@@ -1,0 +1,179 @@
+{
+  "analysis_command_template": [
+    "heaptrack_print",
+    "-f",
+    "$RAW_PROFILE",
+    "-p",
+    "0",
+    "-T",
+    "0",
+    "-a",
+    "0",
+    "-l",
+    "0",
+    "-H",
+    "$HISTOGRAM"
+  ],
+  "capture_runner": {
+    "approval_env": "LITCHI_PERF_0923_ALLOC_CAPTURE_APPROVED=1",
+    "children_total": 24,
+    "packet_root": "external /tmp/litchi-performance-0923/allocation-packet-v2",
+    "path": "docs/performance/results/change-0923/allocation-capture-v2.py",
+    "replay": "copy/replay validates local compact receipts and tooling while raw profiles stay external",
+    "requires": "frozen native comparison manifest with exact baseline/candidate binary, build receipt, and source receipt bindings"
+  },
+  "created_utc": "2026-10-06T09:06:49Z",
+  "parser": {
+    "fail_closed": [
+      "nonnegative hexadecimal fields",
+      "per-allocation-index live counts reject invalid double free",
+      "missing strings/ips terminal summaries reject truncation",
+      "zstdcat process is closed and reaped on parse errors"
+    ],
+    "path": "docs/performance/results/change-0923/allocation-parse-v2.py",
+    "scope": "whole_process"
+  },
+  "parser_controls": {
+    "cases": [
+      "malformed_version",
+      "negative_string_reference",
+      "negative_trace_reference",
+      "negative_allocation_reference",
+      "out_of_range_trace_reference",
+      "out_of_range_allocation_trace",
+      "out_of_range_allocation_reference",
+      "truncated_profile",
+      "deallocation_underflow",
+      "double_free_with_nonnegative_total"
+    ],
+    "path": "docs/performance/results/change-0923/allocation-parse-controls-v2.py",
+    "receipt": "docs/performance/results/change-0923/allocation-parser-controls-v2.json"
+  },
+  "performance_claim": "allocation counts, requested bytes, and heaptrack peak heap only; no native latency claim",
+  "population": {
+    "children_per_route": 8,
+    "children_per_variant": 12,
+    "children_total": 24,
+    "no_selective_recapture": true,
+    "pair_orders": [
+      "baseline,candidate",
+      "candidate,baseline",
+      "baseline,candidate",
+      "candidate,baseline"
+    ],
+    "pairs_per_route": 4,
+    "routes": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader"
+    ],
+    "samples_per_child": 1,
+    "warmups_per_child": 0
+  },
+  "purpose": "whole-process allocation diagnosis for the owned-source fingerprint comparison",
+  "raw_artifacts": {
+    "receipt_fields": [
+      "exact_capture_argv",
+      "exact_analysis_argv",
+      "start_utc",
+      "finish_utc",
+      "exit_codes",
+      "binary_descriptor",
+      "raw_profile_descriptor",
+      "report_descriptor",
+      "print_output_descriptors",
+      "time_log_descriptor",
+      "parser_result",
+      "raw_profile_prefix_and_resolved_profile_path"
+    ],
+    "retention": "all raw .zst profiles, heaptrack_print stdout/stderr, histogram, process-time log, harness report, and child receipt remain outside the repository",
+    "size_and_hash": "each retained raw and derived artifact records byte size and SHA-256"
+  },
+  "schema": "litchi.performance.0923.heaptrack-allocation.protocol.v2",
+  "scope": {
+    "limits": [
+      "Heaptrack overhead is included in the recorded process profile and can affect profile-time behavior.",
+      "The results are allocation diagnostics, not operation peak-live memory, native latency, CPU cycles, or adoption evidence.",
+      "Heaptrack peak heap is a whole-process live-allocation peak, not the timed harness lifecycle boundary.",
+      "The 24-child lane is supplemental whole-process allocation evidence; it does not isolate the selected edit operation."
+    ],
+    "metrics": [
+      "allocation_event_count",
+      "requested_bytes_sum",
+      "peak_live_heap_bytes",
+      "live_bytes_at_end"
+    ],
+    "parser_filter": "none; every allocation (+) and deallocation (-) event in the interpreted profile contributes",
+    "profile": "whole process, including setup, warmup-free lifecycle, correctness/oracle work, report serialization, and teardown allocations recorded by Heaptrack"
+  },
+  "source_and_binary_binding": {
+    "binary_reuse": "use the same frozen 0923 native baseline and candidate executables; no rebuild, alternate binary, or source fallback",
+    "cpu": 12,
+    "harness": "same frozen native harness and route environment",
+    "native_manifest": "the frozen comparison-manifest-v2.json is the sole source for baseline/candidate binary paths and SHA-256 values",
+    "source_case": "docx_source_backed_existing_section_layout_edit_save"
+  },
+  "status": "prospective",
+  "timed_command_template": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "$TIME_LOG",
+    "taskset",
+    "-c",
+    "12",
+    "env",
+    "LC_ALL=C",
+    "LITCHI_DOCX_INGRESS_ROUTE=$ROUTE",
+    "heaptrack",
+    "--record-only",
+    "-o",
+    "$RAW_PREFIX",
+    "$BINARY",
+    "--case",
+    "docx_source_backed_existing_section_layout_edit_save",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--json",
+    "$REPORT"
+  ],
+  "tooling": {
+    "heaptrack": {
+      "path": "/usr/bin/heaptrack",
+      "sha256": "11ef8b89a93d43b63e4dec187f4c7dca2644f10254c5639e55a563fb5465b574",
+      "version": "1.5.0"
+    },
+    "heaptrack_print": {
+      "path": "/usr/bin/heaptrack_print",
+      "sha256": "aaef3e0ba4df8ce202f5418c4289e36504a5154b1a806e177d46384ac93ae01d",
+      "version": "1.5.0"
+    },
+    "interpreted_format": "v 10500 3",
+    "zstd": {
+      "path": "/usr/bin/zstd",
+      "sha256": "35bfa0d33c03bc1d74ade24ceae006098fa2d5e7c9addc7be45640832f9384d6",
+      "version": "1.5.7"
+    },
+    "zstdcat": {
+      "path": "/usr/bin/zstdcat",
+      "sha256": "35bfa0d33c03bc1d74ade24ceae006098fa2d5e7c9addc7be45640832f9384d6",
+      "version": "1.5.7"
+    }
+  },
+  "validation": {
+    "before_capture": "allocation-parse-v2.py parses all six retained 0919 profiles; heaptrack_print totals and decimal-rounded peak are checked for every profile in allocation-parser-validation.json; parser negative controls are recorded in allocation-parser-controls-v2.json",
+    "fail_closed": [
+      "reject unknown Heaptrack format versions or record tags",
+      "reject invalid string/instruction/trace/allocation references",
+      "reject deallocation underflow or nonzero parser failure",
+      "reject missing raw profile, report, print output, histogram, time log, or descriptor",
+      "reject any child with nonzero capture or analysis exit status",
+      "reject a native manifest that is dry-run, lacks candidate source/build identity, or has changed binary hashes",
+      "reject an allocation capture without explicit approval, with an existing state/child output, or with incomplete 24-child schedule",
+      "reject parser/heaptrack_print allocation-call, live/leaked-byte, or rounded-peak disagreement",
+      "reject a capture whose resolved Heaptrack output is not exactly $RAW_PREFIX.zst (Heaptrack appends the suffix)"
+    ]
+  }
+}

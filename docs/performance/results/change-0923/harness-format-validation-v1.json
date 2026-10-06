@@ -1,0 +1,121 @@
+{
+  "created_utc": "2026-10-06T09:57:52.432190+00:00",
+  "formatter": {
+    "added_hunk_proof": {
+      "all_hunks_non_whitespace_equal_modulo_optional_trailing_commas": true,
+      "comparison_scope": "The unpatched HEAD harness is rustfmt-clean; the only six formatter diffs after applying the measured patch fall within the measured patch additions/replacements.",
+      "format_only_hunks": 6,
+      "formatter_only_punctuation_changes": "7 optional trailing commas inserted and 1 optional trailing parameter comma removed; no identifier, literal, operator, control-flow, or call-argument token changed",
+      "hunks": [
+        {
+          "added_commas": 3,
+          "added_lines": 3,
+          "header": "@@ -50394,13 +50394,13 @@",
+          "non_whitespace_equal_after_optional_comma_normalization": true,
+          "removed_commas": 0,
+          "removed_lines": 3
+        },
+        {
+          "added_commas": 2,
+          "added_lines": 1,
+          "header": "@@ -50412,11 +50412,7 @@",
+          "non_whitespace_equal_after_optional_comma_normalization": true,
+          "removed_commas": 3,
+          "removed_lines": 5
+        },
+        {
+          "added_commas": 1,
+          "added_lines": 1,
+          "header": "@@ -50544,7 +50540,7 @@",
+          "non_whitespace_equal_after_optional_comma_normalization": true,
+          "removed_commas": 0,
+          "removed_lines": 1
+        },
+        {
+          "added_commas": 6,
+          "added_lines": 12,
+          "header": "@@ -50580,19 +50576,23 @@",
+          "non_whitespace_equal_after_optional_comma_normalization": true,
+          "removed_commas": 4,
+          "removed_lines": 8
+        },
+        {
+          "added_commas": 1,
+          "added_lines": 2,
+          "header": "@@ -50789,7 +50789,8 @@",
+          "non_whitespace_equal_after_optional_comma_normalization": true,
+          "removed_commas": 1,
+          "removed_lines": 1
+        },
+        {
+          "added_commas": 2,
+          "added_lines": 4,
+          "header": "@@ -50834,7 +50835,10 @@",
+          "non_whitespace_equal_after_optional_comma_normalization": true,
+          "removed_commas": 1,
+          "removed_lines": 1
+        }
+      ],
+      "semantic_equivalence_basis": "The formatter-only unified diff is confined to the six listed added-hunk regions; after whitespace removal and optional trailing-comma normalization, each removed/added hunk has identical non-whitespace content."
+    },
+    "baseline_check": {
+      "baseline_unchanged": true,
+      "check_exit_code": 0,
+      "command": "rustfmt --edition 2024 --config-path /home/zhuhe/code/litchi/rustfmt.toml --check <external HEAD baseline tools/perf-baseline/src/lib.rs>",
+      "emit_files_exit_code": 0,
+      "formatted_baseline_sha256": "8542f4e8e580bef2b12b3782b03bcfabc8e0d60cefc80f27c55042c57baff860",
+      "source_sha256": "8542f4e8e580bef2b12b3782b03bcfabc8e0d60cefc80f27c55042c57baff860"
+    },
+    "check_command": "rustfmt --edition 2024 --config-path /home/zhuhe/code/litchi/rustfmt.toml --check tools/perf-baseline/src/lib.rs",
+    "check_exit_code": 0,
+    "config": "/home/zhuhe/code/litchi/rustfmt.toml",
+    "version": "rustfmt 1.9.0-stable (59807616e1 2026-04-14)"
+  },
+  "formatter_only_patch": {
+    "application_command": "git apply --whitespace=nowarn /tmp/litchi-performance-0923/harness-format-only-v1.patch",
+    "application_exit_code": 0,
+    "apply_check_exit_code": 0,
+    "bytes": 4073,
+    "path": "/tmp/litchi-performance-0923/harness-format-only-v1.patch",
+    "root_final_expected_sha256": "acf87f8d2cdcc3ed466096cc68e9fc99b1574a1ee1aeb0542e215a54e3bb1787",
+    "root_final_sha256": "acf87f8d2cdcc3ed466096cc68e9fc99b1574a1ee1aeb0542e215a54e3bb1787",
+    "sha256": "6b5a6c7e7b6ea3a226571e6241714d7e0b1ab743af4293e38aa8966d93597929"
+  },
+  "measured_harness_patch": {
+    "application_command": "git apply --whitespace=nowarn /tmp/litchi-performance-0923/harness-0923.patch",
+    "application_exit_code": 0,
+    "apply_check_exit_code": 0,
+    "bytes": 17046,
+    "path": "/tmp/litchi-performance-0923/harness-0923.patch",
+    "root_after_measured_patch_sha256": "c1b9b55258df38ac6a376283c2b857ad6a541ba8c62e23730195502f083e70ca",
+    "root_base_sha256": "8542f4e8e580bef2b12b3782b03bcfabc8e0d60cefc80f27c55042c57baff860",
+    "sha256": "5404cf09f7f840aa3a587d1bbdce6659d0d3a8cf35d2c44bbd42b747ddf217e0"
+  },
+  "purpose": "Apply the reviewed 0923 harness patch to the worktree, prove added-hunk formatting, and bind the post-measurement formatter-only patch without recapture.",
+  "schema": "litchi.performance.harness_format_validation.v1",
+  "scope": {
+    "frozen_measured_source_external_copies": [
+      "/tmp/litchi-performance-0923/quality-source-v3/tools/perf-baseline/src/lib.rs",
+      "/tmp/litchi-performance-0923/candidate-source/tree/tools/perf-baseline/src/lib.rs",
+      "/tmp/litchi-performance-0923/baseline-source/tree/tools/perf-baseline/src/lib.rs"
+    ],
+    "frozen_measured_source_sha256": "c1b9b55258df38ac6a376283c2b857ad6a541ba8c62e23730195502f083e70ca",
+    "frozen_measured_source_unchanged": true,
+    "no_build_or_capture_executed": true,
+    "no_production_source_or_frozen_capture_mutation": true,
+    "target": "tools/perf-baseline/src/lib.rs"
+  },
+  "worktree_checks": [
+    {
+      "command": "git diff --check -- tools/perf-baseline/src/lib.rs",
+      "exit_code": 0,
+      "output": ""
+    },
+    {
+      "command": "rustfmt --edition 2024 --config-path /home/zhuhe/code/litchi/rustfmt.toml --check tools/perf-baseline/src/lib.rs",
+      "exit_code": 0,
+      "output": ""
+    }
+  ],
+  "worktree_checks_note": "Patch apply checks returned 0 before each application; final checks are recorded above after both patches are applied."
+}

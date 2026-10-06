@@ -1,0 +1,698 @@
+--- /tmp/litchi-performance-0923/quality-source-v3/crates/litchi-opc/src/source_backed.rs	2026-10-06 09:08:38.311796762 +0000
++++ /tmp/litchi-performance-0923/review/source_backed-v3-rustfmt-skip.rs	2026-10-06 09:08:49.066906652 +0000
+@@ -1,3 +1,5 @@
++/tmp/litchi-performance-0923/quality-source-v3/crates/litchi-opc/src/source_backed.rs:
++
+ //! Immutable, source-backed access to an OPC package.
+ //!
+ //! This module intentionally exposes a smaller surface than [`OpcPackage`].
+@@ -810,7 +812,7 @@
+                         member_name,
+                         "root attribute uses an unbound namespace prefix",
+                     ));
+-                },
++                }
+             };
+             if seen_expanded.contains(&(namespace, local.as_ref())) {
+                 return Err(relationship_manifest_append_error(
+@@ -902,7 +904,7 @@
+                 // 8.7), so the source manifest still matches its catalog.
+                 target_mode = TargetMode::parse_tolerant(&value).0;
+                 target_mode_seen = true;
+-            },
++            }
+             name if decoder
+                 .decode(name)
+                 .ok()
+@@ -915,13 +917,13 @@
+                     decoder,
+                     member_name,
+                 )?;
+-            },
++            }
+             _ => {
+                 return Err(relationship_manifest_append_error(
+                     member_name,
+                     "a Relationship has an unsupported or duplicate attribute",
+                 ));
+-            },
++            }
+         }
+     }
+     let id = id_attribute
+@@ -1379,7 +1381,7 @@
+                         "nested relationship content is not supported",
+                     ));
+                 }
+-            },
++            }
+             Event::Empty(element) => {
+                 if root_closed {
+                     return Err(relationship_manifest_append_error(
+@@ -1492,7 +1494,7 @@
+                     ));
+                 }
+                 relationship_event_counts.insert(id, 1);
+-            },
++            }
+             Event::End(element) => {
+                 validate_relationship_qname(
+                     element.name().as_ref(),
+@@ -1526,7 +1528,7 @@
+                         }
+                         relationship_event_counts.insert(relationship_id, 2);
+                         depth = 1;
+-                    },
++                    }
+                     1 => {
+                         if !opc_namespace || element.local_name().as_ref() != b"Relationships" {
+                             return Err(relationship_manifest_append_error(
+@@ -1546,15 +1548,15 @@
+                         root_close_start = Some(event_start);
+                         root_closed = true;
+                         depth = 0;
+-                    },
++                    }
+                     _ => {
+                         return Err(relationship_manifest_append_error(
+                             member_name,
+                             "an XML closing element is out of place",
+                         ));
+-                    },
++                    }
+                 }
+-            },
++            }
+             Event::Text(text) => {
+                 if text.as_ref().windows(3).any(|window| window == b"]]>") {
+                     return Err(relationship_manifest_append_error(
+@@ -1580,13 +1582,13 @@
+                         "non-whitespace text is not supported in a relationships member",
+                     ));
+                 }
+-            },
++            }
+             Event::Comment(comment) => {
+                 validate_relationship_comment(&comment, member_name)?;
+-            },
++            }
+             Event::PI(instruction) => {
+                 validate_relationship_pi(&instruction, decoder, member_name)?;
+-            },
++            }
+             Event::Decl(declaration) => {
+                 if root_seen || declaration_seen || events != 1 {
+                     return Err(relationship_manifest_append_error(
+@@ -1596,19 +1598,19 @@
+                 }
+                 crate::xml_splice::validate_source_declaration(&declaration, member_name)?;
+                 declaration_seen = true;
+-            },
++            }
+             Event::DocType(_) => {
+                 return Err(relationship_manifest_append_error(
+                     member_name,
+                     "DTDs are not permitted in relationships members",
+                 ));
+-            },
++            }
+             Event::CData(_) | Event::GeneralRef(_) => {
+                 return Err(relationship_manifest_append_error(
+                     member_name,
+                     "unsupported XML content is not safe to append",
+                 ));
+-            },
++            }
+             Event::Eof => {
+                 if !root_seen || !root_closed || depth != 0 || open_relationship.is_some() {
+                     return Err(relationship_manifest_append_error(
+@@ -1617,7 +1619,7 @@
+                     ));
+                 }
+                 break;
+-            },
++            }
+         }
+     }
+ 
+@@ -2392,7 +2394,7 @@
+             TopologyRelationshipOperation::Replace { .. }
+             | TopologyRelationshipOperation::Remove { .. } => {
+                 crate::pkgreader::admissible_source_relationship_id(r_id)
+-            },
++            }
+         };
+         if r_id.len() > MAX_SOURCE_RELATIONSHIP_FIELD_BYTES || !id_valid {
+             return Err(OpcError::InvalidRelationship(format!(
+@@ -2428,7 +2430,7 @@
+                             ));
+                         }
+                         target.len()
+-                    },
++                    }
+                 };
+                 if target_bytes > MAX_SOURCE_RELATIONSHIP_FIELD_BYTES {
+                     return Err(OpcError::InvalidRelationship(
+@@ -2438,8 +2440,8 @@
+                 field_bytes = field_bytes.checked_add(target_bytes).ok_or_else(|| {
+                     overlay_unavailable("topology relationship field bytes overflow")
+                 })?;
+-            },
+-            TopologyRelationshipOperation::Remove { .. } => {},
++            }
++            TopologyRelationshipOperation::Remove { .. } => {}
+         }
+         let next_bytes = self
+             .relationship_bytes
+@@ -3461,7 +3463,7 @@
+                 .write_str("source-cache diagnostic state is poisoned; metrics are unavailable"),
+             Self::CounterMovedBackwards { counter } => {
+                 write!(formatter, "source-cache counter {counter} moved backwards")
+-            },
++            }
+         }
+     }
+ }
+@@ -3681,7 +3683,7 @@
+             OpcError::Execution(error) => execution_io_error(error),
+             OpcError::SourceChanged { expected, actual } => {
+                 std::io::Error::other(SourceChangedIoError { expected, actual })
+-            },
++            }
+             OpcError::IoError(error) => error,
+             error => std::io::Error::other(error.to_string()),
+         })
+@@ -4235,7 +4237,7 @@
+                         bytes.len()
+                     ),
+                 ))
+-            },
++            }
+             Ok(written) => {
+                 let written = u64::try_from(written).map_err(|_| {
+                     std::io::Error::new(
+@@ -4252,11 +4254,11 @@
+                     }
+                 }
+                 Ok(usize::try_from(written).unwrap_or(usize::MAX))
+-            },
++            }
+             Err(error) => {
+                 drop(reservation);
+                 Err(error)
+-            },
++            }
+         }
+     }
+ 
+@@ -4358,7 +4360,7 @@
+     match error {
+         OpcError::SourceChanged { expected, actual } => {
+             std::io::Error::other(SourceChangedIoError { expected, actual })
+-        },
++        }
+         OpcError::Cancelled => execution_io_error(ExecutionError::Cancelled),
+         OpcError::Execution(error) => execution_io_error(error),
+         OpcError::IoError(error) => error,
+@@ -4498,7 +4500,7 @@
+                     formatter,
+                     "verified OPC decoded reader callback failed: {error}"
+                 )
+-            },
++            }
+         }
+     }
+ }
+@@ -5652,7 +5654,7 @@
+                     }
+                     *held = Some(permits);
+                     return Ok((wave.narrowed_to(granted), None));
+-                },
++                }
+                 Err(ExecutionError::ResourceLimit(_)) => continue,
+                 Err(error) => return Err(error),
+             }
+@@ -5763,7 +5765,7 @@
+                     self.record_budget_reservation_failure();
+                 }
+                 Err(error)
+-            },
++            }
+         }
+     }
+ 
+@@ -5804,7 +5806,7 @@
+             Err(error) => {
+                 drop(reservation);
+                 return Err(error);
+-            },
++            }
+         };
+         if let Err(error) = self.charge_cold_work(declared_bytes) {
+             drop(payload_object_reservation);
+@@ -5845,9 +5847,9 @@
+                             self.record_budget_reservation_failure();
+                         }
+                         Err(error)
+-                    },
++                    }
+                 }
+-            },
++            }
+         }
+     }
+ 
+@@ -6186,18 +6188,18 @@
+ 
+     fn record_retention(&self, retention: CacheRetention) {
+         match retention {
+-            CacheRetention::Retained => {},
++            CacheRetention::Retained => {}
+             CacheRetention::Oversized => {
+                 self.counters.bypasses.increment();
+                 self.counters.oversized_bypasses.increment();
+-            },
++            }
+             CacheRetention::Pinned => {
+                 self.counters.bypasses.increment();
+-            },
++            }
+             CacheRetention::AllocationFailure => {
+                 self.counters.bypasses.increment();
+                 self.counters.allocation_bypasses.increment();
+-            },
++            }
+         }
+     }
+ 
+@@ -6513,7 +6515,7 @@
+                 if ordering != std::cmp::Ordering::Equal {
+                     return ordering;
+                 }
+-            },
++            }
+             (None, None) => return std::cmp::Ordering::Equal,
+             (None, Some(_)) => return std::cmp::Ordering::Less,
+             (Some(_), None) => return std::cmp::Ordering::Greater,
+@@ -6639,7 +6641,7 @@
+                     .ensure_current()
+                     .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
+                 return Err(phase(ValidationCatalogPhase::Ingress, mapped));
+-            },
++            }
+         };
+         snapshot
+             .ensure_current()
+@@ -6665,7 +6667,7 @@
+                     .ensure_current()
+                     .map_err(|error| phase(stage, error))?;
+                 return Err(phase(stage, error));
+-            },
++            }
+         };
+         let SourceCatalog {
+             pkg_srels,
+@@ -7026,7 +7028,7 @@
+                 }
+                 snapshot.ensure_current()?;
+                 return Err(mapped);
+-            },
++            }
+         };
+         snapshot.ensure_current()?;
+         if let Some(context) = context.as_ref() {
+@@ -7077,7 +7079,7 @@
+                 }
+                 snapshot.ensure_current()?;
+                 return Err(mapped);
+-            },
++            }
+         };
+         let SourceCatalog {
+             pkg_srels,
+@@ -7899,7 +7901,7 @@
+                 }
+                 let bytes = Arc::clone(&data.payload.bytes);
+                 (Some(data), bytes)
+-            },
++            }
+         };
+         self.source.ensure_current()?;
+         self.cache.check_context().map_err(map_execution_error)?;
+@@ -9949,7 +9951,7 @@
+                         Arc::clone(payload),
+                     )
+                     .compression_method(soapberry_zip::CompressionMethod::Deflate)
+-                },
++                }
+                 TopologyPartPayload::SourceXml(payload) => {
+                     // This payload was fully checked earlier in this
+                     // preparation before topology planning; only the late
+@@ -9963,7 +9965,7 @@
+                         payload.payload_arc(),
+                     )
+                     .compression_method(soapberry_zip::CompressionMethod::Deflate)
+-                },
++                }
+                 TopologyPartPayload::Precompressed(payload) => {
+                     monitored_transfer_sources
+                         .push(payload.source_artifact.snapshot.monitor_publication());
+@@ -9985,7 +9987,7 @@
+                         addition.partname.membername(),
+                         payload.physical.clone(),
+                     )
+-                },
++                }
+             };
+             appended.push(entry);
+         }
+@@ -10049,7 +10051,7 @@
+                     ));
+                 }
+                 target_ref
+-            },
++            }
+             SourceRelationshipTarget::External(target) => target.clone(),
+         };
+         Ok((target_ref, target.mode()))
+@@ -11294,7 +11296,7 @@
+                 ),
+                 TopologyPartPayload::Precompressed(payload) => {
+                     (payload.logical_size(), Some(payload.compressed_size()))
+-                },
++                }
+             };
+             let member_name_bytes = u64::try_from(addition.partname.membername().len())
+                 .map_err(|_| overlay_unavailable("topology member name length overflows u64"))?;
+@@ -11908,7 +11910,7 @@
+                     return Err(overlay_unavailable(mapped.to_string()));
+                 }
+                 return Err(mapped);
+-            },
++            }
+         };
+         self.source.ensure_current()?;
+         if index.archive_end_offset() != self.source.length {
+@@ -12060,10 +12062,10 @@
+                 let regenerated = match &replacement.replacement {
+                     ChangedOverlayPayload::Shared(data) => {
+                         soapberry_zip::RegeneratedEntry::new_shared(target_name, Arc::clone(data))
+-                    },
++                    }
+                     ChangedOverlayPayload::Owned(data) => {
+                         regenerated_owned_entry(target_name, data, compression)?
+-                    },
++                    }
+                 };
+                 plan.push(soapberry_zip::PreservationAction::Regenerate {
+                     id: entry.id(),
+@@ -12112,7 +12114,7 @@
+                         .admit_deflate_wave(wave)
+                         .map_err(map_execution_error)?;
+                     wave.is_parallel().then_some((session, wave, wave_permits))
+-                },
++                }
+                 None => None,
+             };
+             let cancellation = PublicationCancellation(context.clone());
+@@ -12355,7 +12357,7 @@
+                     None
+                 };
+                 (entry_id, declared)
+-            },
++            }
+         };
+         loop {
+             let access = match self.cache.enter_with_observer(
+@@ -12370,7 +12372,7 @@
+                     // the removed loop-head observation produced.
+                     self.source.ensure_current()?;
+                     return Err(map_execution_error(error));
+-                },
++                }
+             };
+             match access {
+                 CacheAccess::Hit(bytes) => {
+@@ -12381,7 +12383,7 @@
+                     }
+                     self.cache.check_context().map_err(map_execution_error)?;
+                     return Ok(PartData { payload: bytes });
+-                },
++                }
+                 CacheAccess::Waiter(flight) => {
+                     if let Some(payload) = flight
+                         .wait_with_observer(self.cache.context(), observer)
+@@ -12399,7 +12401,7 @@
+                     // removed and this caller retries rather than observing a
+                     // retained error. A retry that reaches the loading path
+                     // takes its opening source observation there.
+-                },
++                }
+                 CacheAccess::Loader(flight) => {
+                     let unwind_guard = LoadFlightUnwindGuard {
+                         cache: &self.cache,
+@@ -12419,7 +12421,7 @@
+                     );
+                     unwind_guard.disarm();
+                     return result;
+-                },
++                }
+                 CacheAccess::Bypass(reservation) => {
+                     return self.load_part_with_accounting(
+                         index,
+@@ -12432,7 +12434,7 @@
+                         observer,
+                         capture,
+                     );
+-                },
++                }
+             }
+         }
+     }
+@@ -12481,7 +12483,7 @@
+                 let bytes = match (accounting.as_deref_mut(), session) {
+                     (Some(_), Some(session)) => {
+                         session.read_entry_with_accounting(entry_id, &mut zip_accounting)
+-                    },
++                    }
+                     (Some(_), None) => self
+                         .archive
+                         .read_entry_with_accounting(entry_id, &mut zip_accounting),
+@@ -12498,7 +12500,7 @@
+                         self.source.ensure_current()?;
+                         self.cache.check_context().map_err(map_execution_error)?;
+                         return Err(map_preservation_error(error));
+-                    },
++                    }
+                 }
+             };
+             // The decompressor has finished and no payload has been
+@@ -12573,7 +12575,7 @@
+                         // this branch; take it here instead.
+                         self.source.ensure_current()?;
+                         return Err(map_execution_error(error));
+-                    },
++                    }
+                 };
+                 #[cfg(test)]
+                 self.cache.pause_test_publication();
+@@ -12610,7 +12612,7 @@
+                         self.cache.complete_uncached_success_with_observer(
+                             entry_id, &flight, payload, retention, observer,
+                         )
+-                    },
++                    }
+                     CachePublication::NotCurrent => {
+                         self.cache.rollback_publication_with_observer(
+                             entry_id,
+@@ -12620,7 +12622,7 @@
+                             observer,
+                         );
+                         None
+-                    },
++                    }
+                 };
+                 let Some(payload) = payload else {
+                     return Err(overlay_unavailable(
+@@ -12631,14 +12633,14 @@
+                     return Err(error);
+                 }
+                 Ok(PartData { payload })
+-            },
++            }
+             (Some(flight), Err(error)) => {
+                 drop(reservation);
+                 drop(object_reservation);
+                 self.cache
+                     .complete_failure_with_observer(entry_id, &flight, observer);
+                 Err(error)
+-            },
++            }
+             (None, Ok(bytes)) => {
+                 let payload = CachedPayload {
+                     bytes,
+@@ -12660,11 +12662,11 @@
+                 }
+                 merge_result?;
+                 Ok(PartData { payload })
+-            },
++            }
+             (None, Err(error)) => {
+                 self.cache.complete_bypass_failure();
+                 Err(error)
+-            },
++            }
+         }
+     }
+ }
+@@ -13033,7 +13035,7 @@
+         return match error.into_kind() {
+             soapberry_zip::ErrorKind::IO(error) | soapberry_zip::ErrorKind::Io(error) => {
+                 map_io_error(error)
+-            },
++            }
+             kind => OpcError::ZipError(kind.to_string()),
+         };
+     }
+@@ -13060,7 +13062,7 @@
+         },
+         soapberry_zip::office::VerifiedEntryReaderError::Callback(error) => {
+             VerifiedDecodedReaderError::Callback(error)
+-        },
++        }
+         _ => VerifiedDecodedReaderError::Opc {
+             error: OpcError::ZipError("unrecognized verified ZIP entry-reader failure".to_string()),
+             callback_error: None,
+@@ -13074,12 +13076,12 @@
+     match error {
+         soapberry_zip::office::VerifiedPrecompressedError::Archive(error) => {
+             map_preservation_error(error)
+-        },
++        }
+         soapberry_zip::office::VerifiedPrecompressedError::Transport(error) => map_io_error(error),
+         soapberry_zip::office::VerifiedPrecompressedError::Callback(error) => error,
+         _ => {
+             OpcError::ZipError("unrecognized verified ZIP precompressed-entry failure".to_string())
+-        },
++        }
+     }
+ }
+ 
+@@ -13097,13 +13099,13 @@
+                 error,
+                 callback_error,
+             }
+-        },
++        }
+         Err(VerifiedDecodedReaderError::Callback(callback_error)) => {
+             VerifiedDecodedReaderError::Opc {
+                 error,
+                 callback_error: Some(callback_error),
+             }
+-        },
++        }
+     }
+ }
+ 
+@@ -13522,7 +13524,7 @@
+                     let length = usize::try_from(attempt)
+                         .map_err(|_| overlay_unavailable("source read length overflows usize"))?;
+                     break (&mut output[..length], Some(reservation));
+-                },
++                }
+                 Err(error) => {
+                     let Some(limit) = (match &error {
+                         ExecutionError::ResourceLimit(limit) => Some(limit),
+@@ -13541,7 +13543,7 @@
+                         return Err(map_execution_error(error));
+                     }
+                     attempt = next;
+-                },
++                }
+             }
+         }
+     } else {
+@@ -13562,7 +13564,7 @@
+                         .map_err(map_execution_error)?;
+                 }
+                 snapshot.ensure_current_io_if_monitored()?;
+-            },
++            }
+             Err(error) => return Err(OpcError::IoError(error)),
+         }
+     };
+@@ -17746,7 +17748,7 @@
+             CacheAccess::Loader(flight) => flight,
+             CacheAccess::Hit(_) | CacheAccess::Waiter(_) | CacheAccess::Bypass(_) => {
+                 panic!("fresh managed Part must become the loader")
+-            },
++            }
+         };
+         // The loader has charged its bounded cold-load resources, but has not
+         // entered SourceReader yet. This is the exact race boundary where a
+@@ -20995,13 +20997,13 @@
+             match expected {
+                 "missing external relationship" => {
+                     assert!(matches!(error, OpcError::RelationshipNotFound(_)));
+-                },
++                }
+                 "duplicate relationship" => {
+                     assert!(matches!(error, OpcError::DuplicateRelationshipId(_)));
+-                },
++                }
+                 "internal relationship" => {
+                     assert!(matches!(error, OpcError::InvalidRelationship(_)));
+-                },
++                }
+                 _ => unreachable!(),
+             }
+             assert!(output.is_empty());
+@@ -21608,7 +21610,7 @@
+             OpcError::IncompleteOutput { written, source } => {
+                 assert!(written > 0);
+                 assert!(matches!(*source, OpcError::SourceChanged { .. }));
+-            },
++            }
+             other => panic!("unexpected source-change error: {other:?}"),
+         }
+     }
+@@ -21679,7 +21681,7 @@
+             OpcError::IncompleteOutput { written, source } => {
+                 assert!(written > 0);
+                 assert!(matches!(*source, OpcError::Cancelled));
+-            },
++            }
+             other => panic!("unexpected managed cancellation error: {other:?}"),
+         }
+         assert!(!sink.bytes.is_empty());
+@@ -21827,10 +21829,10 @@
+                 match *source {
+                     OpcError::Execution(ExecutionError::ResourceLimit(limit)) => {
+                         assert_eq!(limit.resource, Resource::OutputBytes);
+-                    },
++                    }
+                     other => panic!("unexpected mid-stream source error: {other:?}"),
+                 }
+-            },
++            }
+             other => panic!("unexpected mid-stream output error: {other:?}"),
+         }
+         assert_eq!(output.len(), SOURCE_PUBLICATION_CHUNK_BYTES);
+@@ -21943,7 +21945,7 @@
+                     OpcError::IoError(error)
+                         if error.kind() == std::io::ErrorKind::Other
+                 ));
+-            },
++            }
+             other => panic!("unexpected flush error: {other:?}"),
+         }
+         assert_eq!(sink.bytes, source_bytes);
+@@ -22063,7 +22065,7 @@
+             OpcError::IncompleteOutput { written, source } => {
+                 assert_eq!(written, sink.bytes.len() as u64);
+                 assert!(matches!(*source, OpcError::SourceChanged { .. }));
+-            },
++            }
+             other => panic!("unexpected source-change error: {other:?}"),
+         }
+         assert_eq!(budget.used(Resource::OutputBytes), sink.bytes.len() as u64);

@@ -1,0 +1,459 @@
+{
+  "actual_command_and_environment": {
+    "argv": [
+      "cargo",
+      "build",
+      "--locked",
+      "--offline",
+      "-j2",
+      "--release",
+      "--manifest-path",
+      "<tree>/tools/perf-baseline/Cargo.toml",
+      "--bin",
+      "litchi-perf-baseline"
+    ],
+    "baseline_regeneration_command": "CARGO_TARGET_DIR=/tmp/litchi-performance-0923/baseline-target cargo build --locked --offline -j2 --release --manifest-path /tmp/litchi-performance-0923/baseline-source/tree/tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline",
+    "candidate_regeneration_command": "RUSTUP_TOOLCHAIN=1.95.0 CARGO_TARGET_DIR=/tmp/litchi-performance-0923/candidate-target cargo build --locked --offline -j2 --release --manifest-path /tmp/litchi-performance-0923/candidate-source/tree/tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline",
+    "candidate_tracked_environment": {
+      "CARGO_TARGET_DIR": "/tmp/litchi-performance-0923/candidate-target",
+      "LC_ALL": "C.UTF-8",
+      "LC_CTYPE": "C.UTF-8",
+      "RUSTUP_TOOLCHAIN": "1.95.0"
+    },
+    "profile_environment_variables_present": []
+  },
+  "authority": "supplement; does not mutate or supersede hash-bound build receipts",
+  "binary_section_evidence": {
+    "baseline": {
+      "debug_sections": false,
+      "path": "/tmp/litchi-performance-0923/frozen-baseline-native/litchi-perf-baseline",
+      "sha256": "ed2d5609cc7a54459cd33627a80416d5ce2ef765b32916b5235b91209e19db28",
+      "unwind_sections": [
+        ".gcc_except_table",
+        ".eh_frame_hdr",
+        ".eh_frame"
+      ],
+      "unwind_symbols": [
+        "_Unwind_Backtrace",
+        "_Unwind_RaiseException",
+        "_Unwind_Resume",
+        "rust_eh_personality"
+      ]
+    },
+    "candidate": {
+      "debug_sections": false,
+      "path": "/tmp/litchi-performance-0923/candidate-target/release/litchi-perf-baseline",
+      "sha256": "8d98309501f63f4911828f52c42653f5950f3f5019bd040cf98f787173528861",
+      "unwind_sections": [
+        ".gcc_except_table",
+        ".eh_frame_hdr",
+        ".eh_frame"
+      ],
+      "unwind_symbols": [
+        "_Unwind_Backtrace",
+        "_Unwind_RaiseException",
+        "_Unwind_Resume",
+        "rust_eh_personality"
+      ]
+    },
+    "interpretation": "Both binaries retain unwind metadata/symbols, which contradicts the claimed panic=abort override. Absence of .debug sections is consistent with release debug=0; it does not independently distinguish strip=none from strip=debuginfo when no DWARF was emitted."
+  },
+  "build_receipts": {
+    "baseline": {
+      "path": "/tmp/litchi-performance-0923/receipts/baseline-build-final.json",
+      "sha256": "86eae277dd3096ab7972cc9d7696d02853fadaa3e7e20678449137b74a80e630"
+    },
+    "candidate": {
+      "path": "/tmp/litchi-performance-0923/receipts/candidate-build-final-v3-bound3.json",
+      "sha256": "04de284ceb4bc43e9698a53c3f5e78ccc66047383342e2c041166166c350d05e"
+    }
+  },
+  "created_utc": "2026-10-06T09:18:04.791051+00:00",
+  "effective_profile_interpretation": {
+    "confidence": "argv/environment/standalone workspace establish this; fingerprint equality establishes baseline/candidate parity. No -vv rustc command capture was retained, so values are stated as effective Cargo defaults rather than a directly emitted Cargo profile dump.",
+    "source": "Cargo built-in release defaults for the standalone benchmark workspace",
+    "values": {
+      "codegen_units": 16,
+      "debug": 0,
+      "debug_assertions": false,
+      "incremental": false,
+      "lto": false,
+      "opt_level": 3,
+      "overflow_checks": false,
+      "panic": "unwind",
+      "strip": "none"
+    }
+  },
+  "fingerprint_archives": {
+    "baseline": {
+      "archive": {
+        "bytes": 5273600,
+        "path": "/tmp/litchi-performance-0923/root-builds/baseline-pre-allocator-fingerprints.tar",
+        "sha256": "08c0232a8c09efa129dba82481c2bc2b3baa7055cc1b8fbe42cd56f47734c17b"
+      },
+      "json_records_rustc_1_95": 258,
+      "json_records_total": 488,
+      "profile_hash_counts_rustc_1_95": {
+        "0": 23,
+        "1062373418235393412": 1,
+        "10755997548157799245": 1,
+        "11250107771638681214": 2,
+        "11558646924270836803": 1,
+        "12889658124186859575": 1,
+        "13670713050734078800": 1,
+        "1369601567987815722": 34,
+        "1419616050453328851": 3,
+        "14241049181779214662": 1,
+        "14299920968756676485": 2,
+        "14791228037615401302": 3,
+        "15005971894838546436": 5,
+        "16042830479834269363": 1,
+        "16520100720801148188": 1,
+        "16663120156060524240": 1,
+        "17269121168799442136": 1,
+        "17519624520233254122": 29,
+        "17625022152224976980": 1,
+        "18050733770209708702": 1,
+        "18057937713355366257": 1,
+        "18393899132335652936": 1,
+        "18406649815991662906": 1,
+        "18409367190543837128": 2,
+        "2040997289075261528": 107,
+        "3739348374511197604": 2,
+        "4219373312221703660": 11,
+        "4314370921045452772": 1,
+        "4405459846660963551": 1,
+        "5011968993515748345": 2,
+        "5199614438611472489": 1,
+        "5365765632467666474": 1,
+        "5791284994426586296": 1,
+        "5963751179823064544": 3,
+        "6350529014318243270": 1,
+        "7642806875711904623": 1,
+        "8898945070389724657": 1,
+        "8917093484142751111": 5,
+        "9612993779253542541": 1,
+        "9777591490344135128": 1
+      },
+      "profile_hash_set_rustc_1_95": [
+        0,
+        1062373418235393412,
+        10755997548157799245,
+        11250107771638681214,
+        11558646924270836803,
+        12889658124186859575,
+        13670713050734078800,
+        1369601567987815722,
+        1419616050453328851,
+        14241049181779214662,
+        14299920968756676485,
+        14791228037615401302,
+        15005971894838546436,
+        16042830479834269363,
+        16520100720801148188,
+        16663120156060524240,
+        17269121168799442136,
+        17519624520233254122,
+        17625022152224976980,
+        18050733770209708702,
+        18057937713355366257,
+        18393899132335652936,
+        18406649815991662906,
+        18409367190543837128,
+        2040997289075261528,
+        3739348374511197604,
+        4219373312221703660,
+        4314370921045452772,
+        4405459846660963551,
+        5011968993515748345,
+        5199614438611472489,
+        5365765632467666474,
+        5791284994426586296,
+        5963751179823064544,
+        6350529014318243270,
+        7642806875711904623,
+        8898945070389724657,
+        8917093484142751111,
+        9612993779253542541,
+        9777591490344135128
+      ],
+      "sample_records": [
+        {
+          "compile_kind": 0,
+          "config": 8247474407144887393,
+          "declared_features": "[\"default\", \"performance-diagnostics\", \"sign\"]",
+          "features": "[\"default\", \"performance-diagnostics\", \"sign\"]",
+          "key": [
+            "litchi-opc",
+            "lib-litchi_opc.json"
+          ],
+          "path": "release/.fingerprint/litchi-opc-65c3deaa8c8045dc/lib-litchi_opc.json",
+          "profile": 17519624520233254122,
+          "rustc": 7458672600737419911,
+          "rustflags": [],
+          "sha256": "93ca27da85b9ea5c7d254d642a0661f19bb2a443cc877eb5d2de67defb89dd69",
+          "target": 17128557232722697089
+        },
+        {
+          "compile_kind": 0,
+          "config": 8247474407144887393,
+          "declared_features": "[\"allocator-metrics\", \"ordinary-save-process-metrics\", \"xls-source-attribution\", \"xlsb-crud\"]",
+          "features": "[]",
+          "key": [
+            "litchi-perf-baseline",
+            "lib-litchi_perf_baseline.json"
+          ],
+          "path": "release/.fingerprint/litchi-perf-baseline-33a956147cac270c/lib-litchi_perf_baseline.json",
+          "profile": 14299920968756676485,
+          "rustc": 7458672600737419911,
+          "rustflags": [],
+          "sha256": "e86f7ff995ccef5a49ef5f1ae1a773b773573e97b5b23d332b5087a4b07bfd23",
+          "target": 13052385800970608856
+        },
+        {
+          "compile_kind": 0,
+          "config": 8247474407144887393,
+          "declared_features": "[\"allocator-metrics\", \"ordinary-save-process-metrics\", \"xls-source-attribution\", \"xlsb-crud\"]",
+          "features": "[]",
+          "key": [
+            "litchi-perf-baseline",
+            "bin-litchi-perf-baseline.json"
+          ],
+          "path": "release/.fingerprint/litchi-perf-baseline-ea1f59420e878cf6/bin-litchi-perf-baseline.json",
+          "profile": 14299920968756676485,
+          "rustc": 7458672600737419911,
+          "rustflags": [],
+          "sha256": "2e46efe396d871565a35def08a5d67ded683887f151ca2acdb1ef10623b13e68",
+          "target": 16900840590408868013
+        }
+      ],
+      "unique_package_filename_keys_rustc_1_95": 238
+    },
+    "candidate": {
+      "archive": {
+        "bytes": 3010560,
+        "path": "/tmp/litchi-performance-0923/custody/candidate-native-fingerprints-v3.tar",
+        "sha256": "973e1af1866257a6ead1a20824bd6ece5604e9c916936baede615bc01d2b3189"
+      },
+      "json_records_rustc_1_95": 258,
+      "json_records_total": 258,
+      "profile_hash_counts_rustc_1_95": {
+        "0": 23,
+        "1062373418235393412": 1,
+        "10755997548157799245": 1,
+        "11250107771638681214": 2,
+        "11558646924270836803": 1,
+        "12889658124186859575": 1,
+        "13670713050734078800": 1,
+        "1369601567987815722": 34,
+        "1419616050453328851": 3,
+        "14241049181779214662": 1,
+        "14299920968756676485": 2,
+        "14791228037615401302": 3,
+        "15005971894838546436": 5,
+        "16042830479834269363": 1,
+        "16520100720801148188": 1,
+        "16663120156060524240": 1,
+        "17269121168799442136": 1,
+        "17519624520233254122": 29,
+        "17625022152224976980": 1,
+        "18050733770209708702": 1,
+        "18057937713355366257": 1,
+        "18393899132335652936": 1,
+        "18406649815991662906": 1,
+        "18409367190543837128": 2,
+        "2040997289075261528": 107,
+        "3739348374511197604": 2,
+        "4219373312221703660": 11,
+        "4314370921045452772": 1,
+        "4405459846660963551": 1,
+        "5011968993515748345": 2,
+        "5199614438611472489": 1,
+        "5365765632467666474": 1,
+        "5791284994426586296": 1,
+        "5963751179823064544": 3,
+        "6350529014318243270": 1,
+        "7642806875711904623": 1,
+        "8898945070389724657": 1,
+        "8917093484142751111": 5,
+        "9612993779253542541": 1,
+        "9777591490344135128": 1
+      },
+      "profile_hash_set_rustc_1_95": [
+        0,
+        1062373418235393412,
+        10755997548157799245,
+        11250107771638681214,
+        11558646924270836803,
+        12889658124186859575,
+        13670713050734078800,
+        1369601567987815722,
+        1419616050453328851,
+        14241049181779214662,
+        14299920968756676485,
+        14791228037615401302,
+        15005971894838546436,
+        16042830479834269363,
+        16520100720801148188,
+        16663120156060524240,
+        17269121168799442136,
+        17519624520233254122,
+        17625022152224976980,
+        18050733770209708702,
+        18057937713355366257,
+        18393899132335652936,
+        18406649815991662906,
+        18409367190543837128,
+        2040997289075261528,
+        3739348374511197604,
+        4219373312221703660,
+        4314370921045452772,
+        4405459846660963551,
+        5011968993515748345,
+        5199614438611472489,
+        5365765632467666474,
+        5791284994426586296,
+        5963751179823064544,
+        6350529014318243270,
+        7642806875711904623,
+        8898945070389724657,
+        8917093484142751111,
+        9612993779253542541,
+        9777591490344135128
+      ],
+      "sample_records": [
+        {
+          "compile_kind": 0,
+          "config": 8247474407144887393,
+          "declared_features": "[\"default\", \"performance-diagnostics\", \"sign\"]",
+          "features": "[\"default\", \"performance-diagnostics\", \"sign\"]",
+          "key": [
+            "litchi-opc",
+            "lib-litchi_opc.json"
+          ],
+          "path": "release/.fingerprint/litchi-opc-eb6bbb03974fe119/lib-litchi_opc.json",
+          "profile": 17519624520233254122,
+          "rustc": 7458672600737419911,
+          "rustflags": [],
+          "sha256": "e8210eed50a5d436d003ffdbd275bb8ad9a8b233711a9de1c4c300d992633268",
+          "target": 17128557232722697089
+        },
+        {
+          "compile_kind": 0,
+          "config": 8247474407144887393,
+          "declared_features": "[\"allocator-metrics\", \"ordinary-save-process-metrics\", \"xls-source-attribution\", \"xlsb-crud\"]",
+          "features": "[]",
+          "key": [
+            "litchi-perf-baseline",
+            "bin-litchi-perf-baseline.json"
+          ],
+          "path": "release/.fingerprint/litchi-perf-baseline-04c1e54f8c964d38/bin-litchi-perf-baseline.json",
+          "profile": 14299920968756676485,
+          "rustc": 7458672600737419911,
+          "rustflags": [],
+          "sha256": "ab15cd27e52f89d8b6c90b54666c65c7ae3b02b9998806b836fbf69f1cd7d436",
+          "target": 16900840590408868013
+        },
+        {
+          "compile_kind": 0,
+          "config": 8247474407144887393,
+          "declared_features": "[\"allocator-metrics\", \"ordinary-save-process-metrics\", \"xls-source-attribution\", \"xlsb-crud\"]",
+          "features": "[]",
+          "key": [
+            "litchi-perf-baseline",
+            "lib-litchi_perf_baseline.json"
+          ],
+          "path": "release/.fingerprint/litchi-perf-baseline-8874156e5f018630/lib-litchi_perf_baseline.json",
+          "profile": 14299920968756676485,
+          "rustc": 7458672600737419911,
+          "rustflags": [],
+          "sha256": "03d6e3633c2a2292071f7db0afa8530a4459a6990989fd991d457f195574387b",
+          "target": 13052385800970608856
+        }
+      ],
+      "unique_package_filename_keys_rustc_1_95": 238
+    }
+  },
+  "manifest_and_workspace": {
+    "benchmark_manifest": "/tmp/litchi-performance-0923/candidate-source/tree/tools/perf-baseline/Cargo.toml",
+    "benchmark_manifest_sha256": "53fd47997ae969e709e2ee45575a6050f75de10df339f48dd427f35538768202",
+    "cargo_config": "/tmp/litchi-performance-0923/candidate-source/tree/.cargo/config.toml",
+    "cargo_config_sha256": "50b044c83828f2c448ee59c362afaa79de2dd47fbd390f0cd2888391f1d1119d",
+    "metadata_workspace_members": [
+      "litchi-perf-baseline@0.1.0"
+    ],
+    "metadata_workspace_root": "/tmp/litchi-performance-0923/candidate-source/tree/tools/perf-baseline",
+    "root_cargo_profile_release_isolation": {
+      "interpretation": "These root settings are outside the standalone benchmark workspace selected by tools/perf-baseline/Cargo.toml and were not effective for this build.",
+      "root_manifest": "/tmp/litchi-performance-0923/candidate-source/tree/Cargo.toml",
+      "root_profile_lines": [
+        "lto = true",
+        "panic = \"abort\""
+      ]
+    }
+  },
+  "parity_receipt": {
+    "path": "/tmp/litchi-performance-0923/custody/candidate-build-parity-v3.json",
+    "profile_hashes": [
+      0,
+      1062373418235393412,
+      1369601567987815722,
+      1419616050453328851,
+      2040997289075261528,
+      3739348374511197604,
+      4219373312221703660,
+      4314370921045452772,
+      4405459846660963551,
+      5011968993515748345,
+      5199614438611472489,
+      5365765632467666474,
+      5791284994426586296,
+      5963751179823064544,
+      6350529014318243270,
+      7642806875711904623,
+      8898945070389724657,
+      8917093484142751111,
+      9612993779253542541,
+      9777591490344135128,
+      10755997548157799245,
+      11250107771638681214,
+      11558646924270836803,
+      12889658124186859575,
+      13670713050734078800,
+      14241049181779214662,
+      14299920968756676485,
+      14791228037615401302,
+      15005971894838546436,
+      16042830479834269363,
+      16520100720801148188,
+      16663120156060524240,
+      17269121168799442136,
+      17519624520233254122,
+      17625022152224976980,
+      18050733770209708702,
+      18057937713355366257,
+      18393899132335652936,
+      18406649815991662906,
+      18409367190543837128
+    ],
+    "profile_hashes_equal": true,
+    "record_comparison": "238 baseline records vs 238 candidate records, 238 shared, 0 field mismatches; rustc/profile/features/declared_features/target/rustflags/config/compile_kind fields match.",
+    "sha256": "2f57e6f04f46aa900c79c78cf0cf4d03bcbd52e047026bd6bf748e5ec92a2d1a"
+  },
+  "profile_override_claim_in_bound_candidate_receipt": {
+    "claimed_values": {
+      "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+      "CARGO_PROFILE_RELEASE_DEBUG": "0",
+      "CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS": "false",
+      "CARGO_PROFILE_RELEASE_INCREMENTAL": "false",
+      "CARGO_PROFILE_RELEASE_LTO": "true",
+      "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+      "CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS": "false",
+      "CARGO_PROFILE_RELEASE_PANIC": "abort",
+      "CARGO_PROFILE_RELEASE_STRIP": "debuginfo"
+    },
+    "field": "profile_overrides",
+    "interpretation": "Non-authoritative copied metadata; the build wrapper did not set these CARGO_PROFILE_* variables and the raw receipt environment records none. Keep the bound receipt immutable; this supplement corrects interpretation."
+  },
+  "schema": "litchi.performance.0923.build-profile-audit.v1"
+}

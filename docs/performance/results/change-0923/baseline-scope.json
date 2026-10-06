@@ -1,0 +1,24 @@
+{
+  "schema": "litchi.performance.0923.baseline-scope.v1",
+  "created_utc": "2026-10-06T08:29:00.355125+00:00",
+  "baseline_revision": "4e2532a0ce958f5928496b0ad9b356d8636916e1",
+  "prior_production_revision": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+  "command": [
+    "git",
+    "diff",
+    "--name-only",
+    "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+    "4e2532a0ce958f5928496b0ad9b356d8636916e1",
+    "--",
+    "crates",
+    "tools/perf-baseline",
+    "Cargo.toml",
+    "rust-toolchain.toml",
+    ".cargo",
+    "clippy.toml"
+  ],
+  "output": "",
+  "production_and_existing_harness_paths_unchanged": true,
+  "new_owned_ingress_benchmark": "Separate harness delta applied symmetrically to baseline and candidate; source receipt must bind it. No historical executable is reused.",
+  "excluded": "Unrelated ignored root lockfile and user working-tree changes are not part of this tracked comparison."
+}

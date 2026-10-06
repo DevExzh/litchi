@@ -1,0 +1,141 @@
+{
+  "compression_tool": {
+    "bytes": 1037784,
+    "path": "/usr/bin/zstd",
+    "sha256": "35bfa0d33c03bc1d74ade24ceae006098fa2d5e7c9addc7be45640832f9384d6"
+  },
+  "controls": [
+    {
+      "exit_code": 1,
+      "expected": "reject",
+      "name": "malformed_version",
+      "profile": {
+        "bytes": 95,
+        "path": "/tmp/litchi-performance-0923/parser-controls-v3/malformed_version.zst",
+        "sha256": "1a60ca654654af668b8003d68db3b4b476b5690be1388f0de09a36cd5972a5ad"
+      },
+      "stderr": ""
+    },
+    {
+      "exit_code": 1,
+      "expected": "reject",
+      "name": "negative_string_reference",
+      "profile": {
+        "bytes": 93,
+        "path": "/tmp/litchi-performance-0923/parser-controls-v3/negative_string_reference.zst",
+        "sha256": "e408c293163e9e2003b3a9fc6f4454d266f2f54f7834b72fa9e1a74996eb551b"
+      },
+      "stderr": ""
+    },
+    {
+      "exit_code": 1,
+      "expected": "reject",
+      "name": "negative_trace_reference",
+      "profile": {
+        "bytes": 93,
+        "path": "/tmp/litchi-performance-0923/parser-controls-v3/negative_trace_reference.zst",
+        "sha256": "5f261ec139c43e20958a38369b0b5412b9a8df5a5a15622fe452beb71ac706b4"
+      },
+      "stderr": ""
+    },
+    {
+      "exit_code": 1,
+      "expected": "reject",
+      "name": "negative_allocation_reference",
+      "profile": {
+        "bytes": 93,
+        "path": "/tmp/litchi-performance-0923/parser-controls-v3/negative_allocation_reference.zst",
+        "sha256": "fb02ea21c3dcedcef5c056a2a37b190972aaa1ca63c95964daf8dd71a1a925f9"
+      },
+      "stderr": ""
+    },
+    {
+      "exit_code": 1,
+      "expected": "reject",
+      "name": "out_of_range_trace_reference",
+      "profile": {
+        "bytes": 93,
+        "path": "/tmp/litchi-performance-0923/parser-controls-v3/out_of_range_trace_reference.zst",
+        "sha256": "66b42bebef57c1694404f4a4dd03a676c8ceec1dc286737295e9680fdf4812d2"
+      },
+      "stderr": ""
+    },
+    {
+      "exit_code": 1,
+      "expected": "reject",
+      "name": "out_of_range_allocation_trace",
+      "profile": {
+        "bytes": 93,
+        "path": "/tmp/litchi-performance-0923/parser-controls-v3/out_of_range_allocation_trace.zst",
+        "sha256": "67b85f5e88c9b177525bb55f0ee4499d7edd83335642f06ad095a75c8374e035"
+      },
+      "stderr": ""
+    },
+    {
+      "exit_code": 1,
+      "expected": "reject",
+      "name": "out_of_range_allocation_reference",
+      "profile": {
+        "bytes": 92,
+        "path": "/tmp/litchi-performance-0923/parser-controls-v3/out_of_range_allocation_reference.zst",
+        "sha256": "ad347a11abc492c21e7ab51adf46a58210b16e664a330edee438e700d59d2c50"
+      },
+      "stderr": ""
+    },
+    {
+      "exit_code": 1,
+      "expected": "reject",
+      "name": "truncated_profile",
+      "profile": {
+        "bytes": 87,
+        "path": "/tmp/litchi-performance-0923/parser-controls-v3/truncated_profile.zst",
+        "sha256": "f4be7547b974c3c4f1b34985fd3c5f005092b4c135ab5f0ec607db159b9f6771"
+      },
+      "stderr": ""
+    },
+    {
+      "exit_code": 1,
+      "expected": "reject",
+      "name": "deallocation_underflow",
+      "profile": {
+        "bytes": 96,
+        "path": "/tmp/litchi-performance-0923/parser-controls-v3/deallocation_underflow.zst",
+        "sha256": "3dc4adcebc074d6a8e9c2aeb4d6697f8fa8782ca39938f8f01680ee8289df97a"
+      },
+      "stderr": ""
+    },
+    {
+      "exit_code": 1,
+      "expected": "reject",
+      "name": "double_free_with_nonnegative_total",
+      "profile": {
+        "bytes": 96,
+        "path": "/tmp/litchi-performance-0923/parser-controls-v3/double_free_with_nonnegative_total.zst",
+        "sha256": "0c001b1ed7090bedf8a856115471d158d4e1410400836834c8037267a4e60234"
+      },
+      "stderr": ""
+    }
+  ],
+  "fixture_root": "/tmp/litchi-performance-0923/parser-controls-v3",
+  "parser": {
+    "bytes": 10521,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/allocation-parse-v2.py",
+    "sha256": "7ef32b74271c7436ba0a7e4dd4676c9cb065955a1ad9b40c56497e232e89748f"
+  },
+  "schema": "litchi.performance.0923.heaptrack-parser-controls.v2",
+  "scope": "parser_integrity_only; no benchmark or operation claim",
+  "status": "pass",
+  "valid_fixture": {
+    "allocation_event_count": 1,
+    "deallocation_event_count": 1,
+    "format": "10500 3",
+    "live_bytes_at_end": 0,
+    "peak_live_heap_bytes": 10,
+    "profile": {
+      "bytes": 92,
+      "path": "/tmp/litchi-performance-0923/parser-controls-v3/valid.zst",
+      "sha256": "d0debbb6c2fd3b86f9e45e3fcd2718ddbdf61482c492734524b4f5ba98b21abc"
+    },
+    "requested_bytes": 10
+  }
+}

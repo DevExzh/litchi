@@ -1,0 +1,1362 @@
+{
+  "schema": "litchi.performance.0923.independent-memory-disposition.v1",
+  "captured_utc": "2026-10-06T09:44:20.897276+00:00",
+  "status": "descriptive evidence verified; original24-childqualification invalid",
+  "scope": "Independent read-only audit of retained Heaptrack whole-process allocation profiles; no recapture, build, cleanup, operation-scoped claim, or adoption decision.",
+  "capture_population": {
+    "original_planned_children": 24,
+    "v3_first_processes": 1,
+    "v4_separate_rerun_processes": 24,
+    "total_retained_raw_profiles": 25,
+    "raw_profiles_copied_into_packet": false,
+    "raw_profile_roots": [
+      "/tmp/litchi-performance-0923/allocation-packet-v3",
+      "/tmp/litchi-performance-0923/allocation-packet-v4"
+    ]
+  },
+  "all_profile_bindings": [
+    {
+      "id": "v3-first-generic_read_at-pair-01-leg-1-baseline",
+      "route": "generic_read_at",
+      "variant": "baseline",
+      "pair": 1,
+      "leg": 1,
+      "raw": {
+        "bytes": 438590,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/heaptrack.zst.zst",
+        "sha256": "0003850a9985115265ac53572ab69dd327fde69977c71a1dc38a84fdb2f2c494"
+      },
+      "report": {
+        "bytes": 18775,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/harness-report.json",
+        "sha256": "4e04bc37ee62b6467816cc2652bd4faa2bb1d869dbfcf9bebe8113beefd18128"
+      },
+      "binary": {
+        "bytes": 69962624,
+        "path": "/tmp/litchi-performance-0923/frozen-baseline-native/litchi-perf-baseline",
+        "sha256": "ed2d5609cc7a54459cd33627a80416d5ce2ef765b32916b5235b91209e19db28"
+      },
+      "metrics": {
+        "allocation_event_count": 312717,
+        "deallocation_event_count": 312716,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234801,
+        "requested_bytes": 151804036
+      }
+    },
+    {
+      "id": "001-generic_read_at-pair-01-leg-1-baseline",
+      "route": "generic_read_at",
+      "variant": "baseline",
+      "pair": 1,
+      "leg": 1,
+      "raw": {
+        "bytes": 438589,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/001-generic_read_at-pair-01-leg-1-baseline/heaptrack.zst",
+        "sha256": "856da4152384b52c65389fa441691f5d788568535dc28394cc2893bf1844c1e5"
+      },
+      "report": {
+        "bytes": 18775,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/001-generic_read_at-pair-01-leg-1-baseline/harness-report.json",
+        "sha256": "bbd2c766f9fa54780a58965403c8b97c90157aacc6cf7463138dafdb03cb6730"
+      },
+      "binary": {
+        "bytes": 69962624,
+        "path": "/tmp/litchi-performance-0923/frozen-baseline-native/litchi-perf-baseline",
+        "sha256": "ed2d5609cc7a54459cd33627a80416d5ce2ef765b32916b5235b91209e19db28"
+      },
+      "metrics": {
+        "allocation_event_count": 312717,
+        "deallocation_event_count": 312716,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234801,
+        "requested_bytes": 151804036
+      },
+      "independent_parse_equal": true
+    },
+    {
+      "id": "002-generic_read_at-pair-01-leg-2-candidate",
+      "route": "generic_read_at",
+      "variant": "candidate",
+      "pair": 1,
+      "leg": 2,
+      "raw": {
+        "bytes": 436389,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/002-generic_read_at-pair-01-leg-2-candidate/heaptrack.zst",
+        "sha256": "0291ac848279a1d6de90d528f111c9153bd0900b1b465a64808f3d1181881840"
+      },
+      "report": {
+        "bytes": 18777,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/002-generic_read_at-pair-01-leg-2-candidate/harness-report.json",
+        "sha256": "3ca93ad233db50d6d06beec0130c657957b6db9992d4965cfef16b374fcd08f5"
+      },
+      "binary": {
+        "bytes": 70379960,
+        "path": "/tmp/litchi-performance-0923/candidate-target/release/litchi-perf-baseline",
+        "sha256": "8d98309501f63f4911828f52c42653f5950f3f5019bd040cf98f787173528861"
+      },
+      "metrics": {
+        "allocation_event_count": 312717,
+        "deallocation_event_count": 312716,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234805,
+        "requested_bytes": 151804057
+      },
+      "independent_parse_equal": true
+    },
+    {
+      "id": "003-generic_read_at-pair-02-leg-1-candidate",
+      "route": "generic_read_at",
+      "variant": "candidate",
+      "pair": 2,
+      "leg": 1,
+      "raw": {
+        "bytes": 437428,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/003-generic_read_at-pair-02-leg-1-candidate/heaptrack.zst",
+        "sha256": "866ff26e3cf9680054b756620e5680024ffe00b205cf59bdd833eb0b853ca2ff"
+      },
+      "report": {
+        "bytes": 18777,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/003-generic_read_at-pair-02-leg-1-candidate/harness-report.json",
+        "sha256": "9353b6b7257e743f5460ae542f4fa6052856e32b22f454e66ba143d50d02263a"
+      },
+      "binary": {
+        "bytes": 70379960,
+        "path": "/tmp/litchi-performance-0923/candidate-target/release/litchi-perf-baseline",
+        "sha256": "8d98309501f63f4911828f52c42653f5950f3f5019bd040cf98f787173528861"
+      },
+      "metrics": {
+        "allocation_event_count": 312717,
+        "deallocation_event_count": 312716,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234805,
+        "requested_bytes": 151804057
+      },
+      "independent_parse_equal": true
+    },
+    {
+      "id": "004-generic_read_at-pair-02-leg-2-baseline",
+      "route": "generic_read_at",
+      "variant": "baseline",
+      "pair": 2,
+      "leg": 2,
+      "raw": {
+        "bytes": 438615,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/004-generic_read_at-pair-02-leg-2-baseline/heaptrack.zst",
+        "sha256": "04d3dbeb8ec43ffe5c5b1135e69a6643ca6e97b495a5f47b0bd417d2dd077c3f"
+      },
+      "report": {
+        "bytes": 18775,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/004-generic_read_at-pair-02-leg-2-baseline/harness-report.json",
+        "sha256": "19c86613bd2d5d7d51e6f0e2547be8408927653364e4e0775035e4aa3bb2ef13"
+      },
+      "binary": {
+        "bytes": 69962624,
+        "path": "/tmp/litchi-performance-0923/frozen-baseline-native/litchi-perf-baseline",
+        "sha256": "ed2d5609cc7a54459cd33627a80416d5ce2ef765b32916b5235b91209e19db28"
+      },
+      "metrics": {
+        "allocation_event_count": 312717,
+        "deallocation_event_count": 312716,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234801,
+        "requested_bytes": 151804036
+      },
+      "independent_parse_equal": true
+    },
+    {
+      "id": "005-generic_read_at-pair-03-leg-1-baseline",
+      "route": "generic_read_at",
+      "variant": "baseline",
+      "pair": 3,
+      "leg": 1,
+      "raw": {
+        "bytes": 438509,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/005-generic_read_at-pair-03-leg-1-baseline/heaptrack.zst",
+        "sha256": "86f33b9b35c3de0ca667935cd7344dea181c41ca8c19e0202f8bd7724121c108"
+      },
+      "report": {
+        "bytes": 18775,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/005-generic_read_at-pair-03-leg-1-baseline/harness-report.json",
+        "sha256": "ca8281c023d4628dadd8da4717060cbb80ca60e68139f065359592ff30dc6bea"
+      },
+      "binary": {
+        "bytes": 69962624,
+        "path": "/tmp/litchi-performance-0923/frozen-baseline-native/litchi-perf-baseline",
+        "sha256": "ed2d5609cc7a54459cd33627a80416d5ce2ef765b32916b5235b91209e19db28"
+      },
+      "metrics": {
+        "allocation_event_count": 312717,
+        "deallocation_event_count": 312716,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234801,
+        "requested_bytes": 151804036
+      },
+      "independent_parse_equal": true
+    },
+    {
+      "id": "006-generic_read_at-pair-03-leg-2-candidate",
+      "route": "generic_read_at",
+      "variant": "candidate",
+      "pair": 3,
+      "leg": 2,
+      "raw": {
+        "bytes": 436429,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/006-generic_read_at-pair-03-leg-2-candidate/heaptrack.zst",
+        "sha256": "f71096353dca2b195cc9c6ddc1bced57df437783f8c685994c35ef7f6884f3b7"
+      },
+      "report": {
+        "bytes": 18777,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/006-generic_read_at-pair-03-leg-2-candidate/harness-report.json",
+        "sha256": "67dd285baeddd5e5a6cecb90a108be81db15fca6d511761043e54ff37fef284d"
+      },
+      "binary": {
+        "bytes": 70379960,
+        "path": "/tmp/litchi-performance-0923/candidate-target/release/litchi-perf-baseline",
+        "sha256": "8d98309501f63f4911828f52c42653f5950f3f5019bd040cf98f787173528861"
+      },
+      "metrics": {
+        "allocation_event_count": 312717,
+        "deallocation_event_count": 312716,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234805,
+        "requested_bytes": 151804057
+      },
+      "independent_parse_equal": true
+    },
+    {
+      "id": "007-generic_read_at-pair-04-leg-1-candidate",
+      "route": "generic_read_at",
+      "variant": "candidate",
+      "pair": 4,
+      "leg": 1,
+      "raw": {
+        "bytes": 436568,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/007-generic_read_at-pair-04-leg-1-candidate/heaptrack.zst",
+        "sha256": "dcb37ada72496a19fc566ee114361b172c6d5980e9ec0df018e929bde951b403"
+      },
+      "report": {
+        "bytes": 18777,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/007-generic_read_at-pair-04-leg-1-candidate/harness-report.json",
+        "sha256": "e9f3438b5fd45fbedf44c97d60fa1254dc7e2f34a986a8eb657449c0479bda60"
+      },
+      "binary": {
+        "bytes": 70379960,
+        "path": "/tmp/litchi-performance-0923/candidate-target/release/litchi-perf-baseline",
+        "sha256": "8d98309501f63f4911828f52c42653f5950f3f5019bd040cf98f787173528861"
+      },
+      "metrics": {
+        "allocation_event_count": 312717,
+        "deallocation_event_count": 312716,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234805,
+        "requested_bytes": 151804057
+      },
+      "independent_parse_equal": true
+    },
+    {
+      "id": "008-generic_read_at-pair-04-leg-2-baseline",
+      "route": "generic_read_at",
+      "variant": "baseline",
+      "pair": 4,
+      "leg": 2,
+      "raw": {
+        "bytes": 438622,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/008-generic_read_at-pair-04-leg-2-baseline/heaptrack.zst",
+        "sha256": "c0cb963073bc721be02e0ee49ca02db34c78be0623406cc0da2bdd19e3bd2e11"
+      },
+      "report": {
+        "bytes": 18775,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/008-generic_read_at-pair-04-leg-2-baseline/harness-report.json",
+        "sha256": "4fb17f9b38410962cc9efb248131e98b26b719bd5c7c9dbe4e99589e498c2e54"
+      },
+      "binary": {
+        "bytes": 69962624,
+        "path": "/tmp/litchi-performance-0923/frozen-baseline-native/litchi-perf-baseline",
+        "sha256": "ed2d5609cc7a54459cd33627a80416d5ce2ef765b32916b5235b91209e19db28"
+      },
+      "metrics": {
+        "allocation_event_count": 312717,
+        "deallocation_event_count": 312716,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234801,
+        "requested_bytes": 151804036
+      },
+      "independent_parse_equal": true
+    },
+    {
+      "id": "009-owned_vec-pair-01-leg-1-baseline",
+      "route": "owned_vec",
+      "variant": "baseline",
+      "pair": 1,
+      "leg": 1,
+      "raw": {
+        "bytes": 437779,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/009-owned_vec-pair-01-leg-1-baseline/heaptrack.zst",
+        "sha256": "2d6c395c54818ca224e6f35686a8c63658a45b7f411e5ba8760ec774159e63e0"
+      },
+      "report": {
+        "bytes": 18598,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/009-owned_vec-pair-01-leg-1-baseline/harness-report.json",
+        "sha256": "d795c23603c746ff0125ff693e2fcabc87753d214bcab1c29601725da78819a0"
+      },
+      "binary": {
+        "bytes": 69962624,
+        "path": "/tmp/litchi-performance-0923/frozen-baseline-native/litchi-perf-baseline",
+        "sha256": "ed2d5609cc7a54459cd33627a80416d5ce2ef765b32916b5235b91209e19db28"
+      },
+      "metrics": {
+        "allocation_event_count": 312705,
+        "deallocation_event_count": 312704,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234029,
+        "requested_bytes": 151803020
+      },
+      "independent_parse_equal": true
+    },
+    {
+      "id": "010-owned_vec-pair-01-leg-2-candidate",
+      "route": "owned_vec",
+      "variant": "candidate",
+      "pair": 1,
+      "leg": 2,
+      "raw": {
+        "bytes": 436491,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/010-owned_vec-pair-01-leg-2-candidate/heaptrack.zst",
+        "sha256": "40812be4ab47bca7a5800022ae96dc2813c1ed0b0b35fb544a756b1e0fa838fd"
+      },
+      "report": {
+        "bytes": 18600,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/010-owned_vec-pair-01-leg-2-candidate/harness-report.json",
+        "sha256": "51513aa6d8569c9bd68cf3443941f4d18e87bfb115abeb9f8198189929dbeecd"
+      },
+      "binary": {
+        "bytes": 70379960,
+        "path": "/tmp/litchi-performance-0923/candidate-target/release/litchi-perf-baseline",
+        "sha256": "8d98309501f63f4911828f52c42653f5950f3f5019bd040cf98f787173528861"
+      },
+      "metrics": {
+        "allocation_event_count": 312706,
+        "deallocation_event_count": 312705,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234117,
+        "requested_bytes": 151737589
+      },
+      "independent_parse_equal": true
+    },
+    {
+      "id": "011-owned_vec-pair-02-leg-1-candidate",
+      "route": "owned_vec",
+      "variant": "candidate",
+      "pair": 2,
+      "leg": 1,
+      "raw": {
+        "bytes": 436481,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/011-owned_vec-pair-02-leg-1-candidate/heaptrack.zst",
+        "sha256": "2e38b9cbc185b677e4455911e8de5ab21840446b5c859ecdb5fb2506b2e07f01"
+      },
+      "report": {
+        "bytes": 18600,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/011-owned_vec-pair-02-leg-1-candidate/harness-report.json",
+        "sha256": "b39d6f470ea9f72499d4dc585128061986ee495c6fde2143a84cb56c20ab0922"
+      },
+      "binary": {
+        "bytes": 70379960,
+        "path": "/tmp/litchi-performance-0923/candidate-target/release/litchi-perf-baseline",
+        "sha256": "8d98309501f63f4911828f52c42653f5950f3f5019bd040cf98f787173528861"
+      },
+      "metrics": {
+        "allocation_event_count": 312706,
+        "deallocation_event_count": 312705,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234117,
+        "requested_bytes": 151737589
+      },
+      "independent_parse_equal": true
+    },
+    {
+      "id": "012-owned_vec-pair-02-leg-2-baseline",
+      "route": "owned_vec",
+      "variant": "baseline",
+      "pair": 2,
+      "leg": 2,
+      "raw": {
+        "bytes": 438317,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/012-owned_vec-pair-02-leg-2-baseline/heaptrack.zst",
+        "sha256": "7ac8d968b7cd8e166bc5c9e9bd055f6fb8879285954b44651749c1dd2bac7311"
+      },
+      "report": {
+        "bytes": 18598,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/012-owned_vec-pair-02-leg-2-baseline/harness-report.json",
+        "sha256": "2c1a908de196866fb2d1d7dba9ef9138a82353a54822cc607a142fa8d335c8aa"
+      },
+      "binary": {
+        "bytes": 69962624,
+        "path": "/tmp/litchi-performance-0923/frozen-baseline-native/litchi-perf-baseline",
+        "sha256": "ed2d5609cc7a54459cd33627a80416d5ce2ef765b32916b5235b91209e19db28"
+      },
+      "metrics": {
+        "allocation_event_count": 312705,
+        "deallocation_event_count": 312704,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234029,
+        "requested_bytes": 151803020
+      },
+      "independent_parse_equal": true
+    },
+    {
+      "id": "013-owned_vec-pair-03-leg-1-baseline",
+      "route": "owned_vec",
+      "variant": "baseline",
+      "pair": 3,
+      "leg": 1,
+      "raw": {
+        "bytes": 438169,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/013-owned_vec-pair-03-leg-1-baseline/heaptrack.zst",
+        "sha256": "f820ef4c3117225f4fc4067193932f6c2fdd7ce3609aa02ae6e5d29fd2881e74"
+      },
+      "report": {
+        "bytes": 18598,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/013-owned_vec-pair-03-leg-1-baseline/harness-report.json",
+        "sha256": "851adbcbd4949bc5ad0e36632f58a2d710f9d0a9d1da5672eef88b3c08ad86a9"
+      },
+      "binary": {
+        "bytes": 69962624,
+        "path": "/tmp/litchi-performance-0923/frozen-baseline-native/litchi-perf-baseline",
+        "sha256": "ed2d5609cc7a54459cd33627a80416d5ce2ef765b32916b5235b91209e19db28"
+      },
+      "metrics": {
+        "allocation_event_count": 312705,
+        "deallocation_event_count": 312704,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234029,
+        "requested_bytes": 151803020
+      },
+      "independent_parse_equal": true
+    },
+    {
+      "id": "014-owned_vec-pair-03-leg-2-candidate",
+      "route": "owned_vec",
+      "variant": "candidate",
+      "pair": 3,
+      "leg": 2,
+      "raw": {
+        "bytes": 436632,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/014-owned_vec-pair-03-leg-2-candidate/heaptrack.zst",
+        "sha256": "7b5397bd06fbcfcab80ab62639d61c7fa286b0b07abf0ccb949cb7f7995ea6a7"
+      },
+      "report": {
+        "bytes": 18600,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/014-owned_vec-pair-03-leg-2-candidate/harness-report.json",
+        "sha256": "02d9c5b719656f88e79a82e2b52ca6c3b786d09017572a05a84270edf04baa45"
+      },
+      "binary": {
+        "bytes": 70379960,
+        "path": "/tmp/litchi-performance-0923/candidate-target/release/litchi-perf-baseline",
+        "sha256": "8d98309501f63f4911828f52c42653f5950f3f5019bd040cf98f787173528861"
+      },
+      "metrics": {
+        "allocation_event_count": 312706,
+        "deallocation_event_count": 312705,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234117,
+        "requested_bytes": 151737589
+      },
+      "independent_parse_equal": true
+    },
+    {
+      "id": "015-owned_vec-pair-04-leg-1-candidate",
+      "route": "owned_vec",
+      "variant": "candidate",
+      "pair": 4,
+      "leg": 1,
+      "raw": {
+        "bytes": 436464,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/015-owned_vec-pair-04-leg-1-candidate/heaptrack.zst",
+        "sha256": "020addef23bc5f90a318cbaab87437e1c6e6c29355d310d6d235c5e8cdfd395a"
+      },
+      "report": {
+        "bytes": 18600,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/015-owned_vec-pair-04-leg-1-candidate/harness-report.json",
+        "sha256": "2f56a9b46bbe96df724e9afd8d2ed3a3f394675765c7b2f4da28e23a4cfee79a"
+      },
+      "binary": {
+        "bytes": 70379960,
+        "path": "/tmp/litchi-performance-0923/candidate-target/release/litchi-perf-baseline",
+        "sha256": "8d98309501f63f4911828f52c42653f5950f3f5019bd040cf98f787173528861"
+      },
+      "metrics": {
+        "allocation_event_count": 312706,
+        "deallocation_event_count": 312705,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234117,
+        "requested_bytes": 151737589
+      },
+      "independent_parse_equal": true
+    },
+    {
+      "id": "016-owned_vec-pair-04-leg-2-baseline",
+      "route": "owned_vec",
+      "variant": "baseline",
+      "pair": 4,
+      "leg": 2,
+      "raw": {
+        "bytes": 438020,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/016-owned_vec-pair-04-leg-2-baseline/heaptrack.zst",
+        "sha256": "d1a441436182fe130c7e46047bf51f97b9083d14148e129f639304984af40bcf"
+      },
+      "report": {
+        "bytes": 18598,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/016-owned_vec-pair-04-leg-2-baseline/harness-report.json",
+        "sha256": "d76621f77bcbbdcadd20125482a62faa970cfbc75a6d47ddfe2422d981cd627f"
+      },
+      "binary": {
+        "bytes": 69962624,
+        "path": "/tmp/litchi-performance-0923/frozen-baseline-native/litchi-perf-baseline",
+        "sha256": "ed2d5609cc7a54459cd33627a80416d5ce2ef765b32916b5235b91209e19db28"
+      },
+      "metrics": {
+        "allocation_event_count": 312705,
+        "deallocation_event_count": 312704,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234029,
+        "requested_bytes": 151803020
+      },
+      "independent_parse_equal": true
+    },
+    {
+      "id": "017-owned_reader-pair-01-leg-1-baseline",
+      "route": "owned_reader",
+      "variant": "baseline",
+      "pair": 1,
+      "leg": 1,
+      "raw": {
+        "bytes": 439707,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/017-owned_reader-pair-01-leg-1-baseline/heaptrack.zst",
+        "sha256": "a44da03e7652475df420231dd595e58e505254bbbfabcae2e4317622676d177c"
+      },
+      "report": {
+        "bytes": 18626,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/017-owned_reader-pair-01-leg-1-baseline/harness-report.json",
+        "sha256": "66a6a91d09bd06a1be098f3ff99e091f3f57949f7040c168330bfae85ecc140c"
+      },
+      "binary": {
+        "bytes": 69962624,
+        "path": "/tmp/litchi-performance-0923/frozen-baseline-native/litchi-perf-baseline",
+        "sha256": "ed2d5609cc7a54459cd33627a80416d5ce2ef765b32916b5235b91209e19db28"
+      },
+      "metrics": {
+        "allocation_event_count": 312964,
+        "deallocation_event_count": 312963,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234083,
+        "requested_bytes": 423388539
+      },
+      "independent_parse_equal": true
+    },
+    {
+      "id": "018-owned_reader-pair-01-leg-2-candidate",
+      "route": "owned_reader",
+      "variant": "candidate",
+      "pair": 1,
+      "leg": 2,
+      "raw": {
+        "bytes": 437922,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/018-owned_reader-pair-01-leg-2-candidate/heaptrack.zst",
+        "sha256": "61cf282bf14f50af611a847d94c7b7cc8c683072ce61e7759385df6aa9c3a931"
+      },
+      "report": {
+        "bytes": 18628,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/018-owned_reader-pair-01-leg-2-candidate/harness-report.json",
+        "sha256": "5da4a8d78e75d01084c11d897e4eb987df30f13a340638a85fbc012c2886a4bc"
+      },
+      "binary": {
+        "bytes": 70379960,
+        "path": "/tmp/litchi-performance-0923/candidate-target/release/litchi-perf-baseline",
+        "sha256": "8d98309501f63f4911828f52c42653f5950f3f5019bd040cf98f787173528861"
+      },
+      "metrics": {
+        "allocation_event_count": 312965,
+        "deallocation_event_count": 312964,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234171,
+        "requested_bytes": 423323108
+      },
+      "independent_parse_equal": true
+    },
+    {
+      "id": "019-owned_reader-pair-02-leg-1-candidate",
+      "route": "owned_reader",
+      "variant": "candidate",
+      "pair": 2,
+      "leg": 1,
+      "raw": {
+        "bytes": 438152,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/019-owned_reader-pair-02-leg-1-candidate/heaptrack.zst",
+        "sha256": "feba65db771a75864260dc8f02c8d87575ded77f6e109134fc83c5a0db37fa16"
+      },
+      "report": {
+        "bytes": 18628,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/019-owned_reader-pair-02-leg-1-candidate/harness-report.json",
+        "sha256": "08365e744747caa6f65b16ab062889f0435bb0c6c96587f81d419d451c10c8cf"
+      },
+      "binary": {
+        "bytes": 70379960,
+        "path": "/tmp/litchi-performance-0923/candidate-target/release/litchi-perf-baseline",
+        "sha256": "8d98309501f63f4911828f52c42653f5950f3f5019bd040cf98f787173528861"
+      },
+      "metrics": {
+        "allocation_event_count": 312965,
+        "deallocation_event_count": 312964,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234171,
+        "requested_bytes": 423323108
+      },
+      "independent_parse_equal": true
+    },
+    {
+      "id": "020-owned_reader-pair-02-leg-2-baseline",
+      "route": "owned_reader",
+      "variant": "baseline",
+      "pair": 2,
+      "leg": 2,
+      "raw": {
+        "bytes": 439782,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/020-owned_reader-pair-02-leg-2-baseline/heaptrack.zst",
+        "sha256": "15abc155eb2a6653cc25922bd4336cae28f577742f23ebd65694f83661212916"
+      },
+      "report": {
+        "bytes": 18626,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/020-owned_reader-pair-02-leg-2-baseline/harness-report.json",
+        "sha256": "28f4817b7b5cc26374a1b092ae78e338aa33d41eaf377c1b01cc727d8d0f1a9b"
+      },
+      "binary": {
+        "bytes": 69962624,
+        "path": "/tmp/litchi-performance-0923/frozen-baseline-native/litchi-perf-baseline",
+        "sha256": "ed2d5609cc7a54459cd33627a80416d5ce2ef765b32916b5235b91209e19db28"
+      },
+      "metrics": {
+        "allocation_event_count": 312964,
+        "deallocation_event_count": 312963,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234083,
+        "requested_bytes": 423388539
+      },
+      "independent_parse_equal": true
+    },
+    {
+      "id": "021-owned_reader-pair-03-leg-1-baseline",
+      "route": "owned_reader",
+      "variant": "baseline",
+      "pair": 3,
+      "leg": 1,
+      "raw": {
+        "bytes": 439897,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/021-owned_reader-pair-03-leg-1-baseline/heaptrack.zst",
+        "sha256": "3c6df7c6c7e48d1a3f4d8a39591d30a8bdbb4d4d612cc61a9e2e65b7618ea68b"
+      },
+      "report": {
+        "bytes": 18626,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/021-owned_reader-pair-03-leg-1-baseline/harness-report.json",
+        "sha256": "0c9b5746d0605e50bd002d566df648cf597ab7bf360000feb3c171b7d3fdd6a2"
+      },
+      "binary": {
+        "bytes": 69962624,
+        "path": "/tmp/litchi-performance-0923/frozen-baseline-native/litchi-perf-baseline",
+        "sha256": "ed2d5609cc7a54459cd33627a80416d5ce2ef765b32916b5235b91209e19db28"
+      },
+      "metrics": {
+        "allocation_event_count": 312964,
+        "deallocation_event_count": 312963,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234083,
+        "requested_bytes": 423388539
+      },
+      "independent_parse_equal": true
+    },
+    {
+      "id": "022-owned_reader-pair-03-leg-2-candidate",
+      "route": "owned_reader",
+      "variant": "candidate",
+      "pair": 3,
+      "leg": 2,
+      "raw": {
+        "bytes": 437869,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/022-owned_reader-pair-03-leg-2-candidate/heaptrack.zst",
+        "sha256": "4dc1abc038a20ef88cf461e9987c44d4e604d27ade7d831491fbfb3126ca8786"
+      },
+      "report": {
+        "bytes": 18628,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/022-owned_reader-pair-03-leg-2-candidate/harness-report.json",
+        "sha256": "fb042317be348609d471a331838e23f78a479bfed858e2c71fc9321eb14a28e4"
+      },
+      "binary": {
+        "bytes": 70379960,
+        "path": "/tmp/litchi-performance-0923/candidate-target/release/litchi-perf-baseline",
+        "sha256": "8d98309501f63f4911828f52c42653f5950f3f5019bd040cf98f787173528861"
+      },
+      "metrics": {
+        "allocation_event_count": 312965,
+        "deallocation_event_count": 312964,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234171,
+        "requested_bytes": 423323108
+      },
+      "independent_parse_equal": true
+    },
+    {
+      "id": "023-owned_reader-pair-04-leg-1-candidate",
+      "route": "owned_reader",
+      "variant": "candidate",
+      "pair": 4,
+      "leg": 1,
+      "raw": {
+        "bytes": 437894,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/023-owned_reader-pair-04-leg-1-candidate/heaptrack.zst",
+        "sha256": "f3ce8547c409e1a3fce219a6ff8a8e183476106ec10a84effac46a9a5bfc0633"
+      },
+      "report": {
+        "bytes": 18628,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/023-owned_reader-pair-04-leg-1-candidate/harness-report.json",
+        "sha256": "aabfa572c4cda2ac9771b1ad0c5605c8f108ee224526cbdc88d13ca3dbab16b8"
+      },
+      "binary": {
+        "bytes": 70379960,
+        "path": "/tmp/litchi-performance-0923/candidate-target/release/litchi-perf-baseline",
+        "sha256": "8d98309501f63f4911828f52c42653f5950f3f5019bd040cf98f787173528861"
+      },
+      "metrics": {
+        "allocation_event_count": 312965,
+        "deallocation_event_count": 312964,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234171,
+        "requested_bytes": 423323108
+      },
+      "independent_parse_equal": true
+    },
+    {
+      "id": "024-owned_reader-pair-04-leg-2-baseline",
+      "route": "owned_reader",
+      "variant": "baseline",
+      "pair": 4,
+      "leg": 2,
+      "raw": {
+        "bytes": 439358,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/024-owned_reader-pair-04-leg-2-baseline/heaptrack.zst",
+        "sha256": "28698b6ffd0f08e91a1a119d64ccad7247b70a3e5dd5a7881ebeba4014b34ddc"
+      },
+      "report": {
+        "bytes": 18626,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/024-owned_reader-pair-04-leg-2-baseline/harness-report.json",
+        "sha256": "ff6dff55d637177da4eb63c26231946778a4aad0e0535d6386b463d28fb9c7d1"
+      },
+      "binary": {
+        "bytes": 69962624,
+        "path": "/tmp/litchi-performance-0923/frozen-baseline-native/litchi-perf-baseline",
+        "sha256": "ed2d5609cc7a54459cd33627a80416d5ce2ef765b32916b5235b91209e19db28"
+      },
+      "metrics": {
+        "allocation_event_count": 312964,
+        "deallocation_event_count": 312963,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234083,
+        "requested_bytes": 423388539
+      },
+      "independent_parse_equal": true
+    }
+  ],
+  "binary_identities": {
+    "baseline": {
+      "bytes": 69962624,
+      "path": "/tmp/litchi-performance-0923/frozen-baseline-native/litchi-perf-baseline",
+      "sha256": "ed2d5609cc7a54459cd33627a80416d5ce2ef765b32916b5235b91209e19db28"
+    },
+    "candidate": {
+      "bytes": 70379960,
+      "path": "/tmp/litchi-performance-0923/candidate-target/release/litchi-perf-baseline",
+      "sha256": "8d98309501f63f4911828f52c42653f5950f3f5019bd040cf98f787173528861"
+    }
+  },
+  "metric_summary": {
+    "groups": {
+      "generic_read_at/baseline": {
+        "allocation_event_count": {
+          "max": 312717,
+          "mean": 312717.0,
+          "median": 312717.0,
+          "min": 312717,
+          "n": 4
+        },
+        "live_bytes_at_end": {
+          "max": 544,
+          "mean": 544.0,
+          "median": 544.0,
+          "min": 544,
+          "n": 4
+        },
+        "peak_live_heap_bytes": {
+          "max": 24234801,
+          "mean": 24234801.0,
+          "median": 24234801.0,
+          "min": 24234801,
+          "n": 4
+        },
+        "requested_bytes": {
+          "max": 151804036,
+          "mean": 151804036.0,
+          "median": 151804036.0,
+          "min": 151804036,
+          "n": 4
+        }
+      },
+      "generic_read_at/candidate": {
+        "allocation_event_count": {
+          "max": 312717,
+          "mean": 312717.0,
+          "median": 312717.0,
+          "min": 312717,
+          "n": 4
+        },
+        "live_bytes_at_end": {
+          "max": 544,
+          "mean": 544.0,
+          "median": 544.0,
+          "min": 544,
+          "n": 4
+        },
+        "peak_live_heap_bytes": {
+          "max": 24234805,
+          "mean": 24234805.0,
+          "median": 24234805.0,
+          "min": 24234805,
+          "n": 4
+        },
+        "requested_bytes": {
+          "max": 151804057,
+          "mean": 151804057.0,
+          "median": 151804057.0,
+          "min": 151804057,
+          "n": 4
+        }
+      },
+      "owned_reader/baseline": {
+        "allocation_event_count": {
+          "max": 312964,
+          "mean": 312964.0,
+          "median": 312964.0,
+          "min": 312964,
+          "n": 4
+        },
+        "live_bytes_at_end": {
+          "max": 544,
+          "mean": 544.0,
+          "median": 544.0,
+          "min": 544,
+          "n": 4
+        },
+        "peak_live_heap_bytes": {
+          "max": 24234083,
+          "mean": 24234083.0,
+          "median": 24234083.0,
+          "min": 24234083,
+          "n": 4
+        },
+        "requested_bytes": {
+          "max": 423388539,
+          "mean": 423388539.0,
+          "median": 423388539.0,
+          "min": 423388539,
+          "n": 4
+        }
+      },
+      "owned_reader/candidate": {
+        "allocation_event_count": {
+          "max": 312965,
+          "mean": 312965.0,
+          "median": 312965.0,
+          "min": 312965,
+          "n": 4
+        },
+        "live_bytes_at_end": {
+          "max": 544,
+          "mean": 544.0,
+          "median": 544.0,
+          "min": 544,
+          "n": 4
+        },
+        "peak_live_heap_bytes": {
+          "max": 24234171,
+          "mean": 24234171.0,
+          "median": 24234171.0,
+          "min": 24234171,
+          "n": 4
+        },
+        "requested_bytes": {
+          "max": 423323108,
+          "mean": 423323108.0,
+          "median": 423323108.0,
+          "min": 423323108,
+          "n": 4
+        }
+      },
+      "owned_vec/baseline": {
+        "allocation_event_count": {
+          "max": 312705,
+          "mean": 312705.0,
+          "median": 312705.0,
+          "min": 312705,
+          "n": 4
+        },
+        "live_bytes_at_end": {
+          "max": 544,
+          "mean": 544.0,
+          "median": 544.0,
+          "min": 544,
+          "n": 4
+        },
+        "peak_live_heap_bytes": {
+          "max": 24234029,
+          "mean": 24234029.0,
+          "median": 24234029.0,
+          "min": 24234029,
+          "n": 4
+        },
+        "requested_bytes": {
+          "max": 151803020,
+          "mean": 151803020.0,
+          "median": 151803020.0,
+          "min": 151803020,
+          "n": 4
+        }
+      },
+      "owned_vec/candidate": {
+        "allocation_event_count": {
+          "max": 312706,
+          "mean": 312706.0,
+          "median": 312706.0,
+          "min": 312706,
+          "n": 4
+        },
+        "live_bytes_at_end": {
+          "max": 544,
+          "mean": 544.0,
+          "median": 544.0,
+          "min": 544,
+          "n": 4
+        },
+        "peak_live_heap_bytes": {
+          "max": 24234117,
+          "mean": 24234117.0,
+          "median": 24234117.0,
+          "min": 24234117,
+          "n": 4
+        },
+        "requested_bytes": {
+          "max": 151737589,
+          "mean": 151737589.0,
+          "median": 151737589.0,
+          "min": 151737589,
+          "n": 4
+        }
+      }
+    },
+    "pair_deltas": [
+      {
+        "baseline": {
+          "allocation_event_count": 312717,
+          "live_bytes_at_end": 544,
+          "peak_live_heap_bytes": 24234801,
+          "requested_bytes": 151804036
+        },
+        "candidate": {
+          "allocation_event_count": 312717,
+          "live_bytes_at_end": 544,
+          "peak_live_heap_bytes": 24234805,
+          "requested_bytes": 151804057
+        },
+        "candidate_minus_baseline": {
+          "allocation_event_count": 0,
+          "live_bytes_at_end": 0,
+          "peak_live_heap_bytes": 4,
+          "requested_bytes": 21
+        },
+        "order": "baseline,candidate",
+        "pair": 1,
+        "route": "generic_read_at"
+      },
+      {
+        "baseline": {
+          "allocation_event_count": 312717,
+          "live_bytes_at_end": 544,
+          "peak_live_heap_bytes": 24234801,
+          "requested_bytes": 151804036
+        },
+        "candidate": {
+          "allocation_event_count": 312717,
+          "live_bytes_at_end": 544,
+          "peak_live_heap_bytes": 24234805,
+          "requested_bytes": 151804057
+        },
+        "candidate_minus_baseline": {
+          "allocation_event_count": 0,
+          "live_bytes_at_end": 0,
+          "peak_live_heap_bytes": 4,
+          "requested_bytes": 21
+        },
+        "order": "candidate,baseline",
+        "pair": 2,
+        "route": "generic_read_at"
+      },
+      {
+        "baseline": {
+          "allocation_event_count": 312717,
+          "live_bytes_at_end": 544,
+          "peak_live_heap_bytes": 24234801,
+          "requested_bytes": 151804036
+        },
+        "candidate": {
+          "allocation_event_count": 312717,
+          "live_bytes_at_end": 544,
+          "peak_live_heap_bytes": 24234805,
+          "requested_bytes": 151804057
+        },
+        "candidate_minus_baseline": {
+          "allocation_event_count": 0,
+          "live_bytes_at_end": 0,
+          "peak_live_heap_bytes": 4,
+          "requested_bytes": 21
+        },
+        "order": "baseline,candidate",
+        "pair": 3,
+        "route": "generic_read_at"
+      },
+      {
+        "baseline": {
+          "allocation_event_count": 312717,
+          "live_bytes_at_end": 544,
+          "peak_live_heap_bytes": 24234801,
+          "requested_bytes": 151804036
+        },
+        "candidate": {
+          "allocation_event_count": 312717,
+          "live_bytes_at_end": 544,
+          "peak_live_heap_bytes": 24234805,
+          "requested_bytes": 151804057
+        },
+        "candidate_minus_baseline": {
+          "allocation_event_count": 0,
+          "live_bytes_at_end": 0,
+          "peak_live_heap_bytes": 4,
+          "requested_bytes": 21
+        },
+        "order": "candidate,baseline",
+        "pair": 4,
+        "route": "generic_read_at"
+      },
+      {
+        "baseline": {
+          "allocation_event_count": 312964,
+          "live_bytes_at_end": 544,
+          "peak_live_heap_bytes": 24234083,
+          "requested_bytes": 423388539
+        },
+        "candidate": {
+          "allocation_event_count": 312965,
+          "live_bytes_at_end": 544,
+          "peak_live_heap_bytes": 24234171,
+          "requested_bytes": 423323108
+        },
+        "candidate_minus_baseline": {
+          "allocation_event_count": 1,
+          "live_bytes_at_end": 0,
+          "peak_live_heap_bytes": 88,
+          "requested_bytes": -65431
+        },
+        "order": "baseline,candidate",
+        "pair": 1,
+        "route": "owned_reader"
+      },
+      {
+        "baseline": {
+          "allocation_event_count": 312964,
+          "live_bytes_at_end": 544,
+          "peak_live_heap_bytes": 24234083,
+          "requested_bytes": 423388539
+        },
+        "candidate": {
+          "allocation_event_count": 312965,
+          "live_bytes_at_end": 544,
+          "peak_live_heap_bytes": 24234171,
+          "requested_bytes": 423323108
+        },
+        "candidate_minus_baseline": {
+          "allocation_event_count": 1,
+          "live_bytes_at_end": 0,
+          "peak_live_heap_bytes": 88,
+          "requested_bytes": -65431
+        },
+        "order": "candidate,baseline",
+        "pair": 2,
+        "route": "owned_reader"
+      },
+      {
+        "baseline": {
+          "allocation_event_count": 312964,
+          "live_bytes_at_end": 544,
+          "peak_live_heap_bytes": 24234083,
+          "requested_bytes": 423388539
+        },
+        "candidate": {
+          "allocation_event_count": 312965,
+          "live_bytes_at_end": 544,
+          "peak_live_heap_bytes": 24234171,
+          "requested_bytes": 423323108
+        },
+        "candidate_minus_baseline": {
+          "allocation_event_count": 1,
+          "live_bytes_at_end": 0,
+          "peak_live_heap_bytes": 88,
+          "requested_bytes": -65431
+        },
+        "order": "baseline,candidate",
+        "pair": 3,
+        "route": "owned_reader"
+      },
+      {
+        "baseline": {
+          "allocation_event_count": 312964,
+          "live_bytes_at_end": 544,
+          "peak_live_heap_bytes": 24234083,
+          "requested_bytes": 423388539
+        },
+        "candidate": {
+          "allocation_event_count": 312965,
+          "live_bytes_at_end": 544,
+          "peak_live_heap_bytes": 24234171,
+          "requested_bytes": 423323108
+        },
+        "candidate_minus_baseline": {
+          "allocation_event_count": 1,
+          "live_bytes_at_end": 0,
+          "peak_live_heap_bytes": 88,
+          "requested_bytes": -65431
+        },
+        "order": "candidate,baseline",
+        "pair": 4,
+        "route": "owned_reader"
+      },
+      {
+        "baseline": {
+          "allocation_event_count": 312705,
+          "live_bytes_at_end": 544,
+          "peak_live_heap_bytes": 24234029,
+          "requested_bytes": 151803020
+        },
+        "candidate": {
+          "allocation_event_count": 312706,
+          "live_bytes_at_end": 544,
+          "peak_live_heap_bytes": 24234117,
+          "requested_bytes": 151737589
+        },
+        "candidate_minus_baseline": {
+          "allocation_event_count": 1,
+          "live_bytes_at_end": 0,
+          "peak_live_heap_bytes": 88,
+          "requested_bytes": -65431
+        },
+        "order": "baseline,candidate",
+        "pair": 1,
+        "route": "owned_vec"
+      },
+      {
+        "baseline": {
+          "allocation_event_count": 312705,
+          "live_bytes_at_end": 544,
+          "peak_live_heap_bytes": 24234029,
+          "requested_bytes": 151803020
+        },
+        "candidate": {
+          "allocation_event_count": 312706,
+          "live_bytes_at_end": 544,
+          "peak_live_heap_bytes": 24234117,
+          "requested_bytes": 151737589
+        },
+        "candidate_minus_baseline": {
+          "allocation_event_count": 1,
+          "live_bytes_at_end": 0,
+          "peak_live_heap_bytes": 88,
+          "requested_bytes": -65431
+        },
+        "order": "candidate,baseline",
+        "pair": 2,
+        "route": "owned_vec"
+      },
+      {
+        "baseline": {
+          "allocation_event_count": 312705,
+          "live_bytes_at_end": 544,
+          "peak_live_heap_bytes": 24234029,
+          "requested_bytes": 151803020
+        },
+        "candidate": {
+          "allocation_event_count": 312706,
+          "live_bytes_at_end": 544,
+          "peak_live_heap_bytes": 24234117,
+          "requested_bytes": 151737589
+        },
+        "candidate_minus_baseline": {
+          "allocation_event_count": 1,
+          "live_bytes_at_end": 0,
+          "peak_live_heap_bytes": 88,
+          "requested_bytes": -65431
+        },
+        "order": "baseline,candidate",
+        "pair": 3,
+        "route": "owned_vec"
+      },
+      {
+        "baseline": {
+          "allocation_event_count": 312705,
+          "live_bytes_at_end": 544,
+          "peak_live_heap_bytes": 24234029,
+          "requested_bytes": 151803020
+        },
+        "candidate": {
+          "allocation_event_count": 312706,
+          "live_bytes_at_end": 544,
+          "peak_live_heap_bytes": 24234117,
+          "requested_bytes": 151737589
+        },
+        "candidate_minus_baseline": {
+          "allocation_event_count": 1,
+          "live_bytes_at_end": 0,
+          "peak_live_heap_bytes": 88,
+          "requested_bytes": -65431
+        },
+        "order": "candidate,baseline",
+        "pair": 4,
+        "route": "owned_vec"
+      }
+    ],
+    "v3_first_vs_v4_first_generic_baseline": {
+      "delta": {
+        "allocation_event_count": 0,
+        "live_bytes_at_end": 0,
+        "peak_live_heap_bytes": 0,
+        "requested_bytes": 0
+      },
+      "same_metrics": true
+    },
+    "heaptrack_print_crosscheck": {
+      "mismatches": [],
+      "v4_profiles": 24
+    }
+  },
+  "audit_results": {
+    "independent_identity_audit": {
+      "status": "pass",
+      "failures": [],
+      "external": {
+        "path": "/tmp/litchi-performance-0923/memory-audit-v3v4/identity-audit.json",
+        "bytes": 30960,
+        "sha256": "73d424257a7a730c5c29d929dc39bde034c39d15ca87b2632990aa02ae282222",
+        "packet_path": "docs/performance/results/change-0923/memory-audit/identity-audit.json"
+      }
+    },
+    "independent_metrics_audit": {
+      "external": {
+        "path": "/tmp/litchi-performance-0923/memory-audit-v3v4/metrics-audit.json",
+        "bytes": 13692,
+        "sha256": "96381696729c1cd03abc5f8bc0440650fdeda9052c65983ab80e52b1f5623dd7",
+        "packet_path": "docs/performance/results/change-0923/memory-audit/metrics-audit.json"
+      }
+    },
+    "full_parser_reproduction": {
+      "profiles": 25,
+      "elapsed_seconds": 14.165,
+      "parser": {
+        "path": "/tmp/litchi-performance-0923/allocation-replay-v4/tooling/allocation-parse-v2.py",
+        "bytes": 10521,
+        "sha256": "7ef32b74271c7436ba0a7e4dd4676c9cb065955a1ad9b40c56497e232e89748f"
+      },
+      "result": "25/25 exit 0"
+    },
+    "commands_log": {
+      "path": "/tmp/litchi-performance-0923/memory-audit-v3v4/audit-commands.log",
+      "bytes": 2277,
+      "sha256": "32f276f1bf3a25c268edd372e5d614973b4a6e307b27f25c0635d063e0782320",
+      "packet_path": "docs/performance/results/change-0923/memory-audit/audit-commands.log"
+    }
+  },
+  "corrective_binding": {
+    "supplement": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/allocation-corrective-supplement-v2.json",
+      "bytes": 12275,
+      "sha256": "624ea2d48615c0b103b57091a80b4a66515b5da985323c4267147c01f04d43a9",
+      "packet_path": "docs/performance/results/change-0923/allocation-corrective-supplement-v2.json"
+    },
+    "prior_final_receipt": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/allocation-final-receipt-v2.json",
+      "bytes": 56309,
+      "sha256": "1bd03c796ad4d6eccf673e31ce8e7c298a5f4f07f1e519ec3075c5320c1e9c09",
+      "packet_path": "docs/performance/results/change-0923/allocation-final-receipt-v2.json"
+    },
+    "protocol_deviation": "The v3 first process captured successfully but analysis failed because the runner passed heaptrack.zst while Heaptrack emitted heaptrack.zst.zst. A separate full v4 24-child cohort then ran. The 25 profiles cannot be presented as the original strict 24-child no-recapture cohort.",
+    "v3_preserved": {
+      "runner": {
+        "path": "/tmp/litchi-performance-0923/v3-preserved-allocation-capture-v2.py",
+        "bytes": 35068,
+        "sha256": "0ee8efbe59adb271c216a3181b08a587bd4e456cae271f09667f90da3fb393d1"
+      },
+      "protocol": {
+        "path": "/tmp/litchi-performance-0923/v3-preserved-allocation-protocol-v2.json",
+        "bytes": 6730,
+        "sha256": "176e4ce419ec8ed297ea1b8113e00439ebd31bea3a248d73ff600c750a690938"
+      },
+      "manifest": {
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v3/allocation-manifest-v2.json",
+        "bytes": 15875,
+        "sha256": "9de922223d3909d1b51aa25fab3079a6cf4d46b5c59c07b07e95fe22deed7d2d"
+      },
+      "freeze": {
+        "path": "/tmp/litchi-performance-0923/allocation-freeze-v3.stdout",
+        "bytes": 15875,
+        "sha256": "9de922223d3909d1b51aa25fab3079a6cf4d46b5c59c07b07e95fe22deed7d2d"
+      },
+      "raw_profile": {
+        "bytes": 438590,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/heaptrack.zst.zst",
+        "sha256": "0003850a9985115265ac53572ab69dd327fde69977c71a1dc38a84fdb2f2c494"
+      }
+    },
+    "v4_rerun": {
+      "manifest": {
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/allocation-manifest-v2.json",
+        "bytes": 15875,
+        "sha256": "c90decf44f8254d1f9ba6a8d567977e946d6ad27da7a47d6e48cfcbbf27b1de4"
+      },
+      "freeze": {
+        "path": "/tmp/litchi-performance-0923/allocation-freeze-v4.stdout",
+        "bytes": 15875,
+        "sha256": "c90decf44f8254d1f9ba6a8d567977e946d6ad27da7a47d6e48cfcbbf27b1de4"
+      },
+      "capture_state": {
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/capture-state.json",
+        "bytes": 1461,
+        "sha256": "a5c88dd7655053b40f2500358b2e85925df67bbaff9de68e374c80700aa07272"
+      },
+      "reduction": {
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/allocation-reduction-v2.json",
+        "bytes": 1878,
+        "sha256": "6f9ebca6264590a15eb20fa188b896862f8f69e2ae5a62367d790acfd1a5bbac"
+      }
+    }
+  },
+  "memory_assessment": {
+    "v3_first_reanalyzed": "Matches the v4 first generic baseline exactly: 312717 events, 151804036 requested bytes, 24234801 peak live heap bytes, 544 live bytes at end.",
+    "observed_candidate_deltas": "Generic route: +21 requested bytes and +4 peak bytes with equal allocation events; owned_vec and owned_reader: +1 allocation event, -65431 requested bytes, +88 peak bytes; every profile ends at 544 live bytes.",
+    "disposition": "No material broad regression observed in these whole-process diagnostics, but the small positive peak deltas are recorded and the evidence is not a strict qualification pass.",
+    "claim_limit": "All metrics include Heaptrack overhead and whole-process setup/serialization/teardown; they do not establish operation-scoped memory or native latency."
+  },
+  "adoption": "Root adoption decision remains based on unchanged native gates and correctness; this supplemental all-25 memory lane is for risk review only."
+}

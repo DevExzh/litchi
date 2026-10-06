@@ -1,0 +1,203 @@
+{
+  "build_binding": {
+    "baseline_binary": {
+      "bytes": 69962624,
+      "path": "/tmp/litchi-performance-0923/frozen-baseline-native/litchi-perf-baseline",
+      "sha256": "ed2d5609cc7a54459cd33627a80416d5ce2ef765b32916b5235b91209e19db28"
+    },
+    "baseline_build_receipt": {
+      "bytes": 1661,
+      "path": "/tmp/litchi-performance-0923/receipts/baseline-build-final.json",
+      "sha256": "86eae277dd3096ab7972cc9d7696d02853fadaa3e7e20678449137b74a80e630"
+    },
+    "candidate_binary": {
+      "bytes": 70379960,
+      "path": "/tmp/litchi-performance-0923/candidate-target/release/litchi-perf-baseline",
+      "sha256": "8d98309501f63f4911828f52c42653f5950f3f5019bd040cf98f787173528861"
+    },
+    "candidate_build_receipt": {
+      "bytes": 5881,
+      "path": "/tmp/litchi-performance-0923/receipts/candidate-build-final-v3-bound3.json",
+      "sha256": "04de284ceb4bc43e9698a53c3f5e78ccc66047383342e2c041166166c350d05e"
+    },
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "fingerprint_parity": "238 shared records; 0 field mismatches; compiler/profile/features/flags/config/kind equal",
+    "profile": "release",
+    "profile_audit": "actual standalone benchmark environment had no CARGO_PROFILE_* overrides; both binaries have no debug sections and matching unwind metadata; the audit records the limits of historical baseline environment evidence"
+  },
+  "capture_guard": {
+    "comparative_capture_command": "LITCHI_PERF_0923_CAPTURE_APPROVED=1 LITCHI_PERF_0923_PACKET_ROOT=/tmp/litchi-performance-0923/packet-v3-final2 python3 -B docs/performance/results/change-0923/comparison-capture-v2.py capture --packet-root /tmp/litchi-performance-0923/packet-v3-final2",
+    "packet_root": "/tmp/litchi-performance-0923/packet-v3-final2",
+    "required": "LITCHI_PERF_0923_CAPTURE_APPROVED=1",
+    "set_during_validation": false,
+    "status": "held for root readiness; freeze manifest and exact command prepared, capture action not invoked"
+  },
+  "copied_packet_replay": {
+    "index_verify": "pass after action_copy to independent root; local tooling, review receipts, source/build receipts, manifest all hash-checked",
+    "reduction_attempt": "refused at missing child receipt; expected because comparative children remain zero",
+    "replay_index": {
+      "bytes": 10195,
+      "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay/replay-index.json",
+      "sha256": "3da3f8dc0d7200d04faa9d3f6c127c059eed9f129ce3c8addfee55ec816c78b8"
+    },
+    "replay_packet": "/tmp/litchi-performance-0923/packet-v3-final2-replay",
+    "source_packet": "/tmp/litchi-performance-0923/packet-v3-final2"
+  },
+  "created_utc": "2026-10-06T09:22:44.339098+00:00",
+  "freeze_dry_run": {
+    "approval_environment_set": false,
+    "authoritative_manifest_written": false,
+    "descriptor": {
+      "bytes": 21911,
+      "path": "/tmp/litchi-performance-0923/custody/freeze-v3-final3-dry-run.json",
+      "sha256": "503071d34344271bc4a3b4536a205229d9fe5ea4e80f7075864efff557641263"
+    },
+    "path": "/tmp/litchi-performance-0923/custody/freeze-v3-final3-dry-run.json",
+    "performance_children_run": 0,
+    "status": "frozen",
+    "verified_schedule_children": 48
+  },
+  "freeze_manifest": {
+    "descriptor": {
+      "bytes": 23166,
+      "path": "/tmp/litchi-performance-0923/packet-v3-final2/comparison-manifest-v2.json",
+      "sha256": "b3089f7dcd5cc1517d22615a066e16088a50b4edbd4e703f7594bc5e66a568ae"
+    },
+    "manifest_verify": "pass; exact source closure/patch, build/profile review, 48-row schedule",
+    "path": "/tmp/litchi-performance-0923/packet-v3-final2/comparison-manifest-v2.json",
+    "performance_children_run": 0,
+    "status": "frozen"
+  },
+  "negative_controls": {
+    "accepted_positive_controls": [
+      "independent_copy_to_new_root",
+      "moved_replay_copy"
+    ],
+    "comparative_children_run": 0,
+    "copied_packet_replay_path": "/tmp/litchi-performance-0923/packet-v3-final2-replay",
+    "receipt": {
+      "bytes": 2498,
+      "path": "/tmp/litchi-performance-0923/receipts/runner-negative-controls-v2.json",
+      "sha256": "b18567e6a093fe6f1c11d5261538e3835487b538ae362f2992990b0420b8a17d"
+    },
+    "rejected_controls": [
+      "missing_build_receipt",
+      "missing_source_production_patch",
+      "changed_source_file",
+      "swapped_binary",
+      "corrupt_stdout",
+      "corrupt_time",
+      "corrupt_rss",
+      "escaped_report_path",
+      "missing_child_schedule",
+      "duplicate_child_schedule",
+      "tampered_local_replay_descriptor"
+    ]
+  },
+  "reduction_capacity": {
+    "control_receipt": {
+      "bytes": 639878,
+      "path": "/tmp/litchi-performance-0923/receipts/comparison-controls-v2.json",
+      "sha256": "0f491232dc503c2f7598e5856f483c0340c1510e7b9075f05fcb8ae22b63ecc1"
+    },
+    "control_receipt_under_1MiB": true,
+    "planned_allocator_rows": 0,
+    "planned_compact_bytes": 245048,
+    "planned_compact_sha256": "5f303112b5d259bf850e0ef288e50b13136d59b70905be493593bd8246850ee2",
+    "planned_native_rows": 48,
+    "planned_rounds_per_row": 12
+  },
+  "review_bindings": {
+    "build_fingerprint_parity": {
+      "bytes": 3274,
+      "path": "/tmp/litchi-performance-0923/custody/candidate-build-parity-v3.json",
+      "sha256": "2f57e6f04f46aa900c79c78cf0cf4d03bcbd52e047026bd6bf748e5ec92a2d1a"
+    },
+    "build_profile_audit": {
+      "bytes": 17404,
+      "path": "/tmp/litchi-performance-0923/receipts/candidate-build-profile-audit-v1.json",
+      "sha256": "6ad300cb464c74b6890fe55da28888e514e27629c7c2e332cfd6f68ef2090fd9"
+    },
+    "shared_owner_quality": {
+      "bytes": 18509,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/shared-owner-quality-v3.json",
+      "sha256": "6c5ea51402fc07ef57dfb1fb5fd97a61c769806a4fdb9e3893ee972e11808dba"
+    },
+    "source_delta": {
+      "bytes": 856,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/root-source-delta.json",
+      "sha256": "d0d445988076e647f3453a082ba7d011df557dc855f7d3ae09c581dd044db72d"
+    }
+  },
+  "runner": {
+    "bytes": 63683,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/comparison-capture-v2.py",
+    "sha256": "3601ea081fb255f2fab65de95fe079694e5cfd6b15e6e88e99684edb74232f96"
+  },
+  "schedule": {
+    "allocator_children": 0,
+    "allocator_lane": null,
+    "children_per_route": 16,
+    "children_per_version": 24,
+    "native_children": 48,
+    "pairs_per_route": 8,
+    "routes": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader"
+    ]
+  },
+  "schema": "litchi.performance.0923.comparison-tooling-validation.v3",
+  "scope": "prospective tooling only; no comparative native child and no allocator child was run",
+  "source_binding": {
+    "base_revision": "4e2532a0ce958f5928496b0ad9b356d8636916e1",
+    "baseline_source_receipt": {
+      "bytes": 2237,
+      "path": "/tmp/litchi-performance-0923/receipts/baseline-source-final.json",
+      "sha256": "62b555f066f9a1ac11dd63c258170b9534015766b18b6962012786004f817307"
+    },
+    "candidate_changed_file_sha256": "d28843caf8245bd6f0ff0f953b9b5545c4d9ad7a4e11f362d29ce226cc251cc2",
+    "candidate_changed_files": [
+      "crates/litchi-opc/src/source_backed.rs"
+    ],
+    "candidate_patch": {
+      "bytes": 15772,
+      "path": "/tmp/litchi-performance-0923/candidate-source-0923-v3.patch",
+      "sha256": "77c2a9952335d5f16c24fbfc8d87e120301808258f70e990324fa21b8ea8e75d"
+    },
+    "candidate_source_listing": {
+      "bytes": 1437118,
+      "path": "/tmp/litchi-performance-0923/custody/source-listing-candidate-v3.jsonl",
+      "sha256": "5eb6840368d0e601e2db4756ae2dbc4c7fdbc4d0b8bfd810934652a95090a83a"
+    },
+    "candidate_source_receipt": {
+      "bytes": 522655,
+      "path": "/tmp/litchi-performance-0923/receipts/candidate-source-final-v3-bound3.json",
+      "sha256": "3872b7d5e8a82c07a770ec186d0b6a447e89aa3e648f5130eccfeaa6944fc8b8"
+    },
+    "source_delta_review": "pass; exact changed set and unified-hunk reconstruction independently verified"
+  },
+  "timestamp_status": "writer wall clock at receipt update; all bound artifacts carry their own byte hash and observed creation/provenance fields",
+  "tooling": {
+    "comparison": {
+      "bytes": 21256,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/comparison-v2.py",
+      "sha256": "e592a03aa8d994c9f9d14785e060a5e10bf2b50be63f9832aa7a774981885cc6"
+    },
+    "controls": {
+      "bytes": 11731,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/comparison-controls-v2.py",
+      "sha256": "e38cf1dee29ab14bb0a5c0a3e4e42494833d8af76f5ea98f7d33a1173b18044c"
+    },
+    "protocol": {
+      "bytes": 7013,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/comparison-protocol-v2.json",
+      "sha256": "756fec0ae6edc4e49d665f46510ba0c9ea1297f414c9470806042c33fc894697"
+    },
+    "receipt_schema": {
+      "bytes": 4034,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/comparison-receipt-schema-v3.json",
+      "sha256": "a1162a06f74b002edd8f08c51bcd5cda07560808e8470ee108c516bbc79bbdf4"
+    }
+  }
+}

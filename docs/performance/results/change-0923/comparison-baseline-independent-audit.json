@@ -1,0 +1,127 @@
+{
+  "schema": "litchi.performance.0923.baseline-independent-audit.v1",
+  "status": "pass_with_supplement_required",
+  "audit_scope": "read-only custody and report validation; no benchmark children run",
+  "baseline_revision": "4e2532a0ce958f5928496b0ad9b356d8636916e1",
+  "source_archive": {
+    "path": "/tmp/litchi-performance-0923/base-head.tar",
+    "bytes": 170065920,
+    "sha256": "a6880fb4f638fbdcff23afb728382ea0c807f3af201648f579844309492b10a9",
+    "git_archive_reproduction": {
+      "command": "git archive --format=tar --prefix=litchi/ HEAD .cargo Cargo.toml clippy.toml crates tools/perf-baseline",
+      "reproduced_path": "/tmp/litchi-performance-0923/audit-git-head.tar",
+      "byte_for_byte_match": true
+    },
+    "archive_file_count": 9352,
+    "baseline_tree_file_count": 9355,
+    "baseline_tree_extra_files": [
+      "Cargo.lock",
+      "test-data/poi/test-data/spreadsheet/54016.xls",
+      "test-data/rtf/watermark.rtf"
+    ],
+    "archive_files_missing_from_baseline_tree": [],
+    "source_tree_non_harness_differences": [],
+    "harness_delta": {
+      "patch_path": "/tmp/litchi-performance-0923/harness-0923.patch",
+      "patch_bytes": 17046,
+      "patch_sha256": "5404cf09f7f840aa3a587d1bbdce6659d0d3a8cf35d2c44bbd42b747ddf217e0",
+      "changed_files": ["tools/perf-baseline/src/lib.rs"],
+      "base_file_sha256": "8542f4e8e580bef2b12b3782b03bcfabc8e0d60cefc80f27c55042c57baff860",
+      "patched_file_sha256": "c1b9b55258df38ac6a376283c2b857ad6a541ba8c62e23730195502f083e70ca",
+      "dry_run_applies_to_head": true,
+      "applied_patch_matches_baseline_tree": true
+    }
+  },
+  "declared_external_inputs": {
+    "cargo_lock": {
+      "path": "/tmp/litchi-performance-0923/baseline-source/tree/Cargo.lock",
+      "bytes": 138465,
+      "sha256": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd",
+      "matches_workspace_copy": true,
+      "git_tracked_at_head": false,
+      "gitignore_reason": "*.lock"
+    },
+    "compile_fixtures": [
+      {
+        "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+        "bytes": 984576,
+        "sha256": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a",
+        "matches_workspace_copy": true
+      },
+      {
+        "path": "test-data/rtf/watermark.rtf",
+        "bytes": 69471,
+        "sha256": "48d62dcd959e737b06ebb8255780bcaaf1e88056ff9c3d5a21d3ff5cd3ddf9cb",
+        "matches_workspace_copy": true
+      }
+    ]
+  },
+  "binary_and_build": {
+    "binary_path": "/tmp/litchi-performance-0923/baseline-target/release/litchi-perf-baseline",
+    "binary_bytes": 69962624,
+    "binary_sha256": "ed2d5609cc7a54459cd33627a80416d5ce2ef765b32916b5235b91209e19db28",
+    "binary_receipt_matches": true,
+    "build_receipt_path": "/tmp/litchi-performance-0923/receipts/baseline-build-final.json",
+    "build_receipt_sha256": "86eae277dd3096ab7972cc9d7696d02853fadaa3e7e20678449137b74a80e630",
+    "build_command": "cargo build --locked --offline -j2 --release --manifest-path /tmp/litchi-performance-0923/baseline-source/tree/tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline",
+    "rustc_vv_recorded": true,
+    "rustc": "1.95.0 (59807616e 2026-04-14)",
+    "cargo_version_recorded_in_receipt": false,
+    "build_start_timestamp_recorded": false,
+    "build_log_retained": false,
+    "build_completed_utc": "2026-10-06T08:38:01.899830+00:00"
+  },
+  "reports": {
+    "controls_command": "python3 -B docs/performance/results/change-0923/comparison-controls.py --report /tmp/litchi-performance-0923/baseline-generic-final.json --report /tmp/litchi-performance-0923/baseline-owned-vec-final.json --report /tmp/litchi-performance-0923/baseline-owned-reader-final.json",
+    "controls_passed": true,
+    "negative_controls_rejected": 10,
+    "children_run": 0,
+    "reports_verified": [
+      {
+        "route": "generic_read_at",
+        "path": "/tmp/litchi-performance-0923/baseline-generic-final.json",
+        "bytes": 151614,
+        "sha256": "910d4ff184f08c9911e40702ba41a7188473e878427cab6cbc2c5fdbc8720787",
+        "samples": 200,
+        "warmups": 30
+      },
+      {
+        "route": "owned_vec",
+        "path": "/tmp/litchi-performance-0923/baseline-owned-vec-final.json",
+        "bytes": 135518,
+        "sha256": "68bbcf703d3b7ba63f1a027ba5ae2843a0ca54b26f0c2444a83a3952a64be545",
+        "samples": 200,
+        "warmups": 30
+      },
+      {
+        "route": "owned_reader",
+        "path": "/tmp/litchi-performance-0923/baseline-owned-reader-final.json",
+        "bytes": 137139,
+        "sha256": "05b8c6b209cd3ba7168f7c9d927e676e0fdd67c13a90ee06299d2448c10ce221",
+        "samples": 200,
+        "warmups": 30
+      }
+    ],
+    "shared_binary_identity_verified": true,
+    "shared_output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+    "all_report_gates_verified": true
+  },
+  "provenance_limits": {
+    "source_listing": {
+      "declared_bytes": 1156468,
+      "declared_sha256": "f9714cda62133005e6eb0046f79189bd8914946ae3f1a16baade631a8b4f12fc",
+      "receipt_path_field": null,
+      "artifact_found_under_custody_root": false,
+      "status": "supplement_required"
+    },
+    "timestamps_and_logs": {
+      "source_receipt_created_utc": false,
+      "build_completion_utc": true,
+      "build_start_utc": false,
+      "report_run_timestamps": false,
+      "retained_build_or_capture_log": false,
+      "filesystem_mtimes_are_not_treated_as_provenance": true
+    },
+    "interpretation": "The source closure, lock/fixture identities, harness delta, binary, and three baseline reports are independently verified. The missing source-listing path/artifact and incomplete timestamp/log provenance must be supplemented before claiming complete baseline custody."
+  }
+}

@@ -1988,6 +1988,19 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --json target/perf/docx-section-layout.json
 ```
 
+Set `LITCHI_DOCX_INGRESS_ROUTE=owned_vec` or `owned_reader` before the command
+to measure moved-vector or sequential-reader ingress. The default is
+`generic_read_at`. Each route uses the same corpus and six timed phases;
+compare a route against itself across builds. Owned routes leave positional
+`ReadAt` vectors empty. The reader route records sequential ingress calls and
+bytes; the vector route records moved bytes and explicitly labels its zero
+reader counters as lacking an observer. Exact output and inverse restoration
+run for every route. The shared stale/foreign/signed/no-op/limit/partial-sink
+control suite runs through the generic provider, so its combined report flag
+does not establish route-local negative-case coverage for owned inputs.
+See [change 0923](../../docs/performance/0923-owned-source-fingerprint.md) for
+separately tested owned-route controls and qualified results.
+
 The fixed `litchi-docx-section-layout-source-v1` corpus has 256 direct
 paragraphs, paragraph-owned `sectPr` elements at direct paragraph indices 63
 and 128 (logical inventory positions 64 and 129 because the table-cell

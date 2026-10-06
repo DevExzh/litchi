@@ -1,5 +1,14 @@
 # Performance CRUD coverage
 
+## 0923 — owned ingress for existing DOCX section editing
+
+[0923](0923-owned-source-fingerprint.md) adds owned-vector and sequential-reader
+routes to the existing generated DOCX section-edit/publication case, retaining
+the generic provider control. Per-route output, preservation and exact inverse
+checks pass; the shared generic negative-case suite is labeled as such and
+focused owned-route tests provide separate coverage. This adds ingress coverage,
+not new format, native-Office, cold-cache or concurrency qualification.
+
 ## 0922 — repeated DOC selection-aware editing qualification
 
 [0922](0922-borrowed-fib-selection.md) reuses the existing NoHeadFoot and

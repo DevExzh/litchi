@@ -1,0 +1,135 @@
+{
+  "schema": "litchi.performance.0923.candidate-build-binding.v3",
+  "created_utc": "2026-10-06T09:14:30.951976+00:00",
+  "source_revision": "4e2532a0ce958f5928496b0ad9b356d8636916e1",
+  "candidate_base_revision": "4e2532a0ce958f5928496b0ad9b356d8636916e1",
+  "profile": "release",
+  "features": [],
+  "argv": [
+    "cargo",
+    "build",
+    "--locked",
+    "--offline",
+    "-j2",
+    "--release",
+    "--manifest-path",
+    "/tmp/litchi-performance-0923/candidate-source/tree/tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "litchi-perf-baseline"
+  ],
+  "regeneration_command": "RUSTUP_TOOLCHAIN=1.95.0 CARGO_TARGET_DIR=/tmp/litchi-performance-0923/candidate-target cargo build --locked --offline -j2 --release --manifest-path /tmp/litchi-performance-0923/candidate-source/tree/tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline",
+  "cwd": "/tmp/litchi-performance-0923/candidate-source/tree",
+  "target_dir": "/tmp/litchi-performance-0923/candidate-target",
+  "environment": {
+    "CARGO_TARGET_DIR": "/tmp/litchi-performance-0923/candidate-target",
+    "LC_ALL": "C.UTF-8",
+    "LC_CTYPE": "C.UTF-8",
+    "RUSTUP_TOOLCHAIN": "1.95.0"
+  },
+  "profile_overrides": {
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS": "false",
+    "CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS": "false",
+    "CARGO_PROFILE_RELEASE_LTO": "true",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+    "CARGO_PROFILE_RELEASE_PANIC": "abort",
+    "CARGO_PROFILE_RELEASE_INCREMENTAL": "false",
+    "CARGO_PROFILE_RELEASE_STRIP": "debuginfo"
+  },
+  "toolchain": {
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\n"
+  },
+  "rustc_vv": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "cargo_v": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\n",
+  "binary": {
+    "path": "/tmp/litchi-performance-0923/candidate-target/release/litchi-perf-baseline",
+    "exists": true,
+    "bytes": 70379960,
+    "sha256": "8d98309501f63f4911828f52c42653f5950f3f5019bd040cf98f787173528861"
+  },
+  "build_started_utc": "2026-10-06T09:08:03.024196+00:00",
+  "build_completed_utc": "2026-10-06T09:13:43.415743+00:00",
+  "exit_code": 0,
+  "log": {
+    "path": "/tmp/litchi-performance-0923/custody/candidate-native-build-v3.log",
+    "bytes": 1610,
+    "sha256": "8a88bdc02e4dc1a3e99e2f115856b82c32c7870c3a0a443b8591c0f087382d31"
+  },
+  "source_receipt": {
+    "path": "/tmp/litchi-performance-0923/receipts/candidate-source-final-v3-bound3.json",
+    "bytes": 522655,
+    "sha256": "3872b7d5e8a82c07a770ec186d0b6a447e89aa3e648f5130eccfeaa6944fc8b8"
+  },
+  "source": {
+    "candidate_base_revision": "4e2532a0ce958f5928496b0ad9b356d8636916e1",
+    "candidate_patch": {
+      "path": "/tmp/litchi-performance-0923/candidate-source-0923-v3.patch",
+      "bytes": 15772,
+      "sha256": "77c2a9952335d5f16c24fbfc8d87e120301808258f70e990324fa21b8ea8e75d"
+    },
+    "modified_files": [
+      "crates/litchi-opc/src/source_backed.rs"
+    ],
+    "candidate_source_file_count": 9355,
+    "candidate_source_listing": {
+      "path": "/tmp/litchi-performance-0923/custody/source-listing-candidate-v3.jsonl",
+      "bytes": 1437118,
+      "sha256": "5eb6840368d0e601e2db4756ae2dbc4c7fdbc4d0b8bfd810934652a95090a83a"
+    },
+    "cargo_lock": {
+      "path": "/tmp/litchi-performance-0923/candidate-source/tree/Cargo.lock",
+      "bytes": 138465,
+      "sha256": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd"
+    },
+    "harness_file": {
+      "path": "/tmp/litchi-performance-0923/candidate-source/tree/tools/perf-baseline/src/lib.rs",
+      "bytes": 3031664,
+      "sha256": "c1b9b55258df38ac6a376283c2b857ad6a541ba8c62e23730195502f083e70ca"
+    },
+    "harness_patch": {
+      "path": "/tmp/litchi-performance-0923/harness-0923.patch",
+      "bytes": 17046,
+      "sha256": "5404cf09f7f840aa3a587d1bbdce6659d0d3a8cf35d2c44bbd42b747ddf217e0"
+    }
+  },
+  "locks": {
+    "root_probe": {
+      "path": "/tmp/litchi-performance-0923/candidate-source/tree/Cargo.lock",
+      "bytes": 138465,
+      "sha256": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd"
+    },
+    "benchmark": {
+      "path": "/tmp/litchi-performance-0923/candidate-source/tree/tools/perf-baseline/Cargo.lock",
+      "bytes": 56289,
+      "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+    },
+    "quality": {
+      "path": "/tmp/litchi-performance-0923/quality-source-v2/Cargo.lock",
+      "bytes": 138201,
+      "sha256": "10cfe9377162d26618ad1c9c2c9028d3444fead3869c7f7d3294663269723ca9"
+    }
+  },
+  "harness_patch": {
+    "path": "/tmp/litchi-performance-0923/harness-0923.patch",
+    "bytes": 17046,
+    "sha256": "5404cf09f7f840aa3a587d1bbdce6659d0d3a8cf35d2c44bbd42b747ddf217e0"
+  },
+  "candidate_source_sha256": "d28843caf8245bd6f0ff0f953b9b5545c4d9ad7a4e11f362d29ce226cc251cc2",
+  "candidate_source_receipt": {
+    "path": "/tmp/litchi-performance-0923/receipts/candidate-source-final-v3-bound3.json",
+    "bytes": 522655,
+    "sha256": "3872b7d5e8a82c07a770ec186d0b6a447e89aa3e648f5130eccfeaa6944fc8b8"
+  },
+  "probe_lock": {
+    "path": "/tmp/litchi-performance-0923/candidate-source/tree/tools/perf-baseline/Cargo.lock",
+    "bytes": 56289,
+    "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+  },
+  "candidate_patch": {
+    "path": "/tmp/litchi-performance-0923/candidate-source-0923-v3.patch",
+    "bytes": 15772,
+    "sha256": "77c2a9952335d5f16c24fbfc8d87e120301808258f70e990324fa21b8ea8e75d"
+  }
+}

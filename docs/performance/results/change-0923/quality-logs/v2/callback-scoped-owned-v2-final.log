@@ -1,0 +1,18 @@
+   Compiling litchi-opc v0.0.1 (/tmp/litchi-performance-0923/quality-source-v2/crates/litchi-opc)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.44s
+     Running unittests src/lib.rs (/tmp/litchi-performance-0923/quality-target-v2/debug/deps/litchi_opc-f162180dbfb2a125)
+
+running 10 tests
+test source_backed::callback_scoped_verified_reader_tests::owned_source_fingerprint_memo_reservation_is_fallible ... ok
+test source_backed::callback_scoped_verified_reader_tests::verified_reader_checks_cancellation_before_callback_and_releases_memory ... ok
+test source_backed::callback_scoped_verified_reader_tests::verified_reader_enforces_part_limit_before_callback ... ok
+test source_backed::callback_scoped_verified_reader_tests::verified_reader_returns_custom_callback_error_after_verification ... ok
+test source_backed::callback_scoped_verified_reader_tests::verified_reader_does_not_admit_payload_to_part_cache ... ok
+test source_backed::callback_scoped_verified_reader_tests::verified_reader_preserves_typed_source_change_transport_error ... ok
+test source_backed::callback_scoped_verified_reader_tests::generic_and_managed_ingresses_do_not_retain_fingerprint_memo ... ok
+test source_backed::callback_scoped_verified_reader_tests::verified_reader_managed_accounting_is_precise_and_not_cached ... ok
+test source_backed::callback_scoped_verified_reader_tests::owned_source_fingerprint_memo_is_deferred_and_shared ... ok
+test source_backed::callback_scoped_verified_reader_tests::owned_fingerprint_warm_path_preserves_limits_publication_inverse_and_sinks ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 612 filtered out; finished in 0.00s
+

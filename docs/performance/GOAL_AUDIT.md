@@ -1,5 +1,17 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0923 — owned fingerprint reuse adopted; broader goal remains active
+
+[0923](0923-owned-source-fingerprint.md) completes implementation, independent
+review, testing and native comparison of an OPC substrate optimization. It
+reduces measured owned DOCX lifecycle median latency about 21% with passing
+paired gates and generic regression control. All 48 native processes replay
+exactly from the retained packet. The allocation workflow incorrectly restarted
+after an analysis-path error: all 25 profiles are audited and the original
+24-profile qualification is invalid, explicitly documented rather than hidden.
+This is progress toward the program goal, not proof of comprehensive CRUD or
+order-of-magnitude improvement. The goal remains active; iWork is excluded.
+
 ## 0922 — FIB copy candidate measured and rejected
 
 [0922](0922-borrowed-fib-selection.md) completes another implementation,

@@ -1,0 +1,3356 @@
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/examples/pack_uri_demo.rs:37:
+                     uri.ext(),
+                     uri.idx(),
+                 )?;
+-            },
++            }
+             Err(e) => writeln!(out, "  {input:?} -> ERROR: {e}")?,
+         }
+     }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/examples/source_backed_batch_perf.rs:213:
+         match requested {
+             0..=4_096 => {
+                 self.le_4k.fetch_add(1, Ordering::Relaxed);
+-            },
++            }
+             4_097..=16_384 => {
+                 self.le_16k.fetch_add(1, Ordering::Relaxed);
+-            },
++            }
+             16_385..=65_536 => {
+                 self.le_64k.fetch_add(1, Ordering::Relaxed);
+-            },
++            }
+             65_537..=262_144 => {
+                 self.le_256k.fetch_add(1, Ordering::Relaxed);
+-            },
++            }
+             _ => {
+                 self.gt_256k.fetch_add(1, Ordering::Relaxed);
+-            },
++            }
+         }
+     }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/examples/source_backed_batch_perf.rs:589:
+             } else {
+                 owned
+             }
+-        },
++        }
+         SourceKind::File => Arc::new(FileSource::open(&corpus.path)?),
+     };
+     let source: Arc<dyn ReadAt> = Arc::new(TrackedSource {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/examples/source_backed_batch_perf.rs:635:
+                 cache_limits,
+                 context,
+             )?
+-        },
++        }
+         None => SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
+             source,
+             ReadLimits::default(),
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/examples/source_backed_batch_perf.rs:974:
+             "--api" => config.apis = parse_apis(&value("--api", &mut args)?)?,
+             "--capability" => {
+                 config.capabilities = parse_capabilities(&value("--capability", &mut args)?)?
+-            },
++            }
+             "--workers" => config.workers = parse_usizes(&value("--workers", &mut args)?)?,
+             "--warmups" => config.warmups = value("--warmups", &mut args)?.parse()?,
+             "--samples" => config.samples = value("--samples", &mut args)?.parse()?,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/examples/source_backed_batch_perf.rs:981:
+             "--repeats" => config.repeats = value("--repeats", &mut args)?.parse()?,
+             "--short-read" => {
+                 config.short_read_bytes = value("--short-read", &mut args)?.parse()?
+-            },
++            }
+             "--delay-us" => config.delay_us = value("--delay-us", &mut args)?.parse()?,
+             "--accounting" => config.accounting = true,
+             "--artifact-dir" => config.artifact_dir = value("--artifact-dir", &mut args)?.into(),
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/examples/source_backed_batch_perf.rs:990:
+             "--help" | "-h" => {
+                 print_help();
+                 std::process::exit(0);
+-            },
++            }
+             unknown => return Err(format!("unknown argument {unknown}").into()),
+         }
+     }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/atomic.rs:263:
+         )),
+         Ok(metadata) if !metadata.is_file() => {
+             Err(invalid_path("package destination is not a regular file"))
+-        },
++        }
+         Ok(metadata) => Ok(Some(metadata.permissions())),
+         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+         Err(error) => Err(error.into()),
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/atomic.rs:281:
+             ) =>
+         {
+             Ok(())
+-        },
++        }
+         Err(error) => Err(error),
+     }
+ }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/content_type.rs:150:
+                             limits,
+                             report,
+                         )? {
+-                            Inspected::Root => {},
++                            Inspected::Root => {}
+                             Inspected::Mapping(key) => open_mapping = Some(key),
+                             Inspected::Skipped => skip_from = Some(depth),
+                         }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/content_type.rs:157:
+                     }
+                     depth = next_depth;
+-                },
++                }
+                 Event::Empty(element) => {
+                     if skip_from.is_none() {
+                         let _ = inspect_element(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/content_type.rs:172:
+                             report,
+                         )?;
+                     }
+-                },
++                }
+                 Event::End(_) => {
+                     depth = depth.checked_sub(1).ok_or_else(|| {
+                         OpcError::InvalidContentTypesManifest(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/content_type.rs:184:
+                     } else if skip_from.is_none() && depth == 1 {
+                         open_mapping = None;
+                     }
+-                },
++                }
+                 // Character data is ignored by Apache POI and LibreOffice
+                 // alike (LENIENCY_AUDIT 8.11); it is recorded, not stored.
+                 // Whitespace-only text never reaches here (`trim_text`).
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/content_type.rs:197:
+                             Some(TEXT_NODE),
+                         );
+                     }
+-                },
++                }
+                 Event::CData(data) => {
+                     if skip_from.is_none() && !data.as_ref().iter().all(u8::is_ascii_whitespace) {
+                         report.record(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/content_type.rs:207:
+                             Some(CDATA_NODE),
+                         );
+                     }
+-                },
++                }
+                 // A DTD stays fatal: Apache POI disallows DOCTYPE outright,
+                 // and entity declarations are a parser-security surface.
+                 Event::DocType(_) => {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/content_type.rs:214:
+                     return Err(OpcError::InvalidContentTypesManifest(
+                         "DTDs are not permitted in the content types manifest".to_string(),
+                     ));
+-                },
++                }
+                 Event::Eof => break,
+                 Event::Text(_)
+                 | Event::Comment(_)
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/content_type.rs:221:
+                 | Event::Decl(_)
+                 | Event::PI(_)
+-                | Event::GeneralRef(_) => {},
++                | Event::GeneralRef(_) => {}
+             }
+         }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/content_type.rs:504:
+         Ok(()) => Ok(ContentType(value)),
+         Err(reason) if value.is_empty() || value.chars().any(char::is_control) => {
+             Err(OpcError::InvalidContentType { value, reason })
+-        },
++        }
+         Err(_) => {
+             report.record(
+                 ContentTypeDefect::InvalidMediaType,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/content_type.rs:513:
+                 Some(&value),
+             );
+             Ok(ContentType(value))
+-        },
++        }
+     }
+ }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/content_type.rs:536:
+                 Some(content_type.as_str()),
+             );
+             Ok(())
+-        },
++        }
+     }
+ }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/error.rs:365:
+             soapberry_zip::ErrorKind::Cancelled => Self::Cancelled,
+             soapberry_zip::ErrorKind::IO(error) | soapberry_zip::ErrorKind::Io(error) => {
+                 map_io_error(error)
+-            },
++            }
+             soapberry_zip::ErrorKind::LimitExceeded {
+                 resource,
+                 actual,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/error.rs:375:
+                     soapberry_zip::LimitResource::FileCount => ReadResource::ArchiveMembers,
+                     soapberry_zip::LimitResource::MemberNameBytes => {
+                         ReadResource::ArchiveMemberNameBytes
+-                    },
++                    }
+                     soapberry_zip::LimitResource::MetadataBytes => {
+                         ReadResource::ArchiveMetadataBytes
+-                    },
++                    }
+                     soapberry_zip::LimitResource::CompressedSize => {
+                         ReadResource::ArchiveCompressedBytes
+-                    },
++                    }
+                     soapberry_zip::LimitResource::EntrySize => ReadResource::ArchiveEntryBytes,
+                     soapberry_zip::LimitResource::TotalSize => ReadResource::ArchiveTotalBytes,
+                 },
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/error.rs:390:
+             },
+             soapberry_zip::ErrorKind::Allocation { resource, source } => {
+                 Self::Allocation { resource, source }
+-            },
++            }
+             soapberry_zip::ErrorKind::CentralDirectorySpool { operation, source } => {
+                 Self::CentralDirectorySpool { operation, source }
+-            },
++            }
+             soapberry_zip::ErrorKind::CentralDirectorySpoolLimitExceeded { actual, maximum } => {
+                 Self::CentralDirectorySpoolLimitExceeded { actual, maximum }
+-            },
++            }
+             kind => Self::ZipError(kind.to_string()),
+         }
+     }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/error.rs:463:
+                 actual: *actual,
+                 maximum: *maximum,
+             }
+-        },
++        }
+         OpcError::Cancelled => OpcError::Cancelled,
+         OpcError::Execution(execution) => OpcError::Execution(execution.clone()),
+         OpcError::IoError(source) => {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/error.rs:470:
+             OpcError::IoError(std::io::Error::new(source.kind(), source.to_string()))
+-        },
++        }
+         OpcError::ZipError(message) => OpcError::ZipError(message.clone()),
+         OpcError::PartNotFound(name) => OpcError::PartNotFound(name.clone()),
+         other => OpcError::ZipError(other.to_string()),
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/error.rs:524:
+             OpcError::PartNotFound(s) => litchi_core::Error::ComponentNotFound(s),
+             OpcError::Allocation { resource, source } => {
+                 litchi_core::Error::Allocation { resource, source }
+-            },
++            }
+             OpcError::CollectionAllocation { resource } => {
+                 litchi_core::Error::Other(format!("allocation failed for {resource}"))
+-            },
++            }
+             OpcError::ValidationReport(error) => litchi_core::Error::Other(error.to_string()),
+             error @ (OpcError::SourceBackedOverlayUnavailable { .. }
+             | OpcError::PreservationUnavailable { .. }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/error.rs:536:
+             | OpcError::SourceBackedBatchWorkerPanic { .. }
+             | OpcError::SourceBackedBatchInvariant { .. }) => {
+                 litchi_core::Error::Unsupported(error.to_string())
+-            },
++            }
+             OpcError::InvalidReadLimit { .. }
+             | OpcError::ReadLimit { .. }
+             | OpcError::Cancelled
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/error.rs:593:
+             }),
+             error @ OpcError::InvalidSourcePartSpliceLimit { .. } => {
+                 litchi_core::Error::Unsupported(error.to_string())
+-            },
++            }
+             OpcError::Committed { source } => litchi_core::Error::Committed(source),
+         }
+     }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/execution.rs:271:
+             Err(error) => {
+                 drop(workers);
+                 return Err(map_execution_error(error));
+-            },
++            }
+         };
+         self.consume_read_cpu_tasks(cpu_tasks)?;
+         Ok(ReadAdmission {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/execution.rs:306:
+                             workers: None,
+                             io,
+                         });
+-                    },
++                    }
+                     Err(ExecutionError::ResourceLimit(limit))
+                         if limit.resource == Resource::IoConcurrency =>
+                     {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/execution.rs:313:
+                         last_limit = Some(limit);
+-                    },
++                    }
+                     Err(error) => return Err(map_execution_error(error)),
+                 }
+             }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/execution.rs:327:
+                     if limit.resource == Resource::Workers =>
+                 {
+                     continue;
+-                },
++                }
+                 Err(error) => return Err(map_execution_error(error)),
+             };
+             let io = match self.context.reserve(Resource::IoConcurrency, width as u64) {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/execution.rs:337:
+                 {
+                     drop(workers);
+                     continue;
+-                },
++                }
+                 Err(error) => {
+                     drop(workers);
+                     return Err(map_execution_error(error));
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/execution.rs:344:
+-                },
++                }
+             };
+             if self.context.scoped_workers().is_some() {
+                 self.consume_read_cpu_tasks(cpu_tasks)?;
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/execution.rs:377:
+             Err(error) => {
+                 drop(workers);
+                 return Err(map_execution_error(error));
+-            },
++            }
+         };
+         self.consume_read_cpu_tasks(cpu_tasks)?;
+         Ok(ReadAdmission {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/leniency.rs:224:
+             Self::DuplicateId => "kept the first relationship with this Id; dropped the duplicate",
+             Self::UnresolvableTarget => {
+                 "kept the relationship as dangling; its unresolvable internal target was not followed"
+-            },
++            }
+             Self::NonCanonicalTargetMode => "matched TargetMode case-insensitively",
+             Self::UnrecognizedTargetMode => "read the unrecognized TargetMode as External",
+             Self::MissingTarget => "skipped the relationship with a missing or empty Target",
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/leniency.rs:231:
+             Self::MissingType => "skipped the relationship with a missing or empty Type",
+             Self::UnknownElement => {
+                 "skipped an unknown element in the relationships manifest, with its subtree"
+-            },
++            }
+             Self::UnknownAttribute => "ignored an unknown Relationship attribute",
+             Self::UnexpectedContent => "ignored character data in the relationships manifest",
+             Self::NonConformingId => {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/leniency.rs:238:
+                 "kept the relationship Id verbatim although it is not an XML ID"
+-            },
++            }
+         }
+     }
+ }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/leniency.rs:324:
+         match self {
+             Self::DuplicateDefault => {
+                 "kept the first Default mapping for the extension; dropped the duplicate"
+-            },
++            }
+             Self::DuplicateOverride => {
+                 "kept the first Override mapping for the part name; dropped the duplicate"
+-            },
++            }
+             Self::RelationshipPartType => {
+                 "typed the relationships part with the fixed relationships content type"
+-            },
++            }
+             Self::UnknownElement => {
+                 "skipped an unknown element in the content types manifest, with its subtree"
+-            },
++            }
+             Self::UnknownAttribute => "ignored an unknown content-type mapping attribute",
+             Self::UnexpectedContent => "ignored character data in the content types manifest",
+             Self::InvalidMediaType => "kept the content type verbatim despite its MIME grammar",
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/members.rs:50:
+             Self::UnmappablePartName => "ZIP item name is not a valid OPC part name",
+             Self::UntypedAndUnreferenced => {
+                 "ZIP item has no content type and no relationship refers to it"
+-            },
++            }
+         }
+     }
+ }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/package/compressed_transfer.rs:295:
+         let untouched = match (handle.payload(), &source_part.blob) {
+             (PartPayload::Deferred(current), PartPayload::Deferred(source)) => {
+                 Arc::ptr_eq(current, source)
+-            },
++            }
+             (current, source) => match (current.decoded(), source.decoded()) {
+                 (Some(current), Some(source)) => Arc::ptr_eq(current, source),
+                 _ => false,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/package/compressed_transfer.rs:374:
+         ) {
+             Ok(index) => {
+                 let _raced = cell.set(Some(Box::new(index)));
+-            },
++            }
+             Err(error) if error.is_content_fault() => {
+                 let _raced = cell.set(None);
+-            },
++            }
+             Err(error) => return Err(OpcError::from(error)),
+         }
+         Ok(cell.get().and_then(Option::as_deref))
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/package/content_types.rs:401:
+                         "content-types XML depth overflows".into(),
+                     )
+                 })?;
+-            },
++            }
+             Event::Empty(element) if depth == 1 && element.local_name().as_ref() == b"Override" => {
+                 let mut part_name = None;
+                 for attribute in element.checked_attributes() {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/package/content_types.rs:434:
+                         edit: OwnedElementEdit::Remove,
+                     });
+                 }
+-            },
+-            Event::Empty(_) => {},
++            }
++            Event::Empty(_) => {}
+             Event::End(_) => {
+                 depth = depth.checked_sub(1).ok_or_else(|| {
+                     OpcError::InvalidContentTypesManifest(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/package/content_types.rs:442:
+                         "unmatched content-types XML closing element".into(),
+                     )
+                 })?;
+-            },
++            }
+             Event::Eof => break,
+-            _ => {},
++            _ => {}
+         }
+     }
+     if depth != 0 {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/package/content_types.rs:567:
+                 root_tag = Some(start..end);
+                 root_name = Some(element.name().as_ref().to_vec());
+                 depth = 1;
+-            },
++            }
+             Event::Empty(element) if depth == 0 => {
+                 if element.local_name().as_ref() != b"Types" {
+                     return Err(OpcError::InvalidContentTypesManifest(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/package/content_types.rs:578:
+                 root_name = Some(element.name().as_ref().to_vec());
+                 root_empty = true;
+                 break;
+-            },
++            }
+             Event::Start(_) => {
+                 depth = depth.checked_add(1).ok_or_else(|| {
+                     OpcError::InvalidContentTypesManifest(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/package/content_types.rs:585:
+                         "content-types XML depth overflows".into(),
+                     )
+                 })?;
+-            },
++            }
+             Event::End(_) => {
+                 if depth == 1 {
+                     root_close = Some(start..end);
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/package/content_types.rs:596:
+                 if depth == 0 {
+                     break;
+                 }
+-            },
++            }
+             Event::Eof => break,
+-            _ => {},
++            _ => {}
+         }
+     }
+     let root_tag = root_tag.ok_or_else(|| {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/package/relationships.rs:768:
+                 root_name = Some(element.name().as_ref().to_vec());
+                 root_tag = Some(start..end);
+                 depth = 1;
+-            },
++            }
+             Event::Empty(element) if depth == 0 => {
+                 if element.local_name().as_ref() != b"Relationships" {
+                     return Err(invalid("relationships root must be Relationships"));
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/package/relationships.rs:776:
+                 root_name = Some(element.name().as_ref().to_vec());
+                 root_tag = Some(start..end);
+                 root_empty = true;
+-            },
++            }
+             Event::Start(element) if depth == 1 => {
+                 if element.local_name().as_ref() == b"Relationship" {
+                     relationship_count = relationship_count
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/package/relationships.rs:790:
+                 depth = depth
+                     .checked_add(1)
+                     .ok_or_else(|| invalid("relationship XML depth overflows"))?;
+-            },
++            }
+             Event::Empty(element) if depth == 1 => {
+                 if element.local_name().as_ref() == b"Relationship" {
+                     relationship_count = relationship_count
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/package/relationships.rs:808:
+                         removal_ranges.push(range);
+                     }
+                 }
+-            },
++            }
+             Event::End(_) => {
+                 if depth == 1 {
+                     root_close = Some(start);
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/package/relationships.rs:828:
+                 depth = depth
+                     .checked_sub(1)
+                     .ok_or_else(|| invalid("unbalanced relationship XML"))?;
+-            },
++            }
+             Event::Eof => break,
+-            _ => {},
++            _ => {}
+         }
+     }
+     if depth != 0 || root_name.is_none() || root_tag.is_none() {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/package/relationships.rs:997:
+                     if !empty {
+                         depth += 1;
+                     }
+-                },
++                }
+                 Event::End(_) => {
+                     depth = depth
+                         .checked_sub(1)
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/package/relationships.rs:1004:
+                         .ok_or_else(|| invalid("unbalanced relationship XML"))?;
+-                },
++                }
+                 Event::Eof => break,
+-                _ => {},
++                _ => {}
+             }
+         }
+         if updates.is_empty() {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/package/relationships.rs:1095:
+                     root_tag = Some(start..end);
+                     root_name = Some(element.name().as_ref().to_vec());
+                     depth = 1;
+-                },
++                }
+                 Event::Empty(element) if depth == 0 => {
+                     if element.local_name().as_ref() != b"Relationships" {
+                         return Err(invalid("relationships root must be Relationships"));
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/package/relationships.rs:1104:
+                     root_name = Some(element.name().as_ref().to_vec());
+                     root_empty = true;
+                     break;
+-                },
++                }
+                 Event::Start(_) => {
+                     depth = depth
+                         .checked_add(1)
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/package/relationships.rs:1111:
+                         .ok_or_else(|| invalid("relationship XML depth overflows"))?;
+-                },
++                }
+                 Event::End(_) => {
+                     if depth == 1 {
+                         root_close = Some(start..end);
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/package/relationships.rs:1120:
+                     if depth == 0 {
+                         break;
+                     }
+-                },
++                }
+                 Event::Eof => break,
+-                _ => {},
++                _ => {}
+             }
+         }
+         let root_tag = root_tag.ok_or_else(|| invalid("relationships root is missing"))?;
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/package/relationships.rs:1569:
+                         .ok_or_else(|| invalid("relationship count overflows"))?;
+                 }
+                 depth = next_depth;
+-            },
++            }
+             Event::Empty(element) => {
+                 if depth == 1 && element.local_name().as_ref() == b"Relationship" {
+                     check_relationship_attributes(&element, decoder, limits)?;
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/package/relationships.rs:1577:
+                         .checked_add(1)
+                         .ok_or_else(|| invalid("relationship count overflows"))?;
+                 }
+-            },
++            }
+             Event::End(_) => {
+                 depth = depth
+                     .checked_sub(1)
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/package/relationships.rs:1584:
+                     .ok_or_else(|| invalid("relationship XML depth underflows"))?;
+-            },
++            }
+             Event::Eof => break,
+-            _ => {},
++            _ => {}
+         }
+     }
+     Ok((events, relationships))
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/package.rs:763:
+                 } else {
+                     None
+                 }
+-            },
++            }
+             _ => None,
+         };
+         let (bytes, binding) = match retained {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/package.rs:784:
+                 )?;
+                 let binding = Arc::new(ContentTypeMap::from_xml(bytes.as_slice(), limits)?);
+                 (bytes, binding)
+-            },
++            }
+         };
+         let xml = crate::OwnedXmlPart::capture_with_limits(
+             name,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/packuri.rs:351:
+                         // Keep leading slash
+                         parts.push("");
+                     }
+-                },
++                }
+                 ".." => {
+                     // Go up one directory
+                     if parts.len() > 1 {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/packuri.rs:361:
+                             "Relationship target escapes the package root: '{path}'"
+                         ));
+                     }
+-                },
++                }
+                 _ => {
+                     parts.push(part);
+-                },
++                }
+             }
+         }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/part.rs:580:
+                         attrs.insert(key.to_string(), value.to_string());
+                     }
+                     results.push(attrs);
+-                },
++                }
+                 Ok(Event::Eof) => break,
+                 Err(e) => return Err(OpcError::XmlError(format!("XML parse error: {e}"))),
+-                _ => {},
++                _ => {}
+             }
+         }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/payload.rs:144:
+                 Ok(_) => {
+                     self.inflated_parts.fetch_add(1, Ordering::Relaxed);
+                     return Ok(());
+-                },
++                }
+                 Err(observed) => current = observed,
+             }
+         }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/payload.rs:357:
+         match self {
+             Self::Verified(verified) => {
+                 verified.covers(bytes, xml_minifier::audit::Limits::default())
+-            },
++            }
+             Self::Ready(_) | Self::Deferred(_) | Self::Transferred(_) => false,
+         }
+     }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/payload.rs:384:
+         match self {
+             Self::Transferred(transferred) => {
+                 Some((transferred.decoded(), transferred.compressed()))
+-            },
++            }
+             Self::Ready(_) | Self::Deferred(_) | Self::Verified(_) => None,
+         }
+     }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/phys_pkg.rs:337:
+             Ok(blob) => {
+                 self.commit_actual_parts(reservation, std::slice::from_ref(&blob))?;
+                 Ok(blob)
+-            },
++            }
+             Err(error) => {
+                 self.release_declared_parts(reservation);
+                 Err(map_part_error(&label, &error))
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/phys_pkg.rs:344:
+-            },
++            }
+         }
+     }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/phys_pkg.rs:542:
+                 Err(error) => {
+                     self.release_declared_parts(reservation);
+                     return Err(map_part_error(name, &error));
+-                },
++                }
+             }
+         }
+         if materialized.len() != names.len() {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/phys_pkg.rs:646:
+             Ok(blob) => {
+                 self.commit_relationship(declared, blob.len() as u64)?;
+                 Ok(blob)
+-            },
++            }
+             Err(error) => {
+                 self.release_declared_relationship(declared);
+                 Err(map_part_error(label, &error))
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/phys_pkg.rs:653:
+-            },
++            }
+         }
+     }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/phys_pkg.rs:1500:
+             } => {
+                 part_names.insert(partname, prepared);
+                 PartNamePolicy::Ordinary(part_names)
+-            },
++            }
+             PartWriterNameState::Generated => PartNamePolicy::Generated,
+         };
+         Ok(PhysPkgWriter {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/phys_pkg.rs:1669:
+                     prepared: prepared_name,
+                     part_names,
+                 }
+-            },
++            }
+             PartNamePolicy::Generated => {
+                 validate_generated_route_name(partname)?;
+                 PartWriterNameState::Generated
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/phys_pkg.rs:1676:
+-            },
++            }
+         };
+         let entry = self
+             .archive
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/phys_pkg.rs:1701:
+                 validate_part_name(part_names, pack_uri, &prepared_name)?;
+                 part_names.reserve(&prepared_name)?;
+                 Some((clone_pack_uri(pack_uri)?, prepared_name))
+-            },
++            }
+             PartNamePolicy::Generated => {
+                 validate_generated_route_name(pack_uri)?;
+                 None
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/phys_pkg.rs:1708:
+-            },
++            }
+         };
+         let result = self.archive.write_deflated(pack_uri.membername(), blob);
+         if let Err(error) = result {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/phys_pkg.rs:1735:
+                 validate_part_name(part_names, pack_uri, &prepared_name)?;
+                 part_names.reserve(&prepared_name)?;
+                 Some((clone_pack_uri(pack_uri)?, prepared_name))
+-            },
++            }
+             PartNamePolicy::Generated => {
+                 validate_generated_route_name(pack_uri)?;
+                 None
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/phys_pkg.rs:1742:
+-            },
++            }
+         };
+         let result = self.archive.write_stored(pack_uri.membername(), blob);
+         if let Err(error) = result {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/phys_pkg.rs:2497:
+                     OpcError::CentralDirectorySpool { operation, source } => {
+                         assert_eq!(operation, "write central-directory record");
+                         assert_eq!(source.kind(), std::io::ErrorKind::Other);
+-                    },
++                    }
+                     error => panic!("unexpected wrapped spool error: {error:?}"),
+                 }
+-            },
++            }
+             Err(error) => panic!("unexpected metadata spool error: {error:?}"),
+             Ok(()) => panic!("spool append unexpectedly succeeded"),
+         }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/phys_pkg.rs:2529:
+                         maximum: 60
+                     } if actual > 60
+                 ));
+-            },
++            }
+             Err(error) => panic!("unexpected metadata spool error: {error:?}"),
+             Ok(()) => panic!("spool limit unexpectedly accepted the record"),
+         }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/phys_pkg.rs:2560:
+                         ..
+                     }
+                 ));
+-            },
++            }
+             Err(error) => panic!("unexpected metadata spool error: {error:?}"),
+             Ok(_) => panic!("spool replay unexpectedly succeeded"),
+         }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/phys_pkg.rs:2818:
+                     *source,
+                     OpcError::IoError(error) if error.kind() == std::io::ErrorKind::Other
+                 ));
+-            },
++            }
+             Ok(_) => panic!("partial output unexpectedly finished"),
+             Err(other) => panic!("unexpected partial output error: {other:?}"),
+         }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgreader.rs:131:
+                     .map_err(|source| allocation(resource, source))?;
+                 owned.extend_from_slice(bytes);
+                 Ok(Arc::new(owned))
+-            },
++            }
+         }
+     }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgreader.rs:1205:
+                             ledger,
+                             report,
+                         )? {
+-                            InspectedRelationship::Root => {},
++                            InspectedRelationship::Root => {}
+                             InspectedRelationship::Relationship(id) => open_relationship = Some(id),
+                             InspectedRelationship::Skipped => skip_from = Some(depth),
+                         }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgreader.rs:1212:
+                     }
+                     depth = next_depth;
+-                },
++                }
+                 Event::Empty(element) => {
+                     if skip_from.is_none() {
+                         let _ = inspect_relationship_element(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgreader.rs:1230:
+                             report,
+                         )?;
+                     }
+-                },
++                }
+                 Event::End(_) => {
+                     depth = depth.checked_sub(1).ok_or_else(|| {
+                         OpcError::InvalidRelationshipsManifest(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgreader.rs:1242:
+                     } else if skip_from.is_none() && depth == 1 {
+                         open_relationship = None;
+                     }
+-                },
++                }
+                 // Character data is ignored by Apache POI and LibreOffice
+                 // alike (LENIENCY_AUDIT 8.11); it is recorded, not stored.
+                 // Whitespace-only text never reaches here (`trim_text`).
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgreader.rs:1255:
+                             Some(TEXT_NODE),
+                         );
+                     }
+-                },
++                }
+                 Event::CData(data) => {
+                     if skip_from.is_none() && !data.as_ref().iter().all(u8::is_ascii_whitespace) {
+                         report.record(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgreader.rs:1265:
+                             Some(CDATA_NODE),
+                         );
+                     }
+-                },
++                }
+                 // A DTD stays fatal: Apache POI disallows DOCTYPE outright,
+                 // and entity declarations are a parser-security surface.
+                 Event::DocType(_) => {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgreader.rs:1272:
+                     return Err(OpcError::InvalidRelationshipsManifest(
+                         "DTDs are not permitted in relationships parts".to_string(),
+                     ));
+-                },
++                }
+                 Event::Eof => break,
+                 Event::Text(_)
+                 | Event::Comment(_)
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgreader.rs:1279:
+                 | Event::Decl(_)
+                 | Event::PI(_)
+-                | Event::GeneralRef(_) => {},
++                | Event::GeneralRef(_) => {}
+             }
+         }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgreader.rs:1359:
+                     source_xml.insert(source_uri.clone(), rels_xml.into_shared()?);
+                 }
+                 Ok(relationships)
+-            },
++            }
+             Err(error) if is_member_missing(&error) => Ok(SmallVec::new()),
+             Err(error) => Err(error.into()),
+         }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgreader.rs:1668:
+                             NonPartReason::UntypedAndUnreferenced,
+                         )?);
+                         continue;
+-                    },
++                    }
+                     Err(error) => return Err(error),
+                 }
+             };
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgreader.rs:1984:
+                 Some(slot) => *slot = part_srels,
+                 None => {
+                     visited.insert(partname.to_string(), part_srels);
+-                },
++                }
+             }
+         }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgreader.rs:2019:
+                     Some(&srel.target_ref),
+                 );
+                 return Ok(());
+-            },
++            }
+             Err(error) => return Err(error),
+         };
+         limits.check(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgreader.rs:2073:
+                     Some(&declared),
+                 );
+                 Ok(ct::OPC_RELATIONSHIPS.to_string())
+-            },
++            }
+             Err(OpcError::ContentTypeNotFound(_)) => Ok(ct::OPC_RELATIONSHIPS.to_string()),
+             Err(error) => Err(error),
+         }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgreader.rs:2363:
+             b"Type" => type_attribute = Some(value),
+             b"Target" => target_attribute = Some(value),
+             b"TargetMode" => target_mode_attribute = Some(value),
+-            b"xmlns" => {},
+-            name if name.starts_with(b"xmlns:") => {},
++            b"xmlns" => {}
++            name if name.starts_with(b"xmlns:") => {}
+             // Apache POI and LibreOffice both ignore attributes they do not
+             // query (LENIENCY_AUDIT 8.11); recorded once the Id is known.
+             name => {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgreader.rs:2374:
+                         resource: "OPC unknown relationship attributes",
+                     })?;
+                 unknown_attributes.push(String::from_utf8_lossy(name).into_owned());
+-            },
++            }
+         }
+     }
+     let id = required_relationship_attribute(id_attribute, "Id")?;
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgreader.rs:2414:
+                 target.as_deref(),
+             );
+             return Ok(opened);
+-        },
++        }
+         (Some(relationship_type), None) => {
+             ledger.add_relationship(limits)?;
+             report.record(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgreader.rs:2424:
+                 Some(&relationship_type),
+             );
+             return Ok(opened);
+-        },
++        }
+     };
+     if ids.contains(&id) {
+         // ECMA-376 Part 2 §6.5.3.4 makes Id uniqueness a producer rule with no
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgreader.rs:2451:
+                 report.record(defect, owner, Some(&id), Some(&value));
+             }
+             mode
+-        },
++        }
+     };
+     if relationship_type.chars().any(char::is_whitespace)
+         || relationship_type.chars().any(char::is_control)
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgreader.rs:2666:
+             OpcError::IoError(error) => {
+                 assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+                 assert!(error.to_string().contains("OPC source reader returned"));
+-            },
++            }
+             other => panic!("expected typed hostile-reader error, got {other:?}"),
+         }
+         assert_eq!(reader.stream_position().unwrap(), original_position);
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgreader.rs:2687:
+             StructuralMember::Shared(shared) => {
+                 assert!(Arc::ptr_eq(&shared, &cached));
+                 assert_eq!(shared.as_slice(), b"shared structural payload");
+-            },
++            }
+             StructuralMember::Borrowed(_) => {
+                 panic!("deflated structural member unexpectedly borrowed")
+-            },
++            }
+             StructuralMember::Owned(_) => {
+                 panic!("lazy structural member did not use shared decompression")
+-            },
++            }
+         }
+     }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgreader.rs:2717:
+                 assert_eq!(borrowed.as_ptr(), source.as_ptr());
+                 assert_eq!(borrowed.len(), source.len());
+                 assert_eq!(archive.cache_size(), 0);
+-            },
++            }
+             StructuralMember::Shared(_) => {
+                 panic!("stored structural member unexpectedly entered shared cache")
+-            },
++            }
+             StructuralMember::Owned(_) => {
+                 panic!("stored structural member unexpectedly materialized")
+-            },
++            }
+         }
+     }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgreader.rs:2744:
+         match member {
+             StructuralMember::Owned(owned) => {
+                 assert_eq!(owned, b"indexed structural payload");
+-            },
++            }
+             StructuralMember::Borrowed(_) => {
+                 panic!("indexed structural member unexpectedly borrowed")
+-            },
++            }
+             StructuralMember::Shared(_) => {
+                 panic!("indexed structural member unexpectedly shared")
+-            },
++            }
+         }
+     }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgreader.rs:3395:
+         match read_with_limits(bytes, limits) {
+             Err(OpcError::ReadLimit {
+                 resource: actual, ..
+-            }) if actual == resource => {},
++            }) if actual == resource => {}
+             Err(error) => panic!("expected {resource} limit, got {error:?}"),
+             Ok(_) => panic!("expected {resource} limit, package was accepted"),
+         }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgreader.rs:3902:
+                 match (expected, actual) {
+                     (Ok(expected), Ok(actual)) => {
+                         assert_eq!(actual, expected, "{} member {name}", path.display());
+-                    },
++                    }
+                     (Err(expected), Err(actual)) => {
+                         assert_eq!(
+                             actual.to_string(),
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgreader.rs:3910:
+                             "{} member {name}",
+                             path.display()
+                         );
+-                    },
++                    }
+                     (expected, actual) => panic!(
+                         "{} member {name} diverged: {expected:?} then {actual:?}",
+                         path.display()
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgwriter.rs:776:
+                 } else {
+                     Some(part.materialized_blob()?.len())
+                 }
+-            },
++            }
+             SourceMemberKind::PartRelationships(partname) => {
+                 let Some(part) = planned_parts.get(partname) else {
+                     return Ok(PreservationWrite::Fallback(writer));
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgwriter.rs:793:
+                     (source_part.relationships_xml.as_bytes() != relationships.bytes())
+                         .then_some(relationships.bytes().len())
+                 }
+-            },
++            }
+             SourceMemberKind::ContentTypes
+             | SourceMemberKind::PackageRelationships
+             | SourceMemberKind::Unknown => None,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgwriter.rs:820:
+                     return Ok(PreservationWrite::Fallback(writer));
+                 };
+                 relationships.bytes().len()
+-            },
++            }
+         };
+         appended_bytes = appended_bytes.checked_add(bytes as u64).ok_or_else(|| {
+             crate::OpcError::ZipError("OPC appended member bytes overflow".into())
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgwriter.rs:864:
+                         preservation_member_name(source_member, indexed_entry),
+                         content_types_xml.bytes(),
+                     )?
+-                },
++                }
+                 SourceMemberKind::PackageRelationships if package_rels_changed => {
+                     let Some(package_rels_xml) = publication.package_rels_xml.as_ref() else {
+                         return Ok(PreservationWrite::Fallback(writer));
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgwriter.rs:874:
+                         preservation_member_name(source_member, indexed_entry),
+                         package_rels_xml.bytes(),
+                     )?
+-                },
++                }
+                 SourceMemberKind::Part(partname) => {
+                     let Some(part) = planned_parts.get(partname) else {
+                         return Ok(PreservationWrite::Fallback(writer));
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgwriter.rs:892:
+                             part.materialized_blob()?,
+                         )?
+                     }
+-                },
++                }
+                 SourceMemberKind::PartRelationships(partname) => {
+                     let Some(part) = planned_parts.get(partname) else {
+                         return Ok(PreservationWrite::Fallback(writer));
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgwriter.rs:916:
+                             )?
+                         }
+                     }
+-                },
++                }
+                 SourceMemberKind::ContentTypes
+                 | SourceMemberKind::PackageRelationships
+                 | SourceMemberKind::Unknown => {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgwriter.rs:923:
+                     soapberry_zip::PreservationAction::Copy(indexed_entry.id())
+-                },
++                }
+             }
+         };
+         plan.push(action);
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgwriter.rs:942:
+                     relationships.bytes(),
+                     "OPC appended relationship payload",
+                 )?
+-            },
++            }
+         };
+         plan.try_append(entry)
+             .map_err(|source| crate::OpcError::Allocation {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgwriter.rs:1033:
+             let relationships_uri = package_uri.rels_uri().ok()?;
+             let relationships_name = relationships_uri.membername();
+             (name == relationships_name).then_some(name)
+-        },
++        }
+         SourceMemberKind::Part(partname) => (name == partname.membername()).then_some(name),
+         SourceMemberKind::PartRelationships(partname) => {
+             let relationships_uri = partname.rels_uri().ok()?;
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgwriter.rs:1040:
+             let relationships_name = relationships_uri.membername();
+             (name == relationships_name).then_some(name)
+-        },
++        }
+         SourceMemberKind::Unknown => Some(name),
+     }
+ }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgwriter.rs:1120:
+     match handle.payload().compressed_transfer() {
+         Some((decoded, compressed)) if Arc::ptr_eq(decoded, &blob) => {
+             soapberry_zip::RegeneratedEntry::new_precompressed_shared(name, compressed.clone())
+-        },
++        }
+         _ => soapberry_zip::RegeneratedEntry::new_shared(name, blob)
+             .compression_method(soapberry_zip::CompressionMethod::Deflate),
+     }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgwriter.rs:1273:
+                 }
+                 plan.materialize_pristine(package)?;
+                 writer
+-            },
++            }
+         };
+         let mut physical = PhysPkgWriter::with_writer(writer);
+         plan.write(&mut physical)?;
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgwriter.rs:1315:
+                 }
+                 debug_assert!(bytes.is_empty());
+                 plan.materialize_pristine(package)?;
+-            },
++            }
+         }
+         let mut physical = PhysPkgWriter::new();
+         plan.write(&mut physical)?;
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/pkgwriter.rs:4270:
+                 "custom/manifest.rdf" => "application/rdf+xml",
+                 "_xmlsignatures/sig1.xml" => {
+                     "application/vnd.openxmlformats-package.digital-signature-xmlsignature+xml"
+-                },
++                }
+                 _ => "application/octet-stream",
+             };
+             if xml_minifier::audit::package::is_xml_part(&name, media_type) {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/rel.rs:426:
+                         TargetMode::Internal
+                     },
+                 ))
+-            },
++            }
+         }
+     }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/rel.rs:486:
+                 );
+                 relationship.source_admitted_id = source_admitted_id;
+                 Ok(entry.insert(relationship))
+-            },
++            }
+         }
+     }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/rel.rs:631:
+             match num.cmp(&next_num) {
+                 std::cmp::Ordering::Equal => next_num += 1,
+                 std::cmp::Ordering::Greater => break,
+-                std::cmp::Ordering::Less => {},
++                std::cmp::Ordering::Less => {}
+             }
+         }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/sign.rs:143:
+                     origin: None,
+                     signatures: Vec::new(),
+                 });
+-            },
++            }
+             Some(origin) if origins.next().is_none() => origin,
+             Some(_) => {
+                 let count = origins.count().saturating_add(2);
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/sign.rs:150:
+                 return Err(Error::Graph(format!(
+                     "expected one signature-origin relationship, found {count}"
+                 )));
+-            },
++            }
+         };
+ 
+         let origin_id = origin_relationship.r_id().to_string();
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/sign.rs:430:
+                     xml::Ref::owned(uri, data)?
+                         .transform(Transform::Relationships(ids))
+                         .transform(Transform::Canon(Canon::Inclusive))
+-                },
++                }
+             };
+             references.push(reference);
+         }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/sign.rs:471:
+                     [Transform::Relationships(selected)] => (selected, None),
+                     [Transform::Relationships(selected), Transform::Canon(canon)] => {
+                         (selected, Some(*canon))
+-                    },
++                    }
+                     _ => {
+                         return Err(litchi_sign::Error::Container(format!(
+                             "invalid RelationshipTransform chain for {uri}"
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/sign.rs:478:
+                         )));
+-                    },
++                    }
+                 };
+                 if selected.len() > self.limits.max_references() {
+                     return Err(litchi_sign::Error::Limit(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/sign.rs:498:
+                     data = xml::canonicalize(&data, algorithm, self.limits)?;
+                 }
+                 Ok((Cow::Owned(data), coverage))
+-            },
++            }
+         }
+     }
+ }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/sign.rs:938:
+                 ],
+                 "relationship reference URI",
+             )
+-        },
++        }
+     }
+ }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/sign.rs:962:
+                 maximum,
+                 "relationship reference URI",
+             )
+-        },
++        }
+     }
+ }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/sign.rs:1056:
+             other => {
+                 let mut encoded = [0; 4];
+                 push(output, other.encode_utf8(&mut encoded).as_bytes(), maximum)?;
+-            },
++            }
+         }
+     }
+     Ok(())
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/batch.rs:162:
+         Err(error) => {
+             drop(prepared);
+             return finish(package, Err(error));
+-        },
++        }
+     };
+     let mut parts = match output.allocate(prepared.requests.len()) {
+         Ok(parts) => parts,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/batch.rs:170:
+             drop(output);
+             drop(prepared);
+             return finish(package, Err(error));
+-        },
++        }
+     };
+ 
+     let workers = context.as_ref().map_or(0, |context| {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/batch.rs:214:
+                 Ok(scheduler) => {
+                     selected = Some((width, scheduler));
+                     break;
+-                },
++                }
+                 Err(OpcError::Execution(ExecutionError::ResourceLimit(limit)))
+                     if matches!(
+                         limit.resource,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/batch.rs:222:
+                             | Resource::IoConcurrency
+                             | Resource::Memory
+                             | Resource::Objects
+-                    ) => {},
++                    ) => {}
+                 Err(error) => {
+                     drop(parts);
+                     drop(output);
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/batch.rs:229:
+                     drop(prepared);
+                     return finish(package, Err(error));
+-                },
++                }
+             }
+         }
+         if let Some((width, scheduler)) = selected {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/batch.rs:267:
+                     Err(error) => {
+                         drop(workers);
+                         return finish(package, Err(super::map_execution_error(error)));
+-                    },
++                    }
+                 },
+                 Err(error) => return finish(package, Err(error)),
+             };
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/batch.rs:304:
+                         drop(output);
+                         drop(prepared);
+                         return finish(package, Err(super::map_execution_error(error)));
+-                    },
++                    }
+                 },
+                 Err(error) => {
+                     drop(parts);
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/batch.rs:311:
+                     drop(output);
+                     drop(prepared);
+                     return finish(package, Err(error));
+-                },
++                }
+             }
+         } else {
+             None
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/batch.rs:345:
+             drop(parts);
+             drop(output);
+             finish(package, Err(error))
+-        },
++        }
+     }
+ }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/batch.rs:442:
+             Err(error) => {
+                 drop(memory);
+                 return Err(super::map_execution_error(error));
+-            },
++            }
+         };
+         Ok(Self {
+             charged_bytes,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/batch.rs:572:
+             Err(error) => {
+                 drop(worker_permits);
+                 return Err(super::map_execution_error(error));
+-            },
++            }
+         };
+         let memory = match context.reserve(
+             Resource::Memory,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/batch.rs:584:
+                 drop(io);
+                 drop(worker_permits);
+                 return Err(super::map_execution_error(error));
+-            },
++            }
+         };
+         let channel_objects = if reuse_workers && !caller_workers {
+             workers
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/batch.rs:607:
+                 drop(io);
+                 drop(worker_permits);
+                 return Err(super::map_execution_error(error));
+-            },
++            }
+         };
+         Ok(Self {
+             handle_bytes,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/batch.rs:845:
+                 Err(error) => {
+                     select_error(&mut selected, ordinal, OpcError::IoError(error));
+                     break;
+-                },
++                }
+             }
+         }
+         for (ordinal, handle) in handles.drain(..) {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/batch.rs:938:
+                     command_senders.push(command_sender);
+                     reply_receivers.push(reply_receiver);
+                     worker_handles.push((worker, handle));
+-                },
++                }
+                 Err(error) => {
+                     startup_error = Some((worker, OpcError::IoError(error)));
+                     break;
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/batch.rs:945:
+-                },
++                }
+             }
+         }
+         if let Some((ordinal, error)) = startup_error {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/batch.rs:1030:
+                         Ok(data) => output.push(data),
+                         Err(error) => select_error(&mut selected, start + lane, error),
+                     }
+-                },
++                }
+                 Err(_) => {
+                     let ordinal = active_ordinals[lane].unwrap_or(start + lane);
+                     select_error(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/batch.rs:1038:
+                         ordinal,
+                         OpcError::SourceBackedBatchWorkerPanic { ordinal },
+                     );
+-                },
++                }
+             }
+         }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/batch.rs:1084:
+                 if panicked {
+                     return;
+                 }
+-            },
++            }
+         }
+     }
+ }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/batch.rs:1251:
+         Err(error) => {
+             drop(memory);
+             Err(super::map_execution_error(error))
+-        },
++        }
+     }
+ }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/content_types_plan.rs:339:
+                         }
+                         root_seen = true;
+                         depth = next_depth(depth, limits)?;
+-                    },
++                    }
+                     Event::Empty(element) if depth == 0 => {
+                         if root_seen
+                             || element.local_name().as_ref() != b"Types"
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/content_types_plan.rs:351:
+                         }
+                         root_seen = true;
+                         root_is_empty = true;
+-                    },
++                    }
+                     Event::Start(element) if depth == 1 => {
+                         ensure_direct_mapping(element, in_content_types_namespace)?;
+                         mapping_count = checked_mapping_count(mapping_count, limits)?;
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/content_types_plan.rs:364:
+                             ));
+                         }
+                         depth = next_depth(depth, limits)?;
+-                    },
++                    }
+                     Event::Empty(element) if depth == 1 => {
+                         ensure_direct_mapping(element, in_content_types_namespace)?;
+                         mapping_count = checked_mapping_count(mapping_count, limits)?;
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/content_types_plan.rs:400:
+                             matched_defaults[index] = true;
+                             matched_removal = Some(removals.len() + index);
+                         }
+-                    },
++                    }
+                     Event::Start(_) | Event::Empty(_) => {
+                         return Err(invalid_structure(
+                             "nested elements are not permitted in a content-type mapping",
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/content_types_plan.rs:407:
+                         ));
+-                    },
++                    }
+                     Event::End(element) => {
+                         if depth == 0 {
+                             return Err(invalid_structure(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/content_types_plan.rs:423:
+                         depth = depth.checked_sub(1).ok_or_else(|| {
+                             invalid_structure("content-types XML depth underflows")
+                         })?;
+-                    },
++                    }
+                     Event::Text(text) if !is_xml_whitespace(text.as_ref()) => {
+                         return Err(invalid_structure(
+                             "non-whitespace text is not permitted in the content types manifest",
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/content_types_plan.rs:430:
+                         ));
+-                    },
++                    }
+                     Event::CData(_) | Event::DocType(_) => {
+                         return Err(invalid_structure(
+                             "CDATA and DTDs are not permitted in the content types manifest",
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/content_types_plan.rs:435:
+                         ));
+-                    },
++                    }
+                     Event::Eof => break,
+                     Event::Text(_)
+                     | Event::Comment(_)
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/content_types_plan.rs:440:
+                     | Event::Decl(_)
+                     | Event::PI(_)
+-                    | Event::GeneralRef(_) => {},
++                    | Event::GeneralRef(_) => {}
+                 }
+                 (
+                     matched_removal,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/read_ahead.rs:467:
+                     self.invalidate_best_effort();
+                 }
+                 Err(error)
+-            },
++            }
+             Ok(()) => self.check_after_read(snapshot).inspect_err(|_| {
+                 self.invalidate_best_effort();
+             }),
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/read_ahead.rs:647:
+             Ok(()) => {
+                 drop(lease);
+                 Ok(count)
+-            },
++            }
+             Err(error) => {
+                 self.invalidate_best_effort();
+                 drop(lease);
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/read_ahead.rs:654:
+                 Err(error)
+-            },
++            }
+         }
+     }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/read_ahead.rs:922:
+                     end,
+                     members: 1,
+                 })
+-            },
++            }
+             None => Some(StructuralRun {
+                 start: offset,
+                 end,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/read_ahead.rs:1851:
+             Ok(result) => result,
+             Err(mpsc::RecvTimeoutError::Timeout) => {
+                 result_rx.recv_timeout(Duration::from_millis(200)).unwrap()
+-            },
++            }
+             Err(mpsc::RecvTimeoutError::Disconnected) => {
+                 panic!("queued reader terminated without reporting its result")
+-            },
++            }
+         };
+         queued.join().unwrap();
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/read_ahead.rs:1906:
+             Ok(result) => result,
+             Err(mpsc::RecvTimeoutError::Timeout) => {
+                 result_rx.recv_timeout(Duration::from_millis(200)).unwrap()
+-            },
++            }
+             Err(mpsc::RecvTimeoutError::Disconnected) => {
+                 panic!("queued reader terminated without reporting its result")
+-            },
++            }
+         };
+         queued.join().unwrap();
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/relationships_plan.rs:133:
+                         target_mode,
+                     )?;
+                     changed = true;
+-                },
++                }
+                 TopologyRelationshipOperation::Replace {
+                     reltype,
+                     target,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/relationships_plan.rs:187:
+                         )?;
+                     }
+                     changed = true;
+-                },
++                }
+                 TopologyRelationshipOperation::Remove { required_mode } => {
+                     let existing = effective.get(&change.r_id).ok_or_else(|| {
+                         OpcError::RelationshipNotFound(format!(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/relationships_plan.rs:206:
+                     }
+                     effective.remove(&change.r_id);
+                     changed = true;
+-                },
++                }
+             }
+         }
+         if changed {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/splice.rs:2087:
+                 return Err(overlay_unavailable(
+                     "decoded splice replay payload has an invalid representation",
+                 ));
+-            },
++            }
+         },
+         SpliceAuditMemoryLimits {
+             authored_replay_window_bytes: limits.max_authored_replay_window_bytes,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/splice.rs:2205:
+             return Err(map_io_error(error));
+         }
+         match audit_result {
+-            Ok(_) => {},
++            Ok(_) => {}
+             Err(xml_minifier::audit::StreamError::Input(error)) => {
+                 return Err(map_io_error(error));
+-            },
++            }
+             Err(xml_minifier::audit::StreamError::Audit(source)) => {
+                 return Err(OpcError::XmlPublication {
+                     part: partname.to_string(),
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/splice.rs:2215:
+                     source,
+                 });
+-            },
++            }
+             Err(_) => {
+                 return Err(overlay_unavailable(
+                     "decoded splice XML audit returned an unknown stream failure",
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/splice.rs:2221:
+                 ));
+-            },
++            }
+         }
+     } else {
+         let drain_result = drain_splice_reader(&mut splice_reader);
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/splice.rs:2361:
+                     && authorization.limits == limits =>
+             {
+                 Ok(())
+-            },
++            }
+             _ => Err(overlay_unavailable(
+                 "decoded splice candidate XML authorization does not match its plan",
+             )),
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/splice.rs:2379:
+                 if authorization.proof == proof && authorization.limits == limits =>
+             {
+                 Ok(())
+-            },
++            }
+             _ => Err(overlay_unavailable(
+                 "decoded splice candidate XML authorization does not match this pass",
+             )),
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/splice.rs:2517:
+                     hasher: Sha256::new(),
+                     eof_checked: false,
+                 }
+-            },
++            }
+         };
+         Ok(Self {
+             source,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/splice.rs:2575:
+                 let message = error.to_string();
+                 self.set_failure(error);
+                 Err(io::Error::other(message))
+-            },
++            }
+         }
+     }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/splice.rs:2587:
+                 let message = error.to_string();
+                 self.set_failure(error);
+                 Some(io::Error::other(message))
+-            },
++            }
+         }
+     }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/splice.rs:2604:
+             let next = match self.phase {
+                 SplicePhase::Prefix if self.source_position >= self.insertion_offset => {
+                     SplicePhase::Fragment
+-                },
++                }
+                 SplicePhase::Fragment => match &self.payload {
+                     SplicePayload::Fixed { bytes, position } if *position >= bytes.len() => {
+                         SplicePhase::Suffix
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/splice.rs:2611:
+-                    },
++                    }
+                     SplicePayload::Replay {
+                         proof,
+                         position,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/splice.rs:2619:
+                 },
+                 SplicePhase::Suffix if self.source_position >= self.source_length => {
+                     SplicePhase::Done
+-                },
++                }
+                 phase => phase,
+             };
+             if next == self.phase {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/splice.rs:2644:
+                         .min(self.buffer.len());
+                     self.buffer[..count].copy_from_slice(&available[..count]);
+                     Ok(count)
+-                },
++                }
+                 Err(error) => Err(error),
+             }
+         };
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/splice.rs:2655:
+                     return Err(source_error);
+                 }
+                 return Err(error);
+-            },
++            }
+         };
+         self.buffer_start = 0;
+         self.buffer_len = count;
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/splice.rs:2741:
+         let read_result = match &mut self.payload {
+             SplicePayload::Replay { reader, .. } => {
+                 reader.read(&mut self.buffer[buffer_start..buffer_start + count])
+-            },
++            }
+             SplicePayload::Fixed { .. } => unreachable!("fixed replay branch returned above"),
+         };
+         if let Some(error) = self.check_source_after_external_error() {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/splice.rs:2802:
+                             "decoded splice sink accepted no progress",
+                         ));
+                     }
+-                },
++                }
+                 Ok(written) if written > amount - offset => {
+                     if self.check_source_after_external_error().is_none() {
+                         self.set_error(io::Error::new(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/splice.rs:2810:
+                             "decoded splice sink accepted more bytes than supplied",
+                         ));
+                     }
+-                },
++                }
+                 Ok(written) => {
+                     self.output_accepted = self
+                         .output_accepted
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/splice.rs:2820:
+                     if self.check_external_state().is_err() {
+                         break;
+                     }
+-                },
++                }
+                 Err(error) => {
+                     // A source mutation during a sink callback is the
+                     // authoritative failure.  Preserve an ordinary sink
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/splice.rs:2828:
+                     if self.check_source_after_external_error().is_none() {
+                         self.set_error(error);
+                     }
+-                },
++                }
+             }
+         }
+     }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/splice.rs:2934:
+                         "decoded splice fixed payload was not fully consumed",
+                     ));
+                 }
+-            },
++            }
+             SplicePayload::Replay {
+                 proof,
+                 position,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/splice.rs:2953:
+                         "decoded splice replay hash changed during replay",
+                     ));
+                 }
+-            },
++            }
+         }
+         if self.output_accepted != self.candidate_length {
+             return Err(overlay_unavailable(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/splice.rs:2993:
+             SplicePhase::Prefix => {
+                 let remaining = self.insertion_offset - self.source_position;
+                 self.fill_source_buffer(remaining)
+-            },
++            }
+             SplicePhase::Fragment => {
+                 let empty = self.fill_fragment_buffer()?.is_empty();
+                 if empty && self.phase != SplicePhase::Fragment {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/splice.rs:3001:
+                 } else {
+                     Ok(&self.buffer[self.buffer_start..self.buffer_len])
+                 }
+-            },
++            }
+             SplicePhase::Suffix => {
+                 let remaining = self.source_length - self.source_position;
+                 self.fill_source_buffer(remaining)
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/splice.rs:3008:
+-            },
++            }
+             SplicePhase::Done => Ok(&[]),
+         }
+     }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/splice.rs:3037:
+                             "decoded splice fragment length exceeds u64",
+                         ));
+                         return;
+-                    },
++                    }
+                 };
+                 if let Err(error) = context
+                     .consume(Resource::Work, work)
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/splice.rs:3076:
+             match &mut self.payload {
+                 SplicePayload::Fixed { position, .. } => {
+                     *position = position.saturating_add(amount);
+-                },
++                }
+                 SplicePayload::Replay { position, .. } => {
+                     *position = position.saturating_add(amount as u64);
+-                },
++                }
+             }
+         }
+         self.pending_len = self.pending_len.saturating_add(amount);
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/splice.rs:3119:
+         ReplayPublicationError::Sink { source, .. } => map_io_error(source),
+         ReplayPublicationError::NonDeterministic { .. } => {
+             overlay_unavailable("decoded splice replay produced non-deterministic output")
+-        },
++        }
+         _ => overlay_unavailable("decoded splice replay returned an unknown failure"),
+     }
+ }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/splice.rs:3530:
+                     self.reads += 1;
+                     output[0] = b'A';
+                     Ok(1)
+-                },
++                }
+                 1 => {
+                     self.reads += 1;
+                     if self.action.bump_source {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed/splice.rs:3552:
+                         output[0] = b'B';
+                         Ok(1)
+                     }
+-                },
++                }
+                 _ => Ok(0),
+             }
+         }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:810:
+                         member_name,
+                         "root attribute uses an unbound namespace prefix",
+                     ));
+-                },
++                }
+             };
+             if seen_expanded.contains(&(namespace, local.as_ref())) {
+                 return Err(relationship_manifest_append_error(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:902:
+                 // 8.7), so the source manifest still matches its catalog.
+                 target_mode = TargetMode::parse_tolerant(&value).0;
+                 target_mode_seen = true;
+-            },
++            }
+             name if decoder
+                 .decode(name)
+                 .ok()
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:915:
+                     decoder,
+                     member_name,
+                 )?;
+-            },
++            }
+             _ => {
+                 return Err(relationship_manifest_append_error(
+                     member_name,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:922:
+                     "a Relationship has an unsupported or duplicate attribute",
+                 ));
+-            },
++            }
+         }
+     }
+     let id = id_attribute
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:1379:
+                         "nested relationship content is not supported",
+                     ));
+                 }
+-            },
++            }
+             Event::Empty(element) => {
+                 if root_closed {
+                     return Err(relationship_manifest_append_error(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:1492:
+                     ));
+                 }
+                 relationship_event_counts.insert(id, 1);
+-            },
++            }
+             Event::End(element) => {
+                 validate_relationship_qname(
+                     element.name().as_ref(),
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:1526:
+                         }
+                         relationship_event_counts.insert(relationship_id, 2);
+                         depth = 1;
+-                    },
++                    }
+                     1 => {
+                         if !opc_namespace || element.local_name().as_ref() != b"Relationships" {
+                             return Err(relationship_manifest_append_error(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:1546:
+                         root_close_start = Some(event_start);
+                         root_closed = true;
+                         depth = 0;
+-                    },
++                    }
+                     _ => {
+                         return Err(relationship_manifest_append_error(
+                             member_name,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:1553:
+                             "an XML closing element is out of place",
+                         ));
+-                    },
++                    }
+                 }
+-            },
++            }
+             Event::Text(text) => {
+                 if text.as_ref().windows(3).any(|window| window == b"]]>") {
+                     return Err(relationship_manifest_append_error(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:1580:
+                         "non-whitespace text is not supported in a relationships member",
+                     ));
+                 }
+-            },
++            }
+             Event::Comment(comment) => {
+                 validate_relationship_comment(&comment, member_name)?;
+-            },
++            }
+             Event::PI(instruction) => {
+                 validate_relationship_pi(&instruction, decoder, member_name)?;
+-            },
++            }
+             Event::Decl(declaration) => {
+                 if root_seen || declaration_seen || events != 1 {
+                     return Err(relationship_manifest_append_error(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:1596:
+                 }
+                 crate::xml_splice::validate_source_declaration(&declaration, member_name)?;
+                 declaration_seen = true;
+-            },
++            }
+             Event::DocType(_) => {
+                 return Err(relationship_manifest_append_error(
+                     member_name,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:1603:
+                     "DTDs are not permitted in relationships members",
+                 ));
+-            },
++            }
+             Event::CData(_) | Event::GeneralRef(_) => {
+                 return Err(relationship_manifest_append_error(
+                     member_name,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:1609:
+                     "unsupported XML content is not safe to append",
+                 ));
+-            },
++            }
+             Event::Eof => {
+                 if !root_seen || !root_closed || depth != 0 || open_relationship.is_some() {
+                     return Err(relationship_manifest_append_error(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:1617:
+                     ));
+                 }
+                 break;
+-            },
++            }
+         }
+     }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:2392:
+             TopologyRelationshipOperation::Replace { .. }
+             | TopologyRelationshipOperation::Remove { .. } => {
+                 crate::pkgreader::admissible_source_relationship_id(r_id)
+-            },
++            }
+         };
+         if r_id.len() > MAX_SOURCE_RELATIONSHIP_FIELD_BYTES || !id_valid {
+             return Err(OpcError::InvalidRelationship(format!(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:2428:
+                             ));
+                         }
+                         target.len()
+-                    },
++                    }
+                 };
+                 if target_bytes > MAX_SOURCE_RELATIONSHIP_FIELD_BYTES {
+                     return Err(OpcError::InvalidRelationship(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:2438:
+                 field_bytes = field_bytes.checked_add(target_bytes).ok_or_else(|| {
+                     overlay_unavailable("topology relationship field bytes overflow")
+                 })?;
+-            },
+-            TopologyRelationshipOperation::Remove { .. } => {},
++            }
++            TopologyRelationshipOperation::Remove { .. } => {}
+         }
+         let next_bytes = self
+             .relationship_bytes
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:3461:
+                 .write_str("source-cache diagnostic state is poisoned; metrics are unavailable"),
+             Self::CounterMovedBackwards { counter } => {
+                 write!(formatter, "source-cache counter {counter} moved backwards")
+-            },
++            }
+         }
+     }
+ }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:3681:
+             OpcError::Execution(error) => execution_io_error(error),
+             OpcError::SourceChanged { expected, actual } => {
+                 std::io::Error::other(SourceChangedIoError { expected, actual })
+-            },
++            }
+             OpcError::IoError(error) => error,
+             error => std::io::Error::other(error.to_string()),
+         })
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:4136:
+                         bytes.len()
+                     ),
+                 ))
+-            },
++            }
+             Ok(written) => {
+                 let written = u64::try_from(written).map_err(|_| {
+                     std::io::Error::new(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:4153:
+                     }
+                 }
+                 Ok(usize::try_from(written).unwrap_or(usize::MAX))
+-            },
++            }
+             Err(error) => {
+                 drop(reservation);
+                 Err(error)
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:4160:
+-            },
++            }
+         }
+     }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:4259:
+     match error {
+         OpcError::SourceChanged { expected, actual } => {
+             std::io::Error::other(SourceChangedIoError { expected, actual })
+-        },
++        }
+         OpcError::Cancelled => execution_io_error(ExecutionError::Cancelled),
+         OpcError::Execution(error) => execution_io_error(error),
+         OpcError::IoError(error) => error,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:4399:
+                     formatter,
+                     "verified OPC decoded reader callback failed: {error}"
+                 )
+-            },
++            }
+         }
+     }
+ }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:5553:
+                     }
+                     *held = Some(permits);
+                     return Ok((wave.narrowed_to(granted), None));
+-                },
++                }
+                 Err(ExecutionError::ResourceLimit(_)) => continue,
+                 Err(error) => return Err(error),
+             }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:5664:
+                     self.record_budget_reservation_failure();
+                 }
+                 Err(error)
+-            },
++            }
+         }
+     }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:5705:
+             Err(error) => {
+                 drop(reservation);
+                 return Err(error);
+-            },
++            }
+         };
+         if let Err(error) = self.charge_cold_work(declared_bytes) {
+             drop(payload_object_reservation);
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:5746:
+                             self.record_budget_reservation_failure();
+                         }
+                         Err(error)
+-                    },
++                    }
+                 }
+-            },
++            }
+         }
+     }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:6087:
+ 
+     fn record_retention(&self, retention: CacheRetention) {
+         match retention {
+-            CacheRetention::Retained => {},
++            CacheRetention::Retained => {}
+             CacheRetention::Oversized => {
+                 self.counters.bypasses.increment();
+                 self.counters.oversized_bypasses.increment();
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:6094:
+-            },
++            }
+             CacheRetention::Pinned => {
+                 self.counters.bypasses.increment();
+-            },
++            }
+             CacheRetention::AllocationFailure => {
+                 self.counters.bypasses.increment();
+                 self.counters.allocation_bypasses.increment();
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:6101:
+-            },
++            }
+         }
+     }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:6414:
+                 if ordering != std::cmp::Ordering::Equal {
+                     return ordering;
+                 }
+-            },
++            }
+             (None, None) => return std::cmp::Ordering::Equal,
+             (None, Some(_)) => return std::cmp::Ordering::Less,
+             (Some(_), None) => return std::cmp::Ordering::Greater,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:6539:
+                     .ensure_current()
+                     .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
+                 return Err(phase(ValidationCatalogPhase::Ingress, mapped));
+-            },
++            }
+         };
+         snapshot
+             .ensure_current()
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:6565:
+                     .ensure_current()
+                     .map_err(|error| phase(stage, error))?;
+                 return Err(phase(stage, error));
+-            },
++            }
+         };
+         let SourceCatalog {
+             pkg_srels,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:6911:
+                 }
+                 snapshot.ensure_current()?;
+                 return Err(mapped);
+-            },
++            }
+         };
+         snapshot.ensure_current()?;
+         if let Some(context) = context.as_ref() {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:6962:
+                 }
+                 snapshot.ensure_current()?;
+                 return Err(mapped);
+-            },
++            }
+         };
+         let SourceCatalog {
+             pkg_srels,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:7778:
+                 }
+                 let bytes = Arc::clone(&data.payload.bytes);
+                 (Some(data), bytes)
+-            },
++            }
+         };
+         self.source.ensure_current()?;
+         self.cache.check_context().map_err(map_execution_error)?;
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:9827:
+                         Arc::clone(payload),
+                     )
+                     .compression_method(soapberry_zip::CompressionMethod::Deflate)
+-                },
++                }
+                 TopologyPartPayload::SourceXml(payload) => {
+                     // This payload was fully checked earlier in this
+                     // preparation before topology planning; only the late
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:9841:
+                         payload.payload_arc(),
+                     )
+                     .compression_method(soapberry_zip::CompressionMethod::Deflate)
+-                },
++                }
+                 TopologyPartPayload::Precompressed(payload) => {
+                     monitored_transfer_sources
+                         .push(payload.source_artifact.snapshot.monitor_publication());
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:9863:
+                         addition.partname.membername(),
+                         payload.physical.clone(),
+                     )
+-                },
++                }
+             };
+             appended.push(entry);
+         }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:9927:
+                     ));
+                 }
+                 target_ref
+-            },
++            }
+             SourceRelationshipTarget::External(target) => target.clone(),
+         };
+         Ok((target_ref, target.mode()))
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:11172:
+                 ),
+                 TopologyPartPayload::Precompressed(payload) => {
+                     (payload.logical_size(), Some(payload.compressed_size()))
+-                },
++                }
+             };
+             let member_name_bytes = u64::try_from(addition.partname.membername().len())
+                 .map_err(|_| overlay_unavailable("topology member name length overflows u64"))?;
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:11786:
+                     return Err(overlay_unavailable(mapped.to_string()));
+                 }
+                 return Err(mapped);
+-            },
++            }
+         };
+         self.source.ensure_current()?;
+         if index.archive_end_offset() != self.source.length {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:11938:
+                 let regenerated = match &replacement.replacement {
+                     ChangedOverlayPayload::Shared(data) => {
+                         soapberry_zip::RegeneratedEntry::new_shared(target_name, Arc::clone(data))
+-                    },
++                    }
+                     ChangedOverlayPayload::Owned(data) => {
+                         regenerated_owned_entry(target_name, data, compression)?
+-                    },
++                    }
+                 };
+                 plan.push(soapberry_zip::PreservationAction::Regenerate {
+                     id: entry.id(),
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:11990:
+                         .admit_deflate_wave(wave)
+                         .map_err(map_execution_error)?;
+                     wave.is_parallel().then_some((session, wave, wave_permits))
+-                },
++                }
+                 None => None,
+             };
+             let cancellation = PublicationCancellation(context.clone());
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:12233:
+                     None
+                 };
+                 (entry_id, declared)
+-            },
++            }
+         };
+         loop {
+             let access = match self.cache.enter_with_observer(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:12248:
+                     // the removed loop-head observation produced.
+                     self.source.ensure_current()?;
+                     return Err(map_execution_error(error));
+-                },
++                }
+             };
+             match access {
+                 CacheAccess::Hit(bytes) => {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:12259:
+                     }
+                     self.cache.check_context().map_err(map_execution_error)?;
+                     return Ok(PartData { payload: bytes });
+-                },
++                }
+                 CacheAccess::Waiter(flight) => {
+                     if let Some(payload) = flight
+                         .wait_with_observer(self.cache.context(), observer)
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:12277:
+                     // removed and this caller retries rather than observing a
+                     // retained error. A retry that reaches the loading path
+                     // takes its opening source observation there.
+-                },
++                }
+                 CacheAccess::Loader(flight) => {
+                     let unwind_guard = LoadFlightUnwindGuard {
+                         cache: &self.cache,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:12297:
+                     );
+                     unwind_guard.disarm();
+                     return result;
+-                },
++                }
+                 CacheAccess::Bypass(reservation) => {
+                     return self.load_part_with_accounting(
+                         index,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:12310:
+                         observer,
+                         capture,
+                     );
+-                },
++                }
+             }
+         }
+     }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:12359:
+                 let bytes = match (accounting.as_deref_mut(), session) {
+                     (Some(_), Some(session)) => {
+                         session.read_entry_with_accounting(entry_id, &mut zip_accounting)
+-                    },
++                    }
+                     (Some(_), None) => self
+                         .archive
+                         .read_entry_with_accounting(entry_id, &mut zip_accounting),
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:12376:
+                         self.source.ensure_current()?;
+                         self.cache.check_context().map_err(map_execution_error)?;
+                         return Err(map_preservation_error(error));
+-                    },
++                    }
+                 }
+             };
+             // The decompressor has finished and no payload has been
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:12451:
+                         // this branch; take it here instead.
+                         self.source.ensure_current()?;
+                         return Err(map_execution_error(error));
+-                    },
++                    }
+                 };
+                 #[cfg(test)]
+                 self.cache.pause_test_publication();
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:12488:
+                         self.cache.complete_uncached_success_with_observer(
+                             entry_id, &flight, payload, retention, observer,
+                         )
+-                    },
++                    }
+                     CachePublication::NotCurrent => {
+                         self.cache.rollback_publication_with_observer(
+                             entry_id,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:12498:
+                             observer,
+                         );
+                         None
+-                    },
++                    }
+                 };
+                 let Some(payload) = payload else {
+                     return Err(overlay_unavailable(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:12509:
+                     return Err(error);
+                 }
+                 Ok(PartData { payload })
+-            },
++            }
+             (Some(flight), Err(error)) => {
+                 drop(reservation);
+                 drop(object_reservation);
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:12516:
+                 self.cache
+                     .complete_failure_with_observer(entry_id, &flight, observer);
+                 Err(error)
+-            },
++            }
+             (None, Ok(bytes)) => {
+                 let payload = CachedPayload {
+                     bytes,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:12538:
+                 }
+                 merge_result?;
+                 Ok(PartData { payload })
+-            },
++            }
+             (None, Err(error)) => {
+                 self.cache.complete_bypass_failure();
+                 Err(error)
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:12545:
+-            },
++            }
+         }
+     }
+ }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:12911:
+         return match error.into_kind() {
+             soapberry_zip::ErrorKind::IO(error) | soapberry_zip::ErrorKind::Io(error) => {
+                 map_io_error(error)
+-            },
++            }
+             kind => OpcError::ZipError(kind.to_string()),
+         };
+     }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:12938:
+         },
+         soapberry_zip::office::VerifiedEntryReaderError::Callback(error) => {
+             VerifiedDecodedReaderError::Callback(error)
+-        },
++        }
+         _ => VerifiedDecodedReaderError::Opc {
+             error: OpcError::ZipError("unrecognized verified ZIP entry-reader failure".to_string()),
+             callback_error: None,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:12952:
+     match error {
+         soapberry_zip::office::VerifiedPrecompressedError::Archive(error) => {
+             map_preservation_error(error)
+-        },
++        }
+         soapberry_zip::office::VerifiedPrecompressedError::Transport(error) => map_io_error(error),
+         soapberry_zip::office::VerifiedPrecompressedError::Callback(error) => error,
+         _ => {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:12959:
+             OpcError::ZipError("unrecognized verified ZIP precompressed-entry failure".to_string())
+-        },
++        }
+     }
+ }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:12975:
+                 error,
+                 callback_error,
+             }
+-        },
++        }
+         Err(VerifiedDecodedReaderError::Callback(callback_error)) => {
+             VerifiedDecodedReaderError::Opc {
+                 error,
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:12982:
+                 callback_error: Some(callback_error),
+             }
+-        },
++        }
+     }
+ }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:13400:
+                     let length = usize::try_from(attempt)
+                         .map_err(|_| overlay_unavailable("source read length overflows usize"))?;
+                     break (&mut output[..length], Some(reservation));
+-                },
++                }
+                 Err(error) => {
+                     let Some(limit) = (match &error {
+                         ExecutionError::ResourceLimit(limit) => Some(limit),
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:13419:
+                         return Err(map_execution_error(error));
+                     }
+                     attempt = next;
+-                },
++                }
+             }
+         }
+     } else {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:13440:
+                         .map_err(map_execution_error)?;
+                 }
+                 snapshot.ensure_current_io_if_monitored()?;
+-            },
++            }
+             Err(error) => return Err(OpcError::IoError(error)),
+         }
+     };
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:17624:
+             CacheAccess::Loader(flight) => flight,
+             CacheAccess::Hit(_) | CacheAccess::Waiter(_) | CacheAccess::Bypass(_) => {
+                 panic!("fresh managed Part must become the loader")
+-            },
++            }
+         };
+         // The loader has charged its bounded cold-load resources, but has not
+         // entered SourceReader yet. This is the exact race boundary where a
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:20873:
+             match expected {
+                 "missing external relationship" => {
+                     assert!(matches!(error, OpcError::RelationshipNotFound(_)));
+-                },
++                }
+                 "duplicate relationship" => {
+                     assert!(matches!(error, OpcError::DuplicateRelationshipId(_)));
+-                },
++                }
+                 "internal relationship" => {
+                     assert!(matches!(error, OpcError::InvalidRelationship(_)));
+-                },
++                }
+                 _ => unreachable!(),
+             }
+             assert!(output.is_empty());
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:21486:
+             OpcError::IncompleteOutput { written, source } => {
+                 assert!(written > 0);
+                 assert!(matches!(*source, OpcError::SourceChanged { .. }));
+-            },
++            }
+             other => panic!("unexpected source-change error: {other:?}"),
+         }
+     }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:21557:
+             OpcError::IncompleteOutput { written, source } => {
+                 assert!(written > 0);
+                 assert!(matches!(*source, OpcError::Cancelled));
+-            },
++            }
+             other => panic!("unexpected managed cancellation error: {other:?}"),
+         }
+         assert!(!sink.bytes.is_empty());
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:21705:
+                 match *source {
+                     OpcError::Execution(ExecutionError::ResourceLimit(limit)) => {
+                         assert_eq!(limit.resource, Resource::OutputBytes);
+-                    },
++                    }
+                     other => panic!("unexpected mid-stream source error: {other:?}"),
+                 }
+-            },
++            }
+             other => panic!("unexpected mid-stream output error: {other:?}"),
+         }
+         assert_eq!(output.len(), SOURCE_PUBLICATION_CHUNK_BYTES);
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:21821:
+                     OpcError::IoError(error)
+                         if error.kind() == std::io::ErrorKind::Other
+                 ));
+-            },
++            }
+             other => panic!("unexpected flush error: {other:?}"),
+         }
+         assert_eq!(sink.bytes, source_bytes);
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/source_backed.rs:21941:
+             OpcError::IncompleteOutput { written, source } => {
+                 assert_eq!(written, sink.bytes.len() as u64);
+                 assert!(matches!(*source, OpcError::SourceChanged { .. }));
+-            },
++            }
+             other => panic!("unexpected source-change error: {other:?}"),
+         }
+         assert_eq!(budget.used(Resource::OutputBytes), sink.bytes.len() as u64);
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/validation.rs:59:
+         Ok(package) => successful_report(&package, report_limits),
+         Err(failure) if matches!(failure.error, OpcError::ReadLimit { .. }) => {
+             blocked_report(failure.phase, report_limits)
+-        },
++        }
+         Err(failure) if is_structural_rejection(&failure.error) => {
+             structural_report(&failure.error, failure.phase, report_limits)
+-        },
++        }
+         Err(failure) => Err(failure.error),
+     }?;
+     let actual = source.version()?;
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_attributes.rs:127:
+             Phase::Done => return None,
+             // quick-xml would hash the next name: turn its check off first.
+             Phase::QuickXml(_) => self.take_over(),
+-            Phase::Own(_) => {},
++            Phase::Own(_) => {}
+         }
+         let Some(item) = self.attributes.next() else {
+             self.phase = Phase::Done;
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_attributes.rs:193:
+                 entry.insert(position);
+                 self.next_start = end_of(tag, &attribute);
+                 Ok(attribute)
+-            },
++            }
+         }
+     }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice/owned/elements.rs:147:
+                     if !empty {
+                         stack.push(index);
+                     }
+-                },
++                }
+                 Event::End(_) => {
+                     if let Some(index) = stack
+                         .pop()
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice/owned/elements.rs:160:
+                         bounds.full.end = end;
+                         bounds.close = start;
+                     }
+-                },
++                }
+                 Event::Eof => break,
+-                _ => {},
++                _ => {}
+             }
+         }
+         if next != targets.len() || !stack.is_empty() {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice/owned/elements.rs:214:
+                 let (range, output) = match update.edit {
+                     OwnedElementEdit::InsertBefore(_) => {
+                         (bounds.full.start..bounds.full.start, Output::Raw(fragment))
+-                    },
++                    }
+                     OwnedElementEdit::AppendChild(_) if bounds.empty => {
+                         if appended_empty {
+                             continue;
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice/owned/elements.rs:227:
+                                 name: bounds.name.clone(),
+                             },
+                         )
+-                    },
++                    }
+                     OwnedElementEdit::AppendChild(_) => {
+                         (bounds.close..bounds.close, Output::Raw(fragment))
+-                    },
++                    }
+                     OwnedElementEdit::Replace(_) | OwnedElementEdit::Remove => {
+                         (bounds.full.clone(), Output::Raw(fragment))
+-                    },
++                    }
+                 };
+                 splices.push(Splice { range, output });
+             }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice/owned/elements.rs:268:
+                         }
+                     }
+                     added
+-                },
++                }
+             };
+             size = size
+                 .checked_sub(splice.range.len())
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice/owned/elements.rs:306:
+                     bytes.extend_from_slice(b"</");
+                     bytes.extend_from_slice(&self.bytes[name]);
+                     bytes.push(b'>');
+-                },
++                }
+             }
+             cursor = splice.range.end;
+         }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice/owned/sequence.rs:116:
+                     if paired {
+                         depth += 1;
+                     }
+-                },
++                }
+                 Event::End(_) => {
+                     depth = depth
+                         .checked_sub(1)
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice/owned/sequence.rs:130:
+                     if parent_depth == Some(depth) && parent_close.is_none() {
+                         parent_close = Some(start);
+                     }
+-                },
++                }
+                 Event::Eof => break,
+-                _ => {},
++                _ => {}
+             }
+         }
+         let close =
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice/owned/sequence.rs:172:
+                     })?;
+                     validate_source_xml(&self.name, bytes, ReadLimits::default(), None)?;
+                     bytes.len()
+-                },
++                }
+             };
+             size = size
+                 .checked_add(added)
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice/owned.rs:224:
+                     if updates[next].start_tag == (start..end) =>
+                 {
+                     element
+-                },
++                }
+                 _ => continue,
+             };
+             let first = next;
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice/owned.rs:330:
+                     bytes.extend_from_slice(b"=\"");
+                     bytes.extend_from_slice(value);
+                     bytes.push(b'"');
+-                },
+-                AttributeOutput::Remove => {},
++                }
++                AttributeOutput::Remove => {}
+             }
+             cursor = splice.range.end;
+         }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice/owned.rs:532:
+                     if !empty {
+                         depth += 1;
+                     }
+-                },
++                }
+                 Event::End(_) => {
+                     depth = depth
+                         .checked_sub(1)
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice/owned.rs:550:
+                             name,
+                         });
+                     }
+-                },
++                }
+                 Event::Eof => {
+                     return Err(invalid_source(
+                         "range does not identify a complete XML opening tag",
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice/owned.rs:557:
+                     ));
+-                },
+-                _ => {},
++                }
++                _ => {}
+             }
+         }
+     }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice/owned.rs:612:
+                         }
+                     }
+                     break end - if empty { 2 } else { 1 };
+-                },
++                }
+                 Event::Eof => {
+                     return Err(invalid_source(
+                         "range does not identify a complete XML opening tag",
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice/owned.rs:619:
+                     ));
+-                },
+-                _ => {},
++                }
++                _ => {}
+             }
+         };
+         let mut bytes = Vec::new();
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice/owned.rs:711:
+                             checked += 1;
+                         }
+                     }
+-                },
++                }
+                 Event::Eof => break,
+-                _ => {},
++                _ => {}
+             }
+         }
+         if checked != edits.len() {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice.rs:973:
+                     .checked_add(1)
+                     .ok_or_else(|| invalid_source("source XML depth overflows"))?;
+                 limits.check(ReadResource::XmlDepth, depth as u64, xml_depth_limit as u64)?;
+-            },
++            }
+             Event::Empty(element) => {
+                 let element_depth = depth
+                     .checked_add(1)
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice.rs:989:
+                         .checked_add(1)
+                         .ok_or_else(|| invalid_source("source XML root count overflows"))?;
+                 }
+-            },
++            }
+             Event::End(element) => {
+                 validate_source_qname(&reader, element.name().as_ref(), "end element")?;
+                 depth = depth
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice.rs:996:
+                     .checked_sub(1)
+                     .ok_or_else(|| invalid_source("source XML has an unexpected end tag"))?;
+-            },
++            }
+             Event::Text(text) => {
+                 if text.as_ref().windows(3).any(|window| window == b"]]>") {
+                     return Err(invalid_source(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice.rs:1009:
+                 if depth == 0 && !text.chars().all(is_xml_whitespace) {
+                     return Err(invalid_source("source XML has text outside its root"));
+                 }
+-            },
++            }
+             Event::CData(data) => {
+                 if data.as_ref().windows(3).any(|window| window == b"]]>") {
+                     return Err(invalid_source(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice.rs:1023:
+                 if depth == 0 {
+                     return Err(invalid_source("source XML has CDATA outside its root"));
+                 }
+-            },
++            }
+             Event::GeneralRef(reference) => {
+                 validate_general_reference(&reference)?;
+                 if depth == 0 {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice.rs:1031:
+                         "source XML has a reference outside its root",
+                     ));
+                 }
+-            },
++            }
+             Event::Decl(declaration) => {
+                 if declaration_seen || roots != 0 || events != 1 {
+                     return Err(invalid_source("source XML declaration is out of place"));
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice.rs:1038:
+                 }
+                 validate_source_declaration(&declaration, partname.as_str())?;
+                 declaration_seen = true;
+-            },
++            }
+             Event::DocType(_) => {
+                 return Err(invalid_source("source XML DTDs are not permitted"));
+-            },
++            }
+             Event::Eof => break,
+             Event::Comment(comment) => {
+                 validate_comment(&comment)?;
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice.rs:1048:
+-            },
++            }
+             Event::PI(instruction) => {
+                 validate_processing_instruction(&reader, &instruction)?;
+-            },
++            }
+         }
+     }
+     if depth != 0 || roots != 1 {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice.rs:1135:
+                 if value != "1.0" {
+                     return Err(invalid_source("source XML declaration version must be 1.0"));
+                 }
+-            },
++            }
+             b"encoding" if seen_version && !seen_encoding && !seen_standalone => {
+                 seen_encoding = true;
+                 if !value.eq_ignore_ascii_case("UTF-8") {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice.rs:1143:
+                         "source XML declaration encoding must be UTF-8",
+                     ));
+                 }
+-            },
++            }
+             b"standalone" if seen_version && !seen_standalone => {
+                 seen_standalone = true;
+                 if value != "yes" && value != "no" {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice.rs:1151:
+                         "source XML declaration standalone must be yes or no",
+                     ));
+                 }
+-            },
++            }
+             _ => {
+                 return Err(invalid_source(
+                     "source XML declaration has a duplicate or out-of-order attribute",
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice.rs:1158:
+                 ));
+-            },
++            }
+         }
+     }
+     if !seen_version {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice.rs:1252:
+                     return Err(invalid_source(
+                         "source XML attribute uses an unbound namespace prefix",
+                     ));
+-                },
++                }
+             };
+             if seen_expanded.contains(&(namespace, local.as_ref())) {
+                 return Err(invalid_source(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/src/xml_splice.rs:1411:
+                     "source XML character reference uses a forbidden character",
+                 ))
+             }
+-        },
++        }
+         _ => Err(invalid_source(
+             "source XML contains a reference that requires a DTD",
+         )),
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/forced_zip64_failures.rs:396:
+                 *source,
+                 OpcError::IoError(error) if error.kind() == io::ErrorKind::BrokenPipe
+             ));
+-        },
++        }
+         other => panic!("expected incomplete output after a partial sink failure: {other:?}"),
+     }
+     assert_eq!(sink.bytes.len(), 137);
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/forced_zip64_failures.rs:433:
+             assert!(written > 0);
+             assert_eq!(written as usize, sink.bytes.len());
+             assert!(matches!(*source, OpcError::SourceChanged { .. }));
+-        },
++        }
+         other => panic!("expected incomplete output after a source change: {other:?}"),
+     }
+     assert!(source.bytes_equal(fixture()));
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/prepared_topology.rs:1372:
+         Err(OpcError::IncompleteOutput { written, .. }) => {
+             assert_eq!(written, output.len() as u64);
+             assert!(written > 0);
+-        },
++        }
+         Err(OpcError::Execution(ExecutionError::ResourceLimit(limit)))
+             if limit.resource == Resource::OutputBytes =>
+         {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/prepared_topology.rs:1379:
+             assert!(output.is_empty());
+-        },
++        }
+         other => panic!("unexpected low-output result: {other:?}"),
+     }
+     assert_eq!(budget.used(Resource::OutputBytes), output.len() as u64);
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/prepared_topology.rs:1492:
+         OpcError::IncompleteOutput { written, .. } => {
+             assert_eq!(written, sink.bytes.len() as u64);
+             assert!(written > 0);
+-        },
++        }
+         other => panic!("expected incomplete output, got {other:?}"),
+     }
+ }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/reader_origin_contract.rs:101:
+         loop {
+             match reader.read_event() {
+                 Ok(Event::Eof) => panic!("mismatched end tag must fail"),
+-                Ok(_) => {},
++                Ok(_) => {}
+                 Err(_) => return origin.offset(reader.error_position()).unwrap(),
+             }
+         }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/source_artifact_restore.rs:368:
+                     .len()
+                     .checked_add(1)
+                     .expect("test read request must leave one representable count"));
+-            },
+-            FAULT_NONE => {},
++            }
++            FAULT_NONE => {}
+             _ => return Err(io::Error::other("unknown test source fault")),
+         }
+         let start = usize::try_from(offset).map_err(|_| io::Error::other("offset overflow"))?;
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/source_artifact_restore.rs:563:
+     match error {
+         OpcError::IncompleteOutput { written, .. } => {
+             assert_eq!(written, PREFIX as u64);
+-        },
++        }
+         other => panic!("unexpected short-sink error: {other:?}"),
+     }
+     assert_eq!(sink.bytes.len(), PREFIX);
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/source_artifact_restore.rs:672:
+                     ..
+                 }
+             ));
+-        },
++        }
+         other => panic!("unexpected stable-version mutation error: {other:?}"),
+     }
+     assert!(!sink.bytes.is_empty());
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/source_artifact_restore.rs:809:
+         OpcError::IncompleteOutput { written, source } => {
+             assert_eq!(written, PREFIX as u64);
+             assert!(contains_cancellation(&source));
+-        },
++        }
+         other => panic!("unexpected original-context cancellation: {other:?}"),
+     }
+     assert_eq!(sink.bytes.len(), PREFIX);
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/source_backed_batch.rs:522:
+                     io::ErrorKind::BrokenPipe,
+                     "low ordinal failure",
+                 ))
+-            },
++            }
+             Some(name) if name == GAMMA_MEMBER => {
+                 let (lock, changed) = &*self.state;
+                 let mut state = lock.lock().unwrap();
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/source_backed_batch.rs:532:
+                     io::ErrorKind::InvalidData,
+                     "high ordinal failure",
+                 ))
+-            },
++            }
+             Some(_) => {
+                 self.state.0.lock().unwrap().later_started = true;
+                 self.inner.read_at(offset, output)
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/source_backed_batch.rs:539:
+-            },
++            }
+             None => self.inner.read_at(offset, output),
+         }
+     }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/source_backed_topology.rs:1011:
+         OpcError::IncompleteOutput { written, .. } => {
+             assert!(written > 0);
+             assert_eq!(written as usize, sink.bytes.len());
+-        },
++        }
+         other => panic!("expected incomplete output, got {other:?}"),
+     }
+ }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/source_fingerprint_quality.rs:22:
+ };
+ 
+ use litchi_core::{
+-    Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits,
+-    OwnedSource, ReadAt, Resource, SourceVersion,
++    Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, ReadAt,
++    Resource, SourceVersion,
+ };
+ use litchi_opc::{OpcError, ReadLimits, SourceBackedPackage};
+ use sha2::{Digest as _, Sha256};
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/source_fingerprint_quality.rs:34:
+ 
+ fn archive_bytes(payload: &[u8]) -> Vec<u8> {
+     let mut writer = StreamingArchiveWriter::new();
+-    writer.write_stored("[Content_Types].xml", CONTENT_TYPES).unwrap();
++    writer
++        .write_stored("[Content_Types].xml", CONTENT_TYPES)
++        .unwrap();
+     writer.write_stored("_rels/.rels", ROOT_RELS).unwrap();
+     writer.write_stored("word/document.xml", payload).unwrap();
+     writer.finish_to_bytes().unwrap()
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/source_fingerprint_quality.rs:195:
+     source.mutate_without_version();
+     let second = artifact.fingerprint().unwrap();
+ 
+-    assert_ne!(second, first, "stable version must not authorize stale bytes");
++    assert_ne!(
++        second, first,
++        "stable version must not authorize stale bytes"
++    );
+     assert!(source.reads.load(Ordering::Acquire) > reads_after_first);
+ }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/source_part_splice.rs:585:
+             usize::try_from(*written).expect("accepted output count must fit usize"),
+             accepted
+         ),
+-        OpcError::IoError(_) => {},
++        OpcError::IoError(_) => {}
+         other => panic!("unexpected sink failure: {other:?}"),
+     }
+ }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/source_part_splice_replay.rs:256:
+     fn bytes_for(&self, open_number: usize) -> Vec<u8> {
+         let mut bytes = self.payload.as_ref().clone();
+         match self.mode {
+-            ReplayMode::Exact => {},
++            ReplayMode::Exact => {}
+             ReplayMode::Truncated => {
+                 bytes.pop();
+-            },
++            }
+             ReplayMode::Extra => bytes.push(b'X'),
+             ReplayMode::TruncatedAtOpen(change_at) if open_number >= change_at => {
+                 bytes.pop();
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/source_part_splice_replay.rs:266:
+-            },
++            }
+             ReplayMode::ExtraAtOpen(change_at) if open_number >= change_at => bytes.push(b'X'),
+-            ReplayMode::TruncatedAtOpen(_) | ReplayMode::ExtraAtOpen(_) => {},
++            ReplayMode::TruncatedAtOpen(_) | ReplayMode::ExtraAtOpen(_) => {}
+             ReplayMode::HashChanged => {
+                 bytes = CHANGED_FRAGMENT.to_vec();
+-            },
+-            ReplayMode::OpenError | ReplayMode::ReadError | ReplayMode::ReadErrorAtOpen(_) => {},
++            }
++            ReplayMode::OpenError | ReplayMode::ReadError | ReplayMode::ReadErrorAtOpen(_) => {}
+             ReplayMode::ChangeAfterFirstOpen if open_number > 1 => {
+                 bytes = CHANGED_FRAGMENT.to_vec();
+-            },
+-            ReplayMode::ChangeAfterFirstOpen => {},
++            }
++            ReplayMode::ChangeAfterFirstOpen => {}
+             ReplayMode::ChangeAtOpen(change_at) if open_number >= change_at => {
+                 bytes = CHANGED_FRAGMENT.to_vec();
+-            },
+-            ReplayMode::ChangeAtOpen(_) => {},
++            }
++            ReplayMode::ChangeAtOpen(_) => {}
+         }
+         bytes
+     }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/source_part_splice_replay.rs:300:
+             ))),
+             ReplayMode::ReadError => {
+                 Ok(Box::new(FailingReader::new(self.bytes_for(open_number), 2)))
+-            },
++            }
+             ReplayMode::ReadErrorAtOpen(change_at) if open_number >= change_at => {
+                 Ok(Box::new(FailingReader::new(self.bytes_for(open_number), 2)))
+-            },
++            }
+             ReplayMode::ReadErrorAtOpen(_) => {
+                 Ok(Box::new(Cursor::new(self.bytes_for(open_number))))
+-            },
++            }
+             _ => Ok(Box::new(Cursor::new(self.bytes_for(open_number)))),
+         }
+     }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/source_part_splice_replay.rs:1177:
+             if limit.resource == Resource::Memory =>
+         {
+             true
+-        },
++        }
+         OpcError::IncompleteOutput { source, .. } => contains_memory_limit(source),
+         _ => false,
+     }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/source_part_splice_replay.rs:1340:
+                     matches!(*source, OpcError::IoError(ref error) if error.kind() == io::ErrorKind::BrokenPipe),
+                     "the original replay I/O error must remain authoritative: {source:?}"
+                 );
+-            },
++            }
+             other => panic!("expected incomplete publication, got {other:?}"),
+         }
+         assert_eq!(provider.open_count(), 3);
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/source_part_splice_replay.rs:1482:
+                                 assert_eq!(written, output.len() as u64);
+                                 assert!(written > 0);
+                                 *source
+-                            },
++                            }
+                             other => panic!("publication must report accepted output: {other:?}"),
+                         }
+                     } else {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/source_part_transfer.rs:588:
+         OpcError::IncompleteOutput { written, source } => {
+             assert!(matches!(*source, OpcError::Cancelled));
+             written
+-        },
++        }
+         other => panic!("source cancellation after a sink write must be incomplete: {other:?}"),
+     };
+     assert!(written > 0);
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/source_part_transfer.rs:660:
+         OpcError::IncompleteOutput { written, source } => {
+             assert!(is_source_changed(&source));
+             written
+-        },
++        }
+         other => panic!("source mutation after the final sink write must be incomplete: {other:?}"),
+     };
+     assert!(mutated.load(Ordering::SeqCst));
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/source_part_transfer.rs:784:
+         OpcError::IncompleteOutput { written, source } => {
+             assert!(matches!(*source, OpcError::IoError(_)));
+             written
+-        },
++        }
+         other => panic!("expected typed incomplete sink failure, got {other:?}"),
+     };
+     assert_eq!(written, 8);
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/source_part_transfer.rs:848:
+                 OpcError::Execution(ExecutionError::ResourceLimit(_))
+             ));
+             return;
+-        },
++        }
+     };
+     let view = package.part(&pack(SOURCE_PART)).unwrap();
+     let payload = view.data().unwrap();
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/source_part_transfer.rs:1238:
+                 assert_eq!(package.cache_diagnostics().retained_entries, 0);
+                 drop(data);
+                 drop(token);
+-            },
++            }
+             1 => assert!(matches!(result, Err(OpcError::Cancelled))),
+             _ => assert!(matches!(result, Err(OpcError::SourceChanged { .. }))),
+         }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/source_part_transfer.rs:1269:
+                 assert!(matches!(error, OpcError::ZipError(_)));
+                 assert_eq!(budget.used(Resource::Memory), 0);
+                 continue;
+-            },
++            }
+             Err(error) => panic!("unexpected source admission error: {error:?}"),
+         };
+         let result = package
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/source_part_transfer.rs:1565:
+                 if limit.resource == Resource::Memory =>
+             {
+                 break;
+-            },
++            }
+             Err(error) => panic!("unexpected retained metadata refusal: {error}"),
+         }
+         assert_eq!(budget.used(Resource::Memory), unit * captures.len() as u64);
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/source_replacement_audit.rs:83:
+             let mut plan = SourceTopologyPlan::new();
+             plan.try_replace_part(uri(), replacement).unwrap();
+             package.write_topology_to_stream(&mut output, plan)
+-        },
++        }
+         Door::SingleOverlay => {
+             package.write_part_overlay_to_stream(&mut output, &uri(), replacement)
+-        },
++        }
+         Door::MultipleOverlays => {
+             package.write_part_overlays_to_stream(&mut output, vec![(uri(), replacement)])
+-        },
++        }
+     };
+     (result, output)
+ }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/source_replacement_audit.rs:104:
+         Err(OpcError::XmlPublication { part, source }) => {
+             assert_eq!(part, DOCUMENT, "{door:?}");
+             assert_eq!(&source, expected, "{door:?}");
+-        },
++        }
+         other => panic!("{door:?}: expected an XML publication refusal, got {other:?}"),
+     }
+     assert!(
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/source_xml_census.rs:108:
+                     match attribute.key.as_ref() {
+                         b"Extension" | b"PartName" => key = Some(text.to_lowercase()),
+                         b"ContentType" => value = Some(text),
+-                        _ => {},
++                        _ => {}
+                     }
+                 }
+                 if let (Some(key), Some(value)) = (key, value) {
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/source_xml_census.rs:118:
+                         _ => None,
+                     };
+                 }
+-            },
++            }
+             Ok(Event::Eof) | Err(_) => break,
+-            Ok(_) => {},
++            Ok(_) => {}
+         }
+     }
+     (defaults, overrides)
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/structural_prefetch.rs:324:
+                 outcome: Ok(parts),
+                 non_parts,
+             }
+-        },
++        }
+     }
+ }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/verified_publication.rs:74:
+         Err(OpcError::XmlPublication { part, source }) => {
+             assert_eq!(part, DOCUMENT);
+             assert_eq!(source, verify_source(bytes, Limits::default()).unwrap_err());
+-        },
++        }
+         other => panic!("expected the writer's audit to refuse, got {other:?}"),
+     }
+ }
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/verified_publication.rs:270:
+             Some(handle) => handle.clone(),
+             None => {
+                 XmlPart::new(document_uri(), CONTENT_TYPE.to_owned(), Vec::new()).payload_handle()
+-            },
++            }
+         }
+     }
+ 
+Diff in /tmp/litchi-performance-0923/quality-source-v1/crates/litchi-opc/tests/verified_publication.rs:325:
+                         verify_source(REFUSED, Limits::default()).unwrap_err(),
+                         "{label}, owned {owned}"
+                     );
+-                },
++                }
+                 Err(error) => panic!("{label}, owned {owned}: unexpected error {error:?}"),
+                 Ok(bytes) => panic!(
+                     "{label}, owned {owned}: published {:?} unaudited",

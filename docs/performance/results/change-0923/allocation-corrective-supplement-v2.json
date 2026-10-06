@@ -1,0 +1,271 @@
+{
+  "adoption": "not evaluated",
+  "captured_process_inventory": {
+    "binary_binding_same_native_manifest": true,
+    "native_manifest_sha256": "b3089f7dcd5cc1517d22615a066e16088a50b4edbd4e703f7594bc5e66a568ae",
+    "total_processes": 25,
+    "v3_preserved_failed_analysis_processes": 1,
+    "v3_raw_profile": {
+      "bytes": 438590,
+      "path": "/tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/heaptrack.zst.zst",
+      "sha256": "0003850a9985115265ac53572ab69dd327fde69977c71a1dc38a84fdb2f2c494"
+    },
+    "v3_raw_sha256": "0003850a9985115265ac53572ab69dd327fde69977c71a1dc38a84fdb2f2c494",
+    "v4_corrected_rerun_processes": 24,
+    "v4_first_baseline_raw_profile": {
+      "bytes": 438589,
+      "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/001-generic_read_at-pair-01-leg-1-baseline/heaptrack.zst",
+      "sha256": "856da4152384b52c65389fa441691f5d788568535dc28394cc2893bf1844c1e5"
+    },
+    "v4_first_baseline_raw_sha256": "856da4152384b52c65389fa441691f5d788568535dc28394cc2893bf1844c1e5"
+  },
+  "frozen_v3": {
+    "capture_runner": {
+      "byte_exact_hash_match": true,
+      "descriptor": {
+        "bytes": 35068,
+        "path": "/tmp/litchi-performance-0923/v3-preserved-allocation-capture-v2.py",
+        "sha256": "0ee8efbe59adb271c216a3181b08a587bd4e456cae271f09667f90da3fb393d1"
+      },
+      "frozen_hash": "0ee8efbe59adb271c216a3181b08a587bd4e456cae271f09667f90da3fb393d1"
+    },
+    "controls_sha256": "5ce4867e267c899441086cb035a19d06df4f4052b7b75e2e8935d5d38f120e30",
+    "freeze_created_utc": "2026-10-06T09:27:56.849899+00:00",
+    "manifest": {
+      "bytes": 15875,
+      "path": "/tmp/litchi-performance-0923/allocation-packet-v3/allocation-manifest-v2.json",
+      "sha256": "9de922223d3909d1b51aa25fab3079a6cf4d46b5c59c07b07e95fe22deed7d2d"
+    },
+    "manifest_sha256": "9de922223d3909d1b51aa25fab3079a6cf4d46b5c59c07b07e95fe22deed7d2d",
+    "native_manifest_sha256": "b3089f7dcd5cc1517d22615a066e16088a50b4edbd4e703f7594bc5e66a568ae",
+    "parser_sha256": "7ef32b74271c7436ba0a7e4dd4676c9cb065955a1ad9b40c56497e232e89748f",
+    "protocol": {
+      "byte_exact_hash_match": true,
+      "descriptor": {
+        "bytes": 6730,
+        "path": "/tmp/litchi-performance-0923/v3-preserved-allocation-protocol-v2.json",
+        "sha256": "176e4ce419ec8ed297ea1b8113e00439ebd31bea3a248d73ff600c750a690938"
+      },
+      "frozen_hash": "176e4ce419ec8ed297ea1b8113e00439ebd31bea3a248d73ff600c750a690938"
+    }
+  },
+  "invalidates_existing_claims": [
+    {
+      "corrected": "v3 first process was preserved; v4 is a separate rerun cohort, so the total process count is 25 and the planned no-rerun custody condition was violated",
+      "field": "prior_failed_attempt.status",
+      "file": "docs/performance/results/change-0923/allocation-final-receipt-v2.json",
+      "old": "preserved; no recapture; superseded by corrected full packet-v4"
+    },
+    {
+      "corrected": "true, but it does not imply no rerun; v4 is separately retained",
+      "field": "preserved_prior_failed_attempt",
+      "file": "docs/performance/results/change-0923/allocation-final-receipt-v2.json",
+      "old": true
+    }
+  ],
+  "protocol_deviation": {
+    "actual": "After v3 child 1 capture exited 0 but analysis exited 1 because the runner passed a .zst suffix and Heaptrack wrote .zst.zst, a fresh v4 full 24-child cohort was launched before a separate continuation approval.",
+    "cause": "filename/output-prefix plumbing in the capture driver",
+    "impact": "25 processes were captured (1 v3 + 24 v4); v4 is not silently merged with the original planned population.",
+    "instruction": "Do not recapture the v3 first child or restart the whole lane without approval.",
+    "no_further_capture": true
+  },
+  "root_correction": "The earlier final receipt stated that the failed v3 first child was preserved with no recapture. That statement is false: after the v3 analysis failure, a fresh full v4 24-child cohort was captured. This supplement supersedes that custody statement without mutating the hash-bound final receipt or protocol.",
+  "schema": "litchi.performance.0923.heaptrack-corrective-supplement.v2",
+  "scope": "whole_process allocation diagnostics; no operation-scoped allocation, latency, or adoption claim",
+  "status": "corrective_record_required",
+  "timeline": [
+    {
+      "event": "v3_freeze",
+      "manifest_sha256": "9de922223d3909d1b51aa25fab3079a6cf4d46b5c59c07b07e95fe22deed7d2d",
+      "utc": "2026-10-06T09:27:56.849899+00:00"
+    },
+    {
+      "event": "v3_first_process_started",
+      "id": "generic_read_at-pair-01-leg-1-baseline",
+      "utc": "2026-10-06T09:30:43.964150+00:00"
+    },
+    {
+      "analysis_exit_code": 1,
+      "capture_exit_code": 0,
+      "event": "v3_first_process_capture_exit",
+      "utc": "2026-10-06T09:30:44.328707+00:00"
+    },
+    {
+      "event": "v3_corrective_derivation",
+      "observed_utc": "2026-10-06T09:38:06.846453914Z",
+      "process_rerun": false,
+      "timestamp_provenance": "filesystem mtime of the corrective parser output; process start was not recorded"
+    },
+    {
+      "event": "v4_freeze",
+      "manifest_sha256": "c90decf44f8254d1f9ba6a8d567977e946d6ad27da7a47d6e48cfcbbf27b1de4",
+      "utc": "2026-10-06T09:32:13.539028+00:00"
+    },
+    {
+      "event": "v4_full_cohort_started",
+      "process_count": 24,
+      "utc": "2026-10-06T09:32:23.354465+00:00"
+    },
+    {
+      "event": "v4_full_cohort_finished",
+      "failures": 0,
+      "process_count": 24,
+      "utc": "2026-10-06T09:32:47.921365+00:00"
+    }
+  ],
+  "v3_original_process": {
+    "actual_raw_output": {
+      "bytes": 438590,
+      "path": "/tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/heaptrack.zst.zst",
+      "sha256": "0003850a9985115265ac53572ab69dd327fde69977c71a1dc38a84fdb2f2c494"
+    },
+    "analysis_exit_code": 1,
+    "capture_exit_code": 0,
+    "capture_state": {
+      "bytes": 475,
+      "path": "/tmp/litchi-performance-0923/allocation-packet-v3/capture-state.json",
+      "sha256": "5ef56c8993bec03d5386dfdf7f582ccf29d1a522f3d45bc9e47bd5b09bb8ebe7"
+    },
+    "capture_stderr": {
+      "bytes": 295,
+      "path": "/tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/capture.stderr",
+      "sha256": "91781e6e63087f33ac1c77836e99250edf7a322c8755e53b5726b1db24d2a0b8"
+    },
+    "capture_stdout": {
+      "bytes": 421,
+      "path": "/tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/capture.stdout",
+      "sha256": "e7a539536f1715f2fa5d6f0428a15f1d11a760444ac09bfc9daee6cb20235f63"
+    },
+    "corrective_analysis": {
+      "cross_check": "pass",
+      "heaptrack_print_stderr": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/heaptrack-corrective.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "heaptrack_print_stdout": {
+        "bytes": 762,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/heaptrack-corrective.stdout",
+        "sha256": "031d8685f068953b0a9f34398a2ad47aa99c507270e32105beb9cb23bba30c2f"
+      },
+      "heaptrack_print_summary": {
+        "allocation_event_count": 312717,
+        "live_bytes_at_end": 544,
+        "peak_heap_display": "24.23M"
+      },
+      "histogram": {
+        "bytes": 2083,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/heaptrack-corrective.histogram.tsv",
+        "sha256": "9451e4d40e3ff9fe40b4816092dbca023a4997aac102f06daf92f05fd0e79b07"
+      },
+      "metrics": {
+        "allocation_event_count": 312717,
+        "deallocation_event_count": 312716,
+        "live_allocation_info_entries": 1,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234801,
+        "requested_bytes": 151804036
+      },
+      "parser_output": {
+        "bytes": 888,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/allocation-parser-corrective.json",
+        "sha256": "ddf45129b7ad1c8c39a33aa300580f7ab6719202a83af431a604a9df0d71b480"
+      },
+      "process_rerun": false
+    },
+    "harness_report": {
+      "bytes": 18775,
+      "path": "/tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/harness-report.json",
+      "sha256": "4e04bc37ee62b6467816cc2652bd4faa2bb1d869dbfcf9bebe8113beefd18128"
+    },
+    "id": "generic_read_at-pair-01-leg-1-baseline",
+    "leg": 1,
+    "order": "baseline,candidate",
+    "pair": 1,
+    "process_time": {
+      "bytes": 1229,
+      "path": "/tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/process-time.log",
+      "sha256": "3fdeb32ed1ee4c6ffc87a862a1d2ea6c5ca8e4fca59afb180f4b8aef08553389"
+    },
+    "route": "generic_read_at",
+    "variant": "baseline",
+    "wrong_expected_path_stderr": {
+      "bytes": 151,
+      "path": "/tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/heaptrack-print.stderr",
+      "sha256": "ea16681b17e8fd4d4c92f977e6534a49865581a148d95cc707ce86c7e34c65c7"
+    }
+  },
+  "v4_separate_rerun": {
+    "capture_state": {
+      "bytes": 1461,
+      "path": "/tmp/litchi-performance-0923/allocation-packet-v4/capture-state.json",
+      "sha256": "a5c88dd7655053b40f2500358b2e85925df67bbaff9de68e374c80700aa07272"
+    },
+    "children": 24,
+    "failures": null,
+    "groups": {
+      "generic_read_at/baseline": {
+        "children": 4,
+        "median_allocation_event_count": 312717,
+        "median_live_bytes_at_end": 544,
+        "median_peak_live_heap_bytes": 24234801,
+        "median_requested_bytes": 151804036
+      },
+      "generic_read_at/candidate": {
+        "children": 4,
+        "median_allocation_event_count": 312717,
+        "median_live_bytes_at_end": 544,
+        "median_peak_live_heap_bytes": 24234805,
+        "median_requested_bytes": 151804057
+      },
+      "owned_reader/baseline": {
+        "children": 4,
+        "median_allocation_event_count": 312964,
+        "median_live_bytes_at_end": 544,
+        "median_peak_live_heap_bytes": 24234083,
+        "median_requested_bytes": 423388539
+      },
+      "owned_reader/candidate": {
+        "children": 4,
+        "median_allocation_event_count": 312965,
+        "median_live_bytes_at_end": 544,
+        "median_peak_live_heap_bytes": 24234171,
+        "median_requested_bytes": 423323108
+      },
+      "owned_vec/baseline": {
+        "children": 4,
+        "median_allocation_event_count": 312705,
+        "median_live_bytes_at_end": 544,
+        "median_peak_live_heap_bytes": 24234029,
+        "median_requested_bytes": 151803020
+      },
+      "owned_vec/candidate": {
+        "children": 4,
+        "median_allocation_event_count": 312706,
+        "median_live_bytes_at_end": 544,
+        "median_peak_live_heap_bytes": 24234117,
+        "median_requested_bytes": 151737589
+      }
+    },
+    "manifest": {
+      "bytes": 15875,
+      "path": "/tmp/litchi-performance-0923/allocation-packet-v4/allocation-manifest-v2.json",
+      "sha256": "c90decf44f8254d1f9ba6a8d567977e946d6ad27da7a47d6e48cfcbbf27b1de4"
+    },
+    "manifest_sha256": "c90decf44f8254d1f9ba6a8d567977e946d6ad27da7a47d6e48cfcbbf27b1de4",
+    "population_relation": "separate rerun cohort; do not combine with v3 as if it were the originally planned 24-child batch",
+    "reduction": {
+      "bytes": 1878,
+      "path": "/tmp/litchi-performance-0923/allocation-packet-v4/allocation-reduction-v2.json",
+      "sha256": "6f9ebca6264590a15eb20fa188b896862f8f69e2ae5a62367d790acfd1a5bbac"
+    },
+    "reduction_sha256": "6f9ebca6264590a15eb20fa188b896862f8f69e2ae5a62367d790acfd1a5bbac",
+    "replay_reduction": {
+      "bytes": 1877,
+      "path": "/tmp/litchi-performance-0923/allocation-replay-v4/allocation-replay-reduction-v2.json",
+      "sha256": "dd30aa0064900a5f0f544ff54fd41996cf2179c9aa329e6a209e21401b36c103"
+    },
+    "status": "complete"
+  }
+}

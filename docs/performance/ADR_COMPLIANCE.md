@@ -1,5 +1,17 @@
 # Performance optimization ADR-compliance matrix
 
+## 0923 — exact immutable-owner fingerprint memo adopted
+
+[0923](0923-owned-source-fingerprint.md) follows the accepted one-shot digest
+shape: exact strongly retained owned bytes, fixed fallibly reserved cell,
+success-only initialization, shared handles, fresh state for new ingress and
+debug re-derivation. Generic, path, validation and managed routes remain
+uncached. First-read error ordering and publication/inverse authorization are
+unchanged. Independent tests cover managed accounting/cancellation and generic
+mutation/short-read refusals. The native qualification passes; a separate
+profiling restart invalidates its original memory protocol and is explicitly
+retained as descriptive evidence, not a clean qualification.
+
 ## 0922 — shared borrowed pointer lookup reviewed, not adopted
 
 [0922](0922-borrowed-fib-selection.md) factors validation into the DOC FIB

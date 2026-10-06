@@ -1,0 +1,71 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-04-leg-1-candidate/process-time.txt",
+    "/tmp/litchi-performance-0923/candidate-target/release/litchi-perf-baseline",
+    "--case",
+    "docx_source_backed_existing_section_layout_edit_save",
+    "--samples",
+    "200",
+    "--warmup",
+    "30",
+    "--json",
+    "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-04-leg-1-candidate/report.json"
+  ],
+  "binary": {
+    "bytes": 70379960,
+    "path": "/tmp/litchi-performance-0923/candidate-target/release/litchi-perf-baseline",
+    "sha256": "8d98309501f63f4911828f52c42653f5950f3f5019bd040cf98f787173528861"
+  },
+  "cwd": "/tmp/litchi-performance-0923/packet-v3-final2",
+  "env_overrides": {
+    "LC_ALL": "C",
+    "LITCHI_DOCX_INGRESS_ROUTE": "owned_vec"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-10-06T09:25:25.163065+00:00",
+  "max_rss_kib": 36544,
+  "pid": 1342872,
+  "process_time": {
+    "bytes": 988,
+    "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-04-leg-1-candidate/process-time.txt",
+    "sha256": "344e453ff78b86b6c3d3c9c12626b95675707b8de5efd92e46dd7b705b1a0e02"
+  },
+  "process_time_relative": "children/owned_vec-pair-04-leg-1-candidate/process-time.txt",
+  "receipt_payload_bytes": 2272,
+  "receipt_payload_sha256": "b2fb8aa40a0949ee0e047c92044a93da64de9eee6d16558f7299c5ac30124607",
+  "report": {
+    "bytes": 135522,
+    "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-04-leg-1-candidate/report.json",
+    "sha256": "7003184b701dc4a8f5bf91b5d4130a08b5d3e87d12ff83c3d7a0b8bedc2cdc01"
+  },
+  "report_relative": "children/owned_vec-pair-04-leg-1-candidate/report.json",
+  "schedule": {
+    "id": "owned_vec-pair-04-leg-1-candidate",
+    "index": 23,
+    "leg": 1,
+    "order": "candidate,baseline",
+    "pair": 4,
+    "route": "owned_vec",
+    "variant": "candidate"
+  },
+  "schema": "litchi.performance.0923.comparison-child.v2",
+  "started_utc": "2026-10-06T09:25:21.690139+00:00",
+  "stderr": {
+    "bytes": 0,
+    "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-04-leg-1-candidate/stderr.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stderr_relative": "children/owned_vec-pair-04-leg-1-candidate/stderr.log",
+  "stdout": {
+    "bytes": 0,
+    "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-04-leg-1-candidate/stdout.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stdout_relative": "children/owned_vec-pair-04-leg-1-candidate/stdout.log"
+}

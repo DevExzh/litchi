@@ -1,0 +1,71 @@
+{
+  "schema": "litchi.performance.0923.root-adoption.v3",
+  "authority": "root-authorized source adoption; no commit",
+  "root": "/home/zhuhe/code/litchi",
+  "root_head_before_apply": "4e2532a0ce958f5928496b0ad9b356d8636916e1",
+  "applied_patches": [
+    {
+      "path": "/tmp/litchi-performance-0923/candidate-source-0923-v3.patch",
+      "sha256": "77c2a9952335d5f16c24fbfc8d87e120301808258f70e990324fa21b8ea8e75d",
+      "targets": ["crates/litchi-opc/src/source_backed.rs"],
+      "source_sha256_after_apply": "d28843caf8245bd6f0ff0f953b9b5545c4d9ad7a4e11f362d29ce226cc251cc2"
+    },
+    {
+      "path": "/tmp/litchi-performance-0923/review/source_fingerprint_quality.patch",
+      "sha256": "176e5793554d0a19c20a6091f532a6c58f3211d4db0c61c6b8acd3a7017223e6",
+      "targets": ["crates/litchi-opc/tests/source_fingerprint_quality.rs"],
+      "test_file_sha256_after_apply": "0aefed94d21c3c1558321b57129f143cfc4174fa853c428306fd9044c08ece33"
+    }
+  ],
+  "held_patch": {
+    "path": "/tmp/litchi-performance-0923/harness-0923.patch",
+    "sha256": "5404cf09f7f840aa3a587d1bbdce6659d0d3a8cf35d2c44bbd42b747ddf217e0",
+    "applied": false
+  },
+  "checks": {
+    "individual_apply_check_exit_codes": {
+      "production": 0,
+      "integration_test": 0
+    },
+    "combined_stack_check_exit_code": 0,
+    "root_diff_check": "git diff --check passed for adopted production source",
+    "no_commit": true
+  },
+  "protected_user_paths_unchanged": {
+    "tools/check_iwork_leaf_public_api.py": "df38b0c737e42270ac0f2f1f6e4e51f785d7967bb3f2707bc6eb863e3abb57f6",
+    "crates/litchi/examples/bench_word_parse.rs": "2bb73030b8ad7e400fda91331ca40ffba29b7ff12c9b0fb2b32f3f1e8ecf90ac",
+    "docs/UNIFIED_OPS_API_DESIGN.md": "be180f256dde0e22d48ad22f3cc7832da1e919b59e30f1cb6a552113b2928d0d"
+  },
+  "cleanup_receipt": {
+    "pre_path": "/tmp/litchi-performance-0923/custody/adoption-cleanup-pre-v1.json",
+    "pre_sha256": "f5a9e3691ad0cf3830d29cc695bce398653f23bd2766ebd8fba2b1a3278f77a",
+    "post_path": "/tmp/litchi-performance-0923/custody/adoption-cleanup-post-v1.json",
+    "post_sha256": "562d4213ce83384b3a68d841df71e635399b2f8ba29ac1d78e00be2e74038ea2",
+    "files_removed": 59411,
+    "logical_bytes_removed": 11062934160,
+    "paths_removed": [
+      "quality-target-v1", "quality-target-v2", "quality-target-v3",
+      "postcapture-baseline-target", "audit-git-head-tree2", "audit-patched-tree",
+      "audit-git-head.tar", "base-head.tar", "quality-source-v1", "quality-source-v2"
+    ],
+    "remaining_paths_verified_absent": true
+  },
+  "preserved_artifacts": {
+    "frozen_baseline_binary_sha256": "ed2d5609cc7a54459cd33627a80416d5ce2ef765b32916b5235b91209e19db28",
+    "candidate_binary_sha256": "8d98309501f63f4911828f52c42653f5950f3f5019bd040cf98f787173528861",
+    "baseline_fingerprint_archive_sha256": "08c0232a8c09efa129dba82481c2bc2b3baa7055cc1b8fbe42cd56f47734c17b",
+    "candidate_fingerprint_archive_sha256": "973e1af1866257a6ead1a20824bd6ece5604e9c916936baede615bc01d2b3189",
+    "candidate_source": "/tmp/litchi-performance-0923/candidate-source",
+    "baseline_source": "/tmp/litchi-performance-0923/baseline-source",
+    "quality_source_v3": "/tmp/litchi-performance-0923/quality-source-v3",
+    "receipts": "/tmp/litchi-performance-0923/receipts",
+    "review": "/tmp/litchi-performance-0923/review",
+    "root_builds": "/tmp/litchi-performance-0923/root-builds",
+    "release_d_files_preserved": {
+      "candidate_target": 236,
+      "baseline_target": 460
+    }
+  },
+  "root_status_after_apply_and_cleanup": "M crates/litchi-opc/src/source_backed.rs; M tools/check_iwork_leaf_public_api.py; ?? crates/litchi-opc/tests/source_fingerprint_quality.rs; ?? crates/litchi/examples/bench_word_parse.rs; ?? docs/UNIFIED_OPS_API_DESIGN.md; ?? docs/performance/0923-owned-source-fingerprint.md; ?? docs/performance/results/change-0923/",
+  "active_build_or_capture_processes_at_final_check": false
+}

@@ -1,0 +1,146 @@
+{
+  "binary": {
+    "bytes": 69962624,
+    "path": "/tmp/litchi-performance-0923/baseline-target/release/litchi-perf-baseline",
+    "sha256": "ed2d5609cc7a54459cd33627a80416d5ce2ef765b32916b5235b91209e19db28"
+  },
+  "candidate_source_edits_applied": false,
+  "comparison_children_run": 0,
+  "controls": {
+    "bytes": 39318,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/comparison-controls.json",
+    "sha256": "09363fec29514b893821b014f2fdebdbc478798191c425fc38ef495bde4564ae"
+  },
+  "controls_summary": {
+    "generic_and_owned_negative_controls_passed": true,
+    "planned_reduction_bytes": 23640,
+    "planned_reduction_sha256": "00b1c208d4335154f97d894490438e44d0e68a9566db6372fc4b740449e8d901",
+    "under_one_mib": true
+  },
+  "harness_patch_sha256": "5404cf09f7f840aa3a587d1bbdce6659d0d3a8cf35d2c44bbd42b747ddf217e0",
+  "protocol": {
+    "bytes": 3870,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/comparison-protocol.json",
+    "sha256": "4cfd0277171d537266df5bc5b17367ca428074b6eebbeefd7370975665c7d6eb"
+  },
+  "receipt": {
+    "bytes": 5913,
+    "path": "/tmp/litchi-performance-0923/receipts/baseline-validation-final.json",
+    "sha256": "3e08e15e28880df7c8ec7aaaf2760b96e8273779b336050c9fa234282dc63e1c"
+  },
+  "routes": [
+    {
+      "all_gates_verified": true,
+      "cache_retained_bytes": [
+        18855
+      ],
+      "elapsed_ns": {
+        "max": 4611239,
+        "min": 4473319,
+        "p50": 4504713.5,
+        "p95": 4539419,
+        "p99": 4569819
+      },
+      "output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+      "report": {
+        "bytes": 151614,
+        "path": "/tmp/litchi-performance-0923/baseline-generic-final.json",
+        "sha256": "910d4ff184f08c9911e40702ba41a7188473e878427cab6cbc2c5fdbc8720787"
+      },
+      "route": "generic_read_at",
+      "samples": 200,
+      "source_observation": {
+        "owned_ingress_owned_bytes": [],
+        "owned_ingress_read_bytes": [],
+        "owned_ingress_read_calls": [],
+        "source_read_bytes": [
+          8409488
+        ],
+        "source_read_calls": [
+          202
+        ]
+      }
+    },
+    {
+      "all_gates_verified": true,
+      "cache_retained_bytes": [
+        18855
+      ],
+      "elapsed_ns": {
+        "max": 4919250,
+        "min": 4706469,
+        "p50": 4732154.0,
+        "p95": 4764059,
+        "p99": 4836450
+      },
+      "output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+      "report": {
+        "bytes": 135518,
+        "path": "/tmp/litchi-performance-0923/baseline-owned-vec-final.json",
+        "sha256": "68bbcf703d3b7ba63f1a027ba5ae2843a0ca54b26f0c2444a83a3952a64be545"
+      },
+      "route": "owned_vec",
+      "samples": 200,
+      "source_observation": {
+        "owned_ingress_owned_bytes": [
+          2101427
+        ],
+        "owned_ingress_read_bytes": [
+          0
+        ],
+        "owned_ingress_read_calls": [
+          0
+        ],
+        "source_read_bytes": [],
+        "source_read_calls": []
+      }
+    },
+    {
+      "all_gates_verified": true,
+      "cache_retained_bytes": [
+        18855
+      ],
+      "elapsed_ns": {
+        "max": 4957610,
+        "min": 4812429,
+        "p50": 4842769.5,
+        "p95": 4884550,
+        "p99": 4936350
+      },
+      "output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+      "report": {
+        "bytes": 137139,
+        "path": "/tmp/litchi-performance-0923/baseline-owned-reader-final.json",
+        "sha256": "05b8c6b209cd3ba7168f7c9d927e676e0fdd67c13a90ee06299d2448c10ce221"
+      },
+      "route": "owned_reader",
+      "samples": 200,
+      "source_observation": {
+        "owned_ingress_owned_bytes": [
+          2101427
+        ],
+        "owned_ingress_read_bytes": [
+          2101427
+        ],
+        "owned_ingress_read_calls": [
+          258
+        ],
+        "source_read_bytes": [],
+        "source_read_calls": []
+      }
+    }
+  ],
+  "schedule": {
+    "children_per_route": 16,
+    "children_per_version": 24,
+    "children_total": 48,
+    "pairs": 8,
+    "routes": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader"
+    ]
+  },
+  "schema": "litchi.performance.0923.baseline-validation-descriptor.v2",
+  "source_revision": "4e2532a0ce958f5928496b0ad9b356d8636916e1"
+}

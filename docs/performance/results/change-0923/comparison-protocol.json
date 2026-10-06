@@ -1,0 +1,91 @@
+{
+  "schema": "litchi.performance.0923.doc-comparison.protocol.v1",
+  "status": "prospective",
+  "created_utc": "2026-10-06T08:36:03+00:00",
+  "baseline_source_head": "4e2532a0ce958f5928496b0ad9b356d8636916e1",
+  "candidate_source_head": null,
+  "candidate_base_revision": "4e2532a0ce958f5928496b0ad9b356d8636916e1",
+  "candidate_source_files": null,
+  "candidate_patch_binding": "external receipt; exact reviewed patch is separate from the source tree",
+  "case": "docx_source_backed_existing_section_layout_edit_save",
+  "corpus": {
+    "generator": "litchi-docx-section-layout-source-v1",
+    "archive_bytes": 2101427,
+    "archive_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+    "output_bytes": 2101446,
+    "output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+    "selected_paragraph": 64,
+    "section_positions": [64, 129],
+    "columns_before": 2,
+    "columns_after": 3,
+    "media_count": 4,
+    "media_bytes": 524288
+  },
+  "routes": ["generic_read_at", "owned_vec", "owned_reader"],
+  "native": {
+    "cpu": 12,
+    "pairs": 8,
+    "pair_orders": [
+      "baseline,candidate",
+      "candidate,baseline",
+      "baseline,candidate",
+      "candidate,baseline",
+      "baseline,candidate",
+      "candidate,baseline",
+      "baseline,candidate",
+      "candidate,baseline"
+    ],
+    "warmups_per_child": 30,
+    "samples_per_child": 200,
+    "routes": ["generic_read_at", "owned_vec", "owned_reader"],
+    "children_per_route": 16,
+    "children_per_version": 24,
+    "children_total": 48,
+    "schedule_identity": "8 paired AB/BA cells for each of 3 routes; each cell has one baseline and one candidate child"
+  },
+  "bootstrap": {
+    "draws": 10000,
+    "seed": 923,
+    "interval": "nearest-rank 2.5th/97.5th percentiles",
+    "statistic": "median of paired baseline_p50/candidate_p50 ratios"
+  },
+  "timing_gates": {
+    "owned_benefit": {
+      "routes": ["owned_vec", "owned_reader"],
+      "ratio": "baseline_over_candidate_p50",
+      "minimum_median_ratio": 1.05,
+      "lower_95_percent_bound_must_exceed": 1.0
+    },
+    "generic_control": {
+      "routes": ["generic_read_at"],
+      "ratio": "baseline_over_candidate_p50",
+      "lower_95_percent_bound_must_be_at_least": 0.9523809523809523,
+      "median_is_descriptive_only": true
+    }
+  },
+  "review_flags": {
+    "pooled_latency_statistics": ["p50", "p95", "p99"],
+    "pooled_latency_increase_fraction": 0.05,
+    "whole_process_max_rss_median_increase_fraction": 0.05,
+    "allocation_increase_fraction": 0.01
+  },
+  "timing_scope": "harness elapsed_ns: preparation, source-backed open, section query, columns edit, commit, and sequential publication; exact six-phase sum",
+  "process_scope": "whole child process metrics are retained as setup-inclusive review flags and never substituted for elapsed_ns",
+  "required_gates": [
+    "semantic reopen of all sections",
+    "table-cell sectPr exclusion",
+    "raw untouched member preservation",
+    "raw member order and ZIP comment preservation",
+    "header/footer relationship preservation",
+    "forward/inverse patch and stale-source refusal",
+    "foreign, signed, no-op, limits, and partial-sink refusal",
+    "source immutability and exact inverse publication",
+    "cache counter contract",
+    "sequential sink byte/write bound",
+    "route-specific source observation truthfulness",
+    "stable output SHA-256"
+  ],
+  "recapture_policy": "a failed child, invalid binding, or failed gate fails the complete batch; no selective recapture or rerun to chase a passing result",
+  "capture_order": "baseline is captured from current production before candidate source edits; candidate uses the identical harness source plus a separately reviewed production patch",
+  "performance_claim": "prospective comparison only; timing eligibility does not adopt the candidate"
+}

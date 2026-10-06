@@ -1,0 +1,703 @@
+{
+  "allocation_evidence": {
+    "lane": null,
+    "measured": false
+  },
+  "baseline_source": {
+    "archive": {
+      "bytes": 170065920,
+      "path": "/tmp/litchi-performance-0923/base-4e2532a0ce958f5928496b0ad9b356d8636916e1.tar",
+      "sha256": "a6880fb4f638fbdcff23afb728382ea0c807f3af201648f579844309492b10a9"
+    },
+    "cargo_lock": {
+      "bytes": 138465,
+      "path": "/tmp/litchi-performance-0923/baseline-source/tree/Cargo.lock",
+      "sha256": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd"
+    },
+    "full_source_listing": {
+      "bytes": 1437118,
+      "path": "/tmp/litchi-performance-0923/custody/source-listing-4e2532a0ce958f5928496b0ad9b356d8636916e1.jsonl",
+      "sha256": "988d3c1d40cbeefc8f937eb2a3f635c1fd003ea36589f1329029f5fef6537509"
+    },
+    "harness_patch": {
+      "bytes": 17046,
+      "path": "/tmp/litchi-performance-0923/harness-0923.patch",
+      "sha256": "5404cf09f7f840aa3a587d1bbdce6659d0d3a8cf35d2c44bbd42b747ddf217e0"
+    },
+    "kind": "baseline",
+    "legacy_receipt_listing_claim": {
+      "bytes": 1156468,
+      "sha256": "f9714cda62133005e6eb0046f79189bd8914946ae3f1a16baade631a8b4f12fc",
+      "status": "preserved_unmatched_legacy_claim"
+    },
+    "probe_lock": {
+      "bytes": 56289,
+      "path": "/tmp/litchi-performance-0923/baseline-source/tree/tools/perf-baseline/Cargo.lock",
+      "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+    },
+    "receipt": {
+      "bytes": 2237,
+      "path": "/tmp/litchi-performance-0923/receipts/baseline-source-final.json",
+      "sha256": "62b555f066f9a1ac11dd63c258170b9534015766b18b6962012786004f817307"
+    },
+    "revision": "4e2532a0ce958f5928496b0ad9b356d8636916e1",
+    "source_files": null,
+    "source_tree": "/tmp/litchi-performance-0923/baseline-source/tree"
+  },
+  "binaries": {
+    "baseline": {
+      "binary": {
+        "bytes": 69962624,
+        "path": "/tmp/litchi-performance-0923/frozen-baseline-native/litchi-perf-baseline",
+        "sha256": "ed2d5609cc7a54459cd33627a80416d5ce2ef765b32916b5235b91209e19db28"
+      },
+      "build_receipt": {
+        "bytes": 1661,
+        "path": "/tmp/litchi-performance-0923/receipts/baseline-build-final.json",
+        "sha256": "86eae277dd3096ab7972cc9d7696d02853fadaa3e7e20678449137b74a80e630"
+      },
+      "build_record": {
+        "argv": [
+          "cargo",
+          "build",
+          "--locked",
+          "--offline",
+          "-j2",
+          "--release",
+          "--manifest-path",
+          "/tmp/litchi-performance-0923/baseline-source/tree/tools/perf-baseline/Cargo.toml",
+          "--bin",
+          "litchi-perf-baseline"
+        ],
+        "cargo_v": null,
+        "environment": null,
+        "features": null,
+        "profile": "release",
+        "profile_overrides": null,
+        "rustc_vv": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+        "source_receipt": {
+          "bytes": 2237,
+          "path": "/tmp/litchi-performance-0923/receipts/baseline-source-final.json",
+          "sha256": "62b555f066f9a1ac11dd63c258170b9534015766b18b6962012786004f817307"
+        },
+        "source_revision": "4e2532a0ce958f5928496b0ad9b356d8636916e1"
+      },
+      "kind": "baseline"
+    },
+    "candidate": {
+      "binary": {
+        "bytes": 70379960,
+        "path": "/tmp/litchi-performance-0923/candidate-target/release/litchi-perf-baseline",
+        "sha256": "8d98309501f63f4911828f52c42653f5950f3f5019bd040cf98f787173528861"
+      },
+      "build_receipt": {
+        "bytes": 5881,
+        "path": "/tmp/litchi-performance-0923/receipts/candidate-build-final-v3-bound3.json",
+        "sha256": "04de284ceb4bc43e9698a53c3f5e78ccc66047383342e2c041166166c350d05e"
+      },
+      "build_record": {
+        "argv": [
+          "cargo",
+          "build",
+          "--locked",
+          "--offline",
+          "-j2",
+          "--release",
+          "--manifest-path",
+          "/tmp/litchi-performance-0923/candidate-source/tree/tools/perf-baseline/Cargo.toml",
+          "--bin",
+          "litchi-perf-baseline"
+        ],
+        "cargo_v": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\n",
+        "environment": {
+          "CARGO_TARGET_DIR": "/tmp/litchi-performance-0923/candidate-target",
+          "LC_ALL": "C.UTF-8",
+          "LC_CTYPE": "C.UTF-8",
+          "RUSTUP_TOOLCHAIN": "1.95.0"
+        },
+        "features": [],
+        "profile": "release",
+        "profile_overrides": {
+          "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+          "CARGO_PROFILE_RELEASE_DEBUG": "0",
+          "CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS": "false",
+          "CARGO_PROFILE_RELEASE_INCREMENTAL": "false",
+          "CARGO_PROFILE_RELEASE_LTO": "true",
+          "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+          "CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS": "false",
+          "CARGO_PROFILE_RELEASE_PANIC": "abort",
+          "CARGO_PROFILE_RELEASE_STRIP": "debuginfo"
+        },
+        "rustc_vv": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+        "source_receipt": {
+          "bytes": 522655,
+          "path": "/tmp/litchi-performance-0923/receipts/candidate-source-final-v3-bound3.json",
+          "sha256": "3872b7d5e8a82c07a770ec186d0b6a447e89aa3e648f5130eccfeaa6944fc8b8"
+        },
+        "source_revision": "4e2532a0ce958f5928496b0ad9b356d8636916e1"
+      },
+      "kind": "candidate"
+    }
+  },
+  "candidate_source": {
+    "archive": {
+      "bytes": 170065920,
+      "path": "/tmp/litchi-performance-0923/base-4e2532a0ce958f5928496b0ad9b356d8636916e1.tar",
+      "sha256": "a6880fb4f638fbdcff23afb728382ea0c807f3af201648f579844309492b10a9"
+    },
+    "candidate_base_revision": "4e2532a0ce958f5928496b0ad9b356d8636916e1",
+    "cargo_lock": {
+      "bytes": 138465,
+      "path": "/tmp/litchi-performance-0923/candidate-source/tree/Cargo.lock",
+      "sha256": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd"
+    },
+    "full_source_listing": {
+      "bytes": 1437118,
+      "path": "/tmp/litchi-performance-0923/custody/source-listing-candidate-v3.jsonl",
+      "sha256": "5eb6840368d0e601e2db4756ae2dbc4c7fdbc4d0b8bfd810934652a95090a83a"
+    },
+    "harness_patch": {
+      "bytes": 17046,
+      "path": "/tmp/litchi-performance-0923/harness-0923.patch",
+      "sha256": "5404cf09f7f840aa3a587d1bbdce6659d0d3a8cf35d2c44bbd42b747ddf217e0"
+    },
+    "kind": "candidate",
+    "legacy_receipt_listing_claim": {
+      "bytes": null,
+      "sha256": null,
+      "status": "preserved_unmatched_legacy_claim"
+    },
+    "probe_lock": {
+      "bytes": 56289,
+      "path": "/tmp/litchi-performance-0923/candidate-source/tree/tools/perf-baseline/Cargo.lock",
+      "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+    },
+    "production_patch": {
+      "bytes": 15772,
+      "path": "/tmp/litchi-performance-0923/candidate-source-0923-v3.patch",
+      "sha256": "77c2a9952335d5f16c24fbfc8d87e120301808258f70e990324fa21b8ea8e75d"
+    },
+    "production_patch_claim": {
+      "bytes": 15772,
+      "path": "/tmp/litchi-performance-0923/candidate-source-0923-v3.patch",
+      "sha256": "77c2a9952335d5f16c24fbfc8d87e120301808258f70e990324fa21b8ea8e75d"
+    },
+    "receipt": {
+      "bytes": 522655,
+      "path": "/tmp/litchi-performance-0923/receipts/candidate-source-final-v3-bound3.json",
+      "sha256": "3872b7d5e8a82c07a770ec186d0b6a447e89aa3e648f5130eccfeaa6944fc8b8"
+    },
+    "revision": "4e2532a0ce958f5928496b0ad9b356d8636916e1",
+    "source_files": [
+      "crates/litchi-opc/src/source_backed.rs"
+    ],
+    "source_tree": "/tmp/litchi-performance-0923/candidate-source/tree"
+  },
+  "capture_runner": {
+    "bytes": 63683,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/comparison-capture-v2.py",
+    "sha256": "3601ea081fb255f2fab65de95fe079694e5cfd6b15e6e88e99684edb74232f96"
+  },
+  "case": "docx_source_backed_existing_section_layout_edit_save",
+  "comparison_runner": {
+    "bytes": 21256,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/comparison-v2.py",
+    "sha256": "e592a03aa8d994c9f9d14785e060a5e10bf2b50be63f9832aa7a774981885cc6"
+  },
+  "controls_runner": {
+    "bytes": 11731,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/comparison-controls-v2.py",
+    "sha256": "e38cf1dee29ab14bb0a5c0a3e4e42494833d8af76f5ea98f7d33a1173b18044c"
+  },
+  "created_timestamp_provenance": "runner wall clock at manifest construction",
+  "created_utc": "2026-10-06T09:22:03.982780+00:00",
+  "freeze_mode": "dry_run",
+  "native": {
+    "capture_approval_env": "LITCHI_PERF_0923_CAPTURE_APPROVED=1",
+    "cpu": 12,
+    "process_wrapper": [
+      "taskset",
+      "-c",
+      "12",
+      "/usr/bin/time",
+      "-v"
+    ],
+    "samples_per_child": 200,
+    "schedule": [
+      {
+        "id": "generic_read_at-pair-01-leg-1-baseline",
+        "index": 1,
+        "leg": 1,
+        "order": "baseline,candidate",
+        "pair": 1,
+        "route": "generic_read_at",
+        "variant": "baseline"
+      },
+      {
+        "id": "generic_read_at-pair-01-leg-2-candidate",
+        "index": 2,
+        "leg": 2,
+        "order": "baseline,candidate",
+        "pair": 1,
+        "route": "generic_read_at",
+        "variant": "candidate"
+      },
+      {
+        "id": "generic_read_at-pair-02-leg-1-candidate",
+        "index": 3,
+        "leg": 1,
+        "order": "candidate,baseline",
+        "pair": 2,
+        "route": "generic_read_at",
+        "variant": "candidate"
+      },
+      {
+        "id": "generic_read_at-pair-02-leg-2-baseline",
+        "index": 4,
+        "leg": 2,
+        "order": "candidate,baseline",
+        "pair": 2,
+        "route": "generic_read_at",
+        "variant": "baseline"
+      },
+      {
+        "id": "generic_read_at-pair-03-leg-1-baseline",
+        "index": 5,
+        "leg": 1,
+        "order": "baseline,candidate",
+        "pair": 3,
+        "route": "generic_read_at",
+        "variant": "baseline"
+      },
+      {
+        "id": "generic_read_at-pair-03-leg-2-candidate",
+        "index": 6,
+        "leg": 2,
+        "order": "baseline,candidate",
+        "pair": 3,
+        "route": "generic_read_at",
+        "variant": "candidate"
+      },
+      {
+        "id": "generic_read_at-pair-04-leg-1-candidate",
+        "index": 7,
+        "leg": 1,
+        "order": "candidate,baseline",
+        "pair": 4,
+        "route": "generic_read_at",
+        "variant": "candidate"
+      },
+      {
+        "id": "generic_read_at-pair-04-leg-2-baseline",
+        "index": 8,
+        "leg": 2,
+        "order": "candidate,baseline",
+        "pair": 4,
+        "route": "generic_read_at",
+        "variant": "baseline"
+      },
+      {
+        "id": "generic_read_at-pair-05-leg-1-baseline",
+        "index": 9,
+        "leg": 1,
+        "order": "baseline,candidate",
+        "pair": 5,
+        "route": "generic_read_at",
+        "variant": "baseline"
+      },
+      {
+        "id": "generic_read_at-pair-05-leg-2-candidate",
+        "index": 10,
+        "leg": 2,
+        "order": "baseline,candidate",
+        "pair": 5,
+        "route": "generic_read_at",
+        "variant": "candidate"
+      },
+      {
+        "id": "generic_read_at-pair-06-leg-1-candidate",
+        "index": 11,
+        "leg": 1,
+        "order": "candidate,baseline",
+        "pair": 6,
+        "route": "generic_read_at",
+        "variant": "candidate"
+      },
+      {
+        "id": "generic_read_at-pair-06-leg-2-baseline",
+        "index": 12,
+        "leg": 2,
+        "order": "candidate,baseline",
+        "pair": 6,
+        "route": "generic_read_at",
+        "variant": "baseline"
+      },
+      {
+        "id": "generic_read_at-pair-07-leg-1-baseline",
+        "index": 13,
+        "leg": 1,
+        "order": "baseline,candidate",
+        "pair": 7,
+        "route": "generic_read_at",
+        "variant": "baseline"
+      },
+      {
+        "id": "generic_read_at-pair-07-leg-2-candidate",
+        "index": 14,
+        "leg": 2,
+        "order": "baseline,candidate",
+        "pair": 7,
+        "route": "generic_read_at",
+        "variant": "candidate"
+      },
+      {
+        "id": "generic_read_at-pair-08-leg-1-candidate",
+        "index": 15,
+        "leg": 1,
+        "order": "candidate,baseline",
+        "pair": 8,
+        "route": "generic_read_at",
+        "variant": "candidate"
+      },
+      {
+        "id": "generic_read_at-pair-08-leg-2-baseline",
+        "index": 16,
+        "leg": 2,
+        "order": "candidate,baseline",
+        "pair": 8,
+        "route": "generic_read_at",
+        "variant": "baseline"
+      },
+      {
+        "id": "owned_vec-pair-01-leg-1-baseline",
+        "index": 17,
+        "leg": 1,
+        "order": "baseline,candidate",
+        "pair": 1,
+        "route": "owned_vec",
+        "variant": "baseline"
+      },
+      {
+        "id": "owned_vec-pair-01-leg-2-candidate",
+        "index": 18,
+        "leg": 2,
+        "order": "baseline,candidate",
+        "pair": 1,
+        "route": "owned_vec",
+        "variant": "candidate"
+      },
+      {
+        "id": "owned_vec-pair-02-leg-1-candidate",
+        "index": 19,
+        "leg": 1,
+        "order": "candidate,baseline",
+        "pair": 2,
+        "route": "owned_vec",
+        "variant": "candidate"
+      },
+      {
+        "id": "owned_vec-pair-02-leg-2-baseline",
+        "index": 20,
+        "leg": 2,
+        "order": "candidate,baseline",
+        "pair": 2,
+        "route": "owned_vec",
+        "variant": "baseline"
+      },
+      {
+        "id": "owned_vec-pair-03-leg-1-baseline",
+        "index": 21,
+        "leg": 1,
+        "order": "baseline,candidate",
+        "pair": 3,
+        "route": "owned_vec",
+        "variant": "baseline"
+      },
+      {
+        "id": "owned_vec-pair-03-leg-2-candidate",
+        "index": 22,
+        "leg": 2,
+        "order": "baseline,candidate",
+        "pair": 3,
+        "route": "owned_vec",
+        "variant": "candidate"
+      },
+      {
+        "id": "owned_vec-pair-04-leg-1-candidate",
+        "index": 23,
+        "leg": 1,
+        "order": "candidate,baseline",
+        "pair": 4,
+        "route": "owned_vec",
+        "variant": "candidate"
+      },
+      {
+        "id": "owned_vec-pair-04-leg-2-baseline",
+        "index": 24,
+        "leg": 2,
+        "order": "candidate,baseline",
+        "pair": 4,
+        "route": "owned_vec",
+        "variant": "baseline"
+      },
+      {
+        "id": "owned_vec-pair-05-leg-1-baseline",
+        "index": 25,
+        "leg": 1,
+        "order": "baseline,candidate",
+        "pair": 5,
+        "route": "owned_vec",
+        "variant": "baseline"
+      },
+      {
+        "id": "owned_vec-pair-05-leg-2-candidate",
+        "index": 26,
+        "leg": 2,
+        "order": "baseline,candidate",
+        "pair": 5,
+        "route": "owned_vec",
+        "variant": "candidate"
+      },
+      {
+        "id": "owned_vec-pair-06-leg-1-candidate",
+        "index": 27,
+        "leg": 1,
+        "order": "candidate,baseline",
+        "pair": 6,
+        "route": "owned_vec",
+        "variant": "candidate"
+      },
+      {
+        "id": "owned_vec-pair-06-leg-2-baseline",
+        "index": 28,
+        "leg": 2,
+        "order": "candidate,baseline",
+        "pair": 6,
+        "route": "owned_vec",
+        "variant": "baseline"
+      },
+      {
+        "id": "owned_vec-pair-07-leg-1-baseline",
+        "index": 29,
+        "leg": 1,
+        "order": "baseline,candidate",
+        "pair": 7,
+        "route": "owned_vec",
+        "variant": "baseline"
+      },
+      {
+        "id": "owned_vec-pair-07-leg-2-candidate",
+        "index": 30,
+        "leg": 2,
+        "order": "baseline,candidate",
+        "pair": 7,
+        "route": "owned_vec",
+        "variant": "candidate"
+      },
+      {
+        "id": "owned_vec-pair-08-leg-1-candidate",
+        "index": 31,
+        "leg": 1,
+        "order": "candidate,baseline",
+        "pair": 8,
+        "route": "owned_vec",
+        "variant": "candidate"
+      },
+      {
+        "id": "owned_vec-pair-08-leg-2-baseline",
+        "index": 32,
+        "leg": 2,
+        "order": "candidate,baseline",
+        "pair": 8,
+        "route": "owned_vec",
+        "variant": "baseline"
+      },
+      {
+        "id": "owned_reader-pair-01-leg-1-baseline",
+        "index": 33,
+        "leg": 1,
+        "order": "baseline,candidate",
+        "pair": 1,
+        "route": "owned_reader",
+        "variant": "baseline"
+      },
+      {
+        "id": "owned_reader-pair-01-leg-2-candidate",
+        "index": 34,
+        "leg": 2,
+        "order": "baseline,candidate",
+        "pair": 1,
+        "route": "owned_reader",
+        "variant": "candidate"
+      },
+      {
+        "id": "owned_reader-pair-02-leg-1-candidate",
+        "index": 35,
+        "leg": 1,
+        "order": "candidate,baseline",
+        "pair": 2,
+        "route": "owned_reader",
+        "variant": "candidate"
+      },
+      {
+        "id": "owned_reader-pair-02-leg-2-baseline",
+        "index": 36,
+        "leg": 2,
+        "order": "candidate,baseline",
+        "pair": 2,
+        "route": "owned_reader",
+        "variant": "baseline"
+      },
+      {
+        "id": "owned_reader-pair-03-leg-1-baseline",
+        "index": 37,
+        "leg": 1,
+        "order": "baseline,candidate",
+        "pair": 3,
+        "route": "owned_reader",
+        "variant": "baseline"
+      },
+      {
+        "id": "owned_reader-pair-03-leg-2-candidate",
+        "index": 38,
+        "leg": 2,
+        "order": "baseline,candidate",
+        "pair": 3,
+        "route": "owned_reader",
+        "variant": "candidate"
+      },
+      {
+        "id": "owned_reader-pair-04-leg-1-candidate",
+        "index": 39,
+        "leg": 1,
+        "order": "candidate,baseline",
+        "pair": 4,
+        "route": "owned_reader",
+        "variant": "candidate"
+      },
+      {
+        "id": "owned_reader-pair-04-leg-2-baseline",
+        "index": 40,
+        "leg": 2,
+        "order": "candidate,baseline",
+        "pair": 4,
+        "route": "owned_reader",
+        "variant": "baseline"
+      },
+      {
+        "id": "owned_reader-pair-05-leg-1-baseline",
+        "index": 41,
+        "leg": 1,
+        "order": "baseline,candidate",
+        "pair": 5,
+        "route": "owned_reader",
+        "variant": "baseline"
+      },
+      {
+        "id": "owned_reader-pair-05-leg-2-candidate",
+        "index": 42,
+        "leg": 2,
+        "order": "baseline,candidate",
+        "pair": 5,
+        "route": "owned_reader",
+        "variant": "candidate"
+      },
+      {
+        "id": "owned_reader-pair-06-leg-1-candidate",
+        "index": 43,
+        "leg": 1,
+        "order": "candidate,baseline",
+        "pair": 6,
+        "route": "owned_reader",
+        "variant": "candidate"
+      },
+      {
+        "id": "owned_reader-pair-06-leg-2-baseline",
+        "index": 44,
+        "leg": 2,
+        "order": "candidate,baseline",
+        "pair": 6,
+        "route": "owned_reader",
+        "variant": "baseline"
+      },
+      {
+        "id": "owned_reader-pair-07-leg-1-baseline",
+        "index": 45,
+        "leg": 1,
+        "order": "baseline,candidate",
+        "pair": 7,
+        "route": "owned_reader",
+        "variant": "baseline"
+      },
+      {
+        "id": "owned_reader-pair-07-leg-2-candidate",
+        "index": 46,
+        "leg": 2,
+        "order": "baseline,candidate",
+        "pair": 7,
+        "route": "owned_reader",
+        "variant": "candidate"
+      },
+      {
+        "id": "owned_reader-pair-08-leg-1-candidate",
+        "index": 47,
+        "leg": 1,
+        "order": "candidate,baseline",
+        "pair": 8,
+        "route": "owned_reader",
+        "variant": "candidate"
+      },
+      {
+        "id": "owned_reader-pair-08-leg-2-baseline",
+        "index": 48,
+        "leg": 2,
+        "order": "candidate,baseline",
+        "pair": 8,
+        "route": "owned_reader",
+        "variant": "baseline"
+      }
+    ],
+    "schedule_sha256": "6b479078eac70dfa0b9b11cc7e832c16911eeb195cba0298ea73a26d08622307",
+    "warmups_per_child": 30
+  },
+  "performance_children_run": 0,
+  "protocol": {
+    "bytes": 7013,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/comparison-protocol-v2.json",
+    "sha256": "756fec0ae6edc4e49d665f46510ba0c9ea1297f414c9470806042c33fc894697"
+  },
+  "receipt_schema": {
+    "bytes": 4034,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/comparison-receipt-schema-v3.json",
+    "sha256": "a1162a06f74b002edd8f08c51bcd5cda07560808e8470ee108c516bbc79bbdf4"
+  },
+  "review_bindings": {
+    "build_fingerprint_parity": {
+      "bytes": 3274,
+      "path": "/tmp/litchi-performance-0923/custody/candidate-build-parity-v3.json",
+      "sha256": "2f57e6f04f46aa900c79c78cf0cf4d03bcbd52e047026bd6bf748e5ec92a2d1a"
+    },
+    "build_profile_audit": {
+      "bytes": 17404,
+      "path": "/tmp/litchi-performance-0923/receipts/candidate-build-profile-audit-v1.json",
+      "sha256": "6ad300cb464c74b6890fe55da28888e514e27629c7c2e332cfd6f68ef2090fd9"
+    },
+    "shared_owner_quality": {
+      "bytes": 18509,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/shared-owner-quality-v3.json",
+      "sha256": "6c5ea51402fc07ef57dfb1fb5fd97a61c769806a4fdb9e3893ee972e11808dba"
+    },
+    "source_delta": {
+      "bytes": 856,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/root-source-delta.json",
+      "sha256": "d0d445988076e647f3453a082ba7d011df557dc855f7d3ae09c581dd044db72d"
+    }
+  },
+  "routes": [
+    "generic_read_at",
+    "owned_vec",
+    "owned_reader"
+  ],
+  "schema": "litchi.performance.0923.comparison-manifest.v2",
+  "status": "frozen"
+}

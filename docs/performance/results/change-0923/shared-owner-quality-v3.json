@@ -1,0 +1,376 @@
+{
+  "schema": "litchi.performance.0923.shared-owner-quality.v3",
+  "captured_utc": "2026-10-06T09:17:48.925096+00:00",
+  "scope": "Independent shared-owner quality gate for the DOCX/OPC source-fingerprint candidate; no benchmark capture, no iWork.",
+  "base_revision": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+  "candidate": {
+    "patch": {
+      "path": "/tmp/litchi-performance-0923/candidate-source-0923-v3.patch",
+      "bytes": 15772,
+      "sha256": "77c2a9952335d5f16c24fbfc8d87e120301808258f70e990324fa21b8ea8e75d"
+    },
+    "patch_v2": {
+      "path": "/tmp/litchi-performance-0923/candidate-source-0923-v2.patch",
+      "bytes": 15897,
+      "sha256": "6cb2b96522428af8e65e2edaf114ec12ad74423829f3a13da2f1f04494d0b212"
+    },
+    "changed_paths": [
+      "crates/litchi-opc/src/source_backed.rs"
+    ],
+    "source_file": {
+      "path": "/tmp/litchi-performance-0923/candidate-source/tree/crates/litchi-opc/src/source_backed.rs",
+      "bytes": 935609,
+      "sha256": "d28843caf8245bd6f0ff0f953b9b5545c4d9ad7a4e11f362d29ce226cc251cc2"
+    },
+    "source_tree": "/tmp/litchi-performance-0923/candidate-source/tree",
+    "v2_to_v3_delta": {
+      "path": "/tmp/litchi-performance-0923/review/v2-to-v3-source-delta.patch",
+      "bytes": 2051,
+      "sha256": "5a754f0ec9b00e41e51db330aff1f7429334510e01fd6e38ec1b89518e8cb842",
+      "packet_path": "docs/performance/results/change-0923/quality-logs/v3/v2-to-v3-source-delta.patch"
+    },
+    "v3_delta_statement": "v3 changes v2 only in four formatter hunks: memo constructor and three focused test expressions; no semantic source change."
+  },
+  "quality_environment": {
+    "cwd_v2": "/tmp/litchi-performance-0923/quality-source-v2",
+    "cwd_v3": "/tmp/litchi-performance-0923/quality-source-v3",
+    "cargo_lock": {
+      "path": "/tmp/litchi-performance-0923/quality-source-v3/Cargo.lock",
+      "bytes": 138201,
+      "sha256": "10cfe9377162d26618ad1c9c2c9028d3444fead3869c7f7d3294663269723ca9"
+    },
+    "target_v2": "/tmp/litchi-performance-0923/quality-target-v2",
+    "target_v3": "/tmp/litchi-performance-0923/quality-target-v3",
+    "toolchain": {
+      "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+      "rustc_commit": "59807616e1fa2540724bfbac14d7976d7e4a3860",
+      "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+      "cargo_commit": "f2d3ce0bd7f24a49f8f72d9000448f8838c4e850",
+      "host": "x86_64-unknown-linux-gnu"
+    }
+  },
+  "focused_test_artifact": {
+    "source": {
+      "path": "/tmp/litchi-performance-0923/quality-tests/source_fingerprint_quality.rs",
+      "bytes": 7906,
+      "sha256": "0aefed94d21c3c1558321b57129f143cfc4174fa853c428306fd9044c08ece33",
+      "packet_path": "docs/performance/results/change-0923/source_fingerprint_quality.rs"
+    },
+    "adoption_patch": {
+      "path": "/tmp/litchi-performance-0923/review/source_fingerprint_quality.patch",
+      "bytes": 8384,
+      "sha256": "176e5793554d0a19c20a6091f532a6c58f3211d4db0c61c6b8acd3a7017223e6",
+      "packet_path": "docs/performance/results/change-0923/source_fingerprint_quality.patch"
+    },
+    "status": "external quality control; separate from the one-path production candidate patch"
+  },
+  "results": [
+    {
+      "id": "v2-fingerprint-controls",
+      "phase": "v2-broad-and-focused",
+      "cwd": "/tmp/litchi-performance-0923/quality-source-v2",
+      "argv": "CARGO_TARGET_DIR=/tmp/litchi-performance-0923/quality-target-v2 cargo test --locked --offline -p litchi-opc --test source_fingerprint_quality -- --nocapture",
+      "exit": 0,
+      "result": "pass",
+      "log": {
+        "path": "/tmp/litchi-performance-0923/review/source-fingerprint-quality-v2-final.log",
+        "bytes": 689,
+        "sha256": "43af9d8336fae28c61950f6cf2922435ac51c132b194f661ab236a22ee8b6b84",
+        "packet_path": "docs/performance/results/change-0923/quality-logs/v2/source-fingerprint-quality-v2-final.log"
+      },
+      "tests": "3/3"
+    },
+    {
+      "id": "v2-callback-controls",
+      "phase": "v2-broad-and-focused",
+      "cwd": "/tmp/litchi-performance-0923/quality-source-v2",
+      "argv": "CARGO_TARGET_DIR=/tmp/litchi-performance-0923/quality-target-v2 cargo test --locked --offline -p litchi-opc --lib callback_scoped_verified_reader_tests -- --nocapture",
+      "exit": 0,
+      "result": "pass",
+      "log": {
+        "path": "/tmp/litchi-performance-0923/review/callback-scoped-owned-v2-final.log",
+        "bytes": 1678,
+        "sha256": "7675c5c3669777867ab451f23adc70cf58ec76406464d809fc41393715020fd2",
+        "packet_path": "docs/performance/results/change-0923/quality-logs/v2/callback-scoped-owned-v2-final.log"
+      },
+      "tests": "10/10"
+    },
+    {
+      "id": "v2-opc-fingerprint-controls",
+      "phase": "v2-broad-and-focused",
+      "cwd": "/tmp/litchi-performance-0923/quality-source-v2",
+      "argv": "CARGO_TARGET_DIR=/tmp/litchi-performance-0923/quality-target-v2 cargo test --locked --offline -p litchi-opc --test source_artifact_restore --test source_read_ahead -- --nocapture",
+      "exit": 0,
+      "result": "pass",
+      "log": {
+        "path": "/tmp/litchi-performance-0923/review/opc-fingerprint-controls-v2-final.log",
+        "bytes": 2965,
+        "sha256": "bb5c5caacbc6b090233f1f0bc9de4eca4724d44dadc21d6e519918275bb158f3",
+        "packet_path": "docs/performance/results/change-0923/quality-logs/v2/opc-fingerprint-controls-v2-final.log"
+      },
+      "tests": "13/13 + 16/16"
+    },
+    {
+      "id": "v2-opc-lib",
+      "phase": "v2-broad",
+      "cwd": "/tmp/litchi-performance-0923/quality-source-v2",
+      "argv": "CARGO_TARGET_DIR=/tmp/litchi-performance-0923/quality-target-v2 cargo test --locked --offline -p litchi-opc --lib -- --nocapture",
+      "exit": 0,
+      "result": "pass",
+      "log": {
+        "path": "/tmp/litchi-performance-0923/review/opc-lib-v2-final.log",
+        "bytes": 60292,
+        "sha256": "433d54b1be34545ab04ad81d53286843068680f22b9c40fc04dbf92aa99eb594",
+        "packet_path": "docs/performance/results/change-0923/quality-logs/v2/opc-lib-v2-final.log"
+      },
+      "tests": "622/622"
+    },
+    {
+      "id": "v2-opc-clippy",
+      "phase": "v2-broad",
+      "cwd": "/tmp/litchi-performance-0923/quality-source-v2",
+      "argv": "CARGO_TARGET_DIR=/tmp/litchi-performance-0923/quality-target-v2 cargo clippy --locked --offline -p litchi-opc --lib -- -D warnings",
+      "exit": 0,
+      "result": "pass",
+      "log": {
+        "path": "/tmp/litchi-performance-0923/review/litchi-opc-clippy-lib-v2-final.log",
+        "bytes": 170,
+        "sha256": "e9b1f6ffecdbe44e3dadba18a176bce647f73b4c008d4506355aff461e4e66ae",
+        "packet_path": "docs/performance/results/change-0923/quality-logs/v2/litchi-opc-clippy-lib-v2-final.log"
+      }
+    },
+    {
+      "id": "v2-opc-rustdoc",
+      "phase": "v2-broad",
+      "cwd": "/tmp/litchi-performance-0923/quality-source-v2",
+      "argv": "RUSTDOCFLAGS='-D warnings' CARGO_TARGET_DIR=/tmp/litchi-performance-0923/quality-target-v2 cargo doc --locked --offline -p litchi-opc --lib --no-deps",
+      "exit": 0,
+      "result": "pass",
+      "log": {
+        "path": "/tmp/litchi-performance-0923/review/litchi-opc-rustdoc-v2-final.log",
+        "bytes": 678,
+        "sha256": "88ea9a6248291cfb55b0262d766a5a9ed25ccf13d8ca4b2768e967b82f75048f",
+        "packet_path": "docs/performance/results/change-0923/quality-logs/v2/litchi-opc-rustdoc-v2-final.log"
+      }
+    },
+    {
+      "id": "v2-docx-lib",
+      "phase": "v2-broad",
+      "cwd": "/tmp/litchi-performance-0923/quality-source-v2",
+      "argv": "CARGO_TARGET_DIR=/tmp/litchi-performance-0923/quality-target-v2 cargo test --locked --offline -p litchi-docx --lib -- --nocapture",
+      "exit": 0,
+      "result": "pass",
+      "log": {
+        "path": "/tmp/litchi-performance-0923/review/docx-lib-v2-final.log",
+        "bytes": 109053,
+        "sha256": "026eb2f8b0e34fe10c61fb70e59723664ebdcf0ae290a53c76952a6048f03030",
+        "packet_path": "docs/performance/results/change-0923/quality-logs/v2/docx-lib-v2-final.log"
+      },
+      "tests": "1231/1231"
+    },
+    {
+      "id": "v2-docx-source-backed",
+      "phase": "v2-broad",
+      "cwd": "/tmp/litchi-performance-0923/quality-source-v2",
+      "argv": "CARGO_TARGET_DIR=/tmp/litchi-performance-0923/quality-target-v2 cargo test --locked --offline -p litchi-docx --test source_backed --test source_backed_file --test source_backed_managed --test source_backed_managed_document_edit --test source_backed_managed_paragraph_batch --test source_read_policy -- --nocapture",
+      "exit": 0,
+      "result": "pass",
+      "log": {
+        "path": "/tmp/litchi-performance-0923/review/docx-source-backed-v2-final.log",
+        "bytes": 7920,
+        "sha256": "2eb34f70b93d0463907806162837b85d044500de68da15a0584e4b5bf24a9ec8",
+        "packet_path": "docs/performance/results/change-0923/quality-logs/v2/docx-source-backed-v2-final.log"
+      },
+      "tests": "16/16 + 6/6 + 6/6 + 42/42 + 8/8 + 1/1"
+    },
+    {
+      "id": "v2-docx-clippy",
+      "phase": "v2-broad",
+      "cwd": "/tmp/litchi-performance-0923/quality-source-v2",
+      "argv": "CARGO_TARGET_DIR=/tmp/litchi-performance-0923/quality-target-v2 cargo clippy --locked --offline -p litchi-docx --lib -- -D warnings",
+      "exit": 0,
+      "result": "pass",
+      "log": {
+        "path": "/tmp/litchi-performance-0923/review/litchi-docx-clippy-lib-v2-final.log",
+        "bytes": 1875,
+        "sha256": "7e24e2bc109d3e2f34ba94ea7c6a98f30140895c04d4b1619893e68c2e155ae8",
+        "packet_path": "docs/performance/results/change-0923/quality-logs/v2/litchi-docx-clippy-lib-v2-final.log"
+      }
+    },
+    {
+      "id": "v2-docx-rustdoc",
+      "phase": "v2-broad",
+      "cwd": "/tmp/litchi-performance-0923/quality-source-v2",
+      "argv": "RUSTDOCFLAGS='-D warnings' CARGO_TARGET_DIR=/tmp/litchi-performance-0923/quality-target-v2 cargo doc --locked --offline -p litchi-docx --lib --no-deps",
+      "exit": 0,
+      "result": "pass",
+      "log": {
+        "path": "/tmp/litchi-performance-0923/review/litchi-docx-rustdoc-v2-final.log",
+        "bytes": 901,
+        "sha256": "53e4dadd558e87b7ebdd6521c9bb3019bc07e68ae3dcd1cdfc48766d11cb8758",
+        "packet_path": "docs/performance/results/change-0923/quality-logs/v2/litchi-docx-rustdoc-v2-final.log"
+      }
+    },
+    {
+      "id": "v3-fingerprint-controls",
+      "phase": "v3-format-only-bind",
+      "cwd": "/tmp/litchi-performance-0923/quality-source-v3",
+      "argv": "CARGO_TARGET_DIR=/tmp/litchi-performance-0923/quality-target-v3 cargo test --locked --offline -p litchi-opc --test source_fingerprint_quality -- --nocapture",
+      "exit": 0,
+      "result": "pass",
+      "log": {
+        "path": "/tmp/litchi-performance-0923/review/source-fingerprint-quality-v3-final.log",
+        "bytes": 3670,
+        "sha256": "af12efa4467b9f1ffad0ddf10663e56de27472a2d044fd6e1764cf0be040fdf6",
+        "packet_path": "docs/performance/results/change-0923/quality-logs/v3/source-fingerprint-quality-v3-final.log"
+      },
+      "tests": "3/3"
+    },
+    {
+      "id": "v3-callback-controls",
+      "phase": "v3-format-only-bind",
+      "cwd": "/tmp/litchi-performance-0923/quality-source-v3",
+      "argv": "CARGO_TARGET_DIR=/tmp/litchi-performance-0923/quality-target-v3 cargo test --locked --offline -p litchi-opc --lib callback_scoped_verified_reader_tests -- --nocapture",
+      "exit": 0,
+      "result": "pass",
+      "log": {
+        "path": "/tmp/litchi-performance-0923/review/callback-scoped-owned-v3-final.log",
+        "bytes": 1678,
+        "sha256": "7262f48d37de01a7e7b07de0671dcbb770315bd73a6cfa5845e9b752fb7bae46",
+        "packet_path": "docs/performance/results/change-0923/quality-logs/v3/callback-scoped-owned-v3-final.log"
+      },
+      "tests": "10/10"
+    },
+    {
+      "id": "v3-opc-clippy",
+      "phase": "v3-format-only-bind",
+      "cwd": "/tmp/litchi-performance-0923/quality-source-v3",
+      "argv": "CARGO_TARGET_DIR=/tmp/litchi-performance-0923/quality-target-v3 cargo clippy --locked --offline -p litchi-opc --lib -- -D warnings",
+      "exit": 0,
+      "result": "pass",
+      "log": {
+        "path": "/tmp/litchi-performance-0923/review/litchi-opc-clippy-lib-v3-final.log",
+        "bytes": 2211,
+        "sha256": "2ead5a6c33453a891bf317cd1ee41fb019524d0ca48d0f84b0ba0fb8376b6f29",
+        "packet_path": "docs/performance/results/change-0923/quality-logs/v3/litchi-opc-clippy-lib-v3-final.log"
+      }
+    },
+    {
+      "id": "v3-opc-rustdoc",
+      "phase": "v3-format-only-bind",
+      "cwd": "/tmp/litchi-performance-0923/quality-source-v3",
+      "argv": "RUSTDOCFLAGS='-D warnings' CARGO_TARGET_DIR=/tmp/litchi-performance-0923/quality-target-v3 cargo doc --locked --offline -p litchi-opc --lib --no-deps",
+      "exit": 0,
+      "result": "pass",
+      "log": {
+        "path": "/tmp/litchi-performance-0923/review/litchi-opc-rustdoc-v3-final.log",
+        "bytes": 678,
+        "sha256": "7f5492f399210fbe153dcf7150585f8d324e8fbb944cbfed391f48b33a1fcafc",
+        "packet_path": "docs/performance/results/change-0923/quality-logs/v3/litchi-opc-rustdoc-v3-final.log"
+      }
+    },
+    {
+      "id": "v3-docx-clippy",
+      "phase": "v3-format-only-bind",
+      "cwd": "/tmp/litchi-performance-0923/quality-source-v3",
+      "argv": "CARGO_TARGET_DIR=/tmp/litchi-performance-0923/quality-target-v3 cargo clippy --locked --offline -p litchi-docx --lib -- -D warnings",
+      "exit": 0,
+      "result": "pass",
+      "log": {
+        "path": "/tmp/litchi-performance-0923/review/litchi-docx-clippy-lib-v3-final.log",
+        "bytes": 2146,
+        "sha256": "a3efe6e9baab9e689ae91c78d6e494b5e693f4c6717b8835b944aef065da31ca",
+        "packet_path": "docs/performance/results/change-0923/quality-logs/v3/litchi-docx-clippy-lib-v3-final.log"
+      }
+    },
+    {
+      "id": "v3-docx-rustdoc",
+      "phase": "v3-format-only-bind",
+      "cwd": "/tmp/litchi-performance-0923/quality-source-v3",
+      "argv": "RUSTDOCFLAGS='-D warnings' CARGO_TARGET_DIR=/tmp/litchi-performance-0923/quality-target-v3 cargo doc --locked --offline -p litchi-docx --lib --no-deps",
+      "exit": 0,
+      "result": "pass",
+      "log": {
+        "path": "/tmp/litchi-performance-0923/review/litchi-docx-rustdoc-v3-final.log",
+        "bytes": 901,
+        "sha256": "6462150ef2646f4824aa45e133ab88326eb3ef7171a6f834a921f6d83bc9c95a",
+        "packet_path": "docs/performance/results/change-0923/quality-logs/v3/litchi-docx-rustdoc-v3-final.log"
+      }
+    }
+  ],
+  "format": {
+    "scoped_baseline": {
+      "argv": "cargo fmt --package litchi-opc -- --check",
+      "cwd": "/tmp/litchi-performance-0923/quality-source-v1",
+      "exit": 1,
+      "log": {
+        "path": "/tmp/litchi-performance-0923/review/rustfmt-opc-baseline.log",
+        "bytes": 145305,
+        "sha256": "6746d290f8044dcfb6290d47fd168777dd6dbe2d4aaf65d7ef774777ee4ebeca",
+        "packet_path": "docs/performance/results/change-0923/quality-logs/v2/rustfmt-opc-baseline.log"
+      },
+      "interpretation": "pre-existing repository formatting drift"
+    },
+    "scoped_v2_candidate": {
+      "argv": "cargo fmt --package litchi-opc -- --check",
+      "cwd": "/tmp/litchi-performance-0923/quality-source-v2",
+      "exit": 1,
+      "log": {
+        "path": "/tmp/litchi-performance-0923/review/rustfmt-opc-v2-final.log",
+        "bytes": 147411,
+        "sha256": "329f3e35ede2a1f362702cab2919743cca5c7679e60c8c24d696636563164b3a",
+        "packet_path": "docs/performance/results/change-0923/quality-logs/v2/rustfmt-opc-v2-final.log"
+      },
+      "interpretation": "same pre-existing drift; v2 added hunks were separately isolated and corrected in v3"
+    },
+    "v3_added_hunks": {
+      "argv": "rustfmt --edition 2024 --config skip_children=true --emit stdout <source_backed.rs> > source_backed-v3-rustfmt-skip.rs; diff -u source_backed.rs source_backed-v3-rustfmt-skip.rs",
+      "source": "/tmp/litchi-performance-0923/quality-source-v3/crates/litchi-opc/src/source_backed.rs",
+      "formatted": "/tmp/litchi-performance-0923/review/source_backed-v3-rustfmt-skip.rs",
+      "delta": {
+        "path": "/tmp/litchi-performance-0923/review/source_backed-v3-rustfmt-delta.patch",
+        "bytes": 25073,
+        "sha256": "a7a49b4baa5dc6bd9fb6664369d54b9a914224e612c1e88c06493b8bb64289d7",
+        "packet_path": "docs/performance/results/change-0923/quality-logs/v3/source_backed-v3-rustfmt-delta.patch"
+      },
+      "result": "no formatter hunks at v3-added lines; remaining hunks are baseline drift elsewhere in the file"
+    },
+    "large_full_check": {
+      "argv": "cargo fmt --all -- --check",
+      "cwd": "/tmp/litchi-performance-0923/quality-source-v2",
+      "exit": 1,
+      "log": {
+        "path": "/tmp/litchi-performance-0923/review/rustfmt-v2-final.log",
+        "bytes": 11939253,
+        "sha256": "0152e4b1c45f74d0f8c46e96ade81f2ec124cf605d7a07774a690b65e3f35427"
+      },
+      "bytes": 11939253,
+      "sha256": "0152e4b1c45f74d0f8c46e96ade81f2ec124cf605d7a07774a690b65e3f35427",
+      "retention": "external only; filename/size/hash recorded because it exceeds the repository evidence limit"
+    }
+  },
+  "fixture_provenance": {
+    "docx_manifest": {
+      "path": "/tmp/litchi-performance-0923/review/docx-fixture-copy-manifest.txt",
+      "bytes": 25230,
+      "sha256": "5b5244ac8e41234d65159a658105b135fd31025c183e86f616498859ac74a89e"
+    },
+    "ooxml_manifest": {
+      "path": "/tmp/litchi-performance-0923/review/ooxml-fixture-copy-manifest.txt",
+      "bytes": 54762,
+      "sha256": "efc7baa5a43cab7155063de221890227f2113437e8fdc480626ed9c4e4e64eb7"
+    },
+    "opc_manifest": {
+      "path": "/tmp/litchi-performance-0923/review/opc-fixture-copy-manifest.txt",
+      "bytes": 1122,
+      "sha256": "a6e986c236316256342ba076cc89737a6a3cf28f1f09ef06b04f1a90dd4e4d01"
+    },
+    "note": "Sparse quality trees initially lacked fixtures; exact source-hash copies restored the applicable corpus. No source fixture normalization was performed. Sparse failures are environment coverage limitations, not candidate failures."
+  },
+  "limitations": [
+    "The broad semantic suites and restore/read-ahead controls were run against v2; v3 is a four-hunk whitespace-only delta and has focused plus lint/doc rebinding.",
+    "Full cargo fmt is baseline-failed by pre-existing repository drift; added v3 lines are formatter-clean under the exact-file comparison.",
+    "This receipt is quality verification only; no benchmark child or comparative capture was run."
+  ],
+  "logs_are_external_copies": true
+}

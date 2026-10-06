@@ -1,0 +1,151 @@
+{
+  "schema": "litchi.performance.0923.exact-raw-whitespace-exceptions.v1",
+  "reason": "Preserve byte-exact captured logs and unified patches already bound by retained SHA-256 receipts; no production or authored prose excluded.",
+  "excluded_files": [
+    {
+      "path": "docs/performance/results/change-0923/allocation-history/capture.stderr",
+      "bytes": 295,
+      "sha256": "91781e6e63087f33ac1c77836e99250edf7a322c8755e53b5726b1db24d2a0b8",
+      "existing_hash_bindings": [
+        "docs/performance/results/change-0923/allocation-capture-attempt-v2.json",
+        "docs/performance/results/change-0923/allocation-corrective-supplement-v2.json",
+        "docs/performance/results/change-0923/allocation-history/retained-first-attempt.json"
+      ]
+    },
+    {
+      "path": "docs/performance/results/change-0923/quality-logs/v2/callback-scoped-owned-v2-final.log",
+      "bytes": 1678,
+      "sha256": "7675c5c3669777867ab451f23adc70cf58ec76406464d809fc41393715020fd2",
+      "existing_hash_bindings": [
+        "docs/performance/results/change-0923/shared-owner-quality-v3.json",
+        "docs/performance/results/change-0923/capture-final/packet/tooling/shared-owner-quality-v3.json"
+      ]
+    },
+    {
+      "path": "docs/performance/results/change-0923/quality-logs/v2/docx-lib-v2-final.log",
+      "bytes": 109053,
+      "sha256": "026eb2f8b0e34fe10c61fb70e59723664ebdcf0ae290a53c76952a6048f03030",
+      "existing_hash_bindings": [
+        "docs/performance/results/change-0923/shared-owner-quality-v3.json",
+        "docs/performance/results/change-0923/capture-final/packet/tooling/shared-owner-quality-v3.json"
+      ]
+    },
+    {
+      "path": "docs/performance/results/change-0923/quality-logs/v2/docx-source-backed-v2-final.log",
+      "bytes": 7920,
+      "sha256": "2eb34f70b93d0463907806162837b85d044500de68da15a0584e4b5bf24a9ec8",
+      "existing_hash_bindings": [
+        "docs/performance/results/change-0923/shared-owner-quality-v3.json",
+        "docs/performance/results/change-0923/capture-final/packet/tooling/shared-owner-quality-v3.json"
+      ]
+    },
+    {
+      "path": "docs/performance/results/change-0923/quality-logs/v2/opc-fingerprint-controls-v2-final.log",
+      "bytes": 2965,
+      "sha256": "bb5c5caacbc6b090233f1f0bc9de4eca4724d44dadc21d6e519918275bb158f3",
+      "existing_hash_bindings": [
+        "docs/performance/results/change-0923/shared-owner-quality-v3.json",
+        "docs/performance/results/change-0923/capture-final/packet/tooling/shared-owner-quality-v3.json"
+      ]
+    },
+    {
+      "path": "docs/performance/results/change-0923/quality-logs/v2/opc-lib-v2-final.log",
+      "bytes": 60292,
+      "sha256": "433d54b1be34545ab04ad81d53286843068680f22b9c40fc04dbf92aa99eb594",
+      "existing_hash_bindings": [
+        "docs/performance/results/change-0923/shared-owner-quality-v3.json",
+        "docs/performance/results/change-0923/capture-final/packet/tooling/shared-owner-quality-v3.json"
+      ]
+    },
+    {
+      "path": "docs/performance/results/change-0923/quality-logs/v2/rustfmt-opc-baseline.log",
+      "bytes": 145305,
+      "sha256": "6746d290f8044dcfb6290d47fd168777dd6dbe2d4aaf65d7ef774777ee4ebeca",
+      "existing_hash_bindings": [
+        "docs/performance/results/change-0923/shared-owner-quality-v3.json",
+        "docs/performance/results/change-0923/capture-final/packet/tooling/shared-owner-quality-v3.json"
+      ]
+    },
+    {
+      "path": "docs/performance/results/change-0923/quality-logs/v2/rustfmt-opc-v2-final.log",
+      "bytes": 147411,
+      "sha256": "329f3e35ede2a1f362702cab2919743cca5c7679e60c8c24d696636563164b3a",
+      "existing_hash_bindings": [
+        "docs/performance/results/change-0923/shared-owner-quality-v3.json",
+        "docs/performance/results/change-0923/capture-final/packet/tooling/shared-owner-quality-v3.json"
+      ]
+    },
+    {
+      "path": "docs/performance/results/change-0923/quality-logs/v2/source-fingerprint-quality-v2-final.log",
+      "bytes": 689,
+      "sha256": "43af9d8336fae28c61950f6cf2922435ac51c132b194f661ab236a22ee8b6b84",
+      "existing_hash_bindings": [
+        "docs/performance/results/change-0923/shared-owner-quality-v3.json",
+        "docs/performance/results/change-0923/capture-final/packet/tooling/shared-owner-quality-v3.json"
+      ]
+    },
+    {
+      "path": "docs/performance/results/change-0923/quality-logs/v3/callback-scoped-owned-v3-final.log",
+      "bytes": 1678,
+      "sha256": "7262f48d37de01a7e7b07de0671dcbb770315bd73a6cfa5845e9b752fb7bae46",
+      "existing_hash_bindings": [
+        "docs/performance/results/change-0923/shared-owner-quality-v3.json",
+        "docs/performance/results/change-0923/capture-final/packet/tooling/shared-owner-quality-v3.json"
+      ]
+    },
+    {
+      "path": "docs/performance/results/change-0923/quality-logs/v3/source-fingerprint-quality-v3-final.log",
+      "bytes": 3670,
+      "sha256": "af12efa4467b9f1ffad0ddf10663e56de27472a2d044fd6e1764cf0be040fdf6",
+      "existing_hash_bindings": [
+        "docs/performance/results/change-0923/shared-owner-quality-v3.json",
+        "docs/performance/results/change-0923/capture-final/packet/tooling/shared-owner-quality-v3.json"
+      ]
+    },
+    {
+      "path": "docs/performance/results/change-0923/quality-logs/v3/source_backed-v3-rustfmt-delta.patch",
+      "bytes": 25073,
+      "sha256": "a7a49b4baa5dc6bd9fb6664369d54b9a914224e612c1e88c06493b8bb64289d7",
+      "existing_hash_bindings": [
+        "docs/performance/results/change-0923/shared-owner-quality-v3.json",
+        "docs/performance/results/change-0923/capture-final/packet/tooling/shared-owner-quality-v3.json"
+      ]
+    },
+    {
+      "path": "docs/performance/results/change-0923/quality-logs/v3/v2-to-v3-source-delta.patch",
+      "bytes": 2051,
+      "sha256": "5a754f0ec9b00e41e51db330aff1f7429334510e01fd6e38ec1b89518e8cb842",
+      "existing_hash_bindings": [
+        "docs/performance/results/change-0923/shared-owner-quality-v3.json",
+        "docs/performance/results/change-0923/capture-final/packet/tooling/shared-owner-quality-v3.json"
+      ]
+    }
+  ],
+  "remaining_staged_diff_check": "pass",
+  "diagnostic_log": {
+    "path": "/tmp/litchi-performance-0923/staged-whitespace-evidence.log",
+    "bytes": 12887,
+    "sha256": "b8c3d62abbe8c84e46d1ed64159d8b7b695159341389ee9f0e5648d4a3fadeef"
+  },
+  "validation_argv": [
+    "git",
+    "diff",
+    "--cached",
+    "--check",
+    "--",
+    ".",
+    ":(exclude,literal)docs/performance/results/change-0923/allocation-history/capture.stderr",
+    ":(exclude,literal)docs/performance/results/change-0923/quality-logs/v2/callback-scoped-owned-v2-final.log",
+    ":(exclude,literal)docs/performance/results/change-0923/quality-logs/v2/docx-lib-v2-final.log",
+    ":(exclude,literal)docs/performance/results/change-0923/quality-logs/v2/docx-source-backed-v2-final.log",
+    ":(exclude,literal)docs/performance/results/change-0923/quality-logs/v2/opc-fingerprint-controls-v2-final.log",
+    ":(exclude,literal)docs/performance/results/change-0923/quality-logs/v2/opc-lib-v2-final.log",
+    ":(exclude,literal)docs/performance/results/change-0923/quality-logs/v2/rustfmt-opc-baseline.log",
+    ":(exclude,literal)docs/performance/results/change-0923/quality-logs/v2/rustfmt-opc-v2-final.log",
+    ":(exclude,literal)docs/performance/results/change-0923/quality-logs/v2/source-fingerprint-quality-v2-final.log",
+    ":(exclude,literal)docs/performance/results/change-0923/quality-logs/v3/callback-scoped-owned-v3-final.log",
+    ":(exclude,literal)docs/performance/results/change-0923/quality-logs/v3/source-fingerprint-quality-v3-final.log",
+    ":(exclude,literal)docs/performance/results/change-0923/quality-logs/v3/source_backed-v3-rustfmt-delta.patch",
+    ":(exclude,literal)docs/performance/results/change-0923/quality-logs/v3/v2-to-v3-source-delta.patch"
+  ]
+}

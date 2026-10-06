@@ -1,0 +1,71 @@
+{
+  "build_receipt": {
+    "profile_evidence": {
+      "profile_audit": "the prospective manifest binds the independent candidate-build-profile-audit-v1.json supplement and candidate-build-parity-v3.json receipt; this is required because the retained baseline build receipt predates profile environment fields",
+      "profile_name": "release is required as a non-empty string; missing profile fields never compare equal",
+      "profile_overrides": "raw profile_overrides metadata is retained for review only and must not be treated as effective unless the standalone benchmark environment records it"
+    },
+    "parity": [
+      "compiler fingerprint",
+      "release profile",
+      "quality Cargo.lock",
+      "probe Cargo.lock",
+      "shared harness patch",
+      "binary descriptor"
+    ],
+    "required": {
+      "argv": "exact release cargo build argv containing --locked --offline --release and the perf harness manifest",
+      "binary": "descriptor object {path,bytes,sha256} for candidate litchi-perf-baseline",
+      "profile": "release",
+      "rustc_vv": "exact compiler fingerprint; must equal retained baseline",
+      "source_receipt": "descriptor object for the exact candidate-source-final.json",
+      "source_revision": "4e2532a0ce958f5928496b0ad9b356d8636916e1"
+    },
+    "schema": "litchi.performance.0923.candidate-build.v3"
+  },
+  "capture_status": "schema documentation only; no candidate child was run",
+  "purpose": "Exact candidate custody contract consumed by comparison-capture-v2.py before a prospective 48-child freeze.",
+  "runner_inputs": {
+    "candidate_binary_env": "LITCHI_PERF_0923_CANDIDATE_BINARY",
+    "candidate_build_receipt_env": "LITCHI_PERF_0923_CANDIDATE_BUILD_RECEIPT",
+    "candidate_source_receipt_env": "LITCHI_PERF_0923_CANDIDATE_SOURCE_RECEIPT",
+    "capture_approval": "LITCHI_PERF_0923_CAPTURE_APPROVED=1 is required only after root readiness review"
+  },
+  "review_bindings": {
+    "build_fingerprint_parity": "/tmp/litchi-performance-0923/custody/candidate-build-parity-v3.json",
+    "build_profile_audit": "/tmp/litchi-performance-0923/receipts/candidate-build-profile-audit-v1.json",
+    "shared_owner_quality": "docs/performance/results/change-0923/shared-owner-quality-v3.json",
+    "source_delta": "docs/performance/results/change-0923/root-source-delta.json"
+  },
+  "schema": "litchi.performance.0923.candidate-receipt-schema.v3",
+  "source_receipt": {
+    "forbidden_substitutions": [
+      "baseline_archive or baseline listing",
+      "source_root in place of source_tree",
+      "modified_files in place of source_files",
+      "candidate_patch supplied only by an environment fallback",
+      "a fabricated candidate commit or source_head"
+    ],
+    "required": {
+      "base_revision": "4e2532a0ce958f5928496b0ad9b356d8636916e1",
+      "cargo_lock": "descriptor object for the candidate quality/workspace Cargo.lock; SHA must equal baseline",
+      "harness_patch": "descriptor object for the exact shared harness patch; SHA must equal baseline harness patch",
+      "probe_lock": "descriptor object for the perf harness Cargo.lock; SHA must equal baseline",
+      "production_patch": "descriptor object for the exact reviewed candidate.patch",
+      "source_archive": "descriptor object {path,bytes,sha256} for the actual candidate source archive",
+      "source_files": "non-empty list of relative candidate changed-file paths; every path must occur in source_listing",
+      "source_listing": "descriptor object {path,bytes,sha256} for external JSONL full source closure",
+      "source_tree": "object {path} naming extracted candidate source tree; file hashes come from source_listing, not a directory SHA-256"
+    },
+    "schema": "litchi.performance.0923.candidate-source.v3",
+    "source_listing_record": {
+      "closure_rule": "the listed relative files and hashes must equal every regular file under source_tree",
+      "format": "one JSON object per line",
+      "required": [
+        "path",
+        "bytes",
+        "sha256"
+      ]
+    }
+  }
+}

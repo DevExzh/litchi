@@ -1,0 +1,498 @@
+{
+  "analysis_command_template": [
+    "/usr/bin/heaptrack_print",
+    "-f",
+    "$RAW_PROFILE",
+    "-p",
+    "0",
+    "-T",
+    "0",
+    "-a",
+    "0",
+    "-l",
+    "0",
+    "-H",
+    "$HISTOGRAM"
+  ],
+  "capture_runner": {
+    "bytes": 35068,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/allocation-capture-v2.py",
+    "sha256": "0ee8efbe59adb271c216a3181b08a587bd4e456cae271f09667f90da3fb393d1"
+  },
+  "case": "docx_source_backed_existing_section_layout_edit_save",
+  "claim_limits": [
+    "Heaptrack overhead is included",
+    "profile covers setup, correctness/report serialization, and teardown",
+    "no operation-scoped allocation or native latency claim",
+    "no production adoption decision"
+  ],
+  "claims": [
+    "allocation_event_count",
+    "requested_bytes_sum",
+    "peak_live_heap_bytes",
+    "live_bytes_at_end"
+  ],
+  "controls": {
+    "bytes": 5792,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/allocation-parse-controls-v2.py",
+    "sha256": "5ce4867e267c899441086cb035a19d06df4f4052b7b75e2e8935d5d38f120e30"
+  },
+  "created_utc": "2026-10-06T09:27:56.849899+00:00",
+  "native_identity": {
+    "binaries": {
+      "baseline": {
+        "binary": {
+          "bytes": 69962624,
+          "path": "/tmp/litchi-performance-0923/frozen-baseline-native/litchi-perf-baseline",
+          "sha256": "ed2d5609cc7a54459cd33627a80416d5ce2ef765b32916b5235b91209e19db28"
+        },
+        "build_receipt": {
+          "bytes": 1661,
+          "path": "/tmp/litchi-performance-0923/receipts/baseline-build-final.json",
+          "sha256": "86eae277dd3096ab7972cc9d7696d02853fadaa3e7e20678449137b74a80e630"
+        },
+        "build_record": {
+          "argv": [
+            "cargo",
+            "build",
+            "--locked",
+            "--offline",
+            "-j2",
+            "--release",
+            "--manifest-path",
+            "/tmp/litchi-performance-0923/baseline-source/tree/tools/perf-baseline/Cargo.toml",
+            "--bin",
+            "litchi-perf-baseline"
+          ],
+          "features": null,
+          "profile": "release",
+          "rustc_vv": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+          "source_receipt": {
+            "bytes": 2237,
+            "path": "/tmp/litchi-performance-0923/receipts/baseline-source-final.json",
+            "sha256": "62b555f066f9a1ac11dd63c258170b9534015766b18b6962012786004f817307"
+          },
+          "source_revision": "4e2532a0ce958f5928496b0ad9b356d8636916e1"
+        },
+        "kind": "baseline"
+      },
+      "candidate": {
+        "binary": {
+          "bytes": 70379960,
+          "path": "/tmp/litchi-performance-0923/candidate-target/release/litchi-perf-baseline",
+          "sha256": "8d98309501f63f4911828f52c42653f5950f3f5019bd040cf98f787173528861"
+        },
+        "build_receipt": {
+          "bytes": 5881,
+          "path": "/tmp/litchi-performance-0923/receipts/candidate-build-final-v3-bound3.json",
+          "sha256": "04de284ceb4bc43e9698a53c3f5e78ccc66047383342e2c041166166c350d05e"
+        },
+        "build_record": {
+          "argv": [
+            "cargo",
+            "build",
+            "--locked",
+            "--offline",
+            "-j2",
+            "--release",
+            "--manifest-path",
+            "/tmp/litchi-performance-0923/candidate-source/tree/tools/perf-baseline/Cargo.toml",
+            "--bin",
+            "litchi-perf-baseline"
+          ],
+          "features": [],
+          "profile": "release",
+          "rustc_vv": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+          "source_receipt": {
+            "bytes": 522655,
+            "path": "/tmp/litchi-performance-0923/receipts/candidate-source-final-v3-bound3.json",
+            "sha256": "3872b7d5e8a82c07a770ec186d0b6a447e89aa3e648f5130eccfeaa6944fc8b8"
+          },
+          "source_revision": "4e2532a0ce958f5928496b0ad9b356d8636916e1"
+        },
+        "kind": "candidate"
+      }
+    },
+    "case": "docx_source_backed_existing_section_layout_edit_save",
+    "cpu": 12,
+    "created_utc": "2026-10-06T09:21:46.910208+00:00",
+    "sources": {
+      "baseline": {
+        "archive": {
+          "bytes": 170065920,
+          "path": "/tmp/litchi-performance-0923/base-4e2532a0ce958f5928496b0ad9b356d8636916e1.tar",
+          "sha256": "a6880fb4f638fbdcff23afb728382ea0c807f3af201648f579844309492b10a9"
+        },
+        "cargo_lock": {
+          "bytes": 138465,
+          "path": "/tmp/litchi-performance-0923/baseline-source/tree/Cargo.lock",
+          "sha256": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd"
+        },
+        "full_source_listing": {
+          "bytes": 1437118,
+          "path": "/tmp/litchi-performance-0923/custody/source-listing-4e2532a0ce958f5928496b0ad9b356d8636916e1.jsonl",
+          "sha256": "988d3c1d40cbeefc8f937eb2a3f635c1fd003ea36589f1329029f5fef6537509"
+        },
+        "harness_patch": {
+          "bytes": 17046,
+          "path": "/tmp/litchi-performance-0923/harness-0923.patch",
+          "sha256": "5404cf09f7f840aa3a587d1bbdce6659d0d3a8cf35d2c44bbd42b747ddf217e0"
+        },
+        "probe_lock": {
+          "bytes": 56289,
+          "path": "/tmp/litchi-performance-0923/baseline-source/tree/tools/perf-baseline/Cargo.lock",
+          "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+        },
+        "receipt": {
+          "bytes": 2237,
+          "path": "/tmp/litchi-performance-0923/receipts/baseline-source-final.json",
+          "sha256": "62b555f066f9a1ac11dd63c258170b9534015766b18b6962012786004f817307"
+        },
+        "revision": "4e2532a0ce958f5928496b0ad9b356d8636916e1"
+      },
+      "candidate": {
+        "archive": {
+          "bytes": 170065920,
+          "path": "/tmp/litchi-performance-0923/base-4e2532a0ce958f5928496b0ad9b356d8636916e1.tar",
+          "sha256": "a6880fb4f638fbdcff23afb728382ea0c807f3af201648f579844309492b10a9"
+        },
+        "cargo_lock": {
+          "bytes": 138465,
+          "path": "/tmp/litchi-performance-0923/candidate-source/tree/Cargo.lock",
+          "sha256": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd"
+        },
+        "full_source_listing": {
+          "bytes": 1437118,
+          "path": "/tmp/litchi-performance-0923/custody/source-listing-candidate-v3.jsonl",
+          "sha256": "5eb6840368d0e601e2db4756ae2dbc4c7fdbc4d0b8bfd810934652a95090a83a"
+        },
+        "harness_patch": {
+          "bytes": 17046,
+          "path": "/tmp/litchi-performance-0923/harness-0923.patch",
+          "sha256": "5404cf09f7f840aa3a587d1bbdce6659d0d3a8cf35d2c44bbd42b747ddf217e0"
+        },
+        "probe_lock": {
+          "bytes": 56289,
+          "path": "/tmp/litchi-performance-0923/candidate-source/tree/tools/perf-baseline/Cargo.lock",
+          "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+        },
+        "production_patch": {
+          "bytes": 15772,
+          "path": "/tmp/litchi-performance-0923/candidate-source-0923-v3.patch",
+          "sha256": "77c2a9952335d5f16c24fbfc8d87e120301808258f70e990324fa21b8ea8e75d"
+        },
+        "receipt": {
+          "bytes": 522655,
+          "path": "/tmp/litchi-performance-0923/receipts/candidate-source-final-v3-bound3.json",
+          "sha256": "3872b7d5e8a82c07a770ec186d0b6a447e89aa3e648f5130eccfeaa6944fc8b8"
+        },
+        "revision": "4e2532a0ce958f5928496b0ad9b356d8636916e1"
+      }
+    }
+  },
+  "native_manifest": {
+    "bytes": 23166,
+    "path": "/tmp/litchi-performance-0923/packet-v3-final2/comparison-manifest-v2.json",
+    "sha256": "b3089f7dcd5cc1517d22615a066e16088a50b4edbd4e703f7594bc5e66a568ae"
+  },
+  "parser": {
+    "bytes": 10521,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/allocation-parse-v2.py",
+    "sha256": "7ef32b74271c7436ba0a7e4dd4676c9cb065955a1ad9b40c56497e232e89748f"
+  },
+  "protocol": {
+    "bytes": 6730,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/allocation-protocol-v2.json",
+    "sha256": "176e4ce419ec8ed297ea1b8113e00439ebd31bea3a248d73ff600c750a690938"
+  },
+  "schedule": {
+    "children_per_route": 8,
+    "children_per_variant": 12,
+    "children_total": 24,
+    "pair_orders": [
+      "baseline,candidate",
+      "candidate,baseline",
+      "baseline,candidate",
+      "candidate,baseline"
+    ],
+    "pairs_per_route": 4,
+    "routes": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader"
+    ],
+    "rows": [
+      {
+        "id": "generic_read_at-pair-01-leg-1-baseline",
+        "index": 1,
+        "leg": 1,
+        "order": "baseline,candidate",
+        "pair": 1,
+        "route": "generic_read_at",
+        "variant": "baseline"
+      },
+      {
+        "id": "generic_read_at-pair-01-leg-2-candidate",
+        "index": 2,
+        "leg": 2,
+        "order": "baseline,candidate",
+        "pair": 1,
+        "route": "generic_read_at",
+        "variant": "candidate"
+      },
+      {
+        "id": "generic_read_at-pair-02-leg-1-candidate",
+        "index": 3,
+        "leg": 1,
+        "order": "candidate,baseline",
+        "pair": 2,
+        "route": "generic_read_at",
+        "variant": "candidate"
+      },
+      {
+        "id": "generic_read_at-pair-02-leg-2-baseline",
+        "index": 4,
+        "leg": 2,
+        "order": "candidate,baseline",
+        "pair": 2,
+        "route": "generic_read_at",
+        "variant": "baseline"
+      },
+      {
+        "id": "generic_read_at-pair-03-leg-1-baseline",
+        "index": 5,
+        "leg": 1,
+        "order": "baseline,candidate",
+        "pair": 3,
+        "route": "generic_read_at",
+        "variant": "baseline"
+      },
+      {
+        "id": "generic_read_at-pair-03-leg-2-candidate",
+        "index": 6,
+        "leg": 2,
+        "order": "baseline,candidate",
+        "pair": 3,
+        "route": "generic_read_at",
+        "variant": "candidate"
+      },
+      {
+        "id": "generic_read_at-pair-04-leg-1-candidate",
+        "index": 7,
+        "leg": 1,
+        "order": "candidate,baseline",
+        "pair": 4,
+        "route": "generic_read_at",
+        "variant": "candidate"
+      },
+      {
+        "id": "generic_read_at-pair-04-leg-2-baseline",
+        "index": 8,
+        "leg": 2,
+        "order": "candidate,baseline",
+        "pair": 4,
+        "route": "generic_read_at",
+        "variant": "baseline"
+      },
+      {
+        "id": "owned_vec-pair-01-leg-1-baseline",
+        "index": 9,
+        "leg": 1,
+        "order": "baseline,candidate",
+        "pair": 1,
+        "route": "owned_vec",
+        "variant": "baseline"
+      },
+      {
+        "id": "owned_vec-pair-01-leg-2-candidate",
+        "index": 10,
+        "leg": 2,
+        "order": "baseline,candidate",
+        "pair": 1,
+        "route": "owned_vec",
+        "variant": "candidate"
+      },
+      {
+        "id": "owned_vec-pair-02-leg-1-candidate",
+        "index": 11,
+        "leg": 1,
+        "order": "candidate,baseline",
+        "pair": 2,
+        "route": "owned_vec",
+        "variant": "candidate"
+      },
+      {
+        "id": "owned_vec-pair-02-leg-2-baseline",
+        "index": 12,
+        "leg": 2,
+        "order": "candidate,baseline",
+        "pair": 2,
+        "route": "owned_vec",
+        "variant": "baseline"
+      },
+      {
+        "id": "owned_vec-pair-03-leg-1-baseline",
+        "index": 13,
+        "leg": 1,
+        "order": "baseline,candidate",
+        "pair": 3,
+        "route": "owned_vec",
+        "variant": "baseline"
+      },
+      {
+        "id": "owned_vec-pair-03-leg-2-candidate",
+        "index": 14,
+        "leg": 2,
+        "order": "baseline,candidate",
+        "pair": 3,
+        "route": "owned_vec",
+        "variant": "candidate"
+      },
+      {
+        "id": "owned_vec-pair-04-leg-1-candidate",
+        "index": 15,
+        "leg": 1,
+        "order": "candidate,baseline",
+        "pair": 4,
+        "route": "owned_vec",
+        "variant": "candidate"
+      },
+      {
+        "id": "owned_vec-pair-04-leg-2-baseline",
+        "index": 16,
+        "leg": 2,
+        "order": "candidate,baseline",
+        "pair": 4,
+        "route": "owned_vec",
+        "variant": "baseline"
+      },
+      {
+        "id": "owned_reader-pair-01-leg-1-baseline",
+        "index": 17,
+        "leg": 1,
+        "order": "baseline,candidate",
+        "pair": 1,
+        "route": "owned_reader",
+        "variant": "baseline"
+      },
+      {
+        "id": "owned_reader-pair-01-leg-2-candidate",
+        "index": 18,
+        "leg": 2,
+        "order": "baseline,candidate",
+        "pair": 1,
+        "route": "owned_reader",
+        "variant": "candidate"
+      },
+      {
+        "id": "owned_reader-pair-02-leg-1-candidate",
+        "index": 19,
+        "leg": 1,
+        "order": "candidate,baseline",
+        "pair": 2,
+        "route": "owned_reader",
+        "variant": "candidate"
+      },
+      {
+        "id": "owned_reader-pair-02-leg-2-baseline",
+        "index": 20,
+        "leg": 2,
+        "order": "candidate,baseline",
+        "pair": 2,
+        "route": "owned_reader",
+        "variant": "baseline"
+      },
+      {
+        "id": "owned_reader-pair-03-leg-1-baseline",
+        "index": 21,
+        "leg": 1,
+        "order": "baseline,candidate",
+        "pair": 3,
+        "route": "owned_reader",
+        "variant": "baseline"
+      },
+      {
+        "id": "owned_reader-pair-03-leg-2-candidate",
+        "index": 22,
+        "leg": 2,
+        "order": "baseline,candidate",
+        "pair": 3,
+        "route": "owned_reader",
+        "variant": "candidate"
+      },
+      {
+        "id": "owned_reader-pair-04-leg-1-candidate",
+        "index": 23,
+        "leg": 1,
+        "order": "candidate,baseline",
+        "pair": 4,
+        "route": "owned_reader",
+        "variant": "candidate"
+      },
+      {
+        "id": "owned_reader-pair-04-leg-2-baseline",
+        "index": 24,
+        "leg": 2,
+        "order": "candidate,baseline",
+        "pair": 4,
+        "route": "owned_reader",
+        "variant": "baseline"
+      }
+    ],
+    "sha256": "b5ba25b8e0a1afa744afd88bd4e1caacead16868e6b6e43b34cc9e8c718d1eb7"
+  },
+  "schema": "litchi.performance.0923.heaptrack-allocation.manifest.v2",
+  "scope": "whole_process",
+  "status": "frozen",
+  "timed_command_template": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "$TIME_LOG",
+    "taskset",
+    "-c",
+    "12",
+    "env",
+    "LC_ALL=C",
+    "LITCHI_DOCX_INGRESS_ROUTE=$ROUTE",
+    "heaptrack",
+    "--record-only",
+    "-o",
+    "$RAW_PROFILE",
+    "$BINARY",
+    "--case",
+    "docx_source_backed_existing_section_layout_edit_save",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--json",
+    "$REPORT"
+  ],
+  "tooling": {
+    "heaptrack": {
+      "bytes": 12702,
+      "path": "/usr/bin/heaptrack",
+      "sha256": "11ef8b89a93d43b63e4dec187f4c7dca2644f10254c5639e55a563fb5465b574",
+      "version_output": "heaptrack 1.5.0"
+    },
+    "heaptrack_print": {
+      "bytes": 346488,
+      "path": "/usr/bin/heaptrack_print",
+      "sha256": "aaef3e0ba4df8ce202f5418c4289e36504a5154b1a806e177d46384ac93ae01d",
+      "version_output": "heaptrack_print 1.5.0"
+    },
+    "zstd": {
+      "bytes": 1037784,
+      "path": "/usr/bin/zstd",
+      "sha256": "35bfa0d33c03bc1d74ade24ceae006098fa2d5e7c9addc7be45640832f9384d6",
+      "version_output": "*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***"
+    },
+    "zstdcat": {
+      "bytes": 1037784,
+      "path": "/usr/bin/zstd",
+      "sha256": "35bfa0d33c03bc1d74ade24ceae006098fa2d5e7c9addc7be45640832f9384d6",
+      "version_output": "1.5.7"
+    }
+  }
+}

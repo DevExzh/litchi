@@ -5857,6 +5857,8 @@ struct DocxSectionLayoutSummary {
     implementation: &'static str,
     timing_scope: &'static str,
     performance_claim: &'static str,
+    ingress_route: &'static str,
+    source_observation_scope: &'static str,
     source_bytes: u64,
     source_sha256: String,
     expected_output_sha256: String,
@@ -5877,6 +5879,13 @@ struct DocxSectionLayoutSummary {
     publication_ns: Vec<u64>,
     source_read_calls: Vec<u64>,
     source_read_bytes: Vec<u64>,
+    /// Sequential ingress observations are only populated for the owned
+    /// reader route.  The owned-vector route has no reader to observe; its
+    /// moved byte count is recorded separately below.  These fields never
+    /// stand in for positional `ReadAt` counters.
+    owned_ingress_read_calls: Vec<u64>,
+    owned_ingress_read_bytes: Vec<u64>,
+    owned_ingress_owned_bytes: Vec<u64>,
     ordinary_payload_materializations: Vec<u64>,
     source_cache_before_publication_after_commit_hits: Vec<u64>,
     source_cache_before_publication_after_commit_cold_loads: Vec<u64>,
@@ -50350,6 +50359,77 @@ fn verify_docx_section_layout_controls(
     Ok(())
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum DocxIngressRoute {
+    GenericReadAt,
+    OwnedVec,
+    OwnedReader,
+}
+
+impl DocxIngressRoute {
+    fn from_environment() -> Result<Self, Box<dyn Error>> {
+        match std::env::var("LITCHI_DOCX_INGRESS_ROUTE")
+            .unwrap_or_else(|_| "generic_read_at".to_owned())
+            .as_str()
+        {
+            "generic_read_at" => Ok(Self::GenericReadAt),
+            "owned_vec" => Ok(Self::OwnedVec),
+            "owned_reader" => Ok(Self::OwnedReader),
+            route => Err(format!(
+                "unknown LITCHI_DOCX_INGRESS_ROUTE {route:?}; expected generic_read_at, owned_vec, or owned_reader"
+            )
+            .into()),
+        }
+    }
+
+    const fn name(self) -> &'static str {
+        match self {
+            Self::GenericReadAt => "generic_read_at",
+            Self::OwnedVec => "owned_vec",
+            Self::OwnedReader => "owned_reader",
+        }
+    }
+
+    const fn source_observation_scope(self) -> &'static str {
+        match self {
+            Self::GenericReadAt => {
+                "instrumented positional ReadAt calls and bytes; ordinary payload counters are source-observed"
+            },
+            Self::OwnedVec => {
+                "moved immutable Vec owner; no positional ReadAt or sequential reader observer is available"
+            },
+            Self::OwnedReader => {
+                "instrumented sequential reader ingress; no positional ReadAt observer is available after ownership transfer"
+            },
+        }
+    }
+}
+
+struct OwnedIngressReader {
+    reader: Cursor<Vec<u8>>,
+    read_calls: Arc<AtomicU64>,
+    read_bytes: Arc<AtomicU64>,
+}
+
+impl OwnedIngressReader {
+    fn new(bytes: Vec<u8>, read_calls: Arc<AtomicU64>, read_bytes: Arc<AtomicU64>) -> Self {
+        Self {
+            reader: Cursor::new(bytes),
+            read_calls,
+            read_bytes,
+        }
+    }
+}
+
+impl Read for OwnedIngressReader {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        let count = self.reader.read(buffer)?;
+        self.read_calls.fetch_add(1, Ordering::Relaxed);
+        self.read_bytes.fetch_add(count as u64, Ordering::Relaxed);
+        Ok(count)
+    }
+}
+
 fn run_docx_source_backed_existing_section_layout_edit_save(
     corpus: &Corpus,
     warmup_iterations: usize,
@@ -50361,6 +50441,7 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
     if corpus.manifest.archive_sha256 != sha256_hex(&corpus.archive) {
         return Err("DOCX section-layout manifest archive SHA-256 differs from archive".into());
     }
+    let ingress_route = DocxIngressRoute::from_environment()?;
     let expected_package = litchi_docx::source_backed::Package::from_read_at(Arc::new(
         OwnedSource::new(corpus.archive.clone()),
     ))?;
@@ -50398,6 +50479,8 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
         implementation: "litchi-docx-source-backed-section-layout",
         timing_scope: "preparation, source-backed open, section query, columns edit, commit, and sequential publication; correctness, reopen, patch, refusal, cache, source, sink, and ZIP gates are excluded",
         performance_claim: "none",
+        ingress_route: ingress_route.name(),
+        source_observation_scope: ingress_route.source_observation_scope(),
         source_bytes: u64::try_from(corpus.archive.len())?,
         source_sha256: corpus.manifest.archive_sha256.clone(),
         expected_output_sha256: expected_digest.clone(),
@@ -50418,6 +50501,9 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
         publication_ns: Vec::with_capacity(samples),
         source_read_calls: Vec::with_capacity(samples),
         source_read_bytes: Vec::with_capacity(samples),
+        owned_ingress_read_calls: Vec::with_capacity(samples),
+        owned_ingress_read_bytes: Vec::with_capacity(samples),
+        owned_ingress_owned_bytes: Vec::with_capacity(samples),
         ordinary_payload_materializations: Vec::with_capacity(samples),
         source_cache_before_publication_after_commit_hits: Vec::with_capacity(samples),
         source_cache_before_publication_after_commit_cold_loads: Vec::with_capacity(samples),
@@ -50443,17 +50529,71 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
 
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let preparation_started = Instant::now();
-        let source = Arc::new(InstrumentedSource::new(
-            corpus.archive.clone(),
-            payload_ranges.clone(),
-        ));
-        let read_at: Arc<dyn ReadAt> = source.clone();
+        let source: Option<Arc<InstrumentedSource>> = match ingress_route {
+            DocxIngressRoute::GenericReadAt => Some(Arc::new(InstrumentedSource::new(
+                corpus.archive.clone(),
+                payload_ranges.clone(),
+            ))),
+            DocxIngressRoute::OwnedVec | DocxIngressRoute::OwnedReader => None,
+        };
+        let owned_input = match ingress_route {
+            DocxIngressRoute::GenericReadAt => None,
+            DocxIngressRoute::OwnedVec | DocxIngressRoute::OwnedReader => {
+                Some(corpus.archive.clone())
+            },
+        };
+        // Keep route setup, including observer allocation and the generic
+        // trait-object coercion, in the same preparation boundary as the
+        // historical generic lane.  They are not source-open work.
+        let read_at: Option<Arc<dyn ReadAt>> = match ingress_route {
+            DocxIngressRoute::GenericReadAt => Some(
+                source
+                    .as_ref()
+                    .expect("generic route creates an instrumented source")
+                    .clone(),
+            ),
+            DocxIngressRoute::OwnedVec | DocxIngressRoute::OwnedReader => None,
+        };
+        let owned_read_calls = match ingress_route {
+            DocxIngressRoute::OwnedReader => Some(Arc::new(AtomicU64::new(0))),
+            DocxIngressRoute::GenericReadAt | DocxIngressRoute::OwnedVec => None,
+        };
+        let owned_read_bytes = match ingress_route {
+            DocxIngressRoute::OwnedReader => Some(Arc::new(AtomicU64::new(0))),
+            DocxIngressRoute::GenericReadAt | DocxIngressRoute::OwnedVec => None,
+        };
         let mut sink = CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
         let preparation_ns = elapsed_ns(preparation_started.elapsed())?;
 
         let open_started = Instant::now();
-        let package = litchi_docx::source_backed::Package::from_read_at(read_at)?;
+        let package = match ingress_route {
+            DocxIngressRoute::GenericReadAt => litchi_docx::source_backed::Package::from_read_at(
+                read_at.expect("generic route prepares its ReadAt observer"),
+            )?,
+            DocxIngressRoute::OwnedVec => {
+                let opc = SourceBackedPackage::from_vec(
+                    owned_input.expect("owned-vector route prepares its input"),
+                )?;
+                litchi_docx::source_backed::Package::from_source_backed_package(opc)?
+            },
+            DocxIngressRoute::OwnedReader => {
+                let reader = OwnedIngressReader::new(
+                    owned_input.expect("owned-reader route prepares its input"),
+                    Arc::clone(
+                        owned_read_calls
+                            .as_ref()
+                            .expect("owned-reader route prepares its read-call observer"),
+                    ),
+                    Arc::clone(
+                        owned_read_bytes
+                            .as_ref()
+                            .expect("owned-reader route prepares its byte observer"),
+                    ),
+                );
+                litchi_docx::source_backed::Package::from_reader(reader)?
+            },
+        };
         std::hint::black_box(&package);
         let open_ns = elapsed_ns(open_started.elapsed())?;
 
@@ -50534,7 +50674,16 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
         if digest != expected_digest {
             return Err("DOCX section-layout output digest differs from expected output".into());
         }
-        if source.bytes.as_ref() != &corpus.archive {
+        let source_immutability_verified = if let Some(source) = source.as_ref() {
+            source.bytes.as_ref() == &corpus.archive
+        } else {
+            // The owned source has no external alias after the move.  The
+            // exact inverse publication is executed through this same package
+            // and retained SourceArtifact; restoring the complete archive is
+            // the route's direct post-timer immutability oracle.
+            restored_output == corpus.archive
+        };
+        if !source_immutability_verified {
             return Err("DOCX section-layout source bytes were mutated".into());
         }
         if before_publication_after_commit.successful_loads != 1
@@ -50563,13 +50712,28 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
         } else {
             cache_observation = Some(observed_cache);
         }
-        let metrics = source.snapshot();
-        if metrics.read_calls == 0
-            || metrics.read_bytes == 0
-            || metrics.ordinary_payload_read_calls == 0
-            || metrics.ordinary_payload_read_bytes == 0
+        let metrics = source.as_ref().map(|source| source.snapshot());
+        if let Some(metrics) = metrics {
+            if metrics.read_calls == 0
+                || metrics.read_bytes == 0
+                || metrics.ordinary_payload_read_calls == 0
+                || metrics.ordinary_payload_read_bytes == 0
+            {
+                return Err("DOCX section-layout source performed no ordinary reads".into());
+            }
+        } else if ingress_route == DocxIngressRoute::OwnedReader
+            && (owned_read_calls
+                .as_ref()
+                .expect("owned-reader route has read-call observer")
+                .load(Ordering::Relaxed)
+                == 0
+                || owned_read_bytes
+                    .as_ref()
+                    .expect("owned-reader route has byte observer")
+                    .load(Ordering::Relaxed)
+                    == 0)
         {
-            return Err("DOCX section-layout source performed no ordinary reads".into());
+            return Err("DOCX owned-reader ingress performed no sequential reads".into());
         }
         if iteration >= warmup_iterations {
             elapsed.push(total_ns);
@@ -50579,8 +50743,32 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
             section_summary.edit_ns.push(edit_ns);
             section_summary.commit_ns.push(commit_ns);
             section_summary.publication_ns.push(publication_ns);
-            section_summary.source_read_calls.push(metrics.read_calls);
-            section_summary.source_read_bytes.push(metrics.read_bytes);
+            if let Some(metrics) = metrics {
+                section_summary.source_read_calls.push(metrics.read_calls);
+                section_summary.source_read_bytes.push(metrics.read_bytes);
+            }
+            if ingress_route == DocxIngressRoute::OwnedVec {
+                section_summary.owned_ingress_read_calls.push(0);
+                section_summary.owned_ingress_read_bytes.push(0);
+            } else if ingress_route == DocxIngressRoute::OwnedReader {
+                section_summary.owned_ingress_read_calls.push(
+                    owned_read_calls
+                        .as_ref()
+                        .expect("owned-reader route has read-call observer")
+                        .load(Ordering::Relaxed),
+                );
+                section_summary.owned_ingress_read_bytes.push(
+                    owned_read_bytes
+                        .as_ref()
+                        .expect("owned-reader route has byte observer")
+                        .load(Ordering::Relaxed),
+                );
+            }
+            if ingress_route != DocxIngressRoute::GenericReadAt {
+                section_summary
+                    .owned_ingress_owned_bytes
+                    .push(u64::try_from(corpus.archive.len())?);
+            }
             section_summary
                 .ordinary_payload_materializations
                 .push(before_publication_after_commit.successful_loads);
@@ -50600,7 +50788,10 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
                 .source_cache_before_publication_after_commit_retained_bytes
                 .push(before_publication_after_commit.retained_bytes);
             section_summary.output_sha256.push(digest.clone());
-            source_summary.record_opc(metrics, before_publication_after_commit.successful_loads);
+            if let Some(metrics) = metrics {
+                source_summary
+                    .record_opc(metrics, before_publication_after_commit.successful_loads);
+            }
             sink_summaries.push(sink.summary());
             measured_digests.push(digest);
         }
@@ -50615,21 +50806,39 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
     }
     let elapsed_statistics = statistics(elapsed);
     let sample_order = elapsed_statistics.sample_order.clone();
-    reorder_sample_vector(&mut source_summary.read_calls, &sample_order)?;
-    reorder_sample_vector(&mut source_summary.read_bytes, &sample_order)?;
-    reorder_sample_vector(
-        &mut source_summary.ordinary_payload_read_calls,
-        &sample_order,
-    )?;
-    reorder_sample_vector(
-        &mut source_summary.ordinary_payload_read_bytes,
-        &sample_order,
-    )?;
-    reorder_sample_vector(&mut source_summary.max_in_flight_reads, &sample_order)?;
-    if let Some(materializations) = source_summary.ordinary_payload_materializations.as_mut() {
-        reorder_sample_vector(materializations, &sample_order)?;
+    if ingress_route == DocxIngressRoute::GenericReadAt {
+        reorder_sample_vector(&mut source_summary.read_calls, &sample_order)?;
+        reorder_sample_vector(&mut source_summary.read_bytes, &sample_order)?;
+        reorder_sample_vector(
+            &mut source_summary.ordinary_payload_read_calls,
+            &sample_order,
+        )?;
+        reorder_sample_vector(
+            &mut source_summary.ordinary_payload_read_bytes,
+            &sample_order,
+        )?;
+        reorder_sample_vector(&mut source_summary.max_in_flight_reads, &sample_order)?;
+        if let Some(materializations) = source_summary.ordinary_payload_materializations.as_mut() {
+            reorder_sample_vector(materializations, &sample_order)?;
+        } else {
+            return Err("DOCX section-layout source materialization evidence is missing".into());
+        }
+        reorder_sample_vector(&mut section_summary.source_read_calls, &sample_order)?;
+        reorder_sample_vector(&mut section_summary.source_read_bytes, &sample_order)?;
     } else {
-        return Err("DOCX section-layout source materialization evidence is missing".into());
+        if !source_summary.read_calls.is_empty()
+            || !source_summary.read_bytes.is_empty()
+            || !section_summary.source_read_calls.is_empty()
+            || !section_summary.source_read_bytes.is_empty()
+        {
+            return Err("DOCX owned ingress emitted positional source counters".into());
+        }
+        reorder_sample_vector(&mut section_summary.owned_ingress_read_calls, &sample_order)?;
+        reorder_sample_vector(&mut section_summary.owned_ingress_read_bytes, &sample_order)?;
+        reorder_sample_vector(
+            &mut section_summary.owned_ingress_owned_bytes,
+            &sample_order,
+        )?;
     }
     reorder_sample_vector(&mut section_summary.preparation_ns, &sample_order)?;
     reorder_sample_vector(&mut section_summary.open_ns, &sample_order)?;
@@ -50637,8 +50846,6 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
     reorder_sample_vector(&mut section_summary.edit_ns, &sample_order)?;
     reorder_sample_vector(&mut section_summary.commit_ns, &sample_order)?;
     reorder_sample_vector(&mut section_summary.publication_ns, &sample_order)?;
-    reorder_sample_vector(&mut section_summary.source_read_calls, &sample_order)?;
-    reorder_sample_vector(&mut section_summary.source_read_bytes, &sample_order)?;
     reorder_sample_vector(
         &mut section_summary.ordinary_payload_materializations,
         &sample_order,

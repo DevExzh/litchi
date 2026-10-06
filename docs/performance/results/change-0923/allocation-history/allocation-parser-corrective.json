@@ -1,0 +1,17 @@
+{
+  "allocation_event_count": 312717,
+  "deallocation_event_count": 312716,
+  "debuggee_command": "/tmp/litchi-performance-0923/frozen-baseline-native/litchi-perf-baseline --case docx_source_backed_existing_section_layout_edit_save --samples 1 --warmup 0 --json /tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/harness-report.json",
+  "format": "10500 3",
+  "live_allocation_info_entries": 1,
+  "live_bytes_at_end": 544,
+  "peak_live_heap_bytes": 24234801,
+  "profile": {
+    "bytes": 438590,
+    "path": "/tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/heaptrack.zst.zst",
+    "sha256": "0003850a9985115265ac53572ab69dd327fde69977c71a1dc38a84fdb2f2c494"
+  },
+  "requested_bytes": 151804036,
+  "schema": "litchi.performance.0923.heaptrack-profile.v2",
+  "scope": "whole_process"
+}

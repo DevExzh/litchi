@@ -1,0 +1,54 @@
+{
+  "archive_scope": [
+    ".cargo",
+    "Cargo.toml",
+    "clippy.toml",
+    "crates",
+    "tools/perf-baseline"
+  ],
+  "candidate_binding": "candidate source revision remains unresolved; bind exact base revision plus reviewed production patch separately",
+  "cargo_lock": {
+    "bytes": 138465,
+    "path": "/tmp/litchi-performance-0923/baseline-source/tree/Cargo.lock",
+    "sha256": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd"
+  },
+  "compile_fixtures": [
+    {
+      "bytes": 984576,
+      "path": "/tmp/litchi-performance-0923/baseline-source/tree/test-data/poi/test-data/spreadsheet/54016.xls",
+      "sha256": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a"
+    },
+    {
+      "bytes": 69471,
+      "path": "/tmp/litchi-performance-0923/baseline-source/tree/test-data/rtf/watermark.rtf",
+      "sha256": "48d62dcd959e737b06ebb8255780bcaaf1e88056ff9c3d5a21d3ff5cd3ddf9cb"
+    }
+  ],
+  "fixture_copy_scope": [
+    "test-data/poi/test-data/spreadsheet/54016.xls",
+    "test-data/rtf/watermark.rtf",
+    "Cargo.lock"
+  ],
+  "harness_file": {
+    "bytes": 3031664,
+    "path": "/tmp/litchi-performance-0923/baseline-source/tree/tools/perf-baseline/src/lib.rs",
+    "sha256": "c1b9b55258df38ac6a376283c2b857ad6a541ba8c62e23730195502f083e70ca"
+  },
+  "harness_patch": {
+    "bytes": 17046,
+    "path": "/tmp/litchi-performance-0923/harness-0923.patch",
+    "sha256": "5404cf09f7f840aa3a587d1bbdce6659d0d3a8cf35d2c44bbd42b747ddf217e0"
+  },
+  "regeneration_command": "git archive --format=tar --prefix=litchi/ HEAD .cargo Cargo.toml clippy.toml crates tools/perf-baseline; copy Cargo.lock and the two compile fixtures; apply the external harness patch",
+  "schema": "litchi.performance.0923.source-binding.v1",
+  "source_archive": {
+    "bytes": 170065920,
+    "path": "/tmp/litchi-performance-0923/base-head.tar",
+    "sha256": "a6880fb4f638fbdcff23afb728382ea0c807f3af201648f579844309492b10a9"
+  },
+  "source_file_count": 9355,
+  "source_listing_bytes": 1156468,
+  "source_listing_sha256": "f9714cda62133005e6eb0046f79189bd8914946ae3f1a16baade631a8b4f12fc",
+  "source_revision": "4e2532a0ce958f5928496b0ad9b356d8636916e1",
+  "source_tree": "/tmp/litchi-performance-0923/baseline-source/tree"
+}

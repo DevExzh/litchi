@@ -1,0 +1,44 @@
+{
+  "all_copied_files_below_1MiB": true,
+  "child_receipts_copied": 48,
+  "copied_files": 316,
+  "external_artifact_policy": "archives, full source listings, binaries, and any future large logs remain external and are bound by descriptors in the manifest/custody receipts",
+  "raw_pooled_control": {
+    "bytes": 551,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/capture-final/custody/raw-pooled-controls-v1.json",
+    "sha256": "3f7f4e9b27248eb026d8f44a2cfcc96ecd3fd966922bd4c9754eafe135e07b3d"
+  },
+  "raw_pooled_reduction": {
+    "bytes": 24409,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/capture-final/reductions/raw-pooled-reduction-v1.json",
+    "sha256": "a12adfbdceb90450babf5fe01d1bd5b9f7c1f3790c6fc6d1290e2bb451099d4c"
+  },
+  "raw_pooled_replay": {
+    "bytes": 24425,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/capture-final/replay/raw-pooled-replay-v1.json",
+    "sha256": "4ef0035de66a76cc874ad3b46a10182e9ede7ed0d5c136a0a6c431860c74efb1"
+  },
+  "raw_pooled_replay_validation": {
+    "bytes": 930,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/capture-final/replay/raw-pooled-replay-validation-v1.json",
+    "sha256": "8f1573fa9ec7877c40a16de52fa192f31b2309c0777aa99b3d40e97947b0b7d5"
+  },
+  "raw_pooled_scripts": [
+    {
+      "bytes": 7708,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/capture-final/tooling/comparison-pooled-v3.py",
+      "sha256": "9cc3e40797fb57f8184cbb0ab9233dad6c13f1b8331c1ef4747bad537d7c805f"
+    },
+    {
+      "bytes": 2340,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/capture-final/tooling/comparison-pooled-controls-v1.py",
+      "sha256": "3b9782ad3e446ed93ec0f5a4c6ebb5ad88ccf159d38af4f6291ab4ab4bd180ad"
+    }
+  ],
+  "raw_reports_copied": 48,
+  "retained_file_count": 323,
+  "schema": "litchi.performance.0923.capture-final-packet.v1",
+  "skipped_large_files": [],
+  "source_packet": "/tmp/litchi-performance-0923/packet-v3-final2",
+  "updated_utc": "2026-10-06T09:35:26.566478+00:00"
+}

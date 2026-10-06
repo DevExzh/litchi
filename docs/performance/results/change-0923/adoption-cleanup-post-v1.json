@@ -1,0 +1,153 @@
+{
+  "authorized_scope": "quality targets, stopped postcapture target, duplicate audit copies, duplicate quality source trees",
+  "created_utc": "2026-10-06T09:43:30.085086+00:00",
+  "files_removed": 59411,
+  "logical_bytes_removed": 11062934160,
+  "paths_removed": [
+    {
+      "exists": true,
+      "files": 1878,
+      "logical_bytes": 845120011,
+      "path": "/tmp/litchi-performance-0923/quality-target-v1",
+      "relative_path": "quality-target-v1"
+    },
+    {
+      "exists": true,
+      "files": 11380,
+      "logical_bytes": 6691618294,
+      "path": "/tmp/litchi-performance-0923/quality-target-v2",
+      "relative_path": "quality-target-v2"
+    },
+    {
+      "exists": true,
+      "files": 6877,
+      "logical_bytes": 2077890170,
+      "path": "/tmp/litchi-performance-0923/quality-target-v3",
+      "relative_path": "quality-target-v3"
+    },
+    {
+      "exists": true,
+      "files": 1630,
+      "logical_bytes": 448250144,
+      "path": "/tmp/litchi-performance-0923/postcapture-baseline-target",
+      "relative_path": "postcapture-baseline-target"
+    },
+    {
+      "exists": true,
+      "files": 9352,
+      "logical_bytes": 161940095,
+      "path": "/tmp/litchi-performance-0923/audit-git-head-tree2",
+      "relative_path": "audit-git-head-tree2"
+    },
+    {
+      "exists": true,
+      "files": 9352,
+      "logical_bytes": 161948836,
+      "path": "/tmp/litchi-performance-0923/audit-patched-tree",
+      "relative_path": "audit-patched-tree"
+    },
+    {
+      "exists": true,
+      "files": 1,
+      "logical_bytes": 170065920,
+      "path": "/tmp/litchi-performance-0923/audit-git-head.tar",
+      "relative_path": "audit-git-head.tar"
+    },
+    {
+      "exists": true,
+      "files": 1,
+      "logical_bytes": 170065920,
+      "path": "/tmp/litchi-performance-0923/base-head.tar",
+      "relative_path": "base-head.tar"
+    },
+    {
+      "exists": true,
+      "files": 9356,
+      "logical_bytes": 163148990,
+      "path": "/tmp/litchi-performance-0923/quality-source-v1",
+      "relative_path": "quality-source-v1"
+    },
+    {
+      "exists": true,
+      "files": 9584,
+      "logical_bytes": 172885780,
+      "path": "/tmp/litchi-performance-0923/quality-source-v2",
+      "relative_path": "quality-source-v2"
+    }
+  ],
+  "post_paths": [
+    {
+      "exists": false,
+      "files": 0,
+      "logical_bytes": 0,
+      "path": "/tmp/litchi-performance-0923/quality-target-v1",
+      "relative_path": "quality-target-v1"
+    },
+    {
+      "exists": false,
+      "files": 0,
+      "logical_bytes": 0,
+      "path": "/tmp/litchi-performance-0923/quality-target-v2",
+      "relative_path": "quality-target-v2"
+    },
+    {
+      "exists": false,
+      "files": 0,
+      "logical_bytes": 0,
+      "path": "/tmp/litchi-performance-0923/quality-target-v3",
+      "relative_path": "quality-target-v3"
+    },
+    {
+      "exists": false,
+      "files": 0,
+      "logical_bytes": 0,
+      "path": "/tmp/litchi-performance-0923/postcapture-baseline-target",
+      "relative_path": "postcapture-baseline-target"
+    },
+    {
+      "exists": false,
+      "files": 0,
+      "logical_bytes": 0,
+      "path": "/tmp/litchi-performance-0923/audit-git-head-tree2",
+      "relative_path": "audit-git-head-tree2"
+    },
+    {
+      "exists": false,
+      "files": 0,
+      "logical_bytes": 0,
+      "path": "/tmp/litchi-performance-0923/audit-patched-tree",
+      "relative_path": "audit-patched-tree"
+    },
+    {
+      "exists": false,
+      "files": 0,
+      "logical_bytes": 0,
+      "path": "/tmp/litchi-performance-0923/audit-git-head.tar",
+      "relative_path": "audit-git-head.tar"
+    },
+    {
+      "exists": false,
+      "files": 0,
+      "logical_bytes": 0,
+      "path": "/tmp/litchi-performance-0923/base-head.tar",
+      "relative_path": "base-head.tar"
+    },
+    {
+      "exists": false,
+      "files": 0,
+      "logical_bytes": 0,
+      "path": "/tmp/litchi-performance-0923/quality-source-v1",
+      "relative_path": "quality-source-v1"
+    },
+    {
+      "exists": false,
+      "files": 0,
+      "logical_bytes": 0,
+      "path": "/tmp/litchi-performance-0923/quality-source-v2",
+      "relative_path": "quality-source-v2"
+    }
+  ],
+  "pre_receipt": "/tmp/litchi-performance-0923/custody/adoption-cleanup-pre-v1.json",
+  "remaining_paths_verified_absent": true,
+  "schema": "litchi.performance.0923.adoption-cleanup.v1"
+}

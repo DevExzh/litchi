@@ -1,0 +1,28 @@
+0923 independent memory-lane audit command log
+Scope: read-only; no recapture, build, cleanup, or benchmark child.
+Toolchain: /usr/bin/python3; parser hash 7ef32b74271c7436ba0a7e4dd4676c9cb065955a1ad9b40c56497e232e89748f.
+
+[profile enumeration]
+find /tmp/litchi-performance-0923/allocation-packet-v3/children /tmp/litchi-performance-0923/allocation-packet-v4/children -type f -name 'heaptrack.zst*' -print
+Result: v3 first raw plus 24 v4 raw profiles = 25.
+
+[full parser reproduction]
+parser=/tmp/litchi-performance-0923/allocation-replay-v4/tooling/allocation-parse-v2.py
+for the v3 raw profile and every sorted v4 children/*/heaptrack.zst:
+  python3 -B "$parser" "$profile" --output "$AUDIT_ROOT/parsed/$name.json"
+Result: 25/25 exit 0; elapsed 14.165 seconds; outputs under /tmp/litchi-performance-0923/memory-audit-v3v4/parsed.
+
+[identity audit]
+python3 -B /tmp/litchi-performance-0923/memory-audit-v3v4/identity_audit.py
+Result: exit 0; status pass; 24 v4 receipts plus v3 first report/raw/binary binding; no descriptor mismatch.
+
+[metric audit]
+python3 -B /tmp/litchi-performance-0923/memory-audit-v3v4/metrics_audit.py
+Result: exit 0; status pass; 24/24 heaptrack_print cross-checks; v3 first versus v4 first generic baseline exact metric equality.
+
+[frozen-input hash checks]
+sha256sum /tmp/litchi-performance-0923/v3-preserved-allocation-capture-v2.py /tmp/litchi-performance-0923/v3-preserved-allocation-protocol-v2.json /tmp/litchi-performance-0923/allocation-packet-v3/allocation-manifest-v2.json /tmp/litchi-performance-0923/allocation-packet-v4/allocation-manifest-v2.json
+Result: v3 runner 0ee8efbe59adb271c216a3181b08a587bd4e456cae271f09667f90da3fb393d1; v3 protocol 176e4ce419ec8ed297ea1b8113e00439ebd31bea3a248d73ff600c750a690938; v3 manifest 9de922223d3909d1b51aa25fab3079a6cf4d46b5c59c07b07e95fe22deed7d2d; v4 manifest c90decf44f8254d1f9ba6a8d567977e946d6ad27da7a47d6e48cfcbbf27b1de4.
+
+[disposition]
+The v3 one-profile analysis failure was caused by the output suffix: expected heaptrack.zst, actual heaptrack.zst.zst. The raw profile remains preserved and parses. A separate v4 24-child cohort was captured, so the original no-recapture 24-child protocol is invalid for strict qualification. All 25 profiles remain descriptive whole-process evidence only.

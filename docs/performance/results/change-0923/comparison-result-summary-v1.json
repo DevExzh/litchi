@@ -1,0 +1,1106 @@
+{
+  "capture": {
+    "children": 48,
+    "manifest": {
+      "bytes": 23166,
+      "path": "/tmp/litchi-performance-0923/packet-v3-final2/comparison-manifest-v2.json",
+      "sha256": "b3089f7dcd5cc1517d22615a066e16088a50b4edbd4e703f7594bc5e66a568ae"
+    },
+    "routes": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader"
+    ],
+    "samples_per_child": 200,
+    "state": {
+      "children_completed": 48,
+      "children_started": 48,
+      "failures": [],
+      "finished_utc": "2026-10-06T09:26:52.824712+00:00",
+      "schema": "litchi.performance.0923.capture-state.v2",
+      "source_closure_revalidated": true,
+      "started_utc": "2026-10-06T09:24:01.635905+00:00",
+      "status": "completed"
+    },
+    "warmups_per_child": 30
+  },
+  "claim_scope": "timing eligibility only; no production adoption decision",
+  "created_utc": "2026-10-06T09:35:35.993591+00:00",
+  "raw_pooled_reduction": {
+    "definition": "nearest-rank over all raw samples; p50/p95/p99",
+    "external": {
+      "bytes": 24409,
+      "path": "/tmp/litchi-performance-0923/receipts/raw-pooled-reduction-v1-final.json",
+      "sha256": "a12adfbdceb90450babf5fe01d1bd5b9f7c1f3790c6fc6d1290e2bb451099d4c"
+    },
+    "note": "paired p50 gates are from comparison-reduction-v2; its pooled_latency_review and phase_summaries are child-summary distributions, not these raw-sample tails",
+    "retained": {
+      "bytes": 24409,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/capture-final/reductions/raw-pooled-reduction-v1.json",
+      "sha256": "a12adfbdceb90450babf5fe01d1bd5b9f7c1f3790c6fc6d1290e2bb451099d4c"
+    },
+    "routes_raw": {
+      "generic_read_at": {
+        "baseline": {
+          "child_ids": [
+            "generic_read_at-pair-01-leg-1-baseline",
+            "generic_read_at-pair-02-leg-2-baseline",
+            "generic_read_at-pair-03-leg-1-baseline",
+            "generic_read_at-pair-04-leg-2-baseline",
+            "generic_read_at-pair-05-leg-1-baseline",
+            "generic_read_at-pair-06-leg-2-baseline",
+            "generic_read_at-pair-07-leg-1-baseline",
+            "generic_read_at-pair-08-leg-2-baseline"
+          ],
+          "children": 8,
+          "elapsed_tails": {
+            "p50_ns": 4507389.0,
+            "p95_ns": 4546789.0,
+            "p99_ns": 4577289.0
+          },
+          "phase_raw_sample_count": {
+            "commit_ns": 1600,
+            "edit_ns": 1600,
+            "open_ns": 1600,
+            "preparation_ns": 1600,
+            "publication_ns": 1600,
+            "query_ns": 1600
+          },
+          "phase_tails": {
+            "commit_ns": {
+              "p50_ns": 352482.0,
+              "p95_ns": 366681.0,
+              "p99_ns": 375212.0
+            },
+            "edit_ns": {
+              "p50_ns": 52480.0,
+              "p95_ns": 60371.0,
+              "p99_ns": 64131.0
+            },
+            "open_ns": {
+              "p50_ns": 44200.0,
+              "p95_ns": 50280.0,
+              "p99_ns": 53280.0
+            },
+            "preparation_ns": {
+              "p50_ns": 34171.0,
+              "p95_ns": 41301.0,
+              "p99_ns": 46630.0
+            },
+            "publication_ns": {
+              "p50_ns": 2680091.0,
+              "p95_ns": 2702892.0,
+              "p99_ns": 2722801.0
+            },
+            "query_ns": {
+              "p50_ns": 1340925.0,
+              "p95_ns": 1356346.0,
+              "p99_ns": 1371166.0
+            }
+          },
+          "raw_reports": [
+            {
+              "bytes": 151615,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-01-leg-1-baseline/report.json",
+              "sha256": "ca320e42bd5551bad761bb57261db20b8414ca915be4eca13d69346ed334836b"
+            },
+            {
+              "bytes": 151614,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-02-leg-2-baseline/report.json",
+              "sha256": "141bc9d0f6f3c16f7378e7d1d804f712e2d7555b520ea11e9a09d64f4c15aabf"
+            },
+            {
+              "bytes": 151607,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-03-leg-1-baseline/report.json",
+              "sha256": "951d1c018835fa0e045786d71be5d95cf1b6ec6b8c63a3280d028bfec598886b"
+            },
+            {
+              "bytes": 151608,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-04-leg-2-baseline/report.json",
+              "sha256": "911f9566ac545fcc897d1fa12dfa70ab3362780d132b3113ac479dbc5e89ec82"
+            },
+            {
+              "bytes": 151613,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-05-leg-1-baseline/report.json",
+              "sha256": "df2bfbc9a60856b5ddc09eb7ccfbf6805eff8e089fc2625bec023d72dbe232d4"
+            },
+            {
+              "bytes": 151614,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-06-leg-2-baseline/report.json",
+              "sha256": "50831972309dfef1f3a3d8223ac8bdd46c5205b21599eb25511bce036a490238"
+            },
+            {
+              "bytes": 151613,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-07-leg-1-baseline/report.json",
+              "sha256": "b243a8b0c147526898876edb3a40f329b6f66d403627ac0c59819f593f23ec77"
+            },
+            {
+              "bytes": 151614,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-08-leg-2-baseline/report.json",
+              "sha256": "e402a46c513895f730be8626a663a2c46a0efed0d7fddd3a1f2ea142327ea7a8"
+            }
+          ],
+          "raw_sample_count": 1600
+        },
+        "candidate": {
+          "child_ids": [
+            "generic_read_at-pair-01-leg-2-candidate",
+            "generic_read_at-pair-02-leg-1-candidate",
+            "generic_read_at-pair-03-leg-2-candidate",
+            "generic_read_at-pair-04-leg-1-candidate",
+            "generic_read_at-pair-05-leg-2-candidate",
+            "generic_read_at-pair-06-leg-1-candidate",
+            "generic_read_at-pair-07-leg-2-candidate",
+            "generic_read_at-pair-08-leg-1-candidate"
+          ],
+          "children": 8,
+          "elapsed_tails": {
+            "p50_ns": 4486529.0,
+            "p95_ns": 4523239.0,
+            "p99_ns": 4553019.0
+          },
+          "phase_raw_sample_count": {
+            "commit_ns": 1600,
+            "edit_ns": 1600,
+            "open_ns": 1600,
+            "preparation_ns": 1600,
+            "publication_ns": 1600,
+            "query_ns": 1600
+          },
+          "phase_tails": {
+            "commit_ns": {
+              "p50_ns": 343151.0,
+              "p95_ns": 356462.0,
+              "p99_ns": 369131.0
+            },
+            "edit_ns": {
+              "p50_ns": 52760.0,
+              "p95_ns": 60090.0,
+              "p99_ns": 63820.0
+            },
+            "open_ns": {
+              "p50_ns": 44850.0,
+              "p95_ns": 49561.0,
+              "p99_ns": 53140.0
+            },
+            "preparation_ns": {
+              "p50_ns": 39940.0,
+              "p95_ns": 44740.0,
+              "p99_ns": 49340.0
+            },
+            "publication_ns": {
+              "p50_ns": 2671221.0,
+              "p95_ns": 2694001.0,
+              "p99_ns": 2708761.0
+            },
+            "query_ns": {
+              "p50_ns": 1333065.0,
+              "p95_ns": 1349175.0,
+              "p99_ns": 1363816.0
+            }
+          },
+          "raw_reports": [
+            {
+              "bytes": 151610,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-01-leg-2-candidate/report.json",
+              "sha256": "0896cc1ea2fb190b42379954994c608aeaac0aa6511f49a97216208998ef3ae6"
+            },
+            {
+              "bytes": 151616,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-02-leg-1-candidate/report.json",
+              "sha256": "c5bbead50735a3113e7ca5ccbf070fb7aef5d8044d36a26c2403db1506ec9844"
+            },
+            {
+              "bytes": 151614,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-03-leg-2-candidate/report.json",
+              "sha256": "56d9f494f474b9648da2667751f03ffc5540ee1eebd4ce74b1087ff8203bdfad"
+            },
+            {
+              "bytes": 151615,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-04-leg-1-candidate/report.json",
+              "sha256": "d9ac694d0f3adac48561440036970887bd0ddccb48137f635db2e870ac9b901d"
+            },
+            {
+              "bytes": 151616,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-05-leg-2-candidate/report.json",
+              "sha256": "1451304f1b4426991d440718441d07a66117e3f2a8034ed10316538520bcea0d"
+            },
+            {
+              "bytes": 151616,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-06-leg-1-candidate/report.json",
+              "sha256": "3828ea0895d3cf68c39fbba926707691b6aec03d4fd014c392d8390b34778f6b"
+            },
+            {
+              "bytes": 151609,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-07-leg-2-candidate/report.json",
+              "sha256": "70a0049fdb85a369e11e69a650402612258c40ed92d203888539322331d23f33"
+            },
+            {
+              "bytes": 151617,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-08-leg-1-candidate/report.json",
+              "sha256": "91da29cc36a8ad6baa15805ddee289eb7c8a3ed44f7b989df5414d77d83510ea"
+            }
+          ],
+          "raw_sample_count": 1600
+        }
+      },
+      "owned_reader": {
+        "baseline": {
+          "child_ids": [
+            "owned_reader-pair-01-leg-1-baseline",
+            "owned_reader-pair-02-leg-2-baseline",
+            "owned_reader-pair-03-leg-1-baseline",
+            "owned_reader-pair-04-leg-2-baseline",
+            "owned_reader-pair-05-leg-1-baseline",
+            "owned_reader-pair-06-leg-2-baseline",
+            "owned_reader-pair-07-leg-1-baseline",
+            "owned_reader-pair-08-leg-2-baseline"
+          ],
+          "children": 8,
+          "elapsed_tails": {
+            "p50_ns": 4860141.0,
+            "p95_ns": 5085882.0,
+            "p99_ns": 5109252.0
+          },
+          "phase_raw_sample_count": {
+            "commit_ns": 1600,
+            "edit_ns": 1600,
+            "open_ns": 1600,
+            "preparation_ns": 1600,
+            "publication_ns": 1600,
+            "query_ns": 1600
+          },
+          "phase_tails": {
+            "commit_ns": {
+              "p50_ns": 352891.0,
+              "p95_ns": 364912.0,
+              "p99_ns": 373932.0
+            },
+            "edit_ns": {
+              "p50_ns": 51671.0,
+              "p95_ns": 58290.0,
+              "p99_ns": 61410.0
+            },
+            "open_ns": {
+              "p50_ns": 379241.0,
+              "p95_ns": 392162.0,
+              "p99_ns": 403652.0
+            },
+            "preparation_ns": {
+              "p50_ns": 34960.0,
+              "p95_ns": 250471.0,
+              "p99_ns": 253471.0
+            },
+            "publication_ns": {
+              "p50_ns": 2684852.0,
+              "p95_ns": 2710262.0,
+              "p99_ns": 2729692.0
+            },
+            "query_ns": {
+              "p50_ns": 1341126.0,
+              "p95_ns": 1356776.0,
+              "p99_ns": 1366726.0
+            }
+          },
+          "raw_reports": [
+            {
+              "bytes": 137141,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-01-leg-1-baseline/report.json",
+              "sha256": "b781f9a5bfd9652966de6617a028b281d2214c45b3f119161a333c66bc409b1c"
+            },
+            {
+              "bytes": 137131,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-02-leg-2-baseline/report.json",
+              "sha256": "99f2ce369fa72de3518970caa701c5054ae0d2931eb192e4c1d1322e917d2981"
+            },
+            {
+              "bytes": 137138,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-03-leg-1-baseline/report.json",
+              "sha256": "be088dfa2b035b78435ab840ca44322eba61959ce03477ead9bfeebb3ae95749"
+            },
+            {
+              "bytes": 137338,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-04-leg-2-baseline/report.json",
+              "sha256": "90052c80db14f4c0841845b2cf57461a07bf8eefd725b5f3cda9e4d0d59a7298"
+            },
+            {
+              "bytes": 137135,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-05-leg-1-baseline/report.json",
+              "sha256": "77bb0a746b816ee3b9cc64a1900c9e15dadb8ac843aea28e658abe241704e173"
+            },
+            {
+              "bytes": 137338,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-06-leg-2-baseline/report.json",
+              "sha256": "8af427edaf76a34f4b8296565a40c371d049ca309cf71c739ce542d00508791a"
+            },
+            {
+              "bytes": 137132,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-07-leg-1-baseline/report.json",
+              "sha256": "a1bd7e2f43d09573d00df7221b32d6c53ac6965193688f8a11f498edf7a36aa3"
+            },
+            {
+              "bytes": 137336,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-08-leg-2-baseline/report.json",
+              "sha256": "50e54094405ad1fdf89455658a260697fada1090a1d36479d9379550f37932c3"
+            }
+          ],
+          "raw_sample_count": 1600
+        },
+        "candidate": {
+          "child_ids": [
+            "owned_reader-pair-01-leg-2-candidate",
+            "owned_reader-pair-02-leg-1-candidate",
+            "owned_reader-pair-03-leg-2-candidate",
+            "owned_reader-pair-04-leg-1-candidate",
+            "owned_reader-pair-05-leg-2-candidate",
+            "owned_reader-pair-06-leg-1-candidate",
+            "owned_reader-pair-07-leg-2-candidate",
+            "owned_reader-pair-08-leg-1-candidate"
+          ],
+          "children": 8,
+          "elapsed_tails": {
+            "p50_ns": 3832216.0,
+            "p95_ns": 4057707.0,
+            "p99_ns": 4080597.0
+          },
+          "phase_raw_sample_count": {
+            "commit_ns": 1600,
+            "edit_ns": 1600,
+            "open_ns": 1600,
+            "preparation_ns": 1600,
+            "publication_ns": 1600,
+            "query_ns": 1600
+          },
+          "phase_tails": {
+            "commit_ns": {
+              "p50_ns": 343482.0,
+              "p95_ns": 355101.0,
+              "p99_ns": 363392.0
+            },
+            "edit_ns": {
+              "p50_ns": 51610.0,
+              "p95_ns": 58170.0,
+              "p99_ns": 61021.0
+            },
+            "open_ns": {
+              "p50_ns": 381551.0,
+              "p95_ns": 414992.0,
+              "p99_ns": 426532.0
+            },
+            "preparation_ns": {
+              "p50_ns": 34700.0,
+              "p95_ns": 241821.0,
+              "p99_ns": 251281.0
+            },
+            "publication_ns": {
+              "p50_ns": 1681707.0,
+              "p95_ns": 1704287.0,
+              "p99_ns": 1714858.0
+            },
+            "query_ns": {
+              "p50_ns": 1332605.0,
+              "p95_ns": 1346346.0,
+              "p99_ns": 1357816.0
+            }
+          },
+          "raw_reports": [
+            {
+              "bytes": 137140,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-01-leg-2-candidate/report.json",
+              "sha256": "c82184972a228648d793eec5e6ea3a312d82b187d2c4fd504d784f939b2905b9"
+            },
+            {
+              "bytes": 137140,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-02-leg-1-candidate/report.json",
+              "sha256": "236ecf6ce583b6cd6f0c27917715c890a47754443d996dd89e134583dafeb4a7"
+            },
+            {
+              "bytes": 137134,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-03-leg-2-candidate/report.json",
+              "sha256": "908023d808ebe97f7e0fc5f992de3bf83b534a55374eada80ad5f50e09949fb1"
+            },
+            {
+              "bytes": 137340,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-04-leg-1-candidate/report.json",
+              "sha256": "4ef3a1414770a9fbfc95e7153eb8309707e7f1e076e64cc1295efc3364ba870b"
+            },
+            {
+              "bytes": 137142,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-05-leg-2-candidate/report.json",
+              "sha256": "d31d00166e7a0dcacff41c585907d8db4cb812080cd7305141ba01371a7f2493"
+            },
+            {
+              "bytes": 137142,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-06-leg-1-candidate/report.json",
+              "sha256": "9be16bde44a293ebd05183b0fc469a4fb26058bbb848f6b216b8be76662c4d69"
+            },
+            {
+              "bytes": 137142,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-07-leg-2-candidate/report.json",
+              "sha256": "7370fec4aadcb37f8b3e4b89afb2dd9ca32536be642fd158538d8a7bbd33aa59"
+            },
+            {
+              "bytes": 137143,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-08-leg-1-candidate/report.json",
+              "sha256": "509fe51150fac597ade60f10585da12fc29b99b868cebabc0609273ebc2d1993"
+            }
+          ],
+          "raw_sample_count": 1600
+        }
+      },
+      "owned_vec": {
+        "baseline": {
+          "child_ids": [
+            "owned_vec-pair-01-leg-1-baseline",
+            "owned_vec-pair-02-leg-2-baseline",
+            "owned_vec-pair-03-leg-1-baseline",
+            "owned_vec-pair-04-leg-2-baseline",
+            "owned_vec-pair-05-leg-1-baseline",
+            "owned_vec-pair-06-leg-2-baseline",
+            "owned_vec-pair-07-leg-1-baseline",
+            "owned_vec-pair-08-leg-2-baseline"
+          ],
+          "children": 8,
+          "elapsed_tails": {
+            "p50_ns": 4717950.0,
+            "p95_ns": 4751660.0,
+            "p99_ns": 4775951.0
+          },
+          "phase_raw_sample_count": {
+            "commit_ns": 1600,
+            "edit_ns": 1600,
+            "open_ns": 1600,
+            "preparation_ns": 1600,
+            "publication_ns": 1600,
+            "query_ns": 1600
+          },
+          "phase_tails": {
+            "commit_ns": {
+              "p50_ns": 352142.0,
+              "p95_ns": 365432.0,
+              "p99_ns": 376572.0
+            },
+            "edit_ns": {
+              "p50_ns": 51980.0,
+              "p95_ns": 59701.0,
+              "p99_ns": 63891.0
+            },
+            "open_ns": {
+              "p50_ns": 43831.0,
+              "p95_ns": 48340.0,
+              "p99_ns": 51731.0
+            },
+            "preparation_ns": {
+              "p50_ns": 238361.0,
+              "p95_ns": 246511.0,
+              "p99_ns": 251631.0
+            },
+            "publication_ns": {
+              "p50_ns": 2687532.0,
+              "p95_ns": 2707891.0,
+              "p99_ns": 2722062.0
+            },
+            "query_ns": {
+              "p50_ns": 1339506.0,
+              "p95_ns": 1354796.0,
+              "p99_ns": 1370966.0
+            }
+          },
+          "raw_reports": [
+            {
+              "bytes": 135510,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-01-leg-1-baseline/report.json",
+              "sha256": "e651bc157b38ee61cf1629f2f96b904d813532fb2bb667665f17b75b26f238f6"
+            },
+            {
+              "bytes": 135512,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-02-leg-2-baseline/report.json",
+              "sha256": "9b2a5a63bd2fe76e2ee015dc9e4f3c3a28ef8258ae547568baa5919618fe494d"
+            },
+            {
+              "bytes": 135519,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-03-leg-1-baseline/report.json",
+              "sha256": "949a49839a236c265de119deefde59e7e19abd6252eefeec8f2565683677827c"
+            },
+            {
+              "bytes": 135512,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-04-leg-2-baseline/report.json",
+              "sha256": "198aecd1fd8facf8b49227b0f5a294a71486c1cf508e622ccd38b41f52ef9c36"
+            },
+            {
+              "bytes": 135518,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-05-leg-1-baseline/report.json",
+              "sha256": "f5291223ae33fecedfe52ad704d8abdaeb383618a23bbc485afd3cebac6d39b4"
+            },
+            {
+              "bytes": 135518,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-06-leg-2-baseline/report.json",
+              "sha256": "37e1ea8dae8a895f1afe586a16d5d7003a68f6a055d186a23d969064352f4239"
+            },
+            {
+              "bytes": 135518,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-07-leg-1-baseline/report.json",
+              "sha256": "dd1be197fddc7a00d9057a90c0e2ae4d464efaeeb84ebc9d734267fa48494aaf"
+            },
+            {
+              "bytes": 135518,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-08-leg-2-baseline/report.json",
+              "sha256": "33d2a2b363c0ef6a08d2d1a898486ed21b8a03bd99b51eb830721e9c2ce45b07"
+            }
+          ],
+          "raw_sample_count": 1600
+        },
+        "candidate": {
+          "child_ids": [
+            "owned_vec-pair-01-leg-2-candidate",
+            "owned_vec-pair-02-leg-1-candidate",
+            "owned_vec-pair-03-leg-2-candidate",
+            "owned_vec-pair-04-leg-1-candidate",
+            "owned_vec-pair-05-leg-2-candidate",
+            "owned_vec-pair-06-leg-1-candidate",
+            "owned_vec-pair-07-leg-2-candidate",
+            "owned_vec-pair-08-leg-1-candidate"
+          ],
+          "children": 8,
+          "elapsed_tails": {
+            "p50_ns": 3705316.0,
+            "p95_ns": 3732636.0,
+            "p99_ns": 3762306.0
+          },
+          "phase_raw_sample_count": {
+            "commit_ns": 1600,
+            "edit_ns": 1600,
+            "open_ns": 1600,
+            "preparation_ns": 1600,
+            "publication_ns": 1600,
+            "query_ns": 1600
+          },
+          "phase_tails": {
+            "commit_ns": {
+              "p50_ns": 343382.0,
+              "p95_ns": 356851.0,
+              "p99_ns": 370232.0
+            },
+            "edit_ns": {
+              "p50_ns": 51840.0,
+              "p95_ns": 58920.0,
+              "p99_ns": 63041.0
+            },
+            "open_ns": {
+              "p50_ns": 44670.0,
+              "p95_ns": 49120.0,
+              "p99_ns": 52781.0
+            },
+            "preparation_ns": {
+              "p50_ns": 238681.0,
+              "p95_ns": 246331.0,
+              "p99_ns": 249281.0
+            },
+            "publication_ns": {
+              "p50_ns": 1691898.0,
+              "p95_ns": 1708777.0,
+              "p99_ns": 1724227.0
+            },
+            "query_ns": {
+              "p50_ns": 1331186.0,
+              "p95_ns": 1344996.0,
+              "p99_ns": 1359795.0
+            }
+          },
+          "raw_reports": [
+            {
+              "bytes": 135512,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-01-leg-2-candidate/report.json",
+              "sha256": "215a2129a3304c050b9c8242dd6517554891994b94c543375e2def518486af3c"
+            },
+            {
+              "bytes": 135521,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-02-leg-1-candidate/report.json",
+              "sha256": "63e5b1952f7e1c15fca8445b9c987a84af329d12529a04d8027b1f23023a3185"
+            },
+            {
+              "bytes": 135522,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-03-leg-2-candidate/report.json",
+              "sha256": "46f073711b9bb74a6596c1c0104e017947267bb3d7bc45b1a7d78ee268943c58"
+            },
+            {
+              "bytes": 135522,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-04-leg-1-candidate/report.json",
+              "sha256": "7003184b701dc4a8f5bf91b5d4130a08b5d3e87d12ff83c3d7a0b8bedc2cdc01"
+            },
+            {
+              "bytes": 135521,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-05-leg-2-candidate/report.json",
+              "sha256": "21194c76f1abe6dcf88f4233b789d1d970afd2342e7d68582fa6a357475c2bf6"
+            },
+            {
+              "bytes": 135521,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-06-leg-1-candidate/report.json",
+              "sha256": "e100bf292173d4f43cffbc718246be737249818da699a799d4edbd00ba5c6ddc"
+            },
+            {
+              "bytes": 135523,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-07-leg-2-candidate/report.json",
+              "sha256": "5636c2cbae17daebb8c42488d99eba826667725bf93da7e8fee817e71a7a32f9"
+            },
+            {
+              "bytes": 135521,
+              "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-08-leg-1-candidate/report.json",
+              "sha256": "468fde6ea5cfddb1b950e192cfb71e0d78f88c54a4ab4563582e44175cea46f8"
+            }
+          ],
+          "raw_sample_count": 1600
+        }
+      }
+    },
+    "samples_per_route_version": 1600
+  },
+  "raw_pooled_replay": {
+    "canonical_metrics": "pass",
+    "external": {
+      "bytes": 24425,
+      "path": "/tmp/litchi-performance-0923/receipts/raw-pooled-replay-v1.json",
+      "sha256": "4ef0035de66a76cc874ad3b46a10182e9ede7ed0d5c136a0a6c431860c74efb1"
+    },
+    "retained": {
+      "bytes": 24425,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/capture-final/replay/raw-pooled-replay-v1.json",
+      "sha256": "4ef0035de66a76cc874ad3b46a10182e9ede7ed0d5c136a0a6c431860c74efb1"
+    },
+    "validation": {
+      "bytes": 930,
+      "path": "/tmp/litchi-performance-0923/receipts/raw-pooled-replay-validation-v1.json",
+      "sha256": "8f1573fa9ec7877c40a16de52fa192f31b2309c0777aa99b3d40e97947b0b7d5"
+    }
+  },
+  "raw_pooling_negative_control": {
+    "retained": {
+      "bytes": 551,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/capture-final/custody/raw-pooled-controls-v1.json",
+      "sha256": "3f7f4e9b27248eb026d8f44a2cfcc96ecd3fd966922bd4c9754eafe135e07b3d"
+    },
+    "status": "rejected child-summary substitution"
+  },
+  "replay": {
+    "canonical_fields_equal": {
+      "child_summaries": true,
+      "children": true,
+      "manifest_status": true,
+      "performance_claim": true,
+      "phase_summaries": true,
+      "pooled_latency_review": true,
+      "recapture": true,
+      "routes": true,
+      "schema": true,
+      "whole_process_rss_review": true
+    },
+    "reduction_replay_validation": {
+      "bytes": 1397,
+      "path": "/tmp/litchi-performance-0923/receipts/reduction-replay-validation-v1.json",
+      "sha256": "cffc88f7118e2d5d108a269c86f0e2cc0136e8383f94e1c8ea423d38fd42e3d2"
+    },
+    "replay_children": 48
+  },
+  "routes": {
+    "generic_read_at": {
+      "pair_ratios": [
+        1.001920093803933,
+        1.001353076464497,
+        1.0066404290374273,
+        1.0068727629162844,
+        1.0040606783593122,
+        1.0069798461816635,
+        1.0064783592119984,
+        1.004526683989183
+      ],
+      "paired_bootstrap": {
+        "confidence_interval_95": {
+          "lower": 1.001920093803933,
+          "method": "nearest-rank 2.5th/97.5th percentiles",
+          "upper": 1.0068727629162844
+        },
+        "draws": 10000,
+        "median_ratio": 1.0055025216005906,
+        "ratios": [
+          1.001920093803933,
+          1.001353076464497,
+          1.0066404290374273,
+          1.0068727629162844,
+          1.0040606783593122,
+          1.0069798461816635,
+          1.0064783592119984,
+          1.004526683989183
+        ],
+        "seed": 923,
+        "statistic": "median of paired baseline_p50/candidate_p50 ratios"
+      },
+      "pairs": 8,
+      "phase_summaries": {
+        "baseline": {
+          "commit_ns": {
+            "p50_ns": 352412.0,
+            "p95_ns": 355312.0,
+            "p99_ns": 355312.0
+          },
+          "edit_ns": {
+            "p50_ns": 52581.0,
+            "p95_ns": 53100.0,
+            "p99_ns": 53100.0
+          },
+          "open_ns": {
+            "p50_ns": 44261.0,
+            "p95_ns": 45020.0,
+            "p99_ns": 45020.0
+          },
+          "preparation_ns": {
+            "p50_ns": 34200.0,
+            "p95_ns": 40270.0,
+            "p99_ns": 40270.0
+          },
+          "publication_ns": {
+            "p50_ns": 2679661.0,
+            "p95_ns": 2681801.0,
+            "p99_ns": 2681801.0
+          },
+          "query_ns": {
+            "p50_ns": 1341016.0,
+            "p95_ns": 1344745.0,
+            "p99_ns": 1344745.0
+          }
+        },
+        "candidate": {
+          "commit_ns": {
+            "p50_ns": 342561.0,
+            "p95_ns": 344621.0,
+            "p99_ns": 344621.0
+          },
+          "edit_ns": {
+            "p50_ns": 52780.0,
+            "p95_ns": 53511.0,
+            "p99_ns": 53511.0
+          },
+          "open_ns": {
+            "p50_ns": 44350.0,
+            "p95_ns": 46131.0,
+            "p99_ns": 46131.0
+          },
+          "preparation_ns": {
+            "p50_ns": 39481.0,
+            "p95_ns": 41280.0,
+            "p99_ns": 41280.0
+          },
+          "publication_ns": {
+            "p50_ns": 2670801.0,
+            "p95_ns": 2676471.0,
+            "p99_ns": 2676471.0
+          },
+          "query_ns": {
+            "p50_ns": 1332845.0,
+            "p95_ns": 1335426.0,
+            "p99_ns": 1335426.0
+          }
+        }
+      },
+      "pooled_latency_tails": {
+        "baseline": {
+          "p50_ns": 4536989.0,
+          "p95_ns": 4609529.0,
+          "p99_ns": 4616179.0,
+          "source": "pooled child p50/p95/p99 statistics; descriptive review flag"
+        },
+        "candidate": {
+          "p50_ns": 4520669.0,
+          "p95_ns": 4562589.0,
+          "p99_ns": 4570890.0,
+          "source": "pooled child p50/p95/p99 statistics; descriptive review flag"
+        }
+      },
+      "timing_gate": {
+        "eligible": true,
+        "lower_95": 1.001920093803933,
+        "median_ratio": 1.0055025216005906,
+        "name": "generic_control"
+      },
+      "whole_process_rss": {
+        "baseline_median_kib": 36692.0,
+        "candidate_median_kib": 36496.0,
+        "candidate_over_baseline_ratio": 0.9946582361277663,
+        "increase_fraction": -0.005341763872233729
+      }
+    },
+    "owned_reader": {
+      "pair_ratios": [
+        1.2635010077935336,
+        1.260772571480797,
+        1.2655387743816964,
+        1.247971969125986,
+        1.2656545157669257,
+        1.3220117464361154,
+        1.2659250173430012,
+        1.3238371371005495
+      ],
+      "paired_bootstrap": {
+        "confidence_interval_95": {
+          "lower": 1.260772571480797,
+          "method": "nearest-rank 2.5th/97.5th percentiles",
+          "upper": 1.3220117464361154
+        },
+        "draws": 10000,
+        "median_ratio": 1.265596645074311,
+        "ratios": [
+          1.2635010077935336,
+          1.260772571480797,
+          1.2655387743816964,
+          1.247971969125986,
+          1.2656545157669257,
+          1.3220117464361154,
+          1.2659250173430012,
+          1.3238371371005495
+        ],
+        "seed": 923,
+        "statistic": "median of paired baseline_p50/candidate_p50 ratios"
+      },
+      "pairs": 8,
+      "phase_summaries": {
+        "baseline": {
+          "commit_ns": {
+            "p50_ns": 351201.0,
+            "p95_ns": 356512.0,
+            "p99_ns": 356512.0
+          },
+          "edit_ns": {
+            "p50_ns": 51350.0,
+            "p95_ns": 52960.0,
+            "p99_ns": 52960.0
+          },
+          "open_ns": {
+            "p50_ns": 379342.0,
+            "p95_ns": 382752.0,
+            "p99_ns": 382752.0
+          },
+          "preparation_ns": {
+            "p50_ns": 34510.0,
+            "p95_ns": 242361.0,
+            "p99_ns": 242361.0
+          },
+          "publication_ns": {
+            "p50_ns": 2679332.0,
+            "p95_ns": 2700712.0,
+            "p99_ns": 2700712.0
+          },
+          "query_ns": {
+            "p50_ns": 1339866.0,
+            "p95_ns": 1345335.0,
+            "p99_ns": 1345335.0
+          }
+        },
+        "candidate": {
+          "commit_ns": {
+            "p50_ns": 343181.0,
+            "p95_ns": 345582.0,
+            "p99_ns": 345582.0
+          },
+          "edit_ns": {
+            "p50_ns": 51720.0,
+            "p95_ns": 52050.0,
+            "p99_ns": 52050.0
+          },
+          "open_ns": {
+            "p50_ns": 379371.0,
+            "p95_ns": 411742.0,
+            "p99_ns": 411742.0
+          },
+          "preparation_ns": {
+            "p50_ns": 34380.0,
+            "p95_ns": 241401.0,
+            "p99_ns": 241401.0
+          },
+          "publication_ns": {
+            "p50_ns": 1680517.0,
+            "p95_ns": 1698057.0,
+            "p99_ns": 1698057.0
+          },
+          "query_ns": {
+            "p50_ns": 1332186.0,
+            "p95_ns": 1334986.0,
+            "p99_ns": 1334986.0
+          }
+        }
+      },
+      "pooled_latency_tails": {
+        "baseline": {
+          "p50_ns": 4894271.0,
+          "p95_ns": 5115481.0,
+          "p99_ns": 5128723.0,
+          "source": "pooled child p50/p95/p99 statistics; descriptive review flag"
+        },
+        "candidate": {
+          "p50_ns": 3860566.0,
+          "p95_ns": 4087838.0,
+          "p99_ns": 4106928.0,
+          "source": "pooled child p50/p95/p99 statistics; descriptive review flag"
+        }
+      },
+      "timing_gate": {
+        "eligible": true,
+        "lower_95": 1.260772571480797,
+        "median_ratio": 1.265596645074311,
+        "name": "owned_benefit"
+      },
+      "whole_process_rss": {
+        "baseline_median_kib": 37456.0,
+        "candidate_median_kib": 36928.0,
+        "candidate_over_baseline_ratio": 0.9859034600598034,
+        "increase_fraction": -0.01409653994019655
+      }
+    },
+    "owned_vec": {
+      "pair_ratios": [
+        1.2809000338688363,
+        1.271875997741414,
+        1.2697464007841612,
+        1.2716677373452743,
+        1.2717481676768458,
+        1.2690243946516855,
+        1.2765123835166114,
+        1.274947849115636
+      ],
+      "paired_bootstrap": {
+        "confidence_interval_95": {
+          "lower": 1.2697464007841612,
+          "method": "nearest-rank 2.5th/97.5th percentiles",
+          "upper": 1.2765123835166114
+        },
+        "draws": 10000,
+        "median_ratio": 1.27181208270913,
+        "ratios": [
+          1.2809000338688363,
+          1.271875997741414,
+          1.2697464007841612,
+          1.2716677373452743,
+          1.2717481676768458,
+          1.2690243946516855,
+          1.2765123835166114,
+          1.274947849115636
+        ],
+        "seed": 923,
+        "statistic": "median of paired baseline_p50/candidate_p50 ratios"
+      },
+      "pairs": 8,
+      "phase_summaries": {
+        "baseline": {
+          "commit_ns": {
+            "p50_ns": 351252.0,
+            "p95_ns": 354802.0,
+            "p99_ns": 354802.0
+          },
+          "edit_ns": {
+            "p50_ns": 51620.0,
+            "p95_ns": 53670.0,
+            "p99_ns": 53670.0
+          },
+          "open_ns": {
+            "p50_ns": 44070.0,
+            "p95_ns": 44260.0,
+            "p99_ns": 44260.0
+          },
+          "preparation_ns": {
+            "p50_ns": 237591.0,
+            "p95_ns": 240471.0,
+            "p99_ns": 240471.0
+          },
+          "publication_ns": {
+            "p50_ns": 2685401.0,
+            "p95_ns": 2693782.0,
+            "p99_ns": 2693782.0
+          },
+          "query_ns": {
+            "p50_ns": 1338536.0,
+            "p95_ns": 1343196.0,
+            "p99_ns": 1343196.0
+          }
+        },
+        "candidate": {
+          "commit_ns": {
+            "p50_ns": 343161.0,
+            "p95_ns": 345532.0,
+            "p99_ns": 345532.0
+          },
+          "edit_ns": {
+            "p50_ns": 51530.0,
+            "p95_ns": 53091.0,
+            "p99_ns": 53091.0
+          },
+          "open_ns": {
+            "p50_ns": 44550.0,
+            "p95_ns": 45090.0,
+            "p99_ns": 45090.0
+          },
+          "preparation_ns": {
+            "p50_ns": 237601.0,
+            "p95_ns": 240531.0,
+            "p99_ns": 240531.0
+          },
+          "publication_ns": {
+            "p50_ns": 1691007.0,
+            "p95_ns": 1698328.0,
+            "p99_ns": 1698328.0
+          },
+          "query_ns": {
+            "p50_ns": 1329885.0,
+            "p95_ns": 1333166.0,
+            "p99_ns": 1333166.0
+          }
+        }
+      },
+      "pooled_latency_tails": {
+        "baseline": {
+          "p50_ns": 4742330.0,
+          "p95_ns": 4778830.0,
+          "p99_ns": 4796941.0,
+          "source": "pooled child p50/p95/p99 statistics; descriptive review flag"
+        },
+        "candidate": {
+          "p50_ns": 3730816.0,
+          "p95_ns": 3768867.0,
+          "p99_ns": 3785126.0,
+          "source": "pooled child p50/p95/p99 statistics; descriptive review flag"
+        }
+      },
+      "timing_gate": {
+        "eligible": true,
+        "lower_95": 1.2697464007841612,
+        "median_ratio": 1.27181208270913,
+        "name": "owned_benefit"
+      },
+      "whole_process_rss": {
+        "baseline_median_kib": 36440.0,
+        "candidate_median_kib": 36630.0,
+        "candidate_over_baseline_ratio": 1.0052140504939626,
+        "increase_fraction": 0.005214050493962619
+      }
+    }
+  },
+  "schema": "litchi.performance.0923.comparison-result-summary.v1",
+  "source_binding": {
+    "base_revision": "4e2532a0ce958f5928496b0ad9b356d8636916e1",
+    "baseline_binary": {
+      "bytes": 69962624,
+      "path": "/tmp/litchi-performance-0923/frozen-baseline-native/litchi-perf-baseline",
+      "sha256": "ed2d5609cc7a54459cd33627a80416d5ce2ef765b32916b5235b91209e19db28"
+    },
+    "candidate_binary": {
+      "bytes": 70379960,
+      "path": "/tmp/litchi-performance-0923/candidate-target/release/litchi-perf-baseline",
+      "sha256": "8d98309501f63f4911828f52c42653f5950f3f5019bd040cf98f787173528861"
+    },
+    "candidate_changed_files": [
+      "crates/litchi-opc/src/source_backed.rs"
+    ],
+    "candidate_patch": {
+      "bytes": 15772,
+      "path": "/tmp/litchi-performance-0923/candidate-source-0923-v3.patch",
+      "sha256": "77c2a9952335d5f16c24fbfc8d87e120301808258f70e990324fa21b8ea8e75d"
+    }
+  }
+}

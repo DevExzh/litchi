@@ -1,0 +1,26 @@
+{
+  "created_utc": "2026-10-06T09:32:54.557139+00:00",
+  "expected_raw_p50": 100,
+  "fixture": {
+    "child_vectors": [
+      [
+        1,
+        1
+      ],
+      [
+        100,
+        100,
+        100,
+        100
+      ]
+    ],
+    "raw_sample_count": 6
+  },
+  "naive_child_summary_p50": 1,
+  "negative_control": {
+    "name": "child_summary_substitution",
+    "reason": "raw p50 differs from p50 of child medians; raw pooling must retain every sample",
+    "status": "rejected"
+  },
+  "schema": "litchi.performance.0923.raw-pooled-controls.v1"
+}

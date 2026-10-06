@@ -1,0 +1,170 @@
+{
+  "allocation_evidence": {
+    "lane": null,
+    "measured": false,
+    "reason": "The native schedule has no allocator instrumentation and supplies no allocation evidence. A separate allocator feasibility lane may be proposed and must never be folded into native timing or gates."
+  },
+  "baseline_source_binding": {
+    "archive": {
+      "bytes": 170065920,
+      "path": "/tmp/litchi-performance-0923/base-4e2532a0ce958f5928496b0ad9b356d8636916e1.tar",
+      "sha256": "a6880fb4f638fbdcff23afb728382ea0c807f3af201648f579844309492b10a9"
+    },
+    "harness_patch": {
+      "bytes": 17046,
+      "path": "/tmp/litchi-performance-0923/harness-0923.patch",
+      "sha256": "5404cf09f7f840aa3a587d1bbdce6659d0d3a8cf35d2c44bbd42b747ddf217e0"
+    },
+    "revision": "4e2532a0ce958f5928496b0ad9b356d8636916e1",
+    "source_listing": {
+      "bytes": 1437118,
+      "path": "/tmp/litchi-performance-0923/custody/source-listing-4e2532a0ce958f5928496b0ad9b356d8636916e1.jsonl",
+      "sha256": "988d3c1d40cbeefc8f937eb2a3f635c1fd003ea36589f1329029f5fef6537509"
+    },
+    "source_receipt": {
+      "path": "/tmp/litchi-performance-0923/receipts/baseline-source-final.json",
+      "sha256": "62b555f066f9a1ac11dd63c258170b9534015766b18b6962012786004f817307"
+    }
+  },
+  "bootstrap": {
+    "draws": 10000,
+    "interval": "nearest-rank 2.5th/97.5th percentiles",
+    "seed": 923,
+    "statistic": "median of paired baseline_p50/candidate_p50 ratios"
+  },
+  "candidate_source_binding": {
+    "base_revision": "4e2532a0ce958f5928496b0ad9b356d8636916e1",
+    "patch_receipt": "external candidate source receipt and reviewed production patch are required before freeze; no fabricated candidate commit is permitted",
+    "source_files": null,
+    "source_head": null
+  },
+  "capture_order": "Baseline is captured from current production before candidate source edits; candidate uses the identical harness source plus a separately reviewed production patch.",
+  "case": "docx_source_backed_existing_section_layout_edit_save",
+  "corpus": {
+    "archive_bytes": 2101427,
+    "archive_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+    "columns_after": 3,
+    "columns_before": 2,
+    "generator": "litchi-docx-section-layout-source-v1",
+    "media_bytes": 524288,
+    "media_count": 4,
+    "output_bytes": 2101446,
+    "output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+    "section_positions": [
+      64,
+      129
+    ],
+    "selected_paragraph": 64
+  },
+  "created_utc": "2026-10-06T00:00:00+00:00",
+  "exact_report_contracts": {
+    "generic_read_at": {
+      "cache_hits": 0,
+      "cold_loads": 1,
+      "max_in_flight_reads": 1,
+      "ordinary_payload_materializations": 1,
+      "ordinary_payload_read_bytes": 8397632,
+      "ordinary_payload_read_calls": 138,
+      "read_bytes": 8409488,
+      "read_calls": 202,
+      "retained_bytes": 18855,
+      "retained_entries": 1,
+      "successful_loads": 1
+    },
+    "owned_reader": {
+      "owned_ingress_owned_bytes": 2101427,
+      "owned_ingress_read_bytes": 2101427,
+      "owned_ingress_read_calls": 258
+    },
+    "owned_vec": {
+      "owned_ingress_owned_bytes": 2101427,
+      "owned_ingress_read_bytes": 0,
+      "owned_ingress_read_calls": 0
+    }
+  },
+  "native": {
+    "children_per_route": 16,
+    "children_per_version": 24,
+    "children_total": 48,
+    "cpu": 12,
+    "pair_orders": [
+      "baseline,candidate",
+      "candidate,baseline",
+      "baseline,candidate",
+      "candidate,baseline",
+      "baseline,candidate",
+      "candidate,baseline",
+      "baseline,candidate",
+      "candidate,baseline"
+    ],
+    "pairs": 8,
+    "routes": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader"
+    ],
+    "samples_per_child": 200,
+    "schedule_identity": "8 paired AB/BA cells for each of 3 routes; each cell has one baseline and one candidate child; no allocation-instrumented children",
+    "warmups_per_child": 30
+  },
+  "performance_claim": "Prospective comparison only; timing eligibility does not adopt the candidate.",
+  "process_scope": "whole child process metrics are retained as setup-inclusive review flags and never substituted for elapsed_ns",
+  "purpose": "Source-bound owned-ingress comparison with a generic ReadAt regression control. This descriptor is prospective until the reviewed candidate source/build binding is supplied.",
+  "recapture_policy": "A failed child, invalid binding, or failed gate fails the complete batch. Selective recapture or rerun to chase a passing result is prohibited.",
+  "required_gate_scope": {
+    "generic_read_at": "The harness generic ReadAt control suite executes the full refusal/partial-sink/semantic control set. Its results are shared setup evidence for all route reports.",
+    "owned_reader": "Route report gates cover executed per-route reopen/output/inverse/source/cache/sink checks. The generic-only source-backed refusal helper is not relabeled as route-local evidence.",
+    "owned_vec": "Route report gates cover executed per-route reopen/output/inverse/source/cache/sink checks. The generic-only source-backed refusal helper is not relabeled as route-local evidence.",
+    "qualification_requirement": "Focused owned-route tests must remain independently reviewed and bound before candidate acceptance; this protocol does not fabricate route-local execution for the shared generic control."
+  },
+  "required_gates": [
+    "semantic reopen of all sections",
+    "table-cell sectPr exclusion",
+    "raw untouched member preservation",
+    "raw member order and ZIP comment preservation",
+    "header/footer relationship preservation",
+    "forward/inverse patch and stale-source refusal",
+    "foreign, signed, no-op, limits, and partial-sink refusal",
+    "source immutability and exact inverse publication",
+    "cache counter contract",
+    "sequential sink byte/write bound",
+    "route-specific source observation truthfulness",
+    "stable output SHA-256"
+  ],
+  "review_flags": {
+    "pooled_latency_increase_fraction": 0.05,
+    "pooled_latency_statistics": [
+      "p50",
+      "p95",
+      "p99"
+    ],
+    "whole_process_max_rss_median_increase_fraction": 0.05
+  },
+  "routes": [
+    "generic_read_at",
+    "owned_vec",
+    "owned_reader"
+  ],
+  "schema": "litchi.performance.0923.doc-comparison.protocol.v2",
+  "status": "prospective",
+  "timing_gates": {
+    "generic_control": {
+      "lower_95_percent_bound_must_be_at_least": 0.9523809523809523,
+      "median_is_descriptive_only": true,
+      "ratio": "baseline_over_candidate_p50",
+      "routes": [
+        "generic_read_at"
+      ]
+    },
+    "owned_benefit": {
+      "lower_95_percent_bound_must_exceed": 1.0,
+      "minimum_median_ratio": 1.05,
+      "ratio": "baseline_over_candidate_p50",
+      "routes": [
+        "owned_vec",
+        "owned_reader"
+      ]
+    }
+  },
+  "timing_scope": "harness elapsed_ns: preparation, source-backed open, section query, columns edit, commit, and sequential publication; exact six-phase sum"
+}

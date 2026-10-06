@@ -1,0 +1,71 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-08-leg-2-baseline/process-time.txt",
+    "/tmp/litchi-performance-0923/frozen-baseline-native/litchi-perf-baseline",
+    "--case",
+    "docx_source_backed_existing_section_layout_edit_save",
+    "--samples",
+    "200",
+    "--warmup",
+    "30",
+    "--json",
+    "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-08-leg-2-baseline/report.json"
+  ],
+  "binary": {
+    "bytes": 69962624,
+    "path": "/tmp/litchi-performance-0923/frozen-baseline-native/litchi-perf-baseline",
+    "sha256": "ed2d5609cc7a54459cd33627a80416d5ce2ef765b32916b5235b91209e19db28"
+  },
+  "cwd": "/tmp/litchi-performance-0923/packet-v3-final2",
+  "env_overrides": {
+    "LC_ALL": "C",
+    "LITCHI_DOCX_INGRESS_ROUTE": "owned_reader"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-10-06T09:26:51.624148+00:00",
+  "max_rss_kib": 39628,
+  "pid": 1343570,
+  "process_time": {
+    "bytes": 987,
+    "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-08-leg-2-baseline/process-time.txt",
+    "sha256": "cb3995be2a05f554f22884571e2f37eaee249e45cd57c8e659fc81b7ee5ff943"
+  },
+  "process_time_relative": "children/owned_reader-pair-08-leg-2-baseline/process-time.txt",
+  "receipt_payload_bytes": 2295,
+  "receipt_payload_sha256": "1bbd933d0a3e287114c53cd4c2f26276f7083866e213ec2f89c17f4a47cc9096",
+  "report": {
+    "bytes": 137336,
+    "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-08-leg-2-baseline/report.json",
+    "sha256": "50e54094405ad1fdf89455658a260697fada1090a1d36479d9379550f37932c3"
+  },
+  "report_relative": "children/owned_reader-pair-08-leg-2-baseline/report.json",
+  "schedule": {
+    "id": "owned_reader-pair-08-leg-2-baseline",
+    "index": 48,
+    "leg": 2,
+    "order": "candidate,baseline",
+    "pair": 8,
+    "route": "owned_reader",
+    "variant": "baseline"
+  },
+  "schema": "litchi.performance.0923.comparison-child.v2",
+  "started_utc": "2026-10-06T09:26:48.083751+00:00",
+  "stderr": {
+    "bytes": 0,
+    "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-08-leg-2-baseline/stderr.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stderr_relative": "children/owned_reader-pair-08-leg-2-baseline/stderr.log",
+  "stdout": {
+    "bytes": 0,
+    "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-08-leg-2-baseline/stdout.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stdout_relative": "children/owned_reader-pair-08-leg-2-baseline/stdout.log"
+}

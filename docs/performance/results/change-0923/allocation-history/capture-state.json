@@ -1,0 +1,10 @@
+{
+  "completed": [],
+  "failed": "generic_read_at-pair-01-leg-1-baseline: heaptrack_print failed (1)",
+  "failed_utc": "2026-10-06T09:30:44.328707+00:00",
+  "manifest_sha256": "b3089f7dcd5cc1517d22615a066e16088a50b4edbd4e703f7594bc5e66a568ae",
+  "schedule_sha256": "b5ba25b8e0a1afa744afd88bd4e1caacead16868e6b6e43b34cc9e8c718d1eb7",
+  "schema": "litchi.performance.0923.heaptrack-capture-state.v2",
+  "started_utc": "2026-10-06T09:30:43.964150+00:00",
+  "status": "failed"
+}

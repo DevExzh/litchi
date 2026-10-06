@@ -1,0 +1,37 @@
+{
+  "argv": [
+    "cargo",
+    "build",
+    "--locked",
+    "--offline",
+    "-j2",
+    "--release",
+    "--manifest-path",
+    "/tmp/litchi-performance-0923/baseline-source/tree/tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "litchi-perf-baseline"
+  ],
+  "binary": {
+    "bytes": 69962624,
+    "path": "/tmp/litchi-performance-0923/baseline-target/release/litchi-perf-baseline",
+    "sha256": "ed2d5609cc7a54459cd33627a80416d5ce2ef765b32916b5235b91209e19db28"
+  },
+  "build_completed_utc": "2026-10-06T08:38:01.899830+00:00",
+  "candidate_source_edits_applied": false,
+  "harness_patch": {
+    "bytes": 17046,
+    "path": "/tmp/litchi-performance-0923/harness-0923.patch",
+    "sha256": "5404cf09f7f840aa3a587d1bbdce6659d0d3a8cf35d2c44bbd42b747ddf217e0"
+  },
+  "profile": "release",
+  "regeneration_command": "CARGO_TARGET_DIR=/tmp/litchi-performance-0923/baseline-target cargo build --locked --offline -j2 --release --manifest-path /tmp/litchi-performance-0923/baseline-source/tree/tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline",
+  "rustc_vv": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "schema": "litchi.performance.0923.build-binding.v1",
+  "source_receipt": {
+    "bytes": 2237,
+    "path": "/tmp/litchi-performance-0923/receipts/baseline-source-final.json",
+    "sha256": "62b555f066f9a1ac11dd63c258170b9534015766b18b6962012786004f817307"
+  },
+  "source_revision": "4e2532a0ce958f5928496b0ad9b356d8636916e1",
+  "target_dir": "/tmp/litchi-performance-0923/baseline-target"
+}

@@ -1,0 +1,501 @@
+{
+  "groups": {
+    "generic_read_at/baseline": {
+      "allocation_event_count": {
+        "max": 312717,
+        "mean": 312717.0,
+        "median": 312717.0,
+        "min": 312717,
+        "n": 4
+      },
+      "live_bytes_at_end": {
+        "max": 544,
+        "mean": 544.0,
+        "median": 544.0,
+        "min": 544,
+        "n": 4
+      },
+      "peak_live_heap_bytes": {
+        "max": 24234801,
+        "mean": 24234801.0,
+        "median": 24234801.0,
+        "min": 24234801,
+        "n": 4
+      },
+      "requested_bytes": {
+        "max": 151804036,
+        "mean": 151804036.0,
+        "median": 151804036.0,
+        "min": 151804036,
+        "n": 4
+      }
+    },
+    "generic_read_at/candidate": {
+      "allocation_event_count": {
+        "max": 312717,
+        "mean": 312717.0,
+        "median": 312717.0,
+        "min": 312717,
+        "n": 4
+      },
+      "live_bytes_at_end": {
+        "max": 544,
+        "mean": 544.0,
+        "median": 544.0,
+        "min": 544,
+        "n": 4
+      },
+      "peak_live_heap_bytes": {
+        "max": 24234805,
+        "mean": 24234805.0,
+        "median": 24234805.0,
+        "min": 24234805,
+        "n": 4
+      },
+      "requested_bytes": {
+        "max": 151804057,
+        "mean": 151804057.0,
+        "median": 151804057.0,
+        "min": 151804057,
+        "n": 4
+      }
+    },
+    "owned_reader/baseline": {
+      "allocation_event_count": {
+        "max": 312964,
+        "mean": 312964.0,
+        "median": 312964.0,
+        "min": 312964,
+        "n": 4
+      },
+      "live_bytes_at_end": {
+        "max": 544,
+        "mean": 544.0,
+        "median": 544.0,
+        "min": 544,
+        "n": 4
+      },
+      "peak_live_heap_bytes": {
+        "max": 24234083,
+        "mean": 24234083.0,
+        "median": 24234083.0,
+        "min": 24234083,
+        "n": 4
+      },
+      "requested_bytes": {
+        "max": 423388539,
+        "mean": 423388539.0,
+        "median": 423388539.0,
+        "min": 423388539,
+        "n": 4
+      }
+    },
+    "owned_reader/candidate": {
+      "allocation_event_count": {
+        "max": 312965,
+        "mean": 312965.0,
+        "median": 312965.0,
+        "min": 312965,
+        "n": 4
+      },
+      "live_bytes_at_end": {
+        "max": 544,
+        "mean": 544.0,
+        "median": 544.0,
+        "min": 544,
+        "n": 4
+      },
+      "peak_live_heap_bytes": {
+        "max": 24234171,
+        "mean": 24234171.0,
+        "median": 24234171.0,
+        "min": 24234171,
+        "n": 4
+      },
+      "requested_bytes": {
+        "max": 423323108,
+        "mean": 423323108.0,
+        "median": 423323108.0,
+        "min": 423323108,
+        "n": 4
+      }
+    },
+    "owned_vec/baseline": {
+      "allocation_event_count": {
+        "max": 312705,
+        "mean": 312705.0,
+        "median": 312705.0,
+        "min": 312705,
+        "n": 4
+      },
+      "live_bytes_at_end": {
+        "max": 544,
+        "mean": 544.0,
+        "median": 544.0,
+        "min": 544,
+        "n": 4
+      },
+      "peak_live_heap_bytes": {
+        "max": 24234029,
+        "mean": 24234029.0,
+        "median": 24234029.0,
+        "min": 24234029,
+        "n": 4
+      },
+      "requested_bytes": {
+        "max": 151803020,
+        "mean": 151803020.0,
+        "median": 151803020.0,
+        "min": 151803020,
+        "n": 4
+      }
+    },
+    "owned_vec/candidate": {
+      "allocation_event_count": {
+        "max": 312706,
+        "mean": 312706.0,
+        "median": 312706.0,
+        "min": 312706,
+        "n": 4
+      },
+      "live_bytes_at_end": {
+        "max": 544,
+        "mean": 544.0,
+        "median": 544.0,
+        "min": 544,
+        "n": 4
+      },
+      "peak_live_heap_bytes": {
+        "max": 24234117,
+        "mean": 24234117.0,
+        "median": 24234117.0,
+        "min": 24234117,
+        "n": 4
+      },
+      "requested_bytes": {
+        "max": 151737589,
+        "mean": 151737589.0,
+        "median": 151737589.0,
+        "min": 151737589,
+        "n": 4
+      }
+    }
+  },
+  "heaptrack_print_crosscheck": {
+    "mismatches": [],
+    "v4_profiles": 24
+  },
+  "observations": {
+    "memory_regression": "No candidate regression in the descriptive whole-process metrics: generic adds +4 peak bytes/+21 requested bytes with equal event count; owned_vec and owned_reader add +88 peak bytes/+1 event and reduce requested bytes by 65431; live bytes end remains 544 for every profile. These are tiny route-specific descriptive deltas, not a strict protocol pass.",
+    "strict_protocol": "not qualified: original one-profile v3 attempt was followed by a separate 24-child v4 run, yielding 25 raw profiles and changed runner/protocol descriptors",
+    "v3_first": "The original retained profile parses successfully and matches the v4 first generic baseline metrics exactly; its initial heaptrack_print failure was path naming (runner passed heaptrack.zst, Heaptrack emitted heaptrack.zst.zst)."
+  },
+  "pair_deltas": [
+    {
+      "baseline": {
+        "allocation_event_count": 312717,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234801,
+        "requested_bytes": 151804036
+      },
+      "candidate": {
+        "allocation_event_count": 312717,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234805,
+        "requested_bytes": 151804057
+      },
+      "candidate_minus_baseline": {
+        "allocation_event_count": 0,
+        "live_bytes_at_end": 0,
+        "peak_live_heap_bytes": 4,
+        "requested_bytes": 21
+      },
+      "order": "baseline,candidate",
+      "pair": 1,
+      "route": "generic_read_at"
+    },
+    {
+      "baseline": {
+        "allocation_event_count": 312717,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234801,
+        "requested_bytes": 151804036
+      },
+      "candidate": {
+        "allocation_event_count": 312717,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234805,
+        "requested_bytes": 151804057
+      },
+      "candidate_minus_baseline": {
+        "allocation_event_count": 0,
+        "live_bytes_at_end": 0,
+        "peak_live_heap_bytes": 4,
+        "requested_bytes": 21
+      },
+      "order": "candidate,baseline",
+      "pair": 2,
+      "route": "generic_read_at"
+    },
+    {
+      "baseline": {
+        "allocation_event_count": 312717,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234801,
+        "requested_bytes": 151804036
+      },
+      "candidate": {
+        "allocation_event_count": 312717,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234805,
+        "requested_bytes": 151804057
+      },
+      "candidate_minus_baseline": {
+        "allocation_event_count": 0,
+        "live_bytes_at_end": 0,
+        "peak_live_heap_bytes": 4,
+        "requested_bytes": 21
+      },
+      "order": "baseline,candidate",
+      "pair": 3,
+      "route": "generic_read_at"
+    },
+    {
+      "baseline": {
+        "allocation_event_count": 312717,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234801,
+        "requested_bytes": 151804036
+      },
+      "candidate": {
+        "allocation_event_count": 312717,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234805,
+        "requested_bytes": 151804057
+      },
+      "candidate_minus_baseline": {
+        "allocation_event_count": 0,
+        "live_bytes_at_end": 0,
+        "peak_live_heap_bytes": 4,
+        "requested_bytes": 21
+      },
+      "order": "candidate,baseline",
+      "pair": 4,
+      "route": "generic_read_at"
+    },
+    {
+      "baseline": {
+        "allocation_event_count": 312964,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234083,
+        "requested_bytes": 423388539
+      },
+      "candidate": {
+        "allocation_event_count": 312965,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234171,
+        "requested_bytes": 423323108
+      },
+      "candidate_minus_baseline": {
+        "allocation_event_count": 1,
+        "live_bytes_at_end": 0,
+        "peak_live_heap_bytes": 88,
+        "requested_bytes": -65431
+      },
+      "order": "baseline,candidate",
+      "pair": 1,
+      "route": "owned_reader"
+    },
+    {
+      "baseline": {
+        "allocation_event_count": 312964,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234083,
+        "requested_bytes": 423388539
+      },
+      "candidate": {
+        "allocation_event_count": 312965,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234171,
+        "requested_bytes": 423323108
+      },
+      "candidate_minus_baseline": {
+        "allocation_event_count": 1,
+        "live_bytes_at_end": 0,
+        "peak_live_heap_bytes": 88,
+        "requested_bytes": -65431
+      },
+      "order": "candidate,baseline",
+      "pair": 2,
+      "route": "owned_reader"
+    },
+    {
+      "baseline": {
+        "allocation_event_count": 312964,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234083,
+        "requested_bytes": 423388539
+      },
+      "candidate": {
+        "allocation_event_count": 312965,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234171,
+        "requested_bytes": 423323108
+      },
+      "candidate_minus_baseline": {
+        "allocation_event_count": 1,
+        "live_bytes_at_end": 0,
+        "peak_live_heap_bytes": 88,
+        "requested_bytes": -65431
+      },
+      "order": "baseline,candidate",
+      "pair": 3,
+      "route": "owned_reader"
+    },
+    {
+      "baseline": {
+        "allocation_event_count": 312964,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234083,
+        "requested_bytes": 423388539
+      },
+      "candidate": {
+        "allocation_event_count": 312965,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234171,
+        "requested_bytes": 423323108
+      },
+      "candidate_minus_baseline": {
+        "allocation_event_count": 1,
+        "live_bytes_at_end": 0,
+        "peak_live_heap_bytes": 88,
+        "requested_bytes": -65431
+      },
+      "order": "candidate,baseline",
+      "pair": 4,
+      "route": "owned_reader"
+    },
+    {
+      "baseline": {
+        "allocation_event_count": 312705,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234029,
+        "requested_bytes": 151803020
+      },
+      "candidate": {
+        "allocation_event_count": 312706,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234117,
+        "requested_bytes": 151737589
+      },
+      "candidate_minus_baseline": {
+        "allocation_event_count": 1,
+        "live_bytes_at_end": 0,
+        "peak_live_heap_bytes": 88,
+        "requested_bytes": -65431
+      },
+      "order": "baseline,candidate",
+      "pair": 1,
+      "route": "owned_vec"
+    },
+    {
+      "baseline": {
+        "allocation_event_count": 312705,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234029,
+        "requested_bytes": 151803020
+      },
+      "candidate": {
+        "allocation_event_count": 312706,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234117,
+        "requested_bytes": 151737589
+      },
+      "candidate_minus_baseline": {
+        "allocation_event_count": 1,
+        "live_bytes_at_end": 0,
+        "peak_live_heap_bytes": 88,
+        "requested_bytes": -65431
+      },
+      "order": "candidate,baseline",
+      "pair": 2,
+      "route": "owned_vec"
+    },
+    {
+      "baseline": {
+        "allocation_event_count": 312705,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234029,
+        "requested_bytes": 151803020
+      },
+      "candidate": {
+        "allocation_event_count": 312706,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234117,
+        "requested_bytes": 151737589
+      },
+      "candidate_minus_baseline": {
+        "allocation_event_count": 1,
+        "live_bytes_at_end": 0,
+        "peak_live_heap_bytes": 88,
+        "requested_bytes": -65431
+      },
+      "order": "baseline,candidate",
+      "pair": 3,
+      "route": "owned_vec"
+    },
+    {
+      "baseline": {
+        "allocation_event_count": 312705,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234029,
+        "requested_bytes": 151803020
+      },
+      "candidate": {
+        "allocation_event_count": 312706,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234117,
+        "requested_bytes": 151737589
+      },
+      "candidate_minus_baseline": {
+        "allocation_event_count": 1,
+        "live_bytes_at_end": 0,
+        "peak_live_heap_bytes": 88,
+        "requested_bytes": -65431
+      },
+      "order": "candidate,baseline",
+      "pair": 4,
+      "route": "owned_vec"
+    }
+  ],
+  "profiles": {
+    "total": 25,
+    "v3_first": {
+      "id": "v3-first-generic_read_at-pair-01-leg-1-baseline",
+      "leg": 1,
+      "metrics": {
+        "allocation_event_count": 312717,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 24234801,
+        "requested_bytes": 151804036
+      },
+      "order": "initial-single-profile",
+      "pair": 1,
+      "raw_sha256": "0003850a9985115265ac53572ab69dd327fde69977c71a1dc38a84fdb2f2c494",
+      "route": "generic_read_at",
+      "variant": "baseline"
+    },
+    "v4_children": 24
+  },
+  "schema": "litchi.performance.0923.memory-lane-metrics-audit.v1",
+  "scope": "descriptive whole-process Heaptrack metrics from all retained profiles; no operation-scoped or adoption claim",
+  "v3_first_vs_v4_first_generic_baseline": {
+    "delta": {
+      "allocation_event_count": 0,
+      "live_bytes_at_end": 0,
+      "peak_live_heap_bytes": 0,
+      "requested_bytes": 0
+    },
+    "same_metrics": true
+  }
+}

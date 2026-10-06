@@ -1,0 +1,98 @@
+{
+  "build": {
+    "command": [
+      "cargo",
+      "build",
+      "--locked",
+      "--offline",
+      "-j2",
+      "--release",
+      "--features",
+      "allocator-metrics",
+      "--bin",
+      "litchi-perf-baseline-alloc",
+      "--manifest-path",
+      "/tmp/litchi-performance-0923/baseline-source/tree/tools/perf-baseline/Cargo.toml"
+    ],
+    "executed": false,
+    "expected_cost": "one separate release build; no native timing child and no allocator measurement was run",
+    "must_match": "baseline and candidate use identical feature, lockfile, profile, compiler, and target flags; allocator executable is never substituted for native elapsed timing",
+    "target_dir": "/tmp/litchi-performance-0923/allocator-feasibility-target"
+  },
+  "created_utc": "2026-10-06T09:01:32.964956+00:00",
+  "decision": {
+    "admissible_for_native_schedule": false,
+    "current_measurement": null,
+    "native_protocol_effect": "No allocator lane or allocation evidence is claimed in comparison-protocol-v2.json.",
+    "next_valid_options": [
+      "review and bind a separate harness patch that brackets preparation through publication with allocation_metrics::begin()/finish() identically in baseline and candidate",
+      "use external heaptrack as whole-process supplemental evidence with setup/postcheck scope and no timing claim"
+    ],
+    "reason": "The selected section-layout operation has no allocation_metrics::begin()/finish() region in the shared harness. The allocator executable therefore cannot provide truthful operation-scoped counters for this case."
+  },
+  "inspection": {
+    "allocator_binary_source": {
+      "bytes": 2169,
+      "path": "/tmp/litchi-performance-0923/baseline-source/tree/tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs",
+      "sha256": "d895986f85e12bec5a30d728bfda2985efd2b0b897e97970e9fa45b2568ae3db"
+    },
+    "binary_required_features": [
+      "allocator-metrics"
+    ],
+    "cargo_manifest": {
+      "bytes": 3286,
+      "path": "/tmp/litchi-performance-0923/baseline-source/tree/tools/perf-baseline/Cargo.toml",
+      "sha256": "53fd47997ae969e709e2ee45575a6050f75de10df339f48dd427f35538768202"
+    },
+    "counter_revision": "serialized_region_peak_v3",
+    "counter_source": {
+      "bytes": 61932,
+      "path": "/tmp/litchi-performance-0923/baseline-source/tree/tools/perf-baseline/src/allocation_metrics.rs",
+      "sha256": "0fcec3e5c4972031b23542fd359a38401e25f32a133c77ef4c6e75facf0710d5"
+    },
+    "feature": "allocator-metrics",
+    "feature_definition": "allocator-metrics = []",
+    "instrumentation_identity": "system_allocator_operation_scoped",
+    "reported_fields": [
+      "allocation_calls",
+      "deallocation_calls",
+      "reallocation_calls",
+      "failed_allocation_calls",
+      "allocated_bytes",
+      "deallocated_bytes",
+      "live_bytes_before",
+      "live_bytes_after",
+      "peak_live_bytes_before",
+      "peak_live_bytes_after",
+      "region_peak_live_bytes"
+    ],
+    "scope_warning": "The global allocator observer covers the instrumented process and operation region; setup/teardown allocation boundaries must be checked from each report. These values are evidence, not native elapsed timing."
+  },
+  "prospective_lane": {
+    "children_per_route": 8,
+    "children_total": 24,
+    "fields_reviewed": [
+      "allocated_bytes",
+      "allocation_calls",
+      "region_peak_live_bytes",
+      "max_rss_kib"
+    ],
+    "order": "AB/BA paired baseline,candidate children; 4 pairs per route",
+    "pairs_per_route": 4,
+    "relationship_to_native": "if separately approved, supplemental evidence only; omitted from the 48-child native schedule and native timing gates",
+    "review_thresholds": {
+      "allocated_bytes_increase_fraction": 0.01,
+      "region_peak_live_bytes_increase_fraction": 0.05
+    },
+    "routes": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader"
+    ],
+    "samples_per_child": 1,
+    "status": "not scheduled",
+    "warmups_per_child": 0
+  },
+  "schema": "litchi.performance.0923.allocator-feasibility.v1",
+  "status": "deferred_no_operation_region"
+}

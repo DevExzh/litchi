@@ -44,7 +44,7 @@ use std::ops::Range;
 #[cfg(any(unix, windows))]
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc, Condvar, Mutex, OnceLock};
 use std::time::Duration;
 
 mod artifact_restore;
@@ -3700,6 +3700,88 @@ pub(crate) struct SourceSnapshot {
     output_reservation_failures: Option<Arc<DiagnosticCounter>>,
 }
 
+/// One private memo owned by one immutable `Vec` ingress.
+///
+/// The source is retained strongly with the memo so the cached digest can
+/// only be reused for the allocation whose bytes were scanned. The one-entry
+/// table is reserved fallibly before it is wrapped in an `Arc`; cloning this
+/// value shares that bounded table, while every new owned ingress constructs a
+/// fresh one.
+struct OwnedSourceFingerprintMemo {
+    source: Arc<OwnedSource>,
+    values: Vec<OnceLock<[u8; 32]>>,
+}
+
+impl OwnedSourceFingerprintMemo {
+    fn new(source: Arc<OwnedSource>) -> Result<Self> {
+        Self::new_with_entries(source, 1)
+    }
+
+    fn new_with_entries(source: Arc<OwnedSource>, entries: usize) -> Result<Self> {
+        let mut values = Vec::new();
+        values
+            .try_reserve_exact(entries)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source artifact fingerprint memo",
+                source,
+            })?;
+        if values.capacity() != entries {
+            return Err(overlay_unavailable(
+                "source artifact fingerprint memo allocation exceeded its reservation",
+            ));
+        }
+        for _ in 0..entries {
+            values.push(OnceLock::new());
+        }
+        if values.is_empty() {
+            return Err(overlay_unavailable(
+                "source artifact fingerprint memo has no value cell",
+            ));
+        }
+        Ok(Self { source, values })
+    }
+
+    fn cached(&self, expected_length: u64) -> Option<SourceArtifactFingerprint> {
+        let source_length = u64::try_from(self.source.as_slice().len()).ok()?;
+        if source_length != expected_length {
+            return None;
+        }
+        let digest = self.values.first()?.get().copied()?;
+        #[cfg(debug_assertions)]
+        {
+            let actual: [u8; 32] = Sha256::digest(self.source.as_slice()).into();
+            debug_assert_eq!(actual, digest, "owned source fingerprint memo diverged");
+        }
+        Some(SourceArtifactFingerprint(digest))
+    }
+
+    fn store(&self, fingerprint: SourceArtifactFingerprint) {
+        let _ = self.values[0].set(fingerprint.into_sha256());
+    }
+
+    #[cfg(test)]
+    fn is_initialized(&self) -> bool {
+        self.values[0].get().is_some()
+    }
+}
+
+enum SourceInput {
+    Generic(Arc<dyn ReadAt>),
+    Owned(Arc<OwnedSource>),
+}
+
+impl SourceInput {
+    fn into_parts(self) -> (Arc<dyn ReadAt>, Option<Arc<OwnedSource>>) {
+        match self {
+            Self::Generic(source) => (source, None),
+            Self::Owned(source) => {
+                let read_at: Arc<dyn ReadAt> = source.clone();
+                (read_at, Some(source))
+            }
+        }
+    }
+}
+
 /// Process-local identity for one opened source-backed package lineage.
 ///
 /// A lineage is intentionally distinct from [`SourceVersion`]. Two source
@@ -3720,6 +3802,7 @@ impl Eq for SourceLineage {}
 #[derive(Clone)]
 pub struct SourceArtifact {
     snapshot: SourceSnapshot,
+    fingerprint_memo: Option<Arc<OwnedSourceFingerprintMemo>>,
 }
 
 /// SHA-256 identity of an exact source artifact.
@@ -3762,6 +3845,16 @@ impl SourceArtifact {
     /// Hash the exact current artifact without materializing it.
     pub fn fingerprint(&self) -> Result<SourceArtifactFingerprint> {
         self.snapshot.ensure_current()?;
+        if self.snapshot.context.is_none() {
+            if let Some(fingerprint) = self
+                .fingerprint_memo
+                .as_ref()
+                .and_then(|memo| memo.cached(self.snapshot.length))
+            {
+                self.snapshot.ensure_current()?;
+                return Ok(fingerprint);
+            }
+        }
         let _workspace_reservation = self
             .snapshot
             .context
@@ -3817,7 +3910,13 @@ impl SourceArtifact {
                 .ok_or_else(|| overlay_unavailable("source offset overflow"))?;
         }
         self.snapshot.ensure_current()?;
-        Ok(SourceArtifactFingerprint(hasher.finalize().into()))
+        let fingerprint = SourceArtifactFingerprint(hasher.finalize().into());
+        if self.snapshot.context.is_none() {
+            if let Some(memo) = self.fingerprint_memo.as_ref() {
+                memo.store(fingerprint);
+            }
+        }
+        Ok(fingerprint)
     }
 
     /// Copy the retained source artifact exactly to a sequential sink.
@@ -6452,6 +6551,7 @@ fn build_casefold_order(parts: &[CatalogPart]) -> Result<Vec<usize>> {
 /// package is needed.
 pub struct SourceBackedPackage {
     source: SourceSnapshot,
+    fingerprint_memo: Option<Arc<OwnedSourceFingerprintMemo>>,
     archive: IndexedArchive<SourceReader>,
     read_ahead: Option<Arc<ArchiveReadAhead>>,
     limits: ReadLimits,
@@ -6628,6 +6728,7 @@ impl SourceBackedPackage {
 
         Ok(Self {
             source: snapshot,
+            fingerprint_memo: None,
             archive,
             read_ahead: None,
             limits,
@@ -6700,7 +6801,7 @@ impl SourceBackedPackage {
     /// remain deferred until a [`PartView::data`] request, just as with
     /// [`Self::from_read_at`].
     pub fn from_vec(data: Vec<u8>) -> Result<Self> {
-        Self::from_read_at(Arc::new(OwnedSource::new(data)))
+        Self::from_vec_with_limits(data, ReadLimits::default())
     }
 
     /// Open an owned source-backed package with an explicit bounded read
@@ -6711,7 +6812,14 @@ impl SourceBackedPackage {
     /// ordinary part payloads; a payload is decompressed only when its
     /// [`PartView::data`] is requested.
     pub fn from_vec_with_limits(data: Vec<u8>, limits: ReadLimits) -> Result<Self> {
-        Self::from_read_at_with_limits(Arc::new(OwnedSource::new(data)), limits)
+        let source = Arc::new(OwnedSource::new(data));
+        Self::from_read_at_inner(
+            SourceInput::Owned(source),
+            limits,
+            SourceCacheLimits::default(),
+            None,
+            SourceReadPolicy::exact(),
+        )
     }
 
     /// Open a source-backed package with the standard bounded read policy.
@@ -6776,7 +6884,7 @@ impl SourceBackedPackage {
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_read_at_inner(
-            source,
+            SourceInput::Generic(source),
             limits,
             cache_limits,
             Some(context),
@@ -6794,7 +6902,7 @@ impl SourceBackedPackage {
         cache_limits: SourceCacheLimits,
     ) -> Result<Self> {
         Self::from_read_at_inner(
-            source,
+            SourceInput::Generic(source),
             limits,
             cache_limits,
             None,
@@ -6815,7 +6923,13 @@ impl SourceBackedPackage {
         cache_limits: SourceCacheLimits,
         source_read_policy: SourceReadPolicy,
     ) -> Result<Self> {
-        Self::from_read_at_inner(source, limits, cache_limits, None, source_read_policy)
+        Self::from_read_at_inner(
+            SourceInput::Generic(source),
+            limits,
+            cache_limits,
+            None,
+            source_read_policy,
+        )
     }
 
     /// Open with explicit read-ahead, cache, and hierarchical execution policies.
@@ -6832,7 +6946,7 @@ impl SourceBackedPackage {
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_read_at_inner(
-            source,
+            SourceInput::Generic(source),
             limits,
             cache_limits,
             Some(context),
@@ -6841,12 +6955,13 @@ impl SourceBackedPackage {
     }
 
     fn from_read_at_inner(
-        source: Arc<dyn ReadAt>,
+        source_input: SourceInput,
         limits: ReadLimits,
         cache_limits: SourceCacheLimits,
         context: Option<ExecutionContext>,
         source_read_policy: SourceReadPolicy,
     ) -> Result<Self> {
+        let (source, owned_source) = source_input.into_parts();
         if let Some(context) = context.as_ref() {
             context.check().map_err(map_execution_error)?;
         }
@@ -7050,8 +7165,13 @@ impl SourceBackedPackage {
         } else {
             PartCache::new_with_diagnostics(cache_limits, diagnostics)
         };
+        let fingerprint_memo = owned_source
+            .map(OwnedSourceFingerprintMemo::new)
+            .transpose()?
+            .map(Arc::new);
         Ok(Self {
             source: snapshot,
+            fingerprint_memo,
             archive,
             read_ahead,
             limits,
@@ -7640,6 +7760,7 @@ impl SourceBackedPackage {
     pub fn source_artifact(&self) -> SourceArtifact {
         SourceArtifact {
             snapshot: self.source.clone(),
+            fingerprint_memo: self.fingerprint_memo.clone(),
         }
     }
 
@@ -7809,6 +7930,7 @@ impl SourceBackedPackage {
             physical,
             source_artifact: SourceArtifact {
                 snapshot: self.source.clone(),
+                fingerprint_memo: self.fingerprint_memo.clone(),
             },
             source_lineage: self.source.lineage.clone(),
             source_version: self.source.version,
@@ -22685,13 +22807,14 @@ mod selected_part_stream_api_tests {
 #[cfg(test)]
 mod callback_scoped_verified_reader_tests {
     use super::{
-        OpcError, OpcOperationAccounting, ReadLimits, Resource, SourceBackedPackage, SourceVersion,
+        OpcError, OpcOperationAccounting, OpcPackage, OwnedSourceFingerprintMemo, ReadLimits,
+        Resource, SourceArtifactRestoreProof, SourceBackedPackage, SourceVersion,
         VerifiedDecodedReaderError,
     };
     use litchi_core::{
         Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, ReadAt,
     };
-    use std::io;
+    use std::io::{self, Cursor, Write};
     use std::num::{NonZeroU64, NonZeroUsize};
     use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -22718,6 +22841,152 @@ mod callback_scoped_verified_reader_tests {
 
     fn package() -> SourceBackedPackage {
         SourceBackedPackage::from_vec(archive_bytes(PAYLOAD)).unwrap()
+    }
+
+    struct RejectingSink;
+
+    impl Write for RejectingSink {
+        fn write(&mut self, _bytes: &[u8]) -> io::Result<usize> {
+            Err(io::Error::other("test sink refusal"))
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn owned_source_fingerprint_memo_is_deferred_and_shared() {
+        let opened = package();
+        let memo = opened
+            .fingerprint_memo
+            .as_ref()
+            .expect("owned ingress must retain its private fingerprint memo");
+        let first = opened.source_artifact();
+        let second = opened.source_artifact();
+        assert!(Arc::ptr_eq(
+            memo,
+            first
+                .fingerprint_memo
+                .as_ref()
+                .expect("artifact must share the package memo"),
+        ));
+        assert!(Arc::ptr_eq(
+            memo,
+            second
+                .fingerprint_memo
+                .as_ref()
+                .expect("artifact clones must share the package memo"),
+        ));
+        assert!(!memo.is_initialized());
+
+        let fingerprint = first.fingerprint().unwrap();
+        assert!(memo.is_initialized());
+        assert_eq!(second.fingerprint().unwrap(), fingerprint);
+
+        let reader_package =
+            SourceBackedPackage::from_reader(Cursor::new(archive_bytes(PAYLOAD))).unwrap();
+        let reader_memo = reader_package
+            .fingerprint_memo
+            .as_ref()
+            .expect("from_reader must retain the owned-ingress fingerprint memo");
+        assert!(!reader_memo.is_initialized());
+        let reader_artifact = reader_package.source_artifact();
+        assert_eq!(reader_artifact.fingerprint().unwrap(), fingerprint);
+        assert!(reader_memo.is_initialized());
+        assert_eq!(reader_artifact.fingerprint().unwrap(), fingerprint);
+
+        let separate = package();
+        let separate_memo = separate
+            .fingerprint_memo
+            .as_ref()
+            .expect("each owned ingress must have a memo");
+        assert!(!separate_memo.is_initialized());
+        assert!(!Arc::ptr_eq(memo, separate_memo));
+    }
+
+    #[test]
+    fn generic_and_managed_ingresses_do_not_retain_fingerprint_memo() {
+        let generic =
+            SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(archive_bytes(PAYLOAD))))
+                .unwrap();
+        assert!(generic.fingerprint_memo.is_none());
+
+        let (_budget, _cancellation_source, context) = managed_context(8 * 1024 * 1024);
+        let managed = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(OwnedSource::new(archive_bytes(PAYLOAD))),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        assert!(managed.fingerprint_memo.is_none());
+    }
+
+    #[test]
+    fn owned_source_fingerprint_memo_reservation_is_fallible() {
+        let source = Arc::new(OwnedSource::new(Vec::new()));
+        let result = OwnedSourceFingerprintMemo::new_with_entries(source, usize::MAX);
+        assert!(matches!(
+            result,
+            Err(OpcError::Allocation {
+                resource: "source artifact fingerprint memo",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn owned_fingerprint_warm_path_preserves_limits_publication_inverse_and_sinks() {
+        let source = archive_bytes(b"<document/>");
+        let package = SourceBackedPackage::from_vec(source.clone()).unwrap();
+        let original = package.source_artifact();
+        let original_sha256 = original.fingerprint().unwrap();
+        assert_eq!(original.fingerprint().unwrap(), original_sha256);
+
+        let mut copied = Vec::new();
+        original.write_to_stream(&mut copied).unwrap();
+        assert_eq!(copied, source);
+        assert!(matches!(
+            original.write_to_stream(RejectingSink),
+            Err(OpcError::IoError(_))
+        ));
+
+        let target = super::PackURI::new("/word/document.xml").unwrap();
+        let mut changed = Vec::new();
+        package
+            .write_part_overlay_to_stream(&mut changed, &target, b"<changed/>".to_vec())
+            .unwrap();
+        let reopened = OpcPackage::from_bytes(&changed).unwrap();
+        assert_eq!(reopened.get_part(&target).unwrap().blob(), b"<changed/>");
+
+        let changed_package = SourceBackedPackage::from_vec(changed).unwrap();
+        let changed_artifact = changed_package.source_artifact();
+        let changed_sha256 = changed_artifact.fingerprint().unwrap();
+        assert_eq!(changed_artifact.fingerprint().unwrap(), changed_sha256);
+        let proof = SourceArtifactRestoreProof {
+            current_len: changed_artifact.len(),
+            current_sha256: changed_sha256,
+            original_len: original.len(),
+            original_sha256,
+        };
+        let mut inverse = Vec::new();
+        changed_package
+            .restore_source_artifact_to_stream(&original, proof, u64::MAX - 1, &mut inverse)
+            .unwrap();
+        assert_eq!(inverse, source);
+
+        let limited = ReadLimits::builder()
+            .max_input_bytes((source.len().saturating_sub(1)) as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            SourceBackedPackage::from_vec_with_limits(source, limited),
+            Err(OpcError::ReadLimit {
+                resource: super::ReadResource::InputBytes,
+                ..
+            })
+        ));
     }
 
     fn managed_context(memory: u64) -> (Budget, CancellationSource, ExecutionContext) {

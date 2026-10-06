@@ -1,0 +1,10 @@
+{
+  "children_completed": 48,
+  "children_started": 48,
+  "failures": [],
+  "finished_utc": "2026-10-06T09:26:52.824712+00:00",
+  "schema": "litchi.performance.0923.capture-state.v2",
+  "source_closure_revalidated": true,
+  "started_utc": "2026-10-06T09:24:01.635905+00:00",
+  "status": "completed"
+}

@@ -1,0 +1,95 @@
+{
+  "schema": "litchi.performance.0923.allocation-first-attempt-preservation.v1",
+  "original_capture_processes": 1,
+  "original_analysis_exit_code": 1,
+  "subsequent_distinct_cohort_processes": 24,
+  "total_captured_processes": 25,
+  "qualification": "original24-childqualification invalid",
+  "files": [
+    {
+      "file": "v3-preserved-allocation-capture-v2.py",
+      "bytes": 35068,
+      "sha256": "0ee8efbe59adb271c216a3181b08a587bd4e456cae271f09667f90da3fb393d1",
+      "original_path": "/tmp/litchi-performance-0923/v3-preserved-allocation-capture-v2.py"
+    },
+    {
+      "file": "v3-preserved-allocation-protocol-v2.json",
+      "bytes": 6730,
+      "sha256": "176e4ce419ec8ed297ea1b8113e00439ebd31bea3a248d73ff600c750a690938",
+      "original_path": "/tmp/litchi-performance-0923/v3-preserved-allocation-protocol-v2.json"
+    },
+    {
+      "file": "allocation-manifest-v2.json",
+      "bytes": 15875,
+      "sha256": "9de922223d3909d1b51aa25fab3079a6cf4d46b5c59c07b07e95fe22deed7d2d",
+      "original_path": "/tmp/litchi-performance-0923/allocation-packet-v3/allocation-manifest-v2.json"
+    },
+    {
+      "file": "capture-state.json",
+      "bytes": 475,
+      "sha256": "5ef56c8993bec03d5386dfdf7f582ccf29d1a522f3d45bc9e47bd5b09bb8ebe7",
+      "original_path": "/tmp/litchi-performance-0923/allocation-packet-v3/capture-state.json"
+    },
+    {
+      "file": "heaptrack-corrective.histogram.tsv",
+      "bytes": 2083,
+      "sha256": "9451e4d40e3ff9fe40b4816092dbca023a4997aac102f06daf92f05fd0e79b07",
+      "original_path": "/tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/heaptrack-corrective.histogram.tsv"
+    },
+    {
+      "file": "heaptrack-corrective.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "original_path": "/tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/heaptrack-corrective.stderr"
+    },
+    {
+      "file": "heaptrack-corrective.stdout",
+      "bytes": 762,
+      "sha256": "031d8685f068953b0a9f34398a2ad47aa99c507270e32105beb9cb23bba30c2f",
+      "original_path": "/tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/heaptrack-corrective.stdout"
+    },
+    {
+      "file": "allocation-parser-corrective.json",
+      "bytes": 888,
+      "sha256": "ddf45129b7ad1c8c39a33aa300580f7ab6719202a83af431a604a9df0d71b480",
+      "original_path": "/tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/allocation-parser-corrective.json"
+    },
+    {
+      "file": "heaptrack-print.stderr",
+      "bytes": 151,
+      "sha256": "ea16681b17e8fd4d4c92f977e6534a49865581a148d95cc707ce86c7e34c65c7",
+      "original_path": "/tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/heaptrack-print.stderr"
+    },
+    {
+      "file": "heaptrack-print.stdout",
+      "bytes": 175,
+      "sha256": "7bc9e092f63309f7d19f552e0592c2c464c8bc132d7d3e2c12bfdd660901a919",
+      "original_path": "/tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/heaptrack-print.stdout"
+    },
+    {
+      "file": "harness-report.json",
+      "bytes": 18775,
+      "sha256": "4e04bc37ee62b6467816cc2652bd4faa2bb1d869dbfcf9bebe8113beefd18128",
+      "original_path": "/tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/harness-report.json"
+    },
+    {
+      "file": "process-time.log",
+      "bytes": 1229,
+      "sha256": "3fdeb32ed1ee4c6ffc87a862a1d2ea6c5ca8e4fca59afb180f4b8aef08553389",
+      "original_path": "/tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/process-time.log"
+    },
+    {
+      "file": "capture.stderr",
+      "bytes": 295,
+      "sha256": "91781e6e63087f33ac1c77836e99250edf7a322c8755e53b5726b1db24d2a0b8",
+      "original_path": "/tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/capture.stderr"
+    },
+    {
+      "file": "capture.stdout",
+      "bytes": 421,
+      "sha256": "e7a539536f1715f2fa5d6f0428a15f1d11a760444ac09bfc9daee6cb20235f63",
+      "original_path": "/tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/capture.stdout"
+    }
+  ],
+  "raw_profile": "External raw profile descriptor is in ../allocation-corrective-supplement-v2.json; not omitted from independent all25 audit."
+}

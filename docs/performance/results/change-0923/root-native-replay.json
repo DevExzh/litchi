@@ -1,0 +1,13 @@
+{
+  "schema": "litchi.performance.0923.root-native-replay.v1",
+  "verified_utc": "2026-10-06T09:39:23.633325+00:00",
+  "source": "repository capture-final/packet copied twice to fresh external paths",
+  "copied_files": 308,
+  "manifest_sha256": "b3089f7dcd5cc1517d22615a066e16088a50b4edbd4e703f7594bc5e66a568ae",
+  "children": 48,
+  "canonical_reduction_sha256": "b2e81abfebf46e4ae5e3682c2f9f48639ba050637d0d3231f13a38fa1b12d9b3",
+  "canonical_equal_to_root_external_reduction": true,
+  "frozen_capture_code_verified": true,
+  "status": "pass",
+  "limitation": "Frozen child-summary distribution fields remain historical; root-raw-sample-summary.json supplies actual pooled operation statistics."
+}

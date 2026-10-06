@@ -1,0 +1,47 @@
+{
+  "binary": {
+    "bytes": 69962624,
+    "path": "/tmp/litchi-performance-0923/baseline-target/release/litchi-perf-baseline",
+    "sha256": "ed2d5609cc7a54459cd33627a80416d5ce2ef765b32916b5235b91209e19db28"
+  },
+  "build_receipt": {
+    "bytes": 1661,
+    "path": "/tmp/litchi-performance-0923/receipts/baseline-build-final.json",
+    "sha256": "86eae277dd3096ab7972cc9d7696d02853fadaa3e7e20678449137b74a80e630"
+  },
+  "controls": {
+    "bytes": 39318,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/comparison-controls.json",
+    "sha256": "09363fec29514b893821b014f2fdebdbc478798191c425fc38ef495bde4564ae"
+  },
+  "external_custody_root": "/tmp/litchi-performance-0923",
+  "harness_patch": {
+    "bytes": 17046,
+    "path": "/tmp/litchi-performance-0923/harness-0923.patch",
+    "sha256": "5404cf09f7f840aa3a587d1bbdce6659d0d3a8cf35d2c44bbd42b747ddf217e0"
+  },
+  "protocol": {
+    "bytes": 3870,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/comparison-protocol.json",
+    "sha256": "4cfd0277171d537266df5bc5b17367ca428074b6eebbeefd7370975665c7d6eb"
+  },
+  "raw_reports_kept_outside_repository": true,
+  "schedule": {
+    "children_per_route": 16,
+    "children_per_version": 24,
+    "children_total": 48,
+    "pairs": 8,
+    "routes": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader"
+    ]
+  },
+  "schema": "litchi.performance.0923.baseline-custody.v2",
+  "source_receipt": {
+    "bytes": 2237,
+    "path": "/tmp/litchi-performance-0923/receipts/baseline-source-final.json",
+    "sha256": "62b555f066f9a1ac11dd63c258170b9534015766b18b6962012786004f817307"
+  },
+  "source_revision": "4e2532a0ce958f5928496b0ad9b356d8636916e1"
+}

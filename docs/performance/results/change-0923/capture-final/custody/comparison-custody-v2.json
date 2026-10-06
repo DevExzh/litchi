@@ -1,0 +1,245 @@
+{
+  "baseline_binary": {
+    "frozen_copy": {
+      "bytes": 69962624,
+      "path": "/tmp/litchi-performance-0923/frozen-baseline-native/litchi-perf-baseline",
+      "sha256": "ed2d5609cc7a54459cd33627a80416d5ce2ef765b32916b5235b91209e19db28"
+    },
+    "identity_status": "frozen copy independently rehashed; original native target was not replaced",
+    "original_receipt_binary": {
+      "bytes": 69962624,
+      "path": "/tmp/litchi-performance-0923/baseline-target/release/litchi-perf-baseline",
+      "sha256": "ed2d5609cc7a54459cd33627a80416d5ce2ef765b32916b5235b91209e19db28"
+    }
+  },
+  "baseline_source": {
+    "archive_regeneration_command": "git archive --format=tar --prefix=litchi/ 4e2532a0ce958f5928496b0ad9b356d8636916e1 .cargo Cargo.toml clippy.toml crates tools/perf-baseline > /tmp/litchi-performance-0923/base-4e2532a0ce958f5928496b0ad9b356d8636916e1.tar; copy Cargo.lock and the two compile fixtures; apply the external harness patch",
+    "build_receipt": {
+      "bytes": 1661,
+      "path": "/tmp/litchi-performance-0923/receipts/baseline-build-final.json",
+      "sha256": "86eae277dd3096ab7972cc9d7696d02853fadaa3e7e20678449137b74a80e630"
+    },
+    "cargo_lock": {
+      "bytes": 138465,
+      "path": "/tmp/litchi-performance-0923/baseline-source/tree/Cargo.lock",
+      "sha256": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd"
+    },
+    "full_source_listing_external": {
+      "bytes": 1437118,
+      "path": "/tmp/litchi-performance-0923/custody/source-listing-4e2532a0ce958f5928496b0ad9b356d8636916e1.jsonl",
+      "sha256": "988d3c1d40cbeefc8f937eb2a3f635c1fd003ea36589f1329029f5fef6537509"
+    },
+    "full_source_listing_status": "postcapture_reconstruction_from_pinned_tree; never copied into repository",
+    "harness_patch": {
+      "bytes": 17046,
+      "path": "/tmp/litchi-performance-0923/harness-0923.patch",
+      "sha256": "5404cf09f7f840aa3a587d1bbdce6659d0d3a8cf35d2c44bbd42b747ddf217e0"
+    },
+    "legacy_listing_claim": {
+      "bytes": 1156468,
+      "sha256": "f9714cda62133005e6eb0046f79189bd8914946ae3f1a16baade631a8b4f12fc",
+      "status": "preserved_unmatched_claim_in_immutable_receipt"
+    },
+    "pinned_archive": {
+      "bytes": 170065920,
+      "path": "/tmp/litchi-performance-0923/base-4e2532a0ce958f5928496b0ad9b356d8636916e1.tar",
+      "sha256": "a6880fb4f638fbdcff23afb728382ea0c807f3af201648f579844309492b10a9"
+    },
+    "revision": "4e2532a0ce958f5928496b0ad9b356d8636916e1",
+    "source_receipt": {
+      "bytes": 2237,
+      "path": "/tmp/litchi-performance-0923/receipts/baseline-source-final.json",
+      "sha256": "62b555f066f9a1ac11dd63c258170b9534015766b18b6962012786004f817307"
+    }
+  },
+  "build_provenance": {
+    "allocator_build_attempt": {
+      "fingerprint_snapshot_before_attempt": {
+        "bytes": 5273600,
+        "path": "/tmp/litchi-performance-0923/root-builds/baseline-pre-allocator-fingerprints.tar",
+        "sha256": "08c0232a8c09efa129dba82481c2bc2b3baa7055cc1b8fbe42cd56f47734c17b"
+      },
+      "log": {
+        "bytes": 1423,
+        "path": "/tmp/litchi-performance-0923/root-builds/baseline-allocator-build.log",
+        "sha256": "c332bef96e59ca66a116cfadb2d586426ecaebaf4c2840a13d4ee4b7fe147182"
+      },
+      "outcome": "stopped with SIGINT before binary completion; no allocator binary is bound",
+      "receipt": {
+        "bytes": 1956,
+        "path": "/tmp/litchi-performance-0923/root-builds/baseline-allocator-build.json",
+        "sha256": "3505253dca695854426c59541f5326c778ce2b57cac37c3b62a8ae636ecb2316"
+      }
+    },
+    "allocator_scope_decision": "Rust allocator target stopped before binary completion and is inadmissible for this case because the selected section-layout operation has no allocation_metrics region; use separately bound heaptrack whole-process evidence only if approved.",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "fingerprint_graph_parity": {
+      "note": "Candidate must independently bind compiler/profile/features/flags and matching fingerprint graph before capture.",
+      "snapshot": {
+        "bytes": 5273600,
+        "path": "/tmp/litchi-performance-0923/root-builds/baseline-pre-allocator-fingerprints.tar",
+        "sha256": "08c0232a8c09efa129dba82481c2bc2b3baa7055cc1b8fbe42cd56f47734c17b"
+      },
+      "status": "root-owned pre-allocator fingerprint snapshot retained externally; no new native build graph was reconstructed here"
+    },
+    "original_start_end_logs": "absent from immutable baseline receipt",
+    "original_terminal_log": "absent from immutable baseline receipt",
+    "profile": "release",
+    "profile_audit": {
+      "bytes": 17404,
+      "path": "/tmp/litchi-performance-0923/receipts/candidate-build-profile-audit-v1.json",
+      "sha256": "6ad300cb464c74b6890fe55da28888e514e27629c7c2e332cfd6f68ef2090fd9",
+      "status": "pass; no effective CARGO_PROFILE_* overrides; exact limits documented in supplement"
+    },
+    "receipt_declared_completed_utc": "2026-10-06T08:38:01.899830+00:00",
+    "setup_attempts": {
+      "bytes": 2202,
+      "path": "/tmp/litchi-performance-0923/custody/setup-attempts.json",
+      "sha256": "dd85b934eb77f520b709fa3661d00040ee94be7bcf1b9497079c70c8060af43d"
+    }
+  },
+  "created_utc": "2026-10-06T09:08:27.326577+00:00",
+  "external_packet": {
+    "baseline_reports": [
+      {
+        "bytes": 151614,
+        "path": "/tmp/litchi-performance-0923/packet-v2/baseline/generic_read_at.json",
+        "sha256": "910d4ff184f08c9911e40702ba41a7188473e878427cab6cbc2c5fdbc8720787"
+      },
+      {
+        "bytes": 135518,
+        "path": "/tmp/litchi-performance-0923/packet-v2/baseline/owned_vec.json",
+        "sha256": "68bbcf703d3b7ba63f1a027ba5ae2843a0ca54b26f0c2444a83a3952a64be545"
+      },
+      {
+        "bytes": 137139,
+        "path": "/tmp/litchi-performance-0923/packet-v2/baseline/owned_reader.json",
+        "sha256": "05b8c6b209cd3ba7168f7c9d927e676e0fdd67c13a90ee06299d2448c10ce221"
+      }
+    ],
+    "capture_refusal": "capture action refused because no frozen candidate manifest exists",
+    "capture_status": "no comparative children; baseline seed and copied replay seed only",
+    "controls_receipt": {
+      "bytes": 639878,
+      "path": "/tmp/litchi-performance-0923/packet-v2/tooling/comparison-controls-v2.json",
+      "sha256": "0f491232dc503c2f7598e5856f483c0340c1510e7b9075f05fcb8ae22b63ecc1"
+    },
+    "freeze_dry_run": {
+      "bytes": 21911,
+      "path": "/tmp/litchi-performance-0923/custody/freeze-v3-final3-dry-run.json",
+      "sha256": "503071d34344271bc4a3b4536a205229d9fe5ea4e80f7075864efff557641263"
+    },
+    "freeze_dry_run_status": "verified frozen prospective manifest; 48 scheduled children, zero executed, no authoritative manifest written",
+    "frozen_manifest": {
+      "bytes": 23166,
+      "path": "/tmp/litchi-performance-0923/packet-v3-final2/comparison-manifest-v2.json",
+      "sha256": "b3089f7dcd5cc1517d22615a066e16088a50b4edbd4e703f7594bc5e66a568ae"
+    },
+    "frozen_manifest_status": "external packet manifest verified frozen; no capture approval env set and no children",
+    "negative_controls": {
+      "bytes": 2498,
+      "path": "/tmp/litchi-performance-0923/receipts/runner-negative-controls-v2.json",
+      "sha256": "b18567e6a093fe6f1c11d5261538e3835487b538ae362f2992990b0420b8a17d"
+    },
+    "negative_controls_status": "11 malformed-input controls rejected; independent and moved copies accepted; zero comparative children",
+    "replay_copy": "/tmp/litchi-performance-0923/packet-v3-final2-replay",
+    "replay_index": {
+      "bytes": 10195,
+      "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay/replay-index.json",
+      "sha256": "3da3f8dc0d7200d04faa9d3f6c127c059eed9f129ce3c8addfee55ec816c78b8"
+    },
+    "replay_index_status": "independent action_copy destination verified with local receipt/tooling/manifest hashes; reduction correctly refused absent children",
+    "replay_status": "copy completed; replay refused incomplete seed because no local frozen manifest exists",
+    "seed_root": "/tmp/litchi-performance-0923/packet-v2",
+    "validation_receipt": {
+      "bytes": 9116,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/comparison-tooling-validation-v3.json",
+      "sha256": "0ceb276230c6b8245d37f7a365d26aa85481a651f020cde8ce49d4cf41998e2b"
+    }
+  },
+  "gate_scope": {
+    "candidate_requirement": "focused owned-route tests remain independently reviewed and source/build bound before final freeze",
+    "generic_refusal_suite": "generic ReadAt control suite; shared setup evidence",
+    "owned_routes": "per-route reopen/output/inverse/source/cache/sink checks; generic-only refusal helper is not relabeled as route-local"
+  },
+  "protocol": {
+    "declared_created_utc": "2026-10-06T00:00:00+00:00",
+    "descriptor": {
+      "bytes": 7013,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/comparison-protocol-v2.json",
+      "sha256": "756fec0ae6edc4e49d665f46510ba0c9ea1297f414c9470806042c33fc894697"
+    },
+    "observed_file_mtime_utc": "2026-10-06T08:49:05.266402+00:00",
+    "timestamp_status": "declared draft time; actual freeze time comes from external runner manifest"
+  },
+  "schema": "litchi.performance.0923.comparison-custody.v2",
+  "setup_attempts_status": "Both attempted provenance builds are logged externally and neither may replace the frozen baseline receipt or binary.",
+  "source_delta_review": {
+    "bytes": 856,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/root-source-delta.json",
+    "sha256": "d0d445988076e647f3453a082ba7d011df557dc855f7d3ae09c581dd044db72d"
+  },
+  "source_immutability_oracle": {
+    "external_harness_reference": "/tmp/litchi-performance-0923/baseline-source/tree/tools/perf-baseline/src/lib.rs:50669-50685",
+    "meaning": "The publication retains the original SourceArtifact and inverse authorization; a reopened emitted package is reauthorized against that publication, and exact archive equality is the owned-ingress post-timer immutability oracle. The reopened package is a distinct object.",
+    "operation": "reopened.publish_section_layout_inverse_to_stream(&mut restored_output, &publication); require restored_output == corpus.archive",
+    "publication_reference": "crates/litchi-docx/src/source_backed.rs:1344-1358",
+    "retained_artifact_reference": "crates/litchi-docx/src/section/layout.rs:481-527"
+  },
+  "timestamp_provenance": "This supplement timestamp is the writer wall clock. The bound v2 protocol retains its prospective declared timestamp, but its 2026-10-06T00:00:00+00:00 value is not treated as an actual creation time; observed file mtime is recorded below.",
+  "tooling": {
+    "allocator_feasibility": {
+      "bytes": 4097,
+      "path": "docs/performance/results/change-0923/allocator-feasibility-v2.json",
+      "sha256": "73dd80f322863960e5f5a49e0c4d545571154be3b01beac68378a037a7f794a8"
+    },
+    "capture_runner": {
+      "bytes": 63683,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/comparison-capture-v2.py",
+      "sha256": "3601ea081fb255f2fab65de95fe079694e5cfd6b15e6e88e99684edb74232f96"
+    },
+    "comparison_runner": {
+      "bytes": 21256,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/comparison-v2.py",
+      "sha256": "e592a03aa8d994c9f9d14785e060a5e10bf2b50be63f9832aa7a774981885cc6"
+    },
+    "controls_runner": {
+      "bytes": 11731,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/comparison-controls-v2.py",
+      "sha256": "e38cf1dee29ab14bb0a5c0a3e4e42494833d8af76f5ea98f7d33a1173b18044c"
+    },
+    "receipt_schema": {
+      "bytes": 4034,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/comparison-receipt-schema-v3.json",
+      "sha256": "a1162a06f74b002edd8f08c51bcd5cda07560808e8470ee108c516bbc79bbdf4"
+    },
+    "review_bindings": {
+      "build_fingerprint_parity": {
+        "bytes": 3274,
+        "path": "/tmp/litchi-performance-0923/custody/candidate-build-parity-v3.json",
+        "sha256": "2f57e6f04f46aa900c79c78cf0cf4d03bcbd52e047026bd6bf748e5ec92a2d1a"
+      },
+      "build_profile_audit": {
+        "bytes": 17404,
+        "path": "/tmp/litchi-performance-0923/receipts/candidate-build-profile-audit-v1.json",
+        "sha256": "6ad300cb464c74b6890fe55da28888e514e27629c7c2e332cfd6f68ef2090fd9"
+      },
+      "shared_owner_quality": {
+        "bytes": 18509,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/shared-owner-quality-v3.json",
+        "sha256": "6c5ea51402fc07ef57dfb1fb5fd97a61c769806a4fdb9e3893ee972e11808dba"
+      },
+      "source_delta": {
+        "bytes": 856,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/root-source-delta.json",
+        "sha256": "d0d445988076e647f3453a082ba7d011df557dc855f7d3ae09c581dd044db72d"
+      }
+    },
+    "validation_receipt": {
+      "bytes": 9116,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/comparison-tooling-validation-v3.json",
+      "sha256": "0ceb276230c6b8245d37f7a365d26aa85481a651f020cde8ce49d4cf41998e2b"
+    }
+  },
+  "updated_utc": "2026-10-06T09:22:46.625359+00:00"
+}

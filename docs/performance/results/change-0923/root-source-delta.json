@@ -1,0 +1,18 @@
+{
+  "schema": "litchi.performance.0923.root-source-delta.v1",
+  "verified_utc": "2026-10-06T09:17:23.084720+00:00",
+  "baseline_file_count": 9355,
+  "candidate_file_count": 9355,
+  "changed_files": [
+    "crates/litchi-opc/src/source_backed.rs"
+  ],
+  "exact_patch_reconstruction": {
+    "path": "/tmp/litchi-performance-0923/candidate-source-0923-v3.patch",
+    "bytes": 15772,
+    "sha256": "77c2a9952335d5f16c24fbfc8d87e120301808258f70e990324fa21b8ea8e75d"
+  },
+  "candidate_source_sha256": "d28843caf8245bd6f0ff0f953b9b5545c4d9ad7a4e11f362d29ce226cc251cc2",
+  "harness_sha256": "c1b9b55258df38ac6a376283c2b857ad6a541ba8c62e23730195502f083e70ca",
+  "status": "pass",
+  "method": "Compare hashes of every file; independently apply each unified hunk in memory, checking source context and old/new line counts; compare reconstructed bytes to candidate."
+}

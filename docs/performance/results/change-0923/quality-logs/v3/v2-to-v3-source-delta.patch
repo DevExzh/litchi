@@ -1,0 +1,53 @@
+--- /tmp/litchi-performance-0923/quality-source-v2/crates/litchi-opc/src/source_backed.rs	2026-10-06 09:01:49.733355521 +0000
++++ /tmp/litchi-performance-0923/quality-source-v3/crates/litchi-opc/src/source_backed.rs	2026-10-06 09:08:38.311796762 +0000
+@@ -3738,10 +3738,7 @@
+                 "source artifact fingerprint memo has no value cell",
+             ));
+         }
+-        Ok(Self {
+-            source,
+-            values,
+-        })
++        Ok(Self { source, values })
+     }
+ 
+     fn cached(&self, expected_length: u64) -> Option<SourceArtifactFingerprint> {
+@@ -22887,8 +22884,8 @@
+         assert!(memo.is_initialized());
+         assert_eq!(second.fingerprint().unwrap(), fingerprint);
+ 
+-        let reader_package = SourceBackedPackage::from_reader(Cursor::new(archive_bytes(PAYLOAD)))
+-            .unwrap();
++        let reader_package =
++            SourceBackedPackage::from_reader(Cursor::new(archive_bytes(PAYLOAD))).unwrap();
+         let reader_memo = reader_package
+             .fingerprint_memo
+             .as_ref()
+@@ -22910,10 +22907,9 @@
+ 
+     #[test]
+     fn generic_and_managed_ingresses_do_not_retain_fingerprint_memo() {
+-        let generic = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(
+-            archive_bytes(PAYLOAD),
+-        )))
+-        .unwrap();
++        let generic =
++            SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(archive_bytes(PAYLOAD))))
++                .unwrap();
+         assert!(generic.fingerprint_memo.is_none());
+ 
+         let (_budget, _cancellation_source, context) = managed_context(8 * 1024 * 1024);
+@@ -22975,12 +22971,7 @@
+         };
+         let mut inverse = Vec::new();
+         changed_package
+-            .restore_source_artifact_to_stream(
+-                &original,
+-                proof,
+-                u64::MAX - 1,
+-                &mut inverse,
+-            )
++            .restore_source_artifact_to_stream(&original, proof, u64::MAX - 1, &mut inverse)
+             .unwrap();
+         assert_eq!(inverse, source);
+ 

@@ -1,0 +1,24 @@
+{
+  "canonical_metrics": {
+    "generic_read_at/baseline": true,
+    "generic_read_at/candidate": true,
+    "owned_reader/baseline": true,
+    "owned_reader/candidate": true,
+    "owned_vec/baseline": true,
+    "owned_vec/candidate": true
+  },
+  "created_utc": "2026-10-06T09:35:07.787674+00:00",
+  "moved_replay": {
+    "bytes": 24425,
+    "path": "/tmp/litchi-performance-0923/receipts/raw-pooled-replay-v1.json",
+    "sha256": "4ef0035de66a76cc874ad3b46a10182e9ede7ed0d5c136a0a6c431860c74efb1"
+  },
+  "note": "raw report descriptors carry different local paths; all raw counts, elapsed tails, and six phase tails are equal",
+  "original": {
+    "bytes": 24409,
+    "path": "/tmp/litchi-performance-0923/receipts/raw-pooled-reduction-v1-final.json",
+    "sha256": "a12adfbdceb90450babf5fe01d1bd5b9f7c1f3790c6fc6d1290e2bb451099d4c"
+  },
+  "schema": "litchi.performance.0923.raw-pooled-replay-validation.v1",
+  "status": "pass"
+}

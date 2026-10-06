@@ -1,0 +1,117 @@
+   Compiling litchi-docx v0.0.1 (/tmp/litchi-performance-0923/quality-source-v2/crates/litchi-docx)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 16.89s
+     Running tests/source_backed.rs (/tmp/litchi-performance-0923/quality-target-v2/debug/deps/source_backed-0297242d40a3f25f)
+
+running 16 tests
+test alt_chunk_overlay_refuses_non_body_anchor_layouts ... ok
+test alt_chunk_real_libreoffice_fixture_preserves_untouched_zip_members ... ok
+test alt_chunk_payload_overlay_is_one_edit_and_preserves_raw_unselected_members ... ok
+test alt_chunk_overlay_refuses_shared_targets_and_signed_changes_but_keeps_signed_noops_exact ... ok
+test alt_chunk_overlay_rejects_oversized_payload_before_reading_source ... ok
+test exact_noop_reproduces_every_source_byte ... ok
+test source_changes_remain_visible_before_the_first_payload_read ... ok
+test markup_compatibility_branch_selection_is_refused_before_output ... ok
+test rolled_back_document_operations_use_the_exact_signed_source_path ... ok
+test read_limits_are_returned_as_the_original_opc_error ... ok
+test sequential_sink_failure_is_typed_as_incomplete_output ... ok
+test signed_changes_are_refused_but_signed_noops_are_exact ... ok
+test strict_main_document_relationship_uses_the_same_overlay_contract ... ok
+test opening_stays_cold_and_document_query_loads_only_main_document ... ok
+test document_commit_edits_only_the_main_part_and_reopens ... ok
+test stale_commit_and_changed_source_fail_before_output ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.58s
+
+     Running tests/source_backed_file.rs (/tmp/litchi-performance-0923/quality-target-v2/debug/deps/source_backed_file-a8618fd0a2b29a1d)
+
+running 6 tests
+test filesystem_path_errors_are_typed ... ok
+test in_place_file_change_is_reported_as_source_changed ... ok
+test open_and_catalog_leave_payloads_cold_until_selected_queries ... ok
+test from_path_variants_forward_limits_and_managed_cache_policy ... ok
+test exact_noop_and_changed_document_overlay_preserve_raw_unselected_members ... ok
+test replacing_the_path_keeps_the_open_source_pinned ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/source_backed_managed.rs (/tmp/litchi-performance-0923/quality-target-v2/debug/deps/source_backed_managed-678f10eac5714e23)
+
+running 6 tests
+test managed_document_read_retains_budgeted_part_data_and_supports_selective_queries ... ok
+test managed_exact_memory_budget_succeeds_and_one_under_fails_before_publication ... ok
+test managed_revisions_query_is_admitted_and_charged_like_extract_text ... ok
+test managed_document_variables_check_cancellation_before_relationship_metadata ... ok
+test managed_cancellation_is_checked_at_open_and_before_lazy_read ... ok
+test managed_main_document_edits_retain_source_and_candidate_reservations ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/source_backed_managed_document_edit.rs (/tmp/litchi-performance-0923/quality-target-v2/debug/deps/source_backed_managed_document_edit-1a92115b69390da8)
+
+running 42 tests
+test managed_cancellation_after_capture_refuses_empty_commit_and_releases_memory ... ok
+test managed_candidate_budget_failure_happens_before_publication_output ... ok
+test managed_collapsed_and_symbols_reads_refuse_when_memory_is_held ... ok
+test managed_paragraph_views_refuse_parser_growth_at_memory_boundary ... ok
+test managed_failed_second_edit_cancellation_leaves_first_projection_intact ... ok
+test managed_file_source_pins_the_open_source_across_path_replacement ... ok
+test managed_paragraph_and_nested_run_mutations_refuse_without_state_change ... ok
+test managed_changed_publication_rejects_mixed_settings_dialect_before_output ... ok
+test managed_document_bom_offsets_are_preserved_through_snapshot_and_edit ... ok
+test managed_cancellation_refuses_edit_and_publication_without_output ... ok
+test managed_failed_second_edit_budget_leaves_first_projection_intact ... ok
+test managed_document_snapshot_and_edit_retain_source_and_candidate_reservations ... ok
+test managed_edit_try_clone_refuses_memory_boundary_without_mutating_projection ... ok
+test managed_repeated_position_keeps_final_value_and_collapses_equal_setter ... ok
+test managed_publication_reports_a_partial_sink_failure ... ok
+test managed_protected_settings_noop_preserves_relationship_and_payload_exactly ... ok
+test managed_cancellation_during_current_part_read_refuses_before_output ... ok
+test managed_retained_runs_resolve_inherited_symex_and_ignore_foreign_bindings ... ok
+test managed_source_change_during_current_part_read_refuses_before_output ... ok
+test managed_source_change_refuses_publication_before_sink_output ... ok
+test managed_revert_to_original_publishes_exact_noop_bytes ... ok
+test managed_source_document_rejects_mce_and_dtd_before_edit ... ok
+test managed_reopened_inverse_rejects_source_mutation_before_output ... ok
+test managed_hyperlink_nested_run_retains_source_after_package_drop_and_refuses_mutation ... ok
+test managed_changed_publication_preserves_readback_and_releases_snapshot_budget ... ok
+test managed_foreign_equal_main_xml_refuses_commit_before_output ... ok
+test managed_noop_inverse_and_changed_publication_preserve_untouched_media ... ok
+test protected_track_revisions_with_ignorable_extension_remains_refused ... ok
+test changed_publication_preserves_standard_ignorable_settings_for_managed_and_unmanaged_sources ... ok
+test managed_reopened_inverse_cancellation_and_output_budget_are_before_output ... ok
+test managed_reopened_inverse_reports_partial_sink_failure ... ok
+test managed_revision_dispositions_are_refused_like_revision_text_replacement ... ok
+test managed_changed_publication_rejects_settings_mce_and_dtd_before_output ... ok
+test managed_signed_noop_and_equal_setter_preserve_exact_source ... ok
+test unmanaged_foreign_package_with_equal_main_xml_refuses_stale_commit_before_output ... ok
+test managed_disjoint_updates_publish_in_arbitrary_order_and_inverse_exact ... ok
+test managed_reverting_one_operation_preserves_the_other_and_inverse_artifact ... ok
+test managed_reopened_inverse_restores_exact_artifact_and_rejects_foreign_member ... ok
+test changed_publication_rejects_unresolved_ignorable_and_active_mce_controls ... ok
+test managed_four_disjoint_updates_release_scan_depth_and_restore_exact_artifact ... ok
+test managed_changed_publication_enforces_settings_protection_flags ... ok
+test managed_empty_text_slots_refuse_low_scan_memory_before_projection_change ... ok
+
+test result: ok. 42 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/source_backed_managed_paragraph_batch.rs (/tmp/litchi-performance-0923/quality-target-v2/debug/deps/source_backed_managed_paragraph_batch-c4ae237f7ba1ec36)
+
+running 8 tests
+test managed_batch_rejects_empty_duplicate_and_unsorted_selectors_atomically ... ok
+test managed_batch_late_leaf_failures_leave_the_staged_projection_unchanged ... ok
+test managed_signed_batch_noop_is_exact_and_change_is_refused ... ok
+test managed_batch_noop_and_revert_restore_the_exact_source_owner ... ok
+test managed_batch_cancellation_work_and_memory_failures_are_typed_and_release_owners ... ok
+test managed_batch_composes_with_scalar_edits_in_either_order ... ok
+test managed_batch_matches_repeated_scalar_xml_and_preserves_unknown_members ... ok
+test managed_batch_forward_and_inverse_are_source_checked ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/source_read_policy.rs (/tmp/litchi-performance-0923/quality-target-v2/debug/deps/source_read_policy-f67ca434411da28e)
+
+running 1 test
+test managed_read_ahead_supports_semantic_read_then_releases_before_docx_publication ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

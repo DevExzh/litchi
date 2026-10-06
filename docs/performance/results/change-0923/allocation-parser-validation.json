@@ -1,0 +1,441 @@
+{
+  "interpretation": "All six retained 0919 profiles parse successfully. For every profile, exact allocation-call and leaked/live-byte totals agree with heaptrack_print; the displayed peak agrees after decimal-unit rounding while exact parser bytes are retained.",
+  "parser": {
+    "bytes": 10521,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/allocation-parse-v2.py",
+    "sha256": "7ef32b74271c7436ba0a7e4dd4676c9cb065955a1ad9b40c56497e232e89748f"
+  },
+  "prior_artifact_fixture_only": true,
+  "profiles": [
+    {
+      "cross_check": "pass",
+      "heaptrack_print": {
+        "command": [
+          "/usr/bin/heaptrack_print",
+          "-f",
+          "/tmp/litchi-performance-0919/r01-docfloat-e02/heaptrack.zst",
+          "-p",
+          "0",
+          "-T",
+          "0",
+          "-a",
+          "0",
+          "-l",
+          "0",
+          "-H",
+          "/tmp/litchi-performance-0923/parser-validation-v2/r01-docfloat-e02.histogram.tsv"
+        ],
+        "exit_code": 0,
+        "histogram": {
+          "bytes": 2647,
+          "path": "/tmp/litchi-performance-0923/parser-validation-v2/r01-docfloat-e02.histogram.tsv",
+          "sha256": "4b60e499257dc25e10fc925dca78852b4536e1303b892ea717bbce4547eb095e"
+        },
+        "rounded_peak_expected": "8.48M",
+        "stderr": {
+          "bytes": 0,
+          "path": "/tmp/litchi-performance-0923/parser-validation-v2/r01-docfloat-e02.print.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 630,
+          "path": "/tmp/litchi-performance-0923/parser-validation-v2/r01-docfloat-e02.print.stdout",
+          "sha256": "be2eb9f17b974758f9ae69ceb0ee03beb5d62681d9fc8180ab3c295426b96cc6"
+        },
+        "summary": {
+          "allocation_event_count": 583873,
+          "live_bytes_at_end": 544,
+          "peak_heap_display": "8.48M"
+        }
+      },
+      "id": "r01-docfloat-e02",
+      "metrics": {
+        "allocation_event_count": 583873,
+        "deallocation_event_count": 583872,
+        "live_allocation_info_entries": 1,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 8483177,
+        "requested_bytes": 534703235
+      },
+      "parser_command": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0923/allocation-parse-v2.py",
+        "/tmp/litchi-performance-0919/r01-docfloat-e02/heaptrack.zst",
+        "--output",
+        "/tmp/litchi-performance-0923/parser-validation-v2/r01-docfloat-e02.parser.json"
+      ],
+      "parser_output": {
+        "bytes": 754,
+        "path": "/tmp/litchi-performance-0923/parser-validation-v2/r01-docfloat-e02.parser.json",
+        "sha256": "a5b7126a649c260c7ccde16b5c3f022f7e79fa9321d4a55f7b340756ef42ea7f"
+      },
+      "profile": {
+        "bytes": 1575901,
+        "path": "/tmp/litchi-performance-0919/r01-docfloat-e02/heaptrack.zst",
+        "sha256": "aec5189d27c75348fcdf7b8d86928e71c0b5ecdc8cae2f1a958e52d4d906a4b5"
+      }
+    },
+    {
+      "cross_check": "pass",
+      "heaptrack_print": {
+        "command": [
+          "/usr/bin/heaptrack_print",
+          "-f",
+          "/tmp/litchi-performance-0919/r02-docfloat-e02/heaptrack.zst",
+          "-p",
+          "0",
+          "-T",
+          "0",
+          "-a",
+          "0",
+          "-l",
+          "0",
+          "-H",
+          "/tmp/litchi-performance-0923/parser-validation-v2/r02-docfloat-e02.histogram.tsv"
+        ],
+        "exit_code": 0,
+        "histogram": {
+          "bytes": 2647,
+          "path": "/tmp/litchi-performance-0923/parser-validation-v2/r02-docfloat-e02.histogram.tsv",
+          "sha256": "4b60e499257dc25e10fc925dca78852b4536e1303b892ea717bbce4547eb095e"
+        },
+        "rounded_peak_expected": "8.48M",
+        "stderr": {
+          "bytes": 0,
+          "path": "/tmp/litchi-performance-0923/parser-validation-v2/r02-docfloat-e02.print.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 630,
+          "path": "/tmp/litchi-performance-0923/parser-validation-v2/r02-docfloat-e02.print.stdout",
+          "sha256": "9ce0d4393181f0ebc6571c0d9ead48f1965e23e62ca93720405d59f69941cc2e"
+        },
+        "summary": {
+          "allocation_event_count": 583873,
+          "live_bytes_at_end": 544,
+          "peak_heap_display": "8.48M"
+        }
+      },
+      "id": "r02-docfloat-e02",
+      "metrics": {
+        "allocation_event_count": 583873,
+        "deallocation_event_count": 583872,
+        "live_allocation_info_entries": 1,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 8483177,
+        "requested_bytes": 534703235
+      },
+      "parser_command": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0923/allocation-parse-v2.py",
+        "/tmp/litchi-performance-0919/r02-docfloat-e02/heaptrack.zst",
+        "--output",
+        "/tmp/litchi-performance-0923/parser-validation-v2/r02-docfloat-e02.parser.json"
+      ],
+      "parser_output": {
+        "bytes": 754,
+        "path": "/tmp/litchi-performance-0923/parser-validation-v2/r02-docfloat-e02.parser.json",
+        "sha256": "8aaaccca5e2c5828a79bcc4c4dbacc978cf72eb4719e17e79272b5628d6521d1"
+      },
+      "profile": {
+        "bytes": 1575235,
+        "path": "/tmp/litchi-performance-0919/r02-docfloat-e02/heaptrack.zst",
+        "sha256": "d4898179e46ef8e581048f1e485944f1d5220112fdcb66bb7b0c4edc420b5e6c"
+      }
+    },
+    {
+      "cross_check": "pass",
+      "heaptrack_print": {
+        "command": [
+          "/usr/bin/heaptrack_print",
+          "-f",
+          "/tmp/litchi-performance-0919/r01-docfloat-e32/heaptrack.zst",
+          "-p",
+          "0",
+          "-T",
+          "0",
+          "-a",
+          "0",
+          "-l",
+          "0",
+          "-H",
+          "/tmp/litchi-performance-0923/parser-validation-v2/r01-docfloat-e32.histogram.tsv"
+        ],
+        "exit_code": 0,
+        "histogram": {
+          "bytes": 5271,
+          "path": "/tmp/litchi-performance-0923/parser-validation-v2/r01-docfloat-e32.histogram.tsv",
+          "sha256": "aa6f9081a208e21dc5e7d7d66bc898ec1e38d44e1a78946d0074b13ab28c39bc"
+        },
+        "rounded_peak_expected": "10.11M",
+        "stderr": {
+          "bytes": 0,
+          "path": "/tmp/litchi-performance-0923/parser-validation-v2/r01-docfloat-e32.print.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 632,
+          "path": "/tmp/litchi-performance-0923/parser-validation-v2/r01-docfloat-e32.print.stdout",
+          "sha256": "08afe8e5b6a6afdb330f5031772f1079c8f8cd0bd047f3432e0244de7ab0122f"
+        },
+        "summary": {
+          "allocation_event_count": 900674,
+          "live_bytes_at_end": 544,
+          "peak_heap_display": "10.11M"
+        }
+      },
+      "id": "r01-docfloat-e32",
+      "metrics": {
+        "allocation_event_count": 900674,
+        "deallocation_event_count": 900673,
+        "live_allocation_info_entries": 1,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 10107395,
+        "requested_bytes": 1281109930
+      },
+      "parser_command": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0923/allocation-parse-v2.py",
+        "/tmp/litchi-performance-0919/r01-docfloat-e32/heaptrack.zst",
+        "--output",
+        "/tmp/litchi-performance-0923/parser-validation-v2/r01-docfloat-e32.parser.json"
+      ],
+      "parser_output": {
+        "bytes": 757,
+        "path": "/tmp/litchi-performance-0923/parser-validation-v2/r01-docfloat-e32.parser.json",
+        "sha256": "1a54e11dc97a874b338de6cd10645d34ebb8cbf1a07283200f1bbf8d9dfe0d93"
+      },
+      "profile": {
+        "bytes": 1628778,
+        "path": "/tmp/litchi-performance-0919/r01-docfloat-e32/heaptrack.zst",
+        "sha256": "4dd11a392572466c364cea7859030a4d812546744dd08315fcdda10da95179d2"
+      }
+    },
+    {
+      "cross_check": "pass",
+      "heaptrack_print": {
+        "command": [
+          "/usr/bin/heaptrack_print",
+          "-f",
+          "/tmp/litchi-performance-0919/r02-docfloat-e32/heaptrack.zst",
+          "-p",
+          "0",
+          "-T",
+          "0",
+          "-a",
+          "0",
+          "-l",
+          "0",
+          "-H",
+          "/tmp/litchi-performance-0923/parser-validation-v2/r02-docfloat-e32.histogram.tsv"
+        ],
+        "exit_code": 0,
+        "histogram": {
+          "bytes": 5271,
+          "path": "/tmp/litchi-performance-0923/parser-validation-v2/r02-docfloat-e32.histogram.tsv",
+          "sha256": "aa6f9081a208e21dc5e7d7d66bc898ec1e38d44e1a78946d0074b13ab28c39bc"
+        },
+        "rounded_peak_expected": "10.11M",
+        "stderr": {
+          "bytes": 0,
+          "path": "/tmp/litchi-performance-0923/parser-validation-v2/r02-docfloat-e32.print.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 632,
+          "path": "/tmp/litchi-performance-0923/parser-validation-v2/r02-docfloat-e32.print.stdout",
+          "sha256": "9921c84d6139029a07ea9dbe4dfcf104b09675d62d55be14134cfbec95d9fe1a"
+        },
+        "summary": {
+          "allocation_event_count": 900674,
+          "live_bytes_at_end": 544,
+          "peak_heap_display": "10.11M"
+        }
+      },
+      "id": "r02-docfloat-e32",
+      "metrics": {
+        "allocation_event_count": 900674,
+        "deallocation_event_count": 900673,
+        "live_allocation_info_entries": 1,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 10107395,
+        "requested_bytes": 1281109930
+      },
+      "parser_command": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0923/allocation-parse-v2.py",
+        "/tmp/litchi-performance-0919/r02-docfloat-e32/heaptrack.zst",
+        "--output",
+        "/tmp/litchi-performance-0923/parser-validation-v2/r02-docfloat-e32.parser.json"
+      ],
+      "parser_output": {
+        "bytes": 757,
+        "path": "/tmp/litchi-performance-0923/parser-validation-v2/r02-docfloat-e32.parser.json",
+        "sha256": "63424c41973a109ae3c46fdacee48ec3f83ba5662a74edd8ca115e853ae5debc"
+      },
+      "profile": {
+        "bytes": 1626600,
+        "path": "/tmp/litchi-performance-0919/r02-docfloat-e32/heaptrack.zst",
+        "sha256": "823571051d4d37de96b0f464565f210952707e9795b59083fd01d842b95c9bf5"
+      }
+    },
+    {
+      "cross_check": "pass",
+      "heaptrack_print": {
+        "command": [
+          "/usr/bin/heaptrack_print",
+          "-f",
+          "/tmp/litchi-performance-0919/r01-docnohf-e32/heaptrack.zst",
+          "-p",
+          "0",
+          "-T",
+          "0",
+          "-a",
+          "0",
+          "-l",
+          "0",
+          "-H",
+          "/tmp/litchi-performance-0923/parser-validation-v2/r01-docnohf-e32.histogram.tsv"
+        ],
+        "exit_code": 0,
+        "histogram": {
+          "bytes": 3514,
+          "path": "/tmp/litchi-performance-0923/parser-validation-v2/r01-docnohf-e32.histogram.tsv",
+          "sha256": "e91e3ce5c21873a96951216994c30557e327bb584d9de75965c84aa9f24c7ce7"
+        },
+        "rounded_peak_expected": "2.83M",
+        "stderr": {
+          "bytes": 0,
+          "path": "/tmp/litchi-performance-0923/parser-validation-v2/r01-docnohf-e32.print.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 621,
+          "path": "/tmp/litchi-performance-0923/parser-validation-v2/r01-docnohf-e32.print.stdout",
+          "sha256": "de42c0c710f89ae46d3ff9a0583a518ae81703680a79bb26c377d911b384f8ef"
+        },
+        "summary": {
+          "allocation_event_count": 150755,
+          "live_bytes_at_end": 544,
+          "peak_heap_display": "2.83M"
+        }
+      },
+      "id": "r01-docnohf-e32",
+      "metrics": {
+        "allocation_event_count": 150755,
+        "deallocation_event_count": 150754,
+        "live_allocation_info_entries": 1,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 2832411,
+        "requested_bytes": 123903928
+      },
+      "parser_command": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0923/allocation-parse-v2.py",
+        "/tmp/litchi-performance-0919/r01-docnohf-e32/heaptrack.zst",
+        "--output",
+        "/tmp/litchi-performance-0923/parser-validation-v2/r01-docnohf-e32.parser.json"
+      ],
+      "parser_output": {
+        "bytes": 746,
+        "path": "/tmp/litchi-performance-0923/parser-validation-v2/r01-docnohf-e32.parser.json",
+        "sha256": "8e8462730604a50a10af99accc19600cd840b076c5e2bffc9fd14fb05a9c2d20"
+      },
+      "profile": {
+        "bytes": 708628,
+        "path": "/tmp/litchi-performance-0919/r01-docnohf-e32/heaptrack.zst",
+        "sha256": "c68faf6b93f1c4c0c565dae8e1f97f3adede0079625bbf1dc7329c167dfd9051"
+      }
+    },
+    {
+      "cross_check": "pass",
+      "heaptrack_print": {
+        "command": [
+          "/usr/bin/heaptrack_print",
+          "-f",
+          "/tmp/litchi-performance-0919/r02-docnohf-e32/heaptrack.zst",
+          "-p",
+          "0",
+          "-T",
+          "0",
+          "-a",
+          "0",
+          "-l",
+          "0",
+          "-H",
+          "/tmp/litchi-performance-0923/parser-validation-v2/r02-docnohf-e32.histogram.tsv"
+        ],
+        "exit_code": 0,
+        "histogram": {
+          "bytes": 3514,
+          "path": "/tmp/litchi-performance-0923/parser-validation-v2/r02-docnohf-e32.histogram.tsv",
+          "sha256": "e91e3ce5c21873a96951216994c30557e327bb584d9de75965c84aa9f24c7ce7"
+        },
+        "rounded_peak_expected": "2.83M",
+        "stderr": {
+          "bytes": 0,
+          "path": "/tmp/litchi-performance-0923/parser-validation-v2/r02-docnohf-e32.print.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 621,
+          "path": "/tmp/litchi-performance-0923/parser-validation-v2/r02-docnohf-e32.print.stdout",
+          "sha256": "10861429269827731d54066c855c68b446fb41db237235fc0fd4d1d27b6f1cb0"
+        },
+        "summary": {
+          "allocation_event_count": 150755,
+          "live_bytes_at_end": 544,
+          "peak_heap_display": "2.83M"
+        }
+      },
+      "id": "r02-docnohf-e32",
+      "metrics": {
+        "allocation_event_count": 150755,
+        "deallocation_event_count": 150754,
+        "live_allocation_info_entries": 1,
+        "live_bytes_at_end": 544,
+        "peak_live_heap_bytes": 2832411,
+        "requested_bytes": 123903928
+      },
+      "parser_command": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0923/allocation-parse-v2.py",
+        "/tmp/litchi-performance-0919/r02-docnohf-e32/heaptrack.zst",
+        "--output",
+        "/tmp/litchi-performance-0923/parser-validation-v2/r02-docnohf-e32.parser.json"
+      ],
+      "parser_output": {
+        "bytes": 746,
+        "path": "/tmp/litchi-performance-0923/parser-validation-v2/r02-docnohf-e32.parser.json",
+        "sha256": "4bb1776a1c45638c8c3592359d0a77a22c2b62268bc1886d89b05fcfa363c17f"
+      },
+      "profile": {
+        "bytes": 708838,
+        "path": "/tmp/litchi-performance-0919/r02-docnohf-e32/heaptrack.zst",
+        "sha256": "b0dd6a63b0ff670cf16801d42a3478e1da4ffd18bb45a39165ed90fda9314bd0"
+      }
+    }
+  ],
+  "purpose": "parser and heaptrack_print cross-check before allocation children",
+  "schema": "litchi.performance.0923.heaptrack-parser-validation.v2",
+  "scope": "whole_process; no operation-scoped allocation, latency, or adoption claim",
+  "status": "pass",
+  "tooling": {
+    "heaptrack_print": {
+      "bytes": 346488,
+      "path": "/usr/bin/heaptrack_print",
+      "sha256": "aaef3e0ba4df8ce202f5418c4289e36504a5154b1a806e177d46384ac93ae01d"
+    },
+    "zstdcat": {
+      "bytes": 1037784,
+      "path": "/usr/bin/zstd",
+      "sha256": "35bfa0d33c03bc1d74ade24ceae006098fa2d5e7c9addc7be45640832f9384d6"
+    }
+  }
+}

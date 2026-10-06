@@ -1,0 +1,48 @@
+{
+  "approval_env": "LITCHI_PERF_0923_ALLOC_CAPTURE_APPROVED=1",
+  "attempt": "packet-v3 first child only; no selective recapture",
+  "capture_runner": {
+    "bytes": 35068,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/allocation-capture-v2.py",
+    "sha256": "0ee8efbe59adb271c216a3181b08a587bd4e456cae271f09667f90da3fb393d1"
+  },
+  "child": {
+    "capture_exit_code": 0,
+    "capture_stderr": {
+      "bytes": 295,
+      "path": "/tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/capture.stderr",
+      "sha256": "91781e6e63087f33ac1c77836e99250edf7a322c8755e53b5726b1db24d2a0b8"
+    },
+    "heaptrack_print_exit_code": 1,
+    "heaptrack_print_stderr": {
+      "bytes": 151,
+      "path": "/tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/heaptrack-print.stderr",
+      "sha256": "ea16681b17e8fd4d4c92f977e6534a49865581a148d95cc707ce86c7e34c65c7"
+    },
+    "id": "generic_read_at-pair-01-leg-1-baseline",
+    "index": 1,
+    "raw_profile_produced_with_wrong_suffix": {
+      "bytes": 438590,
+      "path": "/tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/heaptrack.zst.zst",
+      "sha256": "0003850a9985115265ac53572ab69dd327fde69977c71a1dc38a84fdb2f2c494"
+    },
+    "route": "generic_read_at",
+    "state": {
+      "bytes": 475,
+      "path": "/tmp/litchi-performance-0923/allocation-packet-v3/capture-state.json",
+      "sha256": "5ef56c8993bec03d5386dfdf7f582ccf29d1a522f3d45bc9e47bd5b09bb8ebe7"
+    },
+    "variant": "baseline"
+  },
+  "corrective_action": "new driver uses extensionless $RAW_PREFIX, requires exactly $RAW_PREFIX.zst, and starts a fresh full 24-child packet",
+  "failure": "driver passed a .zst suffix to heaptrack -o; heaptrack appends .zst, producing heaptrack.zst.zst while analysis expected heaptrack.zst",
+  "manifest": {
+    "bytes": 15875,
+    "path": "/tmp/litchi-performance-0923/allocation-packet-v3/allocation-manifest-v2.json",
+    "sha256": "9de922223d3909d1b51aa25fab3079a6cf4d46b5c59c07b07e95fe22deed7d2d"
+  },
+  "no_result_claim": true,
+  "schema": "litchi.performance.0923.heaptrack-capture-attempt.v2",
+  "scope": "whole_process; no operation or adoption claim",
+  "status": "failed_preserved_superseded"
+}

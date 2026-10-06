@@ -1,0 +1,11 @@
+   Compiling litchi-opc v0.0.1 (/tmp/litchi-performance-0923/quality-source-v2/crates/litchi-opc)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.88s
+     Running tests/source_fingerprint_quality.rs (/tmp/litchi-performance-0923/quality-target-v2/debug/deps/source_fingerprint_quality-91205cbc6226b88a)
+
+running 3 tests
+test managed_fingerprint_repeated_calls_charge_work_and_input_and_release_memory ... ok
+test generic_stable_version_mutation_is_rehashed_on_every_fingerprint ... ok
+test generic_short_reads_are_complete_and_overreported_reads_fail_before_digest ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

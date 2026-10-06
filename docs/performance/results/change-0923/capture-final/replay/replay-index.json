@@ -1,0 +1,3704 @@
+{
+  "created_utc": "2026-10-06T09:28:27.415183+00:00",
+  "excluded": "process logs are intentionally not needed to recompute report validation",
+  "files": {
+    "baseline/generic_read_at.json": {
+      "copy": {
+        "bytes": 151614,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/baseline/generic_read_at.json",
+        "sha256": "910d4ff184f08c9911e40702ba41a7188473e878427cab6cbc2c5fdbc8720787"
+      },
+      "source": {
+        "bytes": 151614,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/baseline/generic_read_at.json",
+        "sha256": "910d4ff184f08c9911e40702ba41a7188473e878427cab6cbc2c5fdbc8720787"
+      }
+    },
+    "baseline/owned_reader.json": {
+      "copy": {
+        "bytes": 137139,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/baseline/owned_reader.json",
+        "sha256": "05b8c6b209cd3ba7168f7c9d927e676e0fdd67c13a90ee06299d2448c10ce221"
+      },
+      "source": {
+        "bytes": 137139,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/baseline/owned_reader.json",
+        "sha256": "05b8c6b209cd3ba7168f7c9d927e676e0fdd67c13a90ee06299d2448c10ce221"
+      }
+    },
+    "baseline/owned_vec.json": {
+      "copy": {
+        "bytes": 135518,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/baseline/owned_vec.json",
+        "sha256": "68bbcf703d3b7ba63f1a027ba5ae2843a0ca54b26f0c2444a83a3952a64be545"
+      },
+      "source": {
+        "bytes": 135518,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/baseline/owned_vec.json",
+        "sha256": "68bbcf703d3b7ba63f1a027ba5ae2843a0ca54b26f0c2444a83a3952a64be545"
+      }
+    },
+    "capture-state.json": {
+      "copy": {
+        "bytes": 301,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/capture-state.json",
+        "sha256": "db7afff27cdca798a32cf5a53eab16549f64053c72bb1834af02ed0bf7c580ae"
+      },
+      "source": {
+        "bytes": 301,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/capture-state.json",
+        "sha256": "db7afff27cdca798a32cf5a53eab16549f64053c72bb1834af02ed0bf7c580ae"
+      }
+    },
+    "children/generic_read_at-pair-01-leg-1-baseline/child.json": {
+      "copy": {
+        "bytes": 2788,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-01-leg-1-baseline/child.json",
+        "sha256": "4bd23e8bd7aa62a56570e5fd3199b6323c47c97e9d01bd6c886b3b32e55a7c01"
+      },
+      "source": {
+        "bytes": 2788,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-01-leg-1-baseline/child.json",
+        "sha256": "4bd23e8bd7aa62a56570e5fd3199b6323c47c97e9d01bd6c886b3b32e55a7c01"
+      }
+    },
+    "children/generic_read_at-pair-01-leg-1-baseline/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-01-leg-1-baseline/child.json.sha256",
+        "sha256": "728f90f8d32ebcdf09386c5025262cf4778e4dbedca1b5a5135d5c470609ffb9"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-01-leg-1-baseline/child.json.sha256",
+        "sha256": "728f90f8d32ebcdf09386c5025262cf4778e4dbedca1b5a5135d5c470609ffb9"
+      }
+    },
+    "children/generic_read_at-pair-01-leg-1-baseline/process-time.txt": {
+      "copy": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-01-leg-1-baseline/process-time.txt",
+        "sha256": "a82939ebe3b4b0ea721175706e2944fe2a1dbd0f37fb811444c160f012077c70"
+      },
+      "source": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-01-leg-1-baseline/process-time.txt",
+        "sha256": "a82939ebe3b4b0ea721175706e2944fe2a1dbd0f37fb811444c160f012077c70"
+      }
+    },
+    "children/generic_read_at-pair-01-leg-1-baseline/report.json": {
+      "copy": {
+        "bytes": 151615,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-01-leg-1-baseline/report.json",
+        "sha256": "ca320e42bd5551bad761bb57261db20b8414ca915be4eca13d69346ed334836b"
+      },
+      "source": {
+        "bytes": 151615,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-01-leg-1-baseline/report.json",
+        "sha256": "ca320e42bd5551bad761bb57261db20b8414ca915be4eca13d69346ed334836b"
+      }
+    },
+    "children/generic_read_at-pair-01-leg-1-baseline/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-01-leg-1-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-01-leg-1-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-01-leg-1-baseline/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-01-leg-1-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-01-leg-1-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-01-leg-2-candidate/child.json": {
+      "copy": {
+        "bytes": 2804,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-01-leg-2-candidate/child.json",
+        "sha256": "e81a7175b6c15bc61255af600fd649ffb5e75bb14103293a85e3cca4d4252d6e"
+      },
+      "source": {
+        "bytes": 2804,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-01-leg-2-candidate/child.json",
+        "sha256": "e81a7175b6c15bc61255af600fd649ffb5e75bb14103293a85e3cca4d4252d6e"
+      }
+    },
+    "children/generic_read_at-pair-01-leg-2-candidate/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-01-leg-2-candidate/child.json.sha256",
+        "sha256": "6c55247258fd1ec7c7ea3af8603a629605655c67b125ef527cf38afd61e1c8db"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-01-leg-2-candidate/child.json.sha256",
+        "sha256": "6c55247258fd1ec7c7ea3af8603a629605655c67b125ef527cf38afd61e1c8db"
+      }
+    },
+    "children/generic_read_at-pair-01-leg-2-candidate/process-time.txt": {
+      "copy": {
+        "bytes": 993,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-01-leg-2-candidate/process-time.txt",
+        "sha256": "20961a70f8d40c9d2bf4dc8e22255bbafa0c8c5715ded42aef0f6ff21fea2fef"
+      },
+      "source": {
+        "bytes": 993,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-01-leg-2-candidate/process-time.txt",
+        "sha256": "20961a70f8d40c9d2bf4dc8e22255bbafa0c8c5715ded42aef0f6ff21fea2fef"
+      }
+    },
+    "children/generic_read_at-pair-01-leg-2-candidate/report.json": {
+      "copy": {
+        "bytes": 151610,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-01-leg-2-candidate/report.json",
+        "sha256": "0896cc1ea2fb190b42379954994c608aeaac0aa6511f49a97216208998ef3ae6"
+      },
+      "source": {
+        "bytes": 151610,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-01-leg-2-candidate/report.json",
+        "sha256": "0896cc1ea2fb190b42379954994c608aeaac0aa6511f49a97216208998ef3ae6"
+      }
+    },
+    "children/generic_read_at-pair-01-leg-2-candidate/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-01-leg-2-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-01-leg-2-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-01-leg-2-candidate/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-01-leg-2-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-01-leg-2-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-02-leg-1-candidate/child.json": {
+      "copy": {
+        "bytes": 2804,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-02-leg-1-candidate/child.json",
+        "sha256": "1474acea3cf8446c526d4721070d113ff8ca1f528e16132f9cf364ee266dbde9"
+      },
+      "source": {
+        "bytes": 2804,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-02-leg-1-candidate/child.json",
+        "sha256": "1474acea3cf8446c526d4721070d113ff8ca1f528e16132f9cf364ee266dbde9"
+      }
+    },
+    "children/generic_read_at-pair-02-leg-1-candidate/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-02-leg-1-candidate/child.json.sha256",
+        "sha256": "45e79dc03caeaf44344750c9d8696b16f2f116519f71fa789a54746479297463"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-02-leg-1-candidate/child.json.sha256",
+        "sha256": "45e79dc03caeaf44344750c9d8696b16f2f116519f71fa789a54746479297463"
+      }
+    },
+    "children/generic_read_at-pair-02-leg-1-candidate/process-time.txt": {
+      "copy": {
+        "bytes": 993,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-02-leg-1-candidate/process-time.txt",
+        "sha256": "692da556f5dd1a67db5f0929b03330e7a915605289a27384e024042036977371"
+      },
+      "source": {
+        "bytes": 993,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-02-leg-1-candidate/process-time.txt",
+        "sha256": "692da556f5dd1a67db5f0929b03330e7a915605289a27384e024042036977371"
+      }
+    },
+    "children/generic_read_at-pair-02-leg-1-candidate/report.json": {
+      "copy": {
+        "bytes": 151616,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-02-leg-1-candidate/report.json",
+        "sha256": "c5bbead50735a3113e7ca5ccbf070fb7aef5d8044d36a26c2403db1506ec9844"
+      },
+      "source": {
+        "bytes": 151616,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-02-leg-1-candidate/report.json",
+        "sha256": "c5bbead50735a3113e7ca5ccbf070fb7aef5d8044d36a26c2403db1506ec9844"
+      }
+    },
+    "children/generic_read_at-pair-02-leg-1-candidate/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-02-leg-1-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-02-leg-1-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-02-leg-1-candidate/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-02-leg-1-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-02-leg-1-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-02-leg-2-baseline/child.json": {
+      "copy": {
+        "bytes": 2788,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-02-leg-2-baseline/child.json",
+        "sha256": "d472a0bb8fc50f940e89f048c93f975bf51f744ee57ac4575a2fa63f7e66a1ff"
+      },
+      "source": {
+        "bytes": 2788,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-02-leg-2-baseline/child.json",
+        "sha256": "d472a0bb8fc50f940e89f048c93f975bf51f744ee57ac4575a2fa63f7e66a1ff"
+      }
+    },
+    "children/generic_read_at-pair-02-leg-2-baseline/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-02-leg-2-baseline/child.json.sha256",
+        "sha256": "5063457720aeb1486f67a2af775003734355ee8bdafe91e60c66b3332a2134bb"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-02-leg-2-baseline/child.json.sha256",
+        "sha256": "5063457720aeb1486f67a2af775003734355ee8bdafe91e60c66b3332a2134bb"
+      }
+    },
+    "children/generic_read_at-pair-02-leg-2-baseline/process-time.txt": {
+      "copy": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-02-leg-2-baseline/process-time.txt",
+        "sha256": "7060ea0f74283dbc698ed532698dcf6763504ad7091055cb94b330ff74f9e199"
+      },
+      "source": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-02-leg-2-baseline/process-time.txt",
+        "sha256": "7060ea0f74283dbc698ed532698dcf6763504ad7091055cb94b330ff74f9e199"
+      }
+    },
+    "children/generic_read_at-pair-02-leg-2-baseline/report.json": {
+      "copy": {
+        "bytes": 151614,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-02-leg-2-baseline/report.json",
+        "sha256": "141bc9d0f6f3c16f7378e7d1d804f712e2d7555b520ea11e9a09d64f4c15aabf"
+      },
+      "source": {
+        "bytes": 151614,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-02-leg-2-baseline/report.json",
+        "sha256": "141bc9d0f6f3c16f7378e7d1d804f712e2d7555b520ea11e9a09d64f4c15aabf"
+      }
+    },
+    "children/generic_read_at-pair-02-leg-2-baseline/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-02-leg-2-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-02-leg-2-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-02-leg-2-baseline/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-02-leg-2-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-02-leg-2-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-03-leg-1-baseline/child.json": {
+      "copy": {
+        "bytes": 2788,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-03-leg-1-baseline/child.json",
+        "sha256": "cc8dc9cb4d16b075f60a7d1cbe94086600d73ed18d5caf3054a2f3becb20c2a6"
+      },
+      "source": {
+        "bytes": 2788,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-03-leg-1-baseline/child.json",
+        "sha256": "cc8dc9cb4d16b075f60a7d1cbe94086600d73ed18d5caf3054a2f3becb20c2a6"
+      }
+    },
+    "children/generic_read_at-pair-03-leg-1-baseline/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-03-leg-1-baseline/child.json.sha256",
+        "sha256": "5efd7b4b3abda9fa8157eed60ea108b15f3598dd85595348761c6c864fd50528"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-03-leg-1-baseline/child.json.sha256",
+        "sha256": "5efd7b4b3abda9fa8157eed60ea108b15f3598dd85595348761c6c864fd50528"
+      }
+    },
+    "children/generic_read_at-pair-03-leg-1-baseline/process-time.txt": {
+      "copy": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-03-leg-1-baseline/process-time.txt",
+        "sha256": "5dff23f71b5f0b7abd112f0ed860d3eaf9045fe580e4f1ec18338ffc8ef1ef4a"
+      },
+      "source": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-03-leg-1-baseline/process-time.txt",
+        "sha256": "5dff23f71b5f0b7abd112f0ed860d3eaf9045fe580e4f1ec18338ffc8ef1ef4a"
+      }
+    },
+    "children/generic_read_at-pair-03-leg-1-baseline/report.json": {
+      "copy": {
+        "bytes": 151607,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-03-leg-1-baseline/report.json",
+        "sha256": "951d1c018835fa0e045786d71be5d95cf1b6ec6b8c63a3280d028bfec598886b"
+      },
+      "source": {
+        "bytes": 151607,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-03-leg-1-baseline/report.json",
+        "sha256": "951d1c018835fa0e045786d71be5d95cf1b6ec6b8c63a3280d028bfec598886b"
+      }
+    },
+    "children/generic_read_at-pair-03-leg-1-baseline/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-03-leg-1-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-03-leg-1-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-03-leg-1-baseline/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-03-leg-1-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-03-leg-1-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-03-leg-2-candidate/child.json": {
+      "copy": {
+        "bytes": 2804,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-03-leg-2-candidate/child.json",
+        "sha256": "db771fdaedce03838fbc4ef64d95b5f97997c54a3ed367a93fb85aefb1b09c7d"
+      },
+      "source": {
+        "bytes": 2804,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-03-leg-2-candidate/child.json",
+        "sha256": "db771fdaedce03838fbc4ef64d95b5f97997c54a3ed367a93fb85aefb1b09c7d"
+      }
+    },
+    "children/generic_read_at-pair-03-leg-2-candidate/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-03-leg-2-candidate/child.json.sha256",
+        "sha256": "a775882f4cbb6d99da15c3b989c05e327ff0b1f82b0bd5abd0af09189ef7e0de"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-03-leg-2-candidate/child.json.sha256",
+        "sha256": "a775882f4cbb6d99da15c3b989c05e327ff0b1f82b0bd5abd0af09189ef7e0de"
+      }
+    },
+    "children/generic_read_at-pair-03-leg-2-candidate/process-time.txt": {
+      "copy": {
+        "bytes": 993,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-03-leg-2-candidate/process-time.txt",
+        "sha256": "c2ae94c4bff05c74002e37adca43ec72f5fb651a35c8c25baac0445586a6ab1d"
+      },
+      "source": {
+        "bytes": 993,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-03-leg-2-candidate/process-time.txt",
+        "sha256": "c2ae94c4bff05c74002e37adca43ec72f5fb651a35c8c25baac0445586a6ab1d"
+      }
+    },
+    "children/generic_read_at-pair-03-leg-2-candidate/report.json": {
+      "copy": {
+        "bytes": 151614,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-03-leg-2-candidate/report.json",
+        "sha256": "56d9f494f474b9648da2667751f03ffc5540ee1eebd4ce74b1087ff8203bdfad"
+      },
+      "source": {
+        "bytes": 151614,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-03-leg-2-candidate/report.json",
+        "sha256": "56d9f494f474b9648da2667751f03ffc5540ee1eebd4ce74b1087ff8203bdfad"
+      }
+    },
+    "children/generic_read_at-pair-03-leg-2-candidate/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-03-leg-2-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-03-leg-2-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-03-leg-2-candidate/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-03-leg-2-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-03-leg-2-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-04-leg-1-candidate/child.json": {
+      "copy": {
+        "bytes": 2804,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-04-leg-1-candidate/child.json",
+        "sha256": "99001e90908727dcb2c407d7ad2aa72d845b695aa6b9b13e26cd0cbfd15f55d5"
+      },
+      "source": {
+        "bytes": 2804,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-04-leg-1-candidate/child.json",
+        "sha256": "99001e90908727dcb2c407d7ad2aa72d845b695aa6b9b13e26cd0cbfd15f55d5"
+      }
+    },
+    "children/generic_read_at-pair-04-leg-1-candidate/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-04-leg-1-candidate/child.json.sha256",
+        "sha256": "3c410b71eeee221c81ffaa6b65060eb71373a539ec997a6298426d4d764e4ac8"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-04-leg-1-candidate/child.json.sha256",
+        "sha256": "3c410b71eeee221c81ffaa6b65060eb71373a539ec997a6298426d4d764e4ac8"
+      }
+    },
+    "children/generic_read_at-pair-04-leg-1-candidate/process-time.txt": {
+      "copy": {
+        "bytes": 993,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-04-leg-1-candidate/process-time.txt",
+        "sha256": "65517262b65a2b6e4e6ccdf0ac141163cd964cdd6bd7cab00b5714303770ae2d"
+      },
+      "source": {
+        "bytes": 993,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-04-leg-1-candidate/process-time.txt",
+        "sha256": "65517262b65a2b6e4e6ccdf0ac141163cd964cdd6bd7cab00b5714303770ae2d"
+      }
+    },
+    "children/generic_read_at-pair-04-leg-1-candidate/report.json": {
+      "copy": {
+        "bytes": 151615,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-04-leg-1-candidate/report.json",
+        "sha256": "d9ac694d0f3adac48561440036970887bd0ddccb48137f635db2e870ac9b901d"
+      },
+      "source": {
+        "bytes": 151615,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-04-leg-1-candidate/report.json",
+        "sha256": "d9ac694d0f3adac48561440036970887bd0ddccb48137f635db2e870ac9b901d"
+      }
+    },
+    "children/generic_read_at-pair-04-leg-1-candidate/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-04-leg-1-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-04-leg-1-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-04-leg-1-candidate/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-04-leg-1-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-04-leg-1-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-04-leg-2-baseline/child.json": {
+      "copy": {
+        "bytes": 2788,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-04-leg-2-baseline/child.json",
+        "sha256": "1f589869d8c6412044e68a8304a4f7c9dd1dc67c3f617e968f7c4db60d3ce338"
+      },
+      "source": {
+        "bytes": 2788,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-04-leg-2-baseline/child.json",
+        "sha256": "1f589869d8c6412044e68a8304a4f7c9dd1dc67c3f617e968f7c4db60d3ce338"
+      }
+    },
+    "children/generic_read_at-pair-04-leg-2-baseline/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-04-leg-2-baseline/child.json.sha256",
+        "sha256": "d190fe35d27094517fc78009ecaf82b476d70593a09be0ea43a47d39aa261712"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-04-leg-2-baseline/child.json.sha256",
+        "sha256": "d190fe35d27094517fc78009ecaf82b476d70593a09be0ea43a47d39aa261712"
+      }
+    },
+    "children/generic_read_at-pair-04-leg-2-baseline/process-time.txt": {
+      "copy": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-04-leg-2-baseline/process-time.txt",
+        "sha256": "b1475a465bb6c4042c2932c6037ba1e649c3dca973da3e87171115ccfd61cad3"
+      },
+      "source": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-04-leg-2-baseline/process-time.txt",
+        "sha256": "b1475a465bb6c4042c2932c6037ba1e649c3dca973da3e87171115ccfd61cad3"
+      }
+    },
+    "children/generic_read_at-pair-04-leg-2-baseline/report.json": {
+      "copy": {
+        "bytes": 151608,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-04-leg-2-baseline/report.json",
+        "sha256": "911f9566ac545fcc897d1fa12dfa70ab3362780d132b3113ac479dbc5e89ec82"
+      },
+      "source": {
+        "bytes": 151608,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-04-leg-2-baseline/report.json",
+        "sha256": "911f9566ac545fcc897d1fa12dfa70ab3362780d132b3113ac479dbc5e89ec82"
+      }
+    },
+    "children/generic_read_at-pair-04-leg-2-baseline/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-04-leg-2-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-04-leg-2-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-04-leg-2-baseline/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-04-leg-2-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-04-leg-2-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-05-leg-1-baseline/child.json": {
+      "copy": {
+        "bytes": 2788,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-05-leg-1-baseline/child.json",
+        "sha256": "e7681f415b5812c9a2c8897875ba28e7f0841557052ee2f076a657da1e9e3da8"
+      },
+      "source": {
+        "bytes": 2788,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-05-leg-1-baseline/child.json",
+        "sha256": "e7681f415b5812c9a2c8897875ba28e7f0841557052ee2f076a657da1e9e3da8"
+      }
+    },
+    "children/generic_read_at-pair-05-leg-1-baseline/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-05-leg-1-baseline/child.json.sha256",
+        "sha256": "fb1962637c88c6960ee97932128eb9926525f5e09811652fcfe073d2e0eb3dda"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-05-leg-1-baseline/child.json.sha256",
+        "sha256": "fb1962637c88c6960ee97932128eb9926525f5e09811652fcfe073d2e0eb3dda"
+      }
+    },
+    "children/generic_read_at-pair-05-leg-1-baseline/process-time.txt": {
+      "copy": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-05-leg-1-baseline/process-time.txt",
+        "sha256": "d6c53e59c94a4a2d15fa39d175189fd5e5209f8467a28a6fa3f6a8e7be974d0f"
+      },
+      "source": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-05-leg-1-baseline/process-time.txt",
+        "sha256": "d6c53e59c94a4a2d15fa39d175189fd5e5209f8467a28a6fa3f6a8e7be974d0f"
+      }
+    },
+    "children/generic_read_at-pair-05-leg-1-baseline/report.json": {
+      "copy": {
+        "bytes": 151613,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-05-leg-1-baseline/report.json",
+        "sha256": "df2bfbc9a60856b5ddc09eb7ccfbf6805eff8e089fc2625bec023d72dbe232d4"
+      },
+      "source": {
+        "bytes": 151613,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-05-leg-1-baseline/report.json",
+        "sha256": "df2bfbc9a60856b5ddc09eb7ccfbf6805eff8e089fc2625bec023d72dbe232d4"
+      }
+    },
+    "children/generic_read_at-pair-05-leg-1-baseline/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-05-leg-1-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-05-leg-1-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-05-leg-1-baseline/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-05-leg-1-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-05-leg-1-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-05-leg-2-candidate/child.json": {
+      "copy": {
+        "bytes": 2805,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-05-leg-2-candidate/child.json",
+        "sha256": "a8fea7bbbc2f7729d6317a03912bce63de114b4f2176b276cd13eb9bdcc400b6"
+      },
+      "source": {
+        "bytes": 2805,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-05-leg-2-candidate/child.json",
+        "sha256": "a8fea7bbbc2f7729d6317a03912bce63de114b4f2176b276cd13eb9bdcc400b6"
+      }
+    },
+    "children/generic_read_at-pair-05-leg-2-candidate/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-05-leg-2-candidate/child.json.sha256",
+        "sha256": "f4cc20f5be6ef507cc939241dfaaf5de249810539ffe9063fe676925f875e60a"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-05-leg-2-candidate/child.json.sha256",
+        "sha256": "f4cc20f5be6ef507cc939241dfaaf5de249810539ffe9063fe676925f875e60a"
+      }
+    },
+    "children/generic_read_at-pair-05-leg-2-candidate/process-time.txt": {
+      "copy": {
+        "bytes": 994,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-05-leg-2-candidate/process-time.txt",
+        "sha256": "09e41a51027aeed8cab826277089f7b4509d3c7b1d95fa96025488d52037084a"
+      },
+      "source": {
+        "bytes": 994,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-05-leg-2-candidate/process-time.txt",
+        "sha256": "09e41a51027aeed8cab826277089f7b4509d3c7b1d95fa96025488d52037084a"
+      }
+    },
+    "children/generic_read_at-pair-05-leg-2-candidate/report.json": {
+      "copy": {
+        "bytes": 151616,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-05-leg-2-candidate/report.json",
+        "sha256": "1451304f1b4426991d440718441d07a66117e3f2a8034ed10316538520bcea0d"
+      },
+      "source": {
+        "bytes": 151616,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-05-leg-2-candidate/report.json",
+        "sha256": "1451304f1b4426991d440718441d07a66117e3f2a8034ed10316538520bcea0d"
+      }
+    },
+    "children/generic_read_at-pair-05-leg-2-candidate/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-05-leg-2-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-05-leg-2-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-05-leg-2-candidate/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-05-leg-2-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-05-leg-2-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-06-leg-1-candidate/child.json": {
+      "copy": {
+        "bytes": 2805,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-06-leg-1-candidate/child.json",
+        "sha256": "5aecd8175e3e18501cfa880e4d7e97daa68b512c3c7fa60d25b344558237d6c1"
+      },
+      "source": {
+        "bytes": 2805,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-06-leg-1-candidate/child.json",
+        "sha256": "5aecd8175e3e18501cfa880e4d7e97daa68b512c3c7fa60d25b344558237d6c1"
+      }
+    },
+    "children/generic_read_at-pair-06-leg-1-candidate/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-06-leg-1-candidate/child.json.sha256",
+        "sha256": "d6aa27bae501507f07e4c0c33820b06169f4272a8e32c61b8caae057b059edf6"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-06-leg-1-candidate/child.json.sha256",
+        "sha256": "d6aa27bae501507f07e4c0c33820b06169f4272a8e32c61b8caae057b059edf6"
+      }
+    },
+    "children/generic_read_at-pair-06-leg-1-candidate/process-time.txt": {
+      "copy": {
+        "bytes": 993,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-06-leg-1-candidate/process-time.txt",
+        "sha256": "3056c83119aee7d3697201c33f296e34afae4eeee5b09bece93c05c892c3add5"
+      },
+      "source": {
+        "bytes": 993,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-06-leg-1-candidate/process-time.txt",
+        "sha256": "3056c83119aee7d3697201c33f296e34afae4eeee5b09bece93c05c892c3add5"
+      }
+    },
+    "children/generic_read_at-pair-06-leg-1-candidate/report.json": {
+      "copy": {
+        "bytes": 151616,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-06-leg-1-candidate/report.json",
+        "sha256": "3828ea0895d3cf68c39fbba926707691b6aec03d4fd014c392d8390b34778f6b"
+      },
+      "source": {
+        "bytes": 151616,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-06-leg-1-candidate/report.json",
+        "sha256": "3828ea0895d3cf68c39fbba926707691b6aec03d4fd014c392d8390b34778f6b"
+      }
+    },
+    "children/generic_read_at-pair-06-leg-1-candidate/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-06-leg-1-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-06-leg-1-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-06-leg-1-candidate/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-06-leg-1-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-06-leg-1-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-06-leg-2-baseline/child.json": {
+      "copy": {
+        "bytes": 2789,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-06-leg-2-baseline/child.json",
+        "sha256": "a247679e26c5e46aa57a6f12610a8670390451b7dca57cf4d506b00a379a2d3b"
+      },
+      "source": {
+        "bytes": 2789,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-06-leg-2-baseline/child.json",
+        "sha256": "a247679e26c5e46aa57a6f12610a8670390451b7dca57cf4d506b00a379a2d3b"
+      }
+    },
+    "children/generic_read_at-pair-06-leg-2-baseline/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-06-leg-2-baseline/child.json.sha256",
+        "sha256": "99d8abdb7d6d619abbf4bb1b8af8c26b5302785e97a8aaef333a90b13e292138"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-06-leg-2-baseline/child.json.sha256",
+        "sha256": "99d8abdb7d6d619abbf4bb1b8af8c26b5302785e97a8aaef333a90b13e292138"
+      }
+    },
+    "children/generic_read_at-pair-06-leg-2-baseline/process-time.txt": {
+      "copy": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-06-leg-2-baseline/process-time.txt",
+        "sha256": "9aa5d9e4608b197b13d2901949c570eff1898b9cb4a9392d2fb63a853ea00a17"
+      },
+      "source": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-06-leg-2-baseline/process-time.txt",
+        "sha256": "9aa5d9e4608b197b13d2901949c570eff1898b9cb4a9392d2fb63a853ea00a17"
+      }
+    },
+    "children/generic_read_at-pair-06-leg-2-baseline/report.json": {
+      "copy": {
+        "bytes": 151614,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-06-leg-2-baseline/report.json",
+        "sha256": "50831972309dfef1f3a3d8223ac8bdd46c5205b21599eb25511bce036a490238"
+      },
+      "source": {
+        "bytes": 151614,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-06-leg-2-baseline/report.json",
+        "sha256": "50831972309dfef1f3a3d8223ac8bdd46c5205b21599eb25511bce036a490238"
+      }
+    },
+    "children/generic_read_at-pair-06-leg-2-baseline/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-06-leg-2-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-06-leg-2-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-06-leg-2-baseline/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-06-leg-2-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-06-leg-2-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-07-leg-1-baseline/child.json": {
+      "copy": {
+        "bytes": 2789,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-07-leg-1-baseline/child.json",
+        "sha256": "d3594d3a6a4001ba7840ed93780904f031ce0e196359be2bacfebfea8269bab7"
+      },
+      "source": {
+        "bytes": 2789,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-07-leg-1-baseline/child.json",
+        "sha256": "d3594d3a6a4001ba7840ed93780904f031ce0e196359be2bacfebfea8269bab7"
+      }
+    },
+    "children/generic_read_at-pair-07-leg-1-baseline/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-07-leg-1-baseline/child.json.sha256",
+        "sha256": "2ad77037fd32d05fffbd0d40463cc348c83e36b09e63ab1e448a9b6dd97769f1"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-07-leg-1-baseline/child.json.sha256",
+        "sha256": "2ad77037fd32d05fffbd0d40463cc348c83e36b09e63ab1e448a9b6dd97769f1"
+      }
+    },
+    "children/generic_read_at-pair-07-leg-1-baseline/process-time.txt": {
+      "copy": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-07-leg-1-baseline/process-time.txt",
+        "sha256": "b64688846abf70f070218ca82753f7987005d57316eb9cc8fa298055fec1720c"
+      },
+      "source": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-07-leg-1-baseline/process-time.txt",
+        "sha256": "b64688846abf70f070218ca82753f7987005d57316eb9cc8fa298055fec1720c"
+      }
+    },
+    "children/generic_read_at-pair-07-leg-1-baseline/report.json": {
+      "copy": {
+        "bytes": 151613,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-07-leg-1-baseline/report.json",
+        "sha256": "b243a8b0c147526898876edb3a40f329b6f66d403627ac0c59819f593f23ec77"
+      },
+      "source": {
+        "bytes": 151613,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-07-leg-1-baseline/report.json",
+        "sha256": "b243a8b0c147526898876edb3a40f329b6f66d403627ac0c59819f593f23ec77"
+      }
+    },
+    "children/generic_read_at-pair-07-leg-1-baseline/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-07-leg-1-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-07-leg-1-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-07-leg-1-baseline/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-07-leg-1-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-07-leg-1-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-07-leg-2-candidate/child.json": {
+      "copy": {
+        "bytes": 2805,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-07-leg-2-candidate/child.json",
+        "sha256": "c38113baa35c2137e0c194ef3ae5b1c7129973981a9cf8f37c03c3c297b68f38"
+      },
+      "source": {
+        "bytes": 2805,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-07-leg-2-candidate/child.json",
+        "sha256": "c38113baa35c2137e0c194ef3ae5b1c7129973981a9cf8f37c03c3c297b68f38"
+      }
+    },
+    "children/generic_read_at-pair-07-leg-2-candidate/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-07-leg-2-candidate/child.json.sha256",
+        "sha256": "fc52d018b310848a18ea9b48bbdaaf117b70b117991a581abca58ea15b30f0f0"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-07-leg-2-candidate/child.json.sha256",
+        "sha256": "fc52d018b310848a18ea9b48bbdaaf117b70b117991a581abca58ea15b30f0f0"
+      }
+    },
+    "children/generic_read_at-pair-07-leg-2-candidate/process-time.txt": {
+      "copy": {
+        "bytes": 993,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-07-leg-2-candidate/process-time.txt",
+        "sha256": "e20bf6752f1132c2b8655fb01cb3b8d7f5fd0768004814cb6870de42a21670b2"
+      },
+      "source": {
+        "bytes": 993,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-07-leg-2-candidate/process-time.txt",
+        "sha256": "e20bf6752f1132c2b8655fb01cb3b8d7f5fd0768004814cb6870de42a21670b2"
+      }
+    },
+    "children/generic_read_at-pair-07-leg-2-candidate/report.json": {
+      "copy": {
+        "bytes": 151609,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-07-leg-2-candidate/report.json",
+        "sha256": "70a0049fdb85a369e11e69a650402612258c40ed92d203888539322331d23f33"
+      },
+      "source": {
+        "bytes": 151609,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-07-leg-2-candidate/report.json",
+        "sha256": "70a0049fdb85a369e11e69a650402612258c40ed92d203888539322331d23f33"
+      }
+    },
+    "children/generic_read_at-pair-07-leg-2-candidate/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-07-leg-2-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-07-leg-2-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-07-leg-2-candidate/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-07-leg-2-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-07-leg-2-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-08-leg-1-candidate/child.json": {
+      "copy": {
+        "bytes": 2805,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-08-leg-1-candidate/child.json",
+        "sha256": "a14e5f454af2d2eb38155d705d183d0071676a98379561a16b3fa494239f4f88"
+      },
+      "source": {
+        "bytes": 2805,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-08-leg-1-candidate/child.json",
+        "sha256": "a14e5f454af2d2eb38155d705d183d0071676a98379561a16b3fa494239f4f88"
+      }
+    },
+    "children/generic_read_at-pair-08-leg-1-candidate/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-08-leg-1-candidate/child.json.sha256",
+        "sha256": "b6808d8954076b9e0c2f8fb7529b4166dd170bd35e5f531ad840b92fe5dd378d"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-08-leg-1-candidate/child.json.sha256",
+        "sha256": "b6808d8954076b9e0c2f8fb7529b4166dd170bd35e5f531ad840b92fe5dd378d"
+      }
+    },
+    "children/generic_read_at-pair-08-leg-1-candidate/process-time.txt": {
+      "copy": {
+        "bytes": 993,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-08-leg-1-candidate/process-time.txt",
+        "sha256": "7b4efe57aca87b0639bcb39089f33916c9cbcbe3f8b2c0015d6c55999c5d46bb"
+      },
+      "source": {
+        "bytes": 993,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-08-leg-1-candidate/process-time.txt",
+        "sha256": "7b4efe57aca87b0639bcb39089f33916c9cbcbe3f8b2c0015d6c55999c5d46bb"
+      }
+    },
+    "children/generic_read_at-pair-08-leg-1-candidate/report.json": {
+      "copy": {
+        "bytes": 151617,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-08-leg-1-candidate/report.json",
+        "sha256": "91da29cc36a8ad6baa15805ddee289eb7c8a3ed44f7b989df5414d77d83510ea"
+      },
+      "source": {
+        "bytes": 151617,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-08-leg-1-candidate/report.json",
+        "sha256": "91da29cc36a8ad6baa15805ddee289eb7c8a3ed44f7b989df5414d77d83510ea"
+      }
+    },
+    "children/generic_read_at-pair-08-leg-1-candidate/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-08-leg-1-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-08-leg-1-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-08-leg-1-candidate/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-08-leg-1-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-08-leg-1-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-08-leg-2-baseline/child.json": {
+      "copy": {
+        "bytes": 2789,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-08-leg-2-baseline/child.json",
+        "sha256": "71645f3d03a3823fee4716cdae72a0b3d6db9c521ddc8e80936ba3a01b47118f"
+      },
+      "source": {
+        "bytes": 2789,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-08-leg-2-baseline/child.json",
+        "sha256": "71645f3d03a3823fee4716cdae72a0b3d6db9c521ddc8e80936ba3a01b47118f"
+      }
+    },
+    "children/generic_read_at-pair-08-leg-2-baseline/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-08-leg-2-baseline/child.json.sha256",
+        "sha256": "4cf606b348176ec095ce0cfcab528b641c41cd46d721d75c5c954e4fbc367d3e"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-08-leg-2-baseline/child.json.sha256",
+        "sha256": "4cf606b348176ec095ce0cfcab528b641c41cd46d721d75c5c954e4fbc367d3e"
+      }
+    },
+    "children/generic_read_at-pair-08-leg-2-baseline/process-time.txt": {
+      "copy": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-08-leg-2-baseline/process-time.txt",
+        "sha256": "307d0f6a44fb9914d5dff47f2146bdcbca1e0114fe0ab3c41b7881eea9933643"
+      },
+      "source": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-08-leg-2-baseline/process-time.txt",
+        "sha256": "307d0f6a44fb9914d5dff47f2146bdcbca1e0114fe0ab3c41b7881eea9933643"
+      }
+    },
+    "children/generic_read_at-pair-08-leg-2-baseline/report.json": {
+      "copy": {
+        "bytes": 151614,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-08-leg-2-baseline/report.json",
+        "sha256": "e402a46c513895f730be8626a663a2c46a0efed0d7fddd3a1f2ea142327ea7a8"
+      },
+      "source": {
+        "bytes": 151614,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-08-leg-2-baseline/report.json",
+        "sha256": "e402a46c513895f730be8626a663a2c46a0efed0d7fddd3a1f2ea142327ea7a8"
+      }
+    },
+    "children/generic_read_at-pair-08-leg-2-baseline/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-08-leg-2-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-08-leg-2-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/generic_read_at-pair-08-leg-2-baseline/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/generic_read_at-pair-08-leg-2-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/generic_read_at-pair-08-leg-2-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-01-leg-1-baseline/child.json": {
+      "copy": {
+        "bytes": 2750,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-01-leg-1-baseline/child.json",
+        "sha256": "575b96c48e2aeae8ad6dc93708f091f56e324400641ec288c3d41a1f7512e58d"
+      },
+      "source": {
+        "bytes": 2750,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-01-leg-1-baseline/child.json",
+        "sha256": "575b96c48e2aeae8ad6dc93708f091f56e324400641ec288c3d41a1f7512e58d"
+      }
+    },
+    "children/owned_reader-pair-01-leg-1-baseline/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-01-leg-1-baseline/child.json.sha256",
+        "sha256": "02bfd87addd359bcf603e4e1a1f3adcf87acfbbaee462a9d2c8c76f7caacc6b0"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-01-leg-1-baseline/child.json.sha256",
+        "sha256": "02bfd87addd359bcf603e4e1a1f3adcf87acfbbaee462a9d2c8c76f7caacc6b0"
+      }
+    },
+    "children/owned_reader-pair-01-leg-1-baseline/process-time.txt": {
+      "copy": {
+        "bytes": 987,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-01-leg-1-baseline/process-time.txt",
+        "sha256": "967e5625bd0ba931fdb530d3cd7e0f39e65b44ea2cf554b7e6b75d011ac190a6"
+      },
+      "source": {
+        "bytes": 987,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-01-leg-1-baseline/process-time.txt",
+        "sha256": "967e5625bd0ba931fdb530d3cd7e0f39e65b44ea2cf554b7e6b75d011ac190a6"
+      }
+    },
+    "children/owned_reader-pair-01-leg-1-baseline/report.json": {
+      "copy": {
+        "bytes": 137141,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-01-leg-1-baseline/report.json",
+        "sha256": "b781f9a5bfd9652966de6617a028b281d2214c45b3f119161a333c66bc409b1c"
+      },
+      "source": {
+        "bytes": 137141,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-01-leg-1-baseline/report.json",
+        "sha256": "b781f9a5bfd9652966de6617a028b281d2214c45b3f119161a333c66bc409b1c"
+      }
+    },
+    "children/owned_reader-pair-01-leg-1-baseline/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-01-leg-1-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-01-leg-1-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-01-leg-1-baseline/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-01-leg-1-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-01-leg-1-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-01-leg-2-candidate/child.json": {
+      "copy": {
+        "bytes": 2766,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-01-leg-2-candidate/child.json",
+        "sha256": "ad734a389ad74f3301275179147b892d493f176d4fba72954f5cb8d2d3197f2e"
+      },
+      "source": {
+        "bytes": 2766,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-01-leg-2-candidate/child.json",
+        "sha256": "ad734a389ad74f3301275179147b892d493f176d4fba72954f5cb8d2d3197f2e"
+      }
+    },
+    "children/owned_reader-pair-01-leg-2-candidate/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-01-leg-2-candidate/child.json.sha256",
+        "sha256": "aa2d3cbf21830ab2d12ba7a5b12eda1b6a0cb590a6c6ad82ce4b347c9d908aee"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-01-leg-2-candidate/child.json.sha256",
+        "sha256": "aa2d3cbf21830ab2d12ba7a5b12eda1b6a0cb590a6c6ad82ce4b347c9d908aee"
+      }
+    },
+    "children/owned_reader-pair-01-leg-2-candidate/process-time.txt": {
+      "copy": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-01-leg-2-candidate/process-time.txt",
+        "sha256": "643790546200032f78d0178e94e11808026cfc8f23b352780b258bb1ed4cd3ab"
+      },
+      "source": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-01-leg-2-candidate/process-time.txt",
+        "sha256": "643790546200032f78d0178e94e11808026cfc8f23b352780b258bb1ed4cd3ab"
+      }
+    },
+    "children/owned_reader-pair-01-leg-2-candidate/report.json": {
+      "copy": {
+        "bytes": 137140,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-01-leg-2-candidate/report.json",
+        "sha256": "c82184972a228648d793eec5e6ea3a312d82b187d2c4fd504d784f939b2905b9"
+      },
+      "source": {
+        "bytes": 137140,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-01-leg-2-candidate/report.json",
+        "sha256": "c82184972a228648d793eec5e6ea3a312d82b187d2c4fd504d784f939b2905b9"
+      }
+    },
+    "children/owned_reader-pair-01-leg-2-candidate/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-01-leg-2-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-01-leg-2-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-01-leg-2-candidate/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-01-leg-2-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-01-leg-2-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-02-leg-1-candidate/child.json": {
+      "copy": {
+        "bytes": 2766,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-02-leg-1-candidate/child.json",
+        "sha256": "4ccbdc3f64ca8fe099408936d2a85999aebfa655eb3c79622da7395e5cf28684"
+      },
+      "source": {
+        "bytes": 2766,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-02-leg-1-candidate/child.json",
+        "sha256": "4ccbdc3f64ca8fe099408936d2a85999aebfa655eb3c79622da7395e5cf28684"
+      }
+    },
+    "children/owned_reader-pair-02-leg-1-candidate/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-02-leg-1-candidate/child.json.sha256",
+        "sha256": "4a47b46a7942c24e70aeb40e7db03c79a4012296d338b3c69dfcc6fcdcb0e5c0"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-02-leg-1-candidate/child.json.sha256",
+        "sha256": "4a47b46a7942c24e70aeb40e7db03c79a4012296d338b3c69dfcc6fcdcb0e5c0"
+      }
+    },
+    "children/owned_reader-pair-02-leg-1-candidate/process-time.txt": {
+      "copy": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-02-leg-1-candidate/process-time.txt",
+        "sha256": "7c2fd620267dba70a54bfa6760aa553232739a97c162977205f5f4dc446e6ffe"
+      },
+      "source": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-02-leg-1-candidate/process-time.txt",
+        "sha256": "7c2fd620267dba70a54bfa6760aa553232739a97c162977205f5f4dc446e6ffe"
+      }
+    },
+    "children/owned_reader-pair-02-leg-1-candidate/report.json": {
+      "copy": {
+        "bytes": 137140,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-02-leg-1-candidate/report.json",
+        "sha256": "236ecf6ce583b6cd6f0c27917715c890a47754443d996dd89e134583dafeb4a7"
+      },
+      "source": {
+        "bytes": 137140,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-02-leg-1-candidate/report.json",
+        "sha256": "236ecf6ce583b6cd6f0c27917715c890a47754443d996dd89e134583dafeb4a7"
+      }
+    },
+    "children/owned_reader-pair-02-leg-1-candidate/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-02-leg-1-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-02-leg-1-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-02-leg-1-candidate/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-02-leg-1-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-02-leg-1-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-02-leg-2-baseline/child.json": {
+      "copy": {
+        "bytes": 2750,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-02-leg-2-baseline/child.json",
+        "sha256": "8b7f9b687ee75a15080ac38bf12e531b50f39cf91e3b63f3b2ffccf938afaddd"
+      },
+      "source": {
+        "bytes": 2750,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-02-leg-2-baseline/child.json",
+        "sha256": "8b7f9b687ee75a15080ac38bf12e531b50f39cf91e3b63f3b2ffccf938afaddd"
+      }
+    },
+    "children/owned_reader-pair-02-leg-2-baseline/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-02-leg-2-baseline/child.json.sha256",
+        "sha256": "fa8a4ae550e0b499325451677354ff64aa7830353f108bc76e4c3d971950c3fa"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-02-leg-2-baseline/child.json.sha256",
+        "sha256": "fa8a4ae550e0b499325451677354ff64aa7830353f108bc76e4c3d971950c3fa"
+      }
+    },
+    "children/owned_reader-pair-02-leg-2-baseline/process-time.txt": {
+      "copy": {
+        "bytes": 987,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-02-leg-2-baseline/process-time.txt",
+        "sha256": "662b85cd46820f35a9706f2f9972882f53e750c361dfecb6b22f2dd6160e0baf"
+      },
+      "source": {
+        "bytes": 987,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-02-leg-2-baseline/process-time.txt",
+        "sha256": "662b85cd46820f35a9706f2f9972882f53e750c361dfecb6b22f2dd6160e0baf"
+      }
+    },
+    "children/owned_reader-pair-02-leg-2-baseline/report.json": {
+      "copy": {
+        "bytes": 137131,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-02-leg-2-baseline/report.json",
+        "sha256": "99f2ce369fa72de3518970caa701c5054ae0d2931eb192e4c1d1322e917d2981"
+      },
+      "source": {
+        "bytes": 137131,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-02-leg-2-baseline/report.json",
+        "sha256": "99f2ce369fa72de3518970caa701c5054ae0d2931eb192e4c1d1322e917d2981"
+      }
+    },
+    "children/owned_reader-pair-02-leg-2-baseline/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-02-leg-2-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-02-leg-2-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-02-leg-2-baseline/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-02-leg-2-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-02-leg-2-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-03-leg-1-baseline/child.json": {
+      "copy": {
+        "bytes": 2750,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-03-leg-1-baseline/child.json",
+        "sha256": "3d7105c4681cb6bc08104372ef9d12f5b0552a05a301335cab0656182be81b95"
+      },
+      "source": {
+        "bytes": 2750,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-03-leg-1-baseline/child.json",
+        "sha256": "3d7105c4681cb6bc08104372ef9d12f5b0552a05a301335cab0656182be81b95"
+      }
+    },
+    "children/owned_reader-pair-03-leg-1-baseline/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-03-leg-1-baseline/child.json.sha256",
+        "sha256": "51ed0d4be706882adda5d315f0710d9a5caf77314bb600e4ffe1250a3bb87203"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-03-leg-1-baseline/child.json.sha256",
+        "sha256": "51ed0d4be706882adda5d315f0710d9a5caf77314bb600e4ffe1250a3bb87203"
+      }
+    },
+    "children/owned_reader-pair-03-leg-1-baseline/process-time.txt": {
+      "copy": {
+        "bytes": 988,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-03-leg-1-baseline/process-time.txt",
+        "sha256": "ce8861aeba72e24f1a4e8c6380c74459df52c10db46b85ccea3249a87d313a18"
+      },
+      "source": {
+        "bytes": 988,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-03-leg-1-baseline/process-time.txt",
+        "sha256": "ce8861aeba72e24f1a4e8c6380c74459df52c10db46b85ccea3249a87d313a18"
+      }
+    },
+    "children/owned_reader-pair-03-leg-1-baseline/report.json": {
+      "copy": {
+        "bytes": 137138,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-03-leg-1-baseline/report.json",
+        "sha256": "be088dfa2b035b78435ab840ca44322eba61959ce03477ead9bfeebb3ae95749"
+      },
+      "source": {
+        "bytes": 137138,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-03-leg-1-baseline/report.json",
+        "sha256": "be088dfa2b035b78435ab840ca44322eba61959ce03477ead9bfeebb3ae95749"
+      }
+    },
+    "children/owned_reader-pair-03-leg-1-baseline/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-03-leg-1-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-03-leg-1-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-03-leg-1-baseline/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-03-leg-1-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-03-leg-1-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-03-leg-2-candidate/child.json": {
+      "copy": {
+        "bytes": 2766,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-03-leg-2-candidate/child.json",
+        "sha256": "0214deff2509f6674e4bb0862bc15dd69a1107bf1874d35bd5b35c68499a2a00"
+      },
+      "source": {
+        "bytes": 2766,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-03-leg-2-candidate/child.json",
+        "sha256": "0214deff2509f6674e4bb0862bc15dd69a1107bf1874d35bd5b35c68499a2a00"
+      }
+    },
+    "children/owned_reader-pair-03-leg-2-candidate/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-03-leg-2-candidate/child.json.sha256",
+        "sha256": "7a801deea5403a62864c7cd21132291bb52c0455edfc7fbbf131ac3be8c1cf46"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-03-leg-2-candidate/child.json.sha256",
+        "sha256": "7a801deea5403a62864c7cd21132291bb52c0455edfc7fbbf131ac3be8c1cf46"
+      }
+    },
+    "children/owned_reader-pair-03-leg-2-candidate/process-time.txt": {
+      "copy": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-03-leg-2-candidate/process-time.txt",
+        "sha256": "b7401953990cbc79f396f055a21eca60519c5585a55b5e7f43bbecf26caad9e4"
+      },
+      "source": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-03-leg-2-candidate/process-time.txt",
+        "sha256": "b7401953990cbc79f396f055a21eca60519c5585a55b5e7f43bbecf26caad9e4"
+      }
+    },
+    "children/owned_reader-pair-03-leg-2-candidate/report.json": {
+      "copy": {
+        "bytes": 137134,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-03-leg-2-candidate/report.json",
+        "sha256": "908023d808ebe97f7e0fc5f992de3bf83b534a55374eada80ad5f50e09949fb1"
+      },
+      "source": {
+        "bytes": 137134,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-03-leg-2-candidate/report.json",
+        "sha256": "908023d808ebe97f7e0fc5f992de3bf83b534a55374eada80ad5f50e09949fb1"
+      }
+    },
+    "children/owned_reader-pair-03-leg-2-candidate/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-03-leg-2-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-03-leg-2-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-03-leg-2-candidate/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-03-leg-2-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-03-leg-2-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-04-leg-1-candidate/child.json": {
+      "copy": {
+        "bytes": 2766,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-04-leg-1-candidate/child.json",
+        "sha256": "d0be8e79a89fe335ea1105c82c7a54d63a214bb5bd84e6193a5f61579ed6c213"
+      },
+      "source": {
+        "bytes": 2766,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-04-leg-1-candidate/child.json",
+        "sha256": "d0be8e79a89fe335ea1105c82c7a54d63a214bb5bd84e6193a5f61579ed6c213"
+      }
+    },
+    "children/owned_reader-pair-04-leg-1-candidate/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-04-leg-1-candidate/child.json.sha256",
+        "sha256": "895a7760e03335717e0739a6c3b7da05d31921a1ce698e12ff8a3d1525c4b27f"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-04-leg-1-candidate/child.json.sha256",
+        "sha256": "895a7760e03335717e0739a6c3b7da05d31921a1ce698e12ff8a3d1525c4b27f"
+      }
+    },
+    "children/owned_reader-pair-04-leg-1-candidate/process-time.txt": {
+      "copy": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-04-leg-1-candidate/process-time.txt",
+        "sha256": "88776c34cb95da952d001e057d1a625c757846d42d70bfd7e8ebd3f6850863f8"
+      },
+      "source": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-04-leg-1-candidate/process-time.txt",
+        "sha256": "88776c34cb95da952d001e057d1a625c757846d42d70bfd7e8ebd3f6850863f8"
+      }
+    },
+    "children/owned_reader-pair-04-leg-1-candidate/report.json": {
+      "copy": {
+        "bytes": 137340,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-04-leg-1-candidate/report.json",
+        "sha256": "4ef3a1414770a9fbfc95e7153eb8309707e7f1e076e64cc1295efc3364ba870b"
+      },
+      "source": {
+        "bytes": 137340,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-04-leg-1-candidate/report.json",
+        "sha256": "4ef3a1414770a9fbfc95e7153eb8309707e7f1e076e64cc1295efc3364ba870b"
+      }
+    },
+    "children/owned_reader-pair-04-leg-1-candidate/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-04-leg-1-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-04-leg-1-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-04-leg-1-candidate/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-04-leg-1-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-04-leg-1-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-04-leg-2-baseline/child.json": {
+      "copy": {
+        "bytes": 2750,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-04-leg-2-baseline/child.json",
+        "sha256": "fe7c3e4f945b17842d6b03b46eda82e72300b1027e3360f2d1a97fd7d00b1ed4"
+      },
+      "source": {
+        "bytes": 2750,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-04-leg-2-baseline/child.json",
+        "sha256": "fe7c3e4f945b17842d6b03b46eda82e72300b1027e3360f2d1a97fd7d00b1ed4"
+      }
+    },
+    "children/owned_reader-pair-04-leg-2-baseline/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-04-leg-2-baseline/child.json.sha256",
+        "sha256": "13361e3c6cb2d0b30fc733085cc83a31ccd2111ece8cf71838cc0aa4a3644c70"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-04-leg-2-baseline/child.json.sha256",
+        "sha256": "13361e3c6cb2d0b30fc733085cc83a31ccd2111ece8cf71838cc0aa4a3644c70"
+      }
+    },
+    "children/owned_reader-pair-04-leg-2-baseline/process-time.txt": {
+      "copy": {
+        "bytes": 987,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-04-leg-2-baseline/process-time.txt",
+        "sha256": "fa8292be06b19bee6b4a719e397447ea88b1ca35cfd2125ed0411257607ff353"
+      },
+      "source": {
+        "bytes": 987,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-04-leg-2-baseline/process-time.txt",
+        "sha256": "fa8292be06b19bee6b4a719e397447ea88b1ca35cfd2125ed0411257607ff353"
+      }
+    },
+    "children/owned_reader-pair-04-leg-2-baseline/report.json": {
+      "copy": {
+        "bytes": 137338,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-04-leg-2-baseline/report.json",
+        "sha256": "90052c80db14f4c0841845b2cf57461a07bf8eefd725b5f3cda9e4d0d59a7298"
+      },
+      "source": {
+        "bytes": 137338,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-04-leg-2-baseline/report.json",
+        "sha256": "90052c80db14f4c0841845b2cf57461a07bf8eefd725b5f3cda9e4d0d59a7298"
+      }
+    },
+    "children/owned_reader-pair-04-leg-2-baseline/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-04-leg-2-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-04-leg-2-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-04-leg-2-baseline/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-04-leg-2-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-04-leg-2-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-05-leg-1-baseline/child.json": {
+      "copy": {
+        "bytes": 2750,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-05-leg-1-baseline/child.json",
+        "sha256": "5e12147a52839530b33c9bcf8959ad172f894f8a393416c5603ccf72a7548ccf"
+      },
+      "source": {
+        "bytes": 2750,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-05-leg-1-baseline/child.json",
+        "sha256": "5e12147a52839530b33c9bcf8959ad172f894f8a393416c5603ccf72a7548ccf"
+      }
+    },
+    "children/owned_reader-pair-05-leg-1-baseline/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-05-leg-1-baseline/child.json.sha256",
+        "sha256": "bfa5335d93345d8ca96f144f2acf1cdaff2ee5cf34c283641341957f6d0e5ba0"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-05-leg-1-baseline/child.json.sha256",
+        "sha256": "bfa5335d93345d8ca96f144f2acf1cdaff2ee5cf34c283641341957f6d0e5ba0"
+      }
+    },
+    "children/owned_reader-pair-05-leg-1-baseline/process-time.txt": {
+      "copy": {
+        "bytes": 988,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-05-leg-1-baseline/process-time.txt",
+        "sha256": "04457c373c02c1e2e7a5769deaf51e94c4d0e27e4017e88c15989105432f4141"
+      },
+      "source": {
+        "bytes": 988,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-05-leg-1-baseline/process-time.txt",
+        "sha256": "04457c373c02c1e2e7a5769deaf51e94c4d0e27e4017e88c15989105432f4141"
+      }
+    },
+    "children/owned_reader-pair-05-leg-1-baseline/report.json": {
+      "copy": {
+        "bytes": 137135,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-05-leg-1-baseline/report.json",
+        "sha256": "77bb0a746b816ee3b9cc64a1900c9e15dadb8ac843aea28e658abe241704e173"
+      },
+      "source": {
+        "bytes": 137135,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-05-leg-1-baseline/report.json",
+        "sha256": "77bb0a746b816ee3b9cc64a1900c9e15dadb8ac843aea28e658abe241704e173"
+      }
+    },
+    "children/owned_reader-pair-05-leg-1-baseline/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-05-leg-1-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-05-leg-1-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-05-leg-1-baseline/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-05-leg-1-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-05-leg-1-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-05-leg-2-candidate/child.json": {
+      "copy": {
+        "bytes": 2766,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-05-leg-2-candidate/child.json",
+        "sha256": "aae8f9736ac4e20a8ad5bf10df394ddc215fd40f3cd9d444d7fc810f4792c67e"
+      },
+      "source": {
+        "bytes": 2766,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-05-leg-2-candidate/child.json",
+        "sha256": "aae8f9736ac4e20a8ad5bf10df394ddc215fd40f3cd9d444d7fc810f4792c67e"
+      }
+    },
+    "children/owned_reader-pair-05-leg-2-candidate/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-05-leg-2-candidate/child.json.sha256",
+        "sha256": "968cb70fbe02822ce5952e630177df3a2f2f5c7fd3216393a1e7cf3610ca7b1b"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-05-leg-2-candidate/child.json.sha256",
+        "sha256": "968cb70fbe02822ce5952e630177df3a2f2f5c7fd3216393a1e7cf3610ca7b1b"
+      }
+    },
+    "children/owned_reader-pair-05-leg-2-candidate/process-time.txt": {
+      "copy": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-05-leg-2-candidate/process-time.txt",
+        "sha256": "c5e1eddcf119c30440e886025f7dfc706aebb161679c34ff49d7711d0667d147"
+      },
+      "source": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-05-leg-2-candidate/process-time.txt",
+        "sha256": "c5e1eddcf119c30440e886025f7dfc706aebb161679c34ff49d7711d0667d147"
+      }
+    },
+    "children/owned_reader-pair-05-leg-2-candidate/report.json": {
+      "copy": {
+        "bytes": 137142,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-05-leg-2-candidate/report.json",
+        "sha256": "d31d00166e7a0dcacff41c585907d8db4cb812080cd7305141ba01371a7f2493"
+      },
+      "source": {
+        "bytes": 137142,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-05-leg-2-candidate/report.json",
+        "sha256": "d31d00166e7a0dcacff41c585907d8db4cb812080cd7305141ba01371a7f2493"
+      }
+    },
+    "children/owned_reader-pair-05-leg-2-candidate/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-05-leg-2-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-05-leg-2-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-05-leg-2-candidate/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-05-leg-2-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-05-leg-2-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-06-leg-1-candidate/child.json": {
+      "copy": {
+        "bytes": 2766,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-06-leg-1-candidate/child.json",
+        "sha256": "b1cd69afc7103259b5fb09c5d11b240f92582daa7cff1ffb7901d4a6ceaa5f2f"
+      },
+      "source": {
+        "bytes": 2766,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-06-leg-1-candidate/child.json",
+        "sha256": "b1cd69afc7103259b5fb09c5d11b240f92582daa7cff1ffb7901d4a6ceaa5f2f"
+      }
+    },
+    "children/owned_reader-pair-06-leg-1-candidate/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-06-leg-1-candidate/child.json.sha256",
+        "sha256": "028d70e1d8c0d01b6fa4a79881336b28b1b89921de497202ac5169badd3f5074"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-06-leg-1-candidate/child.json.sha256",
+        "sha256": "028d70e1d8c0d01b6fa4a79881336b28b1b89921de497202ac5169badd3f5074"
+      }
+    },
+    "children/owned_reader-pair-06-leg-1-candidate/process-time.txt": {
+      "copy": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-06-leg-1-candidate/process-time.txt",
+        "sha256": "029c86b5daee533049c7c1f91e0a60c1fba00c51e071779911f3398ea4e43ea9"
+      },
+      "source": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-06-leg-1-candidate/process-time.txt",
+        "sha256": "029c86b5daee533049c7c1f91e0a60c1fba00c51e071779911f3398ea4e43ea9"
+      }
+    },
+    "children/owned_reader-pair-06-leg-1-candidate/report.json": {
+      "copy": {
+        "bytes": 137142,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-06-leg-1-candidate/report.json",
+        "sha256": "9be16bde44a293ebd05183b0fc469a4fb26058bbb848f6b216b8be76662c4d69"
+      },
+      "source": {
+        "bytes": 137142,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-06-leg-1-candidate/report.json",
+        "sha256": "9be16bde44a293ebd05183b0fc469a4fb26058bbb848f6b216b8be76662c4d69"
+      }
+    },
+    "children/owned_reader-pair-06-leg-1-candidate/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-06-leg-1-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-06-leg-1-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-06-leg-1-candidate/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-06-leg-1-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-06-leg-1-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-06-leg-2-baseline/child.json": {
+      "copy": {
+        "bytes": 2750,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-06-leg-2-baseline/child.json",
+        "sha256": "2249329be72b993ad342ee5b96258f1b8b2b047e25c7808fa62d97523df09774"
+      },
+      "source": {
+        "bytes": 2750,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-06-leg-2-baseline/child.json",
+        "sha256": "2249329be72b993ad342ee5b96258f1b8b2b047e25c7808fa62d97523df09774"
+      }
+    },
+    "children/owned_reader-pair-06-leg-2-baseline/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-06-leg-2-baseline/child.json.sha256",
+        "sha256": "6f296cbe859cfe79170beebd803f8f951677078b3ae6e8f53aae83eb6819cfac"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-06-leg-2-baseline/child.json.sha256",
+        "sha256": "6f296cbe859cfe79170beebd803f8f951677078b3ae6e8f53aae83eb6819cfac"
+      }
+    },
+    "children/owned_reader-pair-06-leg-2-baseline/process-time.txt": {
+      "copy": {
+        "bytes": 987,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-06-leg-2-baseline/process-time.txt",
+        "sha256": "bf8dddceb4d96f041deb71d628b5c6442fda60ac0f7160dde1e3340f8c5a1dba"
+      },
+      "source": {
+        "bytes": 987,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-06-leg-2-baseline/process-time.txt",
+        "sha256": "bf8dddceb4d96f041deb71d628b5c6442fda60ac0f7160dde1e3340f8c5a1dba"
+      }
+    },
+    "children/owned_reader-pair-06-leg-2-baseline/report.json": {
+      "copy": {
+        "bytes": 137338,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-06-leg-2-baseline/report.json",
+        "sha256": "8af427edaf76a34f4b8296565a40c371d049ca309cf71c739ce542d00508791a"
+      },
+      "source": {
+        "bytes": 137338,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-06-leg-2-baseline/report.json",
+        "sha256": "8af427edaf76a34f4b8296565a40c371d049ca309cf71c739ce542d00508791a"
+      }
+    },
+    "children/owned_reader-pair-06-leg-2-baseline/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-06-leg-2-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-06-leg-2-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-06-leg-2-baseline/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-06-leg-2-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-06-leg-2-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-07-leg-1-baseline/child.json": {
+      "copy": {
+        "bytes": 2750,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-07-leg-1-baseline/child.json",
+        "sha256": "0f682de68ae120871731f25678ce9250ee887d76ef15207d24af519d3b571e1e"
+      },
+      "source": {
+        "bytes": 2750,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-07-leg-1-baseline/child.json",
+        "sha256": "0f682de68ae120871731f25678ce9250ee887d76ef15207d24af519d3b571e1e"
+      }
+    },
+    "children/owned_reader-pair-07-leg-1-baseline/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-07-leg-1-baseline/child.json.sha256",
+        "sha256": "7858ba4ef9751706797d0a784f180d6951a2205f8072fbc31eb276abaebd860f"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-07-leg-1-baseline/child.json.sha256",
+        "sha256": "7858ba4ef9751706797d0a784f180d6951a2205f8072fbc31eb276abaebd860f"
+      }
+    },
+    "children/owned_reader-pair-07-leg-1-baseline/process-time.txt": {
+      "copy": {
+        "bytes": 988,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-07-leg-1-baseline/process-time.txt",
+        "sha256": "7e224838afaadb6481fc7c8c49e3db9d3da02c9eb019f0b903448d204267a638"
+      },
+      "source": {
+        "bytes": 988,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-07-leg-1-baseline/process-time.txt",
+        "sha256": "7e224838afaadb6481fc7c8c49e3db9d3da02c9eb019f0b903448d204267a638"
+      }
+    },
+    "children/owned_reader-pair-07-leg-1-baseline/report.json": {
+      "copy": {
+        "bytes": 137132,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-07-leg-1-baseline/report.json",
+        "sha256": "a1bd7e2f43d09573d00df7221b32d6c53ac6965193688f8a11f498edf7a36aa3"
+      },
+      "source": {
+        "bytes": 137132,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-07-leg-1-baseline/report.json",
+        "sha256": "a1bd7e2f43d09573d00df7221b32d6c53ac6965193688f8a11f498edf7a36aa3"
+      }
+    },
+    "children/owned_reader-pair-07-leg-1-baseline/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-07-leg-1-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-07-leg-1-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-07-leg-1-baseline/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-07-leg-1-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-07-leg-1-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-07-leg-2-candidate/child.json": {
+      "copy": {
+        "bytes": 2766,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-07-leg-2-candidate/child.json",
+        "sha256": "ee2df30e9a43aabd84860446266d0d7ae2663f972fe01e3d28e3d03ed87e246e"
+      },
+      "source": {
+        "bytes": 2766,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-07-leg-2-candidate/child.json",
+        "sha256": "ee2df30e9a43aabd84860446266d0d7ae2663f972fe01e3d28e3d03ed87e246e"
+      }
+    },
+    "children/owned_reader-pair-07-leg-2-candidate/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-07-leg-2-candidate/child.json.sha256",
+        "sha256": "429b5ffa62d0f2cbedcead06f29e5632f3106f8be8f60b844d2b7cebb792161e"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-07-leg-2-candidate/child.json.sha256",
+        "sha256": "429b5ffa62d0f2cbedcead06f29e5632f3106f8be8f60b844d2b7cebb792161e"
+      }
+    },
+    "children/owned_reader-pair-07-leg-2-candidate/process-time.txt": {
+      "copy": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-07-leg-2-candidate/process-time.txt",
+        "sha256": "765cebd42cafd447866029646badc19c1d3275dccbead0ab816cd3246da72ecc"
+      },
+      "source": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-07-leg-2-candidate/process-time.txt",
+        "sha256": "765cebd42cafd447866029646badc19c1d3275dccbead0ab816cd3246da72ecc"
+      }
+    },
+    "children/owned_reader-pair-07-leg-2-candidate/report.json": {
+      "copy": {
+        "bytes": 137142,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-07-leg-2-candidate/report.json",
+        "sha256": "7370fec4aadcb37f8b3e4b89afb2dd9ca32536be642fd158538d8a7bbd33aa59"
+      },
+      "source": {
+        "bytes": 137142,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-07-leg-2-candidate/report.json",
+        "sha256": "7370fec4aadcb37f8b3e4b89afb2dd9ca32536be642fd158538d8a7bbd33aa59"
+      }
+    },
+    "children/owned_reader-pair-07-leg-2-candidate/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-07-leg-2-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-07-leg-2-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-07-leg-2-candidate/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-07-leg-2-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-07-leg-2-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-08-leg-1-candidate/child.json": {
+      "copy": {
+        "bytes": 2766,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-08-leg-1-candidate/child.json",
+        "sha256": "13744e7714a8ab06c96a7732484546894ec9be761d372fcc19e4b30dfe1b6f74"
+      },
+      "source": {
+        "bytes": 2766,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-08-leg-1-candidate/child.json",
+        "sha256": "13744e7714a8ab06c96a7732484546894ec9be761d372fcc19e4b30dfe1b6f74"
+      }
+    },
+    "children/owned_reader-pair-08-leg-1-candidate/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-08-leg-1-candidate/child.json.sha256",
+        "sha256": "34030ca8bd5ac1957b5ed34e6f539e5cd3be1e2cdf24ab4424961b5316abcbbc"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-08-leg-1-candidate/child.json.sha256",
+        "sha256": "34030ca8bd5ac1957b5ed34e6f539e5cd3be1e2cdf24ab4424961b5316abcbbc"
+      }
+    },
+    "children/owned_reader-pair-08-leg-1-candidate/process-time.txt": {
+      "copy": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-08-leg-1-candidate/process-time.txt",
+        "sha256": "87e5c9f3d0e976c1aff79b88fef02d5d737f341468aaf4a3b4395be974b7dbba"
+      },
+      "source": {
+        "bytes": 990,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-08-leg-1-candidate/process-time.txt",
+        "sha256": "87e5c9f3d0e976c1aff79b88fef02d5d737f341468aaf4a3b4395be974b7dbba"
+      }
+    },
+    "children/owned_reader-pair-08-leg-1-candidate/report.json": {
+      "copy": {
+        "bytes": 137143,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-08-leg-1-candidate/report.json",
+        "sha256": "509fe51150fac597ade60f10585da12fc29b99b868cebabc0609273ebc2d1993"
+      },
+      "source": {
+        "bytes": 137143,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-08-leg-1-candidate/report.json",
+        "sha256": "509fe51150fac597ade60f10585da12fc29b99b868cebabc0609273ebc2d1993"
+      }
+    },
+    "children/owned_reader-pair-08-leg-1-candidate/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-08-leg-1-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-08-leg-1-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-08-leg-1-candidate/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-08-leg-1-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-08-leg-1-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-08-leg-2-baseline/child.json": {
+      "copy": {
+        "bytes": 2750,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-08-leg-2-baseline/child.json",
+        "sha256": "abfcceca8b96eb5262647b69e9031369106e70245be3504e92d3fa41a88302f0"
+      },
+      "source": {
+        "bytes": 2750,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-08-leg-2-baseline/child.json",
+        "sha256": "abfcceca8b96eb5262647b69e9031369106e70245be3504e92d3fa41a88302f0"
+      }
+    },
+    "children/owned_reader-pair-08-leg-2-baseline/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-08-leg-2-baseline/child.json.sha256",
+        "sha256": "7c730cb32f769b71bfb0bfdcabbc341be927e9e20e7070c241adb67c20b3e3a1"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-08-leg-2-baseline/child.json.sha256",
+        "sha256": "7c730cb32f769b71bfb0bfdcabbc341be927e9e20e7070c241adb67c20b3e3a1"
+      }
+    },
+    "children/owned_reader-pair-08-leg-2-baseline/process-time.txt": {
+      "copy": {
+        "bytes": 987,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-08-leg-2-baseline/process-time.txt",
+        "sha256": "cb3995be2a05f554f22884571e2f37eaee249e45cd57c8e659fc81b7ee5ff943"
+      },
+      "source": {
+        "bytes": 987,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-08-leg-2-baseline/process-time.txt",
+        "sha256": "cb3995be2a05f554f22884571e2f37eaee249e45cd57c8e659fc81b7ee5ff943"
+      }
+    },
+    "children/owned_reader-pair-08-leg-2-baseline/report.json": {
+      "copy": {
+        "bytes": 137336,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-08-leg-2-baseline/report.json",
+        "sha256": "50e54094405ad1fdf89455658a260697fada1090a1d36479d9379550f37932c3"
+      },
+      "source": {
+        "bytes": 137336,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-08-leg-2-baseline/report.json",
+        "sha256": "50e54094405ad1fdf89455658a260697fada1090a1d36479d9379550f37932c3"
+      }
+    },
+    "children/owned_reader-pair-08-leg-2-baseline/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-08-leg-2-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-08-leg-2-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_reader-pair-08-leg-2-baseline/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_reader-pair-08-leg-2-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_reader-pair-08-leg-2-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-01-leg-1-baseline/child.json": {
+      "copy": {
+        "bytes": 2711,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-01-leg-1-baseline/child.json",
+        "sha256": "877186ef0e10c2f71dff2c035163fa4f775f92828bcd696a18644a43041a1724"
+      },
+      "source": {
+        "bytes": 2711,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-01-leg-1-baseline/child.json",
+        "sha256": "877186ef0e10c2f71dff2c035163fa4f775f92828bcd696a18644a43041a1724"
+      }
+    },
+    "children/owned_vec-pair-01-leg-1-baseline/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-01-leg-1-baseline/child.json.sha256",
+        "sha256": "98ba4a95a1b02ac795dfa8c6803765ba123c041ae4af9a7ecf71873db23cc9a8"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-01-leg-1-baseline/child.json.sha256",
+        "sha256": "98ba4a95a1b02ac795dfa8c6803765ba123c041ae4af9a7ecf71873db23cc9a8"
+      }
+    },
+    "children/owned_vec-pair-01-leg-1-baseline/process-time.txt": {
+      "copy": {
+        "bytes": 985,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-01-leg-1-baseline/process-time.txt",
+        "sha256": "361e812d4cdf092c6a6d2650d12e51ec6103a75352cef0cfd96a4da8ef5a941c"
+      },
+      "source": {
+        "bytes": 985,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-01-leg-1-baseline/process-time.txt",
+        "sha256": "361e812d4cdf092c6a6d2650d12e51ec6103a75352cef0cfd96a4da8ef5a941c"
+      }
+    },
+    "children/owned_vec-pair-01-leg-1-baseline/report.json": {
+      "copy": {
+        "bytes": 135510,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-01-leg-1-baseline/report.json",
+        "sha256": "e651bc157b38ee61cf1629f2f96b904d813532fb2bb667665f17b75b26f238f6"
+      },
+      "source": {
+        "bytes": 135510,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-01-leg-1-baseline/report.json",
+        "sha256": "e651bc157b38ee61cf1629f2f96b904d813532fb2bb667665f17b75b26f238f6"
+      }
+    },
+    "children/owned_vec-pair-01-leg-1-baseline/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-01-leg-1-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-01-leg-1-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-01-leg-1-baseline/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-01-leg-1-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-01-leg-1-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-01-leg-2-candidate/child.json": {
+      "copy": {
+        "bytes": 2727,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-01-leg-2-candidate/child.json",
+        "sha256": "83016190c605f04656c1e5751ca8ce906c38e2dbc0813cf2479672f058fdc17b"
+      },
+      "source": {
+        "bytes": 2727,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-01-leg-2-candidate/child.json",
+        "sha256": "83016190c605f04656c1e5751ca8ce906c38e2dbc0813cf2479672f058fdc17b"
+      }
+    },
+    "children/owned_vec-pair-01-leg-2-candidate/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-01-leg-2-candidate/child.json.sha256",
+        "sha256": "51fa53a41ce4b15835eff86366548b49c7a53e570bed01ffa53469d2da7d9d12"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-01-leg-2-candidate/child.json.sha256",
+        "sha256": "51fa53a41ce4b15835eff86366548b49c7a53e570bed01ffa53469d2da7d9d12"
+      }
+    },
+    "children/owned_vec-pair-01-leg-2-candidate/process-time.txt": {
+      "copy": {
+        "bytes": 988,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-01-leg-2-candidate/process-time.txt",
+        "sha256": "674a3eca316c9317232b44cda9b860e111a1cc4732509aaa794f3326ec96e492"
+      },
+      "source": {
+        "bytes": 988,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-01-leg-2-candidate/process-time.txt",
+        "sha256": "674a3eca316c9317232b44cda9b860e111a1cc4732509aaa794f3326ec96e492"
+      }
+    },
+    "children/owned_vec-pair-01-leg-2-candidate/report.json": {
+      "copy": {
+        "bytes": 135512,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-01-leg-2-candidate/report.json",
+        "sha256": "215a2129a3304c050b9c8242dd6517554891994b94c543375e2def518486af3c"
+      },
+      "source": {
+        "bytes": 135512,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-01-leg-2-candidate/report.json",
+        "sha256": "215a2129a3304c050b9c8242dd6517554891994b94c543375e2def518486af3c"
+      }
+    },
+    "children/owned_vec-pair-01-leg-2-candidate/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-01-leg-2-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-01-leg-2-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-01-leg-2-candidate/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-01-leg-2-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-01-leg-2-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-02-leg-1-candidate/child.json": {
+      "copy": {
+        "bytes": 2727,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-02-leg-1-candidate/child.json",
+        "sha256": "cf82658f084f700a886a46dff8edd46c1d0ff93ccfdbcc434a1d46b906afd2f4"
+      },
+      "source": {
+        "bytes": 2727,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-02-leg-1-candidate/child.json",
+        "sha256": "cf82658f084f700a886a46dff8edd46c1d0ff93ccfdbcc434a1d46b906afd2f4"
+      }
+    },
+    "children/owned_vec-pair-02-leg-1-candidate/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-02-leg-1-candidate/child.json.sha256",
+        "sha256": "5756e3944c398a09eed9e0bf0a4ddac949d31e82242643b46b5f2a3654db399e"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-02-leg-1-candidate/child.json.sha256",
+        "sha256": "5756e3944c398a09eed9e0bf0a4ddac949d31e82242643b46b5f2a3654db399e"
+      }
+    },
+    "children/owned_vec-pair-02-leg-1-candidate/process-time.txt": {
+      "copy": {
+        "bytes": 988,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-02-leg-1-candidate/process-time.txt",
+        "sha256": "1f36dfad3f100373bfe0d808bae68416677d4b6e7fba94012d37c9abc5454fd7"
+      },
+      "source": {
+        "bytes": 988,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-02-leg-1-candidate/process-time.txt",
+        "sha256": "1f36dfad3f100373bfe0d808bae68416677d4b6e7fba94012d37c9abc5454fd7"
+      }
+    },
+    "children/owned_vec-pair-02-leg-1-candidate/report.json": {
+      "copy": {
+        "bytes": 135521,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-02-leg-1-candidate/report.json",
+        "sha256": "63e5b1952f7e1c15fca8445b9c987a84af329d12529a04d8027b1f23023a3185"
+      },
+      "source": {
+        "bytes": 135521,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-02-leg-1-candidate/report.json",
+        "sha256": "63e5b1952f7e1c15fca8445b9c987a84af329d12529a04d8027b1f23023a3185"
+      }
+    },
+    "children/owned_vec-pair-02-leg-1-candidate/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-02-leg-1-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-02-leg-1-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-02-leg-1-candidate/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-02-leg-1-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-02-leg-1-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-02-leg-2-baseline/child.json": {
+      "copy": {
+        "bytes": 2711,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-02-leg-2-baseline/child.json",
+        "sha256": "680643739f7cca7a79bcbf18095c9101b6725a6763c38c8e847a1b716d202ce7"
+      },
+      "source": {
+        "bytes": 2711,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-02-leg-2-baseline/child.json",
+        "sha256": "680643739f7cca7a79bcbf18095c9101b6725a6763c38c8e847a1b716d202ce7"
+      }
+    },
+    "children/owned_vec-pair-02-leg-2-baseline/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-02-leg-2-baseline/child.json.sha256",
+        "sha256": "9d3c12cdfd5ab91ce974d24abded8e712ee45970ae2433cad384205d7a3b74b7"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-02-leg-2-baseline/child.json.sha256",
+        "sha256": "9d3c12cdfd5ab91ce974d24abded8e712ee45970ae2433cad384205d7a3b74b7"
+      }
+    },
+    "children/owned_vec-pair-02-leg-2-baseline/process-time.txt": {
+      "copy": {
+        "bytes": 985,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-02-leg-2-baseline/process-time.txt",
+        "sha256": "c313a1b19809f528207c9c7cd1a4401f6e1c401976740633dc2ab6382145cb2e"
+      },
+      "source": {
+        "bytes": 985,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-02-leg-2-baseline/process-time.txt",
+        "sha256": "c313a1b19809f528207c9c7cd1a4401f6e1c401976740633dc2ab6382145cb2e"
+      }
+    },
+    "children/owned_vec-pair-02-leg-2-baseline/report.json": {
+      "copy": {
+        "bytes": 135512,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-02-leg-2-baseline/report.json",
+        "sha256": "9b2a5a63bd2fe76e2ee015dc9e4f3c3a28ef8258ae547568baa5919618fe494d"
+      },
+      "source": {
+        "bytes": 135512,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-02-leg-2-baseline/report.json",
+        "sha256": "9b2a5a63bd2fe76e2ee015dc9e4f3c3a28ef8258ae547568baa5919618fe494d"
+      }
+    },
+    "children/owned_vec-pair-02-leg-2-baseline/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-02-leg-2-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-02-leg-2-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-02-leg-2-baseline/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-02-leg-2-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-02-leg-2-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-03-leg-1-baseline/child.json": {
+      "copy": {
+        "bytes": 2711,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-03-leg-1-baseline/child.json",
+        "sha256": "33fd8d528a6a7f91f91b6e9b759c5c93ee55e5d15be9b05576477e48d6ff371f"
+      },
+      "source": {
+        "bytes": 2711,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-03-leg-1-baseline/child.json",
+        "sha256": "33fd8d528a6a7f91f91b6e9b759c5c93ee55e5d15be9b05576477e48d6ff371f"
+      }
+    },
+    "children/owned_vec-pair-03-leg-1-baseline/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-03-leg-1-baseline/child.json.sha256",
+        "sha256": "9f4f057c5ea8342560d2ad13745d52ce220d09ba6f1a6827379b507fc0ee836b"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-03-leg-1-baseline/child.json.sha256",
+        "sha256": "9f4f057c5ea8342560d2ad13745d52ce220d09ba6f1a6827379b507fc0ee836b"
+      }
+    },
+    "children/owned_vec-pair-03-leg-1-baseline/process-time.txt": {
+      "copy": {
+        "bytes": 985,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-03-leg-1-baseline/process-time.txt",
+        "sha256": "da755f0f6086117c225cb44c5306b34c3693e56fff40b43b62953b0717711ddd"
+      },
+      "source": {
+        "bytes": 985,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-03-leg-1-baseline/process-time.txt",
+        "sha256": "da755f0f6086117c225cb44c5306b34c3693e56fff40b43b62953b0717711ddd"
+      }
+    },
+    "children/owned_vec-pair-03-leg-1-baseline/report.json": {
+      "copy": {
+        "bytes": 135519,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-03-leg-1-baseline/report.json",
+        "sha256": "949a49839a236c265de119deefde59e7e19abd6252eefeec8f2565683677827c"
+      },
+      "source": {
+        "bytes": 135519,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-03-leg-1-baseline/report.json",
+        "sha256": "949a49839a236c265de119deefde59e7e19abd6252eefeec8f2565683677827c"
+      }
+    },
+    "children/owned_vec-pair-03-leg-1-baseline/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-03-leg-1-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-03-leg-1-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-03-leg-1-baseline/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-03-leg-1-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-03-leg-1-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-03-leg-2-candidate/child.json": {
+      "copy": {
+        "bytes": 2727,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-03-leg-2-candidate/child.json",
+        "sha256": "372cd1a89462214c5c8298b73b51dd70eb30fda326c0e012a8d6328249fc2cfa"
+      },
+      "source": {
+        "bytes": 2727,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-03-leg-2-candidate/child.json",
+        "sha256": "372cd1a89462214c5c8298b73b51dd70eb30fda326c0e012a8d6328249fc2cfa"
+      }
+    },
+    "children/owned_vec-pair-03-leg-2-candidate/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-03-leg-2-candidate/child.json.sha256",
+        "sha256": "e9379ab14115fece401ad0b1e506e7c99a7c64eb8a4facee71f27643dac9a7dd"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-03-leg-2-candidate/child.json.sha256",
+        "sha256": "e9379ab14115fece401ad0b1e506e7c99a7c64eb8a4facee71f27643dac9a7dd"
+      }
+    },
+    "children/owned_vec-pair-03-leg-2-candidate/process-time.txt": {
+      "copy": {
+        "bytes": 989,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-03-leg-2-candidate/process-time.txt",
+        "sha256": "48c732352cf896966dd9eb09e853e41001311bcd86112de7cb80172e108c86ad"
+      },
+      "source": {
+        "bytes": 989,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-03-leg-2-candidate/process-time.txt",
+        "sha256": "48c732352cf896966dd9eb09e853e41001311bcd86112de7cb80172e108c86ad"
+      }
+    },
+    "children/owned_vec-pair-03-leg-2-candidate/report.json": {
+      "copy": {
+        "bytes": 135522,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-03-leg-2-candidate/report.json",
+        "sha256": "46f073711b9bb74a6596c1c0104e017947267bb3d7bc45b1a7d78ee268943c58"
+      },
+      "source": {
+        "bytes": 135522,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-03-leg-2-candidate/report.json",
+        "sha256": "46f073711b9bb74a6596c1c0104e017947267bb3d7bc45b1a7d78ee268943c58"
+      }
+    },
+    "children/owned_vec-pair-03-leg-2-candidate/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-03-leg-2-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-03-leg-2-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-03-leg-2-candidate/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-03-leg-2-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-03-leg-2-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-04-leg-1-candidate/child.json": {
+      "copy": {
+        "bytes": 2727,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-04-leg-1-candidate/child.json",
+        "sha256": "c1debcfa0282d2a60dfde6df70c5679811b252737dc591b1722ee9929f443d23"
+      },
+      "source": {
+        "bytes": 2727,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-04-leg-1-candidate/child.json",
+        "sha256": "c1debcfa0282d2a60dfde6df70c5679811b252737dc591b1722ee9929f443d23"
+      }
+    },
+    "children/owned_vec-pair-04-leg-1-candidate/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-04-leg-1-candidate/child.json.sha256",
+        "sha256": "3307ecb14ad609b9bc99ef9ea45340f499a6e8fdc24567b8b60a5705c1a86eba"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-04-leg-1-candidate/child.json.sha256",
+        "sha256": "3307ecb14ad609b9bc99ef9ea45340f499a6e8fdc24567b8b60a5705c1a86eba"
+      }
+    },
+    "children/owned_vec-pair-04-leg-1-candidate/process-time.txt": {
+      "copy": {
+        "bytes": 988,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-04-leg-1-candidate/process-time.txt",
+        "sha256": "344e453ff78b86b6c3d3c9c12626b95675707b8de5efd92e46dd7b705b1a0e02"
+      },
+      "source": {
+        "bytes": 988,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-04-leg-1-candidate/process-time.txt",
+        "sha256": "344e453ff78b86b6c3d3c9c12626b95675707b8de5efd92e46dd7b705b1a0e02"
+      }
+    },
+    "children/owned_vec-pair-04-leg-1-candidate/report.json": {
+      "copy": {
+        "bytes": 135522,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-04-leg-1-candidate/report.json",
+        "sha256": "7003184b701dc4a8f5bf91b5d4130a08b5d3e87d12ff83c3d7a0b8bedc2cdc01"
+      },
+      "source": {
+        "bytes": 135522,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-04-leg-1-candidate/report.json",
+        "sha256": "7003184b701dc4a8f5bf91b5d4130a08b5d3e87d12ff83c3d7a0b8bedc2cdc01"
+      }
+    },
+    "children/owned_vec-pair-04-leg-1-candidate/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-04-leg-1-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-04-leg-1-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-04-leg-1-candidate/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-04-leg-1-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-04-leg-1-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-04-leg-2-baseline/child.json": {
+      "copy": {
+        "bytes": 2711,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-04-leg-2-baseline/child.json",
+        "sha256": "333d96e7ea437f53d925820bd9de9c48acd781dae839b741c22142bce9c4d8e0"
+      },
+      "source": {
+        "bytes": 2711,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-04-leg-2-baseline/child.json",
+        "sha256": "333d96e7ea437f53d925820bd9de9c48acd781dae839b741c22142bce9c4d8e0"
+      }
+    },
+    "children/owned_vec-pair-04-leg-2-baseline/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-04-leg-2-baseline/child.json.sha256",
+        "sha256": "f96279a384d868480a1bdb5d4e34d3fa77c15b33862a232fd9f8afb918605779"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-04-leg-2-baseline/child.json.sha256",
+        "sha256": "f96279a384d868480a1bdb5d4e34d3fa77c15b33862a232fd9f8afb918605779"
+      }
+    },
+    "children/owned_vec-pair-04-leg-2-baseline/process-time.txt": {
+      "copy": {
+        "bytes": 985,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-04-leg-2-baseline/process-time.txt",
+        "sha256": "4c9188bdaed735d6fadf0aef3079887640bd25e64e1a726b5fe2225dfec124df"
+      },
+      "source": {
+        "bytes": 985,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-04-leg-2-baseline/process-time.txt",
+        "sha256": "4c9188bdaed735d6fadf0aef3079887640bd25e64e1a726b5fe2225dfec124df"
+      }
+    },
+    "children/owned_vec-pair-04-leg-2-baseline/report.json": {
+      "copy": {
+        "bytes": 135512,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-04-leg-2-baseline/report.json",
+        "sha256": "198aecd1fd8facf8b49227b0f5a294a71486c1cf508e622ccd38b41f52ef9c36"
+      },
+      "source": {
+        "bytes": 135512,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-04-leg-2-baseline/report.json",
+        "sha256": "198aecd1fd8facf8b49227b0f5a294a71486c1cf508e622ccd38b41f52ef9c36"
+      }
+    },
+    "children/owned_vec-pair-04-leg-2-baseline/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-04-leg-2-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-04-leg-2-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-04-leg-2-baseline/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-04-leg-2-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-04-leg-2-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-05-leg-1-baseline/child.json": {
+      "copy": {
+        "bytes": 2711,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-05-leg-1-baseline/child.json",
+        "sha256": "2e7ebe3b3cf01c5a53545307fe9aecff2cff898693b784e25e9b4417cd33b5a7"
+      },
+      "source": {
+        "bytes": 2711,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-05-leg-1-baseline/child.json",
+        "sha256": "2e7ebe3b3cf01c5a53545307fe9aecff2cff898693b784e25e9b4417cd33b5a7"
+      }
+    },
+    "children/owned_vec-pair-05-leg-1-baseline/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-05-leg-1-baseline/child.json.sha256",
+        "sha256": "136cd6ca32b348f91dc7cafd3bbc770b700f1f4ab4ff4c88b771bf465756c506"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-05-leg-1-baseline/child.json.sha256",
+        "sha256": "136cd6ca32b348f91dc7cafd3bbc770b700f1f4ab4ff4c88b771bf465756c506"
+      }
+    },
+    "children/owned_vec-pair-05-leg-1-baseline/process-time.txt": {
+      "copy": {
+        "bytes": 986,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-05-leg-1-baseline/process-time.txt",
+        "sha256": "3bd37744ea70040688f508b7dadf2d7be069fc844f5a5819d1cc0a437195257d"
+      },
+      "source": {
+        "bytes": 986,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-05-leg-1-baseline/process-time.txt",
+        "sha256": "3bd37744ea70040688f508b7dadf2d7be069fc844f5a5819d1cc0a437195257d"
+      }
+    },
+    "children/owned_vec-pair-05-leg-1-baseline/report.json": {
+      "copy": {
+        "bytes": 135518,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-05-leg-1-baseline/report.json",
+        "sha256": "f5291223ae33fecedfe52ad704d8abdaeb383618a23bbc485afd3cebac6d39b4"
+      },
+      "source": {
+        "bytes": 135518,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-05-leg-1-baseline/report.json",
+        "sha256": "f5291223ae33fecedfe52ad704d8abdaeb383618a23bbc485afd3cebac6d39b4"
+      }
+    },
+    "children/owned_vec-pair-05-leg-1-baseline/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-05-leg-1-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-05-leg-1-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-05-leg-1-baseline/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-05-leg-1-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-05-leg-1-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-05-leg-2-candidate/child.json": {
+      "copy": {
+        "bytes": 2727,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-05-leg-2-candidate/child.json",
+        "sha256": "2d0dc29f179039124b4ad702ca5bcaaf0177b6f8dd25d1546ebf2253d4c5e490"
+      },
+      "source": {
+        "bytes": 2727,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-05-leg-2-candidate/child.json",
+        "sha256": "2d0dc29f179039124b4ad702ca5bcaaf0177b6f8dd25d1546ebf2253d4c5e490"
+      }
+    },
+    "children/owned_vec-pair-05-leg-2-candidate/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-05-leg-2-candidate/child.json.sha256",
+        "sha256": "56947c215c15d4a169e04484cad9b088846d91ad18161d629ee38fef94955ef0"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-05-leg-2-candidate/child.json.sha256",
+        "sha256": "56947c215c15d4a169e04484cad9b088846d91ad18161d629ee38fef94955ef0"
+      }
+    },
+    "children/owned_vec-pair-05-leg-2-candidate/process-time.txt": {
+      "copy": {
+        "bytes": 988,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-05-leg-2-candidate/process-time.txt",
+        "sha256": "4719738158af378e68fe474fc2f3d7ba9e5c5b829d81355de1b9b2d3e29ab0cd"
+      },
+      "source": {
+        "bytes": 988,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-05-leg-2-candidate/process-time.txt",
+        "sha256": "4719738158af378e68fe474fc2f3d7ba9e5c5b829d81355de1b9b2d3e29ab0cd"
+      }
+    },
+    "children/owned_vec-pair-05-leg-2-candidate/report.json": {
+      "copy": {
+        "bytes": 135521,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-05-leg-2-candidate/report.json",
+        "sha256": "21194c76f1abe6dcf88f4233b789d1d970afd2342e7d68582fa6a357475c2bf6"
+      },
+      "source": {
+        "bytes": 135521,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-05-leg-2-candidate/report.json",
+        "sha256": "21194c76f1abe6dcf88f4233b789d1d970afd2342e7d68582fa6a357475c2bf6"
+      }
+    },
+    "children/owned_vec-pair-05-leg-2-candidate/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-05-leg-2-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-05-leg-2-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-05-leg-2-candidate/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-05-leg-2-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-05-leg-2-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-06-leg-1-candidate/child.json": {
+      "copy": {
+        "bytes": 2727,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-06-leg-1-candidate/child.json",
+        "sha256": "02769bb4c976c3b43f626d1ceeb361a0f386fe6e3473a4037ea91a23648d01ba"
+      },
+      "source": {
+        "bytes": 2727,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-06-leg-1-candidate/child.json",
+        "sha256": "02769bb4c976c3b43f626d1ceeb361a0f386fe6e3473a4037ea91a23648d01ba"
+      }
+    },
+    "children/owned_vec-pair-06-leg-1-candidate/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-06-leg-1-candidate/child.json.sha256",
+        "sha256": "075d2201fa02df9fae5c5e406eb38038fc08d300a67d8b8056a727c4ef8ffa7a"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-06-leg-1-candidate/child.json.sha256",
+        "sha256": "075d2201fa02df9fae5c5e406eb38038fc08d300a67d8b8056a727c4ef8ffa7a"
+      }
+    },
+    "children/owned_vec-pair-06-leg-1-candidate/process-time.txt": {
+      "copy": {
+        "bytes": 988,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-06-leg-1-candidate/process-time.txt",
+        "sha256": "fb2169879ac8883c74ea433b5efc14a54ae70ffec72f80da03d1f5f5fe8db348"
+      },
+      "source": {
+        "bytes": 988,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-06-leg-1-candidate/process-time.txt",
+        "sha256": "fb2169879ac8883c74ea433b5efc14a54ae70ffec72f80da03d1f5f5fe8db348"
+      }
+    },
+    "children/owned_vec-pair-06-leg-1-candidate/report.json": {
+      "copy": {
+        "bytes": 135521,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-06-leg-1-candidate/report.json",
+        "sha256": "e100bf292173d4f43cffbc718246be737249818da699a799d4edbd00ba5c6ddc"
+      },
+      "source": {
+        "bytes": 135521,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-06-leg-1-candidate/report.json",
+        "sha256": "e100bf292173d4f43cffbc718246be737249818da699a799d4edbd00ba5c6ddc"
+      }
+    },
+    "children/owned_vec-pair-06-leg-1-candidate/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-06-leg-1-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-06-leg-1-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-06-leg-1-candidate/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-06-leg-1-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-06-leg-1-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-06-leg-2-baseline/child.json": {
+      "copy": {
+        "bytes": 2711,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-06-leg-2-baseline/child.json",
+        "sha256": "139920b90f18d1a697cda12d06a5b196d339641e143cc4a404c9cac8cfbd934a"
+      },
+      "source": {
+        "bytes": 2711,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-06-leg-2-baseline/child.json",
+        "sha256": "139920b90f18d1a697cda12d06a5b196d339641e143cc4a404c9cac8cfbd934a"
+      }
+    },
+    "children/owned_vec-pair-06-leg-2-baseline/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-06-leg-2-baseline/child.json.sha256",
+        "sha256": "2e7dc39512fa72ac88dc512441e5e4aa6a45a274038c2aca42c77a60cfb6f76c"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-06-leg-2-baseline/child.json.sha256",
+        "sha256": "2e7dc39512fa72ac88dc512441e5e4aa6a45a274038c2aca42c77a60cfb6f76c"
+      }
+    },
+    "children/owned_vec-pair-06-leg-2-baseline/process-time.txt": {
+      "copy": {
+        "bytes": 985,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-06-leg-2-baseline/process-time.txt",
+        "sha256": "780dcc6782823f83d6354b4c86d27a5da3a13ac7970187d011d4b74143b4c4ae"
+      },
+      "source": {
+        "bytes": 985,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-06-leg-2-baseline/process-time.txt",
+        "sha256": "780dcc6782823f83d6354b4c86d27a5da3a13ac7970187d011d4b74143b4c4ae"
+      }
+    },
+    "children/owned_vec-pair-06-leg-2-baseline/report.json": {
+      "copy": {
+        "bytes": 135518,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-06-leg-2-baseline/report.json",
+        "sha256": "37e1ea8dae8a895f1afe586a16d5d7003a68f6a055d186a23d969064352f4239"
+      },
+      "source": {
+        "bytes": 135518,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-06-leg-2-baseline/report.json",
+        "sha256": "37e1ea8dae8a895f1afe586a16d5d7003a68f6a055d186a23d969064352f4239"
+      }
+    },
+    "children/owned_vec-pair-06-leg-2-baseline/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-06-leg-2-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-06-leg-2-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-06-leg-2-baseline/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-06-leg-2-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-06-leg-2-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-07-leg-1-baseline/child.json": {
+      "copy": {
+        "bytes": 2711,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-07-leg-1-baseline/child.json",
+        "sha256": "c23e2c68039116f22ed6e735d4435edbb3bd5727f6ecfbe0c8164977c605232d"
+      },
+      "source": {
+        "bytes": 2711,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-07-leg-1-baseline/child.json",
+        "sha256": "c23e2c68039116f22ed6e735d4435edbb3bd5727f6ecfbe0c8164977c605232d"
+      }
+    },
+    "children/owned_vec-pair-07-leg-1-baseline/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-07-leg-1-baseline/child.json.sha256",
+        "sha256": "f8662d6524c2ac7f980f7b91c1195dbb89c7955c83aac823d55ef2d01e66203c"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-07-leg-1-baseline/child.json.sha256",
+        "sha256": "f8662d6524c2ac7f980f7b91c1195dbb89c7955c83aac823d55ef2d01e66203c"
+      }
+    },
+    "children/owned_vec-pair-07-leg-1-baseline/process-time.txt": {
+      "copy": {
+        "bytes": 985,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-07-leg-1-baseline/process-time.txt",
+        "sha256": "2e53dd60d756854f7fca8582bab5b75d223d8b840d8dcf34ecf00604673258f5"
+      },
+      "source": {
+        "bytes": 985,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-07-leg-1-baseline/process-time.txt",
+        "sha256": "2e53dd60d756854f7fca8582bab5b75d223d8b840d8dcf34ecf00604673258f5"
+      }
+    },
+    "children/owned_vec-pair-07-leg-1-baseline/report.json": {
+      "copy": {
+        "bytes": 135518,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-07-leg-1-baseline/report.json",
+        "sha256": "dd1be197fddc7a00d9057a90c0e2ae4d464efaeeb84ebc9d734267fa48494aaf"
+      },
+      "source": {
+        "bytes": 135518,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-07-leg-1-baseline/report.json",
+        "sha256": "dd1be197fddc7a00d9057a90c0e2ae4d464efaeeb84ebc9d734267fa48494aaf"
+      }
+    },
+    "children/owned_vec-pair-07-leg-1-baseline/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-07-leg-1-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-07-leg-1-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-07-leg-1-baseline/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-07-leg-1-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-07-leg-1-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-07-leg-2-candidate/child.json": {
+      "copy": {
+        "bytes": 2727,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-07-leg-2-candidate/child.json",
+        "sha256": "9d05c79a72f485c8d54cd05151a06afbe4a4605f8b589b9c7caca8e89a48dcaf"
+      },
+      "source": {
+        "bytes": 2727,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-07-leg-2-candidate/child.json",
+        "sha256": "9d05c79a72f485c8d54cd05151a06afbe4a4605f8b589b9c7caca8e89a48dcaf"
+      }
+    },
+    "children/owned_vec-pair-07-leg-2-candidate/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-07-leg-2-candidate/child.json.sha256",
+        "sha256": "f1a04912ddc68f5bc7434899267e0b248e4006110d247177c2d7730ea067e421"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-07-leg-2-candidate/child.json.sha256",
+        "sha256": "f1a04912ddc68f5bc7434899267e0b248e4006110d247177c2d7730ea067e421"
+      }
+    },
+    "children/owned_vec-pair-07-leg-2-candidate/process-time.txt": {
+      "copy": {
+        "bytes": 988,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-07-leg-2-candidate/process-time.txt",
+        "sha256": "943e32bf59cb58ec58671cd9cf23c4243e47836922912073f5ebcd11998fd17b"
+      },
+      "source": {
+        "bytes": 988,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-07-leg-2-candidate/process-time.txt",
+        "sha256": "943e32bf59cb58ec58671cd9cf23c4243e47836922912073f5ebcd11998fd17b"
+      }
+    },
+    "children/owned_vec-pair-07-leg-2-candidate/report.json": {
+      "copy": {
+        "bytes": 135523,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-07-leg-2-candidate/report.json",
+        "sha256": "5636c2cbae17daebb8c42488d99eba826667725bf93da7e8fee817e71a7a32f9"
+      },
+      "source": {
+        "bytes": 135523,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-07-leg-2-candidate/report.json",
+        "sha256": "5636c2cbae17daebb8c42488d99eba826667725bf93da7e8fee817e71a7a32f9"
+      }
+    },
+    "children/owned_vec-pair-07-leg-2-candidate/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-07-leg-2-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-07-leg-2-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-07-leg-2-candidate/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-07-leg-2-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-07-leg-2-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-08-leg-1-candidate/child.json": {
+      "copy": {
+        "bytes": 2727,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-08-leg-1-candidate/child.json",
+        "sha256": "bc65592c4269a8aadf1214dbcdd82ba3c578e1120386632eb5ddc948096216eb"
+      },
+      "source": {
+        "bytes": 2727,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-08-leg-1-candidate/child.json",
+        "sha256": "bc65592c4269a8aadf1214dbcdd82ba3c578e1120386632eb5ddc948096216eb"
+      }
+    },
+    "children/owned_vec-pair-08-leg-1-candidate/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-08-leg-1-candidate/child.json.sha256",
+        "sha256": "298e93f71f0584c58124327a2afc506743374a2c7f6ce45d7504e8c3a63e61f9"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-08-leg-1-candidate/child.json.sha256",
+        "sha256": "298e93f71f0584c58124327a2afc506743374a2c7f6ce45d7504e8c3a63e61f9"
+      }
+    },
+    "children/owned_vec-pair-08-leg-1-candidate/process-time.txt": {
+      "copy": {
+        "bytes": 988,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-08-leg-1-candidate/process-time.txt",
+        "sha256": "d4859745161ba1d31dd1e82625df2d1f48fedae0b5f0dc7e9ee015a8e94c8ca5"
+      },
+      "source": {
+        "bytes": 988,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-08-leg-1-candidate/process-time.txt",
+        "sha256": "d4859745161ba1d31dd1e82625df2d1f48fedae0b5f0dc7e9ee015a8e94c8ca5"
+      }
+    },
+    "children/owned_vec-pair-08-leg-1-candidate/report.json": {
+      "copy": {
+        "bytes": 135521,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-08-leg-1-candidate/report.json",
+        "sha256": "468fde6ea5cfddb1b950e192cfb71e0d78f88c54a4ab4563582e44175cea46f8"
+      },
+      "source": {
+        "bytes": 135521,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-08-leg-1-candidate/report.json",
+        "sha256": "468fde6ea5cfddb1b950e192cfb71e0d78f88c54a4ab4563582e44175cea46f8"
+      }
+    },
+    "children/owned_vec-pair-08-leg-1-candidate/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-08-leg-1-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-08-leg-1-candidate/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-08-leg-1-candidate/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-08-leg-1-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-08-leg-1-candidate/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-08-leg-2-baseline/child.json": {
+      "copy": {
+        "bytes": 2711,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-08-leg-2-baseline/child.json",
+        "sha256": "a3c646ed9050fd0254715697b5a0d1ef49344e99b1c6aa4c28ddf88b4c6c8a76"
+      },
+      "source": {
+        "bytes": 2711,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-08-leg-2-baseline/child.json",
+        "sha256": "a3c646ed9050fd0254715697b5a0d1ef49344e99b1c6aa4c28ddf88b4c6c8a76"
+      }
+    },
+    "children/owned_vec-pair-08-leg-2-baseline/child.json.sha256": {
+      "copy": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-08-leg-2-baseline/child.json.sha256",
+        "sha256": "d345e193a5c38a7d45655b6dcd4866f6bd50e3ad59264c3e0170695c0c7216ca"
+      },
+      "source": {
+        "bytes": 161,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-08-leg-2-baseline/child.json.sha256",
+        "sha256": "d345e193a5c38a7d45655b6dcd4866f6bd50e3ad59264c3e0170695c0c7216ca"
+      }
+    },
+    "children/owned_vec-pair-08-leg-2-baseline/process-time.txt": {
+      "copy": {
+        "bytes": 985,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-08-leg-2-baseline/process-time.txt",
+        "sha256": "541bda4ce250d778521bc386290195f3bbac914398c245004f849e036173dca2"
+      },
+      "source": {
+        "bytes": 985,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-08-leg-2-baseline/process-time.txt",
+        "sha256": "541bda4ce250d778521bc386290195f3bbac914398c245004f849e036173dca2"
+      }
+    },
+    "children/owned_vec-pair-08-leg-2-baseline/report.json": {
+      "copy": {
+        "bytes": 135518,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-08-leg-2-baseline/report.json",
+        "sha256": "33d2a2b363c0ef6a08d2d1a898486ed21b8a03bd99b51eb830721e9c2ce45b07"
+      },
+      "source": {
+        "bytes": 135518,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-08-leg-2-baseline/report.json",
+        "sha256": "33d2a2b363c0ef6a08d2d1a898486ed21b8a03bd99b51eb830721e9c2ce45b07"
+      }
+    },
+    "children/owned_vec-pair-08-leg-2-baseline/stderr.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-08-leg-2-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-08-leg-2-baseline/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "children/owned_vec-pair-08-leg-2-baseline/stdout.log": {
+      "copy": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/children/owned_vec-pair-08-leg-2-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source": {
+        "bytes": 0,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/children/owned_vec-pair-08-leg-2-baseline/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "comparison-manifest-v2.json": {
+      "copy": {
+        "bytes": 23166,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/comparison-manifest-v2.json",
+        "sha256": "b3089f7dcd5cc1517d22615a066e16088a50b4edbd4e703f7594bc5e66a568ae"
+      },
+      "source": {
+        "bytes": 23166,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/comparison-manifest-v2.json",
+        "sha256": "b3089f7dcd5cc1517d22615a066e16088a50b4edbd4e703f7594bc5e66a568ae"
+      }
+    },
+    "custody/baseline-build-receipt.json": {
+      "copy": {
+        "bytes": 1661,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/custody/baseline-build-receipt.json",
+        "sha256": "86eae277dd3096ab7972cc9d7696d02853fadaa3e7e20678449137b74a80e630"
+      },
+      "source": {
+        "bytes": 1661,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/custody/baseline-build-receipt.json",
+        "sha256": "86eae277dd3096ab7972cc9d7696d02853fadaa3e7e20678449137b74a80e630"
+      }
+    },
+    "custody/baseline-source-receipt.json": {
+      "copy": {
+        "bytes": 2237,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/custody/baseline-source-receipt.json",
+        "sha256": "62b555f066f9a1ac11dd63c258170b9534015766b18b6962012786004f817307"
+      },
+      "source": {
+        "bytes": 2237,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/custody/baseline-source-receipt.json",
+        "sha256": "62b555f066f9a1ac11dd63c258170b9534015766b18b6962012786004f817307"
+      }
+    },
+    "custody/candidate-build-receipt.json": {
+      "copy": {
+        "bytes": 5881,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/custody/candidate-build-receipt.json",
+        "sha256": "04de284ceb4bc43e9698a53c3f5e78ccc66047383342e2c041166166c350d05e"
+      },
+      "source": {
+        "bytes": 5881,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/custody/candidate-build-receipt.json",
+        "sha256": "04de284ceb4bc43e9698a53c3f5e78ccc66047383342e2c041166166c350d05e"
+      }
+    },
+    "custody/candidate-source-receipt.json": {
+      "copy": {
+        "bytes": 522655,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/custody/candidate-source-receipt.json",
+        "sha256": "3872b7d5e8a82c07a770ec186d0b6a447e89aa3e648f5130eccfeaa6944fc8b8"
+      },
+      "source": {
+        "bytes": 522655,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/custody/candidate-source-receipt.json",
+        "sha256": "3872b7d5e8a82c07a770ec186d0b6a447e89aa3e648f5130eccfeaa6944fc8b8"
+      }
+    },
+    "packet-seed.json": {
+      "copy": {
+        "bytes": 6948,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/packet-seed.json",
+        "sha256": "e55ec982cd710950baf28cf11d299194a820ee51c78a997debd4af0c69fef209"
+      },
+      "source": {
+        "bytes": 6948,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/packet-seed.json",
+        "sha256": "e55ec982cd710950baf28cf11d299194a820ee51c78a997debd4af0c69fef209"
+      }
+    },
+    "tooling/candidate-build-parity-v3.json": {
+      "copy": {
+        "bytes": 3274,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/tooling/candidate-build-parity-v3.json",
+        "sha256": "2f57e6f04f46aa900c79c78cf0cf4d03bcbd52e047026bd6bf748e5ec92a2d1a"
+      },
+      "source": {
+        "bytes": 3274,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/tooling/candidate-build-parity-v3.json",
+        "sha256": "2f57e6f04f46aa900c79c78cf0cf4d03bcbd52e047026bd6bf748e5ec92a2d1a"
+      }
+    },
+    "tooling/candidate-build-profile-audit-v1.json": {
+      "copy": {
+        "bytes": 17404,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/tooling/candidate-build-profile-audit-v1.json",
+        "sha256": "6ad300cb464c74b6890fe55da28888e514e27629c7c2e332cfd6f68ef2090fd9"
+      },
+      "source": {
+        "bytes": 17404,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/tooling/candidate-build-profile-audit-v1.json",
+        "sha256": "6ad300cb464c74b6890fe55da28888e514e27629c7c2e332cfd6f68ef2090fd9"
+      }
+    },
+    "tooling/comparison-capture-v2.py": {
+      "copy": {
+        "bytes": 63683,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/tooling/comparison-capture-v2.py",
+        "sha256": "3601ea081fb255f2fab65de95fe079694e5cfd6b15e6e88e99684edb74232f96"
+      },
+      "source": {
+        "bytes": 63683,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/tooling/comparison-capture-v2.py",
+        "sha256": "3601ea081fb255f2fab65de95fe079694e5cfd6b15e6e88e99684edb74232f96"
+      }
+    },
+    "tooling/comparison-controls-v2.json": {
+      "copy": {
+        "bytes": 639878,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/tooling/comparison-controls-v2.json",
+        "sha256": "0f491232dc503c2f7598e5856f483c0340c1510e7b9075f05fcb8ae22b63ecc1"
+      },
+      "source": {
+        "bytes": 639878,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/tooling/comparison-controls-v2.json",
+        "sha256": "0f491232dc503c2f7598e5856f483c0340c1510e7b9075f05fcb8ae22b63ecc1"
+      }
+    },
+    "tooling/comparison-controls-v2.py": {
+      "copy": {
+        "bytes": 11731,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/tooling/comparison-controls-v2.py",
+        "sha256": "e38cf1dee29ab14bb0a5c0a3e4e42494833d8af76f5ea98f7d33a1173b18044c"
+      },
+      "source": {
+        "bytes": 11731,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/tooling/comparison-controls-v2.py",
+        "sha256": "e38cf1dee29ab14bb0a5c0a3e4e42494833d8af76f5ea98f7d33a1173b18044c"
+      }
+    },
+    "tooling/comparison-protocol-v2.json": {
+      "copy": {
+        "bytes": 7013,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/tooling/comparison-protocol-v2.json",
+        "sha256": "756fec0ae6edc4e49d665f46510ba0c9ea1297f414c9470806042c33fc894697"
+      },
+      "source": {
+        "bytes": 7013,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/tooling/comparison-protocol-v2.json",
+        "sha256": "756fec0ae6edc4e49d665f46510ba0c9ea1297f414c9470806042c33fc894697"
+      }
+    },
+    "tooling/comparison-receipt-schema-v3.json": {
+      "copy": {
+        "bytes": 4034,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/tooling/comparison-receipt-schema-v3.json",
+        "sha256": "a1162a06f74b002edd8f08c51bcd5cda07560808e8470ee108c516bbc79bbdf4"
+      },
+      "source": {
+        "bytes": 4034,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/tooling/comparison-receipt-schema-v3.json",
+        "sha256": "a1162a06f74b002edd8f08c51bcd5cda07560808e8470ee108c516bbc79bbdf4"
+      }
+    },
+    "tooling/comparison-v2.py": {
+      "copy": {
+        "bytes": 21256,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/tooling/comparison-v2.py",
+        "sha256": "e592a03aa8d994c9f9d14785e060a5e10bf2b50be63f9832aa7a774981885cc6"
+      },
+      "source": {
+        "bytes": 21256,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/tooling/comparison-v2.py",
+        "sha256": "e592a03aa8d994c9f9d14785e060a5e10bf2b50be63f9832aa7a774981885cc6"
+      }
+    },
+    "tooling/root-source-delta.json": {
+      "copy": {
+        "bytes": 856,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/tooling/root-source-delta.json",
+        "sha256": "d0d445988076e647f3453a082ba7d011df557dc855f7d3ae09c581dd044db72d"
+      },
+      "source": {
+        "bytes": 856,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/tooling/root-source-delta.json",
+        "sha256": "d0d445988076e647f3453a082ba7d011df557dc855f7d3ae09c581dd044db72d"
+      }
+    },
+    "tooling/shared-owner-quality-v3.json": {
+      "copy": {
+        "bytes": 18509,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/tooling/shared-owner-quality-v3.json",
+        "sha256": "6c5ea51402fc07ef57dfb1fb5fd97a61c769806a4fdb9e3893ee972e11808dba"
+      },
+      "source": {
+        "bytes": 18509,
+        "path": "/tmp/litchi-performance-0923/packet-v3-final2/tooling/shared-owner-quality-v3.json",
+        "sha256": "6c5ea51402fc07ef57dfb1fb5fd97a61c769806a4fdb9e3893ee972e11808dba"
+      }
+    }
+  },
+  "schema": "litchi.performance.0923.replay-index.v2",
+  "source_packet": "/tmp/litchi-performance-0923/packet-v3-final2"
+}

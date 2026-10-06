@@ -1,0 +1,43 @@
+   Compiling litchi-opc v0.0.1 (/tmp/litchi-performance-0923/quality-source-v2/crates/litchi-opc)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.80s
+     Running tests/source_artifact_restore.rs (/tmp/litchi-performance-0923/quality-target-v2/debug/deps/source_artifact_restore-652dc003a888b1de)
+
+running 13 tests
+test restore_rejects_finite_output_cap_before_output ... ok
+test restore_observes_original_context_cancellation_after_an_exact_short_prefix ... ok
+test restore_reports_exact_prefix_for_short_sink ... ok
+test managed_restore_charges_shared_output_once_and_releases_memory_lease ... ok
+test restore_rehashes_original_after_output_started_when_version_is_stable ... ok
+test restore_uses_current_context_for_all_io_work_and_output ... ok
+test restore_rejects_wrong_hashes_and_lengths_before_output ... ok
+test restore_succeeds_with_independently_reopened_artifacts ... ok
+test restore_detects_both_artifact_versions_during_authentication ... ok
+test managed_restore_releases_workspace_on_memory_hash_and_sink_failures ... ok
+test restore_detects_both_artifact_versions_from_write_and_flush_callbacks ... ok
+test restore_rejects_truncated_and_overreported_providers_before_output ... ok
+test restore_observes_cancellation_before_output_and_from_sink_callbacks ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/source_read_ahead.rs (/tmp/litchi-performance-0923/quality-target-v2/debug/deps/source_read_ahead-60ff8d829a68e643)
+
+running 16 tests
+test managed_read_ahead_accounts_physical_input_and_retained_window_memory ... ok
+test source_version_change_is_a_typed_publication_error_before_output ... ok
+test exact_source_save_preserves_unknown_member_after_known_payload_read ... ok
+test retained_source_artifact_does_not_pin_the_read_ahead_window ... ok
+test source_read_policy_is_bounded_and_exact_is_the_default_control ... ok
+test batch_replacement_and_deletion_preserve_unknown_physical_records ... ok
+test package_publication_callback_refuses_before_recursive_source_version_fence ... ok
+test source_xml_capture_permanently_disables_opt_in_reads ... ok
+test precompressed_topology_addition_disables_opt_in_reads_before_physical_transfer ... ok
+test batch_external_relationship_removal_disables_opt_in_reads_before_publication ... ok
+test exact_restore_noop_permanently_releases_the_opt_in_window ... ok
+test one_part_external_relationship_removal_disables_opt_in_reads_before_publication ... ok
+test non_empty_topology_publication_disables_opt_in_reads_and_adds_a_typed_part ... ok
+test publication_disables_read_ahead_before_output_and_keeps_future_reads_exact ... ok
+test managed_changed_overlay_releases_window_before_first_write_and_preserves_unknown_records ... ok
+test expected_artifact_splice_preview_releases_opt_in_reads_and_runs_exact_twice ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

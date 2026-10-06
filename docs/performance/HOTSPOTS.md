@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## 0923 — repeated owned-source hash removed from publication
+
+[0923](0923-owned-source-fingerprint.md) adopts digest reuse only for explicitly
+owned immutable sources. Publication p50 falls about 37% on the two measured
+owned DOCX routes, reducing total p50 about 21%; initial-query hashing remains.
+Generic/versioned providers and execution-context paths keep their full scans.
+The memo costs 84 logical heap bytes plus per-handle storage. Whole-process
+allocation diagnostics, including a documented profiling protocol deviation,
+show one extra allocation and 65,431 fewer requested bytes on owned routes.
+Other workflows and the first-hash cost remain unqualified. The much larger
+whole-process requested-byte total for reader ingress merits separate source
+attribution; it is not yet an operation-scoped finding.
+
 ## 0922 — saved-selection suffix copies measured, candidate unadopted
 
 [0922](0922-borrowed-fib-selection.md) removes full WordDocument suffix copies

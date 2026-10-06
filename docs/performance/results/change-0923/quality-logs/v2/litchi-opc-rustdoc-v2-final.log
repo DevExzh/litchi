@@ -1,0 +1,7 @@
+   Compiling xml-minifier-macros v0.1.0 (/tmp/litchi-performance-0923/quality-source-v2/crates/xml-minifier-macros)
+    Checking litchi-core v0.0.1 (/tmp/litchi-performance-0923/quality-source-v2/crates/litchi-core)
+    Checking soapberry-zip v0.0.1 (/tmp/litchi-performance-0923/quality-source-v2/crates/soapberry-zip)
+    Checking xml-minifier v0.1.0 (/tmp/litchi-performance-0923/quality-source-v2/crates/xml-minifier)
+ Documenting litchi-opc v0.0.1 (/tmp/litchi-performance-0923/quality-source-v2/crates/litchi-opc)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.22s
+   Generated /tmp/litchi-performance-0923/quality-target-v2/doc/litchi_opc/index.html

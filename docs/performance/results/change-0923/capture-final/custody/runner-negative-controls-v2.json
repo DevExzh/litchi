@@ -1,0 +1,76 @@
+{
+  "comparative_children_run": 0,
+  "results": [
+    {
+      "error": "CaptureError: candidate build receipt is required: /tmp/litchi-performance-0923/runner-negative-bfxmojqc/missing-build.json",
+      "name": "missing_build_receipt",
+      "status": "rejected"
+    },
+    {
+      "error": "CaptureError: candidate v3 source receipt missing actual production_patch",
+      "name": "missing_source_production_patch",
+      "status": "rejected"
+    },
+    {
+      "error": "CaptureError: candidate.source: source file changed: src/a.rs",
+      "name": "changed_source_file",
+      "status": "rejected"
+    },
+    {
+      "error": "EvidenceError: report: binary identity differs from receipt",
+      "name": "swapped_binary",
+      "status": "rejected"
+    },
+    {
+      "error": "CaptureError: generic_read_at-pair-01-leg-1-baseline.stdout: descriptor changed",
+      "name": "corrupt_stdout",
+      "status": "rejected"
+    },
+    {
+      "error": "CaptureError: generic_read_at-pair-01-leg-1-baseline.process_time: descriptor changed",
+      "name": "corrupt_time",
+      "status": "rejected"
+    },
+    {
+      "error": "CaptureError: generic_read_at-pair-01-leg-1-baseline: max RSS value changed",
+      "name": "corrupt_rss",
+      "status": "rejected"
+    },
+    {
+      "error": "CaptureError: generic_read_at-pair-01-leg-1-baseline.report: relative path is unsafe",
+      "name": "escaped_report_path",
+      "status": "rejected"
+    },
+    {
+      "error": "CaptureError: manifest schedule changed",
+      "name": "missing_child_schedule",
+      "status": "rejected"
+    },
+    {
+      "error": "CaptureError: manifest schedule changed",
+      "name": "duplicate_child_schedule",
+      "status": "rejected"
+    },
+    {
+      "detail": "litchi.performance.0923.comparison-manifest.v2",
+      "name": "independent_copy_to_new_root",
+      "status": "accepted"
+    },
+    {
+      "detail": "litchi.performance.0923.comparison-manifest.v2",
+      "name": "moved_replay_copy",
+      "status": "accepted"
+    },
+    {
+      "error": "CaptureError: replay copy tooling/comparison-v2.py: local bytes or hash changed",
+      "name": "tampered_local_replay_descriptor",
+      "status": "rejected"
+    }
+  ],
+  "runner": {
+    "bytes": 63683,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/comparison-capture-v2.py",
+    "sha256": "3601ea081fb255f2fab65de95fe079694e5cfd6b15e6e88e99684edb74232f96"
+  },
+  "schema": "litchi.performance.0923.runner-negative-controls.v2"
+}

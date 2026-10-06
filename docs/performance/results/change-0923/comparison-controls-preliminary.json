@@ -1,0 +1,1182 @@
+{
+  "controls": {
+    "bytes": 8305,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/comparison-controls.py",
+    "sha256": "e10ec1bd9d1a732ab3f3bf21cba4eef3f3da9d2865294831a3ab0a8d2dd359e5"
+  },
+  "negative_controls": [
+    {
+      "error": "EvidenceError: route_identity: ingress route changed",
+      "name": "route_identity",
+      "status": "rejected"
+    },
+    {
+      "error": "EvidenceError: phase_sum: six-phase sum mismatch at sample 0",
+      "name": "phase_sum",
+      "status": "rejected"
+    },
+    {
+      "error": "EvidenceError: owned_positional_counter: source/section counter mismatch for read_calls",
+      "name": "owned_positional_counter",
+      "status": "rejected"
+    },
+    {
+      "error": "EvidenceError: owned_ingress_cardinality.section source read_calls: cardinality changed",
+      "name": "owned_ingress_cardinality",
+      "status": "rejected"
+    },
+    {
+      "error": "EvidenceError: gate: gate patch_forward_inverse_verified failed",
+      "name": "gate",
+      "status": "rejected"
+    },
+    {
+      "error": "EvidenceError: output: output digest changed",
+      "name": "output",
+      "status": "rejected"
+    },
+    {
+      "error": "EvidenceError: sink: sink byte count changed",
+      "name": "sink",
+      "status": "rejected"
+    },
+    {
+      "error": "EvidenceError: source: section field source_sha256 changed",
+      "name": "source",
+      "status": "rejected"
+    },
+    {
+      "error": "EvidenceError: generic_zero_read.source.read_calls[0]: out of range",
+      "name": "generic_zero_read",
+      "status": "rejected"
+    },
+    {
+      "error": "EvidenceError: owned_vec_fabricated_reader: owned-vector route fabricated reader observations",
+      "name": "owned_vec_fabricated_reader",
+      "status": "rejected"
+    }
+  ],
+  "performance_children_run": 0,
+  "planned_reduction": {
+    "allocator_rows": 96,
+    "bytes": 980404,
+    "native_rows": 96,
+    "rounds_per_row": 12,
+    "sha256": "f9f2f63f9c24682d62856463ff8e820f852ea5501891dee795b3cabdc27ae962",
+    "under_one_mib": true
+  },
+  "positive_same_report_pairs": [
+    {
+      "baseline_over_candidate_p50_ratio": 1.0,
+      "baseline_p50_ns": 4598214.0,
+      "candidate_p50_ns": 4598214.0,
+      "label": "positive-generic_read_at",
+      "paired_bootstrap": {
+        "confidence_interval_95": {
+          "lower": 1.0,
+          "method": "nearest-rank 2.5th/97.5th percentiles",
+          "upper": 1.0
+        },
+        "draws": 10000,
+        "median_ratio": 1.0,
+        "ratios": [
+          1.0
+        ],
+        "seed": 923,
+        "statistic": "median of paired baseline_p50/candidate_p50 ratios"
+      },
+      "route": "generic_read_at",
+      "timing_gate": {
+        "eligible": null,
+        "lower_95": 1.0,
+        "median_ratio": 1.0,
+        "name": null
+      },
+      "validation": {
+        "baseline": {
+          "cache_counters_verified": true,
+          "header_footer_relationships_verified": true,
+          "patch_forward_inverse_verified": true,
+          "phase_sum_verified": true,
+          "publication_inverse_exact_source_verified": true,
+          "raw_member_order_and_comment_verified": true,
+          "raw_untouched_members_verified": true,
+          "semantic_reopen_all_sections_verified": true,
+          "sink_counters_verified": true,
+          "source_immutability_verified": true,
+          "stale_foreign_signed_noop_limits_partial_sink_verified": true,
+          "table_cell_sectpr_excluded_verified": true
+        },
+        "candidate": {
+          "cache_counters_verified": true,
+          "header_footer_relationships_verified": true,
+          "patch_forward_inverse_verified": true,
+          "phase_sum_verified": true,
+          "publication_inverse_exact_source_verified": true,
+          "raw_member_order_and_comment_verified": true,
+          "raw_untouched_members_verified": true,
+          "semantic_reopen_all_sections_verified": true,
+          "sink_counters_verified": true,
+          "source_immutability_verified": true,
+          "stale_foreign_signed_noop_limits_partial_sink_verified": true,
+          "table_cell_sectpr_excluded_verified": true
+        }
+      }
+    },
+    {
+      "baseline_over_candidate_p50_ratio": 1.0,
+      "baseline_p50_ns": 4663539.0,
+      "candidate_p50_ns": 4663539.0,
+      "label": "positive-owned_vec",
+      "paired_bootstrap": {
+        "confidence_interval_95": {
+          "lower": 1.0,
+          "method": "nearest-rank 2.5th/97.5th percentiles",
+          "upper": 1.0
+        },
+        "draws": 10000,
+        "median_ratio": 1.0,
+        "ratios": [
+          1.0
+        ],
+        "seed": 923,
+        "statistic": "median of paired baseline_p50/candidate_p50 ratios"
+      },
+      "route": "owned_vec",
+      "timing_gate": {
+        "eligible": null,
+        "lower_95": 1.0,
+        "median_ratio": 1.0,
+        "name": null
+      },
+      "validation": {
+        "baseline": {
+          "cache_counters_verified": true,
+          "header_footer_relationships_verified": true,
+          "patch_forward_inverse_verified": true,
+          "phase_sum_verified": true,
+          "publication_inverse_exact_source_verified": true,
+          "raw_member_order_and_comment_verified": true,
+          "raw_untouched_members_verified": true,
+          "semantic_reopen_all_sections_verified": true,
+          "sink_counters_verified": true,
+          "source_immutability_verified": true,
+          "stale_foreign_signed_noop_limits_partial_sink_verified": true,
+          "table_cell_sectpr_excluded_verified": true
+        },
+        "candidate": {
+          "cache_counters_verified": true,
+          "header_footer_relationships_verified": true,
+          "patch_forward_inverse_verified": true,
+          "phase_sum_verified": true,
+          "publication_inverse_exact_source_verified": true,
+          "raw_member_order_and_comment_verified": true,
+          "raw_untouched_members_verified": true,
+          "semantic_reopen_all_sections_verified": true,
+          "sink_counters_verified": true,
+          "source_immutability_verified": true,
+          "stale_foreign_signed_noop_limits_partial_sink_verified": true,
+          "table_cell_sectpr_excluded_verified": true
+        }
+      }
+    },
+    {
+      "baseline_over_candidate_p50_ratio": 1.0,
+      "baseline_p50_ns": 5058691.0,
+      "candidate_p50_ns": 5058691.0,
+      "label": "positive-owned_reader",
+      "paired_bootstrap": {
+        "confidence_interval_95": {
+          "lower": 1.0,
+          "method": "nearest-rank 2.5th/97.5th percentiles",
+          "upper": 1.0
+        },
+        "draws": 10000,
+        "median_ratio": 1.0,
+        "ratios": [
+          1.0
+        ],
+        "seed": 923,
+        "statistic": "median of paired baseline_p50/candidate_p50 ratios"
+      },
+      "route": "owned_reader",
+      "timing_gate": {
+        "eligible": null,
+        "lower_95": 1.0,
+        "median_ratio": 1.0,
+        "name": null
+      },
+      "validation": {
+        "baseline": {
+          "cache_counters_verified": true,
+          "header_footer_relationships_verified": true,
+          "patch_forward_inverse_verified": true,
+          "phase_sum_verified": true,
+          "publication_inverse_exact_source_verified": true,
+          "raw_member_order_and_comment_verified": true,
+          "raw_untouched_members_verified": true,
+          "semantic_reopen_all_sections_verified": true,
+          "sink_counters_verified": true,
+          "source_immutability_verified": true,
+          "stale_foreign_signed_noop_limits_partial_sink_verified": true,
+          "table_cell_sectpr_excluded_verified": true
+        },
+        "candidate": {
+          "cache_counters_verified": true,
+          "header_footer_relationships_verified": true,
+          "patch_forward_inverse_verified": true,
+          "phase_sum_verified": true,
+          "publication_inverse_exact_source_verified": true,
+          "raw_member_order_and_comment_verified": true,
+          "raw_untouched_members_verified": true,
+          "semantic_reopen_all_sections_verified": true,
+          "sink_counters_verified": true,
+          "source_immutability_verified": true,
+          "stale_foreign_signed_noop_limits_partial_sink_verified": true,
+          "table_cell_sectpr_excluded_verified": true
+        }
+      }
+    }
+  ],
+  "protocol": {
+    "bytes": 3770,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/comparison-protocol.json",
+    "sha256": "3ed72f867d20e1e026a5abfa6625e8a7d9bb9a0dfdaf70339197f212965edd4d"
+  },
+  "reports": [
+    {
+      "descriptor": {
+        "bytes": 19529,
+        "path": "/tmp/litchi-performance-0923/smoke-generic.json",
+        "sha256": "03859963e69cb3d476870a44d45a6cb40bc650b5291545b588bcf4ff60519c95"
+      },
+      "route": "generic_read_at",
+      "validation": {
+        "cache": {
+          "source_cache_before_publication_after_commit_cold_loads": [
+            1,
+            1
+          ],
+          "source_cache_before_publication_after_commit_hits": [
+            0,
+            0
+          ],
+          "source_cache_before_publication_after_commit_retained_bytes": [
+            18855,
+            18855
+          ],
+          "source_cache_before_publication_after_commit_retained_entries": [
+            1,
+            1
+          ],
+          "source_cache_before_publication_after_commit_successful_loads": [
+            1,
+            1
+          ]
+        },
+        "elapsed_ns": [
+          4487189,
+          4709239
+        ],
+        "gates": {
+          "cache_counters_verified": true,
+          "header_footer_relationships_verified": true,
+          "patch_forward_inverse_verified": true,
+          "phase_sum_verified": true,
+          "publication_inverse_exact_source_verified": true,
+          "raw_member_order_and_comment_verified": true,
+          "raw_untouched_members_verified": true,
+          "semantic_reopen_all_sections_verified": true,
+          "sink_counters_verified": true,
+          "source_immutability_verified": true,
+          "stale_foreign_signed_noop_limits_partial_sink_verified": true,
+          "table_cell_sectpr_excluded_verified": true
+        },
+        "label": "generic_read_at",
+        "phase_ns": {
+          "commit_ns": [
+            343062,
+            352811
+          ],
+          "edit_ns": [
+            51960,
+            46930
+          ],
+          "open_ns": [
+            45320,
+            59670
+          ],
+          "preparation_ns": [
+            34161,
+            247891
+          ],
+          "publication_ns": [
+            2684211,
+            2665471
+          ],
+          "query_ns": [
+            1328475,
+            1336466
+          ]
+        },
+        "route": "generic_read_at",
+        "samples": 2,
+        "section": {
+          "cache_counters_verified": true,
+          "columns_after": 3,
+          "columns_before": 2,
+          "commit_ns": [
+            343062,
+            352811
+          ],
+          "edit_ns": [
+            51960,
+            46930
+          ],
+          "expected_output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+          "header_footer_relationships_verified": true,
+          "implementation": "litchi-docx-source-backed-section-layout",
+          "ingress_route": "generic_read_at",
+          "media_bytes": 524288,
+          "media_count": 4,
+          "open_ns": [
+            45320,
+            59670
+          ],
+          "ordinary_payload_materializations": [
+            1,
+            1
+          ],
+          "output_sha256": [
+            "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+            "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec"
+          ],
+          "owned_ingress_owned_bytes": [],
+          "owned_ingress_read_bytes": [],
+          "owned_ingress_read_calls": [],
+          "paragraph_owned_section_positions": [
+            64,
+            129
+          ],
+          "patch_forward_inverse_verified": true,
+          "performance_claim": "none",
+          "phase_sum_verified": true,
+          "preparation_ns": [
+            34161,
+            247891
+          ],
+          "publication_inverse_exact_source_verified": true,
+          "publication_ns": [
+            2684211,
+            2665471
+          ],
+          "query_ns": [
+            1328475,
+            1336466
+          ],
+          "raw_member_order_and_comment_verified": true,
+          "raw_untouched_members_verified": true,
+          "sample_order": [
+            1,
+            0
+          ],
+          "section_count": 3,
+          "selected_paragraph": 64,
+          "semantic_reopen_all_sections_verified": true,
+          "sink_counters_verified": true,
+          "source_bytes": 2101427,
+          "source_cache_before_publication_after_commit_cold_loads": [
+            1,
+            1
+          ],
+          "source_cache_before_publication_after_commit_hits": [
+            0,
+            0
+          ],
+          "source_cache_before_publication_after_commit_retained_bytes": [
+            18855,
+            18855
+          ],
+          "source_cache_before_publication_after_commit_retained_entries": [
+            1,
+            1
+          ],
+          "source_cache_before_publication_after_commit_successful_loads": [
+            1,
+            1
+          ],
+          "source_immutability_verified": true,
+          "source_observation_scope": "instrumented positional ReadAt calls and bytes; ordinary payload counters are source-observed",
+          "source_read_bytes": [
+            8409488,
+            8409488
+          ],
+          "source_read_calls": [
+            202,
+            202
+          ],
+          "source_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+          "stale_foreign_signed_noop_limits_partial_sink_verified": true,
+          "table_cell_sectpr_excluded_verified": true,
+          "timing_scope": "preparation, source-backed open, section query, columns edit, commit, and sequential publication; correctness, reopen, patch, refusal, cache, source, sink, and ZIP gates are excluded",
+          "total_main_story_paragraph_count": 257
+        },
+        "sink": {
+          "accepted_bytes": 2101446,
+          "largest_write": 65536,
+          "write_calls": 75,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_16385_to_65536": 32,
+            "bytes_1_to_512": 42,
+            "bytes_4097_to_16384": 0,
+            "bytes_513_to_4096": 1,
+            "bytes_over_65536": 0
+          }
+        },
+        "source": {
+          "docx_section_layout": {
+            "cache_counters_verified": true,
+            "columns_after": 3,
+            "columns_before": 2,
+            "commit_ns": [
+              343062,
+              352811
+            ],
+            "edit_ns": [
+              51960,
+              46930
+            ],
+            "expected_output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+            "header_footer_relationships_verified": true,
+            "implementation": "litchi-docx-source-backed-section-layout",
+            "ingress_route": "generic_read_at",
+            "media_bytes": 524288,
+            "media_count": 4,
+            "open_ns": [
+              45320,
+              59670
+            ],
+            "ordinary_payload_materializations": [
+              1,
+              1
+            ],
+            "output_sha256": [
+              "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+              "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec"
+            ],
+            "owned_ingress_owned_bytes": [],
+            "owned_ingress_read_bytes": [],
+            "owned_ingress_read_calls": [],
+            "paragraph_owned_section_positions": [
+              64,
+              129
+            ],
+            "patch_forward_inverse_verified": true,
+            "performance_claim": "none",
+            "phase_sum_verified": true,
+            "preparation_ns": [
+              34161,
+              247891
+            ],
+            "publication_inverse_exact_source_verified": true,
+            "publication_ns": [
+              2684211,
+              2665471
+            ],
+            "query_ns": [
+              1328475,
+              1336466
+            ],
+            "raw_member_order_and_comment_verified": true,
+            "raw_untouched_members_verified": true,
+            "sample_order": [
+              1,
+              0
+            ],
+            "section_count": 3,
+            "selected_paragraph": 64,
+            "semantic_reopen_all_sections_verified": true,
+            "sink_counters_verified": true,
+            "source_bytes": 2101427,
+            "source_cache_before_publication_after_commit_cold_loads": [
+              1,
+              1
+            ],
+            "source_cache_before_publication_after_commit_hits": [
+              0,
+              0
+            ],
+            "source_cache_before_publication_after_commit_retained_bytes": [
+              18855,
+              18855
+            ],
+            "source_cache_before_publication_after_commit_retained_entries": [
+              1,
+              1
+            ],
+            "source_cache_before_publication_after_commit_successful_loads": [
+              1,
+              1
+            ],
+            "source_immutability_verified": true,
+            "source_observation_scope": "instrumented positional ReadAt calls and bytes; ordinary payload counters are source-observed",
+            "source_read_bytes": [
+              8409488,
+              8409488
+            ],
+            "source_read_calls": [
+              202,
+              202
+            ],
+            "source_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+            "stale_foreign_signed_noop_limits_partial_sink_verified": true,
+            "table_cell_sectpr_excluded_verified": true,
+            "timing_scope": "preparation, source-backed open, section query, columns edit, commit, and sequential publication; correctness, reopen, patch, refusal, cache, source, sink, and ZIP gates are excluded",
+            "total_main_story_paragraph_count": 257
+          },
+          "max_in_flight_reads": [
+            1,
+            1
+          ],
+          "ordinary_payload_materializations": [
+            1,
+            1
+          ],
+          "ordinary_payload_read_bytes": [
+            8397632,
+            8397632
+          ],
+          "ordinary_payload_read_calls": [
+            138,
+            138
+          ],
+          "read_bytes": [
+            8409488,
+            8409488
+          ],
+          "read_calls": [
+            202,
+            202
+          ]
+        }
+      }
+    },
+    {
+      "descriptor": {
+        "bytes": 19279,
+        "path": "/tmp/litchi-performance-0923/smoke-owned-vec.json",
+        "sha256": "1540936906a7cd44f169f980a4cd5de45f58572eeed85a1c5e261bb129e06dd3"
+      },
+      "route": "owned_vec",
+      "validation": {
+        "cache": {
+          "source_cache_before_publication_after_commit_cold_loads": [
+            1,
+            1
+          ],
+          "source_cache_before_publication_after_commit_hits": [
+            0,
+            0
+          ],
+          "source_cache_before_publication_after_commit_retained_bytes": [
+            18855,
+            18855
+          ],
+          "source_cache_before_publication_after_commit_retained_entries": [
+            1,
+            1
+          ],
+          "source_cache_before_publication_after_commit_successful_loads": [
+            1,
+            1
+          ]
+        },
+        "elapsed_ns": [
+          4526349,
+          4800729
+        ],
+        "gates": {
+          "cache_counters_verified": true,
+          "header_footer_relationships_verified": true,
+          "patch_forward_inverse_verified": true,
+          "phase_sum_verified": true,
+          "publication_inverse_exact_source_verified": true,
+          "raw_member_order_and_comment_verified": true,
+          "raw_untouched_members_verified": true,
+          "semantic_reopen_all_sections_verified": true,
+          "sink_counters_verified": true,
+          "source_immutability_verified": true,
+          "stale_foreign_signed_noop_limits_partial_sink_verified": true,
+          "table_cell_sectpr_excluded_verified": true
+        },
+        "label": "owned_vec",
+        "phase_ns": {
+          "commit_ns": [
+            355431,
+            344151
+          ],
+          "edit_ns": [
+            55891,
+            47731
+          ],
+          "open_ns": [
+            45910,
+            61050
+          ],
+          "preparation_ns": [
+            37521,
+            257531
+          ],
+          "publication_ns": [
+            2693711,
+            2727611
+          ],
+          "query_ns": [
+            1337885,
+            1362655
+          ]
+        },
+        "route": "owned_vec",
+        "samples": 2,
+        "section": {
+          "cache_counters_verified": true,
+          "columns_after": 3,
+          "columns_before": 2,
+          "commit_ns": [
+            355431,
+            344151
+          ],
+          "edit_ns": [
+            55891,
+            47731
+          ],
+          "expected_output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+          "header_footer_relationships_verified": true,
+          "implementation": "litchi-docx-source-backed-section-layout",
+          "ingress_route": "owned_vec",
+          "media_bytes": 524288,
+          "media_count": 4,
+          "open_ns": [
+            45910,
+            61050
+          ],
+          "ordinary_payload_materializations": [
+            1,
+            1
+          ],
+          "output_sha256": [
+            "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+            "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec"
+          ],
+          "owned_ingress_owned_bytes": [
+            2101427,
+            2101427
+          ],
+          "owned_ingress_read_bytes": [
+            0,
+            0
+          ],
+          "owned_ingress_read_calls": [
+            0,
+            0
+          ],
+          "paragraph_owned_section_positions": [
+            64,
+            129
+          ],
+          "patch_forward_inverse_verified": true,
+          "performance_claim": "none",
+          "phase_sum_verified": true,
+          "preparation_ns": [
+            37521,
+            257531
+          ],
+          "publication_inverse_exact_source_verified": true,
+          "publication_ns": [
+            2693711,
+            2727611
+          ],
+          "query_ns": [
+            1337885,
+            1362655
+          ],
+          "raw_member_order_and_comment_verified": true,
+          "raw_untouched_members_verified": true,
+          "sample_order": [
+            1,
+            0
+          ],
+          "section_count": 3,
+          "selected_paragraph": 64,
+          "semantic_reopen_all_sections_verified": true,
+          "sink_counters_verified": true,
+          "source_bytes": 2101427,
+          "source_cache_before_publication_after_commit_cold_loads": [
+            1,
+            1
+          ],
+          "source_cache_before_publication_after_commit_hits": [
+            0,
+            0
+          ],
+          "source_cache_before_publication_after_commit_retained_bytes": [
+            18855,
+            18855
+          ],
+          "source_cache_before_publication_after_commit_retained_entries": [
+            1,
+            1
+          ],
+          "source_cache_before_publication_after_commit_successful_loads": [
+            1,
+            1
+          ],
+          "source_immutability_verified": true,
+          "source_observation_scope": "moved immutable Vec owner; no positional ReadAt or sequential reader observer is available",
+          "source_read_bytes": [],
+          "source_read_calls": [],
+          "source_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+          "stale_foreign_signed_noop_limits_partial_sink_verified": true,
+          "table_cell_sectpr_excluded_verified": true,
+          "timing_scope": "preparation, source-backed open, section query, columns edit, commit, and sequential publication; correctness, reopen, patch, refusal, cache, source, sink, and ZIP gates are excluded",
+          "total_main_story_paragraph_count": 257
+        },
+        "sink": {
+          "accepted_bytes": 2101446,
+          "largest_write": 65536,
+          "write_calls": 75,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_16385_to_65536": 32,
+            "bytes_1_to_512": 42,
+            "bytes_4097_to_16384": 0,
+            "bytes_513_to_4096": 1,
+            "bytes_over_65536": 0
+          }
+        },
+        "source": {
+          "docx_section_layout": {
+            "cache_counters_verified": true,
+            "columns_after": 3,
+            "columns_before": 2,
+            "commit_ns": [
+              355431,
+              344151
+            ],
+            "edit_ns": [
+              55891,
+              47731
+            ],
+            "expected_output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+            "header_footer_relationships_verified": true,
+            "implementation": "litchi-docx-source-backed-section-layout",
+            "ingress_route": "owned_vec",
+            "media_bytes": 524288,
+            "media_count": 4,
+            "open_ns": [
+              45910,
+              61050
+            ],
+            "ordinary_payload_materializations": [
+              1,
+              1
+            ],
+            "output_sha256": [
+              "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+              "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec"
+            ],
+            "owned_ingress_owned_bytes": [
+              2101427,
+              2101427
+            ],
+            "owned_ingress_read_bytes": [
+              0,
+              0
+            ],
+            "owned_ingress_read_calls": [
+              0,
+              0
+            ],
+            "paragraph_owned_section_positions": [
+              64,
+              129
+            ],
+            "patch_forward_inverse_verified": true,
+            "performance_claim": "none",
+            "phase_sum_verified": true,
+            "preparation_ns": [
+              37521,
+              257531
+            ],
+            "publication_inverse_exact_source_verified": true,
+            "publication_ns": [
+              2693711,
+              2727611
+            ],
+            "query_ns": [
+              1337885,
+              1362655
+            ],
+            "raw_member_order_and_comment_verified": true,
+            "raw_untouched_members_verified": true,
+            "sample_order": [
+              1,
+              0
+            ],
+            "section_count": 3,
+            "selected_paragraph": 64,
+            "semantic_reopen_all_sections_verified": true,
+            "sink_counters_verified": true,
+            "source_bytes": 2101427,
+            "source_cache_before_publication_after_commit_cold_loads": [
+              1,
+              1
+            ],
+            "source_cache_before_publication_after_commit_hits": [
+              0,
+              0
+            ],
+            "source_cache_before_publication_after_commit_retained_bytes": [
+              18855,
+              18855
+            ],
+            "source_cache_before_publication_after_commit_retained_entries": [
+              1,
+              1
+            ],
+            "source_cache_before_publication_after_commit_successful_loads": [
+              1,
+              1
+            ],
+            "source_immutability_verified": true,
+            "source_observation_scope": "moved immutable Vec owner; no positional ReadAt or sequential reader observer is available",
+            "source_read_bytes": [],
+            "source_read_calls": [],
+            "source_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+            "stale_foreign_signed_noop_limits_partial_sink_verified": true,
+            "table_cell_sectpr_excluded_verified": true,
+            "timing_scope": "preparation, source-backed open, section query, columns edit, commit, and sequential publication; correctness, reopen, patch, refusal, cache, source, sink, and ZIP gates are excluded",
+            "total_main_story_paragraph_count": 257
+          },
+          "max_in_flight_reads": [],
+          "ordinary_payload_read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "read_bytes": [],
+          "read_calls": []
+        }
+      }
+    },
+    {
+      "descriptor": {
+        "bytes": 19311,
+        "path": "/tmp/litchi-performance-0923/smoke-owned-reader.json",
+        "sha256": "0a6b57cf702bac33b6e73f954674bdc8e2ee31b392aa28b0704b2a145ab81114"
+      },
+      "route": "owned_reader",
+      "validation": {
+        "cache": {
+          "source_cache_before_publication_after_commit_cold_loads": [
+            1,
+            1
+          ],
+          "source_cache_before_publication_after_commit_hits": [
+            0,
+            0
+          ],
+          "source_cache_before_publication_after_commit_retained_bytes": [
+            18855,
+            18855
+          ],
+          "source_cache_before_publication_after_commit_retained_entries": [
+            1,
+            1
+          ],
+          "source_cache_before_publication_after_commit_successful_loads": [
+            1,
+            1
+          ]
+        },
+        "elapsed_ns": [
+          5034651,
+          5082731
+        ],
+        "gates": {
+          "cache_counters_verified": true,
+          "header_footer_relationships_verified": true,
+          "patch_forward_inverse_verified": true,
+          "phase_sum_verified": true,
+          "publication_inverse_exact_source_verified": true,
+          "raw_member_order_and_comment_verified": true,
+          "raw_untouched_members_verified": true,
+          "semantic_reopen_all_sections_verified": true,
+          "sink_counters_verified": true,
+          "source_immutability_verified": true,
+          "stale_foreign_signed_noop_limits_partial_sink_verified": true,
+          "table_cell_sectpr_excluded_verified": true
+        },
+        "label": "owned_reader",
+        "phase_ns": {
+          "commit_ns": [
+            351842,
+            352202
+          ],
+          "edit_ns": [
+            49330,
+            52510
+          ],
+          "open_ns": [
+            369221,
+            398201
+          ],
+          "preparation_ns": [
+            258251,
+            243741
+          ],
+          "publication_ns": [
+            2668671,
+            2695171
+          ],
+          "query_ns": [
+            1337336,
+            1340906
+          ]
+        },
+        "route": "owned_reader",
+        "samples": 2,
+        "section": {
+          "cache_counters_verified": true,
+          "columns_after": 3,
+          "columns_before": 2,
+          "commit_ns": [
+            351842,
+            352202
+          ],
+          "edit_ns": [
+            49330,
+            52510
+          ],
+          "expected_output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+          "header_footer_relationships_verified": true,
+          "implementation": "litchi-docx-source-backed-section-layout",
+          "ingress_route": "owned_reader",
+          "media_bytes": 524288,
+          "media_count": 4,
+          "open_ns": [
+            369221,
+            398201
+          ],
+          "ordinary_payload_materializations": [
+            1,
+            1
+          ],
+          "output_sha256": [
+            "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+            "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec"
+          ],
+          "owned_ingress_owned_bytes": [
+            2101427,
+            2101427
+          ],
+          "owned_ingress_read_bytes": [
+            2101427,
+            2101427
+          ],
+          "owned_ingress_read_calls": [
+            258,
+            258
+          ],
+          "paragraph_owned_section_positions": [
+            64,
+            129
+          ],
+          "patch_forward_inverse_verified": true,
+          "performance_claim": "none",
+          "phase_sum_verified": true,
+          "preparation_ns": [
+            258251,
+            243741
+          ],
+          "publication_inverse_exact_source_verified": true,
+          "publication_ns": [
+            2668671,
+            2695171
+          ],
+          "query_ns": [
+            1337336,
+            1340906
+          ],
+          "raw_member_order_and_comment_verified": true,
+          "raw_untouched_members_verified": true,
+          "sample_order": [
+            0,
+            1
+          ],
+          "section_count": 3,
+          "selected_paragraph": 64,
+          "semantic_reopen_all_sections_verified": true,
+          "sink_counters_verified": true,
+          "source_bytes": 2101427,
+          "source_cache_before_publication_after_commit_cold_loads": [
+            1,
+            1
+          ],
+          "source_cache_before_publication_after_commit_hits": [
+            0,
+            0
+          ],
+          "source_cache_before_publication_after_commit_retained_bytes": [
+            18855,
+            18855
+          ],
+          "source_cache_before_publication_after_commit_retained_entries": [
+            1,
+            1
+          ],
+          "source_cache_before_publication_after_commit_successful_loads": [
+            1,
+            1
+          ],
+          "source_immutability_verified": true,
+          "source_observation_scope": "instrumented sequential reader ingress; no positional ReadAt observer is available after ownership transfer",
+          "source_read_bytes": [],
+          "source_read_calls": [],
+          "source_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+          "stale_foreign_signed_noop_limits_partial_sink_verified": true,
+          "table_cell_sectpr_excluded_verified": true,
+          "timing_scope": "preparation, source-backed open, section query, columns edit, commit, and sequential publication; correctness, reopen, patch, refusal, cache, source, sink, and ZIP gates are excluded",
+          "total_main_story_paragraph_count": 257
+        },
+        "sink": {
+          "accepted_bytes": 2101446,
+          "largest_write": 65536,
+          "write_calls": 75,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_16385_to_65536": 32,
+            "bytes_1_to_512": 42,
+            "bytes_4097_to_16384": 0,
+            "bytes_513_to_4096": 1,
+            "bytes_over_65536": 0
+          }
+        },
+        "source": {
+          "docx_section_layout": {
+            "cache_counters_verified": true,
+            "columns_after": 3,
+            "columns_before": 2,
+            "commit_ns": [
+              351842,
+              352202
+            ],
+            "edit_ns": [
+              49330,
+              52510
+            ],
+            "expected_output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+            "header_footer_relationships_verified": true,
+            "implementation": "litchi-docx-source-backed-section-layout",
+            "ingress_route": "owned_reader",
+            "media_bytes": 524288,
+            "media_count": 4,
+            "open_ns": [
+              369221,
+              398201
+            ],
+            "ordinary_payload_materializations": [
+              1,
+              1
+            ],
+            "output_sha256": [
+              "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+              "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec"
+            ],
+            "owned_ingress_owned_bytes": [
+              2101427,
+              2101427
+            ],
+            "owned_ingress_read_bytes": [
+              2101427,
+              2101427
+            ],
+            "owned_ingress_read_calls": [
+              258,
+              258
+            ],
+            "paragraph_owned_section_positions": [
+              64,
+              129
+            ],
+            "patch_forward_inverse_verified": true,
+            "performance_claim": "none",
+            "phase_sum_verified": true,
+            "preparation_ns": [
+              258251,
+              243741
+            ],
+            "publication_inverse_exact_source_verified": true,
+            "publication_ns": [
+              2668671,
+              2695171
+            ],
+            "query_ns": [
+              1337336,
+              1340906
+            ],
+            "raw_member_order_and_comment_verified": true,
+            "raw_untouched_members_verified": true,
+            "sample_order": [
+              0,
+              1
+            ],
+            "section_count": 3,
+            "selected_paragraph": 64,
+            "semantic_reopen_all_sections_verified": true,
+            "sink_counters_verified": true,
+            "source_bytes": 2101427,
+            "source_cache_before_publication_after_commit_cold_loads": [
+              1,
+              1
+            ],
+            "source_cache_before_publication_after_commit_hits": [
+              0,
+              0
+            ],
+            "source_cache_before_publication_after_commit_retained_bytes": [
+              18855,
+              18855
+            ],
+            "source_cache_before_publication_after_commit_retained_entries": [
+              1,
+              1
+            ],
+            "source_cache_before_publication_after_commit_successful_loads": [
+              1,
+              1
+            ],
+            "source_immutability_verified": true,
+            "source_observation_scope": "instrumented sequential reader ingress; no positional ReadAt observer is available after ownership transfer",
+            "source_read_bytes": [],
+            "source_read_calls": [],
+            "source_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+            "stale_foreign_signed_noop_limits_partial_sink_verified": true,
+            "table_cell_sectpr_excluded_verified": true,
+            "timing_scope": "preparation, source-backed open, section query, columns edit, commit, and sequential publication; correctness, reopen, patch, refusal, cache, source, sink, and ZIP gates are excluded",
+            "total_main_story_paragraph_count": 257
+          },
+          "max_in_flight_reads": [],
+          "ordinary_payload_read_bytes": [],
+          "ordinary_payload_read_calls": [],
+          "read_bytes": [],
+          "read_calls": []
+        }
+      }
+    }
+  ],
+  "runner": {
+    "bytes": 19979,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/comparison.py",
+    "sha256": "0fca631d2c4f62da1e667e94eb1e6e8dccafaa34dc809e3cca9dfa9839d4c5b3"
+  },
+  "schema": "litchi.performance.0923.comparison-controls.v1"
+}

@@ -1,0 +1,45 @@
+{
+  "canonical_equality": {
+    "child_summaries": true,
+    "children": true,
+    "manifest_status": true,
+    "performance_claim": true,
+    "phase_summaries": true,
+    "pooled_latency_review": true,
+    "recapture": true,
+    "routes": true,
+    "schema": true,
+    "whole_process_rss_review": true
+  },
+  "canonical_fields": [
+    "schema",
+    "manifest_status",
+    "children",
+    "child_summaries",
+    "routes",
+    "pooled_latency_review",
+    "phase_summaries",
+    "whole_process_rss_review",
+    "performance_claim",
+    "recapture"
+  ],
+  "capture_manifest": {
+    "path": "/tmp/litchi-performance-0923/packet-v3-final2/comparison-manifest-v2.json",
+    "sha256": "b3089f7dcd5cc1517d22615a066e16088a50b4edbd4e703f7594bc5e66a568ae"
+  },
+  "comparative_children_run": 48,
+  "created_utc": "2026-10-06T09:28:40.499557+00:00",
+  "native_reduction": {
+    "bytes": 91192,
+    "path": "/tmp/litchi-performance-0923/receipts/comparison-reduction-v2.json",
+    "sha256": "f43dad724741469107e774786b5f69c43e1c8c07b10a63a731c0d4e0a03dcedf"
+  },
+  "no_recapture": true,
+  "replay_reduction": {
+    "bytes": 91384,
+    "path": "/tmp/litchi-performance-0923/packet-v3-final2-replay-captured/replay-reduction-v2.json",
+    "sha256": "d72bc9eb4773b25a3cae6a8184a9bcda905175c9964e5ea5e07c54d30d354989"
+  },
+  "schema": "litchi.performance.0923.reduction-replay-validation.v1",
+  "status": "pass"
+}

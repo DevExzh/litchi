@@ -1,5 +1,18 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0923 — owned DOCX source fingerprints reused
+
+[0923](0923-owned-source-fingerprint.md) adopts a private immutable-owner
+fingerprint memo after 48 native paired processes (9,600 samples). Owned-vector
+and owned-reader pooled median latency falls 21.46% and 21.15%; paired ratios
+are 1.271812 and 1.265597 with lower 95% bounds 1.269746 and 1.260773. The
+generic regression control passes, with no total-tail or RSS flag. Scope is
+one generated DOCX section-edit/publication fixture. A supplemental raw-sample
+reducer corrects a child-summary pooling error without recapture. Heaptrack
+produced 25 profiles after an erroneous restart; all are retained and independently
+audited, but the original 24-profile qualification is invalid. Memory values
+are descriptive only; the owned routes add 88 peak-live bytes per process.
+
 ## 0922 — borrowed FIB selection candidate fails two latency bounds
 
 [0922](0922-borrowed-fib-selection.md) measures a three-file DOC candidate
