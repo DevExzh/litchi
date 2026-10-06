@@ -1,0 +1,88 @@
+{
+  "created_utc": "2026-10-06T10:11:39.568138+00:00",
+  "cwd": "/home/zhuhe/code/litchi",
+  "gaps": [
+    "No deterministic public sequential-reader allocation-refusal test; try_reserve failures map to typed Allocation at phys_pkg.rs:1783-1787 and 1829-1833.",
+    "No existing sequential-reader arbitrary-short-read/late-error matrix; current final-short-read reader does not exercise short chunks or late failure.",
+    "No reader ingress cancellation/budget test because from_reader has no execution-context overload; any future context route must define pre-read cancellation, hierarchical reservation, actual-byte commit, retry/error ordering, and typed refusal."
+  ],
+  "head": "679252bad65004085eb62a28b056b1a16b3f7468",
+  "optimization_boundary_controls": [
+    "retain exact source bytes and owned authorization",
+    "do not infer ownership/memoization for generic ReadAt",
+    "preserve max+1 sentinel and limit-before-parse ordering",
+    "check checked arithmetic and allocator reservation precedence",
+    "separate requested allocation totals from copy traffic and live/RSS",
+    "no hidden runtime or implicit context"
+  ],
+  "routes": [
+    {
+      "boundary": "OpcPackage::from_reader / SourceBackedPackage::from_reader",
+      "controls": [
+        "8KiB requests",
+        "Interrupted retry",
+        "short reads accumulate",
+        "zero means EOF",
+        "overreported count InvalidData",
+        "exact-limit one-byte sentinel",
+        "typed InputBytes ReadLimit before ZIP validation",
+        "typed OPC package input Allocation on try_reserve"
+      ],
+      "implementation": "read_limited -> owned Vec -> validation/source owner",
+      "source_refs": [
+        "crates/litchi-opc/src/phys_pkg.rs:1775-1836",
+        "crates/litchi-opc/src/package.rs:1036-1047",
+        "crates/litchi-opc/src/source_backed.rs:6783-6795"
+      ]
+    },
+    {
+      "boundary": "Sequential reader existing tests",
+      "coverage": [
+        "single-pass/final EOF",
+        "max+1 sentinel",
+        "Interrupted",
+        "InvalidData overreport",
+        "deferred ordinary payload"
+      ],
+      "tests": [
+        "crates/litchi-opc/tests/source_backed_reader.rs:132 reader_ingress_consumes_once_and_keeps_ordinary_payloads_cold",
+        "crates/litchi-opc/tests/source_backed_reader.rs:159 reader_ingress_rejects_input_above_max_input_bytes",
+        "crates/litchi-opc/tests/source_backed_reader.rs:187 reader_ingress_retries_one_interrupted_read",
+        "crates/litchi-opc/tests/source_backed_reader.rs:207 reader_ingress_rejects_invalid_read_count_without_panicking"
+      ]
+    },
+    {
+      "boundary": "Owned Vec / positional ReadAt index limits",
+      "coverage": [
+        "typed archive limits",
+        "exact bytes/output",
+        "limit-before-parse",
+        "malformed ZIP error ordering"
+      ],
+      "tests": [
+        "crates/litchi-opc/tests/source_backed_reader.rs:261 indexed_archive_limits_remain_typed_for_vec_and_read_at_ingress",
+        "crates/litchi-opc/src/package.rs:3761 owned_constructors_preserve_mixed_storage_and_exact_source",
+        "crates/litchi-opc/src/package.rs:3779 owned_constructors_check_input_limit_before_zip_validation",
+        "crates/litchi-opc/src/package.rs:3806 malformed archive after bounded read"
+      ]
+    },
+    {
+      "boundary": "Managed ReadAt execution context",
+      "coverage": [
+        "pre-cancellation",
+        "budget/refusal",
+        "source errors",
+        "stable-version mutation",
+        "generic short reads/overreport"
+      ],
+      "note": "No sequential-reader+ExecutionContext API exists; read_limited has no cancellation or Work/InputBytes context routing.",
+      "tests": [
+        "crates/litchi-opc/src/execution.rs context constructor tests",
+        "crates/litchi-opc/src/source_backed.rs managed context tests",
+        "crates/litchi-opc/tests/source_fingerprint_quality.rs"
+      ]
+    }
+  ],
+  "schema": "litchi.performance.0924.source-test-matrix.v1",
+  "scope": "read-only source and existing-test audit; no build or test invocation"
+}

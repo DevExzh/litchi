@@ -1,5 +1,14 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0924 — current reader allocation hypothesis resolved before implementation
+
+[0924](0924-reader-allocation-attribution.md) relates current retained allocation
+stacks and native phase shares to the rejected 0779 capacity-growth experiment.
+The result changes prioritization without repeating an unsupported optimization.
+No production capability or CRUD row is promoted. Current provider intersections,
+representative producers, broader scenarios and the program-level performance
+goal remain unproven; iWork remains excluded.
+
 ## 0923 — owned fingerprint reuse adopted; broader goal remains active
 
 [0923](0923-owned-source-fingerprint.md) completes implementation, independent

@@ -1,0 +1,111 @@
+{
+  "artifacts": {
+    "stack-attribution-v2.json": {
+      "bytes": 135378,
+      "path": "/tmp/litchi-performance-0924/stack-attribution-v2.json",
+      "sha256": "fae07a13e700d00b1bf03c296daf8a3fd61cfe844e5ae89f93a3d0e226744661"
+    },
+    "stack-attribution-v2.md": {
+      "bytes": 6080,
+      "path": "/tmp/litchi-performance-0924/stack-attribution-v2.md",
+      "sha256": "3159346541f37aafacfac6bb1ea81c12a5a4755ea9fe6e9a0871df8da359ec6c"
+    },
+    "stack-attribution-v2.py": {
+      "bytes": 28606,
+      "path": "/tmp/litchi-performance-0924/stack-attribution-v2.py",
+      "sha256": "e4bef0c1fa0cc835f808d2afa77e002a25bbb7b1df40f4ed513f436f02d49294"
+    },
+    "stack-rows-v2.json": {
+      "bytes": 150263792,
+      "path": "/tmp/litchi-performance-0924/stack-rows-v2.json",
+      "sha256": "7db5a787e43d1b7c700c93d609d66d298f4c5cbd09884c58fca1e001c1a6340b"
+    }
+  },
+  "checks": [
+    {
+      "detail": 25,
+      "name": "profile_count_25",
+      "pass": true
+    },
+    {
+      "detail": null,
+      "name": "all_raw_profiles_receipt_bound",
+      "pass": true
+    },
+    {
+      "detail": null,
+      "name": "owned_gap_accounting",
+      "pass": true
+    },
+    {
+      "detail": null,
+      "name": "no_operation_marker",
+      "pass": true
+    },
+    {
+      "detail": null,
+      "name": "parser_negative_controls",
+      "pass": true
+    },
+    {
+      "detail": null,
+      "name": "source_count",
+      "pass": true
+    },
+    {
+      "detail": null,
+      "name": "binaries_present",
+      "pass": true
+    },
+    {
+      "detail": null,
+      "name": "baseline_missing_archive_visible",
+      "pass": true
+    },
+    {
+      "detail": {
+        "bytes": 150263792,
+        "path": "/tmp/litchi-performance-0924/stack-rows-v2.json",
+        "sha256": "7db5a787e43d1b7c700c93d609d66d298f4c5cbd09884c58fca1e001c1a6340b"
+      },
+      "name": "full_stack_descriptor_bound",
+      "pass": true
+    },
+    {
+      "detail": {
+        "bytes": 28606,
+        "path": "/tmp/litchi-performance-0924/stack-attribution-v2.py",
+        "sha256": "e4bef0c1fa0cc835f808d2afa77e002a25bbb7b1df40f4ed513f436f02d49294"
+      },
+      "name": "script_descriptor_bound",
+      "pass": true
+    },
+    {
+      "detail": 1086342076,
+      "name": "baseline_accounting_delta_exact",
+      "pass": true
+    },
+    {
+      "detail": 1086342076,
+      "name": "candidate_accounting_delta_exact",
+      "pass": true
+    }
+  ],
+  "generated_utc": "2026-10-06",
+  "schema": "litchi.performance.0924.stack-attribution-validation.v1",
+  "status": "pass",
+  "summary_metrics": {
+    "baseline": {
+      "common_stack_delta_bytes": 240,
+      "primary_read_limited_bytes": 1086341836,
+      "route_equivalent_setup_net_bytes": 0,
+      "total_delta_bytes": 1086342076
+    },
+    "candidate": {
+      "common_stack_delta_bytes": 240,
+      "primary_read_limited_bytes": 1086341836,
+      "route_equivalent_setup_net_bytes": 0,
+      "total_delta_bytes": 1086342076
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "schema": "litchi.performance.0924.cleanup.v1",
+  "removed_obsolete_drafts": [
+    {
+      "path": "/tmp/litchi-performance-0924/stack-attribution-full.json",
+      "bytes": 14903592,
+      "sha256": "e58d838cac8d1eda6a03b3d16c554ec5f13efa738ae9417bef30ba5eded7b4fb"
+    },
+    {
+      "path": "/tmp/litchi-performance-0924/stack-attribution-summary.json",
+      "bytes": 123971,
+      "sha256": "f739016e60e7cc858c17288824cde9466a2b530cd6834bbcb8f035ad2b419643"
+    },
+    {
+      "path": "/tmp/litchi-performance-0924/decode-stacks.py",
+      "bytes": 8813,
+      "sha256": "a4a05f7ae6e373aa712ab572536cc97e296e9cc972523271fb0aabccdacabcc3"
+    },
+    {
+      "path": "/tmp/litchi-performance-0924/decode.log",
+      "bytes": 3869,
+      "sha256": "fc83f920d0916bd45fd3f356b1121dad2bbb463cdab3f62508a30eff81064d47"
+    },
+    {
+      "path": "/tmp/litchi-performance-0924/phase-share-v1.py",
+      "bytes": 19463,
+      "sha256": "c01b8241ddaa8168e81e34e5c6acbcfd8b8217f2fe276e08758959ef51ca1892"
+    },
+    {
+      "path": "/tmp/litchi-performance-0924/phase-share-v1.json",
+      "bytes": 24460,
+      "sha256": "e3981d0d3e00261781e71a89f3d79f2723f93ba66f22ffbe2438bd370e364f1b"
+    },
+    {
+      "path": "/tmp/litchi-performance-0924/phase-share-replay-copy.json",
+      "bytes": 24456,
+      "sha256": "a43e09051ca67f04130fe5ecdd37393bc8baea797ebd9c120ae6f8eee33f1dd4"
+    }
+  ],
+  "removed_bytes": 15108624,
+  "retained": "Final canonical analysis, raw 0923 profiles, source/build custody, logs, receipts, and stack-rows-v2.json remain external; small final tooling and summaries copied into repository. Agent-owned moved-packet/control copies and duplicate full-stack replay had already been removed.",
+  "no_production_or_user_files_removed": true
+}

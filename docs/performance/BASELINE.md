@@ -1,5 +1,14 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0924 — retained reader allocation and native phase attribution
+
+[0924](0924-reader-allocation-attribution.md) analyzes existing 0923 data without
+recapture. All candidate native phase arrays cover 24 processes and 4,800
+samples. Reader open accounts for 9.9652% of summed elapsed time; deleting that
+entire phase would yield a conditional maximum 1.1107× speedup with other work
+fixed. This is an Amdahl model, not an achievable gain. Allocation stacks remain
+descriptive evidence under the explicitly invalid prior profiling protocol.
+
 ## 0923 — owned DOCX source fingerprints reused
 
 [0923](0923-owned-source-fingerprint.md) adopts a private immutable-owner

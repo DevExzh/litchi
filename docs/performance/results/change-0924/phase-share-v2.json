@@ -1,0 +1,779 @@
+{
+  "all_routes_sum_of_raw_samples": {
+    "amdahl_bounds": {
+      "open_only": {
+        "eliminated_fraction": 0.03940313655651334,
+        "eliminated_phases": [
+          "open_ns"
+        ],
+        "interpretation": "descriptive bound from summed raw samples, not a timing gate",
+        "maximum_speedup_if_eliminated": 1.0410194307893776,
+        "remaining_fraction": 0.9605968634434867
+      },
+      "publication_only": {
+        "eliminated_fraction": 0.5017167947917993,
+        "eliminated_phases": [
+          "publication_ns"
+        ],
+        "interpretation": "descriptive bound from summed raw samples, not a timing gate",
+        "maximum_speedup_if_eliminated": 2.0068908394818643,
+        "remaining_fraction": 0.4982832052082007
+      },
+      "query_plus_publication": {
+        "eliminated_fraction": 0.8335073548911436,
+        "eliminated_phases": [
+          "query_ns",
+          "publication_ns"
+        ],
+        "interpretation": "descriptive bound from summed raw samples, not a timing gate",
+        "maximum_speedup_if_eliminated": 6.0062713241547625,
+        "remaining_fraction": 0.16649264510885642
+      }
+    },
+    "phase_shares": {
+      "commit_ns": 0.08581432399236111,
+      "edit_ns": 0.01309683469541654,
+      "open_ns": 0.03940313655651334,
+      "preparation_ns": 0.028178349864565504,
+      "publication_ns": 0.5017167947917993,
+      "query_ns": 0.3317905600993442
+    },
+    "phase_sums_ns": {
+      "commit_ns": 1655476898,
+      "edit_ns": 252656040,
+      "open_ns": 760140956,
+      "preparation_ns": 543599309,
+      "publication_ns": 9678810302,
+      "query_ns": 6400698411
+    },
+    "sample_count": 4800,
+    "total_elapsed_ns": 19291381916
+  },
+  "capture_performed": false,
+  "created_utc": "2026-10-06T10:14:43.115239+00:00",
+  "inputs": {
+    "candidate_binary": {
+      "bytes": 70379960,
+      "sha256": "8d98309501f63f4911828f52c42653f5950f3f5019bd040cf98f787173528861"
+    },
+    "candidate_reports": 24,
+    "case": "docx_source_backed_existing_section_layout_edit_save",
+    "comparison_summary": {
+      "bytes": 39617,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/comparison-result-summary-v1.json",
+      "sha256": "abbb158c87104a9f5cad85165d9a578984c23c0035722d491c1a9bb3319cc54f"
+    },
+    "manifest": {
+      "bytes": 23166,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/capture-final/packet/comparison-manifest-v2.json",
+      "sha256": "b3089f7dcd5cc1517d22615a066e16088a50b4edbd4e703f7594bc5e66a568ae"
+    },
+    "raw_sample_summary": {
+      "bytes": 19286,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/root-raw-sample-summary.json",
+      "report_index_entries": 48,
+      "sha256": "edac04901aa00de5d726aef7229daca96ce58fb9441b13f093d50f26a9e43b7b"
+    },
+    "reports_per_route": 8,
+    "routes": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader"
+    ],
+    "samples_per_report": 200,
+    "source_identity": {
+      "bytes": 2101427,
+      "sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8"
+    }
+  },
+  "interpretation": {
+    "amdahl_definition": "counterfactual descriptive ceiling if the listed phase(s) consumed zero time while all other raw samples stayed fixed",
+    "median_distinction": "paired_median_timing_gate values are p50 baseline/candidate ratios and are not phase shares or pooled raw-sample quantiles",
+    "no_adoption_claim": true,
+    "raw_share_definition": "sum of each phase's 1600 raw samples divided by the sum of all six phases' 1600 raw samples for that route",
+    "reader_ingress_limit": "owned_reader open is measurable but bounded by its open-only share; query and publication dominate the retained route's summed time"
+  },
+  "purpose": "offline phase-share and descriptive Amdahl-bound audit of retained 0923 candidate raw samples",
+  "regeneration": {
+    "command": "python3 -B /tmp/litchi-performance-0924/phase-share-v2.py --repo /home/zhuhe/code/litchi --output /tmp/litchi-performance-0924/phase-share-v2.json",
+    "script_path": "/tmp/litchi-performance-0924/phase-share-v2.py"
+  },
+  "repo_git_revision_at_audit": "679252bad65004085eb62a28b056b1a16b3f7468",
+  "routes": {
+    "generic_read_at": {
+      "amdahl_bounds": {
+        "open_only": {
+          "eliminated_fraction": 0.010086770954901587,
+          "eliminated_phases": [
+            "open_ns"
+          ],
+          "interpretation": "descriptive bound from summed raw samples, not a timing gate",
+          "maximum_speedup_if_eliminated": 1.01018955061812,
+          "remaining_fraction": 0.9899132290450984
+        },
+        "publication_only": {
+          "eliminated_fraction": 0.5953097582446295,
+          "eliminated_phases": [
+            "publication_ns"
+          ],
+          "interpretation": "descriptive bound from summed raw samples, not a timing gate",
+          "maximum_speedup_if_eliminated": 2.471025729858062,
+          "remaining_fraction": 0.4046902417553705
+        },
+        "query_plus_publication": {
+          "eliminated_fraction": 0.8925028591609605,
+          "eliminated_phases": [
+            "query_ns",
+            "publication_ns"
+          ],
+          "interpretation": "descriptive bound from summed raw samples, not a timing gate",
+          "maximum_speedup_if_eliminated": 9.302573000498189,
+          "remaining_fraction": 0.1074971408390395
+        }
+      },
+      "invalid_sample_orders": 0,
+      "output_identities": [
+        {
+          "sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+          "source_bytes": 2101427
+        }
+      ],
+      "paired_median_timing_gate": {
+        "eligible": true,
+        "lower_95": 1.001920093803933,
+        "median_ratio": 1.0055025216005906,
+        "note": "paired p50 ratio from retained summary; separate from summed raw phase shares"
+      },
+      "phase_shares": {
+        "commit_ns": 0.07682906783801337,
+        "edit_ns": 0.011892559162021508,
+        "open_ns": 0.010086770954901587,
+        "preparation_ns": 0.008688742884103047,
+        "publication_ns": 0.5953097582446295,
+        "query_ns": 0.29719310091633094
+      },
+      "phase_sum_mismatches": 0,
+      "phase_sums_ns": {
+        "commit_ns": 551874865,
+        "edit_ns": 85426059,
+        "open_ns": 72454808,
+        "preparation_ns": 62412560,
+        "publication_ns": 4276200424,
+        "query_ns": 2134783189
+      },
+      "query_plus_publication_share": 0.8925028591609605,
+      "report_count": 8,
+      "report_files": [
+        {
+          "bytes": 151610,
+          "expected_bytes": 151610,
+          "expected_sha256": "0896cc1ea2fb190b42379954994c608aeaac0aa6511f49a97216208998ef3ae6",
+          "id": "generic_read_at-pair-01-leg-2-candidate",
+          "route": "generic_read_at",
+          "sha256": "0896cc1ea2fb190b42379954994c608aeaac0aa6511f49a97216208998ef3ae6",
+          "variant": "candidate"
+        },
+        {
+          "bytes": 151616,
+          "expected_bytes": 151616,
+          "expected_sha256": "c5bbead50735a3113e7ca5ccbf070fb7aef5d8044d36a26c2403db1506ec9844",
+          "id": "generic_read_at-pair-02-leg-1-candidate",
+          "route": "generic_read_at",
+          "sha256": "c5bbead50735a3113e7ca5ccbf070fb7aef5d8044d36a26c2403db1506ec9844",
+          "variant": "candidate"
+        },
+        {
+          "bytes": 151614,
+          "expected_bytes": 151614,
+          "expected_sha256": "56d9f494f474b9648da2667751f03ffc5540ee1eebd4ce74b1087ff8203bdfad",
+          "id": "generic_read_at-pair-03-leg-2-candidate",
+          "route": "generic_read_at",
+          "sha256": "56d9f494f474b9648da2667751f03ffc5540ee1eebd4ce74b1087ff8203bdfad",
+          "variant": "candidate"
+        },
+        {
+          "bytes": 151615,
+          "expected_bytes": 151615,
+          "expected_sha256": "d9ac694d0f3adac48561440036970887bd0ddccb48137f635db2e870ac9b901d",
+          "id": "generic_read_at-pair-04-leg-1-candidate",
+          "route": "generic_read_at",
+          "sha256": "d9ac694d0f3adac48561440036970887bd0ddccb48137f635db2e870ac9b901d",
+          "variant": "candidate"
+        },
+        {
+          "bytes": 151616,
+          "expected_bytes": 151616,
+          "expected_sha256": "1451304f1b4426991d440718441d07a66117e3f2a8034ed10316538520bcea0d",
+          "id": "generic_read_at-pair-05-leg-2-candidate",
+          "route": "generic_read_at",
+          "sha256": "1451304f1b4426991d440718441d07a66117e3f2a8034ed10316538520bcea0d",
+          "variant": "candidate"
+        },
+        {
+          "bytes": 151616,
+          "expected_bytes": 151616,
+          "expected_sha256": "3828ea0895d3cf68c39fbba926707691b6aec03d4fd014c392d8390b34778f6b",
+          "id": "generic_read_at-pair-06-leg-1-candidate",
+          "route": "generic_read_at",
+          "sha256": "3828ea0895d3cf68c39fbba926707691b6aec03d4fd014c392d8390b34778f6b",
+          "variant": "candidate"
+        },
+        {
+          "bytes": 151609,
+          "expected_bytes": 151609,
+          "expected_sha256": "70a0049fdb85a369e11e69a650402612258c40ed92d203888539322331d23f33",
+          "id": "generic_read_at-pair-07-leg-2-candidate",
+          "route": "generic_read_at",
+          "sha256": "70a0049fdb85a369e11e69a650402612258c40ed92d203888539322331d23f33",
+          "variant": "candidate"
+        },
+        {
+          "bytes": 151617,
+          "expected_bytes": 151617,
+          "expected_sha256": "91da29cc36a8ad6baa15805ddee289eb7c8a3ed44f7b989df5414d77d83510ea",
+          "id": "generic_read_at-pair-08-leg-1-candidate",
+          "route": "generic_read_at",
+          "sha256": "91da29cc36a8ad6baa15805ddee289eb7c8a3ed44f7b989df5414d77d83510ea",
+          "variant": "candidate"
+        }
+      ],
+      "sample_count": 1600,
+      "source_identities": [
+        {
+          "bytes": 2101427,
+          "sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8"
+        }
+      ],
+      "total_elapsed_ns": 7183151905
+    },
+    "owned_reader": {
+      "amdahl_bounds": {
+        "open_only": {
+          "eliminated_fraction": 0.09965195084465603,
+          "eliminated_phases": [
+            "open_ns"
+          ],
+          "interpretation": "descriptive bound from summed raw samples, not a timing gate",
+          "maximum_speedup_if_eliminated": 1.1106815869020252,
+          "remaining_fraction": 0.9003480491553439
+        },
+        "publication_only": {
+          "eliminated_fraction": 0.4361723435835624,
+          "eliminated_phases": [
+            "publication_ns"
+          ],
+          "interpretation": "descriptive bound from summed raw samples, not a timing gate",
+          "maximum_speedup_if_eliminated": 1.7735916083928485,
+          "remaining_fraction": 0.5638276564164376
+        },
+        "query_plus_publication": {
+          "eliminated_fraction": 0.7816861470120378,
+          "eliminated_phases": [
+            "query_ns",
+            "publication_ns"
+          ],
+          "interpretation": "descriptive bound from summed raw samples, not a timing gate",
+          "maximum_speedup_if_eliminated": 4.580561362980203,
+          "remaining_fraction": 0.21831385298796224
+        }
+      },
+      "invalid_sample_orders": 0,
+      "output_identities": [
+        {
+          "sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+          "source_bytes": 2101427
+        }
+      ],
+      "paired_median_timing_gate": {
+        "eligible": true,
+        "lower_95": 1.260772571480797,
+        "median_ratio": 1.265596645074311,
+        "note": "paired p50 ratio from retained summary; separate from summed raw phase shares"
+      },
+      "phase_shares": {
+        "commit_ns": 0.08923216165741593,
+        "edit_ns": 0.013495256907467829,
+        "open_ns": 0.09965195084465603,
+        "preparation_ns": 0.01593448357842246,
+        "publication_ns": 0.4361723435835624,
+        "query_ns": 0.3455138034284754
+      },
+      "phase_sum_mismatches": 0,
+      "phase_sums_ns": {
+        "commit_ns": 551149341,
+        "edit_ns": 83354497,
+        "open_ns": 615507974,
+        "preparation_ns": 98420569,
+        "publication_ns": 2694052181,
+        "query_ns": 2134092703
+      },
+      "query_plus_publication_share": 0.7816861470120378,
+      "report_count": 8,
+      "report_files": [
+        {
+          "bytes": 137140,
+          "expected_bytes": 137140,
+          "expected_sha256": "c82184972a228648d793eec5e6ea3a312d82b187d2c4fd504d784f939b2905b9",
+          "id": "owned_reader-pair-01-leg-2-candidate",
+          "route": "owned_reader",
+          "sha256": "c82184972a228648d793eec5e6ea3a312d82b187d2c4fd504d784f939b2905b9",
+          "variant": "candidate"
+        },
+        {
+          "bytes": 137140,
+          "expected_bytes": 137140,
+          "expected_sha256": "236ecf6ce583b6cd6f0c27917715c890a47754443d996dd89e134583dafeb4a7",
+          "id": "owned_reader-pair-02-leg-1-candidate",
+          "route": "owned_reader",
+          "sha256": "236ecf6ce583b6cd6f0c27917715c890a47754443d996dd89e134583dafeb4a7",
+          "variant": "candidate"
+        },
+        {
+          "bytes": 137134,
+          "expected_bytes": 137134,
+          "expected_sha256": "908023d808ebe97f7e0fc5f992de3bf83b534a55374eada80ad5f50e09949fb1",
+          "id": "owned_reader-pair-03-leg-2-candidate",
+          "route": "owned_reader",
+          "sha256": "908023d808ebe97f7e0fc5f992de3bf83b534a55374eada80ad5f50e09949fb1",
+          "variant": "candidate"
+        },
+        {
+          "bytes": 137340,
+          "expected_bytes": 137340,
+          "expected_sha256": "4ef3a1414770a9fbfc95e7153eb8309707e7f1e076e64cc1295efc3364ba870b",
+          "id": "owned_reader-pair-04-leg-1-candidate",
+          "route": "owned_reader",
+          "sha256": "4ef3a1414770a9fbfc95e7153eb8309707e7f1e076e64cc1295efc3364ba870b",
+          "variant": "candidate"
+        },
+        {
+          "bytes": 137142,
+          "expected_bytes": 137142,
+          "expected_sha256": "d31d00166e7a0dcacff41c585907d8db4cb812080cd7305141ba01371a7f2493",
+          "id": "owned_reader-pair-05-leg-2-candidate",
+          "route": "owned_reader",
+          "sha256": "d31d00166e7a0dcacff41c585907d8db4cb812080cd7305141ba01371a7f2493",
+          "variant": "candidate"
+        },
+        {
+          "bytes": 137142,
+          "expected_bytes": 137142,
+          "expected_sha256": "9be16bde44a293ebd05183b0fc469a4fb26058bbb848f6b216b8be76662c4d69",
+          "id": "owned_reader-pair-06-leg-1-candidate",
+          "route": "owned_reader",
+          "sha256": "9be16bde44a293ebd05183b0fc469a4fb26058bbb848f6b216b8be76662c4d69",
+          "variant": "candidate"
+        },
+        {
+          "bytes": 137142,
+          "expected_bytes": 137142,
+          "expected_sha256": "7370fec4aadcb37f8b3e4b89afb2dd9ca32536be642fd158538d8a7bbd33aa59",
+          "id": "owned_reader-pair-07-leg-2-candidate",
+          "route": "owned_reader",
+          "sha256": "7370fec4aadcb37f8b3e4b89afb2dd9ca32536be642fd158538d8a7bbd33aa59",
+          "variant": "candidate"
+        },
+        {
+          "bytes": 137143,
+          "expected_bytes": 137143,
+          "expected_sha256": "509fe51150fac597ade60f10585da12fc29b99b868cebabc0609273ebc2d1993",
+          "id": "owned_reader-pair-08-leg-1-candidate",
+          "route": "owned_reader",
+          "sha256": "509fe51150fac597ade60f10585da12fc29b99b868cebabc0609273ebc2d1993",
+          "variant": "candidate"
+        }
+      ],
+      "sample_count": 1600,
+      "source_identities": [
+        {
+          "bytes": 2101427,
+          "sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8"
+        }
+      ],
+      "total_elapsed_ns": 6176577265
+    },
+    "owned_vec": {
+      "amdahl_bounds": {
+        "open_only": {
+          "eliminated_fraction": 0.012168307399429819,
+          "eliminated_phases": [
+            "open_ns"
+          ],
+          "interpretation": "descriptive bound from summed raw samples, not a timing gate",
+          "maximum_speedup_if_eliminated": 1.0123181990318568,
+          "remaining_fraction": 0.9878316926005701
+        },
+        "publication_only": {
+          "eliminated_fraction": 0.4566278258326082,
+          "eliminated_phases": [
+            "publication_ns"
+          ],
+          "interpretation": "descriptive bound from summed raw samples, not a timing gate",
+          "maximum_speedup_if_eliminated": 1.8403592372618236,
+          "remaining_fraction": 0.5433721741673918
+        },
+        "query_plus_publication": {
+          "eliminated_fraction": 0.8160255536307486,
+          "eliminated_phases": [
+            "query_ns",
+            "publication_ns"
+          ],
+          "interpretation": "descriptive bound from summed raw samples, not a timing gate",
+          "maximum_speedup_if_eliminated": 5.435537487597164,
+          "remaining_fraction": 0.18397444636925142
+        }
+      },
+      "invalid_sample_orders": 0,
+      "output_identities": [
+        {
+          "sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+          "source_bytes": 2101427
+        }
+      ],
+      "paired_median_timing_gate": {
+        "eligible": true,
+        "lower_95": 1.2697464007841612,
+        "median_ratio": 1.27181208270913,
+        "note": "paired p50 ratio from retained summary; separate from summed raw phase shares"
+      },
+      "phase_shares": {
+        "commit_ns": 0.09313638469017688,
+        "edit_ns": 0.014140322704588749,
+        "open_ns": 0.012168307399429819,
+        "preparation_ns": 0.064529431575056,
+        "publication_ns": 0.4566278258326082,
+        "query_ns": 0.3593977277981404
+      },
+      "phase_sum_mismatches": 0,
+      "phase_sums_ns": {
+        "commit_ns": 552452692,
+        "edit_ns": 83875484,
+        "open_ns": 72178174,
+        "preparation_ns": 382766180,
+        "publication_ns": 2708557697,
+        "query_ns": 2131822519
+      },
+      "query_plus_publication_share": 0.8160255536307486,
+      "report_count": 8,
+      "report_files": [
+        {
+          "bytes": 135512,
+          "expected_bytes": 135512,
+          "expected_sha256": "215a2129a3304c050b9c8242dd6517554891994b94c543375e2def518486af3c",
+          "id": "owned_vec-pair-01-leg-2-candidate",
+          "route": "owned_vec",
+          "sha256": "215a2129a3304c050b9c8242dd6517554891994b94c543375e2def518486af3c",
+          "variant": "candidate"
+        },
+        {
+          "bytes": 135521,
+          "expected_bytes": 135521,
+          "expected_sha256": "63e5b1952f7e1c15fca8445b9c987a84af329d12529a04d8027b1f23023a3185",
+          "id": "owned_vec-pair-02-leg-1-candidate",
+          "route": "owned_vec",
+          "sha256": "63e5b1952f7e1c15fca8445b9c987a84af329d12529a04d8027b1f23023a3185",
+          "variant": "candidate"
+        },
+        {
+          "bytes": 135522,
+          "expected_bytes": 135522,
+          "expected_sha256": "46f073711b9bb74a6596c1c0104e017947267bb3d7bc45b1a7d78ee268943c58",
+          "id": "owned_vec-pair-03-leg-2-candidate",
+          "route": "owned_vec",
+          "sha256": "46f073711b9bb74a6596c1c0104e017947267bb3d7bc45b1a7d78ee268943c58",
+          "variant": "candidate"
+        },
+        {
+          "bytes": 135522,
+          "expected_bytes": 135522,
+          "expected_sha256": "7003184b701dc4a8f5bf91b5d4130a08b5d3e87d12ff83c3d7a0b8bedc2cdc01",
+          "id": "owned_vec-pair-04-leg-1-candidate",
+          "route": "owned_vec",
+          "sha256": "7003184b701dc4a8f5bf91b5d4130a08b5d3e87d12ff83c3d7a0b8bedc2cdc01",
+          "variant": "candidate"
+        },
+        {
+          "bytes": 135521,
+          "expected_bytes": 135521,
+          "expected_sha256": "21194c76f1abe6dcf88f4233b789d1d970afd2342e7d68582fa6a357475c2bf6",
+          "id": "owned_vec-pair-05-leg-2-candidate",
+          "route": "owned_vec",
+          "sha256": "21194c76f1abe6dcf88f4233b789d1d970afd2342e7d68582fa6a357475c2bf6",
+          "variant": "candidate"
+        },
+        {
+          "bytes": 135521,
+          "expected_bytes": 135521,
+          "expected_sha256": "e100bf292173d4f43cffbc718246be737249818da699a799d4edbd00ba5c6ddc",
+          "id": "owned_vec-pair-06-leg-1-candidate",
+          "route": "owned_vec",
+          "sha256": "e100bf292173d4f43cffbc718246be737249818da699a799d4edbd00ba5c6ddc",
+          "variant": "candidate"
+        },
+        {
+          "bytes": 135523,
+          "expected_bytes": 135523,
+          "expected_sha256": "5636c2cbae17daebb8c42488d99eba826667725bf93da7e8fee817e71a7a32f9",
+          "id": "owned_vec-pair-07-leg-2-candidate",
+          "route": "owned_vec",
+          "sha256": "5636c2cbae17daebb8c42488d99eba826667725bf93da7e8fee817e71a7a32f9",
+          "variant": "candidate"
+        },
+        {
+          "bytes": 135521,
+          "expected_bytes": 135521,
+          "expected_sha256": "468fde6ea5cfddb1b950e192cfb71e0d78f88c54a4ab4563582e44175cea46f8",
+          "id": "owned_vec-pair-08-leg-1-candidate",
+          "route": "owned_vec",
+          "sha256": "468fde6ea5cfddb1b950e192cfb71e0d78f88c54a4ab4563582e44175cea46f8",
+          "variant": "candidate"
+        }
+      ],
+      "sample_count": 1600,
+      "source_identities": [
+        {
+          "bytes": 2101427,
+          "sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8"
+        }
+      ],
+      "total_elapsed_ns": 5931652746
+    }
+  },
+  "schema": "litchi.performance.0924.raw-phase-share-audit.v2",
+  "source_mutation_performed": false,
+  "validation": {
+    "all_candidate_report_hashes_match_root_raw_sample_summary": true,
+    "all_candidate_report_sizes_match_root_raw_sample_summary": true,
+    "all_candidate_reports_have_exact_binary_identity": true,
+    "all_candidate_reports_have_exact_case_and_route": true,
+    "all_phase_sums_equal_elapsed_samples": true,
+    "all_phase_vectors_have_200_samples": true,
+    "all_sample_orders_are_permutations": true,
+    "candidate_route_counts": {
+      "generic_read_at": 8,
+      "owned_reader": 8,
+      "owned_vec": 8
+    },
+    "candidate_schedule_children": 24,
+    "manifest_status": "frozen",
+    "report_hashes": [
+      {
+        "bytes": 151610,
+        "expected_bytes": 151610,
+        "expected_sha256": "0896cc1ea2fb190b42379954994c608aeaac0aa6511f49a97216208998ef3ae6",
+        "id": "generic_read_at-pair-01-leg-2-candidate",
+        "route": "generic_read_at",
+        "sha256": "0896cc1ea2fb190b42379954994c608aeaac0aa6511f49a97216208998ef3ae6",
+        "variant": "candidate"
+      },
+      {
+        "bytes": 151616,
+        "expected_bytes": 151616,
+        "expected_sha256": "c5bbead50735a3113e7ca5ccbf070fb7aef5d8044d36a26c2403db1506ec9844",
+        "id": "generic_read_at-pair-02-leg-1-candidate",
+        "route": "generic_read_at",
+        "sha256": "c5bbead50735a3113e7ca5ccbf070fb7aef5d8044d36a26c2403db1506ec9844",
+        "variant": "candidate"
+      },
+      {
+        "bytes": 151614,
+        "expected_bytes": 151614,
+        "expected_sha256": "56d9f494f474b9648da2667751f03ffc5540ee1eebd4ce74b1087ff8203bdfad",
+        "id": "generic_read_at-pair-03-leg-2-candidate",
+        "route": "generic_read_at",
+        "sha256": "56d9f494f474b9648da2667751f03ffc5540ee1eebd4ce74b1087ff8203bdfad",
+        "variant": "candidate"
+      },
+      {
+        "bytes": 151615,
+        "expected_bytes": 151615,
+        "expected_sha256": "d9ac694d0f3adac48561440036970887bd0ddccb48137f635db2e870ac9b901d",
+        "id": "generic_read_at-pair-04-leg-1-candidate",
+        "route": "generic_read_at",
+        "sha256": "d9ac694d0f3adac48561440036970887bd0ddccb48137f635db2e870ac9b901d",
+        "variant": "candidate"
+      },
+      {
+        "bytes": 151616,
+        "expected_bytes": 151616,
+        "expected_sha256": "1451304f1b4426991d440718441d07a66117e3f2a8034ed10316538520bcea0d",
+        "id": "generic_read_at-pair-05-leg-2-candidate",
+        "route": "generic_read_at",
+        "sha256": "1451304f1b4426991d440718441d07a66117e3f2a8034ed10316538520bcea0d",
+        "variant": "candidate"
+      },
+      {
+        "bytes": 151616,
+        "expected_bytes": 151616,
+        "expected_sha256": "3828ea0895d3cf68c39fbba926707691b6aec03d4fd014c392d8390b34778f6b",
+        "id": "generic_read_at-pair-06-leg-1-candidate",
+        "route": "generic_read_at",
+        "sha256": "3828ea0895d3cf68c39fbba926707691b6aec03d4fd014c392d8390b34778f6b",
+        "variant": "candidate"
+      },
+      {
+        "bytes": 151609,
+        "expected_bytes": 151609,
+        "expected_sha256": "70a0049fdb85a369e11e69a650402612258c40ed92d203888539322331d23f33",
+        "id": "generic_read_at-pair-07-leg-2-candidate",
+        "route": "generic_read_at",
+        "sha256": "70a0049fdb85a369e11e69a650402612258c40ed92d203888539322331d23f33",
+        "variant": "candidate"
+      },
+      {
+        "bytes": 151617,
+        "expected_bytes": 151617,
+        "expected_sha256": "91da29cc36a8ad6baa15805ddee289eb7c8a3ed44f7b989df5414d77d83510ea",
+        "id": "generic_read_at-pair-08-leg-1-candidate",
+        "route": "generic_read_at",
+        "sha256": "91da29cc36a8ad6baa15805ddee289eb7c8a3ed44f7b989df5414d77d83510ea",
+        "variant": "candidate"
+      },
+      {
+        "bytes": 137140,
+        "expected_bytes": 137140,
+        "expected_sha256": "c82184972a228648d793eec5e6ea3a312d82b187d2c4fd504d784f939b2905b9",
+        "id": "owned_reader-pair-01-leg-2-candidate",
+        "route": "owned_reader",
+        "sha256": "c82184972a228648d793eec5e6ea3a312d82b187d2c4fd504d784f939b2905b9",
+        "variant": "candidate"
+      },
+      {
+        "bytes": 137140,
+        "expected_bytes": 137140,
+        "expected_sha256": "236ecf6ce583b6cd6f0c27917715c890a47754443d996dd89e134583dafeb4a7",
+        "id": "owned_reader-pair-02-leg-1-candidate",
+        "route": "owned_reader",
+        "sha256": "236ecf6ce583b6cd6f0c27917715c890a47754443d996dd89e134583dafeb4a7",
+        "variant": "candidate"
+      },
+      {
+        "bytes": 137134,
+        "expected_bytes": 137134,
+        "expected_sha256": "908023d808ebe97f7e0fc5f992de3bf83b534a55374eada80ad5f50e09949fb1",
+        "id": "owned_reader-pair-03-leg-2-candidate",
+        "route": "owned_reader",
+        "sha256": "908023d808ebe97f7e0fc5f992de3bf83b534a55374eada80ad5f50e09949fb1",
+        "variant": "candidate"
+      },
+      {
+        "bytes": 137340,
+        "expected_bytes": 137340,
+        "expected_sha256": "4ef3a1414770a9fbfc95e7153eb8309707e7f1e076e64cc1295efc3364ba870b",
+        "id": "owned_reader-pair-04-leg-1-candidate",
+        "route": "owned_reader",
+        "sha256": "4ef3a1414770a9fbfc95e7153eb8309707e7f1e076e64cc1295efc3364ba870b",
+        "variant": "candidate"
+      },
+      {
+        "bytes": 137142,
+        "expected_bytes": 137142,
+        "expected_sha256": "d31d00166e7a0dcacff41c585907d8db4cb812080cd7305141ba01371a7f2493",
+        "id": "owned_reader-pair-05-leg-2-candidate",
+        "route": "owned_reader",
+        "sha256": "d31d00166e7a0dcacff41c585907d8db4cb812080cd7305141ba01371a7f2493",
+        "variant": "candidate"
+      },
+      {
+        "bytes": 137142,
+        "expected_bytes": 137142,
+        "expected_sha256": "9be16bde44a293ebd05183b0fc469a4fb26058bbb848f6b216b8be76662c4d69",
+        "id": "owned_reader-pair-06-leg-1-candidate",
+        "route": "owned_reader",
+        "sha256": "9be16bde44a293ebd05183b0fc469a4fb26058bbb848f6b216b8be76662c4d69",
+        "variant": "candidate"
+      },
+      {
+        "bytes": 137142,
+        "expected_bytes": 137142,
+        "expected_sha256": "7370fec4aadcb37f8b3e4b89afb2dd9ca32536be642fd158538d8a7bbd33aa59",
+        "id": "owned_reader-pair-07-leg-2-candidate",
+        "route": "owned_reader",
+        "sha256": "7370fec4aadcb37f8b3e4b89afb2dd9ca32536be642fd158538d8a7bbd33aa59",
+        "variant": "candidate"
+      },
+      {
+        "bytes": 137143,
+        "expected_bytes": 137143,
+        "expected_sha256": "509fe51150fac597ade60f10585da12fc29b99b868cebabc0609273ebc2d1993",
+        "id": "owned_reader-pair-08-leg-1-candidate",
+        "route": "owned_reader",
+        "sha256": "509fe51150fac597ade60f10585da12fc29b99b868cebabc0609273ebc2d1993",
+        "variant": "candidate"
+      },
+      {
+        "bytes": 135512,
+        "expected_bytes": 135512,
+        "expected_sha256": "215a2129a3304c050b9c8242dd6517554891994b94c543375e2def518486af3c",
+        "id": "owned_vec-pair-01-leg-2-candidate",
+        "route": "owned_vec",
+        "sha256": "215a2129a3304c050b9c8242dd6517554891994b94c543375e2def518486af3c",
+        "variant": "candidate"
+      },
+      {
+        "bytes": 135521,
+        "expected_bytes": 135521,
+        "expected_sha256": "63e5b1952f7e1c15fca8445b9c987a84af329d12529a04d8027b1f23023a3185",
+        "id": "owned_vec-pair-02-leg-1-candidate",
+        "route": "owned_vec",
+        "sha256": "63e5b1952f7e1c15fca8445b9c987a84af329d12529a04d8027b1f23023a3185",
+        "variant": "candidate"
+      },
+      {
+        "bytes": 135522,
+        "expected_bytes": 135522,
+        "expected_sha256": "46f073711b9bb74a6596c1c0104e017947267bb3d7bc45b1a7d78ee268943c58",
+        "id": "owned_vec-pair-03-leg-2-candidate",
+        "route": "owned_vec",
+        "sha256": "46f073711b9bb74a6596c1c0104e017947267bb3d7bc45b1a7d78ee268943c58",
+        "variant": "candidate"
+      },
+      {
+        "bytes": 135522,
+        "expected_bytes": 135522,
+        "expected_sha256": "7003184b701dc4a8f5bf91b5d4130a08b5d3e87d12ff83c3d7a0b8bedc2cdc01",
+        "id": "owned_vec-pair-04-leg-1-candidate",
+        "route": "owned_vec",
+        "sha256": "7003184b701dc4a8f5bf91b5d4130a08b5d3e87d12ff83c3d7a0b8bedc2cdc01",
+        "variant": "candidate"
+      },
+      {
+        "bytes": 135521,
+        "expected_bytes": 135521,
+        "expected_sha256": "21194c76f1abe6dcf88f4233b789d1d970afd2342e7d68582fa6a357475c2bf6",
+        "id": "owned_vec-pair-05-leg-2-candidate",
+        "route": "owned_vec",
+        "sha256": "21194c76f1abe6dcf88f4233b789d1d970afd2342e7d68582fa6a357475c2bf6",
+        "variant": "candidate"
+      },
+      {
+        "bytes": 135521,
+        "expected_bytes": 135521,
+        "expected_sha256": "e100bf292173d4f43cffbc718246be737249818da699a799d4edbd00ba5c6ddc",
+        "id": "owned_vec-pair-06-leg-1-candidate",
+        "route": "owned_vec",
+        "sha256": "e100bf292173d4f43cffbc718246be737249818da699a799d4edbd00ba5c6ddc",
+        "variant": "candidate"
+      },
+      {
+        "bytes": 135523,
+        "expected_bytes": 135523,
+        "expected_sha256": "5636c2cbae17daebb8c42488d99eba826667725bf93da7e8fee817e71a7a32f9",
+        "id": "owned_vec-pair-07-leg-2-candidate",
+        "route": "owned_vec",
+        "sha256": "5636c2cbae17daebb8c42488d99eba826667725bf93da7e8fee817e71a7a32f9",
+        "variant": "candidate"
+      },
+      {
+        "bytes": 135521,
+        "expected_bytes": 135521,
+        "expected_sha256": "468fde6ea5cfddb1b950e192cfb71e0d78f88c54a4ab4563582e44175cea46f8",
+        "id": "owned_vec-pair-08-leg-1-candidate",
+        "route": "owned_vec",
+        "sha256": "468fde6ea5cfddb1b950e192cfb71e0d78f88c54a4ab4563582e44175cea46f8",
+        "variant": "candidate"
+      }
+    ],
+    "schedule_children": 48
+  }
+}

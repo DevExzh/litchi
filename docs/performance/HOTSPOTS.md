@@ -1,5 +1,15 @@
 # Performance hotspot inventory
 
+## 0924 — reader request volume attributed; growth policy remains rejected
+
+[0924](0924-reader-allocation-attribution.md) traces the 0923 reader/vector
+requested-byte gap to exact 8 KiB-step input-buffer growth. The source mechanism
+matches the previously rejected 0779 tradeoff; requested capacities do not
+measure copying or latency. Open accounts for 9.97% of retained candidate reader
+time, versus 78.17% for query plus publication. Prioritize current section-layout
+file/range-provider qualification using existing 0491–0494 infrastructure.
+No new growth policy, length-hinted API, capture, or production change is adopted.
+
 ## 0923 — repeated owned-source hash removed from publication
 
 [0923](0923-owned-source-fingerprint.md) adopts digest reuse only for explicitly

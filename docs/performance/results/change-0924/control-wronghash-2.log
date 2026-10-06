@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/tmp/litchi-performance-0924/phase-share-v1.py", line 377, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/tmp/litchi-performance-0924/phase-share-v1.py", line 177, in main
+    require(actual_report_sha == expected_report["sha256"], f"{report_id}: report hash mismatch")
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/litchi-performance-0924/phase-share-v1.py", line 55, in require
+    raise RuntimeError(message)
+RuntimeError: owned_reader-pair-01-leg-2-candidate: report hash mismatch

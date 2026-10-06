@@ -1,0 +1,122 @@
+{
+  "artifact_hashes_at_receipt": {
+    "attribution_independent_replay_result_sha256": "a55500629bfc3c2724fd67f356a2c5308ff1b4053314e562fa4add8f67ba0d41",
+    "attribution_independent_replay_script_sha256": "a36c5840fabea4dd3cd77a56fc028b3f7745846392fcb7f62b7355556e970791",
+    "final_independent_check_script_sha256": "07bc74834996e47d0b8576f7e23519568161caf2cc741d34a1b7dca17e5d62ff",
+    "final_independent_check_sha256": "ca452692c357321d9d04163699d74fde44687bf9c96b31a236bef87fd9f97af9",
+    "phase_share_v2_sha256": "081e329cfd08643487880039312e9cf31ea32a4f6064e11301d293bc1ae3ef6c",
+    "stack_attribution_v2_sha256": "fae07a13e700d00b1bf03c296daf8a3fd61cfe844e5ae89f93a3d0e226744661",
+    "stack_attribution_v2_stacks_sha256": "7db5a787e43d1b7c700c93d609d66d298f4c5cbd09884c58fca1e001c1a6340b"
+  },
+  "attribution": {
+    "common_delta_calls": {
+      "baseline": 8,
+      "candidate": 8
+    },
+    "final_independent_check_result": "/tmp/litchi-performance-0924/final-independent-check.json",
+    "final_independent_check_result_sha256": "ca452692c357321d9d04163699d74fde44687bf9c96b31a236bef87fd9f97af9",
+    "final_independent_check_script": "/tmp/litchi-performance-0924/final-independent-check.py",
+    "final_independent_check_script_sha256": "07bc74834996e47d0b8576f7e23519568161caf2cc741d34a1b7dca17e5d62ff",
+    "final_replay_command": "cd /home/zhuhe/code/litchi && python3 -B /tmp/litchi-performance-0924/final-independent-check.py > /tmp/litchi-performance-0924/final-independent-check.json",
+    "group_pair_delta_bytes": {
+      "baseline": 1086342076,
+      "candidate": 1086342076
+    },
+    "group_pair_delta_calls": {
+      "baseline": 1036,
+      "candidate": 1036
+    },
+    "independent_replay_command": "cd /home/zhuhe/code/litchi && python3 -B /tmp/litchi-performance-0924/attribution-independent-replay.py > /tmp/litchi-performance-0924/attribution-independent-replay.json",
+    "independent_replay_result": "/tmp/litchi-performance-0924/attribution-independent-replay.json",
+    "independent_replay_result_sha256": "a55500629bfc3c2724fd67f356a2c5308ff1b4053314e562fa4add8f67ba0d41",
+    "independent_replay_script": "/tmp/litchi-performance-0924/attribution-independent-replay.py",
+    "independent_replay_script_sha256": "a36c5840fabea4dd3cd77a56fc028b3f7745846392fcb7f62b7355556e970791",
+    "input": "/tmp/litchi-performance-0924/stack-attribution-v2.json",
+    "input_sha256": "fae07a13e700d00b1bf03c296daf8a3fd61cfe844e5ae89f93a3d0e226744661",
+    "limitation": "The parser assigns each + event once to a complete exact leaf-to-root stack. operation_boundary is none; optimized/inlined symbols and whole-process profiles prevent strict exclusive timing-phase attribution.",
+    "profiles": 25,
+    "read_limited_calls": {
+      "baseline": 1028,
+      "candidate": 1028
+    },
+    "read_limited_delta_bytes": {
+      "baseline": 1086341836,
+      "candidate": 1086341836
+    },
+    "reader_calls_field_bug": false,
+    "residual_non_read_limited_bytes": {
+      "baseline": 240,
+      "candidate": 240
+    },
+    "residual_per_four_profile_pair_bytes": 60,
+    "route_setup_net_bytes": {
+      "baseline": 0,
+      "candidate": 0
+    },
+    "unique_raw_sha256": 25,
+    "v2_command": "cd /home/zhuhe/code/litchi && /usr/bin/python3.14 -B /tmp/litchi-performance-0924/stack-attribution-v2.py --repo /home/zhuhe/code/litchi --raw-root /tmp/litchi-performance-0923/allocation-packet-v3 --raw-root /tmp/litchi-performance-0923/allocation-packet-v4 --output /tmp/litchi-performance-0924/stack-attribution-v2.json --stacks-output /tmp/litchi-performance-0924/stack-rows-v2.json",
+    "v2_output": "/tmp/litchi-performance-0924/stack-attribution-v2.json",
+    "v2_output_sha256": "fae07a13e700d00b1bf03c296daf8a3fd61cfe844e5ae89f93a3d0e226744661",
+    "v2_parser": "/tmp/litchi-performance-0924/stack-attribution-v2.py",
+    "v2_parser_sha256": "e4bef0c1fa0cc835f808d2afa77e002a25bbb7b1df40f4ed513f436f02d49294",
+    "v2_stack_output": "/tmp/litchi-performance-0924/stack-rows-v2.json",
+    "v2_stack_output_sha256": "7db5a787e43d1b7c700c93d609d66d298f4c5cbd09884c58fca1e001c1a6340b"
+  },
+  "build_or_capture_performed": false,
+  "created_utc": "2026-10-06T10:21:42.911538+00:00",
+  "cwd": "/home/zhuhe/code/litchi",
+  "git_head": "679252bad65004085eb62a28b056b1a16b3f7468",
+  "phase_share": {
+    "candidate_reports": 24,
+    "command": "cd /home/zhuhe/code/litchi && python3 -B /tmp/litchi-performance-0924/phase-share-v2.py --repo /home/zhuhe/code/litchi --output /tmp/litchi-performance-0924/phase-share-v2.json",
+    "corruption_controls": {
+      "samplealignment": {
+        "exit": 1,
+        "log": "/tmp/litchi-performance-0924/control-samplealignment-4.log",
+        "log_sha256": "caf2840e2b429f046627ec04ac4356b170a5ab77d33eca9babe91a958df2b829",
+        "note": "same-size tampered copied report; disposable control copy removed after retaining this log",
+        "observed": "owned_vec-pair-01-leg-2-candidate: report hash mismatch"
+      },
+      "wronghash": {
+        "exit": 1,
+        "log": "/tmp/litchi-performance-0924/control-wronghash-2.log",
+        "log_sha256": "053b32e984162499700ce712c68fd81b8299018023d60cce0f0cbc975550a2a1",
+        "note": "same-size tampered copied report; disposable control copy removed after retaining this log",
+        "observed": "owned_reader-pair-01-leg-2-candidate: report hash mismatch"
+      }
+    },
+    "detail_expected_output_checked": true,
+    "expected_output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+    "interpretation": "Descriptive pooled raw-sample shares and Amdahl bounds; no timing or adoption gate.",
+    "invalid_sample_orders": 0,
+    "output": "/tmp/litchi-performance-0924/phase-share-v2.json",
+    "output_sha256": "081e329cfd08643487880039312e9cf31ea32a4f6064e11301d293bc1ae3ef6c",
+    "owned_reader_query_plus_publication_share": 0.7816861470120378,
+    "phase_sum_mismatches": 0,
+    "pooled_open_share": 0.03940313655651334,
+    "pooled_query_plus_publication_share": 0.8335073548911436,
+    "report_hash_binding": true,
+    "reports_per_route": 8,
+    "root_raw_sample_summary_sha256": "edac04901aa00de5d726aef7229daca96ce58fb9441b13f093d50f26a9e43b7b",
+    "route_open_share": {
+      "generic_read_at": 0.010086770954901587,
+      "owned_reader": 0.09965195084465603,
+      "owned_vec": 0.012168307399429819
+    },
+    "samples_per_report": 200,
+    "schema_observed": "litchi.performance.0924.raw-phase-share-audit.v2",
+    "script": "/tmp/litchi-performance-0924/phase-share-v2.py",
+    "script_sha256": "3b819fb2885b9e5357ea34f5eb0f311d572099e3add3293e96a688ea163a751e"
+  },
+  "schema": "litchi.performance.0924.independent-review.v2",
+  "source_bindings": {
+    "OpcPackage.from_reader_with_limits": "crates/litchi-opc/src/package.rs:1045-1047",
+    "SourceBackedPackage.from_reader_with_limits": "crates/litchi-opc/src/source_backed.rs:6794-6795",
+    "phys_pkg.rs": {
+      "expected": "3dfa9ec92c0d090b0bc753ecacc63f263975a470c267b79b03ae1c5898ac3ab8",
+      "sha256": "3dfa9ec92c0d090b0bc753ecacc63f263975a470c267b79b03ae1c5898ac3ab8"
+    },
+    "read_limited": "crates/litchi-opc/src/phys_pkg.rs:1775-1836"
+  },
+  "source_mutation_performed": false
+}

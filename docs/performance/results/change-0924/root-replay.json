@@ -1,0 +1,31 @@
+{
+  "schema": "litchi.performance.0924.root-replay.v1",
+  "phase_metrics_equal": true,
+  "stack_metrics_and_identity_equal": true,
+  "comparison_note": "Initial byte-equality assertion failed because the root replay omitted optional --stacks-output. The only JSON difference is the absent stack_rows_external descriptor; every other field is identical. No capture was rerun.",
+  "phase": {
+    "path": "/tmp/litchi-performance-0924/root-phase-replay.json",
+    "bytes": 31170,
+    "sha256": "09b94790fa11a9e61341a49160097914f7af107202b4ad1246dced5afcd7b7d9"
+  },
+  "stack": {
+    "path": "/tmp/litchi-performance-0924/root-stack-replay.json",
+    "bytes": 134441,
+    "sha256": "79433d7c28c2e4e91f1f10aa7ee0db82ff36fe0696545047623b7ba76114d76d"
+  },
+  "commands": [
+    "python3 -B docs/performance/results/change-0924/phase-share-v2.py --repo . --output /tmp/litchi-performance-0924/root-phase-replay.json",
+    "python3 -B docs/performance/results/change-0924/stack-attribution-v2.py --repo . --output /tmp/litchi-performance-0924/root-stack-replay.json"
+  ],
+  "scope": "offline replay only; no benchmark or profiler capture",
+  "post_cleanup_independent_replay": {
+    "command": "python3 -B docs/performance/results/change-0924/attribution-independent-replay.py --summary docs/performance/results/change-0924/stack-attribution-v2.json",
+    "exit_code": 0,
+    "status": "verified",
+    "profiles": 25,
+    "path": "/tmp/litchi-performance-0924/post-cleanup-independent-replay.json",
+    "bytes": 3092,
+    "sha256": "a638ecd79680ab6112fc5f0f9628d5e7a5789fd43b76756b77dfd8ff11967caf",
+    "obsolete_draft_absent": true
+  }
+}

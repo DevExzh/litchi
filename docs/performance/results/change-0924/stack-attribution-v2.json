@@ -1,0 +1,2903 @@
+{
+  "binary_proof": {
+    "baseline": {
+      "actual": {
+        "bytes": 69962624,
+        "path": "/tmp/litchi-performance-0923/frozen-baseline-native/litchi-perf-baseline",
+        "sha256": "ed2d5609cc7a54459cd33627a80416d5ce2ef765b32916b5235b91209e19db28"
+      },
+      "present": true
+    },
+    "candidate": {
+      "actual": {
+        "bytes": 70379960,
+        "path": "/tmp/litchi-performance-0923/candidate-target/release/litchi-perf-baseline",
+        "sha256": "8d98309501f63f4911828f52c42653f5950f3f5019bd040cf98f787173528861"
+      },
+      "present": true
+    }
+  },
+  "groups": {
+    "generic_read_at:baseline": {
+      "allocation_event_count": 1563585,
+      "profiles": 5,
+      "read_limited_bytes": 0,
+      "read_limited_calls": 0,
+      "requested_bytes": 759020180
+    },
+    "generic_read_at:candidate": {
+      "allocation_event_count": 1250868,
+      "profiles": 4,
+      "read_limited_bytes": 0,
+      "read_limited_calls": 0,
+      "requested_bytes": 607216228
+    },
+    "owned_reader:baseline": {
+      "allocation_event_count": 1251856,
+      "profiles": 4,
+      "read_limited_bytes": 1086341836,
+      "read_limited_calls": 1028,
+      "requested_bytes": 1693554156
+    },
+    "owned_reader:candidate": {
+      "allocation_event_count": 1251860,
+      "profiles": 4,
+      "read_limited_bytes": 1086341836,
+      "read_limited_calls": 1028,
+      "requested_bytes": 1693292432
+    },
+    "owned_vec:baseline": {
+      "allocation_event_count": 1250820,
+      "profiles": 4,
+      "read_limited_bytes": 0,
+      "read_limited_calls": 0,
+      "requested_bytes": 607212080
+    },
+    "owned_vec:candidate": {
+      "allocation_event_count": 1250824,
+      "profiles": 4,
+      "read_limited_bytes": 0,
+      "read_limited_calls": 0,
+      "requested_bytes": 606950356
+    }
+  },
+  "owned_reader_vs_owned_vec": {
+    "baseline": {
+      "accounting_check": {
+        "each_plus_event_assigned_once": true,
+        "parent_stack_rows_added": false,
+        "pass": true,
+        "primary_plus_route_equivalent_plus_common": 1086342076,
+        "total_delta": 1086342076
+      },
+      "common_nonzero_rows": [
+        {
+          "delta_bytes": 192,
+          "delta_calls": 8,
+          "reader_bytes": 512,
+          "stack": [
+            "_RNvNtCslNYArtu3iFV_5alloc5boxed14box_new_uninit",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ],
+          "vec_bytes": 320
+        },
+        {
+          "delta_bytes": 12,
+          "delta_calls": 0,
+          "reader_bytes": 48,
+          "stack": [
+            "_RNCNvNtNtNtCsjrHSEGnQ3l9_3std3sys3env4unix6getenv0B9_",
+            "_RNvNtCsjrHSEGnQ3l9_3std3env4__var",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ],
+          "vec_bytes": 36
+        },
+        {
+          "delta_bytes": 12,
+          "delta_calls": 0,
+          "reader_bytes": 1956,
+          "stack": [
+            "_RNvNtCsjrHSEGnQ3l9_3std3env7args_os",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ],
+          "vec_bytes": 1944
+        },
+        {
+          "delta_bytes": 12,
+          "delta_calls": 0,
+          "reader_bytes": 1956,
+          "stack": [
+            "_RNvNtCsjrHSEGnQ3l9_3std3env7args_os",
+            "litchi_perf_baseline::parse_options::h148d79adc70d5b96",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ],
+          "vec_bytes": 1944
+        },
+        {
+          "delta_bytes": 12,
+          "delta_calls": 0,
+          "reader_bytes": 1956,
+          "stack": [
+            "_RNvNtCsjrHSEGnQ3l9_3std3env7args_os",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ],
+          "vec_bytes": 1944
+        }
+      ],
+      "common_stack_delta_bytes": 240,
+      "common_stack_delta_calls": 8,
+      "primary_read_limited_bytes": 1086341836,
+      "primary_read_limited_calls": 1028,
+      "primary_stack_count": 1,
+      "primary_stacks": [
+        [
+          "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hdcbc6d2eaa4365f3E.llvm.15467246616864011325",
+          "litchi_opc::phys_pkg::read_limited::h9cdd2ec84b96cf4c",
+          "litchi_docx::source_backed::Package::from_reader::h62418022bab2c172",
+          "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+          "litchi_perf_baseline::run::hc4f4236377105b94",
+          "litchi_perf_baseline::main::h85394887a56f0b30",
+          "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+          "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+          "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+          "main",
+          "__libc_start_call_main",
+          "__libc_start_main_impl",
+          "_start"
+        ]
+      ],
+      "reader_allocation_events": 1251856,
+      "reader_profiles": 4,
+      "reader_requested_bytes": 1693554156,
+      "reader_route_only_bytes": 1087483104,
+      "reader_route_only_calls": 2572,
+      "reader_route_only_non_read_limited_bytes": 1141268,
+      "route_equivalent_setup_net_bytes": 0,
+      "total_delta_bytes": 1086342076,
+      "vec_allocation_events": 1250820,
+      "vec_profiles": 4,
+      "vec_requested_bytes": 607212080,
+      "vec_route_only_bytes": 1141268,
+      "vec_route_only_calls": 1544
+    },
+    "candidate": {
+      "accounting_check": {
+        "each_plus_event_assigned_once": true,
+        "parent_stack_rows_added": false,
+        "pass": true,
+        "primary_plus_route_equivalent_plus_common": 1086342076,
+        "total_delta": 1086342076
+      },
+      "common_nonzero_rows": [
+        {
+          "delta_bytes": 192,
+          "delta_calls": 8,
+          "reader_bytes": 512,
+          "stack": [
+            "_RNvNtCslNYArtu3iFV_5alloc5boxed14box_new_uninit",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ],
+          "vec_bytes": 320
+        },
+        {
+          "delta_bytes": 12,
+          "delta_calls": 0,
+          "reader_bytes": 48,
+          "stack": [
+            "_RNCNvNtNtNtCsjrHSEGnQ3l9_3std3sys3env4unix6getenv0B9_",
+            "_RNvNtCsjrHSEGnQ3l9_3std3env4__var",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ],
+          "vec_bytes": 36
+        },
+        {
+          "delta_bytes": 12,
+          "delta_calls": 0,
+          "reader_bytes": 1968,
+          "stack": [
+            "_RNvNtCsjrHSEGnQ3l9_3std3env7args_os",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ],
+          "vec_bytes": 1956
+        },
+        {
+          "delta_bytes": 12,
+          "delta_calls": 0,
+          "reader_bytes": 1968,
+          "stack": [
+            "_RNvNtCsjrHSEGnQ3l9_3std3env7args_os",
+            "litchi_perf_baseline::parse_options::h65b5fcb08bfeab12",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ],
+          "vec_bytes": 1956
+        },
+        {
+          "delta_bytes": 12,
+          "delta_calls": 0,
+          "reader_bytes": 1968,
+          "stack": [
+            "_RNvNtCsjrHSEGnQ3l9_3std3env7args_os",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ],
+          "vec_bytes": 1956
+        }
+      ],
+      "common_stack_delta_bytes": 240,
+      "common_stack_delta_calls": 8,
+      "primary_read_limited_bytes": 1086341836,
+      "primary_read_limited_calls": 1028,
+      "primary_stack_count": 1,
+      "primary_stacks": [
+        [
+          "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h59a438c9a63e820aE.llvm.11409347516399337018",
+          "litchi_opc::phys_pkg::read_limited::h7c00fe41d2e098b1",
+          "litchi_docx::source_backed::Package::from_reader::h00c4504894a9b108",
+          "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+          "litchi_perf_baseline::run::h5b5406535bcc9d63",
+          "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+          "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+          "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+          "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+          "main",
+          "__libc_start_call_main",
+          "__libc_start_main_impl",
+          "_start"
+        ]
+      ],
+      "reader_allocation_events": 1251860,
+      "reader_profiles": 4,
+      "reader_requested_bytes": 1693292432,
+      "reader_route_only_bytes": 1087483440,
+      "reader_route_only_calls": 2580,
+      "reader_route_only_non_read_limited_bytes": 1141604,
+      "route_equivalent_setup_net_bytes": 0,
+      "total_delta_bytes": 1086342076,
+      "vec_allocation_events": 1250824,
+      "vec_profiles": 4,
+      "vec_requested_bytes": 606950356,
+      "vec_route_only_bytes": 1141604,
+      "vec_route_only_calls": 1552
+    }
+  },
+  "parser_controls": {
+    "control_count": 10,
+    "names": [
+      "malformed_version",
+      "negative_string_reference",
+      "negative_trace_reference",
+      "negative_allocation_reference",
+      "out_of_range_trace_reference",
+      "out_of_range_allocation_trace",
+      "out_of_range_allocation_reference",
+      "truncated_profile",
+      "deallocation_underflow",
+      "double_free_with_nonnegative_total"
+    ],
+    "receipt": {
+      "bytes": 4611,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/allocation-parser-controls-v2.json",
+      "sha256": "de0bc315bb56bee62155ff3e70701547f300af9816c5c67df82a24d43a7bf9cd"
+    },
+    "scope": "parser_integrity_only; no benchmark or operation claim",
+    "status": "pass"
+  },
+  "profile_count": 25,
+  "profiles": [
+    {
+      "allocation_event_count": 312717,
+      "deallocation_event_count": 312716,
+      "id": "v3-first-generic_read_at-pair-01-leg-1-baseline",
+      "leg": 1,
+      "live_bytes_at_end": 544,
+      "pair": 1,
+      "peak_live_heap_bytes": 24234801,
+      "raw": {
+        "bytes": 438590,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v3/children/001-generic_read_at-pair-01-leg-1-baseline/heaptrack.zst.zst",
+        "sha256": "0003850a9985115265ac53572ab69dd327fde69977c71a1dc38a84fdb2f2c494"
+      },
+      "read_limited_bytes": 0,
+      "read_limited_calls": 0,
+      "read_limited_stacks": [],
+      "requested_bytes": 151804036,
+      "route": "generic_read_at",
+      "stack_row_count": 3772,
+      "top_stacks": [
+        {
+          "bytes": 16646144,
+          "calls": 14,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hdcbc6d2eaa4365f3E.llvm.15467246616864011325",
+            "alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hc27bec4a62e0dc52",
+            "_$LT$litchi_docx..source_backed..FingerprintingWriter$LT$W$GT$$u20$as$u20$std..io..Write$GT$::write::h5c86bf3806f3e9ea",
+            "litchi_opc::source_backed::write_exact_snapshot::ha51e42724995d2b5",
+            "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream::h4f6efa1a4e0e16cd",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::he8785aaa09a9dd3e",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 10525724,
+          "calls": 5,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h898ca481424497bb",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::he8785aaa09a9dd3e",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 8668566,
+          "calls": 124,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "litchi_perf_baseline::raw_zip_members::h4b1500946c54a345",
+            "litchi_perf_baseline::verify_docx_section_layout_output::hceff199479d3e947",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "trace_count": 44930,
+      "variant": "baseline"
+    },
+    {
+      "allocation_event_count": 312717,
+      "deallocation_event_count": 312716,
+      "id": "001-generic_read_at-pair-01-leg-1-baseline",
+      "leg": 1,
+      "live_bytes_at_end": 544,
+      "pair": 1,
+      "peak_live_heap_bytes": 24234801,
+      "raw": {
+        "bytes": 438589,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/001-generic_read_at-pair-01-leg-1-baseline/heaptrack.zst",
+        "sha256": "856da4152384b52c65389fa441691f5d788568535dc28394cc2893bf1844c1e5"
+      },
+      "read_limited_bytes": 0,
+      "read_limited_calls": 0,
+      "read_limited_stacks": [],
+      "requested_bytes": 151804036,
+      "route": "generic_read_at",
+      "stack_row_count": 3772,
+      "top_stacks": [
+        {
+          "bytes": 16646144,
+          "calls": 14,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hdcbc6d2eaa4365f3E.llvm.15467246616864011325",
+            "alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hc27bec4a62e0dc52",
+            "_$LT$litchi_docx..source_backed..FingerprintingWriter$LT$W$GT$$u20$as$u20$std..io..Write$GT$::write::h5c86bf3806f3e9ea",
+            "litchi_opc::source_backed::write_exact_snapshot::ha51e42724995d2b5",
+            "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream::h4f6efa1a4e0e16cd",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::he8785aaa09a9dd3e",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 10525724,
+          "calls": 5,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h898ca481424497bb",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::he8785aaa09a9dd3e",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 8668566,
+          "calls": 124,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "litchi_perf_baseline::raw_zip_members::h4b1500946c54a345",
+            "litchi_perf_baseline::verify_docx_section_layout_output::hceff199479d3e947",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "trace_count": 44930,
+      "variant": "baseline"
+    },
+    {
+      "allocation_event_count": 312717,
+      "deallocation_event_count": 312716,
+      "id": "002-generic_read_at-pair-01-leg-2-candidate",
+      "leg": 2,
+      "live_bytes_at_end": 544,
+      "pair": 1,
+      "peak_live_heap_bytes": 24234805,
+      "raw": {
+        "bytes": 436389,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/002-generic_read_at-pair-01-leg-2-candidate/heaptrack.zst",
+        "sha256": "0291ac848279a1d6de90d528f111c9153bd0900b1b465a64808f3d1181881840"
+      },
+      "read_limited_bytes": 0,
+      "read_limited_calls": 0,
+      "read_limited_stacks": [],
+      "requested_bytes": 151804057,
+      "route": "generic_read_at",
+      "stack_row_count": 3772,
+      "top_stacks": [
+        {
+          "bytes": 16646144,
+          "calls": 14,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h59a438c9a63e820aE.llvm.11409347516399337018",
+            "alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h1300ddea67e99be7",
+            "_$LT$litchi_docx..source_backed..FingerprintingWriter$LT$W$GT$$u20$as$u20$std..io..Write$GT$::write::hb13b713ca3d954c4",
+            "litchi_opc::source_backed::write_exact_snapshot::h110ceb7e1849a7c5",
+            "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream::h020450331f6ee942",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::h2292a0c45399ceee",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 10525724,
+          "calls": 5,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::hd840b74dad2b740a",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::h2292a0c45399ceee",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 8668566,
+          "calls": 124,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "litchi_perf_baseline::raw_zip_members::he6716ada15463526",
+            "litchi_perf_baseline::verify_docx_section_layout_output::h77ea8ce7355de8c2",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "trace_count": 44971,
+      "variant": "candidate"
+    },
+    {
+      "allocation_event_count": 312717,
+      "deallocation_event_count": 312716,
+      "id": "003-generic_read_at-pair-02-leg-1-candidate",
+      "leg": 1,
+      "live_bytes_at_end": 544,
+      "pair": 2,
+      "peak_live_heap_bytes": 24234805,
+      "raw": {
+        "bytes": 437428,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/003-generic_read_at-pair-02-leg-1-candidate/heaptrack.zst",
+        "sha256": "866ff26e3cf9680054b756620e5680024ffe00b205cf59bdd833eb0b853ca2ff"
+      },
+      "read_limited_bytes": 0,
+      "read_limited_calls": 0,
+      "read_limited_stacks": [],
+      "requested_bytes": 151804057,
+      "route": "generic_read_at",
+      "stack_row_count": 3772,
+      "top_stacks": [
+        {
+          "bytes": 16646144,
+          "calls": 14,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h59a438c9a63e820aE.llvm.11409347516399337018",
+            "alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h1300ddea67e99be7",
+            "_$LT$litchi_docx..source_backed..FingerprintingWriter$LT$W$GT$$u20$as$u20$std..io..Write$GT$::write::hb13b713ca3d954c4",
+            "litchi_opc::source_backed::write_exact_snapshot::h110ceb7e1849a7c5",
+            "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream::h020450331f6ee942",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::h2292a0c45399ceee",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 10525724,
+          "calls": 5,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::hd840b74dad2b740a",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::h2292a0c45399ceee",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 8668566,
+          "calls": 124,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "litchi_perf_baseline::raw_zip_members::he6716ada15463526",
+            "litchi_perf_baseline::verify_docx_section_layout_output::h77ea8ce7355de8c2",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "trace_count": 44971,
+      "variant": "candidate"
+    },
+    {
+      "allocation_event_count": 312717,
+      "deallocation_event_count": 312716,
+      "id": "004-generic_read_at-pair-02-leg-2-baseline",
+      "leg": 2,
+      "live_bytes_at_end": 544,
+      "pair": 2,
+      "peak_live_heap_bytes": 24234801,
+      "raw": {
+        "bytes": 438615,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/004-generic_read_at-pair-02-leg-2-baseline/heaptrack.zst",
+        "sha256": "04d3dbeb8ec43ffe5c5b1135e69a6643ca6e97b495a5f47b0bd417d2dd077c3f"
+      },
+      "read_limited_bytes": 0,
+      "read_limited_calls": 0,
+      "read_limited_stacks": [],
+      "requested_bytes": 151804036,
+      "route": "generic_read_at",
+      "stack_row_count": 3772,
+      "top_stacks": [
+        {
+          "bytes": 16646144,
+          "calls": 14,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hdcbc6d2eaa4365f3E.llvm.15467246616864011325",
+            "alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hc27bec4a62e0dc52",
+            "_$LT$litchi_docx..source_backed..FingerprintingWriter$LT$W$GT$$u20$as$u20$std..io..Write$GT$::write::h5c86bf3806f3e9ea",
+            "litchi_opc::source_backed::write_exact_snapshot::ha51e42724995d2b5",
+            "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream::h4f6efa1a4e0e16cd",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::he8785aaa09a9dd3e",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 10525724,
+          "calls": 5,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h898ca481424497bb",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::he8785aaa09a9dd3e",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 8668566,
+          "calls": 124,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "litchi_perf_baseline::raw_zip_members::h4b1500946c54a345",
+            "litchi_perf_baseline::verify_docx_section_layout_output::hceff199479d3e947",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "trace_count": 44930,
+      "variant": "baseline"
+    },
+    {
+      "allocation_event_count": 312717,
+      "deallocation_event_count": 312716,
+      "id": "005-generic_read_at-pair-03-leg-1-baseline",
+      "leg": 1,
+      "live_bytes_at_end": 544,
+      "pair": 3,
+      "peak_live_heap_bytes": 24234801,
+      "raw": {
+        "bytes": 438509,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/005-generic_read_at-pair-03-leg-1-baseline/heaptrack.zst",
+        "sha256": "86f33b9b35c3de0ca667935cd7344dea181c41ca8c19e0202f8bd7724121c108"
+      },
+      "read_limited_bytes": 0,
+      "read_limited_calls": 0,
+      "read_limited_stacks": [],
+      "requested_bytes": 151804036,
+      "route": "generic_read_at",
+      "stack_row_count": 3772,
+      "top_stacks": [
+        {
+          "bytes": 16646144,
+          "calls": 14,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hdcbc6d2eaa4365f3E.llvm.15467246616864011325",
+            "alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hc27bec4a62e0dc52",
+            "_$LT$litchi_docx..source_backed..FingerprintingWriter$LT$W$GT$$u20$as$u20$std..io..Write$GT$::write::h5c86bf3806f3e9ea",
+            "litchi_opc::source_backed::write_exact_snapshot::ha51e42724995d2b5",
+            "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream::h4f6efa1a4e0e16cd",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::he8785aaa09a9dd3e",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 10525724,
+          "calls": 5,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h898ca481424497bb",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::he8785aaa09a9dd3e",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 8668566,
+          "calls": 124,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "litchi_perf_baseline::raw_zip_members::h4b1500946c54a345",
+            "litchi_perf_baseline::verify_docx_section_layout_output::hceff199479d3e947",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "trace_count": 44930,
+      "variant": "baseline"
+    },
+    {
+      "allocation_event_count": 312717,
+      "deallocation_event_count": 312716,
+      "id": "006-generic_read_at-pair-03-leg-2-candidate",
+      "leg": 2,
+      "live_bytes_at_end": 544,
+      "pair": 3,
+      "peak_live_heap_bytes": 24234805,
+      "raw": {
+        "bytes": 436429,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/006-generic_read_at-pair-03-leg-2-candidate/heaptrack.zst",
+        "sha256": "f71096353dca2b195cc9c6ddc1bced57df437783f8c685994c35ef7f6884f3b7"
+      },
+      "read_limited_bytes": 0,
+      "read_limited_calls": 0,
+      "read_limited_stacks": [],
+      "requested_bytes": 151804057,
+      "route": "generic_read_at",
+      "stack_row_count": 3772,
+      "top_stacks": [
+        {
+          "bytes": 16646144,
+          "calls": 14,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h59a438c9a63e820aE.llvm.11409347516399337018",
+            "alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h1300ddea67e99be7",
+            "_$LT$litchi_docx..source_backed..FingerprintingWriter$LT$W$GT$$u20$as$u20$std..io..Write$GT$::write::hb13b713ca3d954c4",
+            "litchi_opc::source_backed::write_exact_snapshot::h110ceb7e1849a7c5",
+            "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream::h020450331f6ee942",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::h2292a0c45399ceee",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 10525724,
+          "calls": 5,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::hd840b74dad2b740a",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::h2292a0c45399ceee",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 8668566,
+          "calls": 124,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "litchi_perf_baseline::raw_zip_members::he6716ada15463526",
+            "litchi_perf_baseline::verify_docx_section_layout_output::h77ea8ce7355de8c2",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "trace_count": 44971,
+      "variant": "candidate"
+    },
+    {
+      "allocation_event_count": 312717,
+      "deallocation_event_count": 312716,
+      "id": "007-generic_read_at-pair-04-leg-1-candidate",
+      "leg": 1,
+      "live_bytes_at_end": 544,
+      "pair": 4,
+      "peak_live_heap_bytes": 24234805,
+      "raw": {
+        "bytes": 436568,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/007-generic_read_at-pair-04-leg-1-candidate/heaptrack.zst",
+        "sha256": "dcb37ada72496a19fc566ee114361b172c6d5980e9ec0df018e929bde951b403"
+      },
+      "read_limited_bytes": 0,
+      "read_limited_calls": 0,
+      "read_limited_stacks": [],
+      "requested_bytes": 151804057,
+      "route": "generic_read_at",
+      "stack_row_count": 3772,
+      "top_stacks": [
+        {
+          "bytes": 16646144,
+          "calls": 14,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h59a438c9a63e820aE.llvm.11409347516399337018",
+            "alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h1300ddea67e99be7",
+            "_$LT$litchi_docx..source_backed..FingerprintingWriter$LT$W$GT$$u20$as$u20$std..io..Write$GT$::write::hb13b713ca3d954c4",
+            "litchi_opc::source_backed::write_exact_snapshot::h110ceb7e1849a7c5",
+            "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream::h020450331f6ee942",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::h2292a0c45399ceee",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 10525724,
+          "calls": 5,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::hd840b74dad2b740a",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::h2292a0c45399ceee",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 8668566,
+          "calls": 124,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "litchi_perf_baseline::raw_zip_members::he6716ada15463526",
+            "litchi_perf_baseline::verify_docx_section_layout_output::h77ea8ce7355de8c2",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "trace_count": 44971,
+      "variant": "candidate"
+    },
+    {
+      "allocation_event_count": 312717,
+      "deallocation_event_count": 312716,
+      "id": "008-generic_read_at-pair-04-leg-2-baseline",
+      "leg": 2,
+      "live_bytes_at_end": 544,
+      "pair": 4,
+      "peak_live_heap_bytes": 24234801,
+      "raw": {
+        "bytes": 438622,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/008-generic_read_at-pair-04-leg-2-baseline/heaptrack.zst",
+        "sha256": "c0cb963073bc721be02e0ee49ca02db34c78be0623406cc0da2bdd19e3bd2e11"
+      },
+      "read_limited_bytes": 0,
+      "read_limited_calls": 0,
+      "read_limited_stacks": [],
+      "requested_bytes": 151804036,
+      "route": "generic_read_at",
+      "stack_row_count": 3772,
+      "top_stacks": [
+        {
+          "bytes": 16646144,
+          "calls": 14,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hdcbc6d2eaa4365f3E.llvm.15467246616864011325",
+            "alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hc27bec4a62e0dc52",
+            "_$LT$litchi_docx..source_backed..FingerprintingWriter$LT$W$GT$$u20$as$u20$std..io..Write$GT$::write::h5c86bf3806f3e9ea",
+            "litchi_opc::source_backed::write_exact_snapshot::ha51e42724995d2b5",
+            "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream::h4f6efa1a4e0e16cd",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::he8785aaa09a9dd3e",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 10525724,
+          "calls": 5,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h898ca481424497bb",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::he8785aaa09a9dd3e",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 8668566,
+          "calls": 124,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "litchi_perf_baseline::raw_zip_members::h4b1500946c54a345",
+            "litchi_perf_baseline::verify_docx_section_layout_output::hceff199479d3e947",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "trace_count": 44930,
+      "variant": "baseline"
+    },
+    {
+      "allocation_event_count": 312705,
+      "deallocation_event_count": 312704,
+      "id": "009-owned_vec-pair-01-leg-1-baseline",
+      "leg": 1,
+      "live_bytes_at_end": 544,
+      "pair": 1,
+      "peak_live_heap_bytes": 24234029,
+      "raw": {
+        "bytes": 437779,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/009-owned_vec-pair-01-leg-1-baseline/heaptrack.zst",
+        "sha256": "2d6c395c54818ca224e6f35686a8c63658a45b7f411e5ba8760ec774159e63e0"
+      },
+      "read_limited_bytes": 0,
+      "read_limited_calls": 0,
+      "read_limited_stacks": [],
+      "requested_bytes": 151803020,
+      "route": "owned_vec",
+      "stack_row_count": 3873,
+      "top_stacks": [
+        {
+          "bytes": 16646144,
+          "calls": 14,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hdcbc6d2eaa4365f3E.llvm.15467246616864011325",
+            "alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hc27bec4a62e0dc52",
+            "_$LT$litchi_docx..source_backed..FingerprintingWriter$LT$W$GT$$u20$as$u20$std..io..Write$GT$::write::h5c86bf3806f3e9ea",
+            "litchi_opc::source_backed::write_exact_snapshot::ha51e42724995d2b5",
+            "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream::h4f6efa1a4e0e16cd",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::he8785aaa09a9dd3e",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 10525724,
+          "calls": 5,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h898ca481424497bb",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::he8785aaa09a9dd3e",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 8668566,
+          "calls": 124,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "litchi_perf_baseline::raw_zip_members::h4b1500946c54a345",
+            "litchi_perf_baseline::verify_docx_section_layout_output::hceff199479d3e947",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "trace_count": 44896,
+      "variant": "baseline"
+    },
+    {
+      "allocation_event_count": 312706,
+      "deallocation_event_count": 312705,
+      "id": "010-owned_vec-pair-01-leg-2-candidate",
+      "leg": 2,
+      "live_bytes_at_end": 544,
+      "pair": 1,
+      "peak_live_heap_bytes": 24234117,
+      "raw": {
+        "bytes": 436491,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/010-owned_vec-pair-01-leg-2-candidate/heaptrack.zst",
+        "sha256": "40812be4ab47bca7a5800022ae96dc2813c1ed0b0b35fb544a756b1e0fa838fd"
+      },
+      "read_limited_bytes": 0,
+      "read_limited_calls": 0,
+      "read_limited_stacks": [],
+      "requested_bytes": 151737589,
+      "route": "owned_vec",
+      "stack_row_count": 3873,
+      "top_stacks": [
+        {
+          "bytes": 16646144,
+          "calls": 14,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h59a438c9a63e820aE.llvm.11409347516399337018",
+            "alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h1300ddea67e99be7",
+            "_$LT$litchi_docx..source_backed..FingerprintingWriter$LT$W$GT$$u20$as$u20$std..io..Write$GT$::write::hb13b713ca3d954c4",
+            "litchi_opc::source_backed::write_exact_snapshot::h110ceb7e1849a7c5",
+            "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream::h020450331f6ee942",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::h2292a0c45399ceee",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 10525724,
+          "calls": 5,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::hd840b74dad2b740a",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::h2292a0c45399ceee",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 8668566,
+          "calls": 124,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "litchi_perf_baseline::raw_zip_members::he6716ada15463526",
+            "litchi_perf_baseline::verify_docx_section_layout_output::h77ea8ce7355de8c2",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "trace_count": 44940,
+      "variant": "candidate"
+    },
+    {
+      "allocation_event_count": 312706,
+      "deallocation_event_count": 312705,
+      "id": "011-owned_vec-pair-02-leg-1-candidate",
+      "leg": 1,
+      "live_bytes_at_end": 544,
+      "pair": 2,
+      "peak_live_heap_bytes": 24234117,
+      "raw": {
+        "bytes": 436481,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/011-owned_vec-pair-02-leg-1-candidate/heaptrack.zst",
+        "sha256": "2e38b9cbc185b677e4455911e8de5ab21840446b5c859ecdb5fb2506b2e07f01"
+      },
+      "read_limited_bytes": 0,
+      "read_limited_calls": 0,
+      "read_limited_stacks": [],
+      "requested_bytes": 151737589,
+      "route": "owned_vec",
+      "stack_row_count": 3873,
+      "top_stacks": [
+        {
+          "bytes": 16646144,
+          "calls": 14,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h59a438c9a63e820aE.llvm.11409347516399337018",
+            "alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h1300ddea67e99be7",
+            "_$LT$litchi_docx..source_backed..FingerprintingWriter$LT$W$GT$$u20$as$u20$std..io..Write$GT$::write::hb13b713ca3d954c4",
+            "litchi_opc::source_backed::write_exact_snapshot::h110ceb7e1849a7c5",
+            "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream::h020450331f6ee942",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::h2292a0c45399ceee",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 10525724,
+          "calls": 5,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::hd840b74dad2b740a",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::h2292a0c45399ceee",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 8668566,
+          "calls": 124,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "litchi_perf_baseline::raw_zip_members::he6716ada15463526",
+            "litchi_perf_baseline::verify_docx_section_layout_output::h77ea8ce7355de8c2",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "trace_count": 44940,
+      "variant": "candidate"
+    },
+    {
+      "allocation_event_count": 312705,
+      "deallocation_event_count": 312704,
+      "id": "012-owned_vec-pair-02-leg-2-baseline",
+      "leg": 2,
+      "live_bytes_at_end": 544,
+      "pair": 2,
+      "peak_live_heap_bytes": 24234029,
+      "raw": {
+        "bytes": 438317,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/012-owned_vec-pair-02-leg-2-baseline/heaptrack.zst",
+        "sha256": "7ac8d968b7cd8e166bc5c9e9bd055f6fb8879285954b44651749c1dd2bac7311"
+      },
+      "read_limited_bytes": 0,
+      "read_limited_calls": 0,
+      "read_limited_stacks": [],
+      "requested_bytes": 151803020,
+      "route": "owned_vec",
+      "stack_row_count": 3873,
+      "top_stacks": [
+        {
+          "bytes": 16646144,
+          "calls": 14,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hdcbc6d2eaa4365f3E.llvm.15467246616864011325",
+            "alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hc27bec4a62e0dc52",
+            "_$LT$litchi_docx..source_backed..FingerprintingWriter$LT$W$GT$$u20$as$u20$std..io..Write$GT$::write::h5c86bf3806f3e9ea",
+            "litchi_opc::source_backed::write_exact_snapshot::ha51e42724995d2b5",
+            "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream::h4f6efa1a4e0e16cd",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::he8785aaa09a9dd3e",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 10525724,
+          "calls": 5,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h898ca481424497bb",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::he8785aaa09a9dd3e",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 8668566,
+          "calls": 124,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "litchi_perf_baseline::raw_zip_members::h4b1500946c54a345",
+            "litchi_perf_baseline::verify_docx_section_layout_output::hceff199479d3e947",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "trace_count": 44896,
+      "variant": "baseline"
+    },
+    {
+      "allocation_event_count": 312705,
+      "deallocation_event_count": 312704,
+      "id": "013-owned_vec-pair-03-leg-1-baseline",
+      "leg": 1,
+      "live_bytes_at_end": 544,
+      "pair": 3,
+      "peak_live_heap_bytes": 24234029,
+      "raw": {
+        "bytes": 438169,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/013-owned_vec-pair-03-leg-1-baseline/heaptrack.zst",
+        "sha256": "f820ef4c3117225f4fc4067193932f6c2fdd7ce3609aa02ae6e5d29fd2881e74"
+      },
+      "read_limited_bytes": 0,
+      "read_limited_calls": 0,
+      "read_limited_stacks": [],
+      "requested_bytes": 151803020,
+      "route": "owned_vec",
+      "stack_row_count": 3873,
+      "top_stacks": [
+        {
+          "bytes": 16646144,
+          "calls": 14,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hdcbc6d2eaa4365f3E.llvm.15467246616864011325",
+            "alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hc27bec4a62e0dc52",
+            "_$LT$litchi_docx..source_backed..FingerprintingWriter$LT$W$GT$$u20$as$u20$std..io..Write$GT$::write::h5c86bf3806f3e9ea",
+            "litchi_opc::source_backed::write_exact_snapshot::ha51e42724995d2b5",
+            "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream::h4f6efa1a4e0e16cd",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::he8785aaa09a9dd3e",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 10525724,
+          "calls": 5,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h898ca481424497bb",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::he8785aaa09a9dd3e",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 8668566,
+          "calls": 124,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "litchi_perf_baseline::raw_zip_members::h4b1500946c54a345",
+            "litchi_perf_baseline::verify_docx_section_layout_output::hceff199479d3e947",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "trace_count": 44896,
+      "variant": "baseline"
+    },
+    {
+      "allocation_event_count": 312706,
+      "deallocation_event_count": 312705,
+      "id": "014-owned_vec-pair-03-leg-2-candidate",
+      "leg": 2,
+      "live_bytes_at_end": 544,
+      "pair": 3,
+      "peak_live_heap_bytes": 24234117,
+      "raw": {
+        "bytes": 436632,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/014-owned_vec-pair-03-leg-2-candidate/heaptrack.zst",
+        "sha256": "7b5397bd06fbcfcab80ab62639d61c7fa286b0b07abf0ccb949cb7f7995ea6a7"
+      },
+      "read_limited_bytes": 0,
+      "read_limited_calls": 0,
+      "read_limited_stacks": [],
+      "requested_bytes": 151737589,
+      "route": "owned_vec",
+      "stack_row_count": 3873,
+      "top_stacks": [
+        {
+          "bytes": 16646144,
+          "calls": 14,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h59a438c9a63e820aE.llvm.11409347516399337018",
+            "alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h1300ddea67e99be7",
+            "_$LT$litchi_docx..source_backed..FingerprintingWriter$LT$W$GT$$u20$as$u20$std..io..Write$GT$::write::hb13b713ca3d954c4",
+            "litchi_opc::source_backed::write_exact_snapshot::h110ceb7e1849a7c5",
+            "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream::h020450331f6ee942",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::h2292a0c45399ceee",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 10525724,
+          "calls": 5,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::hd840b74dad2b740a",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::h2292a0c45399ceee",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 8668566,
+          "calls": 124,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "litchi_perf_baseline::raw_zip_members::he6716ada15463526",
+            "litchi_perf_baseline::verify_docx_section_layout_output::h77ea8ce7355de8c2",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "trace_count": 44940,
+      "variant": "candidate"
+    },
+    {
+      "allocation_event_count": 312706,
+      "deallocation_event_count": 312705,
+      "id": "015-owned_vec-pair-04-leg-1-candidate",
+      "leg": 1,
+      "live_bytes_at_end": 544,
+      "pair": 4,
+      "peak_live_heap_bytes": 24234117,
+      "raw": {
+        "bytes": 436464,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/015-owned_vec-pair-04-leg-1-candidate/heaptrack.zst",
+        "sha256": "020addef23bc5f90a318cbaab87437e1c6e6c29355d310d6d235c5e8cdfd395a"
+      },
+      "read_limited_bytes": 0,
+      "read_limited_calls": 0,
+      "read_limited_stacks": [],
+      "requested_bytes": 151737589,
+      "route": "owned_vec",
+      "stack_row_count": 3873,
+      "top_stacks": [
+        {
+          "bytes": 16646144,
+          "calls": 14,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h59a438c9a63e820aE.llvm.11409347516399337018",
+            "alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h1300ddea67e99be7",
+            "_$LT$litchi_docx..source_backed..FingerprintingWriter$LT$W$GT$$u20$as$u20$std..io..Write$GT$::write::hb13b713ca3d954c4",
+            "litchi_opc::source_backed::write_exact_snapshot::h110ceb7e1849a7c5",
+            "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream::h020450331f6ee942",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::h2292a0c45399ceee",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 10525724,
+          "calls": 5,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::hd840b74dad2b740a",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::h2292a0c45399ceee",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 8668566,
+          "calls": 124,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "litchi_perf_baseline::raw_zip_members::he6716ada15463526",
+            "litchi_perf_baseline::verify_docx_section_layout_output::h77ea8ce7355de8c2",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "trace_count": 44940,
+      "variant": "candidate"
+    },
+    {
+      "allocation_event_count": 312705,
+      "deallocation_event_count": 312704,
+      "id": "016-owned_vec-pair-04-leg-2-baseline",
+      "leg": 2,
+      "live_bytes_at_end": 544,
+      "pair": 4,
+      "peak_live_heap_bytes": 24234029,
+      "raw": {
+        "bytes": 438020,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/016-owned_vec-pair-04-leg-2-baseline/heaptrack.zst",
+        "sha256": "d1a441436182fe130c7e46047bf51f97b9083d14148e129f639304984af40bcf"
+      },
+      "read_limited_bytes": 0,
+      "read_limited_calls": 0,
+      "read_limited_stacks": [],
+      "requested_bytes": 151803020,
+      "route": "owned_vec",
+      "stack_row_count": 3873,
+      "top_stacks": [
+        {
+          "bytes": 16646144,
+          "calls": 14,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hdcbc6d2eaa4365f3E.llvm.15467246616864011325",
+            "alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hc27bec4a62e0dc52",
+            "_$LT$litchi_docx..source_backed..FingerprintingWriter$LT$W$GT$$u20$as$u20$std..io..Write$GT$::write::h5c86bf3806f3e9ea",
+            "litchi_opc::source_backed::write_exact_snapshot::ha51e42724995d2b5",
+            "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream::h4f6efa1a4e0e16cd",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::he8785aaa09a9dd3e",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 10525724,
+          "calls": 5,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h898ca481424497bb",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::he8785aaa09a9dd3e",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 8668566,
+          "calls": 124,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "litchi_perf_baseline::raw_zip_members::h4b1500946c54a345",
+            "litchi_perf_baseline::verify_docx_section_layout_output::hceff199479d3e947",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "trace_count": 44896,
+      "variant": "baseline"
+    },
+    {
+      "allocation_event_count": 312964,
+      "deallocation_event_count": 312963,
+      "id": "017-owned_reader-pair-01-leg-1-baseline",
+      "leg": 1,
+      "live_bytes_at_end": 544,
+      "pair": 1,
+      "peak_live_heap_bytes": 24234083,
+      "raw": {
+        "bytes": 439707,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/017-owned_reader-pair-01-leg-1-baseline/heaptrack.zst",
+        "sha256": "a44da03e7652475df420231dd595e58e505254bbbfabcae2e4317622676d177c"
+      },
+      "read_limited_bytes": 271585459,
+      "read_limited_calls": 257,
+      "read_limited_stacks": [
+        {
+          "bytes": 271585459,
+          "calls": 257,
+          "contains_measure_one": false,
+          "contains_read_limited": true,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hdcbc6d2eaa4365f3E.llvm.15467246616864011325",
+            "litchi_opc::phys_pkg::read_limited::h9cdd2ec84b96cf4c",
+            "litchi_docx::source_backed::Package::from_reader::h62418022bab2c172",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "requested_bytes": 423388539,
+      "route": "owned_reader",
+      "stack_row_count": 3874,
+      "top_stacks": [
+        {
+          "bytes": 271585459,
+          "calls": 257,
+          "contains_measure_one": false,
+          "contains_read_limited": true,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hdcbc6d2eaa4365f3E.llvm.15467246616864011325",
+            "litchi_opc::phys_pkg::read_limited::h9cdd2ec84b96cf4c",
+            "litchi_docx::source_backed::Package::from_reader::h62418022bab2c172",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 16646144,
+          "calls": 14,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hdcbc6d2eaa4365f3E.llvm.15467246616864011325",
+            "alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hc27bec4a62e0dc52",
+            "_$LT$litchi_docx..source_backed..FingerprintingWriter$LT$W$GT$$u20$as$u20$std..io..Write$GT$::write::h5c86bf3806f3e9ea",
+            "litchi_opc::source_backed::write_exact_snapshot::ha51e42724995d2b5",
+            "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream::h4f6efa1a4e0e16cd",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::he8785aaa09a9dd3e",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 10525724,
+          "calls": 5,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h898ca481424497bb",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::he8785aaa09a9dd3e",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "trace_count": 44906,
+      "variant": "baseline"
+    },
+    {
+      "allocation_event_count": 312965,
+      "deallocation_event_count": 312964,
+      "id": "018-owned_reader-pair-01-leg-2-candidate",
+      "leg": 2,
+      "live_bytes_at_end": 544,
+      "pair": 1,
+      "peak_live_heap_bytes": 24234171,
+      "raw": {
+        "bytes": 437922,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/018-owned_reader-pair-01-leg-2-candidate/heaptrack.zst",
+        "sha256": "61cf282bf14f50af611a847d94c7b7cc8c683072ce61e7759385df6aa9c3a931"
+      },
+      "read_limited_bytes": 271585459,
+      "read_limited_calls": 257,
+      "read_limited_stacks": [
+        {
+          "bytes": 271585459,
+          "calls": 257,
+          "contains_measure_one": false,
+          "contains_read_limited": true,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h59a438c9a63e820aE.llvm.11409347516399337018",
+            "litchi_opc::phys_pkg::read_limited::h7c00fe41d2e098b1",
+            "litchi_docx::source_backed::Package::from_reader::h00c4504894a9b108",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "requested_bytes": 423323108,
+      "route": "owned_reader",
+      "stack_row_count": 3874,
+      "top_stacks": [
+        {
+          "bytes": 271585459,
+          "calls": 257,
+          "contains_measure_one": false,
+          "contains_read_limited": true,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h59a438c9a63e820aE.llvm.11409347516399337018",
+            "litchi_opc::phys_pkg::read_limited::h7c00fe41d2e098b1",
+            "litchi_docx::source_backed::Package::from_reader::h00c4504894a9b108",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 16646144,
+          "calls": 14,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h59a438c9a63e820aE.llvm.11409347516399337018",
+            "alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h1300ddea67e99be7",
+            "_$LT$litchi_docx..source_backed..FingerprintingWriter$LT$W$GT$$u20$as$u20$std..io..Write$GT$::write::hb13b713ca3d954c4",
+            "litchi_opc::source_backed::write_exact_snapshot::h110ceb7e1849a7c5",
+            "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream::h020450331f6ee942",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::h2292a0c45399ceee",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 10525724,
+          "calls": 5,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::hd840b74dad2b740a",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::h2292a0c45399ceee",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "trace_count": 44949,
+      "variant": "candidate"
+    },
+    {
+      "allocation_event_count": 312965,
+      "deallocation_event_count": 312964,
+      "id": "019-owned_reader-pair-02-leg-1-candidate",
+      "leg": 1,
+      "live_bytes_at_end": 544,
+      "pair": 2,
+      "peak_live_heap_bytes": 24234171,
+      "raw": {
+        "bytes": 438152,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/019-owned_reader-pair-02-leg-1-candidate/heaptrack.zst",
+        "sha256": "feba65db771a75864260dc8f02c8d87575ded77f6e109134fc83c5a0db37fa16"
+      },
+      "read_limited_bytes": 271585459,
+      "read_limited_calls": 257,
+      "read_limited_stacks": [
+        {
+          "bytes": 271585459,
+          "calls": 257,
+          "contains_measure_one": false,
+          "contains_read_limited": true,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h59a438c9a63e820aE.llvm.11409347516399337018",
+            "litchi_opc::phys_pkg::read_limited::h7c00fe41d2e098b1",
+            "litchi_docx::source_backed::Package::from_reader::h00c4504894a9b108",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "requested_bytes": 423323108,
+      "route": "owned_reader",
+      "stack_row_count": 3874,
+      "top_stacks": [
+        {
+          "bytes": 271585459,
+          "calls": 257,
+          "contains_measure_one": false,
+          "contains_read_limited": true,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h59a438c9a63e820aE.llvm.11409347516399337018",
+            "litchi_opc::phys_pkg::read_limited::h7c00fe41d2e098b1",
+            "litchi_docx::source_backed::Package::from_reader::h00c4504894a9b108",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 16646144,
+          "calls": 14,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h59a438c9a63e820aE.llvm.11409347516399337018",
+            "alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h1300ddea67e99be7",
+            "_$LT$litchi_docx..source_backed..FingerprintingWriter$LT$W$GT$$u20$as$u20$std..io..Write$GT$::write::hb13b713ca3d954c4",
+            "litchi_opc::source_backed::write_exact_snapshot::h110ceb7e1849a7c5",
+            "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream::h020450331f6ee942",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::h2292a0c45399ceee",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 10525724,
+          "calls": 5,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::hd840b74dad2b740a",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::h2292a0c45399ceee",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "trace_count": 44949,
+      "variant": "candidate"
+    },
+    {
+      "allocation_event_count": 312964,
+      "deallocation_event_count": 312963,
+      "id": "020-owned_reader-pair-02-leg-2-baseline",
+      "leg": 2,
+      "live_bytes_at_end": 544,
+      "pair": 2,
+      "peak_live_heap_bytes": 24234083,
+      "raw": {
+        "bytes": 439782,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/020-owned_reader-pair-02-leg-2-baseline/heaptrack.zst",
+        "sha256": "15abc155eb2a6653cc25922bd4336cae28f577742f23ebd65694f83661212916"
+      },
+      "read_limited_bytes": 271585459,
+      "read_limited_calls": 257,
+      "read_limited_stacks": [
+        {
+          "bytes": 271585459,
+          "calls": 257,
+          "contains_measure_one": false,
+          "contains_read_limited": true,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hdcbc6d2eaa4365f3E.llvm.15467246616864011325",
+            "litchi_opc::phys_pkg::read_limited::h9cdd2ec84b96cf4c",
+            "litchi_docx::source_backed::Package::from_reader::h62418022bab2c172",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "requested_bytes": 423388539,
+      "route": "owned_reader",
+      "stack_row_count": 3874,
+      "top_stacks": [
+        {
+          "bytes": 271585459,
+          "calls": 257,
+          "contains_measure_one": false,
+          "contains_read_limited": true,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hdcbc6d2eaa4365f3E.llvm.15467246616864011325",
+            "litchi_opc::phys_pkg::read_limited::h9cdd2ec84b96cf4c",
+            "litchi_docx::source_backed::Package::from_reader::h62418022bab2c172",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 16646144,
+          "calls": 14,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hdcbc6d2eaa4365f3E.llvm.15467246616864011325",
+            "alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hc27bec4a62e0dc52",
+            "_$LT$litchi_docx..source_backed..FingerprintingWriter$LT$W$GT$$u20$as$u20$std..io..Write$GT$::write::h5c86bf3806f3e9ea",
+            "litchi_opc::source_backed::write_exact_snapshot::ha51e42724995d2b5",
+            "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream::h4f6efa1a4e0e16cd",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::he8785aaa09a9dd3e",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 10525724,
+          "calls": 5,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h898ca481424497bb",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::he8785aaa09a9dd3e",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "trace_count": 44906,
+      "variant": "baseline"
+    },
+    {
+      "allocation_event_count": 312964,
+      "deallocation_event_count": 312963,
+      "id": "021-owned_reader-pair-03-leg-1-baseline",
+      "leg": 1,
+      "live_bytes_at_end": 544,
+      "pair": 3,
+      "peak_live_heap_bytes": 24234083,
+      "raw": {
+        "bytes": 439897,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/021-owned_reader-pair-03-leg-1-baseline/heaptrack.zst",
+        "sha256": "3c6df7c6c7e48d1a3f4d8a39591d30a8bdbb4d4d612cc61a9e2e65b7618ea68b"
+      },
+      "read_limited_bytes": 271585459,
+      "read_limited_calls": 257,
+      "read_limited_stacks": [
+        {
+          "bytes": 271585459,
+          "calls": 257,
+          "contains_measure_one": false,
+          "contains_read_limited": true,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hdcbc6d2eaa4365f3E.llvm.15467246616864011325",
+            "litchi_opc::phys_pkg::read_limited::h9cdd2ec84b96cf4c",
+            "litchi_docx::source_backed::Package::from_reader::h62418022bab2c172",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "requested_bytes": 423388539,
+      "route": "owned_reader",
+      "stack_row_count": 3874,
+      "top_stacks": [
+        {
+          "bytes": 271585459,
+          "calls": 257,
+          "contains_measure_one": false,
+          "contains_read_limited": true,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hdcbc6d2eaa4365f3E.llvm.15467246616864011325",
+            "litchi_opc::phys_pkg::read_limited::h9cdd2ec84b96cf4c",
+            "litchi_docx::source_backed::Package::from_reader::h62418022bab2c172",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 16646144,
+          "calls": 14,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hdcbc6d2eaa4365f3E.llvm.15467246616864011325",
+            "alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hc27bec4a62e0dc52",
+            "_$LT$litchi_docx..source_backed..FingerprintingWriter$LT$W$GT$$u20$as$u20$std..io..Write$GT$::write::h5c86bf3806f3e9ea",
+            "litchi_opc::source_backed::write_exact_snapshot::ha51e42724995d2b5",
+            "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream::h4f6efa1a4e0e16cd",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::he8785aaa09a9dd3e",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 10525724,
+          "calls": 5,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h898ca481424497bb",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::he8785aaa09a9dd3e",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "trace_count": 44906,
+      "variant": "baseline"
+    },
+    {
+      "allocation_event_count": 312965,
+      "deallocation_event_count": 312964,
+      "id": "022-owned_reader-pair-03-leg-2-candidate",
+      "leg": 2,
+      "live_bytes_at_end": 544,
+      "pair": 3,
+      "peak_live_heap_bytes": 24234171,
+      "raw": {
+        "bytes": 437869,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/022-owned_reader-pair-03-leg-2-candidate/heaptrack.zst",
+        "sha256": "4dc1abc038a20ef88cf461e9987c44d4e604d27ade7d831491fbfb3126ca8786"
+      },
+      "read_limited_bytes": 271585459,
+      "read_limited_calls": 257,
+      "read_limited_stacks": [
+        {
+          "bytes": 271585459,
+          "calls": 257,
+          "contains_measure_one": false,
+          "contains_read_limited": true,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h59a438c9a63e820aE.llvm.11409347516399337018",
+            "litchi_opc::phys_pkg::read_limited::h7c00fe41d2e098b1",
+            "litchi_docx::source_backed::Package::from_reader::h00c4504894a9b108",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "requested_bytes": 423323108,
+      "route": "owned_reader",
+      "stack_row_count": 3874,
+      "top_stacks": [
+        {
+          "bytes": 271585459,
+          "calls": 257,
+          "contains_measure_one": false,
+          "contains_read_limited": true,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h59a438c9a63e820aE.llvm.11409347516399337018",
+            "litchi_opc::phys_pkg::read_limited::h7c00fe41d2e098b1",
+            "litchi_docx::source_backed::Package::from_reader::h00c4504894a9b108",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 16646144,
+          "calls": 14,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h59a438c9a63e820aE.llvm.11409347516399337018",
+            "alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h1300ddea67e99be7",
+            "_$LT$litchi_docx..source_backed..FingerprintingWriter$LT$W$GT$$u20$as$u20$std..io..Write$GT$::write::hb13b713ca3d954c4",
+            "litchi_opc::source_backed::write_exact_snapshot::h110ceb7e1849a7c5",
+            "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream::h020450331f6ee942",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::h2292a0c45399ceee",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 10525724,
+          "calls": 5,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::hd840b74dad2b740a",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::h2292a0c45399ceee",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "trace_count": 44949,
+      "variant": "candidate"
+    },
+    {
+      "allocation_event_count": 312965,
+      "deallocation_event_count": 312964,
+      "id": "023-owned_reader-pair-04-leg-1-candidate",
+      "leg": 1,
+      "live_bytes_at_end": 544,
+      "pair": 4,
+      "peak_live_heap_bytes": 24234171,
+      "raw": {
+        "bytes": 437894,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/023-owned_reader-pair-04-leg-1-candidate/heaptrack.zst",
+        "sha256": "f3ce8547c409e1a3fce219a6ff8a8e183476106ec10a84effac46a9a5bfc0633"
+      },
+      "read_limited_bytes": 271585459,
+      "read_limited_calls": 257,
+      "read_limited_stacks": [
+        {
+          "bytes": 271585459,
+          "calls": 257,
+          "contains_measure_one": false,
+          "contains_read_limited": true,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h59a438c9a63e820aE.llvm.11409347516399337018",
+            "litchi_opc::phys_pkg::read_limited::h7c00fe41d2e098b1",
+            "litchi_docx::source_backed::Package::from_reader::h00c4504894a9b108",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "requested_bytes": 423323108,
+      "route": "owned_reader",
+      "stack_row_count": 3874,
+      "top_stacks": [
+        {
+          "bytes": 271585459,
+          "calls": 257,
+          "contains_measure_one": false,
+          "contains_read_limited": true,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h59a438c9a63e820aE.llvm.11409347516399337018",
+            "litchi_opc::phys_pkg::read_limited::h7c00fe41d2e098b1",
+            "litchi_docx::source_backed::Package::from_reader::h00c4504894a9b108",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 16646144,
+          "calls": 14,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h59a438c9a63e820aE.llvm.11409347516399337018",
+            "alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h1300ddea67e99be7",
+            "_$LT$litchi_docx..source_backed..FingerprintingWriter$LT$W$GT$$u20$as$u20$std..io..Write$GT$::write::hb13b713ca3d954c4",
+            "litchi_opc::source_backed::write_exact_snapshot::h110ceb7e1849a7c5",
+            "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream::h020450331f6ee942",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::h2292a0c45399ceee",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 10525724,
+          "calls": 5,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::hd840b74dad2b740a",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::h2292a0c45399ceee",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::h140fcca7aa160169",
+            "litchi_perf_baseline::run::h5b5406535bcc9d63",
+            "litchi_perf_baseline::main::h26cdfad5eb5bbe5c",
+            "std::sys::backtrace::__rust_begin_short_backtrace::h131c977fd13ed1b8",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h03829ac27b98c3d7E.llvm.9178885947727266053",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "trace_count": 44949,
+      "variant": "candidate"
+    },
+    {
+      "allocation_event_count": 312964,
+      "deallocation_event_count": 312963,
+      "id": "024-owned_reader-pair-04-leg-2-baseline",
+      "leg": 2,
+      "live_bytes_at_end": 544,
+      "pair": 4,
+      "peak_live_heap_bytes": 24234083,
+      "raw": {
+        "bytes": 439358,
+        "path": "/tmp/litchi-performance-0923/allocation-packet-v4/children/024-owned_reader-pair-04-leg-2-baseline/heaptrack.zst",
+        "sha256": "28698b6ffd0f08e91a1a119d64ccad7247b70a3e5dd5a7881ebeba4014b34ddc"
+      },
+      "read_limited_bytes": 271585459,
+      "read_limited_calls": 257,
+      "read_limited_stacks": [
+        {
+          "bytes": 271585459,
+          "calls": 257,
+          "contains_measure_one": false,
+          "contains_read_limited": true,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hdcbc6d2eaa4365f3E.llvm.15467246616864011325",
+            "litchi_opc::phys_pkg::read_limited::h9cdd2ec84b96cf4c",
+            "litchi_docx::source_backed::Package::from_reader::h62418022bab2c172",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "requested_bytes": 423388539,
+      "route": "owned_reader",
+      "stack_row_count": 3874,
+      "top_stacks": [
+        {
+          "bytes": 271585459,
+          "calls": 257,
+          "contains_measure_one": false,
+          "contains_read_limited": true,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hdcbc6d2eaa4365f3E.llvm.15467246616864011325",
+            "litchi_opc::phys_pkg::read_limited::h9cdd2ec84b96cf4c",
+            "litchi_docx::source_backed::Package::from_reader::h62418022bab2c172",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 16646144,
+          "calls": 14,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hdcbc6d2eaa4365f3E.llvm.15467246616864011325",
+            "alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::hc27bec4a62e0dc52",
+            "_$LT$litchi_docx..source_backed..FingerprintingWriter$LT$W$GT$$u20$as$u20$std..io..Write$GT$::write::h5c86bf3806f3e9ea",
+            "litchi_opc::source_backed::write_exact_snapshot::ha51e42724995d2b5",
+            "litchi_docx::source_backed::Package::publish_section_layout_commit_to_stream::h4f6efa1a4e0e16cd",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::he8785aaa09a9dd3e",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        },
+        {
+          "bytes": 10525724,
+          "calls": 5,
+          "contains_measure_one": false,
+          "contains_read_limited": false,
+          "stack": [
+            "_$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h898ca481424497bb",
+            "litchi_perf_baseline::verify_docx_section_layout_controls::he8785aaa09a9dd3e",
+            "litchi_perf_baseline::run_docx_source_backed_existing_section_layout_edit_save::he6e7bb32d6d715b1",
+            "litchi_perf_baseline::run::hc4f4236377105b94",
+            "litchi_perf_baseline::main::h85394887a56f0b30",
+            "std::sys::backtrace::__rust_begin_short_backtrace::hceba5c5eac572171",
+            "_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h9c0513882e0569adE.llvm.11884636543153565440",
+            "_RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal",
+            "main",
+            "__libc_start_call_main",
+            "__libc_start_main_impl",
+            "_start"
+          ]
+        }
+      ],
+      "trace_count": 44906,
+      "variant": "baseline"
+    }
+  ],
+  "raw_only": true,
+  "raw_roots": [
+    "/tmp/litchi-performance-0923/allocation-packet-v3",
+    "/tmp/litchi-performance-0923/allocation-packet-v4"
+  ],
+  "receipt": {
+    "descriptor": {
+      "bytes": 49949,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/independent-memory-disposition.json",
+      "sha256": "68898adc74f4885e3602f4c4cc146604b0d572e75ca7ddfd840ba70b845efe4c"
+    },
+    "expected_bindings": 25,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0923/independent-memory-disposition.json"
+  },
+  "schema": "litchi.performance.0924.heaptrack-stack-attribution.v2",
+  "source_proof": {
+    "baseline_receipt": {
+      "bytes": 2237,
+      "path": "/tmp/litchi-performance-0923/packet-v3-final2/custody/baseline-source-receipt.json",
+      "sha256": "62b555f066f9a1ac11dd63c258170b9534015766b18b6962012786004f817307"
+    },
+    "baseline_source_listing_recorded": {
+      "bytes": 1156468,
+      "sha256": "f9714cda62133005e6eb0046f79189bd8914946ae3f1a16baade631a8b4f12fc"
+    },
+    "baseline_source_tree_recorded": "/tmp/litchi-performance-0923/baseline-source/tree",
+    "baseline_witnesses": {
+      "cargo_lock": {
+        "bytes": 138465,
+        "path": "/tmp/litchi-performance-0923/baseline-source/tree/Cargo.lock",
+        "present": true,
+        "sha256": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd"
+      },
+      "harness_file": {
+        "bytes": 3031664,
+        "path": "/tmp/litchi-performance-0923/baseline-source/tree/tools/perf-baseline/src/lib.rs",
+        "present": true,
+        "sha256": "c1b9b55258df38ac6a376283c2b857ad6a541ba8c62e23730195502f083e70ca"
+      },
+      "harness_patch": {
+        "bytes": 17046,
+        "path": "/tmp/litchi-performance-0923/harness-0923.patch",
+        "present": true,
+        "sha256": "5404cf09f7f840aa3a587d1bbdce6659d0d3a8cf35d2c44bbd42b747ddf217e0"
+      },
+      "source_archive": {
+        "present": false,
+        "recorded": {
+          "bytes": 170065920,
+          "path": "/tmp/litchi-performance-0923/base-head.tar",
+          "sha256": "a6880fb4f638fbdcff23afb728382ea0c807f3af201648f579844309492b10a9"
+        }
+      }
+    },
+    "candidate_base_revision": "4e2532a0ce958f5928496b0ad9b356d8636916e1",
+    "candidate_receipt": {
+      "bytes": 522655,
+      "path": "/tmp/litchi-performance-0923/packet-v3-final2/custody/candidate-source-receipt.json",
+      "sha256": "3872b7d5e8a82c07a770ec186d0b6a447e89aa3e648f5130eccfeaa6944fc8b8"
+    },
+    "candidate_source_file_count": 9355,
+    "candidate_source_tree_recorded": {
+      "bytes": 163151032,
+      "path": "/tmp/litchi-performance-0923/candidate-source/tree",
+      "sha256": "5eb6840368d0e601e2db4756ae2dbc4c7fdbc4d0b8bfd810934652a95090a83a"
+    },
+    "candidate_witnesses": {
+      "candidate_patch": {
+        "bytes": 15772,
+        "path": "/tmp/litchi-performance-0923/candidate-source-0923-v3.patch",
+        "present": true,
+        "sha256": "77c2a9952335d5f16c24fbfc8d87e120301808258f70e990324fa21b8ea8e75d"
+      },
+      "cargo_lock": {
+        "bytes": 138465,
+        "path": "/tmp/litchi-performance-0923/candidate-source/tree/Cargo.lock",
+        "present": true,
+        "sha256": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd"
+      },
+      "full_source_listing": {
+        "bytes": 1437118,
+        "path": "/tmp/litchi-performance-0923/custody/source-listing-candidate-v3.jsonl",
+        "present": true,
+        "sha256": "5eb6840368d0e601e2db4756ae2dbc4c7fdbc4d0b8bfd810934652a95090a83a"
+      },
+      "harness_file": {
+        "bytes": 3031664,
+        "path": "/tmp/litchi-performance-0923/candidate-source/tree/tools/perf-baseline/src/lib.rs",
+        "present": true,
+        "sha256": "c1b9b55258df38ac6a376283c2b857ad6a541ba8c62e23730195502f083e70ca"
+      },
+      "harness_patch": {
+        "bytes": 17046,
+        "path": "/tmp/litchi-performance-0923/harness-0923.patch",
+        "present": true,
+        "sha256": "5404cf09f7f840aa3a587d1bbdce6659d0d3a8cf35d2c44bbd42b747ddf217e0"
+      },
+      "probe_lock": {
+        "bytes": 56289,
+        "path": "/tmp/litchi-performance-0923/candidate-source/tree/tools/perf-baseline/Cargo.lock",
+        "present": true,
+        "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+      },
+      "source_archive": {
+        "bytes": 170065920,
+        "path": "/tmp/litchi-performance-0923/base-4e2532a0ce958f5928496b0ad9b356d8636916e1.tar",
+        "present": true,
+        "sha256": "a6880fb4f638fbdcff23afb728382ea0c807f3af201648f579844309492b10a9"
+      }
+    },
+    "source_file_count": 9355,
+    "source_revision": "4e2532a0ce958f5928496b0ad9b356d8636916e1"
+  },
+  "stack_method": {
+    "assignment": "each event contributes its allocation-info size once to the complete leaf->root trace stack",
+    "comparison": "exact full leaf-stack keys; route-only setup rows shown gross on each side and netted once",
+    "event_unit": "one '+' allocation event",
+    "format": "10500 3",
+    "operation_boundary": "none in Heaptrack; contains_measure_one was absent from all 25 profiles",
+    "parent_rows_added": false,
+    "read_limited_interpretation": "source-ingress stack observed under Package::from_reader; retained whole-process profile cannot prove timing phase by itself"
+  },
+  "stack_rows_external": {
+    "descriptor": {
+      "bytes": 150263792,
+      "path": "/tmp/litchi-performance-0924/stack-rows-v2.json",
+      "sha256": "7db5a787e43d1b7c700c93d609d66d298f4c5cbd09884c58fca1e001c1a6340b"
+    },
+    "regeneration_argv": [
+      "/usr/bin/python3.14",
+      "-B",
+      "/tmp/litchi-performance-0924/stack-attribution-v2.py",
+      "--repo",
+      "/home/zhuhe/code/litchi",
+      "--raw-root",
+      "/tmp/litchi-performance-0923/allocation-packet-v3",
+      "--raw-root",
+      "/tmp/litchi-performance-0923/allocation-packet-v4",
+      "--output",
+      "/tmp/litchi-performance-0924/stack-attribution-v2.json",
+      "--stacks-output",
+      "/tmp/litchi-performance-0924/stack-rows-v2.json"
+    ],
+    "script": {
+      "bytes": 28606,
+      "path": "/tmp/litchi-performance-0924/stack-attribution-v2.py",
+      "sha256": "e4bef0c1fa0cc835f808d2afa77e002a25bbb7b1df40f4ed513f436f02d49294"
+    }
+  },
+  "status": "descriptive retained-profile analysis; no recapture or qualification"
+}

@@ -1,5 +1,15 @@
 # Performance optimization ADR-compliance matrix
 
+## 0924 — offline allocation attribution and phase-priority review
+
+[0924](0924-reader-allocation-attribution.md) changes only diagnostic tooling and
+evidence. ADR 0005 measurement scope separates allocator requests from copied
+bytes, resident memory and native latency; ADR 0008 keeps old profiling protocol
+failures visible. ADR 0003/0006 source checks, error ordering and preservation
+remain unchanged. The shared helper and possible future provider work stay
+within ADR 0010/0011/0024 ownership boundaries. No API or allocation policy is
+changed, and no cancellation or execution-context behavior is weakened.
+
 ## 0923 — exact immutable-owner fingerprint memo adopted
 
 [0923](0923-owned-source-fingerprint.md) follows the accepted one-shot digest

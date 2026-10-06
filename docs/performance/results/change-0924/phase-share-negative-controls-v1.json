@@ -1,0 +1,79 @@
+{
+  "all_rejected": true,
+  "moved_packet_replay": {
+    "metrics_equal_to_canonical": true,
+    "output_bytes": 31240,
+    "output_sha256": "3d4a7ebe7887ff85c50ba92e600a4ebc064ff462f09edac60ef8eac4ec4b3701",
+    "packet_root": "/tmp/litchi-performance-0924/negative-fixtures/moved-packet",
+    "return_code": 0,
+    "stdout_tail": "9313638469017688, \"edit_ns\": 0.014140322704588749, \"open_ns\": 0.012168307399429819, \"preparation_ns\": 0.064529431575056, \"publication_ns\": 0.4566278258326082, \"query_ns\": 0.3593977277981404}, \"route\": \"owned_vec\"}\n{\"amdahl_open\": 1.1106815869020252, \"phase_shares\": {\"commit_ns\": 0.08923216165741593, \"edit_ns\": 0.013495256907467829, \"open_ns\": 0.09965195084465603, \"preparation_ns\": 0.01593448357842246, \"publication_ns\": 0.4361723435835624, \"query_ns\": 0.3455138034284754}, \"route\": \"owned_reader\"}",
+    "success": true
+  },
+  "notes": [
+    "corrupted_report_hash uses the production raw-index binding unchanged",
+    "semantic fixtures rebind only their copied raw index and a copied validator constant; this is a test-only rebind to reach structural checks",
+    "all fixture packet directories and test-only scripts may be removed after this receipt is retained"
+  ],
+  "purpose": "fail-closed validator tests on copied retained reports; no frozen evidence was changed",
+  "schema": "litchi.performance.0924.phase-share-negative-controls.v1",
+  "test_runner": {
+    "path": "/tmp/litchi-performance-0924/negative-controls-v1.py",
+    "sha256": "54e4c1c4192c0dcf6b461448cbf178d4f9d8037242142b1be602d57dcc892e56"
+  },
+  "tests": [
+    {
+      "expected_rejection": true,
+      "name": "corrupted_report_hash",
+      "observed_failure_contains": true,
+      "observed_output_tail": "stemExit(main())\n                     ~~~~^^\n  File \"/tmp/litchi-performance-0924/phase-share-v2.py\", line 177, in main\n    require(actual_report_sha == expected_report[\"sha256\"], f\"{report_id}: report hash mismatch\")\n    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-performance-0924/phase-share-v2.py\", line 55, in require\n    raise RuntimeError(message)\nRuntimeError: generic_read_at-pair-01-leg-2-candidate: report hash mismatch",
+      "observed_return_code": 1,
+      "test_only_raw_index_rebound": false,
+      "test_only_raw_index_sha256": null,
+      "validator_sha256": "3b819fb2885b9e5357ea34f5eb0f311d572099e3add3293e96a688ea163a751e"
+    },
+    {
+      "expected_rejection": true,
+      "name": "duplicate_sample_index",
+      "observed_failure_contains": true,
+      "observed_output_tail": "re(sorted(elapsed_order) == list(range(SAMPLES_PER_REPORT)), f\"{report_id}: elapsed order is not a permutation\")\n    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-performance-0924/negative-fixtures/duplicate_sample_index/duplicate_sample_index-test-only-rebound.py\", line 55, in require\n    raise RuntimeError(message)\nRuntimeError: generic_read_at-pair-01-leg-2-candidate: elapsed order is not a permutation",
+      "observed_return_code": 1,
+      "test_only_raw_index_rebound": true,
+      "test_only_raw_index_sha256": "02dbc7e1ce6331064acece23a238cd563ff8c6ca5028a930294193e07e83c913",
+      "validator_sha256": "728388d65a0d3e72d9bbb40e9515131cf5d6c24ae5aa224e52d3ebd1ce01ce1d"
+    },
+    {
+      "expected_rejection": true,
+      "name": "missing_sample_index",
+      "observed_failure_contains": true,
+      "observed_output_tail": "(elapsed_order) == SAMPLES_PER_REPORT,\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n        f\"{report_id}: elapsed sample order missing\",\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    )\n    ^\n  File \"/tmp/litchi-performance-0924/negative-fixtures/missing_sample_index/missing_sample_index-test-only-rebound.py\", line 55, in require\n    raise RuntimeError(message)\nRuntimeError: generic_read_at-pair-01-leg-2-candidate: elapsed sample order missing",
+      "observed_return_code": 1,
+      "test_only_raw_index_rebound": true,
+      "test_only_raw_index_sha256": "42954994334735ff8c94b1c04ce5ee45ce241ad98ce393c253dbe325c62974c6",
+      "validator_sha256": "bf241989e2867bf719524d9f4e7e948c8bb35ed35db6e1df10df16d66033224b"
+    },
+    {
+      "expected_rejection": true,
+      "name": "changed_phase_sum",
+      "observed_failure_contains": true,
+      "observed_output_tail": "-0924/negative-fixtures/changed_phase_sum/changed_phase_sum-test-only-rebound.py\", line 256, in main\n    require(route_data[route][\"phase_sum_mismatches\"] == 0, f\"{route}: phase sum mismatch\")\n    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-performance-0924/negative-fixtures/changed_phase_sum/changed_phase_sum-test-only-rebound.py\", line 55, in require\n    raise RuntimeError(message)\nRuntimeError: generic_read_at: phase sum mismatch",
+      "observed_return_code": 1,
+      "test_only_raw_index_rebound": true,
+      "test_only_raw_index_sha256": "d32c83ddd0188e10e22d0c59170207383a29779801bbb6fe845ab8337d1b31cd",
+      "validator_sha256": "3979c2c877d450d91acb71f646276f9433021cc0fb44438cb0aff482c32853fc"
+    },
+    {
+      "expected_rejection": true,
+      "name": "wrong_binary_identity",
+      "observed_failure_contains": true,
+      "observed_output_tail": "_identity-test-only-rebound.py\", line 179, in main\n    require(identity.get(\"binary_sha256\") == expected_binary, f\"{report_id}: binary hash mismatch\")\n    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/litchi-performance-0924/negative-fixtures/wrong_binary_identity/wrong_binary_identity-test-only-rebound.py\", line 55, in require\n    raise RuntimeError(message)\nRuntimeError: generic_read_at-pair-01-leg-2-candidate: binary hash mismatch",
+      "observed_return_code": 1,
+      "test_only_raw_index_rebound": true,
+      "test_only_raw_index_sha256": "969a3f34494a6606855b8dc071c137a92ce3fe946daccf64479e5a0b416c0b4d",
+      "validator_sha256": "00516de89b62a4d7d22d40bf312735ed575b497a18837b6d4425443ae9794cd1"
+    }
+  ],
+  "validator": {
+    "path": "/tmp/litchi-performance-0924/phase-share-v2.py",
+    "sha256": "3b819fb2885b9e5357ea34f5eb0f311d572099e3add3293e96a688ea163a751e"
+  }
+}
