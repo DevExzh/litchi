@@ -1,0 +1,341 @@
+{
+  "schema": "litchi.performance.0919.heaptrack.phases.v1",
+  "rules": [
+    [
+      "replace",
+      "litchi_doc::body_text::Edit::replace_paragraph"
+    ],
+    [
+      "capture",
+      "capture_container"
+    ],
+    [
+      "render",
+      "render_with_layout"
+    ],
+    [
+      "candidate_commit",
+      "commit_candidate_with_rendered"
+    ],
+    [
+      "revision_commit",
+      "litchi_doc::tracked_revision::package::RevisionEditor::commit"
+    ],
+    [
+      "replace_plain",
+      "replace_plain_text"
+    ],
+    [
+      "open",
+      "litchi_doc::body_text::Snapshot::open_bounded"
+    ],
+    [
+      "final_commit",
+      "litchi_doc::body_text::Edit::commit"
+    ],
+    [
+      "edit",
+      "litchi_doc::body_text::Snapshot::edit"
+    ]
+  ],
+  "classification": "When replace is present: capture, render, candidate_commit, revision_commit, replace_plain priority then target_and_guards. Otherwise final_commit, open, edit priority then probe_boundary_and_other. Final commit may reopen Snapshot internally, so final_commit takes priority over nested open. Categories are exclusive requested allocations; not wall-time phases.",
+  "runs": [
+    {
+      "label": "r01-docfloat-e02",
+      "exclusive_phases": {
+        "edit": {
+          "calls": 2355,
+          "bytes": 2268807
+        },
+        "final_commit": {
+          "calls": 5333,
+          "bytes": 4585705
+        },
+        "open": {
+          "calls": 5307,
+          "bytes": 4005029
+        },
+        "probe_boundary_and_other": {
+          "calls": 2,
+          "bytes": 688640
+        },
+        "staged_candidate_commit": {
+          "calls": 176,
+          "bytes": 46687
+        },
+        "staged_capture": {
+          "calls": 242,
+          "bytes": 1393419
+        },
+        "staged_render": {
+          "calls": 1102,
+          "bytes": 2109649
+        },
+        "staged_replace_plain": {
+          "calls": 2008,
+          "bytes": 1315343
+        },
+        "staged_revision_commit": {
+          "calls": 208,
+          "bytes": 316427
+        },
+        "staged_target_and_guards": {
+          "calls": 1281,
+          "bytes": 639985
+        }
+      },
+      "joint_membership": {
+        "": {
+          "calls": 2,
+          "bytes": 688640
+        },
+        "candidate_commit,capture,replace,replace_plain,revision_commit": {
+          "calls": 242,
+          "bytes": 1393419
+        },
+        "candidate_commit,render,replace,replace_plain,revision_commit": {
+          "calls": 1102,
+          "bytes": 2109649
+        },
+        "candidate_commit,replace,replace_plain,revision_commit": {
+          "calls": 176,
+          "bytes": 46687
+        },
+        "capture,edit": {
+          "calls": 121,
+          "bytes": 665110
+        },
+        "capture,final_commit,open": {
+          "calls": 121,
+          "bytes": 707493
+        },
+        "capture,open": {
+          "calls": 121,
+          "bytes": 665110
+        },
+        "edit": {
+          "calls": 2234,
+          "bytes": 1603697
+        },
+        "final_commit,open": {
+          "calls": 5212,
+          "bytes": 3878212
+        },
+        "open": {
+          "calls": 5186,
+          "bytes": 3339919
+        },
+        "replace": {
+          "calls": 1281,
+          "bytes": 639985
+        },
+        "replace,replace_plain": {
+          "calls": 2008,
+          "bytes": 1315343
+        },
+        "replace,replace_plain,revision_commit": {
+          "calls": 208,
+          "bytes": 316427
+        }
+      }
+    },
+    {
+      "label": "r01-docfloat-e32",
+      "exclusive_phases": {
+        "edit": {
+          "calls": 2355,
+          "bytes": 2268807
+        },
+        "final_commit": {
+          "calls": 5487,
+          "bytes": 7647386
+        },
+        "open": {
+          "calls": 5307,
+          "bytes": 4005029
+        },
+        "probe_boundary_and_other": {
+          "calls": 2,
+          "bytes": 1021952
+        },
+        "staged_candidate_commit": {
+          "calls": 2816,
+          "bytes": 802310
+        },
+        "staged_capture": {
+          "calls": 3872,
+          "bytes": 32756816
+        },
+        "staged_render": {
+          "calls": 17779,
+          "bytes": 44759310
+        },
+        "staged_replace_plain": {
+          "calls": 33102,
+          "bytes": 42275408
+        },
+        "staged_revision_commit": {
+          "calls": 3328,
+          "bytes": 15523744
+        },
+        "staged_target_and_guards": {
+          "calls": 21009,
+          "bytes": 13173117
+        }
+      },
+      "joint_membership": {
+        "": {
+          "calls": 2,
+          "bytes": 1021952
+        },
+        "candidate_commit,capture,replace,replace_plain,revision_commit": {
+          "calls": 3872,
+          "bytes": 32756816
+        },
+        "candidate_commit,render,replace,replace_plain,revision_commit": {
+          "calls": 17779,
+          "bytes": 44759310
+        },
+        "candidate_commit,replace,replace_plain,revision_commit": {
+          "calls": 2816,
+          "bytes": 802310
+        },
+        "capture,edit": {
+          "calls": 121,
+          "bytes": 665110
+        },
+        "capture,final_commit,open": {
+          "calls": 121,
+          "bytes": 1369111
+        },
+        "capture,open": {
+          "calls": 121,
+          "bytes": 665110
+        },
+        "edit": {
+          "calls": 2234,
+          "bytes": 1603697
+        },
+        "final_commit,open": {
+          "calls": 5366,
+          "bytes": 6278275
+        },
+        "open": {
+          "calls": 5186,
+          "bytes": 3339919
+        },
+        "replace": {
+          "calls": 21009,
+          "bytes": 13173117
+        },
+        "replace,replace_plain": {
+          "calls": 33102,
+          "bytes": 42275408
+        },
+        "replace,replace_plain,revision_commit": {
+          "calls": 3328,
+          "bytes": 15523744
+        }
+      }
+    },
+    {
+      "label": "r01-docnohf-e32",
+      "exclusive_phases": {
+        "edit": {
+          "calls": 226,
+          "bytes": 153967
+        },
+        "final_commit": {
+          "calls": 690,
+          "bytes": 678925
+        },
+        "open": {
+          "calls": 521,
+          "bytes": 255802
+        },
+        "probe_boundary_and_other": {
+          "calls": 2,
+          "bytes": 89600
+        },
+        "staged_candidate_commit": {
+          "calls": 1693,
+          "bytes": 296171
+        },
+        "staged_capture": {
+          "calls": 1332,
+          "bytes": 2802864
+        },
+        "staged_render": {
+          "calls": 7227,
+          "bytes": 4965983
+        },
+        "staged_replace_plain": {
+          "calls": 4660,
+          "bytes": 4477272
+        },
+        "staged_revision_commit": {
+          "calls": 1088,
+          "bytes": 1978960
+        },
+        "staged_target_and_guards": {
+          "calls": 1585,
+          "bytes": 1082146
+        }
+      },
+      "joint_membership": {
+        "": {
+          "calls": 2,
+          "bytes": 89600
+        },
+        "candidate_commit,capture,replace,replace_plain,revision_commit": {
+          "calls": 1332,
+          "bytes": 2802864
+        },
+        "candidate_commit,render,replace,replace_plain,revision_commit": {
+          "calls": 7227,
+          "bytes": 4965983
+        },
+        "candidate_commit,replace,replace_plain,revision_commit": {
+          "calls": 1693,
+          "bytes": 296171
+        },
+        "capture,edit": {
+          "calls": 40,
+          "bytes": 48874
+        },
+        "capture,final_commit,open": {
+          "calls": 43,
+          "bytes": 124202
+        },
+        "capture,open": {
+          "calls": 40,
+          "bytes": 48874
+        },
+        "edit": {
+          "calls": 186,
+          "bytes": 105093
+        },
+        "final_commit,open": {
+          "calls": 647,
+          "bytes": 554723
+        },
+        "open": {
+          "calls": 481,
+          "bytes": 206928
+        },
+        "replace": {
+          "calls": 1585,
+          "bytes": 1082146
+        },
+        "replace,replace_plain": {
+          "calls": 4660,
+          "bytes": 4477272
+        },
+        "replace,replace_plain,revision_commit": {
+          "calls": 1088,
+          "bytes": 1978960
+        }
+      }
+    }
+  ]
+}

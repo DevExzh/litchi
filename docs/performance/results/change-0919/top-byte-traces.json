@@ -1,0 +1,395 @@
+{
+  "case": "docfloat",
+  "edits": 32,
+  "capture": "r01-docfloat-e32",
+  "raw_trace_indices_local_to_capture": true,
+  "top_30": [
+    {
+      "trace": 84612,
+      "bytes": 21245952,
+      "calls": 73,
+      "library_frames_leaf_to_root": [
+        "litchi_cfb::writer::layout::ReusePlan::emit::h6e297ecffb679cee",
+        "litchi_cfb::writer::core::OleWriter::write_to::h99ffe66efc23b8de",
+        "litchi_ole_common::object::codec::Package::render_with_layout::h27dfc47adca9fc14",
+        "litchi_ole_common::object::editor::Editor::commit_candidate_with_rendered::_$u7b$$u7b$closure$u7d$$u7d$::h4f3700caca444d84",
+        "litchi_ole_common::object::editor::Editor::commit_candidate_with_rendered::ha0dc5364dae54aef",
+        "litchi_ole_common::object::editor::Editor::put_streams_shared_with_rendered::h57a6cd1773a59dcb",
+        "litchi_doc::tracked_revision::package::RevisionEditor::commit::h347db5e2c6fa09db",
+        "litchi_doc::tracked_revision::package::RevisionEditor::replace_plain_text::hf503e9d1d07a8e3e",
+        "litchi_doc::body_text::Edit::replace_text::hecf2de9faeed9d23",
+        "litchi_doc::body_text::Edit::replace_paragraph::h9af13fe424ca7ceb"
+      ]
+    },
+    {
+      "trace": 84615,
+      "bytes": 18808832,
+      "calls": 32,
+      "library_frames_leaf_to_root": [
+        "litchi_cfb::writer::layout::ReusePlan::emit::h6e297ecffb679cee",
+        "litchi_cfb::writer::core::OleWriter::write_to::h99ffe66efc23b8de",
+        "litchi_ole_common::object::codec::Package::render_with_layout::h27dfc47adca9fc14",
+        "litchi_ole_common::object::editor::Editor::commit_candidate_with_rendered::_$u7b$$u7b$closure$u7d$$u7d$::h4f3700caca444d84",
+        "litchi_ole_common::object::editor::Editor::commit_candidate_with_rendered::ha0dc5364dae54aef",
+        "litchi_ole_common::object::editor::Editor::put_streams_shared_with_rendered::h57a6cd1773a59dcb",
+        "litchi_doc::tracked_revision::package::RevisionEditor::commit::h347db5e2c6fa09db",
+        "litchi_doc::tracked_revision::package::RevisionEditor::replace_plain_text::hf503e9d1d07a8e3e",
+        "litchi_doc::body_text::Edit::replace_text::hecf2de9faeed9d23",
+        "litchi_doc::body_text::Edit::replace_paragraph::h9af13fe424ca7ceb"
+      ]
+    },
+    {
+      "trace": 84758,
+      "bytes": 15886728,
+      "calls": 192,
+      "library_frames_leaf_to_root": [
+        "litchi_ole_common::object::codec::capture_container::_$u7b$$u7b$closure$u7d$$u7d$::h997ba99c617bdf13",
+        "litchi_cfb::file::OleFile$LT$R$GT$::visit_directory_entries::h0a4a744c788aabb4",
+        "litchi_ole_common::object::codec::capture_container::h39f021be9aaea15f",
+        "litchi_ole_common::object::codec::Package::capture_with_budget::h6ca472c01d3943e0",
+        "litchi_ole_common::object::codec::Package::capture::h3dc040b3fd8074a7",
+        "litchi_ole_common::object::editor::Editor::commit_candidate_with_rendered::ha0dc5364dae54aef",
+        "litchi_ole_common::object::editor::Editor::put_streams_shared_with_rendered::h57a6cd1773a59dcb",
+        "litchi_doc::tracked_revision::package::RevisionEditor::commit::h347db5e2c6fa09db",
+        "litchi_doc::tracked_revision::package::RevisionEditor::replace_plain_text::hf503e9d1d07a8e3e",
+        "litchi_doc::body_text::Edit::replace_text::hecf2de9faeed9d23",
+        "litchi_doc::body_text::Edit::replace_paragraph::h9af13fe424ca7ceb"
+      ]
+    },
+    {
+      "trace": 84755,
+      "bytes": 15837080,
+      "calls": 96,
+      "library_frames_leaf_to_root": [
+        "litchi_cfb::file::try_vec_with_capacity::hcd77b1d459aab64d",
+        "litchi_cfb::file::try_filled_vec::h57c18a66aabfd645",
+        "litchi_cfb::file::OleFile$LT$R$GT$::read_fat_chain::hbee4c83fe61e9409",
+        "litchi_cfb::file::OleFile$LT$R$GT$::read_stream_from_fat::hce9b3d4849f45782",
+        "litchi_cfb::file::OleFile$LT$R$GT$::open_stream::h9565263594c1b8d8",
+        "litchi_ole_common::object::codec::capture_container::_$u7b$$u7b$closure$u7d$$u7d$::h997ba99c617bdf13",
+        "litchi_cfb::file::OleFile$LT$R$GT$::visit_directory_entries::h0a4a744c788aabb4",
+        "litchi_ole_common::object::codec::capture_container::h39f021be9aaea15f",
+        "litchi_ole_common::object::codec::Package::capture_with_budget::h6ca472c01d3943e0",
+        "litchi_ole_common::object::codec::Package::capture::h3dc040b3fd8074a7",
+        "litchi_ole_common::object::editor::Editor::commit_candidate_with_rendered::ha0dc5364dae54aef",
+        "litchi_ole_common::object::editor::Editor::put_streams_shared_with_rendered::h57a6cd1773a59dcb",
+        "litchi_doc::tracked_revision::package::RevisionEditor::commit::h347db5e2c6fa09db",
+        "litchi_doc::tracked_revision::package::RevisionEditor::replace_plain_text::hf503e9d1d07a8e3e",
+        "litchi_doc::body_text::Edit::replace_text::hecf2de9faeed9d23",
+        "litchi_doc::body_text::Edit::replace_paragraph::h9af13fe424ca7ceb"
+      ]
+    },
+    {
+      "trace": 84019,
+      "bytes": 8169856,
+      "calls": 32,
+      "library_frames_leaf_to_root": [
+        "_$LT$litchi_doc..tracked_revision..package..RevisionEditor$u20$as$u20$core..clone..Clone$GT$::clone::h8c0beb66b040158e",
+        "litchi_doc::tracked_revision::package::RevisionEditor::replace_plain_text::hf503e9d1d07a8e3e",
+        "litchi_doc::body_text::Edit::replace_text::hecf2de9faeed9d23",
+        "litchi_doc::body_text::Edit::replace_paragraph::h9af13fe424ca7ceb"
+      ]
+    },
+    {
+      "trace": 84833,
+      "bytes": 8060928,
+      "calls": 31,
+      "library_frames_leaf_to_root": [
+        "litchi_doc::tracked_revision::package::RevisionEditor::replace_plain_text::hf503e9d1d07a8e3e",
+        "litchi_doc::body_text::Edit::replace_text::hecf2de9faeed9d23",
+        "litchi_doc::body_text::Edit::replace_paragraph::h9af13fe424ca7ceb"
+      ]
+    },
+    {
+      "trace": 84083,
+      "bytes": 6492048,
+      "calls": 32,
+      "library_frames_leaf_to_root": [
+        "litchi_doc::tracked_revision::codec::append_table_block::h6ee2e5471967dfee",
+        "litchi_doc::tracked_revision::package::RevisionEditor::rewrite_chpx::h40aed281550d61f4",
+        "litchi_doc::tracked_revision::package::RevisionEditor::replace_plain_text::hf503e9d1d07a8e3e",
+        "litchi_doc::body_text::Edit::replace_text::hecf2de9faeed9d23",
+        "litchi_doc::body_text::Edit::replace_paragraph::h9af13fe424ca7ceb"
+      ]
+    },
+    {
+      "trace": 84109,
+      "bytes": 4256768,
+      "calls": 32,
+      "library_frames_leaf_to_root": [
+        "litchi_doc::tracked_revision::package::RevisionEditor::commit::h347db5e2c6fa09db",
+        "litchi_doc::tracked_revision::package::RevisionEditor::replace_plain_text::hf503e9d1d07a8e3e",
+        "litchi_doc::body_text::Edit::replace_text::hecf2de9faeed9d23",
+        "litchi_doc::body_text::Edit::replace_paragraph::h9af13fe424ca7ceb"
+      ]
+    },
+    {
+      "trace": 84105,
+      "bytes": 4256256,
+      "calls": 32,
+      "library_frames_leaf_to_root": [
+        "litchi_doc::parts::fib::FileInformationBlock::parse_at::h91420e71d619eb46",
+        "litchi_doc::parts::fib::FileInformationBlock::parse::ha13484deb0687764",
+        "litchi_doc::tracked_revision::package::RevisionEditor::apply_saved_selection_splice::hdc1bd31c701cdfba",
+        "litchi_doc::tracked_revision::package::RevisionEditor::replace_plain_text::hf503e9d1d07a8e3e",
+        "litchi_doc::body_text::Edit::replace_text::hecf2de9faeed9d23",
+        "litchi_doc::body_text::Edit::replace_paragraph::h9af13fe424ca7ceb"
+      ]
+    },
+    {
+      "trace": 84108,
+      "bytes": 4256256,
+      "calls": 32,
+      "library_frames_leaf_to_root": [
+        "litchi_doc::tracked_revision::package::RevisionEditor::commit::h347db5e2c6fa09db",
+        "litchi_doc::tracked_revision::package::RevisionEditor::replace_plain_text::hf503e9d1d07a8e3e",
+        "litchi_doc::body_text::Edit::replace_text::hecf2de9faeed9d23",
+        "litchi_doc::body_text::Edit::replace_paragraph::h9af13fe424ca7ceb"
+      ]
+    },
+    {
+      "trace": 83930,
+      "bytes": 4069239,
+      "calls": 32,
+      "library_frames_leaf_to_root": [
+        "litchi_doc::parts::fib::FileInformationBlock::parse_at::h91420e71d619eb46",
+        "litchi_doc::parts::fib::FileInformationBlock::parse::ha13484deb0687764",
+        "litchi_doc::tracked_revision::package::RevisionEditor::saved_selection_splice::h747c74abda3eb237",
+        "litchi_doc::body_text::Edit::prepare_saved_selection_length_change::h022f180cf92d4207",
+        "litchi_doc::body_text::Edit::replace_text::hecf2de9faeed9d23",
+        "litchi_doc::body_text::Edit::replace_paragraph::h9af13fe424ca7ceb"
+      ]
+    },
+    {
+      "trace": 83974,
+      "bytes": 4069239,
+      "calls": 32,
+      "library_frames_leaf_to_root": [
+        "litchi_doc::parts::fib::FileInformationBlock::parse_at::h91420e71d619eb46",
+        "litchi_doc::parts::fib::FileInformationBlock::parse::ha13484deb0687764",
+        "litchi_doc::tracked_revision::package::RevisionEditor::saved_selection_splice::h747c74abda3eb237",
+        "litchi_doc::tracked_revision::package::RevisionEditor::prepared_saved_selection_splice::h1986b441f075d967",
+        "litchi_doc::tracked_revision::package::RevisionEditor::replace_plain_text::hf503e9d1d07a8e3e",
+        "litchi_doc::body_text::Edit::replace_text::hecf2de9faeed9d23",
+        "litchi_doc::body_text::Edit::replace_paragraph::h9af13fe424ca7ceb"
+      ]
+    },
+    {
+      "trace": 84017,
+      "bytes": 4069239,
+      "calls": 32,
+      "library_frames_leaf_to_root": [
+        "_$LT$litchi_doc..tracked_revision..package..RevisionEditor$u20$as$u20$core..clone..Clone$GT$::clone::h8c0beb66b040158e",
+        "litchi_doc::tracked_revision::package::RevisionEditor::replace_plain_text::hf503e9d1d07a8e3e",
+        "litchi_doc::body_text::Edit::replace_text::hecf2de9faeed9d23",
+        "litchi_doc::body_text::Edit::replace_paragraph::h9af13fe424ca7ceb"
+      ]
+    },
+    {
+      "trace": 83923,
+      "bytes": 3425280,
+      "calls": 8912,
+      "library_frames_leaf_to_root": [
+        "litchi_doc::sprm::parse_sprms_two_byte::h7f817e78b7e9c4a4",
+        "litchi_doc::sprm::parse_sprms::hf664de565bcfb8e2",
+        "litchi_doc::tracked_revision::codec::strict_sprms::h67113c2f17340fd7",
+        "litchi_doc::tracked_revision::package::RevisionEditor::revisions::he1e507ea1142a845",
+        "litchi_doc::body_text::text_revision_intersects::hafbba25a9e8dd21a",
+        "litchi_doc::body_text::Edit::replace_text::hecf2de9faeed9d23",
+        "litchi_doc::body_text::Edit::replace_paragraph::h9af13fe424ca7ceb"
+      ]
+    },
+    {
+      "trace": 84111,
+      "bytes": 3411592,
+      "calls": 32,
+      "library_frames_leaf_to_root": [
+        "litchi_doc::tracked_revision::package::RevisionEditor::commit::h347db5e2c6fa09db",
+        "litchi_doc::tracked_revision::package::RevisionEditor::replace_plain_text::hf503e9d1d07a8e3e",
+        "litchi_doc::body_text::Edit::replace_text::hecf2de9faeed9d23",
+        "litchi_doc::body_text::Edit::replace_paragraph::h9af13fe424ca7ceb"
+      ]
+    },
+    {
+      "trace": 84110,
+      "bytes": 3410968,
+      "calls": 32,
+      "library_frames_leaf_to_root": [
+        "litchi_doc::tracked_revision::package::RevisionEditor::commit::h347db5e2c6fa09db",
+        "litchi_doc::tracked_revision::package::RevisionEditor::replace_plain_text::hf503e9d1d07a8e3e",
+        "litchi_doc::body_text::Edit::replace_text::hecf2de9faeed9d23",
+        "litchi_doc::body_text::Edit::replace_paragraph::h9af13fe424ca7ceb"
+      ]
+    },
+    {
+      "trace": 84018,
+      "bytes": 3246024,
+      "calls": 32,
+      "library_frames_leaf_to_root": [
+        "_$LT$litchi_doc..tracked_revision..package..RevisionEditor$u20$as$u20$core..clone..Clone$GT$::clone::h8c0beb66b040158e",
+        "litchi_doc::tracked_revision::package::RevisionEditor::replace_plain_text::hf503e9d1d07a8e3e",
+        "litchi_doc::body_text::Edit::replace_text::hecf2de9faeed9d23",
+        "litchi_doc::body_text::Edit::replace_paragraph::h9af13fe424ca7ceb"
+      ]
+    },
+    {
+      "trace": 83925,
+      "bytes": 2990592,
+      "calls": 6784,
+      "library_frames_leaf_to_root": [
+        "litchi_doc::sprm::parse_sprms_two_byte::h7f817e78b7e9c4a4",
+        "litchi_doc::sprm::parse_sprms::hf664de565bcfb8e2",
+        "litchi_doc::tracked_revision::codec::strict_sprms::h67113c2f17340fd7",
+        "litchi_doc::tracked_revision::package::RevisionEditor::revisions::he1e507ea1142a845",
+        "litchi_doc::body_text::text_revision_intersects::hafbba25a9e8dd21a",
+        "litchi_doc::body_text::Edit::replace_text::hecf2de9faeed9d23",
+        "litchi_doc::body_text::Edit::replace_paragraph::h9af13fe424ca7ceb"
+      ]
+    },
+    {
+      "trace": 84058,
+      "bytes": 1040384,
+      "calls": 224,
+      "library_frames_leaf_to_root": [
+        "litchi_doc::writer::fkp::ChpxFkpBuilder::add_entry::hbe3eef15c57042f8",
+        "litchi_doc::tracked_revision::package::RevisionEditor::rewrite_chpx::h40aed281550d61f4",
+        "litchi_doc::tracked_revision::package::RevisionEditor::replace_plain_text::hf503e9d1d07a8e3e",
+        "litchi_doc::body_text::Edit::replace_text::hecf2de9faeed9d23",
+        "litchi_doc::body_text::Edit::replace_paragraph::h9af13fe424ca7ceb"
+      ]
+    },
+    {
+      "trace": 83898,
+      "bytes": 717478,
+      "calls": 32,
+      "library_frames_leaf_to_root": [
+        "litchi_doc::tracked_revision::package::RevisionEditor::decode_text_range::h6f1fcc61c70ad489",
+        "litchi_doc::tracked_revision::package::RevisionEditor::main_story_text::hbd0c9671e6a90012",
+        "litchi_doc::body_text::source_paragraphs::hf6c7b613b1ee9211",
+        "litchi_doc::body_text::target_spans::h623018101d06ab77",
+        "litchi_doc::body_text::resolve_target::he913c7964f917bd7",
+        "litchi_doc::body_text::Edit::replace_text::hecf2de9faeed9d23",
+        "litchi_doc::body_text::Edit::replace_paragraph::h9af13fe424ca7ceb"
+      ]
+    },
+    {
+      "trace": 86116,
+      "bytes": 686608,
+      "calls": 1,
+      "library_frames_leaf_to_root": [
+        "litchi_doc::body_text::Snapshot::open_bounded_with_policy::h5ce17ead4cff4fc9",
+        "litchi_doc::body_text::Edit::commit::h259e1ad7ba6e283f"
+      ]
+    },
+    {
+      "trace": 84843,
+      "bytes": 686592,
+      "calls": 1,
+      "library_frames_leaf_to_root": [
+        "litchi_doc::body_text::Snapshot::open_bounded_with_policy::h5ce17ead4cff4fc9",
+        "litchi_doc::body_text::Edit::commit::h259e1ad7ba6e283f"
+      ]
+    },
+    {
+      "trace": 85042,
+      "bytes": 686592,
+      "calls": 1,
+      "library_frames_leaf_to_root": [
+        "litchi_ole_common::object::editor::Editor::open_with_ole_file::h78b5358f4d0c73b6",
+        "litchi_doc::tracked_revision::package::RevisionEditor::open_with_ole_file_with_policy::hb18bb4570c61dd5c",
+        "litchi_doc::body_text::Snapshot::open_bounded_with_policy::h5ce17ead4cff4fc9",
+        "litchi_doc::body_text::Edit::commit::h259e1ad7ba6e283f"
+      ]
+    },
+    {
+      "trace": 86114,
+      "bytes": 686592,
+      "calls": 1,
+      "library_frames_leaf_to_root": [
+        "litchi_doc::body_text::Snapshot::open_bounded_with_policy::h5ce17ead4cff4fc9",
+        "litchi_doc::body_text::Edit::commit::h259e1ad7ba6e283f"
+      ]
+    },
+    {
+      "trace": 86117,
+      "bytes": 686592,
+      "calls": 1,
+      "library_frames_leaf_to_root": []
+    },
+    {
+      "trace": 84988,
+      "bytes": 669168,
+      "calls": 6,
+      "library_frames_leaf_to_root": [
+        "litchi_ole_common::object::codec::capture_container::_$u7b$$u7b$closure$u7d$$u7d$::h17845cb5b0ceca53",
+        "litchi_cfb::file::OleFile$LT$R$GT$::visit_directory_entries::hab7e3e63addb15d1",
+        "litchi_ole_common::object::codec::capture_container::h32a67e703496d375",
+        "litchi_ole_common::object::codec::Package::capture_with_budget::h1f6ff932cf88146d",
+        "litchi_ole_common::object::codec::Package::capture::h8448ae5433682c20",
+        "litchi_ole_common::object::editor::Editor::admit_open::hc9daf62c3526f140",
+        "litchi_ole_common::object::editor::Editor::open_with_ole_file::h78b5358f4d0c73b6",
+        "litchi_doc::tracked_revision::package::RevisionEditor::open_with_ole_file_with_policy::hb18bb4570c61dd5c",
+        "litchi_doc::body_text::Snapshot::open_bounded_with_policy::h5ce17ead4cff4fc9",
+        "litchi_doc::body_text::Edit::commit::h259e1ad7ba6e283f"
+      ]
+    },
+    {
+      "trace": 84985,
+      "bytes": 667619,
+      "calls": 3,
+      "library_frames_leaf_to_root": [
+        "litchi_cfb::file::try_vec_with_capacity::hcd77b1d459aab64d",
+        "litchi_cfb::file::try_filled_vec::h57c18a66aabfd645",
+        "litchi_cfb::file::OleFile$LT$R$GT$::read_fat_chain::h84eb42671b16f0e0",
+        "litchi_cfb::file::OleFile$LT$R$GT$::read_stream_from_fat::hf3a7fffd246dad75",
+        "litchi_cfb::file::OleFile$LT$R$GT$::open_stream::hd87b1fbb71743528",
+        "litchi_ole_common::object::codec::capture_container::_$u7b$$u7b$closure$u7d$$u7d$::h17845cb5b0ceca53",
+        "litchi_cfb::file::OleFile$LT$R$GT$::visit_directory_entries::hab7e3e63addb15d1",
+        "litchi_ole_common::object::codec::capture_container::h32a67e703496d375",
+        "litchi_ole_common::object::codec::Package::capture_with_budget::h1f6ff932cf88146d",
+        "litchi_ole_common::object::codec::Package::capture::h8448ae5433682c20",
+        "litchi_ole_common::object::editor::Editor::admit_open::hc9daf62c3526f140",
+        "litchi_ole_common::object::editor::Editor::open_with_ole_file::h78b5358f4d0c73b6",
+        "litchi_doc::tracked_revision::package::RevisionEditor::open_with_ole_file_with_policy::hb18bb4570c61dd5c",
+        "litchi_doc::body_text::Snapshot::open_bounded_with_policy::h5ce17ead4cff4fc9",
+        "litchi_doc::body_text::Edit::commit::h259e1ad7ba6e283f"
+      ]
+    },
+    {
+      "trace": 84050,
+      "bytes": 570368,
+      "calls": 32,
+      "library_frames_leaf_to_root": [
+        "litchi_doc::tracked_revision::package::RevisionEditor::replace_plain_text::hf503e9d1d07a8e3e",
+        "litchi_doc::body_text::Edit::replace_text::hecf2de9faeed9d23",
+        "litchi_doc::body_text::Edit::replace_paragraph::h9af13fe424ca7ceb"
+      ]
+    },
+    {
+      "trace": 83910,
+      "bytes": 552784,
+      "calls": 32,
+      "library_frames_leaf_to_root": [
+        "litchi_doc::tracked_revision::package::RevisionEditor::decode_text_range::h6f1fcc61c70ad489",
+        "litchi_doc::tracked_revision::package::RevisionEditor::main_story_text::hbd0c9671e6a90012",
+        "litchi_doc::body_text::source_paragraphs::hf6c7b613b1ee9211",
+        "litchi_doc::body_text::target_spans::h623018101d06ab77",
+        "litchi_doc::body_text::resolve_target::he913c7964f917bd7",
+        "litchi_doc::body_text::Edit::replace_text::hecf2de9faeed9d23",
+        "litchi_doc::body_text::Edit::replace_paragraph::h9af13fe424ca7ceb"
+      ]
+    },
+    {
+      "trace": 83915,
+      "bytes": 516096,
+      "calls": 192,
+      "library_frames_leaf_to_root": [
+        "litchi_doc::body_text::source_paragraphs::hf6c7b613b1ee9211",
+        "litchi_doc::body_text::target_spans::h623018101d06ab77",
+        "litchi_doc::body_text::resolve_target::he913c7964f917bd7",
+        "litchi_doc::body_text::Edit::replace_text::hecf2de9faeed9d23",
+        "litchi_doc::body_text::Edit::replace_paragraph::h9af13fe424ca7ceb"
+      ]
+    }
+  ]
+}

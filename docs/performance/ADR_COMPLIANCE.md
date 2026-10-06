@@ -1,5 +1,16 @@
 # Performance optimization ADR-compliance matrix
 
+## 0919 — evidence-only allocation diagnosis
+
+[0919](0919-doc-allocation-attribution.md) changes no production or harness
+code. Full-process captures are explicitly filtered to the measured lifecycle;
+allocation evidence is separate from native timing and peak-live claims.
+Future output reservation must preserve validated plan ownership, fallbacks,
+checked sizes, typed failures and deterministic output. Future recapture work
+must preserve complete stream validation and fresh directory metadata. Neither
+candidate is admitted to production; the separate output-reservation prototype
+remains unadopted. No ADR exception is claimed.
+
 ## 0918 — isolated stream-ownership candidate remains unadopted
 
 [0918](0918-doc-stream-arc-handoff.md) changes no production code. Its

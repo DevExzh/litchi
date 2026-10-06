@@ -1,5 +1,15 @@
 # Performance hotspot inventory
 
+## 0919 — output growth and recapture lead requested-byte owners
+
+[0919](0919-doc-allocation-attribution.md) attributes 164,233,879 requested
+bytes at 32 FloatingPictures edits. Two output-emission stacks account for
+40,054,784 bytes, including necessary output storage; staged package recapture
+accounts for 32,756,816 bytes. Investigate exact reservation at the existing
+validated CFB plan boundary first, then source-bound recapture comparison.
+The paragraph resolver is a smaller 2,370,318-byte inclusive subtree. These
+allocation totals neither predict native speedup nor quantify avoidable bytes.
+
 ## 0918 — temporary DOC stream ownership copy measured, not adopted
 
 [0918](0918-doc-stream-arc-handoff.md) profiles the repeated-edit lifecycle

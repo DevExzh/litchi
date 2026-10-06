@@ -1,0 +1,54 @@
+{
+  "schema": "litchi.performance.0919.finalization-audit.v1",
+  "utc": "2026-10-06T06:06:47.595157+00:00",
+  "source_head": "bf88f1da5f15ebf89b32709c3537b19519d89f2d",
+  "scope": "Evidence-only finalization. No new performance capture or production change.",
+  "artifact_descriptor_checks": 78,
+  "distinct_artifact_paths": 60,
+  "all_descriptors_match": true,
+  "strict_replay": {
+    "command": "Run the first shell block in profile-audit.md from the repository root; compare stdout byte-for-byte with the retained raw-decode.tsv.",
+    "exit_code": 0,
+    "six_capture_stdout_matches": true,
+    "expected_stdout": {
+      "path": "/tmp/litchi-performance-0919-audit/raw-decode.tsv",
+      "bytes": 300,
+      "sha256": "4f6e9e8405645491a245c6bf8cc4699deac9e705ee5e6612fe2ad9b1fe7b229e"
+    },
+    "method": {
+      "path": "docs/performance/results/change-0919/profile-audit.md",
+      "bytes": 10365,
+      "sha256": "2da4e241eb75e868d07ad63641df70de15fa61f4b733beb477cbabb9a2c69c25"
+    },
+    "decoder": {
+      "path": "docs/performance/results/change-0830/heaptrack_reader.py",
+      "bytes": 21711,
+      "sha256": "fd3e9b795246cce859195ad8946ac0669665782ca219a4e26a874e155782f1ea"
+    }
+  },
+  "production_source_equivalence": {
+    "command": [
+      "git",
+      "diff",
+      "--name-only",
+      "bb19ca74bd52",
+      "HEAD",
+      "--",
+      "crates",
+      "Cargo.toml",
+      "Cargo.lock"
+    ],
+    "stdout": "",
+    "exit_code": 0
+  },
+  "validation": [
+    "Local Markdown links resolve in 0919 change record and evidence Markdown.",
+    "All seven original evidence files are smaller than 1 MiB; JSON documents parse.",
+    "git diff --check passes."
+  ],
+  "limitations": [
+    "No new latency, peak-live or RSS evidence.",
+    "0920 remains a separate unadopted prototype.",
+    "Full goal is incomplete."
+  ]
+}

@@ -1,5 +1,12 @@
 # Performance CRUD coverage
 
+## 0919 — allocation diagnosis of existing DOC scenarios
+
+[0919](0919-doc-allocation-attribution.md) profiles NoHeadFoot at 32 edits and
+FloatingPictures at two/32 edits, twice each. All six reports pass the existing
+twenty correctness gates. It adds no scenarios, selectors, producer coverage
+or distinct-object bulk-edit claim; production is unchanged.
+
 ## 0918 — DOC repeated-object ownership experiment
 
 [0918](0918-doc-stream-arc-handoff.md) compares an isolated ownership-copy

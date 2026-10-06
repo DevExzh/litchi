@@ -1,0 +1,27 @@
+{
+  "schema": "litchi.performance.0919.heaptrack.protocol.v1",
+  "frozen_utc": "2026-10-05T19:18:56Z",
+  "source_head": "bf88f1da5f15ebf89b32709c3537b19519d89f2d",
+  "production_baseline": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+  "binary": "/home/zhuhe/litchi-performance-0917/target/release/doc_retention_probe",
+  "binary_bytes": 55146832,
+  "binary_sha256": "2ae48b4f7548c1468c8e7691d56d89b231c4a63f52ed48383f07fe3609c59a13",
+  "tool": "heaptrack 1.5.0; heaptrack_print 1.5.0",
+  "external_root": "/tmp/litchi-performance-0919",
+  "cpu": 14,
+  "warmups": 0,
+  "samples": 1,
+  "retention": "default",
+  "schedule": [
+    {"label": "r01-docnohf-e32", "case": "docnohf", "edits": 32},
+    {"label": "r01-docfloat-e02", "case": "docfloat", "edits": 2},
+    {"label": "r01-docfloat-e32", "case": "docfloat", "edits": 32},
+    {"label": "r02-docfloat-e32", "case": "docfloat", "edits": 32},
+    {"label": "r02-docfloat-e02", "case": "docfloat", "edits": 2},
+    {"label": "r02-docnohf-e32", "case": "docnohf", "edits": 32}
+  ],
+  "scope": "Heaptrack records the full process. Attribution accepts only allocation backtraces containing doc_retention_probe_0917::measure_one, which encloses the one measured public lifecycle; preparation, reference routes and post-sample oracles are excluded by this stack predicate. Verify this predicate from retained stacks before making scoped claims.",
+  "metrics": "Allocation call-stack counts and, only if independently decoded and reconciled, requested bytes. Heaptrack process peaks and merged backtrace peaks are not lifecycle peak-live evidence. No latency, native-cycle or hardware-cache claim.",
+  "correctness": "Each raw probe report must pass unchanged change-0917 capture.validate_report with zero warmups and one sample, all twenty gates. Fixture identities and binary hash are checked before capture. Repetitions must preserve exact output/control identities.",
+  "custody": "Exclusive child directories; preserve failed attempts; raw heaptrack and large analysis stay external. Small summaries bind filename, size, SHA-256 and exact regeneration commands. No production candidate or adoption gate is authorized by this attribution protocol."
+}

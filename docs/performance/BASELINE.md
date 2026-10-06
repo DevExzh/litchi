@@ -1,5 +1,13 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0919 — scoped DOC allocation attribution
+
+[0919](0919-doc-allocation-attribution.md) adds six Heaptrack captures of the
+unchanged 0917 native binary. Scoped calls and requested bytes exactly match
+the separate allocator results in every capture; repeated folded stacks are
+identical. This is diagnosis only, with no new latency or peak-live result,
+production adoption, or replacement of the 0918 rejection.
+
 ## 0918 — DOC stream-copy candidate rejected
 
 [0918](0918-doc-stream-arc-handoff.md) retains 192 matched native children

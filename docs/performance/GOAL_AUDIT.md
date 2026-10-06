@@ -1,5 +1,15 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0919 — next DOC allocation target measured
+
+[0919](0919-doc-allocation-attribution.md) reconciles six scoped Heaptrack
+captures with separate allocator counts and bytes, then identifies output
+buffer growth and package recapture as larger byte owners than paragraph
+resolution. It prepares the next implementation decision without claiming an
+optimization or native speedup. Independent review and
+current custody checks are recorded in the change record. Broad CRUD,
+producer, distinct-object, cold/range and concurrency gaps remain open.
+
 ## 0918 — measured DOC candidate rejected by latency gate
 
 [0918](0918-doc-stream-arc-handoff.md) adds scoped current-source diagnosis
