@@ -1,0 +1,298 @@
+{
+  "binaries": {
+    "candidate_allocator": {
+      "bytes": 68454648,
+      "path": "/home/zhuhe/litchi-performance-0937/target-candidate-allocator/release/litchi-perf-baseline-alloc",
+      "sha256": "9245cdc6af8f84e3e98ba8004d2adb7d65499acba31a426891a52312c0028a43"
+    },
+    "candidate_normal": {
+      "bytes": 69940560,
+      "path": "/home/zhuhe/litchi-performance-0937/target-candidate-normal/release/litchi-perf-baseline",
+      "sha256": "5589ae16db8839b0d7481a4557010e113e3a6396f720f32aba92264011165554"
+    },
+    "retained_baseline_allocator": {
+      "bytes": 68448792,
+      "path": "/home/zhuhe/litchi-performance-0933/target-candidate-allocator/release/litchi-perf-baseline-alloc",
+      "sha256": "927df9a232ef6f827aef71216a6e3d2b694204a50ea41fa2d6e9bc7bdbc519e9"
+    },
+    "retained_baseline_normal": {
+      "bytes": 69934624,
+      "path": "/home/zhuhe/litchi-performance-0933/target-candidate-normal/release/litchi-perf-baseline",
+      "sha256": "8a81df641151e5ed06b8f700c5d4cf068d0fee9c9e131fa147bf707a799c4c66"
+    }
+  },
+  "build_identity": {
+    "candidate_allocator": {
+      "role": "0937 candidate build",
+      "source_revision": "e3b5acdd91280b9926f94a61e5d736ad8063422e"
+    },
+    "candidate_normal": {
+      "role": "0937 candidate build",
+      "source_revision": "e3b5acdd91280b9926f94a61e5d736ad8063422e"
+    },
+    "retained_baseline_allocator": {
+      "role": "historical retained baseline",
+      "source_revision": "3ae856d76424f2f9b58d26dcd20fd074b8e97541"
+    },
+    "retained_baseline_normal": {
+      "role": "historical retained baseline",
+      "source_revision": "3ae856d76424f2f9b58d26dcd20fd074b8e97541"
+    }
+  },
+  "build_receipts": {
+    "candidate_allocator": {
+      "bytes": 6841,
+      "path": "/home/zhuhe/litchi-performance-0937/receipts/candidate-allocator-build-bound-v1.json",
+      "sha256": "123de045cebdb8b77dea7dd8bb1839105520554849ca5f1b0ce4a8952cdd9fdc"
+    },
+    "candidate_normal": {
+      "bytes": 6669,
+      "path": "/home/zhuhe/litchi-performance-0937/receipts/candidate-normal-build-bound-v1.json",
+      "sha256": "ba487338a47aee20ae6c3dd435240443e02e90a6cd0b42134ae22b9d878aca2e"
+    },
+    "retained_baseline_allocator": {
+      "bytes": 5191,
+      "path": "/home/zhuhe/litchi-performance-0933/receipts/fresh_candidate_allocator-final-v3.json",
+      "sha256": "3618e44b611dc69f3b5cf455de1c20c1d40df32d871a91a75c55d31d030b1f03"
+    },
+    "retained_baseline_normal": {
+      "bytes": 5579,
+      "path": "/home/zhuhe/litchi-performance-0936/receipts/baseline-normal-build-bound-v1.json",
+      "sha256": "a44d73d276564219499472bb49923f38c0519a4aaec64b419d1f29cd1aa23e45"
+    }
+  },
+  "collection_cwd": "/home/zhuhe/code/litchi",
+  "command_regeneration": "PYTHONDONTWRITEBYTECODE=1 python3 -B /home/zhuhe/litchi-performance-0937/collect-compiler-metadata-v2.py",
+  "commands": {
+    "candidate_allocator_elf_comment": {
+      "argv": [
+        "/usr/bin/readelf",
+        "--string-dump=.comment",
+        "/home/zhuhe/litchi-performance-0937/target-candidate-allocator/release/litchi-perf-baseline-alloc"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "end_utc": "2026-10-06T19:44:44.134328+00:00",
+      "exit_code": 0,
+      "start_utc": "2026-10-06T19:44:44.133650+00:00",
+      "stderr": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0937/compiler-metadata-v1/candidate_allocator-elf-comment.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 249,
+        "path": "/home/zhuhe/litchi-performance-0937/compiler-metadata-v1/candidate_allocator-elf-comment.stdout",
+        "sha256": "eb486663de224ee02fcc1717b7c19f8da02b03a9b8119d45d767c408fd20dfe2"
+      },
+      "terminal": {
+        "bytes": 971,
+        "path": "/home/zhuhe/litchi-performance-0937/compiler-metadata-v1/candidate_allocator-elf-comment.terminal.json",
+        "sha256": "edfc7e7ffd5f427d979090e1cf5b7fb64eb1c1508570aa814a6afb65290eaedc"
+      }
+    },
+    "candidate_normal_elf_comment": {
+      "argv": [
+        "/usr/bin/readelf",
+        "--string-dump=.comment",
+        "/home/zhuhe/litchi-performance-0937/target-candidate-normal/release/litchi-perf-baseline"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "end_utc": "2026-10-06T19:44:44.133514+00:00",
+      "exit_code": 0,
+      "start_utc": "2026-10-06T19:44:44.132585+00:00",
+      "stderr": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0937/compiler-metadata-v1/candidate_normal-elf-comment.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 249,
+        "path": "/home/zhuhe/litchi-performance-0937/compiler-metadata-v1/candidate_normal-elf-comment.stdout",
+        "sha256": "eb486663de224ee02fcc1717b7c19f8da02b03a9b8119d45d767c408fd20dfe2"
+      },
+      "terminal": {
+        "bytes": 953,
+        "path": "/home/zhuhe/litchi-performance-0937/compiler-metadata-v1/candidate_normal-elf-comment.terminal.json",
+        "sha256": "53d863acc9f4f40dea87271cfb80be01afdb622e3db9710cbab72bd89d9663e2"
+      }
+    },
+    "cargo_v": {
+      "argv": [
+        "/home/zhuhe/.cargo/bin/cargo",
+        "+1.95.0",
+        "-V"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "end_utc": "2026-10-06T19:44:44.120709+00:00",
+      "exit_code": 0,
+      "start_utc": "2026-10-06T19:44:44.115087+00:00",
+      "stderr": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0937/compiler-metadata-v1/cargo-v.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 36,
+        "path": "/home/zhuhe/litchi-performance-0937/compiler-metadata-v1/cargo-v.stdout",
+        "sha256": "c10ec31b8c6e6e2693cf65fc1971b41edbc3da1ae7db6f9f3f36c4823f8dcab5"
+      },
+      "terminal": {
+        "bytes": 799,
+        "path": "/home/zhuhe/litchi-performance-0937/compiler-metadata-v1/cargo-v.terminal.json",
+        "sha256": "12998b82256a7c1911531ca49156fb15101deb24ee2f2399c7bb2bf7841afda7"
+      }
+    },
+    "retained_baseline_allocator_elf_comment": {
+      "argv": [
+        "/usr/bin/readelf",
+        "--string-dump=.comment",
+        "/home/zhuhe/litchi-performance-0933/target-candidate-allocator/release/litchi-perf-baseline-alloc"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "end_utc": "2026-10-06T19:44:44.132249+00:00",
+      "exit_code": 0,
+      "start_utc": "2026-10-06T19:44:44.131375+00:00",
+      "stderr": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0937/compiler-metadata-v1/retained_baseline_allocator-elf-comment.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 249,
+        "path": "/home/zhuhe/litchi-performance-0937/compiler-metadata-v1/retained_baseline_allocator-elf-comment.stdout",
+        "sha256": "eb486663de224ee02fcc1717b7c19f8da02b03a9b8119d45d767c408fd20dfe2"
+      },
+      "terminal": {
+        "bytes": 995,
+        "path": "/home/zhuhe/litchi-performance-0937/compiler-metadata-v1/retained_baseline_allocator-elf-comment.terminal.json",
+        "sha256": "94dcf234a649419c882b408059b8b3e7ec9a5b2659901687bbd2e10fb9153fa9"
+      }
+    },
+    "retained_baseline_normal_elf_comment": {
+      "argv": [
+        "/usr/bin/readelf",
+        "--string-dump=.comment",
+        "/home/zhuhe/litchi-performance-0933/target-candidate-normal/release/litchi-perf-baseline"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "end_utc": "2026-10-06T19:44:44.131180+00:00",
+      "exit_code": 0,
+      "start_utc": "2026-10-06T19:44:44.130428+00:00",
+      "stderr": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0937/compiler-metadata-v1/retained_baseline_normal-elf-comment.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 249,
+        "path": "/home/zhuhe/litchi-performance-0937/compiler-metadata-v1/retained_baseline_normal-elf-comment.stdout",
+        "sha256": "eb486663de224ee02fcc1717b7c19f8da02b03a9b8119d45d767c408fd20dfe2"
+      },
+      "terminal": {
+        "bytes": 977,
+        "path": "/home/zhuhe/litchi-performance-0937/compiler-metadata-v1/retained_baseline_normal-elf-comment.terminal.json",
+        "sha256": "17ae17635dc12c793c2ac2fac27766de92d632955a410701a8a2d286d4a65b0b"
+      }
+    },
+    "rustc_vv": {
+      "argv": [
+        "/home/zhuhe/.cargo/bin/rustc",
+        "+1.95.0",
+        "-Vv"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "end_utc": "2026-10-06T19:44:44.130072+00:00",
+      "exit_code": 0,
+      "start_utc": "2026-10-06T19:44:44.121046+00:00",
+      "stderr": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0937/compiler-metadata-v1/rustc-vv.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 196,
+        "path": "/home/zhuhe/litchi-performance-0937/compiler-metadata-v1/rustc-vv.stdout",
+        "sha256": "4fdff2578428e9c5c08ddd7a0d3079c1a106b1cdaa46e73e46f7cd32b0fb9cad"
+      },
+      "terminal": {
+        "bytes": 804,
+        "path": "/home/zhuhe/litchi-performance-0937/compiler-metadata-v1/rustc-vv.terminal.json",
+        "sha256": "9a1e7b203704d3392b60036994ba3f08b95806d0059accd59ee97182fbc35759"
+      }
+    }
+  },
+  "elf_comment_outputs": {
+    "candidate_allocator_elf_comment": "\nString dump of section '.comment':\n  [     0]  rustc version 1.95.0 (59807616e 2026-04-14)\n  [    2c]  Linker: LLD 22.1.2 (/checkout/src/llvm-project/llvm 1cb4e3833c1919c2e6fb579a23ac0e2b22587b7e)\n  [    8b]  GCC: (Ubuntu 15.2.0-16ubuntu1) 15.2.0\n\n",
+    "candidate_normal_elf_comment": "\nString dump of section '.comment':\n  [     0]  rustc version 1.95.0 (59807616e 2026-04-14)\n  [    2c]  Linker: LLD 22.1.2 (/checkout/src/llvm-project/llvm 1cb4e3833c1919c2e6fb579a23ac0e2b22587b7e)\n  [    8b]  GCC: (Ubuntu 15.2.0-16ubuntu1) 15.2.0\n\n",
+    "retained_baseline_allocator_elf_comment": "\nString dump of section '.comment':\n  [     0]  rustc version 1.95.0 (59807616e 2026-04-14)\n  [    2c]  Linker: LLD 22.1.2 (/checkout/src/llvm-project/llvm 1cb4e3833c1919c2e6fb579a23ac0e2b22587b7e)\n  [    8b]  GCC: (Ubuntu 15.2.0-16ubuntu1) 15.2.0\n\n",
+    "retained_baseline_normal_elf_comment": "\nString dump of section '.comment':\n  [     0]  rustc version 1.95.0 (59807616e 2026-04-14)\n  [    2c]  Linker: LLD 22.1.2 (/checkout/src/llvm-project/llvm 1cb4e3833c1919c2e6fb579a23ac0e2b22587b7e)\n  [    8b]  GCC: (Ubuntu 15.2.0-16ubuntu1) 15.2.0\n\n"
+  },
+  "elf_comment_outputs_equal": true,
+  "lock_sha256": {
+    "perf_baseline": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5",
+    "root": "10cfe9377162d26618ad1c9c2c9028d3444fead3869c7f7d3294663269723ca9",
+    "rustfmt": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3"
+  },
+  "profile_and_flags": {
+    "candidate_allocator": [
+      "/home/zhuhe/.cargo/bin/cargo",
+      "+1.95.0",
+      "build",
+      "--offline",
+      "--locked",
+      "-j2",
+      "--release",
+      "--features",
+      "allocator-metrics",
+      "--bin",
+      "litchi-perf-baseline-alloc",
+      "--manifest-path",
+      "/home/zhuhe/litchi-performance-0937/candidate-source/tools/perf-baseline/Cargo.toml",
+      "--target-dir",
+      "/home/zhuhe/litchi-performance-0937/target-candidate-allocator"
+    ],
+    "candidate_allocator_environment": {
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "LANG": "C.UTF-8",
+      "LC_ALL": "C.UTF-8",
+      "PATH": "/home/zhuhe/.codex/packages/standalone/releases/0.160.1-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.local/bin:/home/zhuhe/.codex/tmp/arg0/codex-arg0tqukeD:/home/zhuhe/.codex/packages/standalone/releases/0.160.1-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0/codex-arg01OELl0:/home/zhuhe/.codex/packages/standalone/releases/0.160.0-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0/codex-arg0bpOmy9:/home/zhuhe/.codex/packages/standalone/releases/0.160.0-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.local/bin:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/1624262_1791179898176/bin:/home/zhuhe/.local/bin:/home/zhuhe/.moon/bin:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/1623971_1791179866663/bin:/home/zhuhe/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/zhuhe/.fzf/bin:/home/zhuhe/go/bin:/home/zhuhe/go/bin",
+      "RUSTFLAGS": "-C force-frame-pointers=yes",
+      "RUST_BACKTRACE": null,
+      "TZ": null
+    },
+    "candidate_normal": [
+      "/home/zhuhe/.cargo/bin/cargo",
+      "+1.95.0",
+      "build",
+      "--offline",
+      "--locked",
+      "-j2",
+      "--release",
+      "--bin",
+      "litchi-perf-baseline",
+      "--manifest-path",
+      "/home/zhuhe/litchi-performance-0937/candidate-source/tools/perf-baseline/Cargo.toml",
+      "--target-dir",
+      "/home/zhuhe/litchi-performance-0937/target-candidate-normal"
+    ],
+    "candidate_normal_environment": {
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "LANG": "C.UTF-8",
+      "LC_ALL": "C.UTF-8",
+      "PATH": "/home/zhuhe/.codex/packages/standalone/releases/0.160.1-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.local/bin:/home/zhuhe/.codex/tmp/arg0/codex-arg0tqukeD:/home/zhuhe/.codex/packages/standalone/releases/0.160.1-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0/codex-arg01OELl0:/home/zhuhe/.codex/packages/standalone/releases/0.160.0-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0/codex-arg0bpOmy9:/home/zhuhe/.codex/packages/standalone/releases/0.160.0-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.local/bin:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/1624262_1791179898176/bin:/home/zhuhe/.local/bin:/home/zhuhe/.moon/bin:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/1623971_1791179866663/bin:/home/zhuhe/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/zhuhe/.fzf/bin:/home/zhuhe/go/bin:/home/zhuhe/go/bin",
+      "RUSTFLAGS": null,
+      "RUST_BACKTRACE": null,
+      "TZ": null
+    },
+    "retained_baseline_allocator": "historical receipt; original environment is not reconstructed",
+    "retained_baseline_normal": "historical receipt; original environment is not reconstructed"
+  },
+  "schema": "litchi.performance.0937.compiler-metadata.v2",
+  "scope": "Read-only compiler selector/version and ELF .comment metadata; no benchmark child executed. Build receipts and their historical/current source identities remain immutable.",
+  "source_revision_scope": "Current candidate build receipts are bound to 0937 e3b5 source; retained baseline receipts remain historical 3ae source and are linked to 0937 baseline by separate runtime-equivalence receipts.",
+  "status": "passed",
+  "tool_versions": {
+    "cargo_stdout": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\n",
+    "rustc_stdout": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "archive": {
+    "bytes": 748268,
+    "path": "/home/zhuhe/litchi-performance-0937/archives/canonical-evidence-v1.tar.zst",
+    "sha256": "11ee88a534cbf202d4cc11a098cfc45b038eb0b0886fbf35726ea51fee86a82f"
+  },
+  "checks": {
+    "input_sources_rehashed": 657,
+    "member_list_exact": true,
+    "tar_members_exact": true,
+    "tar_regular_files_only": true,
+    "zstd_test_exit_code": 0
+  },
+  "completed_utc": "2026-10-06T20:02:46.571043Z",
+  "schema": "litchi.performance.0937.archive-integrity-verify.v1",
+  "terminal": {
+    "bytes": 417,
+    "path": "/home/zhuhe/litchi-performance-0937/receipts/archive-integrity-verify-v1.terminal.json",
+    "sha256": "9ebe90cbb39fd4ed04c15752ddc6f0e6ae7ffe9945e7126e697bcc1f6ce0e246"
+  }
+}

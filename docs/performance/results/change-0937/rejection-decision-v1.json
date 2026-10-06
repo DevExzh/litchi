@@ -1,0 +1,97 @@
+{
+  "schema": "litchi.performance.0937.rejection-decision.v1",
+  "decision": "reject_combined_candidate_due_frozen_normal_p50_safety_failure",
+  "head_before_batch": "e3b5acdd91280b9926f94a61e5d736ad8063422e",
+  "allocation_improvement_gate": {
+    "passed": true,
+    "threshold_each_cell": 0.1,
+    "observed_minimum": 0.15161289402204925,
+    "observed_maximum": 0.3045459388871747,
+    "calls_strictly_lower_all_cells": true,
+    "memory_review_flags": 0
+  },
+  "normal_primary_improvement_gate": {
+    "passed": false,
+    "median_ratio_minimum": 1.05,
+    "observed_median": 1.0068376493437083,
+    "bootstrap_lower95": 1.00496105871505,
+    "bootstrap_upper95": 1.009071228656183,
+    "seed": 937,
+    "draws": 10000
+  },
+  "normal_safety_gate": {
+    "passed": false,
+    "criterion": "every paired block on every route must have candidate/base p50 <=1.05",
+    "failing_pair": "normal-block-03-03-owned_reader",
+    "candidate_over_baseline_p50": 1.053824683156813,
+    "candidate_over_baseline_rss": 1.0571879936808848,
+    "threshold_waived": false
+  },
+  "other_flags": {
+    "p95_pairs": 0,
+    "p99_pairs": 2,
+    "spread_pairs": 11,
+    "rss_pairs": 1
+  },
+  "restored_production": [
+    {
+      "path": "/home/zhuhe/code/litchi/crates/litchi-docx/src/section/codec.rs",
+      "bytes": 76303,
+      "sha256": "dac8d1495653973be53eb2bb971430d87a924e8b9bac9c7d97a59fc0ac3ee886"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/crates/litchi-docx/src/section/footnote_columns/mod.rs",
+      "bytes": 587,
+      "sha256": "56b9f9977c38955a5c15770676bd2e292a15d8b1bbdc33e81b14a5e466b0b9dd"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/crates/litchi-docx/src/section/inventory.rs",
+      "bytes": 61433,
+      "sha256": "69b47f114ed0c95d37072001f0fb950e8cc54e407a6b070c248e2eed9705e36b"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/crates/litchi-docx/src/section/footnote_columns/codec.rs",
+      "bytes": 40435,
+      "sha256": "98886c4f99e541d35aec8e48a96ba4d65304451fe789bcf3b9f11b735497f14d"
+    }
+  ],
+  "restored_equals_head_and_frozen_baseline": true,
+  "new_tests": 0,
+  "existing_regressions_retained": 11,
+  "external_candidate_patch": {
+    "path": "/home/zhuhe/litchi-performance-0937/candidate-combined.patch",
+    "bytes": 6400,
+    "sha256": "6646ab635de68d7cea5e8b38f1c24a29fe0fc77e31122a0bcf03042e8049736d"
+  },
+  "evidence": {
+    "allocator_original": {
+      "path": "/home/zhuhe/litchi-performance-0937/independent-allocator-audit-original-v2.json",
+      "bytes": 29223,
+      "sha256": "e8725175f722b5e9c2489ed988900fe2af57b778df7f34017e5e4e1c112089ba"
+    },
+    "allocator_moved": {
+      "path": "/home/zhuhe/litchi-performance-0937/independent-allocator-audit-moved-v1.json",
+      "bytes": 29229,
+      "sha256": "1a08dc394cb9ea255315fb2faae3f268cb59b1f95d9bfa19ad0e2be4274cbb3c"
+    },
+    "normal_original_and_moved": {
+      "path": "/home/zhuhe/litchi-performance-0937/independent-normal-audit-original-peer-v1.json",
+      "bytes": 275202,
+      "sha256": "3f35db809a8bd9640e9dc4f41bd7873b6180d93e075f983877713ed855d7b637"
+    },
+    "outer_terminal": {
+      "path": "/home/zhuhe/litchi-performance-0937/capture-outer-terminal-v1.json",
+      "bytes": 1837,
+      "sha256": "631f688cd8ed07fc7231cec3819965c4da076997c6a9596b5d0081cff30f669c"
+    },
+    "reduction": {
+      "path": "/home/zhuhe/litchi-performance-0937/formal-reduction-v1.json",
+      "bytes": 26994,
+      "sha256": "5da2eedb91ba646ded6f2bb46ee56215895b167043801a0fd0ce0594c8307819"
+    }
+  },
+  "formal_children": 72,
+  "failed_children": 0,
+  "recaptures": 0,
+  "next_evidence": "Separately plan identical-binary controls to characterize repeated reader-pair variability; no retroactive qualification of0937. Broad non-iWork GOAL remains active."
+}

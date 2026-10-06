@@ -1,5 +1,21 @@
 # Performance hotspot inventory
 
+## 0937 — allocation gains qualified; paired latency safety fails
+
+[0937](0937-docx-combined-fragment-validation.md) measures the combined
+parse-reuse/scanner candidate. Its 15.16–30.45% allocation-request reductions
+pass the improvement gate, but a 5.38% reader-pair p50 regression fails the
+prospectively explicit safety rule. The production change is rejected.
+Reader outliers at different blocks across 0935–0937 motivate a separately
+planned identical-binary variability control before another candidate cohort;
+that control cannot retroactively waive the 0937 failure.
+
+The broader non-iWork queue remains evidence-driven: operation-local
+attribution of the restored CFB repeated-edit path after 0920–0922, and current
+XLSX full-cell fallback attribution after 0891/0899 and the intervening rejected
+candidates. Existing OLE2 range selectors already cover the historical missing
+infrastructure; follow-up must identify current scenario gaps explicitly.
+
 ## 0936 — footnote scanner copies alone miss adoption thresholds
 
 [0936](0936-docx-borrowed-footnote-scanner.md) removes transient event and

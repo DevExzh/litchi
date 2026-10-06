@@ -1,0 +1,82 @@
+{
+  "schema": "litchi.performance.0937.archive-preparation-history.v1",
+  "scope": "Packaging and verification only; no benchmark workload repeated. Final archive is unchanged. Later verification/cleanup records remain outside that archive with descriptors committed here.",
+  "history": [
+    {
+      "version": "v1",
+      "outcome": "Preflight refused a historical binaries-directory receipt reached through the unintentionally included boundary source tree; no tar/compression success claimed."
+    },
+    {
+      "version": "v2",
+      "outcome": "Overbroad archive included boundary-head-candidate-v1; explicitly interrupted during compression after tar completed. Partial output identities preserved, redundant partial archive/snapshot removed after canonical verification."
+    },
+    {
+      "version": "v3",
+      "outcome": "Correct archive excluded boundary source. Verifier then incorrectly rejected the intentionally included committed-evidence snapshot directory."
+    },
+    {
+      "version": "v4",
+      "outcome": "Verifier recognizes explicit committed-evidence snapshot membership. Exact member list,657 input hashes,regular-file-only tar and zstd integrity pass. No canonical archive rewrite."
+    }
+  ],
+  "records": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0937/receipts/archive-v1-preflight-failure.terminal.json",
+      "bytes": 716,
+      "sha256": "59393ff1d315864c7c856b3c861864d857e13b37a18d764385c09ba601dc3aa8"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0937/receipts/archive-v2-interrupted.terminal.json",
+      "bytes": 1268,
+      "sha256": "c567b1bd8f95ac0b11e9e2b90e8062080fb77268f0a2c834ad1335b4e888b131"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0937/receipts/archive-v2-interrupted-artifact-descriptors-v1.json",
+      "bytes": 1590,
+      "sha256": "1bc9182a9a7b8d192febbada696286a7c748d3b6c0a0dc939cd4e4979e6e565b"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0937/receipts/archive-v3-verify-failure.terminal.json",
+      "bytes": 696,
+      "sha256": "49ea94024271f80bb396afc4fdcd53dddbb2fa2aa81d219f7dbb3e7d01446285"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0937/receipts/archive-integrity-verify-v1.json",
+      "bytes": 735,
+      "sha256": "4b5897f253e383750a6a65795a94131bb63d28e93a04ca13417bed77e124b05b"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0937/receipts/archive-integrity-verify-v1.terminal.json",
+      "bytes": 417,
+      "sha256": "9ebe90cbb39fd4ed04c15752ddc6f0e6ae7ffe9945e7126e697bcc1f6ce0e246"
+    }
+  ],
+  "scripts": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0937/archive-cleanup-0937-v1.py",
+      "bytes": 29173,
+      "sha256": "3c74947954d08d03d9d739233a9819146e30b4363481daab32fb638984b82874"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0937/archive-cleanup-0937-v2.py",
+      "bytes": 29189,
+      "sha256": "d9f54282593a4515bdb5330177e2bb553a3a2ae321d5ec357081fdfa4ccb8fa7"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0937/archive-cleanup-0937-v3.py",
+      "bytes": 29223,
+      "sha256": "ae9e197e4ed7074ec22fd4245caff826078f7adae00442ebf5f99820ed701b0d"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0937/archive-cleanup-0937-v4.py",
+      "bytes": 29381,
+      "sha256": "a0b6a50245f393307055ce266063022757d7a736aeb561f25d7269ceecc692a7"
+    }
+  ],
+  "final_archive": {
+    "path": "/home/zhuhe/litchi-performance-0937/archives/canonical-evidence-v1.tar.zst",
+    "bytes": 748268,
+    "sha256": "11ee88a534cbf202d4cc11a098cfc45b038eb0b0886fbf35726ea51fee86a82f"
+  },
+  "shared_checkout_target_touched": false
+}

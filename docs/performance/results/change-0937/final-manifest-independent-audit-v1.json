@@ -1,0 +1,107 @@
+{
+  "capture_authorized": false,
+  "controls": {
+    "allocator_negative_control": true,
+    "bytes": 1599,
+    "capture_started": false,
+    "document_children_started": 0,
+    "exclusive_receipt": true,
+    "path": "/home/zhuhe/litchi-performance-0937/controls-v1.json",
+    "process_group_closure": true,
+    "sha256": "8b323d61adeee13dce46a4bdc4d9e3285cdf9045ebfdb99dfa06e65dc731a605",
+    "status": "passed"
+  },
+  "formal_status": "prospective_unfinished",
+  "historical_fixture_preflight": {
+    "receipt": {
+      "bytes": 2921,
+      "path": "/home/zhuhe/litchi-performance-0937/historical-allocator-preflight-v1.json",
+      "sha256": "0abd71f0b77a62b14ec3e5a8baf7db7efb74a970a0b0fee6772d9069fbe83c57"
+    },
+    "scope": "0936 packet only, in-memory 0936-to-0937 terminal schema adaptation; 24 reports, 72 terminals, and eight negatives passed; no 0937 workload"
+  },
+  "independent_audit": {
+    "receipt": {
+      "bytes": 2134,
+      "path": "/home/zhuhe/litchi-performance-0937/final-manifest-audit-v1.json",
+      "sha256": "41de02e699df3c9ba1ad39677f27ba049cdf3a92c014e2570ecc7bca130e3866"
+    },
+    "regeneration": "PYTHONDONTWRITEBYTECODE=1 python3 -B /home/zhuhe/litchi-performance-0937/run-manifest-audit-0937.py",
+    "result": "recursive manifest descriptors, source/build bindings, runner/validator/plan/control bindings, changed-path set, schedule, and prospective gate fields passed"
+  },
+  "limitations": "The formal manifest is intentionally unauthorized and has no child results; this receipt approves custody and controls only, not performance, adoption, or correctness outcomes.",
+  "manifest": {
+    "bytes": 53213,
+    "descriptor_count": 46,
+    "path": "/home/zhuhe/litchi-performance-0937/formal-manifest-unauthorized-v1.json",
+    "runner_verify_manifest": "passed",
+    "sha256": "08022fb14814fb2d1c9a0363054c0494861f5cbb142357e5d249c8249aea40da"
+  },
+  "quality": {
+    "receipt": {
+      "bytes": 12249,
+      "path": "docs/performance/results/change-0937/quality-independent-audit-v1.json",
+      "sha256": "a60483480120202df96911590d877880bd2a33f2f9d58b6d14940f661d025c22"
+    },
+    "verdict": "all seven isolated baseline/candidate quality checks passed; boundary scan passed; no checkout cargo invocation or workload capture"
+  },
+  "schedule": {
+    "allocator_children": 24,
+    "children": 72,
+    "normal_children": 48,
+    "routes": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader",
+      "range_short"
+    ],
+    "schedule_sha256": "0ac8e13ff21de9d86e8eef800de34ce2f9417e44bae6897c5f0e94bb9003865c"
+  },
+  "schema": "litchi.performance.0937.final-manifest-independent-audit.v1",
+  "scope": "independent pre-capture binding audit; no workload started",
+  "scripts": {
+    "allocator_checker": {
+      "bytes": 39571,
+      "path": "/home/zhuhe/litchi-performance-0937/independent-allocator-check-0937-v1.py",
+      "sha256": "18d187de1c7b79dee5cb690866606989fbbbf1912fe852446c5482db15ed2575"
+    },
+    "gate_correction": {
+      "bytes": 1331,
+      "path": "docs/performance/results/change-0937/comparison-formal-gate-correction-v1.json",
+      "sha256": "01acd7082a8a06462088b4549c337f28b6aeae41ccab0b6797d8001ad9a348c1"
+    },
+    "plan": {
+      "bytes": 24281,
+      "path": "docs/performance/results/change-0937/comparison-plan-v1.json",
+      "sha256": "4a79bb34ba6223506f52300a84ed3dc714e82d13ec7f013e20b4079eba369e9b"
+    },
+    "runner": {
+      "bytes": 82093,
+      "path": "docs/performance/results/change-0937/comparison-runner.py",
+      "sha256": "068e0fa4c3e7851dc6215ca5901f9131755bfcbe027c8b14cb89bcca3bf0080b"
+    },
+    "validator": {
+      "bytes": 39792,
+      "path": "docs/performance/results/change-0937/comparison.py",
+      "sha256": "b70a2b38d098e3abd2b567d1bea70f40e9d27e62acaca8f80ff633dd2c596712"
+    }
+  },
+  "source": {
+    "baseline_files": 10779,
+    "baseline_revision": "3ae856d76424f2f9b58d26dcd20fd074b8e97541",
+    "candidate_files": 10779,
+    "candidate_revision": "e3b5acdd91280b9926f94a61e5d736ad8063422e",
+    "changed_paths": [
+      "crates/litchi-docx/src/section/codec.rs",
+      "crates/litchi-docx/src/section/inventory.rs",
+      "crates/litchi-docx/src/section/footnote_columns/mod.rs",
+      "crates/litchi-docx/src/section/footnote_columns/codec.rs"
+    ],
+    "full_listing": {
+      "bytes": 3729629,
+      "path": "/home/zhuhe/litchi-performance-0937/source-manifest-v1.jsonl",
+      "sha256": "0a1853c31d32e81e8cd05eaf907b31238b34dd93785fb51b9b15f3aa26eb51703"
+    }
+  },
+  "status": "passed"
+}

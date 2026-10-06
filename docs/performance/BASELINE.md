@@ -1,5 +1,17 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0937 — combined validation candidate fails paired latency safety
+
+[0937](0937-docx-combined-fragment-validation.md) combines private inventory
+parse reuse and borrowed footnote scanner state in a new 72-child comparison.
+Construction requested bytes fall 15.16–30.45%, with fewer calls in every cell
+and no allocator memory flags. The primary latency ratio is 1.006838, below
+1.05, and one reader pair regresses 5.38% at p50 and 5.72% in RSS. The frozen
+per-pair p50 safety rule prevents adoption despite the allocation gains.
+All four production files are restored. Independent original/moved replay,
+1,936 candidate tests and 78 doctests pass. The retained source exactly matches
+the previously tested baseline; no new test is added in this batch.
+
 ## 0936 — footnote scanner borrowing evaluated and rejected
 
 [0936](0936-docx-borrowed-footnote-scanner.md) evaluates borrowed transient XML

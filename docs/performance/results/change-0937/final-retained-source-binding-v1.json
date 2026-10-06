@@ -1,0 +1,57 @@
+{
+  "current_checkout": {
+    "docx_aggregate_sha256": "496bec569a1edff53e42e8b245338019a7b35908cbb2cf0a2cbbc20479674836",
+    "docx_bytes": 11063620,
+    "docx_file_count": 450,
+    "docx_root": "/home/zhuhe/code/litchi/crates/litchi-docx",
+    "head": "e3b5acdd91280b9926f94a61e5d736ad8063422e",
+    "production_paths_equal_head": true
+  },
+  "current_quality_binding": {
+    "baseline_focused_check": "passed",
+    "no_new_all_targets_run": true,
+    "receipt": {
+      "bytes": 12249,
+      "path": "docs/performance/results/change-0937/quality-independent-audit-v1.json",
+      "sha256": "a60483480120202df96911590d877880bd2a33f2f9d58b6d14940f661d025c22"
+    }
+  },
+  "historical_quality": {
+    "audit": {
+      "bytes": 3051,
+      "path": "/home/zhuhe/litchi-performance-0936/final-retained-baseline-quality-audit-v1.json",
+      "sha256": "a03de6d8c4c589cfaadac69f49dce8bac954b485a11957abf55f41095edc2ff8"
+    },
+    "benchmark_children_started": 0,
+    "command": "cargo +1.95.0 test --offline --locked -j2 -p litchi-docx --all-targets",
+    "exit_code": 0,
+    "failed": 0,
+    "historical_reuse_explicit": true,
+    "ignored": 1,
+    "passed": 1936,
+    "result": {
+      "bytes": 1672,
+      "path": "/home/zhuhe/litchi-performance-0936/committed-evidence-v1/change-0936/final-retained-baseline-quality-v1.json",
+      "sha256": "7060f8bcf8c62b782410232a6f16754b1895b7cc24ee6309b2d9d1163e1e08b7"
+    },
+    "source_unchanged": true,
+    "terminal": {
+      "bytes": 1529,
+      "path": "/home/zhuhe/litchi-performance-0936/quality/final-retained-baseline-all-targets-v1-terminal.json",
+      "sha256": "92cf9db4bce893820cb02eaceef5da87988aaba77b19b40aad511afdb8d0853b"
+    },
+    "terminal_first": true,
+    "timed_out": false
+  },
+  "limitations": "This binds the current retained DOCX source and the prior terminal-first 0936 all-targets result. It makes no candidate performance or adoption claim.",
+  "retained_baseline_source": {
+    "aggregate_sha256": "496bec569a1edff53e42e8b245338019a7b35908cbb2cf0a2cbbc20479674836",
+    "bytes": 11063620,
+    "file_count": 450,
+    "file_names_and_sha256_equal_current_checkout": true,
+    "root": "/home/zhuhe/litchi-performance-0936/baseline-source/crates/litchi-docx"
+  },
+  "schema": "litchi.performance.0937.final-retained-source-binding.v1",
+  "scope": "final retained baseline source binding after 0937 rejection; no new cargo run or benchmark",
+  "status": "passed"
+}

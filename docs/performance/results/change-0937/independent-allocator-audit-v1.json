@@ -1,0 +1,171 @@
+{
+  "audit_outputs": {
+    "moved": {
+      "bytes": 29229,
+      "path": "/home/zhuhe/litchi-performance-0937/independent-allocator-audit-moved-v1.json",
+      "sha256": "1a08dc394cb9ea255315fb2faae3f268cb59b1f95d9bfa19ad0e2be4274cbb3c"
+    },
+    "original": {
+      "bytes": 29223,
+      "path": "/home/zhuhe/litchi-performance-0937/independent-allocator-audit-original-v2.json",
+      "sha256": "e8725175f722b5e9c2489ed988900fe2af57b778df7f34017e5e4e1c112089ba"
+    },
+    "semantic_equal_except_packet_path": true
+  },
+  "capture_terminal": {
+    "authorized_manifest": {
+      "bytes": 53212,
+      "path": "/home/zhuhe/litchi-performance-0937/formal-manifest-authorized-v1.json",
+      "sha256": "630de12a806a694dbcffea2582025766fa79a6b937ff87a0690c58c329e69906"
+    },
+    "outer_terminal": {
+      "bytes": 1837,
+      "children_failed": 0,
+      "children_passed": 72,
+      "exit_code": 0,
+      "path": "/home/zhuhe/litchi-performance-0937/capture-outer-terminal-v1.json",
+      "retries": 0,
+      "sha256": "631f688cd8ed07fc7231cec3819965c4da076997c6a9596b5d0081cff30f669c"
+    }
+  },
+  "cells": [
+    {
+      "baseline_calls": 28398,
+      "baseline_requested_bytes": 2108662,
+      "candidate_calls": 21302,
+      "candidate_requested_bytes": 1628830,
+      "max_rss_ratio": 0.9881026925485284,
+      "ownership": "shared_snapshot_clones",
+      "requested_bytes_reduction_fraction": 0.22755282733790433,
+      "sections": 16
+    },
+    {
+      "baseline_calls": 47928,
+      "baseline_requested_bytes": 5607808,
+      "candidate_calls": 35344,
+      "candidate_requested_bytes": 4757592,
+      "max_rss_ratio": 1.004646840148699,
+      "ownership": "independent_sources",
+      "requested_bytes_reduction_fraction": 0.15161289402204925,
+      "sections": 16
+    },
+    {
+      "baseline_calls": 11875584,
+      "baseline_requested_bytes": 800608673,
+      "candidate_calls": 8262872,
+      "candidate_requested_bytes": 556786553,
+      "max_rss_ratio": 1.0044557606619988,
+      "ownership": "shared_snapshot_clones",
+      "requested_bytes_reduction_fraction": 0.3045459388871747,
+      "sections": 8192
+    },
+    {
+      "baseline_calls": 21109592,
+      "baseline_requested_bytes": 1425467600,
+      "candidate_calls": 14687024,
+      "candidate_requested_bytes": 992008872,
+      "max_rss_ratio": 1.0130355154953854,
+      "ownership": "independent_sources",
+      "requested_bytes_reduction_fraction": 0.30408178200612906,
+      "sections": 8192
+    }
+  ],
+  "checker": {
+    "bytes": 39571,
+    "path": "/home/zhuhe/litchi-performance-0937/independent-allocator-check-0937-v1.py",
+    "sha256": "18d187de1c7b79dee5cb690866606989fbbbf1912fe852446c5482db15ed2575"
+  },
+  "initial_direct_tool_completion": {
+    "moved_output": {
+      "bytes": 29229,
+      "path": "/home/zhuhe/litchi-performance-0937/independent-allocator-audit-moved-v1.json",
+      "sha256": "1a08dc394cb9ea255315fb2faae3f268cb59b1f95d9bfa19ad0e2be4274cbb3c"
+    },
+    "original_output": {
+      "bytes": 29223,
+      "path": "/home/zhuhe/litchi-performance-0937/independent-allocator-audit-original-v2.json",
+      "sha256": "e8725175f722b5e9c2489ed988900fe2af57b778df7f34017e5e4e1c112089ba"
+    },
+    "original_v1_attempt": {
+      "reason": "exec command rejected before checker launch; no workload or packet mutation",
+      "status": "not_executed"
+    },
+    "provenance": "The first direct functions.exec invocation was rejected before process launch because its compound command used an rm-style command; the checker did not run and no output was created or changed. The subsequent original-v2 and moved-v1 outputs were produced by direct tool completion without persisted terminal descriptors and are retained unchanged."
+  },
+  "limits": "Allocator result only. It does not establish normal-lane latency/adoption; that gate is audited separately.",
+  "packet_equivalence": {
+    "moved": {
+      "bytes": 4380460,
+      "files": 521,
+      "path": "/home/zhuhe/litchi-performance-0937/formal-packet-v1-moved"
+    },
+    "original": {
+      "bytes": 4380460,
+      "files": 521,
+      "path": "/home/zhuhe/litchi-performance-0937/formal-packet-v1"
+    },
+    "packet_manifest_sha256": "208ca54f7b4a47e5e27667c042b2145ac02c6850a9adc28f44567331ffc2fe24",
+    "relative_file_names_equal": true,
+    "relative_file_sha256_and_sizes_equal": true
+  },
+  "phase_peak_observation": {
+    "absolute_peak_delta_bytes_candidate_minus_baseline": "uniform +2 in checker rows",
+    "interpretation": "reported for audit completeness; checker memory review emitted no flags",
+    "region_peak_delta_bytes_candidate_minus_baseline": "uniform +2 in checker rows"
+  },
+  "regeneration": "PYTHONDONTWRITEBYTECODE=1 python3 -B /home/zhuhe/litchi-performance-0937/independent-allocator-check-0937-v1.py --packet <packet> --output <receipt>",
+  "schema": "litchi.performance.0937.independent-allocator-audit.v1",
+  "scope": "independent offline allocator audit of the completed 0937 packet and its moved copy; no workload or recapture",
+  "status": "passed",
+  "terminal_and_controls": {
+    "allocation_gate_pass": true,
+    "allocator_rows_verified": 24,
+    "correctness_and_counter_conservation": true,
+    "fixture_output_cap_equality": true,
+    "max_observed_candidate_to_baseline_rss_ratio": 1.0130355154953854,
+    "memory_review_flags": [],
+    "memory_review_required": false,
+    "negative_controls": 8,
+    "negative_controls_all_rejected": true,
+    "rss_review_threshold_ratio": 1.05,
+    "terminal_rows_verified": 72
+  },
+  "terminal_revalidation": {
+    "moved": {
+      "exit_code": 0,
+      "output": {
+        "bytes": 29229,
+        "path": "/home/zhuhe/litchi-performance-0937/independent-allocator-audit-moved-terminal-v1.json",
+        "sha256": "1a08dc394cb9ea255315fb2faae3f268cb59b1f95d9bfa19ad0e2be4274cbb3c"
+      },
+      "stderr_bytes": 0,
+      "terminal": {
+        "bytes": 1405,
+        "path": "/home/zhuhe/litchi-performance-0937/allocator-audit-moved-terminal-v1/terminal.json",
+        "sha256": "2a3653265e541bfd3223789b4e8d5bd8e4091caf421f8941ec901fd40a18b7b1"
+      }
+    },
+    "original": {
+      "exit_code": 0,
+      "output": {
+        "bytes": 29223,
+        "path": "/home/zhuhe/litchi-performance-0937/independent-allocator-audit-original-terminal-v1.json",
+        "sha256": "e8725175f722b5e9c2489ed988900fe2af57b778df7f34017e5e4e1c112089ba"
+      },
+      "stderr_bytes": 0,
+      "terminal": {
+        "bytes": 1414,
+        "path": "/home/zhuhe/litchi-performance-0937/allocator-audit-original-terminal-v1/terminal.json",
+        "sha256": "5da22dc0d13fbff92cd344e4db8f6de0f62f856c86a527b135fc4ce40a56f90d"
+      }
+    },
+    "regeneration": "PYTHONDONTWRITEBYTECODE=1 python3 -B /home/zhuhe/litchi-performance-0937/run-independent-allocator-audit-terminal-v1.py",
+    "scope": "offline checker revalidation only; no workload or recapture",
+    "terminal_first": true,
+    "wrapper": {
+      "bytes": 2406,
+      "path": "/home/zhuhe/litchi-performance-0937/run-independent-allocator-audit-terminal-v1.py",
+      "sha256": "750f6eb9ec8f9479868d2fbccd467190bdb16ab5775f9a184557c394d30f1909"
+    }
+  }
+}

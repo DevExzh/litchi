@@ -1,0 +1,177 @@
+{
+  "adr_scope": "Applicable accepted non-iWork ADRs were read through docs/adr/README.md; iWork-only amendments/records are excluded from this DOCX measurement.",
+  "build_binding": {
+    "baseline_allocator": {
+      "bytes": 5191,
+      "path": "/home/zhuhe/litchi-performance-0933/receipts/fresh_candidate_allocator-final-v3.json",
+      "sha256": "3618e44b611dc69f3b5cf455de1c20c1d40df32d871a91a75c55d31d030b1f03"
+    },
+    "baseline_normal": {
+      "bytes": 5956,
+      "path": "/home/zhuhe/litchi-performance-0937/receipts/baseline-normal-build-bound-v1.json",
+      "sha256": "26e9592fe312ca097d10effa0a0251ffc911182851e3b4d4f81a41cbb44bd0ca"
+    },
+    "binary_hashes": {
+      "baseline_allocator": "927df9a232ef6f827aef71216a6e3d2b694204a50ea41fa2d6e9bc7bdbc519e9",
+      "baseline_normal": "8a81df641151e5ed06b8f700c5d4cf068d0fee9c9e131fa147bf707a799c4c66",
+      "candidate_allocator": "9245cdc6af8f84e3e98ba8004d2adb7d65499acba31a426891a52312c0028a43",
+      "candidate_normal": "5589ae16db8839b0d7481a4557010e113e3a6396f720f32aba92264011165554"
+    },
+    "candidate_allocator": {
+      "bytes": 6841,
+      "path": "/home/zhuhe/litchi-performance-0937/receipts/candidate-allocator-build-bound-v1.json",
+      "sha256": "123de045cebdb8b77dea7dd8bb1839105520554849ca5f1b0ce4a8952cdd9fdc"
+    },
+    "candidate_normal": {
+      "bytes": 6669,
+      "path": "/home/zhuhe/litchi-performance-0937/receipts/candidate-normal-build-bound-v1.json",
+      "sha256": "ba487338a47aee20ae6c3dd435240443e02e90a6cd0b42134ae22b9d878aca2e"
+    },
+    "compiler_metadata": {
+      "bytes": 15536,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0937/compiler-metadata-v2.json",
+      "sha256": "f8caea79a8113209e931bc751c2b57ea3952f8628d1cafd7187157759c1aad7d"
+    }
+  },
+  "capture_authorized": false,
+  "checks": {
+    "build_receipts": {
+      "candidate_allocator_exit": 0,
+      "candidate_normal_exit": 0,
+      "retained_baseline_equivalence": "passed",
+      "status": "passed"
+    },
+    "controls": {
+      "bytes": 1599,
+      "path": "/home/zhuhe/litchi-performance-0937/controls-v1.json",
+      "sha256": "8b323d61adeee13dce46a4bdc4d9e3285cdf9045ebfdb99dfa06e65dc731a605"
+    },
+    "historical_allocator_preflight": {
+      "bytes": 2921,
+      "note": "Receipt hash supplied by independent preflight; artifact size was not re-read in this turn.",
+      "path": "/home/zhuhe/litchi-performance-0937/historical-allocator-preflight-v1.json",
+      "sha256": "0abd71f0b77a62b14ec3e5a8baf7db7efb74a970a0b0fee6772d9069fbe83c57"
+    },
+    "schedule": {
+      "allocator_children": 24,
+      "children": 72,
+      "cpu": 12,
+      "normal_children": 48,
+      "samples": 50,
+      "schedule_sha256": "0ac8e13ff21de9d86e8eef800de34ce2f9417e44bae6897c5f0e94bb9003865c",
+      "status": "passed",
+      "warmups": 5
+    },
+    "source_receipts": {
+      "baseline_bytes": 259962058,
+      "baseline_files": 10779,
+      "candidate_bytes": 259962928,
+      "candidate_files": 10779,
+      "changed_paths": 4,
+      "status": "passed"
+    }
+  },
+  "commands": {
+    "controls": "PYTHONDONTWRITEBYTECODE=1 python3 -B docs/performance/results/change-0937/comparison-runner.py controls --manifest /home/zhuhe/litchi-performance-0937/formal-manifest-unauthorized-v1.json --output /home/zhuhe/litchi-performance-0937/controls-v1.json",
+    "freeze": "PYTHONDONTWRITEBYTECODE=1 python3 -B docs/performance/results/change-0937/comparison-runner.py freeze --manifest /home/zhuhe/litchi-performance-0937/formal-manifest-unauthorized-v1.json --plan docs/performance/results/change-0937/comparison-plan-v1.json --gate-correction docs/performance/results/change-0937/comparison-formal-gate-correction-v1.json --baseline-source-receipt /home/zhuhe/litchi-performance-0937/receipts/baseline-source-final-v1.json --candidate-source-receipt /home/zhuhe/litchi-performance-0937/receipts/candidate-source-final-v1.json --baseline-build-receipt /home/zhuhe/litchi-performance-0937/receipts/baseline-normal-build-bound-v1.json --candidate-build-receipt /home/zhuhe/litchi-performance-0937/receipts/candidate-normal-build-bound-v1.json --baseline-allocator-build-receipt /home/zhuhe/litchi-performance-0933/receipts/fresh_candidate_allocator-final-v3.json --candidate-allocator-build-receipt /home/zhuhe/litchi-performance-0937/receipts/candidate-allocator-build-bound-v1.json --allocator-equivalence /home/zhuhe/litchi-performance-0937/retained-allocator-runtime-equivalence-v1.json",
+    "schedule": "PYTHONDONTWRITEBYTECODE=1 python3 -B docs/performance/results/change-0937/comparison-runner.py check-schedule"
+  },
+  "evidence_policy": "Raw source listing, binaries, build logs, and future packet remain external under /home/zhuhe/litchi-performance-0937; only this compact descriptor and other sub-1MiB tooling records belong in the repository.",
+  "formal_children_run": 0,
+  "schema": "litchi.performance.0937.comparison-tooling-validation.v1",
+  "scope": "Source/build custody, schedule, validator, negative controls, and unauthorized freeze manifest are complete. No comparative workload child was started by this validation.",
+  "source_binding": {
+    "base_revision": "3ae856d76424f2f9b58d26dcd20fd074b8e97541",
+    "baseline_receipt": {
+      "bytes": 3129,
+      "path": "/home/zhuhe/litchi-performance-0937/receipts/baseline-source-final-v1.json",
+      "sha256": "7c05ace57d66de90ac3657855d62bf5683e058522b2bfdc2f30a4c22a55fc2bb"
+    },
+    "candidate_patch": {
+      "bytes": 6400,
+      "path": "/home/zhuhe/litchi-performance-0937/candidate-combined.patch",
+      "sha256": "6646ab635de68d7cea5e8b38f1c24a29fe0fc77e31122a0bcf03042e8049736d"
+    },
+    "candidate_receipt": {
+      "bytes": 3633,
+      "path": "/home/zhuhe/litchi-performance-0937/receipts/candidate-source-final-v1.json",
+      "sha256": "d45eb2a4561ce3fffabdf24a27630129b40aa122ba4ed33f9cdada8e70628a2e"
+    },
+    "candidate_revision": "e3b5acdd91280b9926f94a61e5d736ad8063422e",
+    "changed_paths": [
+      "crates/litchi-docx/src/section/codec.rs",
+      "crates/litchi-docx/src/section/inventory.rs",
+      "crates/litchi-docx/src/section/footnote_columns/mod.rs",
+      "crates/litchi-docx/src/section/footnote_columns/codec.rs"
+    ],
+    "full_listing": {
+      "bytes": 3729629,
+      "path": "/home/zhuhe/litchi-performance-0937/source-manifest-v1.jsonl",
+      "sha256": "0a185c31d32e81e8cd05eaf907b31238b34dd93785fb51b9b15f3aa26eb51703"
+    },
+    "historical_setup_note": "0936 differential was accidentally regenerated during 0937 preparation and restored byte-for-byte from canonical-evidence-v1.tar; restored SHA cfa586be2a597ba5744b7da6b034468ebea1730bdc786912d44e697d9d6bbb30. No 0936 evidence is overwritten.",
+    "retained_allocator_runtime_equivalence": {
+      "bytes": 2484,
+      "path": "/home/zhuhe/litchi-performance-0937/retained-allocator-runtime-equivalence-v1.json",
+      "sha256": "14eca9c4c843a7c22168f8f6cfdf1bdc14c05f80393411ba00c07b6ed1dffb18"
+    },
+    "retained_normal_runtime_equivalence": {
+      "bytes": 3036,
+      "path": "/home/zhuhe/litchi-performance-0937/retained-baseline-runtime-equivalence-v1.json",
+      "sha256": "e0d3b32f7eac59b175986d43027fd19490991832ad77987a1f63ed2a867a2a10"
+    },
+    "snapshot_differential": {
+      "bytes": 2978,
+      "path": "/home/zhuhe/litchi-performance-0937/source-snapshot-differential-v1.json",
+      "sha256": "5ebba53693a39133028e3b1e2b983c77ac0bc719bda2e5e58d11162fb3c29f63"
+    }
+  },
+  "status": "pre_capture_ready",
+  "tooling": {
+    "allocator_checker": {
+      "bytes": 39571,
+      "path": "/home/zhuhe/litchi-performance-0937/independent-allocator-check-0937-v1.py",
+      "sha256": "18d187de1c7b79dee5cb690866606989fbbbf1912fe852446c5482db15ed2575"
+    },
+    "build_receipt_adapter": {
+      "bytes": 5441,
+      "path": "/home/zhuhe/litchi-performance-0937/adapt-build-receipts-v1.py",
+      "sha256": "be8d71205ceea9b74cc1d38205f5f60d821d7516c96f890ffc2b94446526aef2"
+    },
+    "gate_correction": {
+      "bytes": 1331,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0937/comparison-formal-gate-correction-v1.json",
+      "sha256": "01acd7082a8a06462088b4549c337f28b6aeae41ccab0b6797d8001ad9a348c1"
+    },
+    "normal_audit": {
+      "bytes": 33699,
+      "path": "/home/zhuhe/litchi-performance-0937/independent-normal-audit-v1.py",
+      "sha256": "f7653aa3edaba4f179d7ce7e1acc2e6b1234a1ecc0aea775ec9c6dd79057acd5"
+    },
+    "plan": {
+      "bytes": 24281,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0937/comparison-plan-v1.json",
+      "sha256": "4a79bb34ba6223506f52300a84ed3dc714e82d13ec7f013e20b4079eba369e9b"
+    },
+    "retained_normal_adapter": {
+      "bytes": 4865,
+      "path": "/home/zhuhe/litchi-performance-0937/adapt-retained-normal-v1.py",
+      "sha256": "c0173b804a21b73b6a2ee94a9d83fd20e1db7b52767dd8e590ada39879d9d0af"
+    },
+    "runner": {
+      "bytes": 82093,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0937/comparison-runner.py",
+      "sha256": "068e0fa4c3e7851dc6215ca5901f9131755bfcbe027c8b14cb89bcca3bf0080b"
+    },
+    "validator": {
+      "bytes": 39792,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0937/comparison.py",
+      "sha256": "b70a2b38d098e3abd2b567d1bea70f40e9d27e62acaca8f80ff633dd2c596712"
+    }
+  },
+  "unauthorized_manifest": {
+    "bytes": 53213,
+    "path": "/home/zhuhe/litchi-performance-0937/formal-manifest-unauthorized-v1.json",
+    "sha256": "08022fb14814fb2d1c9a0363054c0494861f5cbb142357e5d249c8249aea40da"
+  }
+}

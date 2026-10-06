@@ -1,0 +1,428 @@
+{
+  "adr_scope": {
+    "applicable_non_iwork": [
+      "0001",
+      "0002",
+      "0003",
+      "0004",
+      "0005",
+      "0006",
+      "0007",
+      "0008",
+      "0010",
+      "0011",
+      "0024",
+      "0030",
+      "0031",
+      "0032"
+    ],
+    "constraints": [
+      "lossless preservation and typed refusal precede speed",
+      "private reuse cannot change public API, lazy semantic timing, source identity, or error order",
+      "all resource/cancellation/size limits remain bounded and fail closed",
+      "allocation and latency evidence must be representative, paired, and hash-bound",
+      "iWork-only amendments/records are outside this DOCX measurement scope",
+      "0935 rejection is historical evidence only; it does not authorize reuse of its rejected parse-reuse patch or relaxed gates."
+    ],
+    "readme": "docs/adr/README.md"
+  },
+  "allocator_lane": {
+    "children": 24,
+    "concurrent_commits": 8,
+    "cpu": "12",
+    "deadline_seconds": 600,
+    "metric_scope": "Whole-process allocator gauges and max RSS; construction deltas are after_snapshot_drop absolute allocated_bytes/allocation_calls minus baseline, not absolute process totals.",
+    "ownership": [
+      "shared_snapshot_clones",
+      "independent_sources"
+    ],
+    "pair_unit": "same sections, ownership, and repetition; version order alternates by repetition",
+    "policy": "exact",
+    "raw_held_across_footnote_focus": "Retain after_snapshot_drop, commits_retained, releaseN-1, release_last, and drop gauges so raw-source retention across footnote/section work is visible; do not infer a phase attribution from these checkpoints.",
+    "repetitions_per_cell_per_version": 3,
+    "required_metrics": [
+      "baseline and every checkpoint gauges",
+      "construction_requested_bytes_delta",
+      "construction_allocation_calls_delta",
+      "region_peak_live_bytes at creation/release endpoints",
+      "max RSS from terminal time record",
+      "logical retained base bytes",
+      "source sharing/validation counters"
+    ],
+    "samples_per_child": 1,
+    "secondary_allocation_gate": {
+      "construction_allocation_calls": "strictly lower in every cell",
+      "construction_requested_bytes_reduction": "at least 0.10 in every cell",
+      "correctness": "required",
+      "no_latency_claim": true
+    },
+    "sections": [
+      16,
+      8192
+    ],
+    "warmups_per_child": 0
+  },
+  "build_binding": {
+    "candidate_allocator": {
+      "binary": {
+        "bytes": 68454648,
+        "path": "/home/zhuhe/litchi-performance-0937/target-candidate-allocator/release/litchi-perf-baseline-alloc",
+        "sha256": "9245cdc6af8f84e3e98ba8004d2adb7d65499acba31a426891a52312c0028a43"
+      },
+      "bytes": 6841,
+      "path": "/home/zhuhe/litchi-performance-0937/receipts/candidate-allocator-build-bound-v1.json",
+      "sha256": "123de045cebdb8b77dea7dd8bb1839105520554849ca5f1b0ce4a8952cdd9fdc"
+    },
+    "candidate_normal": {
+      "binary": {
+        "bytes": 69940560,
+        "path": "/home/zhuhe/litchi-performance-0937/target-candidate-normal/release/litchi-perf-baseline",
+        "sha256": "5589ae16db8839b0d7481a4557010e113e3a6396f720f32aba92264011165554"
+      },
+      "bytes": 6669,
+      "path": "/home/zhuhe/litchi-performance-0937/receipts/candidate-normal-build-bound-v1.json",
+      "sha256": "ba487338a47aee20ae6c3dd435240443e02e90a6cd0b42134ae22b9d878aca2e"
+    },
+    "candidate_source_revision": "e3b5acdd91280b9926f94a61e5d736ad8063422e",
+    "terminal_exit_codes": {
+      "allocator": 0,
+      "normal": 0
+    }
+  },
+  "change": "0937",
+  "claim_scope": "Prospective 48-child paired normal lane plus 24-child allocator lane; no timing, allocation, RSS, or adoption claim until all terminal records, semantic validation, and moved-packet replay pass.",
+  "corpus_and_correctness": {
+    "allocator_fixtures": {
+      "16": {
+        "required_retained_base_bytes": 7280,
+        "source_archive_bytes": 1052,
+        "source_archive_sha256": "ac0e4a784d75f16c3c3d7f203e6f2a92b505b28d7db965b7a4ff54ad61f52726"
+      },
+      "8192": {
+        "required_retained_base_bytes": 3580192,
+        "source_archive_bytes": 25498,
+        "source_archive_sha256": "92b5b61c00568e1b104b8096d1ce06ca5bc247cacf037561b3752e3657bd67f3"
+      }
+    },
+    "normal": {
+      "archive_bytes": 2101427,
+      "archive_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+      "expected_output_bytes": 2101446,
+      "expected_output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec"
+    },
+    "required_report_contracts": [
+      "schema docx_section_retention_v1",
+      "exact source/output/inverse/shape identity",
+      "boundary checks verified",
+      "overflowed=false and observer_invalid=false",
+      "monotone allocator gauges and live-byte conservation",
+      "region peak is present at creation/release endpoints and absent at commits_retained",
+      "returned_to_baseline=true and final live bytes equal baseline",
+      "shared/independent source sharing and measured validation counts match frozen fixtures"
+    ]
+  },
+  "created_utc": "2026-10-06T19:32:14.190070+00:00",
+  "evidence_policy": "No benchmark binary or artifact >=1 MiB is written under docs/performance/results. Repository receives only compact plans/receipts; raw packet, source listing, profiles, logs, and binaries stay under /home/zhuhe/litchi-performance-0937.",
+  "failure_and_replay": {
+    "failed_child": "preserve terminal, streams, report, and validation; invalidate interpretation rather than replacing the child",
+    "large_artifacts": "all raw reports, logs, source listing, profiles, and archives remain external with size/SHA/regeneration descriptors",
+    "moved_replay": "rehash copied source/build/runner/manifest/report/terminal/stream descriptors and recompute summaries from relative packet paths",
+    "observation_timeout": "poll the same process; only confirmed deadline may terminate it",
+    "packet": "/home/zhuhe/litchi-performance-0937/formal-packet-v1",
+    "retry_or_recapture": false,
+    "terminal_first": true
+  },
+  "hypothesis": "The reviewed combined candidate exposes one raw section topology to inventory semantic decoding and borrows footnote scanner events/resolver state, reducing duplicate fragment parsing and transient event/resolver copies while preserving validation order, lazy errors, namespace context, source spans, limits, tolerance mapping, exact output, and refusal behavior.",
+  "normal_lane": {
+    "blocks": 6,
+    "children": 48,
+    "cpu": "12",
+    "deadline_seconds": 900,
+    "no_selective_recapture": true,
+    "normal_guardrails": "For every route and every paired block, candidate_p50 / baseline_p50 <=1.05; p95/p99/spread and max RSS increases >5% are review flags.",
+    "optional_latency_gate": "Primary latency gate: generic_read_at baseline_p50 / candidate_p50 >=1.05 with nearest-rank bootstrap lower 95% >1.0; seed 937, 10000 paired draws. The 1.05 p50 safety guardrail is checked for every route in every paired block; p95/p99/spread, RSS and named peak increases >5% require review.",
+    "pair_unit": "same route, block, and position; version order alternates by block",
+    "primary_statistic": "baseline_p50 / candidate_p50; primary route generic_read_at",
+    "route_order_even": [
+      "range_short",
+      "owned_reader",
+      "owned_vec",
+      "generic_read_at"
+    ],
+    "route_order_odd": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader",
+      "range_short"
+    ],
+    "routes": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader",
+      "range_short"
+    ],
+    "samples_per_child": 50,
+    "selector_env": "LITCHI_DOCX_INGRESS_ROUTE",
+    "warmups_per_child": 5
+  },
+  "planned_commands": {
+    "baseline_allocator_provenance": "Use retained 0933 candidate-allocator binary only through its immutable 0933 receipt/equivalence review and the 0937 source closure.",
+    "baseline_normal_provenance": "Use retained 0933 candidate-normal binary only through its immutable 0933 receipt and the 0937 retained-baseline runtime-equivalence review.",
+    "candidate_allocator_build": "PYTHONDONTWRITEBYTECODE=1 python3 -B /home/zhuhe/litchi-performance-0937/build-candidate-v1.py --lane allocator",
+    "candidate_normal_build": "PYTHONDONTWRITEBYTECODE=1 python3 -B /home/zhuhe/litchi-performance-0937/build-candidate-v1.py --lane normal",
+    "capture": "Not authorized by this plan; only after final test review, source/build custody, controls, and a root-authorized immutable manifest.",
+    "normal_baseline_reuse": "Revalidate retained 0933 candidate binaries against the 0937 baseline-source runtime closure and explicit test-only equivalence receipts; do not rebuild the historical baseline or capture before source review."
+  },
+  "purpose": "Measure the combined private inventory fragment parse reuse and borrowed footnote scanner candidate against the retained adopted DOCX runtime. The candidate must preserve independent validation, lazy public semantic timing, namespace/markup-compatibility behavior, source spans, limits, refusal order, authored bytes, and atomic publication. The rejected standalone 0935 and 0936 cohorts remain historical evidence; this is a fresh combined comparison.",
+  "reusable_tooling": {
+    "adaptation": "0937 adaptation of the final 0936 runner/checker: new external root, source/build paths, four-file allowlist, seed 937, and the same 10% allocator gate. No earlier broken scripts or controls are reused.",
+    "adapted_runner": {
+      "bytes": 82093,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0937/comparison-runner.py",
+      "sha256": "068e0fa4c3e7851dc6215ca5901f9131755bfcbe027c8b14cb8bcca3bf0080b",
+      "status": "adapted final 0936 runner; capture remains unauthorized"
+    },
+    "build_receipt_adapter": {
+      "bytes": 5441,
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -B /home/zhuhe/litchi-performance-0937/adapt-build-receipts-v1.py --lane {normal|allocator}",
+      "path": "/home/zhuhe/litchi-performance-0937/adapt-build-receipts-v1.py",
+      "role": "normalizes custom terminal-first v2 receipts without rewriting originals",
+      "sha256": "be8d71205ceea9b74cc1d38205f5f60d821d7516c96f890ffc2b94446526aef2"
+    },
+    "compiler_metadata": {
+      "bytes": 15536,
+      "path": "docs/performance/results/change-0937/compiler-metadata-v2.json",
+      "scope": "Current read-only compiler/ELF metadata collection; retained baseline build source identity remains historical 3ae and candidate build identity is e3b5.",
+      "sha256": "f8caea79a8113209e931bc751c2b57ea3952f8628d1cafd7187157759c1aad7d"
+    },
+    "control_fixture": {
+      "bytes": 7376,
+      "path": "/home/zhuhe/litchi-performance-0937/fixtures/allocator-section-08192-shared_snapshot_clones-rep-01-baseline-report.json",
+      "role": "copied immutable baseline allocator report with source_revision=3ae856d... for no-workload validator controls; prior 0935-source fixture retained as historical setup input",
+      "sha256": "4cc72e725cc061f7cea7e4219c79f870bd496307725582b2db3c36d8428b7f8e"
+    },
+    "independent_checker": {
+      "bytes": 39571,
+      "path": "/home/zhuhe/litchi-performance-0937/independent-allocator-check-0937-v1.py",
+      "sha256": "18d187de1c7b79dee5cb690866606989fbbbf1912fe852446c5482db15ed2575"
+    },
+    "origin_runner": {
+      "bytes": 81933,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0936/comparison-runner.py",
+      "role": "final 0936 runner reused as the source of the inert 0937 adaptation",
+      "sha256": "83fd51f57032f0cb9c95c3d645e47e87e34f1fae6426c2d95a8910e451dfba02"
+    },
+    "retained_normal_binding_adapter": {
+      "bytes": 4865,
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -B /home/zhuhe/litchi-performance-0937/adapt-retained-normal-v1.py",
+      "path": "/home/zhuhe/litchi-performance-0937/adapt-retained-normal-v1.py",
+      "role": "binds retained 0933 normal binary to verified 0937 baseline runtime source; no rebuild",
+      "sha256": "c0173b804a21b73b6a2ee94a9d83fd20e1db7b52767dd8e590ada39879d9d0af"
+    },
+    "validator_origin": {
+      "bytes": 39792,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0937/comparison.py",
+      "sha256": "b70a2b38d098e3abd2b567d1bea70f40e9d27e62acaca8f80ff633dd2c596712"
+    }
+  },
+  "review_requirements_before_freeze": [
+    "independent quality receipt for the final identical test overlay and candidate codec patch",
+    "candidate normal/allocator release receipts with actual terminal status, compiler/profile/lock/fingerprint bindings",
+    "retained baseline normal/allocator binary source/runtime equivalence receipts bound to the 0937 final source tree",
+    "preflight correctness and negative controls for source/output/allocator counters/peak/RSS identity, using 0937-bound immutable expected fixtures",
+    "final manifest hash, auditor approval, and explicit root authorization before any child process"
+  ],
+  "schema": "litchi.performance.0937.comparison-plan.v1",
+  "scope": {
+    "build_terminal_status": "Candidate normal and allocator release builds completed with terminal-first exit 0 receipts; all interpretation remains withheld pending final controls, manifest authorization, capture, and replay.",
+    "builds_started": true,
+    "candidate_allowlist_final": true,
+    "candidate_exclusion": "No rejected candidate source tree is reused; baseline is copied from the final 0936 baseline-source, candidate is baseline plus the exact four-file combined overlay.",
+    "candidate_production_delta": "four reviewed production paths: section/codec.rs, section/inventory.rs, section/footnote_columns/mod.rs, section/footnote_columns/codec.rs",
+    "captures_started": false,
+    "claims_withheld_until_replay": "All latency, allocation, RSS, and adoption claims remain withheld until source/build custody, correctness, terminal records, and moved-packet replay pass.",
+    "hypothesis": "Borrow footnote scanner state within the focused validation pass to reduce its temporary copy traffic while preserving independent section parsing, public lazy semantic timing, namespace/markup-compatibility behavior, source spans, limits, refusal order, authored bytes, and atomic publication. This cohort does not include the rejected 0935 private fragment parse-reuse candidate.",
+    "iwork": "excluded",
+    "production_edits_by_tooling_owner": false,
+    "source_copies_final": true,
+    "test_overlay_identical": "No new test overlay; the existing test overlay is byte-identical in baseline and candidate source receipts."
+  },
+  "source_binding": {
+    "baseline_identity": "Retained 0933 candidate normal and allocator binaries remain the baseline after explicit 0937 runtime/source equivalence review against 0937 baseline-source; original historical build identities remain immutable.",
+    "baseline_runtime_equivalence_context": {
+      "baseline_source_receipt": {
+        "bytes": 3129,
+        "path": "/home/zhuhe/litchi-performance-0937/receipts/baseline-source-final-v1.json",
+        "sha256": "7c05ace57d66de90ac3657855d62bf5683e058522b2bfdc2f30a4c22a55fc2bb"
+      },
+      "current_head": "e3b5acdd91280b9926f94a61e5d736ad8063422e",
+      "current_root_unrelated_changes_excluded": true,
+      "measured_runtime_paths": "All runtime paths in the 0937 baseline tree; only the existing cfg(test) overlay differs from the retained build source. Candidate differs from that baseline in the exact four declared production paths.",
+      "prior_0933_binary_identity_is_preserved": true,
+      "source_copy_preflight": {
+        "bytes": 3036,
+        "path": "/home/zhuhe/litchi-performance-0937/retained-baseline-runtime-equivalence-v1.json",
+        "sha256": "e0d3b32f7eac59b175986d43027fd19490991832ad77987a1f63ed2a867a2a10"
+      },
+      "source_snapshot_differential": {
+        "bytes": 2978,
+        "path": "/home/zhuhe/litchi-performance-0937/source-snapshot-differential-v1.json",
+        "sha256": "5ebba53693a39133028e3b1e2b983c77ac0bc719bda2e5e58d11162fb3c29f63"
+      }
+    },
+    "baseline_source_origin": {
+      "copied_to": "/home/zhuhe/litchi-performance-0937/baseline-source",
+      "copy_scope": "entire 10779-file source closure copied from /home/zhuhe/litchi-performance-0936/baseline-source; source-copy equality is recorded in the 0937 runtime-equivalence receipt.",
+      "final_receipt": {
+        "bytes": 3129,
+        "path": "/home/zhuhe/litchi-performance-0937/receipts/baseline-source-final-v1.json",
+        "sha256": "7c05ace57d66de90ac3657855d62bf5683e058522b2bfdc2f30a4c22a55fc2bb"
+      },
+      "full_listing": {
+        "bytes": 3729629,
+        "path": "/home/zhuhe/litchi-performance-0937/source-manifest-v1.jsonl",
+        "sha256": "0a185c31d32e81e8cd05eaf907b31238b34dd93785fb51b9b15f3aa26eb51703"
+      },
+      "source_bytes": 259962058,
+      "source_file_count": 10779,
+      "source_receipt": {
+        "bytes": 3129,
+        "path": "/home/zhuhe/litchi-performance-0937/receipts/baseline-source-final-v1.json",
+        "sha256": "7c05ace57d66de90ac3657855d62bf5683e058522b2bfdc2f30a4c22a55fc2bb"
+      },
+      "source_revision": "3ae856d76424f2f9b58d26dcd20fd074b8e97541",
+      "source_root": "/home/zhuhe/litchi-performance-0937/baseline-source"
+    },
+    "baseline_source_receipt": {
+      "bytes": 3129,
+      "path": "/home/zhuhe/litchi-performance-0937/receipts/baseline-source-final-v1.json",
+      "sha256": "7c05ace57d66de90ac3657855d62bf5683e058522b2bfdc2f30a4c22a55fc2bb"
+    },
+    "baseline_source_root": "/home/zhuhe/litchi-performance-0937/baseline-source",
+    "candidate_patch": {
+      "bytes": 6400,
+      "path": "/home/zhuhe/litchi-performance-0937/candidate-combined.patch",
+      "sha256": "6646ab635de68d7cea5e8b38f1c24a29fe0fc77e31122a0bcf03042e8049736d"
+    },
+    "candidate_production_delta": "four reviewed production paths: section/codec.rs, section/inventory.rs, section/footnote_columns/mod.rs, section/footnote_columns/codec.rs",
+    "candidate_runtime_base": "e3b5acdd91280b9926f94a61e5d736ad8063422e",
+    "candidate_source": {
+      "changed_runtime_paths": [
+        "crates/litchi-docx/src/section/codec.rs",
+        "crates/litchi-docx/src/section/inventory.rs",
+        "crates/litchi-docx/src/section/footnote_columns/mod.rs",
+        "crates/litchi-docx/src/section/footnote_columns/codec.rs"
+      ],
+      "full_listing": {
+        "bytes": 3729629,
+        "path": "/home/zhuhe/litchi-performance-0937/source-manifest-v1.jsonl",
+        "sha256": "0a185c31d32e81e8cd05eaf907b31238b34dd93785fb51b9b15f3aa26eb51703"
+      },
+      "patch": {
+        "bytes": 6400,
+        "path": "/home/zhuhe/litchi-performance-0937/candidate-combined.patch",
+        "sha256": "6646ab635de68d7cea5e8b38f1c24a29fe0fc77e31122a0bcf03042e8049736d"
+      },
+      "patch_identity": "6646ab635de68d7cea5e8b38f1c24a29fe0fc77e31122a0bcf03042e8049736d",
+      "required_binding": "exact base revision, reviewed patch identity, complete source listing, build receipt, binary SHA, compiler/profile/lock/fingerprint parity",
+      "source_receipt": {
+        "bytes": 3633,
+        "path": "/home/zhuhe/litchi-performance-0937/receipts/candidate-source-final-v1.json",
+        "sha256": "d45eb2a4561ce3fffabdf24a27630129b40aa122ba4ed33f9cdada8e70628a2e"
+      },
+      "source_revision": "e3b5acdd91280b9926f94a61e5d736ad8063422e",
+      "source_revision_kind": "0937 current runtime base e3b5 plus exact reviewed four-file combined parse-reuse and borrowed-scanner overlay",
+      "source_root": "/home/zhuhe/litchi-performance-0937/candidate-source",
+      "test_overlay": "No new test overlay; existing test overlay is identical in baseline and candidate receipts."
+    },
+    "candidate_source_receipt": {
+      "bytes": 3633,
+      "path": "/home/zhuhe/litchi-performance-0937/receipts/candidate-source-final-v1.json",
+      "sha256": "d45eb2a4561ce3fffabdf24a27630129b40aa122ba4ed33f9cdada8e70628a2e"
+    },
+    "changed_paths": [
+      "crates/litchi-docx/src/section/codec.rs",
+      "crates/litchi-docx/src/section/inventory.rs",
+      "crates/litchi-docx/src/section/footnote_columns/mod.rs",
+      "crates/litchi-docx/src/section/footnote_columns/codec.rs"
+    ],
+    "current_head": "e3b5acdd91280b9926f94a61e5d736ad8063422e",
+    "production_candidate_scope": "Four production paths: section/codec.rs, section/inventory.rs, section/footnote_columns/mod.rs, and section/footnote_columns/codec.rs; no test-only delta.",
+    "retained_baseline_binaries": {
+      "allocator": {
+        "build_receipt": {
+          "bytes": 5191,
+          "path": "/home/zhuhe/litchi-performance-0933/receipts/fresh_candidate_allocator-final-v3.json",
+          "sha256": "3618e44b611dc69f3b5cf455de1c20c1d40df32d871a91a75c55d31d030b1f03"
+        },
+        "bytes": 68448792,
+        "equivalence_receipt": {
+          "bytes": 2484,
+          "path": "/home/zhuhe/litchi-performance-0937/retained-allocator-runtime-equivalence-v1.json",
+          "sha256": "14eca9c4c843a7c22168f8f6cfdf1bdc14c05f80393411ba00c07b6ed1dffb18"
+        },
+        "path": "/home/zhuhe/litchi-performance-0933/target-candidate-allocator/release/litchi-perf-baseline-alloc",
+        "sha256": "927df9a232ef6f827aef71216a6e3d2b694204a50ea41fa2d6e9bc7bdbc519e9"
+      },
+      "normal": {
+        "build_receipt": {
+          "bytes": 5956,
+          "path": "/home/zhuhe/litchi-performance-0937/receipts/baseline-normal-build-bound-v1.json",
+          "sha256": "26e9592fe312ca097d10effa0a0251ffc911182851e3b4d4f81a41cbb44bd0ca"
+        },
+        "bytes": 69934624,
+        "path": "/home/zhuhe/litchi-performance-0933/target-candidate-normal/release/litchi-perf-baseline",
+        "runtime_equivalence": {
+          "bytes": 3036,
+          "path": "/home/zhuhe/litchi-performance-0937/retained-baseline-runtime-equivalence-v1.json",
+          "sha256": "e0d3b32f7eac59b175986d43027fd19490991832ad77987a1f63ed2a867a2a10"
+        },
+        "sha256": "8a81df641151e5ed06b8f700c5d4cf068d0fee9c9e131fa147bf707a799c4c66"
+      }
+    },
+    "retained_baseline_runtime_equivalence": {
+      "bytes": 3036,
+      "method": "All regular files compared between retained 0933 candidate source and 0937 baseline source; only cfg(test)-only overlay differences remain.",
+      "path": "/home/zhuhe/litchi-performance-0937/retained-baseline-runtime-equivalence-v1.json",
+      "sha256": "e0d3b32f7eac59b175986d43027fd19490991832ad77987a1f63ed2a867a2a10"
+    },
+    "source_copy_preflight": {
+      "bytes": 3036,
+      "path": "/home/zhuhe/litchi-performance-0937/retained-baseline-runtime-equivalence-v1.json",
+      "sha256": "e0d3b32f7eac59b175986d43027fd19490991832ad77987a1f63ed2a867a2a10"
+    },
+    "source_listing": {
+      "bytes": 3729629,
+      "path": "/home/zhuhe/litchi-performance-0937/source-manifest-v1.jsonl",
+      "sha256": "0a185c31d32e81e8cd05eaf907b31238b34dd93785fb51b9b15f3aa26eb51703"
+    },
+    "source_snapshot_differential": {
+      "bytes": 2978,
+      "path": "/home/zhuhe/litchi-performance-0937/source-snapshot-differential-v1.json",
+      "sha256": "5ebba53693a39133028e3b1e2b983c77ac0bc719bda2e5e58d11162fb3c29f63"
+    }
+  },
+  "status": "source_and_builds_bound_capture_pending",
+  "toolchain_and_environment": {
+    "allocator_flags": "RUSTFLAGS=-C force-frame-pointers=yes, CARGO_ENCODED_RUSTFLAGS unset",
+    "bootstrap_seed": 937,
+    "cargo_lock_sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5",
+    "cpu": "12",
+    "env_allowlist": {
+      "LANG": "C",
+      "LC_ALL": "C",
+      "PATH": "/usr/bin:/bin",
+      "RUST_BACKTRACE": "0",
+      "TZ": "UTC"
+    },
+    "external_root": "/home/zhuhe/litchi-performance-0937",
+    "inherited_environment": "Build wrappers inherit the process environment and record selected explicit overrides/unsets; formal children will use the exact allowlisted child environment. No claim of a fully clean inherited build environment is made.",
+    "jobs": 2,
+    "normal_flags": "no RUSTFLAGS and CARGO_ENCODED_RUSTFLAGS unset",
+    "offline_locked": true,
+    "profile": "release",
+    "repository_binaries": "none",
+    "rustc": "1.95.0 via cargo +1.95.0"
+  },
+  "updated_utc": "2026-10-06T19:45:41.167688+00:00"
+}
