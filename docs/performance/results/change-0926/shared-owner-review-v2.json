@@ -1,0 +1,120 @@
+{
+  "created_utc": "2026-10-06T11:55:40.323604+00:00",
+  "custody_caveat": {
+    "authorized_manifest": {
+      "bytes": 19626,
+      "hash_matches_failure_receipt_authorized_manifest": true,
+      "path": "/tmp/litchi-performance-0925/provider-capture-manifest-v4-authorized.json",
+      "sha256": "ac813964c7cc9e1b7a861b7f7dd3d06e06cf36c4e9ede13176d96745dc90ae82"
+    },
+    "capture_state_present": false,
+    "comparison": {
+      "added_top_level_keys_in_packet_manifest": [
+        "packet_custody",
+        "packet_scripts"
+      ],
+      "changed_common_top_level_keys": [],
+      "common_fields_equal": true,
+      "difference_assessed_as_expected_runner_enrichment": true,
+      "removed_top_level_keys": []
+    },
+    "effect": "The retained packet manifest is the authorized manifest plus the runner-added packet_scripts and packet_custody maps. This explains the byte/hash difference; it is not an unexplained source or schedule mutation. The capture terminal receipt still records capture_state_present=false, so the retained cohort remains descriptive-only and is not formal qualification evidence.",
+    "failure_receipt_sha256": "dacc0eb868c8580f5ff93087b6119b9f763e5a4cf568caa792747cc90a8ee7f7",
+    "packet_manifest": {
+      "bytes": 20905,
+      "path": "docs/performance/results/change-0925/capture-v4/manifest.json",
+      "sha256": "306ad084cbc6f864187133f3ebaf633e3036f3bc221a7b64ecba5376764bcc61"
+    },
+    "terminal_status": "invalid_capture_terminal_custody"
+  },
+  "manifest_comparison": {
+    "added_top_level_keys": [
+      "packet_custody",
+      "packet_scripts"
+    ],
+    "authorized_bytes": 19626,
+    "authorized_path": "/tmp/litchi-performance-0925/provider-capture-manifest-v4-authorized.json",
+    "authorized_sha256": "ac813964c7cc9e1b7a861b7f7dd3d06e06cf36c4e9ede13176d96745dc90ae82",
+    "changed_common_top_level_keys": [],
+    "common_fields_equal": true,
+    "packet_bytes": 20905,
+    "packet_path": "docs/performance/results/change-0925/capture-v4/manifest.json",
+    "packet_sha256": "306ad084cbc6f864187133f3ebaf633e3036f3bc221a7b64ecba5376764bcc61",
+    "removed_top_level_keys": []
+  },
+  "nonblocking_checker_note": "provider_parameters validates route-specific caps/delay policy and ingress_route, but does not assert provider.provider equals the route; this is metadata provenance only and does not affect the reconciled counters.",
+  "replay": {
+    "argv": [
+      "python3",
+      "-B",
+      "docs/performance/results/change-0926/provider-reconciliation.py",
+      "--packet",
+      "docs/performance/results/change-0925/capture-v4",
+      "--output",
+      "/tmp/0926-provider-reconciliation-independent-20261006.json"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "exit_code": 0,
+    "output_bytes": 27365,
+    "output_path": "/tmp/0926-provider-reconciliation-independent-20261006.json",
+    "output_sha256": "4a8126be1e1c7294dea2a253f01a3a90ab56fd324d72d9e56bf31cf81692d5da",
+    "reported": {
+      "performance_children_run": 0,
+      "raw_report_bytes": 3793767,
+      "reports": 42,
+      "status": "passed"
+    },
+    "retained_v4": {
+      "checks_equal": true,
+      "only_expected_difference": "created_utc differs because this replay generated a fresh receipt; input descriptors/checks/identities/route aggregates match",
+      "path": "docs/performance/results/change-0926/provider-reconciliation-final-v4.json",
+      "route_aggregates_equal": true,
+      "sha256": "73f3a9df59f8119714387be1fc0ef3f440994eea30ddb1987aadadf09d1a74ff",
+      "source_identity_equal": true
+    },
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout_bytes": 185,
+    "stdout_sha256": "249f0dabf619d736c9134459b68656378179ce55168960b0e9bf3b7cc980c9c4"
+  },
+  "schema": "litchi.performance.0926.shared-owner-review.v1",
+  "scope": "read-only source/API review and offline retained-report reconciliation; no builds, tests, captures, or production edits",
+  "source": {
+    "coalescing_review": "StructuralPrefetch, opt-in SourceReadPolicy::forward_start, and PartReadSession already provide bounded request/decode reuse; section-layout Snapshot/Inventory reuse is package-bound.",
+    "git_head": "82b0017e42305e6b909dce486ffd913e2da66613",
+    "references": [
+      "crates/litchi-core/src/source.rs",
+      "crates/litchi-core/src/source/file.rs",
+      "crates/litchi-opc/src/source_backed.rs",
+      "crates/litchi-opc/src/source_backed/read_ahead.rs",
+      "crates/litchi-opc/src/source_backed/read_session.rs",
+      "crates/litchi-docx/src/source_backed.rs",
+      "crates/litchi-docx/src/section/layout.rs",
+      "docs/adr/0003-snapshots-edits-and-patches.md",
+      "docs/adr/0005-io-memory-and-performance.md",
+      "docs/adr/0006-validation-security-and-compatibility.md",
+      "docs/adr/0032-snapshot-derived-value-memos.md"
+    ],
+    "source_review": "Generic ReadAt/SourceVersion is a freshness fence; ADR0032 owner-held fingerprint memo remains restricted to SourceInput::Owned(Arc<OwnedSource>)."
+  },
+  "source_model_arithmetic": {
+    "full_scan_requests": 33,
+    "full_scan_returned_bytes": 2101427,
+    "raw_full_route_per_operation": {
+      "read_calls": 165,
+      "requested_bytes": 6308061,
+      "returned_bytes": 6308061
+    },
+    "raw_short_route_per_operation": {
+      "read_calls": 1607,
+      "requested_bytes": 84096471,
+      "returned_bytes": 6308061,
+      "short_reads": 1506
+    },
+    "short_cap_bytes": 4096,
+    "short_scan_requests": 514,
+    "short_scan_returned_bytes": 2101427,
+    "source_bytes": 2101427
+  },
+  "status": "passed_descriptive_reconciliation_with_expected_manifest_enrichment_and_terminal_custody_caveat"
+}

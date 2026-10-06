@@ -1,0 +1,800 @@
+{
+  "binary_identity": {
+    "binary_bytes": 70187352,
+    "binary_sha256": "7138c6c458dc13f1677deba3f413120ffc1af155d07848a243a43ebcf335feb7",
+    "profile": "release"
+  },
+  "checks": {
+    "aggregate_histograms_conserve_read_calls": true,
+    "binary_identities_equal_across_42_reports": true,
+    "nominal_service_formula_conserved": true,
+    "per_sample_provider_counters_and_histograms_equal": true,
+    "report_sha256_and_size_bound_to_failure_inventory": true,
+    "source_lengths_and_hashes_equal_across_42_reports": true
+  },
+  "claim_scope": "offline raw-report reconciliation only; no timing, capture, provider ranking, or optimization claim",
+  "created_utc": "2026-10-06T11:52:21.453110+00:00",
+  "input": {
+    "failure_receipt": {
+      "bytes": 8767,
+      "path": "capture-failure.json",
+      "sha256": "dacc0eb868c8580f5ff93087b6119b9f763e5a4cf568caa792747cc90a8ee7f7"
+    },
+    "manifest": {
+      "bytes": 20905,
+      "path": "manifest.json",
+      "sha256": "306ad084cbc6f864187133f3ebaf633e3036f3bc221a7b64ecba5376764bcc61"
+    },
+    "packet": "/home/zhuhe/code/litchi/docs/performance/results/change-0925/capture-v4",
+    "report_bindings": [
+      {
+        "bytes": 53470,
+        "id": "provider-block-01-01-generic_read_at",
+        "path": "children/provider-block-01-01-generic_read_at/report.json",
+        "route": "generic_read_at",
+        "sha256": "b69073d472e4cf868e2748da1080af11fca817bd579a82b5f0b42b58c5106c20"
+      },
+      {
+        "bytes": 47454,
+        "id": "provider-block-01-02-owned_vec",
+        "path": "children/provider-block-01-02-owned_vec/report.json",
+        "route": "owned_vec",
+        "sha256": "68351ba553679f91e15e807ec363a22e6c7a221029dc6f8b8c2895426124f2b3"
+      },
+      {
+        "bytes": 47868,
+        "id": "provider-block-01-03-owned_reader",
+        "path": "children/provider-block-01-03-owned_reader/report.json",
+        "route": "owned_reader",
+        "sha256": "84a05de13ee404e6fb906815d94721c4c22ef88591e6184f54381f7924b03cdb"
+      },
+      {
+        "bytes": 89549,
+        "id": "provider-block-01-04-file_warm",
+        "path": "children/provider-block-01-04-file_warm/report.json",
+        "route": "file_warm",
+        "sha256": "15086df6ece82b5a3960ca43ab108362b2570325967c14b53a4760d3e4e53001"
+      },
+      {
+        "bytes": 130954,
+        "id": "provider-block-01-05-range_short",
+        "path": "children/provider-block-01-05-range_short/report.json",
+        "route": "range_short",
+        "sha256": "dcf2ad8335ea0f93ed36839ac255bcd2597b61923e9b3541eb73cc446e0d79a8"
+      },
+      {
+        "bytes": 131358,
+        "id": "provider-block-01-06-range_zero",
+        "path": "children/provider-block-01-06-range_zero/report.json",
+        "route": "range_zero",
+        "sha256": "fb9fb9e7ba9abb845e834abeb77ef67380b94abb2723e63471cd4fbe33ba613d"
+      },
+      {
+        "bytes": 131639,
+        "id": "provider-block-01-07-range_delayed",
+        "path": "children/provider-block-01-07-range_delayed/report.json",
+        "route": "range_delayed",
+        "sha256": "eb757a0a0158984a8a2f245f7bfcbf427ffd35ce5c9962411aa374fffe7b0068"
+      },
+      {
+        "bytes": 131640,
+        "id": "provider-block-02-01-range_delayed",
+        "path": "children/provider-block-02-01-range_delayed/report.json",
+        "route": "range_delayed",
+        "sha256": "c6b2be7ca5871840f8f56f5818565b2e1c1f818d7df4648cd206d045dc952ee0"
+      },
+      {
+        "bytes": 131361,
+        "id": "provider-block-02-02-range_zero",
+        "path": "children/provider-block-02-02-range_zero/report.json",
+        "route": "range_zero",
+        "sha256": "2ef0c8dff6d6887b32ad8456a79a0d0d3dc151aa22782e0648b02e5adadeb550"
+      },
+      {
+        "bytes": 130955,
+        "id": "provider-block-02-03-range_short",
+        "path": "children/provider-block-02-03-range_short/report.json",
+        "route": "range_short",
+        "sha256": "ac51139fedc79f9d4c7e9f2bb05d2a387bd4904df9f7174ef02219cccf4dde4c"
+      },
+      {
+        "bytes": 89548,
+        "id": "provider-block-02-04-file_warm",
+        "path": "children/provider-block-02-04-file_warm/report.json",
+        "route": "file_warm",
+        "sha256": "477b5508a45b3b7083b4c708de22a8d3bb622d6401afebe9fbe3236ab5b2316b"
+      },
+      {
+        "bytes": 47917,
+        "id": "provider-block-02-05-owned_reader",
+        "path": "children/provider-block-02-05-owned_reader/report.json",
+        "route": "owned_reader",
+        "sha256": "5a05a584ee23966a0547124a4d3f895171913be1495a1a6de981c0fb92ba900e"
+      },
+      {
+        "bytes": 47456,
+        "id": "provider-block-02-06-owned_vec",
+        "path": "children/provider-block-02-06-owned_vec/report.json",
+        "route": "owned_vec",
+        "sha256": "4f6e568cdea72887e6ac8987795423813006642bdeb13138402fa1bf92484476"
+      },
+      {
+        "bytes": 53463,
+        "id": "provider-block-02-07-generic_read_at",
+        "path": "children/provider-block-02-07-generic_read_at/report.json",
+        "route": "generic_read_at",
+        "sha256": "fa19f77b52dd916aef0e6ee265da05d6fdc5d0dc89cbbc62f4124078684d5631"
+      },
+      {
+        "bytes": 53458,
+        "id": "provider-block-03-01-generic_read_at",
+        "path": "children/provider-block-03-01-generic_read_at/report.json",
+        "route": "generic_read_at",
+        "sha256": "c3dd34aa264e1977cc4828f049b4a2352a3f3011b8455659870ef3d7455fad37"
+      },
+      {
+        "bytes": 47457,
+        "id": "provider-block-03-02-owned_vec",
+        "path": "children/provider-block-03-02-owned_vec/report.json",
+        "route": "owned_vec",
+        "sha256": "e1a42519864444bfe9ffccdb9fcb3c26da15b10f9134fbef120ef5367350d3be"
+      },
+      {
+        "bytes": 47874,
+        "id": "provider-block-03-03-owned_reader",
+        "path": "children/provider-block-03-03-owned_reader/report.json",
+        "route": "owned_reader",
+        "sha256": "5ebf9bb1c798e478757edca4aec83e23bd12ee9c86db1c44b44fec6051e7c187"
+      },
+      {
+        "bytes": 89549,
+        "id": "provider-block-03-04-file_warm",
+        "path": "children/provider-block-03-04-file_warm/report.json",
+        "route": "file_warm",
+        "sha256": "97da8add6fc34940f28c6a755131dcf66f8c9b037e4b2a19438fe7c648c7a7bd"
+      },
+      {
+        "bytes": 130947,
+        "id": "provider-block-03-05-range_short",
+        "path": "children/provider-block-03-05-range_short/report.json",
+        "route": "range_short",
+        "sha256": "31e027aebbebc9c485d18f75106a38fe63170165b74ec93c273cd296fa5a5221"
+      },
+      {
+        "bytes": 131356,
+        "id": "provider-block-03-06-range_zero",
+        "path": "children/provider-block-03-06-range_zero/report.json",
+        "route": "range_zero",
+        "sha256": "9d7e61f72b3a1eb09669f4cf6efacc5d0d0b2d3ae8382d9315e07678e3bc2458"
+      },
+      {
+        "bytes": 131634,
+        "id": "provider-block-03-07-range_delayed",
+        "path": "children/provider-block-03-07-range_delayed/report.json",
+        "route": "range_delayed",
+        "sha256": "fab7fdf6dc697697a3387b75215656a92a662927f133f8eb4f9be4351632c96c"
+      },
+      {
+        "bytes": 131639,
+        "id": "provider-block-04-01-range_delayed",
+        "path": "children/provider-block-04-01-range_delayed/report.json",
+        "route": "range_delayed",
+        "sha256": "3407028238e740a61b0d07aa1a99585da886feb734e5f7235cbfa6a5551a3f30"
+      },
+      {
+        "bytes": 131363,
+        "id": "provider-block-04-02-range_zero",
+        "path": "children/provider-block-04-02-range_zero/report.json",
+        "route": "range_zero",
+        "sha256": "ac6d3e6c4a88389638eac6d5571ab53f502b66b9d848ba590d904f83489e46c1"
+      },
+      {
+        "bytes": 130947,
+        "id": "provider-block-04-03-range_short",
+        "path": "children/provider-block-04-03-range_short/report.json",
+        "route": "range_short",
+        "sha256": "42d53113da59ff63eee1a21615e3c9b2636dc9172242855a88ae5808248f3d19"
+      },
+      {
+        "bytes": 89542,
+        "id": "provider-block-04-04-file_warm",
+        "path": "children/provider-block-04-04-file_warm/report.json",
+        "route": "file_warm",
+        "sha256": "e59c401cc939da0e65467de5a142d38fc26095f6be1233808f7dd5df2cb29602"
+      },
+      {
+        "bytes": 47876,
+        "id": "provider-block-04-05-owned_reader",
+        "path": "children/provider-block-04-05-owned_reader/report.json",
+        "route": "owned_reader",
+        "sha256": "0e5efafd23d01915eac8d0854cc1080e051da5cd4a543e8b04cebac074f902a8"
+      },
+      {
+        "bytes": 47455,
+        "id": "provider-block-04-06-owned_vec",
+        "path": "children/provider-block-04-06-owned_vec/report.json",
+        "route": "owned_vec",
+        "sha256": "38b6b6e5be67723a00c9695854f6262d5487bf0841c4f93ab140453f2856c3d3"
+      },
+      {
+        "bytes": 53463,
+        "id": "provider-block-04-07-generic_read_at",
+        "path": "children/provider-block-04-07-generic_read_at/report.json",
+        "route": "generic_read_at",
+        "sha256": "1f77bc5a09f2b2d14f97b4d1e10eb5311103351deca3d027548889c7762c3d6f"
+      },
+      {
+        "bytes": 53463,
+        "id": "provider-block-05-01-generic_read_at",
+        "path": "children/provider-block-05-01-generic_read_at/report.json",
+        "route": "generic_read_at",
+        "sha256": "599880db9f36a983d6df506b83468d432e9a9ea8a90dca93d90ce42b5080ada3"
+      },
+      {
+        "bytes": 47456,
+        "id": "provider-block-05-02-owned_vec",
+        "path": "children/provider-block-05-02-owned_vec/report.json",
+        "route": "owned_vec",
+        "sha256": "80902322d900442938bd96495f8b952a709d83868e0b5047d841cee9c02dffd2"
+      },
+      {
+        "bytes": 47870,
+        "id": "provider-block-05-03-owned_reader",
+        "path": "children/provider-block-05-03-owned_reader/report.json",
+        "route": "owned_reader",
+        "sha256": "863203192f8b1f93bd0e8fe3bc3a4e8723d7fcc7dcb8fafe44f69e0cbfb0a060"
+      },
+      {
+        "bytes": 89548,
+        "id": "provider-block-05-04-file_warm",
+        "path": "children/provider-block-05-04-file_warm/report.json",
+        "route": "file_warm",
+        "sha256": "c6e25751bc81ff3289496e26947ffdd80c42fe007b6368090300fe2a4d525adc"
+      },
+      {
+        "bytes": 130954,
+        "id": "provider-block-05-05-range_short",
+        "path": "children/provider-block-05-05-range_short/report.json",
+        "route": "range_short",
+        "sha256": "ae7e60eecad08715f96a4d1e2a46d9de09e7586b4b2d63a5b5e35d7fe9223898"
+      },
+      {
+        "bytes": 131356,
+        "id": "provider-block-05-06-range_zero",
+        "path": "children/provider-block-05-06-range_zero/report.json",
+        "route": "range_zero",
+        "sha256": "8848da9759e8a6ec4eb3051c7d9cd9393975756631b9e80ef6b3fbdff9e1aa8b"
+      },
+      {
+        "bytes": 131632,
+        "id": "provider-block-05-07-range_delayed",
+        "path": "children/provider-block-05-07-range_delayed/report.json",
+        "route": "range_delayed",
+        "sha256": "4d11f2d7eb232f5c3f71017f6ef6276488e945f77ceb945e37d4c2009e396073"
+      },
+      {
+        "bytes": 131639,
+        "id": "provider-block-06-01-range_delayed",
+        "path": "children/provider-block-06-01-range_delayed/report.json",
+        "route": "range_delayed",
+        "sha256": "ea0b66a8e53d0eceb6da4cbb2266f8670f685021b5af5b2d47d30d9ad52a58e7"
+      },
+      {
+        "bytes": 131362,
+        "id": "provider-block-06-02-range_zero",
+        "path": "children/provider-block-06-02-range_zero/report.json",
+        "route": "range_zero",
+        "sha256": "75aff147c0faba2943935f9df97f05f6867ded6030b959f8d9b75277f67f4827"
+      },
+      {
+        "bytes": 130955,
+        "id": "provider-block-06-03-range_short",
+        "path": "children/provider-block-06-03-range_short/report.json",
+        "route": "range_short",
+        "sha256": "12e1875d8e24862cbf8a01b0457d824f95be552d7f937ca108489adf030b8138"
+      },
+      {
+        "bytes": 89550,
+        "id": "provider-block-06-04-file_warm",
+        "path": "children/provider-block-06-04-file_warm/report.json",
+        "route": "file_warm",
+        "sha256": "9d0490866e789f7e0dfc4431f3765d1f7fb8741b2f479cab622d435d9e017d1e"
+      },
+      {
+        "bytes": 47874,
+        "id": "provider-block-06-05-owned_reader",
+        "path": "children/provider-block-06-05-owned_reader/report.json",
+        "route": "owned_reader",
+        "sha256": "ca5e8d53f96c3dcae7c3010b6d711e70f29a948f8727b1164e5bfbd65f571002"
+      },
+      {
+        "bytes": 47453,
+        "id": "provider-block-06-06-owned_vec",
+        "path": "children/provider-block-06-06-owned_vec/report.json",
+        "route": "owned_vec",
+        "sha256": "1a29a114b85c919a3b52a9f4068e5c900503e30668d7316a5cda506e4af27323"
+      },
+      {
+        "bytes": 53463,
+        "id": "provider-block-06-07-generic_read_at",
+        "path": "children/provider-block-06-07-generic_read_at/report.json",
+        "route": "generic_read_at",
+        "sha256": "0b930761289c0c5e8a99b0e6c4f8b31fb93023cfa8a8f19e3eec4bc509febfde"
+      }
+    ],
+    "report_bytes": 3793767,
+    "reports": 42
+  },
+  "performance_children_run": 0,
+  "provider_routes": {
+    "file_warm": {
+      "children": 6,
+      "logical": {
+        "max_request_bytes": 65536,
+        "min_request_bytes": 8,
+        "request_size_count_total": 49500,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          3000,
+          3900,
+          2700,
+          4200,
+          1800,
+          2100,
+          900,
+          1200,
+          300,
+          0,
+          600,
+          0,
+          0,
+          28800,
+          0
+        ],
+        "sample_observations": 300,
+        "totals": {
+          "delayed_calls": 0,
+          "read_calls": 49500,
+          "requested_bytes": 1892418300,
+          "returned_bytes": 1892418300,
+          "short_reads": 0,
+          "transfer_delay_ns": 0,
+          "transfer_paced_calls": 0
+        }
+      },
+      "nominal_service_delay_ns": {
+        "max": 0,
+        "min": 0,
+        "samples": 300,
+        "total": 0
+      },
+      "per_sample_equality": {
+        "comparisons": 250,
+        "logical": true,
+        "nominal_service_delay_ns": true,
+        "underlying": true
+      },
+      "provider": {
+        "fixed_delay_ns": null,
+        "logical_observation_scope": "caller-facing positional requests accepted by FileSource wrapper or PptxRangeSource; request-size distribution is logical wrapper evidence",
+        "max_returned_bytes": null,
+        "observation_boundary": "provider counters snapshot immediately after publication and before reopen, inverse publication, semantic validation, or other verification",
+        "provider": "file_warm",
+        "source_scope": "staged regular file written and synced before the run; each FileSource is opened during sample preparation; warm recently-written observation, not a filesystem-cold result",
+        "staging_scope": "filesystem staging and source hashing are outside the operation clock; range backing construction, FileSource::open (warm route), and adapter construction are inside sample preparation",
+        "transfer_bytes_per_second": null,
+        "transfer_delay_policy": null,
+        "underlying_observation_scope": "no separate delegated boundary; the direct FileSource wrapper is the sole logical observation, not physical filesystem I/O"
+      },
+      "samples": 300,
+      "underlying": null,
+      "underlying_null_samples": 300
+    },
+    "range_delayed": {
+      "children": 6,
+      "logical": {
+        "max_request_bytes": 65536,
+        "min_request_bytes": 8,
+        "request_size_count_total": 49500,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          3000,
+          3900,
+          2700,
+          4200,
+          1800,
+          2100,
+          900,
+          1200,
+          300,
+          0,
+          600,
+          0,
+          0,
+          28800,
+          0
+        ],
+        "sample_observations": 300,
+        "totals": {
+          "delayed_calls": 49500,
+          "read_calls": 49500,
+          "requested_bytes": 1892418300,
+          "returned_bytes": 1892418300,
+          "short_reads": 0,
+          "transfer_delay_ns": 18047517900,
+          "transfer_paced_calls": 49500
+        }
+      },
+      "nominal_service_delay_ns": {
+        "max": 225158393,
+        "min": 225158393,
+        "samples": 300,
+        "total": 67547517900
+      },
+      "per_sample_equality": {
+        "comparisons": 250,
+        "logical": true,
+        "nominal_service_delay_ns": true,
+        "underlying": true
+      },
+      "provider": {
+        "fixed_delay_ns": 1000000,
+        "logical_observation_scope": "caller-facing positional requests accepted by FileSource wrapper or PptxRangeSource; request-size distribution is logical wrapper evidence",
+        "max_returned_bytes": 65536,
+        "observation_boundary": "provider counters snapshot immediately after publication and before reopen, inverse publication, semantic validation, or other verification",
+        "provider": "range_delayed",
+        "source_scope": "immutable OwnedSource memory backing beneath the benchmark-only PptxRangeSource; simulated range/service behavior, with no network or physical-storage claim",
+        "staging_scope": "filesystem staging and source hashing are outside the operation clock; range backing construction, FileSource::open (warm route), and adapter construction are inside sample preparation",
+        "transfer_bytes_per_second": 104857600,
+        "transfer_delay_policy": "minimum-service",
+        "underlying_observation_scope": "ReadAt calls delegated beneath PptxRangeSource, counted before and after the wrapped call; not physical filesystem, kernel, network, or remote-service I/O"
+      },
+      "samples": 300,
+      "underlying": {
+        "max_request_bytes": 65536,
+        "min_request_bytes": 8,
+        "request_size_count_total": 49500,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          3000,
+          3900,
+          2700,
+          4200,
+          1800,
+          2100,
+          900,
+          1200,
+          300,
+          0,
+          600,
+          0,
+          0,
+          28800,
+          0
+        ],
+        "sample_observations": 300,
+        "totals": {
+          "delayed_calls": 0,
+          "read_calls": 49500,
+          "requested_bytes": 1892418300,
+          "returned_bytes": 1892418300,
+          "short_reads": 0,
+          "transfer_delay_ns": 0,
+          "transfer_paced_calls": 0
+        }
+      },
+      "underlying_null_samples": 0
+    },
+    "range_short": {
+      "children": 6,
+      "logical": {
+        "max_request_bytes": 65536,
+        "min_request_bytes": 8,
+        "request_size_count_total": 482100,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          3000,
+          3900,
+          2700,
+          4200,
+          1800,
+          2700,
+          900,
+          1200,
+          300,
+          9600,
+          10200,
+          20400,
+          40800,
+          380400,
+          0
+        ],
+        "sample_observations": 300,
+        "totals": {
+          "delayed_calls": 0,
+          "read_calls": 482100,
+          "requested_bytes": 25228941300,
+          "returned_bytes": 1892418300,
+          "short_reads": 451800,
+          "transfer_delay_ns": 0,
+          "transfer_paced_calls": 0
+        }
+      },
+      "nominal_service_delay_ns": {
+        "max": 0,
+        "min": 0,
+        "samples": 300,
+        "total": 0
+      },
+      "per_sample_equality": {
+        "comparisons": 250,
+        "logical": true,
+        "nominal_service_delay_ns": true,
+        "underlying": true
+      },
+      "provider": {
+        "fixed_delay_ns": null,
+        "logical_observation_scope": "caller-facing positional requests accepted by FileSource wrapper or PptxRangeSource; request-size distribution is logical wrapper evidence",
+        "max_returned_bytes": 4096,
+        "observation_boundary": "provider counters snapshot immediately after publication and before reopen, inverse publication, semantic validation, or other verification",
+        "provider": "range_short",
+        "source_scope": "immutable OwnedSource memory backing beneath the benchmark-only PptxRangeSource; simulated range/service behavior, with no network or physical-storage claim",
+        "staging_scope": "filesystem staging and source hashing are outside the operation clock; range backing construction, FileSource::open (warm route), and adapter construction are inside sample preparation",
+        "transfer_bytes_per_second": null,
+        "transfer_delay_policy": null,
+        "underlying_observation_scope": "ReadAt calls delegated beneath PptxRangeSource, counted before and after the wrapped call; not physical filesystem, kernel, network, or remote-service I/O"
+      },
+      "samples": 300,
+      "underlying": {
+        "max_request_bytes": 4096,
+        "min_request_bytes": 8,
+        "request_size_count_total": 482100,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          3000,
+          3900,
+          2700,
+          4200,
+          1800,
+          2700,
+          900,
+          1200,
+          300,
+          461400,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "sample_observations": 300,
+        "totals": {
+          "delayed_calls": 0,
+          "read_calls": 482100,
+          "requested_bytes": 1892418300,
+          "returned_bytes": 1892418300,
+          "short_reads": 0,
+          "transfer_delay_ns": 0,
+          "transfer_paced_calls": 0
+        }
+      },
+      "underlying_null_samples": 0
+    },
+    "range_zero": {
+      "children": 6,
+      "logical": {
+        "max_request_bytes": 65536,
+        "min_request_bytes": 8,
+        "request_size_count_total": 49500,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          3000,
+          3900,
+          2700,
+          4200,
+          1800,
+          2100,
+          900,
+          1200,
+          300,
+          0,
+          600,
+          0,
+          0,
+          28800,
+          0
+        ],
+        "sample_observations": 300,
+        "totals": {
+          "delayed_calls": 49500,
+          "read_calls": 49500,
+          "requested_bytes": 1892418300,
+          "returned_bytes": 1892418300,
+          "short_reads": 0,
+          "transfer_delay_ns": 18047517900,
+          "transfer_paced_calls": 49500
+        }
+      },
+      "nominal_service_delay_ns": {
+        "max": 60158393,
+        "min": 60158393,
+        "samples": 300,
+        "total": 18047517900
+      },
+      "per_sample_equality": {
+        "comparisons": 250,
+        "logical": true,
+        "nominal_service_delay_ns": true,
+        "underlying": true
+      },
+      "provider": {
+        "fixed_delay_ns": 0,
+        "logical_observation_scope": "caller-facing positional requests accepted by FileSource wrapper or PptxRangeSource; request-size distribution is logical wrapper evidence",
+        "max_returned_bytes": 65536,
+        "observation_boundary": "provider counters snapshot immediately after publication and before reopen, inverse publication, semantic validation, or other verification",
+        "provider": "range_zero",
+        "source_scope": "immutable OwnedSource memory backing beneath the benchmark-only PptxRangeSource; simulated range/service behavior, with no network or physical-storage claim",
+        "staging_scope": "filesystem staging and source hashing are outside the operation clock; range backing construction, FileSource::open (warm route), and adapter construction are inside sample preparation",
+        "transfer_bytes_per_second": 104857600,
+        "transfer_delay_policy": "minimum-service",
+        "underlying_observation_scope": "ReadAt calls delegated beneath PptxRangeSource, counted before and after the wrapped call; not physical filesystem, kernel, network, or remote-service I/O"
+      },
+      "samples": 300,
+      "underlying": {
+        "max_request_bytes": 65536,
+        "min_request_bytes": 8,
+        "request_size_count_total": 49500,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          3000,
+          3900,
+          2700,
+          4200,
+          1800,
+          2100,
+          900,
+          1200,
+          300,
+          0,
+          600,
+          0,
+          0,
+          28800,
+          0
+        ],
+        "sample_observations": 300,
+        "totals": {
+          "delayed_calls": 0,
+          "read_calls": 49500,
+          "requested_bytes": 1892418300,
+          "returned_bytes": 1892418300,
+          "short_reads": 0,
+          "transfer_delay_ns": 0,
+          "transfer_paced_calls": 0
+        }
+      },
+      "underlying_null_samples": 0
+    }
+  },
+  "request_size_bucket_scope": "fixed log2 bucket counts from the retained provider counters; this is not an exact per-request size trace",
+  "request_size_buckets": [
+    {
+      "index": 0,
+      "lower_inclusive": 0,
+      "upper_inclusive": 1
+    },
+    {
+      "index": 1,
+      "lower_inclusive": 2,
+      "upper_inclusive": 2
+    },
+    {
+      "index": 2,
+      "lower_inclusive": 3,
+      "upper_inclusive": 4
+    },
+    {
+      "index": 3,
+      "lower_inclusive": 5,
+      "upper_inclusive": 8
+    },
+    {
+      "index": 4,
+      "lower_inclusive": 9,
+      "upper_inclusive": 16
+    },
+    {
+      "index": 5,
+      "lower_inclusive": 17,
+      "upper_inclusive": 32
+    },
+    {
+      "index": 6,
+      "lower_inclusive": 33,
+      "upper_inclusive": 64
+    },
+    {
+      "index": 7,
+      "lower_inclusive": 65,
+      "upper_inclusive": 128
+    },
+    {
+      "index": 8,
+      "lower_inclusive": 129,
+      "upper_inclusive": 256
+    },
+    {
+      "index": 9,
+      "lower_inclusive": 257,
+      "upper_inclusive": 512
+    },
+    {
+      "index": 10,
+      "lower_inclusive": 513,
+      "upper_inclusive": 1024
+    },
+    {
+      "index": 11,
+      "lower_inclusive": 1025,
+      "upper_inclusive": 2048
+    },
+    {
+      "index": 12,
+      "lower_inclusive": 2049,
+      "upper_inclusive": 4096
+    },
+    {
+      "index": 13,
+      "lower_inclusive": 4097,
+      "upper_inclusive": 8192
+    },
+    {
+      "index": 14,
+      "lower_inclusive": 8193,
+      "upper_inclusive": 16384
+    },
+    {
+      "index": 15,
+      "lower_inclusive": 16385,
+      "upper_inclusive": 32768
+    },
+    {
+      "index": 16,
+      "lower_inclusive": 32769,
+      "upper_inclusive": 65536
+    },
+    {
+      "index": 17,
+      "lower_inclusive": 65537,
+      "upper_inclusive": null
+    }
+  ],
+  "schema": "litchi.performance.0926.provider-reconciliation.v1",
+  "source_identity": {
+    "corpus_archive_bytes": 2101427,
+    "corpus_archive_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+    "corpus_entry_bytes": 524288,
+    "corpus_uncompressed_payload_bytes": 2116441,
+    "expected_output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+    "output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+    "source_bytes": 2101427,
+    "source_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+    "target_payload_bytes": 18855,
+    "target_payload_sha256": "67cb9066f112bfee6905a23f3eabdc76b65c86cd0c6613dd60a5a18895ceac81"
+  },
+  "status": "passed"
+}

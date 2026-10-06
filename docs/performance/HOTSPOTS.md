@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0926 — two full fingerprints explain most provider bytes
+
+[0926](0926-provider-read-attribution.md) reconciles all 42 retained 0925 reports
+without recapture. Source inspection attributes 4,202,854 of 6,308,061 returned
+bytes to two complete fingerprints; 2,105,207 bytes remain across catalog,
+target and preservation work. The total is not three exact source scans.
+Short-read request amplification does not increase returned bytes. Existing
+archive read-ahead does not cache the fingerprints and is disabled for
+publication. Preserve the generic source freshness boundary; next distinguish
+hashing, preservation and structural reads before choosing a provider change.
+The original timing cohort remains invalid for protocol qualification.
+
 ## 0925 — provider request shapes observed; terminal custody failed
 
 [0925](0925-section-layout-provider-baseline.md) retains 42 raw reports with an

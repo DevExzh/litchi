@@ -1,5 +1,13 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0926 — retained provider counters independently reconciled
+
+[0926](0926-provider-read-attribution.md) verifies the 42 retained 0925 report
+hashes and provider counters without running performance children. Two
+source-derived fingerprint scans explain 66 of 165 full-return calls or 1,028
+of 1,607 short-provider calls. Requested buffer bytes remain distinct from
+returned bytes. This attribution adds no timing qualification or speedup claim.
+
 ## 0925 — current DOCX provider reports retained after receipt failure
 
 [0925](0925-section-layout-provider-baseline.md) adds warm tmpfs FileSource and
