@@ -1,5 +1,13 @@
 # Performance CRUD coverage
 
+## 0921 — repeated DOC edits, unchanged scenario population
+
+[0921](0921-source-bound-stream-recapture.md) covers existing NoHeadFoot and
+FloatingPictures cases at 1/2/8/32 edits, with default native timing and
+zero/default/release allocator routes. All 288 reports pass correctness and
+exact capacity comparison. This adds no cold-cache, range-source, concurrent
+or iWork coverage.
+
 ## 0920 — repeated DOC edit comparison, unchanged scenario scope
 
 [0920](0920-cfb-output-reservation-rejected.md) compares existing NoHeadFoot and

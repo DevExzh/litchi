@@ -1,0 +1,51 @@
+{
+  "schema": "litchi.performance.0921.cfb-write-check.v1",
+  "argv": [
+    "cargo",
+    "+1.95.0",
+    "check",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-cfb",
+    "--features",
+    "write"
+  ],
+  "cwd": "/tmp/litchi-performance-0921/source",
+  "environment_overrides": {
+    "CARGO_TARGET_DIR": "/tmp/litchi-performance-0921/cfb-write-check-target",
+    "CARGO_TERM_COLOR": "never",
+    "CARGO_INCREMENTAL": "0"
+  },
+  "toolchain": {
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
+  },
+  "start_utc": "2026-10-06T07:16:14.462985+00:00",
+  "exit_code": 0,
+  "end_utc": "2026-10-06T07:16:18.145028+00:00",
+  "elapsed_seconds": 3.6820201039954554,
+  "source": {
+    "revision": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+    "candidate_manifest_sha256": "dceb2bd74acc8d0bb899368eb9ed0b7c0294e40eeb6272e87f8e4874d412a09f",
+    "candidate_patch_sha256": "7705c8ec7f12a5a5083b2ff29408451b0ee2afbbf8a25bb827c01b885aece67d"
+  },
+  "target_directory": "/tmp/litchi-performance-0921/cfb-write-check-target",
+  "artifacts": [
+    {
+      "path": "/tmp/litchi-performance-0921/logs/cfb-write-check.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/logs/cfb-write-check.stderr",
+      "bytes": 1629,
+      "sha256": "f0548ee8f4fc730a7bac777a433c622ef44639996a0bac002fdfb7e80e7129b9"
+    }
+  ],
+  "toolchain_probe": {
+    "rustc_info_path": "/tmp/litchi-performance-0921/cfb-write-check-target/.rustc_info.json",
+    "rustc_info_sha256": "b0ea09b63deab7fcb2b7aa313ffacc545a21fd833cd0d388414a276bce1bf10d",
+    "rustc_info_rustc_fingerprint": 18078629669389283957
+  }
+}

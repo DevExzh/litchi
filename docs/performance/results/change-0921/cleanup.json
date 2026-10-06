@@ -1,0 +1,103 @@
+{
+  "schema": "litchi.performance.0921.cleanup.v1",
+  "utc": "2026-10-06T07:23:27.282198+00:00",
+  "removed": [
+    {
+      "path": "/tmp/litchi-performance-0921/source/target",
+      "logical_bytes": 24274382613,
+      "reason": "Completed debug functional/quality build intermediates; coder confirmed idle, no measured binaries here."
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/baseline-target/release/deps",
+      "logical_bytes": 560060137,
+      "reason": "Completed build intermediates or scratch draft/cache; measured release binaries, fingerprint metadata and all receipt-bound evidence retained."
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/baseline-target/release/build",
+      "logical_bytes": 177382246,
+      "reason": "Completed build intermediates or scratch draft/cache; measured release binaries, fingerprint metadata and all receipt-bound evidence retained."
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/baseline-target/release/incremental",
+      "logical_bytes": 0,
+      "reason": "Completed build intermediates or scratch draft/cache; measured release binaries, fingerprint metadata and all receipt-bound evidence retained."
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/baseline-target/release/examples",
+      "logical_bytes": 0,
+      "reason": "Completed build intermediates or scratch draft/cache; measured release binaries, fingerprint metadata and all receipt-bound evidence retained."
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/candidate-target/release/deps",
+      "logical_bytes": 546351132,
+      "reason": "Completed build intermediates or scratch draft/cache; measured release binaries, fingerprint metadata and all receipt-bound evidence retained."
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/candidate-target/release/build",
+      "logical_bytes": 177382306,
+      "reason": "Completed build intermediates or scratch draft/cache; measured release binaries, fingerprint metadata and all receipt-bound evidence retained."
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/candidate-target/release/incremental",
+      "logical_bytes": 0,
+      "reason": "Completed build intermediates or scratch draft/cache; measured release binaries, fingerprint metadata and all receipt-bound evidence retained."
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/candidate-target/release/examples",
+      "logical_bytes": 0,
+      "reason": "Completed build intermediates or scratch draft/cache; measured release binaries, fingerprint metadata and all receipt-bound evidence retained."
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/candidate-target-before-clippy-fix/release/deps",
+      "logical_bytes": 546352292,
+      "reason": "Completed build intermediates or scratch draft/cache; measured release binaries, fingerprint metadata and all receipt-bound evidence retained."
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/candidate-target-before-clippy-fix/release/build",
+      "logical_bytes": 177382306,
+      "reason": "Completed build intermediates or scratch draft/cache; measured release binaries, fingerprint metadata and all receipt-bound evidence retained."
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/candidate-target-before-clippy-fix/release/incremental",
+      "logical_bytes": 0,
+      "reason": "Completed build intermediates or scratch draft/cache; measured release binaries, fingerprint metadata and all receipt-bound evidence retained."
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/candidate-target-before-clippy-fix/release/examples",
+      "logical_bytes": 0,
+      "reason": "Completed build intermediates or scratch draft/cache; measured release binaries, fingerprint metadata and all receipt-bound evidence retained."
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/cfb-write-check-target/debug",
+      "logical_bytes": 223198645,
+      "reason": "Completed build intermediates or scratch draft/cache; measured release binaries, fingerprint metadata and all receipt-bound evidence retained."
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/cfb-write-target/debug",
+      "logical_bytes": 223197680,
+      "reason": "Completed build intermediates or scratch draft/cache; measured release binaries, fingerprint metadata and all receipt-bound evidence retained."
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/review/check-candidate-target/debug",
+      "logical_bytes": 228146422,
+      "reason": "Completed build intermediates or scratch draft/cache; measured release binaries, fingerprint metadata and all receipt-bound evidence retained."
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/review/clippy-candidate-target/debug",
+      "logical_bytes": 228158785,
+      "reason": "Completed build intermediates or scratch draft/cache; measured release binaries, fingerprint metadata and all receipt-bound evidence retained."
+    },
+    {
+      "path": "/tmp/litchi-performance-0921-tooling-pycache",
+      "logical_bytes": 178153,
+      "reason": "Completed build intermediates or scratch draft/cache; measured release binaries, fingerprint metadata and all receipt-bound evidence retained."
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/change-record-draft.md",
+      "logical_bytes": 2067,
+      "reason": "Completed build intermediates or scratch draft/cache; measured release binaries, fingerprint metadata and all receipt-bound evidence retained."
+    }
+  ],
+  "retained": "Source, measured release binaries/fingerprints, receipts and raw evidence retained externally.",
+  "total_logical_bytes_removed": 27362174784
+}

@@ -1,5 +1,14 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0921 — implemented and measured recapture candidate rejected
+
+[0921](0921-source-bound-stream-recapture.md) completes another
+source-reviewed implementation and frozen comparison. Allocation savings meet
+the practical gate, but one of eight native confidence bounds fails narrowly;
+production remains unchanged. The packet retains all adverse rows, 288-report
+replays and the separate 0920 diagnostic limits. Program-level 10x and broader
+workload requirements remain open.
+
 ## 0920 — exact output reservation measured and rejected
 
 [0920](0920-cfb-output-reservation-rejected.md) completes the next allocation

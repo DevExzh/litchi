@@ -1,0 +1,35 @@
+{
+  "schema": "litchi.performance.0921.dependency-graph-parity.v1",
+  "created_utc": "2026-10-06T07:16:01.342280+00:00",
+  "command": [
+    "cargo",
+    "+1.95.0",
+    "metadata",
+    "--locked",
+    "--offline",
+    "--format-version",
+    "1",
+    "--manifest-path",
+    "docs/performance/results/change-0917/probe/Cargo.toml"
+  ],
+  "source": {
+    "base_revision": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+    "candidate_manifest_sha256": "dceb2bd74acc8d0bb899368eb9ed0b7c0294e40eeb6272e87f8e4874d412a09f",
+    "candidate_patch_sha256": "7705c8ec7f12a5a5083b2ff29408451b0ee2afbbf8a25bb827c01b885aece67d"
+  },
+  "normalization": "sorted package name/version/source, target kinds, features and dependency declarations; checkout-specific local paths and workspace member IDs replaced by package identities",
+  "baseline": {
+    "raw_metadata_path": "/tmp/litchi-performance-0921/baseline-metadata.json",
+    "raw_metadata_sha256": "6bf02a421b0e8e5fe78dd3abf25aa8d674ee784b4cb293fd68d6ce14385ac786",
+    "normalized_graph_path": "/tmp/litchi-performance-0921/baseline-dependency-graph.json",
+    "normalized_graph_sha256": "4318b349e472e807eaea16562fe7fdfeab8e1a8009dafcc0c16a3ebafe9d619f"
+  },
+  "candidate": {
+    "raw_metadata_path": "/tmp/litchi-performance-0921/candidate-metadata.json",
+    "raw_metadata_sha256": "893952d972da7fc34ec98272f7a0d6c85cb1076f21d61c8ee09a4da23ebd1690",
+    "normalized_graph_path": "/tmp/litchi-performance-0921/candidate-dependency-graph.json",
+    "normalized_graph_sha256": "4318b349e472e807eaea16562fe7fdfeab8e1a8009dafcc0c16a3ebafe9d619f"
+  },
+  "package_count": 144,
+  "equal": true
+}

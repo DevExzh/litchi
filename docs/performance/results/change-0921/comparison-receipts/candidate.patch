@@ -1,0 +1,578 @@
+diff --git a/crates/litchi-cfb/src/file.rs b/crates/litchi-cfb/src/file.rs
+index 7f23eec953..25c76f2fa5 100644
+--- a/crates/litchi-cfb/src/file.rs
++++ b/crates/litchi-cfb/src/file.rs
+@@ -13,7 +13,7 @@ use crate::directory_name::{
+ use crate::leniency::{AllocationDefect, DirectoryDefect, HeaderDefect, ToleranceReport};
+ use smallvec::SmallVec;
+ use std::cmp::Ordering;
+-use std::io::{self, Read, Seek, SeekFrom};
++use std::io::{self, Cursor, Read, Seek, SeekFrom};
+ use std::num::NonZeroUsize;
+ use std::ops::Range;
+ use zerocopy::{FromBytes, LE, U16, U32, U64};
+@@ -3571,6 +3571,54 @@ pub(crate) trait CandidateBytes {
+     fn check_readable(&self, offset: u64, len: usize) -> Result<(), OleError>;
+ }
+ 
++/// A stream comparer bound to the immutable bytes parsed by a cursor reader.
++///
++/// This adapter deliberately does not accept a second byte slice: the
++/// candidate ranges are read from the exact `Cursor<&[u8]>` that
++/// [`OleFile::open`] parsed.  Keeping that binding in the type prevents a
++/// caller from validating one reader against unrelated bytes.
++pub struct SourceStreamComparer<'a> {
++    inner: StreamComparer<'a, Cursor<&'a [u8]>, OleFile<Cursor<&'a [u8]>>>,
++}
++
++impl SourceStreamComparer<'_> {
++    /// Whether the stream at `path` holds exactly `expected`.
++    ///
++    /// The comparison retains the existing comparer’s chain, tail,
++    /// readability, zero-fill, and one-time root mini-stream validation.  A
++    /// false result means the parsed stream is valid but its bytes differ; an
++    /// error means the parsed source failed one of those validations.
++    ///
++    /// # Errors
++    ///
++    /// Returns the same structural, bounds, and candidate-read errors that a
++    /// corresponding stream read would report.
++    pub fn stream_equals(&mut self, path: &[&str], expected: &[u8]) -> Result<bool, OleError> {
++        self.inner.stream_equals(path, expected)
++    }
++}
++
++impl CandidateBytes for OleFile<Cursor<&[u8]>> {
++    fn equals_at(&self, offset: u64, expected: &[u8]) -> Result<bool, OleError> {
++        Ok(source_range(self.reader.get_ref(), offset, expected.len())? == expected)
++    }
++
++    fn check_readable(&self, offset: u64, len: usize) -> Result<(), OleError> {
++        source_range(self.reader.get_ref(), offset, len).map(drop)
++    }
++}
++
++fn source_range(bytes: &[u8], offset: u64, len: usize) -> Result<&[u8], OleError> {
++    let start = usize::try_from(offset)
++        .map_err(|_error| OleError::InvalidData("comparison leaves the file".to_string()))?;
++    let end = start
++        .checked_add(len)
++        .ok_or_else(|| OleError::InvalidData("comparison leaves the file".to_string()))?;
++    bytes
++        .get(start..end)
++        .ok_or_else(|| OleError::InvalidData("comparison leaves the file".to_string()))
++}
++
+ /// In-place stream comparison between one parsed reader and one candidate.
+ ///
+ /// [`Self::stream_equals`] reaches `open_stream`'s verdict on a stream
+@@ -3622,6 +3670,18 @@ impl<R: Read + Seek> OleFile<R> {
+     }
+ }
+ 
++impl<'a> OleFile<Cursor<&'a [u8]>> {
++    /// Compares streams against the exact immutable bytes this reader parsed.
++    ///
++    /// The returned session should be reused for every stream in one capture;
++    /// in particular, a mini-stream root is checked once per session.
++    pub fn source_stream_comparer(&'a self) -> SourceStreamComparer<'a> {
++        SourceStreamComparer {
++            inner: self.stream_comparer(self),
++        }
++    }
++}
++
+ impl<R: Read + Seek, C: CandidateBytes> StreamComparer<'_, R, C> {
+     /// Whether the stream at `path` holds exactly `expected`.
+     ///
+diff --git a/crates/litchi-cfb/src/lib.rs b/crates/litchi-cfb/src/lib.rs
+index e2e6354850..75bfff2ac8 100644
+--- a/crates/litchi-cfb/src/lib.rs
++++ b/crates/litchi-cfb/src/lib.rs
+@@ -28,7 +28,9 @@ mod validation;
+ pub mod writer;
+ 
+ pub use directory_name::{DirectoryNameKey, directory_names_equal, validate_directory_name};
+-pub use file::{DirectoryEntry, OleError, OleFile, OleFileLimits, is_ole_file};
++pub use file::{
++    DirectoryEntry, OleError, OleFile, OleFileLimits, SourceStreamComparer, is_ole_file,
++};
+ pub use leniency::{
+     AllocationDefect, Defect, DirectoryDefect, HeaderDefect, Leniency, ToleranceReport,
+     ToleratedDefect,
+diff --git a/crates/litchi-cfb/src/stream_compare_tests.rs b/crates/litchi-cfb/src/stream_compare_tests.rs
+index 2fd29c3962..18c00a506b 100644
+--- a/crates/litchi-cfb/src/stream_compare_tests.rs
++++ b/crates/litchi-cfb/src/stream_compare_tests.rs
+@@ -117,6 +117,48 @@ fn agree_on_every_stream(label: &str, file: &[u8]) -> usize {
+     cases.len()
+ }
+ 
++/// The same fixture oracle through the public source-bound adapter. Keeping
++/// this separate from the private `FileBytes` oracle makes the corpus check
++/// exercise the production binding to the reader's own cursor bytes.
++fn agree_on_every_stream_source_bound(label: &str, file: &[u8]) -> usize {
++    let Ok(mut first) = OleFile::open(Cursor::new(file)) else {
++        return 0;
++    };
++    let mut cases = Vec::new();
++    for path in first.list_streams() {
++        let refs: Vec<&str> = path.iter().map(String::as_str).collect();
++        let actual = first.open_stream(&refs).unwrap_or_default();
++        for expected in expectations(&actual) {
++            cases.push((path.clone(), expected));
++        }
++    }
++    let mut reader = OleFile::open(Cursor::new(file)).unwrap();
++    let readback: Vec<Verdict> = cases
++        .iter()
++        .map(|(path, expected)| {
++            let refs: Vec<&str> = path.iter().map(String::as_str).collect();
++            reader
++                .open_stream(&refs)
++                .map(|data| data == *expected)
++                .map_err(|error| error.to_string())
++        })
++        .collect();
++    let mut comparer = reader.source_stream_comparer();
++    for ((path, expected), readback) in cases.iter().zip(&readback) {
++        let refs: Vec<&str> = path.iter().map(String::as_str).collect();
++        let in_place = comparer
++            .stream_equals(&refs, expected)
++            .map_err(|error| error.to_string());
++        assert_eq!(
++            &in_place,
++            readback,
++            "{label}: stream {path:?}, expectation of {} bytes",
++            expected.len()
++        );
++    }
++    cases.len()
++}
++
+ fn repository_root() -> PathBuf {
+     Path::new(env!("CARGO_MANIFEST_DIR"))
+         .parent()
+@@ -166,6 +208,30 @@ fn every_fixture_stream_reaches_the_readback_verdict() {
+     eprintln!("0749 corpus: {files} OLE2 files, {compared} expectations agree");
+ }
+ 
++#[test]
++fn every_fixture_stream_reaches_the_source_bound_verdict() {
++    let mut paths = Vec::new();
++    collect(&repository_root().join("test-data"), &mut paths);
++    let mut files = 0;
++    let mut compared = 0;
++    for path in paths {
++        let Ok(bytes) = std::fs::read(&path) else {
++            continue;
++        };
++        if bytes.get(..8) != Some(MAGIC) {
++            continue;
++        }
++        files += 1;
++        compared += agree_on_every_stream_source_bound(&path.display().to_string(), &bytes);
++    }
++    assert!(files > 100, "the OLE2 corpus is present ({files} files)");
++    assert!(
++        compared > 1_000,
++        "the source-bound comparison exercises the corpus ({compared})"
++    );
++    eprintln!("source-bound corpus: {files} OLE2 files, {compared} expectations agree");
++}
++
+ fn written(sector_size: usize) -> Vec<u8> {
+     let mut writer = OleWriter::with_sector_size(sector_size).unwrap();
+     writer
+@@ -184,6 +250,27 @@ fn written(sector_size: usize) -> Vec<u8> {
+     output.into_inner()
+ }
+ 
++#[test]
++fn source_bound_comparer_uses_the_reader_bytes() {
++    let bytes = written(512);
++    let reader = OleFile::open(Cursor::new(bytes.as_slice())).unwrap();
++    let mut comparer = reader.source_stream_comparer();
++    assert!(
++        comparer
++            .stream_equals(
++                &["Regular"],
++                &(0..9_000u32).map(|v| v as u8).collect::<Vec<_>>()
++            )
++            .unwrap()
++    );
++    assert!(
++        !comparer
++            .stream_equals(&["Regular"], b"foreign expectation")
++            .unwrap()
++    );
++    assert!(comparer.stream_equals(&["Mini"], &[7u8; 700]).unwrap());
++}
++
+ #[test]
+ fn short_final_sectors_reach_the_readback_verdict() {
+     for sector_size in [512, 4096] {
+diff --git a/crates/litchi-ole-common/src/object/codec.rs b/crates/litchi-ole-common/src/object/codec.rs
+index 189e555851..9d42ff838d 100644
+--- a/crates/litchi-ole-common/src/object/codec.rs
++++ b/crates/litchi-ole-common/src/object/codec.rs
+@@ -8,7 +8,7 @@ use crate::property_set::Guid;
+ use crate::protection::reject_protected_container;
+ use litchi_cfb::{
+     OleError, OleFile, OleWriter, OverlayError, OverlayLimits, SameLengthStreamOverlay,
+-    SectorLayoutPolicy, SharedOleFile,
++    SectorLayoutPolicy, SharedOleFile, SourceStreamComparer,
+ };
+ use litchi_core::SourceVersion;
+ use std::collections::HashMap;
+@@ -39,6 +39,59 @@ impl Package {
+         )
+     }
+ 
++    /// Captures a freshly rendered package while reusing staged stream
++    /// allocations whose physical bytes compare equal in the rendered source.
++    ///
++    /// The comparer is bound to this exact cursor-backed reader and remains
++    /// alive for the whole directory traversal, so mini-stream validation is
++    /// shared across streams. Unequal or absent streams are read normally only
++    /// after that validation session is dropped.
++    pub(crate) fn capture_reusing(
++        ole: &mut OleFile<Cursor<&[u8]>>,
++        staged: &Self,
++        limits: Limits,
++    ) -> Result<Self, OleError> {
++        let root_directory = ole.root_entry().map(directory::decode).transpose()?;
++        let mut package = Self {
++            sector_size: ole.sector_size(),
++            root_clsid: root_directory.and_then(directory::Metadata::class_id),
++            root_directory,
++            storages: Vec::new(),
++            streams: Vec::new(),
++        };
++        let mut budget = Budget::new(
++            limits.max_package_storages(),
++            limits.max_streams,
++            limits.max_total_size,
++        );
++        let mut staged_by_path = HashMap::new();
++        staged_by_path
++            .try_reserve(staged.streams.len())
++            .map_err(|source| OleError::Allocation {
++                resource: "CFB staged stream index",
++                source,
++            })?;
++        for stream in &staged.streams {
++            staged_by_path.insert(stream.path(), stream);
++        }
++
++        let mut pending = Vec::new();
++        let mut comparer = ole.source_stream_comparer();
++        capture_container_reusing(
++            &*ole,
++            &[],
++            &mut package,
++            &mut budget,
++            limits,
++            &mut comparer,
++            &staged_by_path,
++            &mut pending,
++        )?;
++        drop(comparer);
++        finish_reused_stream_capture(ole, &mut package, pending)?;
++        Ok(package)
++    }
++
+     /// Captures a standalone replacement/object compound file.  The file is
+     /// one selected object, so its storage ceiling is the per-object depth
+     /// limit rather than the aggregate package product.
+@@ -211,27 +264,6 @@ impl Package {
+             .map(Stream::bytes_shared)
+     }
+ 
+-    pub(crate) fn reuse_stream_allocations(&mut self, previous: &Self) -> Result<(), OleError> {
+-        let mut by_path = HashMap::new();
+-        by_path
+-            .try_reserve(previous.streams.len())
+-            .map_err(|source| OleError::Allocation {
+-                resource: "CFB stream allocation index",
+-                source,
+-            })?;
+-        for stream in &previous.streams {
+-            by_path.insert(stream.path(), stream);
+-        }
+-        for stream in &mut self.streams {
+-            if let Some(cached_stream) = by_path.get(stream.path())
+-                && cached_stream.bytes() == stream.bytes()
+-            {
+-                stream.replace_data(cached_stream.bytes_shared());
+-            }
+-        }
+-        Ok(())
+-    }
+-
+     pub(crate) fn add_stream(
+         &mut self,
+         path: Vec<String>,
+@@ -1154,6 +1186,125 @@ impl Budget {
+     }
+ }
+ 
++struct PendingCapturedStream {
++    path: Vec<String>,
++    metadata: directory::Metadata,
++    size: u64,
++    reused: Option<Arc<[u8]>>,
++}
++
++fn capture_container_reusing(
++    ole: &OleFile<Cursor<&[u8]>>,
++    path: &[String],
++    package: &mut Package,
++    budget: &mut Budget,
++    limits: Limits,
++    comparer: &mut SourceStreamComparer<'_>,
++    staged_by_path: &HashMap<&[String], &Stream>,
++    pending: &mut Vec<PendingCapturedStream>,
++) -> Result<(), OleError> {
++    let max_entries = budget.max_directory_entries();
++    let refs = path_refs(path);
++    ole.visit_directory_entry_refs(&refs, max_entries, |entry| {
++        let metadata = directory::decode(entry)?;
++        let mut child = path.to_vec();
++        child.push(entry.name.clone());
++        match metadata.kind() {
++            EntryKind::Storage => {
++                if child.len() > limits.max_storage_depth {
++                    return Err(OleError::InvalidFormat(
++                        "CFB storage nesting limit exceeded".into(),
++                    ));
++                }
++                budget.charge_storage()?;
++                package
++                    .storages
++                    .try_reserve(1)
++                    .map_err(|source| OleError::Allocation {
++                        resource: "CFB storage capture",
++                        source,
++                    })?;
++                package.storages.push(Storage::new(child.clone(), metadata));
++                capture_container_reusing(
++                    ole,
++                    &child,
++                    package,
++                    budget,
++                    limits,
++                    comparer,
++                    staged_by_path,
++                    pending,
++                )?;
++            },
++            EntryKind::Stream => {
++                if entry.size > limits.max_stream_size {
++                    return Err(OleError::InvalidFormat(format!(
++                        "stream {child:?} exceeds size limit"
++                    )));
++                }
++                budget.charge(entry.size)?;
++                let staged_stream = staged_by_path.get(child.as_slice()).copied();
++                let expected = staged_stream.map_or(&[][..], Stream::bytes);
++                // Even an absent staged path is compared against an empty
++                // expectation. This validates the candidate stream in
++                // traversal order before any later queued read can be
++                // reached; the missing path still falls back to open_stream.
++                let equal = comparer.stream_equals(&path_refs(&child), expected)?;
++                let reused = equal
++                    .then(|| staged_stream.map(Stream::bytes_shared))
++                    .flatten();
++                pending
++                    .try_reserve(1)
++                    .map_err(|source| OleError::Allocation {
++                        resource: "CFB pending stream capture",
++                        source,
++                    })?;
++                pending.push(PendingCapturedStream {
++                    path: child,
++                    metadata,
++                    size: entry.size,
++                    reused,
++                });
++            },
++            EntryKind::Root => {},
++        }
++        Ok(())
++    })
++}
++
++fn finish_reused_stream_capture(
++    ole: &mut OleFile<Cursor<&[u8]>>,
++    package: &mut Package,
++    pending: Vec<PendingCapturedStream>,
++) -> Result<(), OleError> {
++    for stream in pending {
++        let data = match stream.reused {
++            Some(data) => data,
++            None => {
++                let data = ole.open_stream(&path_refs(&stream.path))?;
++                if data.len() as u64 != stream.size {
++                    return Err(OleError::InvalidFormat(format!(
++                        "stream {:?} size changed during capture",
++                        stream.path
++                    )));
++                }
++                Arc::<[u8]>::from(data)
++            },
++        };
++        package
++            .streams
++            .try_reserve(1)
++            .map_err(|source| OleError::Allocation {
++                resource: "CFB stream capture",
++                source,
++            })?;
++        package
++            .streams
++            .push(Stream::new(stream.path, data, Some(stream.metadata)));
++    }
++    Ok(())
++}
++
+ fn capture_container<R: Read + Seek>(
+     ole: &mut OleFile<R>,
+     path: &[String],
+@@ -1396,3 +1547,107 @@ fn check_counts(
+     }
+     Ok(())
+ }
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn fixture() -> Vec<u8> {
++        let mut writer = OleWriter::with_sector_size(512).unwrap();
++        writer.create_storage(&["Nested"]).unwrap();
++        writer.create_stream(&["Stable"], &[7u8; 700]).unwrap();
++        writer
++            .create_stream(&["Nested", "Changed"], b"before")
++            .unwrap();
++        let mut output = Cursor::new(Vec::new());
++        writer.write_to(&mut output).unwrap();
++        output.into_inner()
++    }
++
++    fn metadata_fixture(modified_time: u64) -> Vec<u8> {
++        let mut writer = OleWriter::with_sector_size(512).unwrap();
++        writer.create_stream(&["Stable"], &[7u8; 700]).unwrap();
++        writer
++            .set_stream_metadata(&["Stable"], 0, 1, modified_time)
++            .unwrap();
++        let mut output = Cursor::new(Vec::new());
++        writer.write_to(&mut output).unwrap();
++        output.into_inner()
++    }
++
++    #[test]
++    fn recapture_reuses_equal_staged_streams_and_reads_mismatches() {
++        let source = fixture();
++        let mut source_reader = OleFile::open(Cursor::new(source)).unwrap();
++        let original = Package::capture(&mut source_reader, Limits::default()).unwrap();
++        let mut changed = original.clone();
++        changed
++            .put_stream(
++                &["Nested".into(), "Changed".into()],
++                Arc::from(b"after".to_vec().into_boxed_slice()),
++                Limits::default(),
++            )
++            .unwrap();
++        let rendered = changed.render().unwrap();
++        let mut rendered_reader = OleFile::open(Cursor::new(rendered.as_slice())).unwrap();
++        let recaptured =
++            Package::capture_reusing(&mut rendered_reader, &original, Limits::default()).unwrap();
++
++        for stream in &recaptured.streams {
++            if stream.path() == ["Stable".to_string()] {
++                let staged = original
++                    .streams
++                    .iter()
++                    .find(|candidate| candidate.path() == stream.path())
++                    .unwrap();
++                let parsed_data = stream.bytes_shared();
++                let staged_data = staged.bytes_shared();
++                assert!(Arc::ptr_eq(&parsed_data, &staged_data));
++            } else {
++                assert_eq!(stream.bytes(), b"after");
++                let staged = original
++                    .streams
++                    .iter()
++                    .find(|candidate| candidate.path() == stream.path())
++                    .unwrap();
++                let parsed_data = stream.bytes_shared();
++                let staged_data = staged.bytes_shared();
++                assert!(!Arc::ptr_eq(&parsed_data, &staged_data));
++            }
++        }
++    }
++
++    #[test]
++    fn recapture_keeps_fresh_directory_metadata_and_limits() {
++        let original_bytes = metadata_fixture(11);
++        let candidate_bytes = metadata_fixture(22);
++        let mut original_reader = OleFile::open(Cursor::new(original_bytes.as_slice())).unwrap();
++        let original = Package::capture(&mut original_reader, Limits::default()).unwrap();
++        let mut candidate_reader = OleFile::open(Cursor::new(candidate_bytes.as_slice())).unwrap();
++        let recaptured =
++            Package::capture_reusing(&mut candidate_reader, &original, Limits::default()).unwrap();
++        let stable = recaptured
++            .streams
++            .iter()
++            .find(|stream| stream.path() == ["Stable".to_string()])
++            .unwrap();
++        assert_eq!(stable.directory().unwrap().modified_time(), 22);
++        let staged = original
++            .streams
++            .iter()
++            .find(|stream| stream.path() == stable.path())
++            .unwrap();
++        assert!(Arc::ptr_eq(&stable.bytes_shared(), &staged.bytes_shared()));
++
++        let limits = Limits {
++            max_streams: 0,
++            ..Limits::default()
++        };
++        let limited_bytes = metadata_fixture(22);
++        let mut limited_reader = OleFile::open(Cursor::new(limited_bytes.as_slice())).unwrap();
++        assert!(matches!(
++            Package::capture_reusing(&mut limited_reader, &original, limits),
++            Err(OleError::InvalidFormat(_))
++        ));
++    }
++}
+diff --git a/crates/litchi-ole-common/src/object/editor.rs b/crates/litchi-ole-common/src/object/editor.rs
+index a197c12308..4daf9b10e3 100644
+--- a/crates/litchi-ole-common/src/object/editor.rs
++++ b/crates/litchi-ole-common/src/object/editor.rs
+@@ -992,8 +992,7 @@ impl Editor {
+         };
+         let mut check = OleFile::open(Cursor::new(rendered.as_slice()))?;
+         codec::open(&check, self.limits.max_package_directory_entries())?;
+-        let mut parsed = Package::capture(&mut check, self.limits)?;
+-        parsed.reuse_stream_allocations(&self.package)?;
++        let parsed = Package::capture_reusing(&mut check, &self.package, self.limits)?;
+         self.package = parsed;
+         self.objects = discovery::from_package(&self.package, &self.targets, self.limits)?;
+         self.changed = true;
+diff --git a/crates/litchi-ole-common/src/object/model.rs b/crates/litchi-ole-common/src/object/model.rs
+index 9cc017cbec..45eb7792df 100644
+--- a/crates/litchi-ole-common/src/object/model.rs
++++ b/crates/litchi-ole-common/src/object/model.rs
+@@ -273,10 +273,6 @@ impl Stream {
+         )
+         .map(Some)
+     }
+-
+-    pub(crate) fn replace_data(&mut self, data: Arc<[u8]>) {
+-        self.data = data;
+-    }
+ }
+ 
+ /// A target-selected OLE storage and its opaque captured descendants.

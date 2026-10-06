@@ -1,0 +1,112 @@
+{
+  "schema": "litchi.performance.0921.operation-profile.protocol.v1",
+  "status": "frozen-before-capture",
+  "created_utc": "2026-10-06T06:45:31Z",
+  "purpose": "Diagnostic attribution of the rejected 0920 CFB output-reservation candidate; this packet makes no adoption or recapture claim.",
+  "raw_root": "/tmp/litchi-performance-0921-profile",
+  "source_binding": {
+    "base_revision": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+    "candidate_patch_sha256": "0441e3d739155ab4bbe05cf2dde02c837d10c48b3162352f6b3327055ab929e3",
+    "candidate_manifest_sha256": "c4e30450dd4e0f5f185c6b535da790f375063ab07c996fa168947d6564deda24",
+    "comparison_manifest": {
+      "path": "docs/performance/results/change-0920/comparison-manifest.json",
+      "bytes": 7749,
+      "sha256": "abd01971d218d4d74ccfdd3ffb5ead1f67910bf5223499c359ad196942bd4702"
+    },
+    "probe_source": {
+      "path": "docs/performance/results/change-0917/probe",
+      "src_lib_sha256": "b932992f10ecee244eaa3bd14833a07dcd2456f0bfc2de0dce3bf64403737dc3",
+      "cargo_lock_sha256": "abd9f47a5aaa973a760cd61392de79c2b6143026c300dc1329831652aa54c06c"
+    },
+    "validator": {
+      "path": "docs/performance/results/change-0917/capture.py",
+      "bytes": 69575,
+      "sha256": "fde5219539cf538d51b8bf92ec5527fd9959ac0f39eb2ea5412b8ddf8cd7a894"
+    }
+  },
+  "binaries": {
+    "baseline": {
+      "lane": "native",
+      "path": "/tmp/litchi-performance-0920-baseline/target/release/doc_retention_probe",
+      "bytes": 54795488,
+      "sha256": "9f3c2bb2c589ba8e7a47b99c051d4a4910e41002d28f1caa1d1edc036a7515e5"
+    },
+    "candidate": {
+      "lane": "native",
+      "path": "/tmp/litchi-performance-0920/candidate-target/release/doc_retention_probe",
+      "bytes": 48098944,
+      "sha256": "4901f974ba32f8453399c4ddff31e9f08702fe2d03124152d8113427f54dece3"
+    }
+  },
+  "fixtures": {
+    "docfloat": {
+      "path": "test-data/ole/doc/FloatingPictures.doc",
+      "bytes": 335360,
+      "sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d"
+    },
+    "docnohf": {
+      "path": "test-data/ole/doc/NoHeadFoot.doc",
+      "bytes": 26112,
+      "sha256": "45e5df073f34314da6f39d2dad119fb2ef23470878fd2df67f632864cd92ea48"
+    }
+  },
+  "boundary": {
+    "entry": "doc_retention_probe_0917::measure_one",
+    "call_edge": "doc_retention_probe_0917::measure_one -> doc_retention_probe_0917::run_case, calls=1",
+    "includes": "Snapshot::open_bounded source clone, repeated paragraph-zero replacements, commit, output Vec copy, local lifecycle destruction",
+    "excludes": "source file read, preparation and reference routes, correctness/public-reader/oracle checks, hashing, JSON serialization",
+    "retention": "default",
+    "warmup": 0,
+    "samples": 1,
+    "cpu": 14
+  },
+  "population": {
+    "callgrind": {
+      "tool": "valgrind-3.26.0 callgrind",
+      "collection": "--instr-atstart=yes --collect-atstart=no --toggle-collect=*measure_one* --collect-jumps=yes --simulate-cache=yes --dump-instr=yes",
+      "runs": [
+        "baseline/docfloat/e01", "candidate/docfloat/e01",
+        "baseline/docfloat/e02", "candidate/docfloat/e02",
+        "baseline/docfloat/e08", "candidate/docfloat/e08",
+        "baseline/docfloat/e32", "candidate/docfloat/e32",
+        "baseline/docnohf/e32", "candidate/docnohf/e32"
+      ],
+      "count": 10
+    },
+    "perf_stat": {
+      "scope": "whole process; page-fault and syscall attribution is reported separately from the operation-local Callgrind boundary",
+      "events": ["task-clock", "context-switches", "cpu-migrations", "page-faults", "cycles", "instructions", "branches", "branch-misses"],
+      "runs": "same ten binary/case/edit rows as Callgrind",
+      "count": 10
+    },
+    "perf_record": {
+      "tool": "perf-7.0.14",
+      "event": "cycles:u",
+      "frequency_hz": 2000,
+      "callgraph": "dwarf,4096",
+      "samples_per_child": 200,
+      "post_filter": "callchains containing doc_retention_probe_0917::measure_one",
+      "runs": "same ten binary/case/edit rows as Callgrind",
+      "count": 10,
+      "purpose": "Native callchain attribution; unlike whole-process perf stat, report only samples in the frozen operation boundary and retain process-wide samples separately."
+    },
+    "strace": {
+      "scope": "whole process; syscall counts are a bounded control because syscall tracepoints are unavailable",
+      "runs": [
+        "baseline/docfloat/e02", "candidate/docfloat/e02",
+        "baseline/docfloat/e32", "candidate/docfloat/e32",
+        "baseline/docnohf/e32", "candidate/docnohf/e32"
+      ],
+      "count": 6
+    }
+  },
+  "controls": {
+    "perf_event_paranoid": 1,
+    "perf_tracepoints": "unavailable without permission",
+    "existing_0920_receipt_page_faults": "retained as the multi-sample whole-process page-fault context; no 0920 child is rerun",
+    "no_source_edits": true,
+    "no_0920_recapture": true,
+    "no_allocator_tuning": true,
+    "raw_artifacts_over_1mib": "external only"
+  }
+}

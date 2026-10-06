@@ -1,0 +1,83 @@
+{
+  "schema": "litchi.performance.0921.candidate-build.v1",
+  "argv": [
+    "taskset",
+    "-c",
+    "14,15",
+    "cargo",
+    "build",
+    "--locked",
+    "--offline",
+    "-j2",
+    "--release",
+    "--manifest-path",
+    "/tmp/litchi-performance-0921/source/docs/performance/results/change-0917/probe/Cargo.toml",
+    "--bins"
+  ],
+  "cwd": "/tmp/litchi-performance-0921/source",
+  "environment_overrides": {
+    "CARGO_TARGET_DIR": "/tmp/litchi-performance-0921/candidate-target",
+    "CARGO_TERM_COLOR": "never",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS": "false",
+    "CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS": "false",
+    "CARGO_PROFILE_RELEASE_LTO": "false",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "16",
+    "CARGO_PROFILE_RELEASE_PANIC": "unwind",
+    "CARGO_PROFILE_RELEASE_INCREMENTAL": "false",
+    "CARGO_PROFILE_RELEASE_STRIP": "none",
+    "CARGO_PROFILE_RELEASE_SPLIT_DEBUGINFO": "off",
+    "RUSTUP_TOOLCHAIN": "1.95.0"
+  },
+  "removed_environment_names": [],
+  "toolchain": {
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
+  },
+  "start_utc": "2026-10-06T07:14:15.562451+00:00",
+  "exit_code": 0,
+  "end_utc": "2026-10-06T07:15:30.191187+00:00",
+  "elapsed_seconds": 74.62871304500732,
+  "source": {
+    "revision": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+    "baseline_archive_sha256": "869aa001cc81972c3881f972ea6d34fe47bccf2bc2dc2c90c3303662eb6a6d3f",
+    "candidate_manifest_sha256": "dceb2bd74acc8d0bb899368eb9ed0b7c0294e40eeb6272e87f8e4874d412a09f",
+    "candidate_patch_sha256": "7705c8ec7f12a5a5083b2ff29408451b0ee2afbbf8a25bb827c01b885aece67d",
+    "probe_lock_sha256": "abd9f47a5aaa973a760cd61392de79c2b6143026c300dc1329831652aa54c06c"
+  },
+  "target_directory": "/tmp/litchi-performance-0921/candidate-target",
+  "artifacts": [
+    {
+      "path": "/tmp/litchi-performance-0921/logs/candidate-build.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/logs/candidate-build.stderr",
+      "bytes": 4180,
+      "sha256": "88e9558a69f40db0e02cab05d6e79665091086be6ce0e36bf2aab160a86928a9"
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/candidate-target/release/doc_retention_probe_alloc.d",
+      "bytes": 49138,
+      "sha256": "5606041e75caeb52e156cebb9112de5af71db6e942e78d394608f32fc2390f32"
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/candidate-target/release/doc_retention_probe.d",
+      "bytes": 49127,
+      "sha256": "340356e46280603d3249c8c112c0eff0633f133f1f18445e8bd926f9a8360cfe"
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/candidate-target/release/doc_retention_probe_alloc",
+      "bytes": 47836856,
+      "sha256": "27e32c8de26168e543833dfed6f405d19fa277bab54a45c6b26145830321b7e1"
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/candidate-target/release/doc_retention_probe",
+      "bytes": 47832328,
+      "sha256": "5476c1b505c8bbcf60d63d17d1066b5b5419063dcffbb06ff5f5c141f9231fa4"
+    }
+  ]
+}

@@ -1,0 +1,90 @@
+{
+  "schema": "litchi.performance.0921.shared-owner-quality.v2",
+  "created_utc": "2026-10-06T07:13:15.675654Z",
+  "scope": {
+    "candidate_source": "/tmp/litchi-performance-0921/source",
+    "base_revision": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+    "candidate_patch_bytes": 22350,
+    "candidate_patch_sha256": "7705c8ec7f12a5a5083b2ff29408451b0ee2afbbf8a25bb827c01b885aece67d",
+    "final_source_files": {
+      "crates/litchi-cfb/src/file.rs": {
+        "bytes": 277957,
+        "sha256": "eafb3483a589e2ef092637eca967a6fe59b5ff6c3926ec7f1824f8edfdb84ece"
+      },
+      "crates/litchi-cfb/src/lib.rs": {
+        "bytes": 2385,
+        "sha256": "54613cd40aeb63ab7681753dadca0d0f230d70e5d7d5b6423f0f762da4246021"
+      },
+      "crates/litchi-cfb/src/stream_compare_tests.rs": {
+        "bytes": 16625,
+        "sha256": "227433482035f50639a5ee7e0acdc81705f6b21e217ae953598ab2e59305557e"
+      },
+      "crates/litchi-ole-common/src/object/codec.rs": {
+        "bytes": 62630,
+        "sha256": "eb3c1b3f5bfbffe5a55129802d78556db4db1419d98690c4972e5fcf446eb577"
+      },
+      "crates/litchi-ole-common/src/object/editor.rs": {
+        "bytes": 39071,
+        "sha256": "75bb22f1953f9202d9c050b488132cbaf5760726ac7042db451046d346ac840e"
+      },
+      "crates/litchi-ole-common/src/object/model.rs": {
+        "bytes": 19221,
+        "sha256": "ffaa6043f550e8de047a006c5598a00d0bd3bbdc20de24301b3fc27a98abd1db"
+      }
+    },
+    "modified_file_count": 6,
+    "excluded": "No source edits by reviewer, benchmark/comparative capture, standalone probe, iWork, or full-workspace verification."
+  },
+  "functional_receipts": {
+    "source_bound_corpus": {
+      "ole2_files": 215,
+      "expectations": 9139,
+      "log": "/tmp/litchi-performance-0921/review/source-bound-corpus.log",
+      "sha256": "e7f74aa7307872f89939b354c2adbc6ce5aa12393aecb7558e6b8e83a97a5523"
+    },
+    "scoped_pass_total": 5059,
+    "counts": {
+      "litchi-cfb-lib": 479,
+      "litchi-ole-common-lib": 199,
+      "litchi-ole-common-object": 30,
+      "litchi-doc-tests": 1347,
+      "litchi-xls-tests": 1704,
+      "litchi-ppt-tests": 1300
+    },
+    "binding": "These broad functional receipts were captured before the final lint-only source delta; no functional suites were repeated."
+  },
+  "final_delta_gates": [
+    {
+      "id": "git-diff-check",
+      "argv": "git diff --check -- crates/litchi-cfb/src/file.rs crates/litchi-cfb/src/lib.rs crates/litchi-cfb/src/stream_compare_tests.rs crates/litchi-ole-common/src/object/codec.rs crates/litchi-ole-common/src/object/editor.rs crates/litchi-ole-common/src/object/model.rs",
+      "cwd": "/tmp/litchi-performance-0921/source",
+      "exit": 0
+    },
+    {
+      "id": "candidate-rustfmt",
+      "argv": "rustfmt --edition 2024 --check crates/litchi-cfb/src/file.rs crates/litchi-cfb/src/lib.rs crates/litchi-cfb/src/stream_compare_tests.rs crates/litchi-ole-common/src/object/codec.rs crates/litchi-ole-common/src/object/editor.rs crates/litchi-ole-common/src/object/model.rs",
+      "cwd": "/tmp/litchi-performance-0921/source",
+      "exit": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "scoped-clippy",
+      "argv": "cargo clippy --offline --locked -p litchi-cfb -p litchi-ole-common --all-targets -- -D warnings",
+      "cwd": "/tmp/litchi-performance-0921/source",
+      "exit": 0,
+      "log_sha256": "6e7c1f8bbe8512e420aa68fa6fc14a8bf8f0fa38c755cd6da5bc081a37feb5f6"
+    }
+  ],
+  "design_review": {
+    "source_binding": "Exact OleFile<Cursor<&[u8]>> reader source; no caller-supplied candidate slice or mutable adapter.",
+    "missing_staged_and_errors": "Missing paths compare against empty bytes; chain/marker/cycle/declared-length checks precede comparison, late physical ranges remain checked after mismatch, and malformed sources return errors before fallback reads.",
+    "short_tail_zero_fill": "Only physically present bytes are compared; absent final-sector bytes must be zero.",
+    "atomic_publication": "Pending metadata/Arc hits are published only after comparer completion, fallback reads, reopen/protection, and discovery succeed on the cloned candidate.",
+    "public_synthetic_gap": "No direct public-adapter malformed/short-tail synthetic test; private generic oracle and valid public corpus pass. Coverage gap is nonblocking with no observed semantic defect."
+  },
+  "known_baseline": [
+    "Workspace fmt remains a pre-existing failure in unrelated soapberry-zip and litchi-iwa-archive files; candidate-only rustfmt passes.",
+    "Earlier XLS SST failure was nested fixture setup drift; removing the duplicate symlink and rerunning the exact baseline fixture passed."
+  ],
+  "result": "READY for quality gates: final scoped Clippy/diff/rustfmt pass; broad functional totals are source-bound to the pre-lint candidate and final delta is lint-only."
+}

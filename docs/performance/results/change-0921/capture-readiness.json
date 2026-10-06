@@ -1,0 +1,113 @@
+{
+  "schema": "litchi.performance.0921.capture-readiness.v1",
+  "utc": "2026-10-06T07:18:26.461347+00:00",
+  "status": "admitted_to_comparative_capture_only",
+  "production_adoption": false,
+  "disposition": "Final semantic review, scoped quality, exact-capacity controls,96-report qualification replay,938-file source verification,157 compiler fingerprints and144-package dependency parity pass. Final candidate includes only reviewed lint cleanup after broad functional tests. Diagnostic and build/test jobs are idle.",
+  "bindings": [
+    {
+      "path": "docs/performance/results/change-0921/shared-owner-quality.json",
+      "bytes": 4892,
+      "sha256": "59a5ce0ca4bcd3c98f65519c09e588cc479e535cf85709fe906654b0e57926c6"
+    },
+    {
+      "path": "docs/performance/results/change-0921/shared-owner-quality.md",
+      "bytes": 1557,
+      "sha256": "9e30e535ebd0bbebf5b2dff6f97a7aa1724a530c6724132dc9552dd8e26f6578"
+    },
+    {
+      "path": "docs/performance/results/change-0921/focused-comparer-final.json",
+      "bytes": 2573,
+      "sha256": "bf45373f51d83ca692662d06f00ba2fa37685ff77f9c3a6508fed0125eeb6adf"
+    },
+    {
+      "path": "docs/performance/results/change-0921/cfb-write-check.json",
+      "bytes": 1744,
+      "sha256": "5416008dbda40a5c8f33cc5954750628d4dac26cc1860dbcc1963500519a7592"
+    },
+    {
+      "path": "docs/performance/results/change-0921/boundary-check.json",
+      "bytes": 413,
+      "sha256": "f61dbb3c937c3d438ad1d0c03ba9129ec35f151948af596302f50cc36b1066b0"
+    },
+    {
+      "path": "docs/performance/results/change-0921/comparison-tooling-validation.json",
+      "bytes": 7724,
+      "sha256": "a104d382ea045ec3ccb4601854ca04b75041c35d425557fed0d13856e35bc2d9"
+    },
+    {
+      "path": "docs/performance/results/change-0921/capacity-controls.json",
+      "bytes": 2735,
+      "sha256": "46fcb8a7829459cad49b8108d7966e8d36f9c12cdd6e79b0a31890b301702b02"
+    },
+    {
+      "path": "docs/performance/results/change-0921/qualification-replay-final.json",
+      "bytes": 1291,
+      "sha256": "0b7eaa5534bf548dced4c562e70ed031dbd7477ea7d065e3ef59f8ba31b5171f"
+    },
+    {
+      "path": "docs/performance/results/change-0921/root-build-parity.json",
+      "bytes": 127756,
+      "sha256": "f6241a8ad1f42bdc58515911a9d82d96ec93dd5ae21b9dab62e6487e010bd3fc"
+    },
+    {
+      "path": "docs/performance/results/change-0921/root-source-verification.json",
+      "bytes": 956,
+      "sha256": "871d00024e97f6b82f7e0f27710c81091afc9e2599ad894ee2716eff540ed5df"
+    },
+    {
+      "path": "docs/performance/results/change-0921/dependency-graph-parity.json",
+      "bytes": 1629,
+      "sha256": "a50c0dfd59bc7d032bf771014fa2b530e332108dcd4f53663397d63089c6cc0c"
+    },
+    {
+      "path": "docs/performance/results/change-0921/comparison.py",
+      "bytes": 87482,
+      "sha256": "e23458b09f4927c5ab8f9aeebe511bdf17eda44e9b219cb39c9afcb86baf4942"
+    },
+    {
+      "path": "docs/performance/results/change-0921/comparison-replay.py",
+      "bytes": 7256,
+      "sha256": "0f5716eed13071e1240ad6c0cd8407be3660c86107e2e2bfae2dc18fc2c1ef44"
+    },
+    {
+      "path": "docs/performance/results/change-0921/comparison-protocol.json",
+      "bytes": 10828,
+      "sha256": "2e0b1d10a7b45b403aeb053fa3da24b2371d955fb92b5cb68a312ae7b19b4a53"
+    }
+  ],
+  "root_rechecks": {
+    "baseline_source_files": 938,
+    "candidate_source_files": 938,
+    "modified_files": 6,
+    "release_fingerprint_records": 157,
+    "dependency_packages": 144,
+    "quality_and_tooling_artifact_descriptors_checked": 23,
+    "qualification_reports": 96,
+    "qualification_pairs": 48,
+    "exact_capacities": true
+  },
+  "candidate_patch_sha256": "7705c8ec7f12a5a5083b2ff29408451b0ee2afbbf8a25bb827c01b885aece67d",
+  "performance_children_run_before_readiness": 0,
+  "dry_run_note": "Earlier temporary freeze was solely a tooling dry-run, preserved externally and removed from packet before this readiness. No comparative children ran. The next manifest is the authoritative final freeze.",
+  "limitations": [
+    "Broad5059 functional passes precede lint-only syntax and test-initializer cleanup; final focused comparer tests,Clippy,check and formatting pass.",
+    "Public-adapter synthetic corruption/short-tail tests are a nonblocking coverage gap; shared private comparer tests and public215-file corpus pass.",
+    "Workspace formatting drift outside candidate remains; no full-workspace or iWork claim.",
+    "Native profiling of0920 remains process-wide where callchain filtering is unavailable."
+  ],
+  "host": {
+    "platform": "Linux-7.0.0-1013-aws-x86_64-with-glibc2.43",
+    "machine": "x86_64",
+    "cpu_model": "AMD EPYC 9R45",
+    "logical_cpus": 32,
+    "affinity_cpu": 14,
+    "cpu14_siblings": "14",
+    "memory": "MemTotal:       129447072 kB",
+    "libc": [
+      "glibc",
+      "2.43"
+    ],
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)"
+  }
+}

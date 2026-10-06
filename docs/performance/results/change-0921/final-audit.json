@@ -1,0 +1,133 @@
+{
+  "schema": "litchi.performance.0921.final-audit.v1",
+  "status": "passed-adoption-false",
+  "generated_utc": "2026-10-06T07:25:10.161891+00:00",
+  "scope": "Read-only final audit; no comparative child, benchmark, recapture, or source edit was run.",
+  "manifest": {
+    "path": "docs/performance/results/change-0921/comparison-manifest.json",
+    "bytes": 7580,
+    "sha256": "cc782ab79078a5eed79114f01328bd64d19c7be0ec873bffff4141f91f42d1d8",
+    "protocol_sha256": "2e0b1d10a7b45b403aeb053fa3da24b2371d955fb92b5cb68a312ae7b19b4a53",
+    "reduction_path": "docs/performance/results/change-0921/comparison-reduced.json",
+    "reduction_bytes": 560529,
+    "reduction_sha256": "afc65949f8f2fdeb646bf1f9c7166fa8b8ff3adde50e7d411f3d3b68c2f03dae"
+  },
+  "source_binding": {
+    "baseline_revision": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+    "candidate_base_revision": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+    "candidate_source_head": null,
+    "candidate_patch_bytes": 22350,
+    "candidate_patch_sha256": "7705c8ec7f12a5a5083b2ff29408451b0ee2afbbf8a25bb827c01b885aece67d",
+    "candidate_manifest_sha256": "dceb2bd74acc8d0bb899368eb9ed0b7c0294e40eeb6272e87f8e4874d412a09f",
+    "modified_files": [
+      "crates/litchi-cfb/src/file.rs",
+      "crates/litchi-cfb/src/lib.rs",
+      "crates/litchi-cfb/src/stream_compare_tests.rs",
+      "crates/litchi-ole-common/src/object/codec.rs",
+      "crates/litchi-ole-common/src/object/editor.rs",
+      "crates/litchi-ole-common/src/object/model.rs"
+    ],
+    "baseline_files": 938,
+    "candidate_files": 938,
+    "root_source_hashes_match": true
+  },
+  "build_binding": {
+    "baseline_native": {
+      "bytes": 54795488,
+      "path": "/tmp/litchi-performance-0921/baseline-target/release/doc_retention_probe",
+      "sha256": "9f3c2bb2c589ba8e7a47b99c051d4a4910e41002d28f1caa1d1edc036a7515e5"
+    },
+    "candidate_native": {
+      "bytes": 47832328,
+      "path": "/tmp/litchi-performance-0921/candidate-target/release/doc_retention_probe",
+      "sha256": "5476c1b505c8bbcf60d63d17d1066b5b5419063dcffbb06ff5f5c141f9231fa4"
+    },
+    "baseline_allocator": {
+      "bytes": 54800008,
+      "path": "/tmp/litchi-performance-0921/baseline-target/release/doc_retention_probe_alloc",
+      "sha256": "20b96ebbdf611c22b7114b88580044a707d7fce2e4c8811c8084679feb1060dd"
+    },
+    "candidate_allocator": {
+      "bytes": 47836856,
+      "path": "/tmp/litchi-performance-0921/candidate-target/release/doc_retention_probe_alloc",
+      "sha256": "27e32c8de26168e543833dfed6f405d19fa277bab54a45c6b26145830321b7e1"
+    },
+    "rustc": "1.95.0",
+    "compiler_fingerprint_records_per_version": 157,
+    "compiler_fingerprint_equal": true,
+    "dependency_package_count": 144,
+    "dependency_graph_equal": true
+  },
+  "children": {
+    "expected_native": 192,
+    "expected_allocator": 96,
+    "expected_total": 288,
+    "logs_checked": 288,
+    "raw_directories": 288,
+    "packet_artifacts_checked": 864,
+    "external_artifacts_checked": 864,
+    "validator_reports_checked": 288,
+    "all_status_passed": true
+  },
+  "reduction": {
+    "recomputed_from_retained_reports": true,
+    "native_cells": 8,
+    "native_round_rows": 96,
+    "allocator_cells": 48,
+    "review_latency_rows": 96,
+    "review_allocator_rows": 48,
+    "false_latency_cells": [
+      [
+        "docfloat",
+        2,
+        0.9520756186100885
+      ]
+    ],
+    "gates": {
+      "adoption": false,
+      "all_children_and_controls_validated": true,
+      "all_explicit_capacity_fields_equal": true,
+      "all_native_default_latency_lower_bounds": false,
+      "candidate_saves_at_least_5_percent_allocated_bytes_in_one_32_edit_default_fixture": true,
+      "no_allocator_allocated_bytes_increase_over_1_percent": true,
+      "no_allocator_peak_live_increase_over_5_percent": true
+    },
+    "latency_adverse_flags": {
+      "p50": 5,
+      "p95": 5,
+      "p99": 9
+    },
+    "native_rss_adverse_rows": 1,
+    "allocator_adverse_flags": {
+      "allocation": 0,
+      "peak_live": 0,
+      "rss": 3
+    },
+    "adverse_rows_retained": true
+  },
+  "conclusion": "All 288 child receipts, compressed and external artifacts, validator summaries, source/build bindings, and reduction rows pass custody checks. Adoption remains false solely because docfloat/e02 lower CI 0.9520756186100885 is below 1/1.05 = 0.9523809523809523; allocator, capacity, and peak-live gates pass. RSS and per-round latency adverse rows remain visible in review_flags.",
+  "offline_replay": {
+    "command": "python3 -B /tmp/litchi-0921-replay-copy/docs/performance/results/change-0921/comparison-replay.py --packet /tmp/litchi-0921-replay-copy/docs/performance/results/change-0921",
+    "temporary_packet_copy": "/tmp/litchi-0921-replay-copy",
+    "exit": 0,
+    "status": "verified",
+    "fixture_hashes_verified": [
+      "docfloat",
+      "docnohf"
+    ],
+    "native_children": 192,
+    "allocator_children": 96,
+    "canonical_reports": 288,
+    "canonical_sha256": "4f867b4a6f7aafe0119403065ef7b3f7db8201c247f1f5e358aa936ba55cef0d",
+    "copy_cleaned_after_receipt": true
+  },
+  "quick_claim_check": {
+    "all_native_default_median_ratios_gt_1": true,
+    "minimum_native_default_median_ratio": 1.0095497236589868,
+    "minimum_native_default_ci_lower": 0.9520756186100885,
+    "adoption_ci_threshold": 0.9523809523809523,
+    "maximum_allocator_allocated_increase_fraction": -0.04189690962781045,
+    "maximum_allocator_peak_live_increase_fraction": 0.0,
+    "maximum_capacity_changed_fields": 0
+  }
+}

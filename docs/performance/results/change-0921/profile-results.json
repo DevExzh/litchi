@@ -1,0 +1,1982 @@
+{
+  "schema": "litchi.performance.0921.operation-profile.results.v1",
+  "change": "0921",
+  "status": "complete-with-perf-filter-limitation",
+  "generated_utc": "2026-10-06T07:06:01.994118Z",
+  "purpose": "Diagnostic attribution only for the rejected 0920 CFB output-reservation candidate; no 0920 recapture, adoption, allocator tuning, source edit or new candidate build.",
+  "protocol": {
+    "path": "docs/performance/results/change-0921/profile-protocol.json",
+    "sha256": "e620b3c40946ba2cbf556604455aa9aed0cb9d4802c39d69f3967a56bcf2ce23"
+  },
+  "method": {
+    "path": "docs/performance/results/change-0921/profile-method.md",
+    "sha256": "19cfeced145a82840ff2eaa6a1d7580f56593118c2da5676e09af6119c1adccf"
+  },
+  "report": {
+    "path": "docs/performance/results/change-0921/profile-report.md",
+    "sha256": "f92296162c8db28ba4fb2e10f54c5c40abd5f767aad974d3f2ed171e6395cf86"
+  },
+  "raw_root": "/tmp/litchi-performance-0921-profile",
+  "source_binding": {
+    "base_revision": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+    "retained_0920_binaries": true,
+    "note": "0921 used retained 0920 baseline/candidate binaries and exact fixture hashes; it is not a new source/build candidate."
+  },
+  "environment": {
+    "kernel": "Linux 7.0.0-1013-aws x86_64 GNU/Linux",
+    "perf": "perf version 7.0.14",
+    "valgrind": "valgrind-3.26.0",
+    "cpu": "14",
+    "perf_event_paranoid": 1,
+    "syscall_tracepoints": "unavailable"
+  },
+  "boundary": {
+    "entry": "doc_retention_probe_0917::measure_one",
+    "lifecycle": "doc_retention_probe_0917::run_case",
+    "warmup": 0,
+    "callgrind_samples": 1,
+    "perf_record_samples_per_child": 200,
+    "controls_samples": 1,
+    "retention": "default"
+  },
+  "callgrind": {
+    "count": 10,
+    "rows": [
+      {
+        "lane": "baseline",
+        "case": "docfloat",
+        "edits": 1,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-baseline-docfloat-e1-default/probe.stdout",
+          "bytes": 15492,
+          "sha256": "990c25cb644b5a4cf4fa2c5fe44330c0de0ba1e4c80dd92dcc633524b83978cb",
+          "output_sha256": "6ba1bc972d66715e76d882f47c587b22000100f47abaa88428990619fc59fa20",
+          "output_bytes": 342528,
+          "output_capacity": 342528,
+          "exact_output_equal_reference": true
+        },
+        "stderr": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-baseline-docfloat-e1-default/probe.stderr",
+          "bytes": 1756,
+          "sha256": "17fd49141081e2ee94927dc7c226d02be2d82da8a0fd6a7a68c99aa75cce2fd2"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-baseline-docfloat-e1-default/callgrind.out",
+          "bytes": 1760696,
+          "sha256": "c40a90b3358cae00ef071d722c650cb01e24052fc0f6e11b4d645d0fd1830d90"
+        },
+        "events": {
+          "Ir": 22544494,
+          "Dr": 11974561,
+          "Dw": 13272263,
+          "I1mr": 34228,
+          "D1mr": 191976,
+          "D1mw": 201910,
+          "ILmr": 18,
+          "DLmr": 0,
+          "DLmw": 1
+        },
+        "scope": {
+          "entry_present": true,
+          "lifecycle_present": true,
+          "collection_nonzero": true
+        },
+        "valgrind_diagnostic": "brk segment overflow"
+      },
+      {
+        "lane": "candidate",
+        "case": "docfloat",
+        "edits": 1,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-candidate-docfloat-e1-default/probe.stdout",
+          "bytes": 15492,
+          "sha256": "4ff6baf4eff65e943fec301e9065ea5146b55fe72f304838e62a9f371c1b3999",
+          "output_sha256": "6ba1bc972d66715e76d882f47c587b22000100f47abaa88428990619fc59fa20",
+          "output_bytes": 342528,
+          "output_capacity": 342528,
+          "exact_output_equal_reference": true
+        },
+        "stderr": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-candidate-docfloat-e1-default/probe.stderr",
+          "bytes": 1753,
+          "sha256": "015b9f5f8284ce2c95f35b9dac45116e5162f9ae78f01728fdc947170a3d32b6"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-candidate-docfloat-e1-default/callgrind.out",
+          "bytes": 1754577,
+          "sha256": "7b4a79450cf72fee530652cffa0bff4d874d22b35057d76eac9f716a3a76e811"
+        },
+        "events": {
+          "Ir": 22185231,
+          "Dr": 11620093,
+          "Dw": 12919537,
+          "I1mr": 32765,
+          "D1mr": 186653,
+          "D1mw": 196635,
+          "ILmr": 19,
+          "DLmr": 0,
+          "DLmw": 0
+        },
+        "scope": {
+          "entry_present": true,
+          "lifecycle_present": true,
+          "collection_nonzero": true
+        },
+        "valgrind_diagnostic": "brk segment overflow"
+      },
+      {
+        "lane": "baseline",
+        "case": "docfloat",
+        "edits": 2,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-baseline-docfloat-e2-default/probe.stdout",
+          "bytes": 15686,
+          "sha256": "3d27aa73705b6acb26974cfd254198c377d9ddd0a9dec8ef881ffa0d50148f47",
+          "output_sha256": "a298ac14820cfa74f952367a2c9212f13654ac5aca306f46756745b7bfbe7e39",
+          "output_bytes": 353280,
+          "output_capacity": 353280,
+          "exact_output_equal_reference": true
+        },
+        "stderr": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-baseline-docfloat-e2-default/probe.stderr",
+          "bytes": 1756,
+          "sha256": "9d68cf224e4871751dd9bbb1453d20102876148f5b26122444c6a45724a1adee"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-baseline-docfloat-e2-default/callgrind.out",
+          "bytes": 1777129,
+          "sha256": "7e9825ded98f3c0aa5f78e3119b52e9ac28afc76a6fc867fedbc892eb9f854ee"
+        },
+        "events": {
+          "Ir": 27381303,
+          "Dr": 14635051,
+          "Dw": 16079203,
+          "I1mr": 38905,
+          "D1mr": 249556,
+          "D1mw": 247153,
+          "ILmr": 20,
+          "DLmr": 0,
+          "DLmw": 1
+        },
+        "scope": {
+          "entry_present": true,
+          "lifecycle_present": true,
+          "collection_nonzero": true
+        },
+        "valgrind_diagnostic": "brk segment overflow"
+      },
+      {
+        "lane": "candidate",
+        "case": "docfloat",
+        "edits": 2,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-candidate-docfloat-e2-default/probe.stdout",
+          "bytes": 15686,
+          "sha256": "6c3c9bed4a55537e5583c0d798347ec662c65a372ffa56d7b1d7728cfbc9014f",
+          "output_sha256": "a298ac14820cfa74f952367a2c9212f13654ac5aca306f46756745b7bfbe7e39",
+          "output_bytes": 353280,
+          "output_capacity": 353280,
+          "exact_output_equal_reference": true
+        },
+        "stderr": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-candidate-docfloat-e2-default/probe.stderr",
+          "bytes": 1753,
+          "sha256": "8dc5f454929358151ba063bb928129987cbd601d7986bf2ec734f0ad522bd68b"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-candidate-docfloat-e2-default/callgrind.out",
+          "bytes": 1770146,
+          "sha256": "7d4a9ec68a492f6322c943f31fbf253429c7a8ec527aeda44e8f1c2aa0c7f6b9"
+        },
+        "events": {
+          "Ir": 26766429,
+          "Dr": 14020300,
+          "Dw": 15465245,
+          "I1mr": 37616,
+          "D1mr": 239710,
+          "D1mw": 236851,
+          "ILmr": 19,
+          "DLmr": 0,
+          "DLmw": 0
+        },
+        "scope": {
+          "entry_present": true,
+          "lifecycle_present": true,
+          "collection_nonzero": true
+        },
+        "valgrind_diagnostic": "brk segment overflow"
+      },
+      {
+        "lane": "baseline",
+        "case": "docfloat",
+        "edits": 8,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-baseline-docfloat-e8-default/probe.stdout",
+          "bytes": 16838,
+          "sha256": "9498fc201190e285565e661649c1fb77e8da8dbd7fae312043e972bb1f6934dd",
+          "output_sha256": "59f03ff2e64e77b93ab35ca28f10f5ce6b09361b06c045b03322a4e6b05241f5",
+          "output_bytes": 418304,
+          "output_capacity": 418304,
+          "exact_output_equal_reference": true
+        },
+        "stderr": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-baseline-docfloat-e8-default/probe.stderr",
+          "bytes": 1756,
+          "sha256": "4b55d35678004d82d2b75d215deceb9606e394d9960140cf1cf50a8253968c37"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-baseline-docfloat-e8-default/callgrind.out",
+          "bytes": 1810365,
+          "sha256": "993c3868055822ff7a3766efc4ec8fc6a521d35ac1a68cd7c5e83b81d63e30c6"
+        },
+        "events": {
+          "Ir": 57775420,
+          "Dr": 31530728,
+          "Dw": 34035914,
+          "I1mr": 66562,
+          "D1mr": 614381,
+          "D1mw": 530920,
+          "ILmr": 18,
+          "DLmr": 0,
+          "DLmw": 1
+        },
+        "scope": {
+          "entry_present": true,
+          "lifecycle_present": true,
+          "collection_nonzero": true
+        },
+        "valgrind_diagnostic": "brk segment overflow"
+      },
+      {
+        "lane": "candidate",
+        "case": "docfloat",
+        "edits": 8,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-candidate-docfloat-e8-default/probe.stdout",
+          "bytes": 16838,
+          "sha256": "ef6143ef34ae847ad3ff3a1ad3a3957900cc6e37d8323e8df9ef3a491615e52e",
+          "output_sha256": "59f03ff2e64e77b93ab35ca28f10f5ce6b09361b06c045b03322a4e6b05241f5",
+          "output_bytes": 418304,
+          "output_capacity": 418304,
+          "exact_output_equal_reference": true
+        },
+        "stderr": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-candidate-docfloat-e8-default/probe.stderr",
+          "bytes": 1753,
+          "sha256": "610a666d235bc12993651303d4e41749d98974abef4579b1fa61e7bdb57b7458"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-candidate-docfloat-e8-default/callgrind.out",
+          "bytes": 1804479,
+          "sha256": "a55aa49050c58c2107457324da2c396bbedee2148905219f075885d90f48dcfd"
+        },
+        "events": {
+          "Ir": 56394348,
+          "Dr": 30138313,
+          "Dw": 32638218,
+          "I1mr": 65473,
+          "D1mr": 592842,
+          "D1mw": 510295,
+          "ILmr": 19,
+          "DLmr": 0,
+          "DLmw": 0
+        },
+        "scope": {
+          "entry_present": true,
+          "lifecycle_present": true,
+          "collection_nonzero": true
+        },
+        "valgrind_diagnostic": "brk segment overflow"
+      },
+      {
+        "lane": "baseline",
+        "case": "docfloat",
+        "edits": 32,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-baseline-docfloat-e32-default/probe.stdout",
+          "bytes": 21589,
+          "sha256": "81222fbd31ff3d03f42e25699d52d69acf4fa123369a96632e34d222f72e02ad",
+          "output_sha256": "642063d159bdbcc65148087a1a491d7ff9a36814fcf4ee7a8a48c7c281021ad8",
+          "output_bytes": 686592,
+          "output_capacity": 686592,
+          "exact_output_equal_reference": true
+        },
+        "stderr": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-baseline-docfloat-e32-default/probe.stderr",
+          "bytes": 1792,
+          "sha256": "d04445e27690163a133a5aa5487d56bd6969c08ac704f0fd70a6c960eb2cf8dd"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-baseline-docfloat-e32-default/callgrind.out",
+          "bytes": 1864736,
+          "sha256": "340efc82a5a3be6989115f1eac1b17e2af30caede18ec1a68953bb9b8226c153"
+        },
+        "events": {
+          "Ir": 228736771,
+          "Dr": 140645557,
+          "Dw": 150576793,
+          "I1mr": 177603,
+          "D1mr": 2840270,
+          "D1mw": 2361790,
+          "ILmr": 18,
+          "DLmr": 0,
+          "DLmw": 1
+        },
+        "scope": {
+          "entry_present": true,
+          "lifecycle_present": true,
+          "collection_nonzero": true
+        },
+        "valgrind_diagnostic": "brk segment overflow"
+      },
+      {
+        "lane": "candidate",
+        "case": "docfloat",
+        "edits": 32,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-candidate-docfloat-e32-default/probe.stdout",
+          "bytes": 21545,
+          "sha256": "c6862073ced031e1a8b0f33fb85c9ad22f7bee08b5b373bd9af548b991fa8b3e",
+          "output_sha256": "642063d159bdbcc65148087a1a491d7ff9a36814fcf4ee7a8a48c7c281021ad8",
+          "output_bytes": 686592,
+          "output_capacity": 686592,
+          "exact_output_equal_reference": true
+        },
+        "stderr": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-candidate-docfloat-e32-default/probe.stderr",
+          "bytes": 1795,
+          "sha256": "38e6720c8ed912fdb93163df064f09f9e5487ed5e9a77a7df0f4da2deef19970"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-candidate-docfloat-e32-default/callgrind.out",
+          "bytes": 1858154,
+          "sha256": "1c38131d2f9dbbbe5b1f15f82d8f1c020f68b947c339580ec9c637db91633b94"
+        },
+        "events": {
+          "Ir": 217499938,
+          "Dr": 129551416,
+          "Dw": 139479234,
+          "I1mr": 176021,
+          "D1mr": 2668390,
+          "D1mw": 2188934,
+          "ILmr": 19,
+          "DLmr": 0,
+          "DLmw": 921
+        },
+        "scope": {
+          "entry_present": true,
+          "lifecycle_present": true,
+          "collection_nonzero": true
+        },
+        "valgrind_diagnostic": "brk segment overflow"
+      },
+      {
+        "lane": "baseline",
+        "case": "docnohf",
+        "edits": 32,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-baseline-docnohf-e32-default/probe.stdout",
+          "bytes": 21365,
+          "sha256": "0bb76822ee14b7206cadf80919bfa566fbe290b85ef01ec3f977c76c87f98aca",
+          "output_sha256": "0c91fc9286b8592e25f2f2cb0de23f5ae32244c43fec8ee7883cf437c710347f",
+          "output_bytes": 63488,
+          "output_capacity": 63488,
+          "exact_output_equal_reference": true
+        },
+        "stderr": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-baseline-docnohf-e32-default/probe.stderr",
+          "bytes": 1557,
+          "sha256": "8e5c8a192c9b627a197361da66ae77afab641c8e8bf9ddc2bedde590a3ae6a56"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-baseline-docnohf-e32-default/callgrind.out",
+          "bytes": 1324488,
+          "sha256": "1a292ccd2b058eebff730d92d73d3f32403b9ee833d5fedf43a10a9f28411e03"
+        },
+        "events": {
+          "Ir": 23975815,
+          "Dr": 12004251,
+          "Dw": 12943079,
+          "I1mr": 141845,
+          "D1mr": 243206,
+          "D1mw": 213534,
+          "ILmr": 18,
+          "DLmr": 0,
+          "DLmw": 2
+        },
+        "scope": {
+          "entry_present": true,
+          "lifecycle_present": true,
+          "collection_nonzero": true
+        },
+        "valgrind_diagnostic": null
+      },
+      {
+        "lane": "candidate",
+        "case": "docnohf",
+        "edits": 32,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-candidate-docnohf-e32-default/probe.stdout",
+          "bytes": 21365,
+          "sha256": "598b8ea7e49009ee3d2308e2a083d5620eac40f87852c30ec0c2818d7783e15a",
+          "output_sha256": "0c91fc9286b8592e25f2f2cb0de23f5ae32244c43fec8ee7883cf437c710347f",
+          "output_bytes": 63488,
+          "output_capacity": 63488,
+          "exact_output_equal_reference": true
+        },
+        "stderr": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-candidate-docnohf-e32-default/probe.stderr",
+          "bytes": 1558,
+          "sha256": "84e53ec055a136a952c585e80b72a76fb04153150f65a60d3e6a9088ebba3992"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/callgrind-candidate-docnohf-e32-default/callgrind.out",
+          "bytes": 1318464,
+          "sha256": "a1bab3a98600c4faf8123362b2fec502e61281e93091fa69eab07fbc6a0531e6"
+        },
+        "events": {
+          "Ir": 22675333,
+          "Dr": 10777036,
+          "Dw": 11719921,
+          "I1mr": 140810,
+          "D1mr": 235873,
+          "D1mw": 195269,
+          "ILmr": 19,
+          "DLmr": 0,
+          "DLmw": 3
+        },
+        "scope": {
+          "entry_present": true,
+          "lifecycle_present": true,
+          "collection_nonzero": true
+        },
+        "valgrind_diagnostic": null
+      }
+    ],
+    "paired_event_deltas_pct": {
+      "docfloat-e01": {
+        "Ir": -1.594,
+        "Dr": -2.96,
+        "Dw": -2.658,
+        "I1mr": -4.274,
+        "D1mr": -2.773,
+        "D1mw": -2.613,
+        "ILmr": 5.556,
+        "DLmw": -100.0
+      },
+      "docfloat-e02": {
+        "Ir": -2.246,
+        "Dr": -4.201,
+        "Dw": -3.818,
+        "I1mr": -3.313,
+        "D1mr": -3.945,
+        "D1mw": -4.168,
+        "ILmr": -5.0,
+        "DLmw": -100.0
+      },
+      "docfloat-e08": {
+        "Ir": -2.39,
+        "Dr": -4.416,
+        "Dw": -4.107,
+        "I1mr": -1.636,
+        "D1mr": -3.506,
+        "D1mw": -3.885,
+        "ILmr": 5.556,
+        "DLmw": -100.0
+      },
+      "docfloat-e32": {
+        "Ir": -4.913,
+        "Dr": -7.888,
+        "Dw": -7.37,
+        "I1mr": -0.891,
+        "D1mr": -6.052,
+        "D1mw": -7.319,
+        "ILmr": 5.556,
+        "DLmw": 92000.0
+      },
+      "docnohf-e32": {
+        "Ir": -5.424,
+        "Dr": -10.223,
+        "Dw": -9.45,
+        "I1mr": -0.73,
+        "D1mr": -3.015,
+        "D1mw": -8.554,
+        "ILmr": 5.556,
+        "DLmw": 50.0
+      }
+    },
+    "representative_publication_e02": {
+      "baseline": {
+        "render_with_layout": {
+          "Ir": 2779245,
+          "inclusive_pct": 10.15,
+          "line": "2,779,245 (10.15%)  1,670,516 (11.41%)  1,542,068 ( 9.59%)  5,023 (12.91%)  24,700 ( 9.90%)  24,299 ( 9.83%)  2 (10.00%) .          .           /tmp/litchi-performance-0920-baseline/source/crates/litchi-ole-common/src/object/codec.rs:litchi_ole_common::object::codec::Package::render_with_layout [/tmp/litchi-performance-0920-baseline/target/release/doc_retention_probe]"
+        },
+        "writer": {
+          "Ir": 2255926,
+          "inclusive_pct": 8.24,
+          "line": "2,255,926 ( 8.24%)  1,541,028 (10.53%)  1,450,618 ( 9.02%)  2,836 ( 7.29%)  23,285 ( 9.33%)  22,885 ( 9.26%)  .          .          .           /tmp/litchi-performance-0920-baseline/source/crates/litchi-cfb/src/writer/core.rs:litchi_cfb::writer::core::OleWriter::write_to [/tmp/litchi-performance-0920-baseline/target/release/doc_retention_probe]"
+        }
+      },
+      "candidate": {
+        "render_with_layout": {
+          "Ir": 2113479,
+          "inclusive_pct": 7.9,
+          "line": "2,113,479 ( 7.90%)  1,003,630 ( 7.16%)    875,186 ( 5.66%)  5,008 (13.31%)  14,110 ( 5.89%)  13,743 ( 5.80%)  .          .          .           /tmp/litchi-performance-0920/source/crates/litchi-ole-common/src/object/codec.rs:litchi_ole_common::object::codec::Package::render_with_layout [/tmp/litchi-performance-0920/candidate-target/release/doc_retention_probe]"
+        },
+        "writer": {
+          "Ir": 1587256,
+          "inclusive_pct": 5.93,
+          "line": "1,587,256 ( 5.93%)    873,845 ( 6.23%)    783,557 ( 5.07%)  2,826 ( 7.51%)  12,696 ( 5.30%)  12,335 ( 5.21%)  .          .          .           /tmp/litchi-performance-0920/source/crates/litchi-cfb/src/writer/core.rs:litchi_cfb::writer::core::OleWriter::write_to_vec [/tmp/litchi-performance-0920/candidate-target/release/doc_retention_probe]"
+        }
+      }
+    }
+  },
+  "perf_record": {
+    "count": 10,
+    "rows": [
+      {
+        "lane": "baseline",
+        "case": "docfloat",
+        "edits": 1,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-baseline-docfloat-e1-default/probe.stdout",
+          "bytes": 712877,
+          "sha256": "6e11afe77af2ff242528440ecd571f5a278ef9c047ed3abde224ed871193452b"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-baseline-docfloat-e1-default/perf.data",
+          "bytes": 13521080,
+          "sha256": "5a6ad03d0c49b3e1722c9773605ca1c726dc3ef3cc36ed727a0c2c1477fb5af9"
+        },
+        "report": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-baseline-docfloat-e1-default/perf.report.txt",
+          "bytes": 188248,
+          "sha256": "540efe314ab27fb7709b2625e03bf7f3ddfff39ee6828c5f24e83831281c5b49"
+        },
+        "samples": 3068,
+        "lost_samples": 0,
+        "operation_filter": {
+          "requested": "callchains containing doc_retention_probe_0917::measure_one",
+          "status": "unavailable",
+          "reason": "measure_one and run_case absent from perf script/report callchains despite DWARF debug sections and symbols"
+        },
+        "top_symbols": [
+          {
+            "children_pct": 24.06,
+            "self_pct": 22.74,
+            "symbol": "__memmove_avx512_unaligned_erms"
+          },
+          {
+            "children_pct": 13.04,
+            "self_pct": 13.04,
+            "symbol": "litchi_doc::sprm::parse_sprms"
+          },
+          {
+            "children_pct": 9.71,
+            "self_pct": 9.71,
+            "symbol": "sha2::sha256::x86_sha::compress"
+          },
+          {
+            "children_pct": 6.33,
+            "self_pct": 5.38,
+            "symbol": "_int_malloc"
+          },
+          {
+            "children_pct": 5.91,
+            "self_pct": 0.46,
+            "symbol": "__libc_malloc2"
+          },
+          {
+            "children_pct": 4.56,
+            "self_pct": 0.53,
+            "symbol": "_int_free_chunk"
+          },
+          {
+            "children_pct": 3.77,
+            "self_pct": 2.92,
+            "symbol": "_int_free_merge_chunk"
+          },
+          {
+            "children_pct": 2.71,
+            "self_pct": 2.71,
+            "symbol": "malloc"
+          }
+        ]
+      },
+      {
+        "lane": "candidate",
+        "case": "docfloat",
+        "edits": 1,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-candidate-docfloat-e1-default/probe.stdout",
+          "bytes": 712877,
+          "sha256": "3bee59f78722a04e533f2b62eaeda3f4667f0100b09041d854a3336ebbb5d525"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-candidate-docfloat-e1-default/perf.data",
+          "bytes": 13635216,
+          "sha256": "067b628a24c08b4b44cd51e1d622fd97ab7e84781eb354719ec7efb0c6c4a10d"
+        },
+        "report": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-candidate-docfloat-e1-default/perf.report.txt",
+          "bytes": 588214,
+          "sha256": "7aca35875ebad2f4d1195cdeff48f5369770d07d759971fff969fd7f973e6889"
+        },
+        "samples": 3087,
+        "lost_samples": 0,
+        "operation_filter": {
+          "requested": "callchains containing doc_retention_probe_0917::measure_one",
+          "status": "unavailable",
+          "reason": "measure_one and run_case absent from perf script/report callchains despite DWARF debug sections and symbols"
+        },
+        "top_symbols": [
+          {
+            "children_pct": 20.97,
+            "self_pct": 20.91,
+            "symbol": "__memmove_avx512_unaligned_erms"
+          },
+          {
+            "children_pct": 11.74,
+            "self_pct": 0.0,
+            "symbol": "parse_sprms (inlined)"
+          },
+          {
+            "children_pct": 11.55,
+            "self_pct": 0.0,
+            "symbol": "parse_sprms_two_byte (inlined)"
+          },
+          {
+            "children_pct": 10.66,
+            "self_pct": 10.66,
+            "symbol": "litchi_doc::sprm::parse_sprms"
+          },
+          {
+            "children_pct": 8.91,
+            "self_pct": 0.0,
+            "symbol": "compress (inlined)"
+          },
+          {
+            "children_pct": 8.26,
+            "self_pct": 8.26,
+            "symbol": "sha2::sha256::x86_sha::compress"
+          },
+          {
+            "children_pct": 6.46,
+            "self_pct": 6.46,
+            "symbol": "_int_malloc"
+          },
+          {
+            "children_pct": 4.24,
+            "self_pct": 0.0,
+            "symbol": "schedule (inlined)"
+          }
+        ]
+      },
+      {
+        "lane": "baseline",
+        "case": "docfloat",
+        "edits": 2,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-baseline-docfloat-e2-default/probe.stdout",
+          "bytes": 723021,
+          "sha256": "448e8f08a25a3e069c7f02a520a5bdb6b0e244034634f7c3f5e7ca67973768f6"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-baseline-docfloat-e2-default/perf.data",
+          "bytes": 12843120,
+          "sha256": "8b4ed0a37f83749bf7a6a1075bd32aac9cc592ba2571f97a0898194f0a09142c"
+        },
+        "report": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-baseline-docfloat-e2-default/perf.report.txt",
+          "bytes": 557989,
+          "sha256": "8f9e8728bfa32dbc7ec77b0055f687d238b72f9bb14f1f97412c51c194299248"
+        },
+        "samples": 2953,
+        "lost_samples": 0,
+        "operation_filter": {
+          "requested": "callchains containing doc_retention_probe_0917::measure_one",
+          "status": "unavailable",
+          "reason": "measure_one and run_case absent from perf script/report callchains despite DWARF debug sections and symbols"
+        },
+        "top_symbols": [
+          {
+            "children_pct": 19.48,
+            "self_pct": 19.38,
+            "symbol": "__memmove_avx512_unaligned_erms"
+          },
+          {
+            "children_pct": 12.79,
+            "self_pct": 12.79,
+            "symbol": "litchi_doc::sprm::parse_sprms"
+          },
+          {
+            "children_pct": 9.17,
+            "self_pct": 9.17,
+            "symbol": "sha2::sha256::x86_sha::compress"
+          },
+          {
+            "children_pct": 6.27,
+            "self_pct": 6.03,
+            "symbol": "_int_malloc"
+          },
+          {
+            "children_pct": 3.7,
+            "self_pct": 3.43,
+            "symbol": "_int_free_merge_chunk"
+          },
+          {
+            "children_pct": 3.22,
+            "self_pct": 0.0,
+            "symbol": "parse_sprms (inlined)"
+          },
+          {
+            "children_pct": 3.18,
+            "self_pct": 0.0,
+            "symbol": "parse_sprms_two_byte (inlined)"
+          },
+          {
+            "children_pct": 2.52,
+            "self_pct": 2.52,
+            "symbol": "cfree@GLIBC_2.2.5"
+          }
+        ]
+      },
+      {
+        "lane": "candidate",
+        "case": "docfloat",
+        "edits": 2,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-candidate-docfloat-e2-default/probe.stdout",
+          "bytes": 723021,
+          "sha256": "9676637014d8a1efc7498972ddaccb48602412c7cf0ba5147d1a1811ad65df12"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-candidate-docfloat-e2-default/perf.data",
+          "bytes": 14448544,
+          "sha256": "96d867a658768651f6099b88c7c35f25d9a91afd150cb2d25d07098d108e1ca2"
+        },
+        "report": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-candidate-docfloat-e2-default/perf.report.txt",
+          "bytes": 31022,
+          "sha256": "c61020d1de698bc8a2a8ecad5a96c26404400958c0b59ce9f95f67ae87989bf0"
+        },
+        "samples": 3261,
+        "lost_samples": 0,
+        "operation_filter": {
+          "requested": "callchains containing doc_retention_probe_0917::measure_one",
+          "status": "unavailable",
+          "reason": "measure_one and run_case absent from perf script/report callchains despite DWARF debug sections and symbols"
+        },
+        "top_symbols": [
+          {
+            "children_pct": 23.69,
+            "self_pct": 21.4,
+            "symbol": "__memmove_avx512_unaligned_erms"
+          },
+          {
+            "children_pct": 12.45,
+            "self_pct": 12.45,
+            "symbol": "litchi_doc::sprm::parse_sprms"
+          },
+          {
+            "children_pct": 9.39,
+            "self_pct": 9.39,
+            "symbol": "sha2::sha256::x86_sha::compress"
+          },
+          {
+            "children_pct": 7.24,
+            "self_pct": 6.0,
+            "symbol": "_int_malloc"
+          },
+          {
+            "children_pct": 6.32,
+            "self_pct": 0.22,
+            "symbol": "__libc_malloc2"
+          },
+          {
+            "children_pct": 4.8,
+            "self_pct": 0.41,
+            "symbol": "_int_free_chunk"
+          },
+          {
+            "children_pct": 3.62,
+            "self_pct": 2.62,
+            "symbol": "_int_free_merge_chunk"
+          },
+          {
+            "children_pct": 2.44,
+            "self_pct": 2.43,
+            "symbol": "cfree@GLIBC_2.2.5"
+          }
+        ]
+      },
+      {
+        "lane": "baseline",
+        "case": "docfloat",
+        "edits": 8,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-baseline-docfloat-e8-default/probe.stdout",
+          "bytes": 783276,
+          "sha256": "166bf2cebfdbe16bb2451577fcc6fb084b4294be6fe6c4d0f19c697449d3fca9"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-baseline-docfloat-e8-default/perf.data",
+          "bytes": 16582128,
+          "sha256": "9d63b50e3f6af93a3b24cabf16f35d67393784b79c8d22ad98d90a86754d54ef"
+        },
+        "report": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-baseline-docfloat-e8-default/perf.report.txt",
+          "bytes": 31886,
+          "sha256": "2ff31491266d35e6213aa916fee20b9e14ecb1320dd05df43c15f771ea1db8a2"
+        },
+        "samples": 3777,
+        "lost_samples": 0,
+        "operation_filter": {
+          "requested": "callchains containing doc_retention_probe_0917::measure_one",
+          "status": "unavailable",
+          "reason": "measure_one and run_case absent from perf script/report callchains despite DWARF debug sections and symbols"
+        },
+        "top_symbols": [
+          {
+            "children_pct": 22.98,
+            "self_pct": 21.97,
+            "symbol": "__memmove_avx512_unaligned_erms"
+          },
+          {
+            "children_pct": 10.76,
+            "self_pct": 10.76,
+            "symbol": "litchi_doc::sprm::parse_sprms"
+          },
+          {
+            "children_pct": 8.62,
+            "self_pct": 8.62,
+            "symbol": "sha2::sha256::x86_sha::compress"
+          },
+          {
+            "children_pct": 6.79,
+            "self_pct": 5.66,
+            "symbol": "_int_malloc"
+          },
+          {
+            "children_pct": 6.11,
+            "self_pct": 0.45,
+            "symbol": "__libc_malloc2"
+          },
+          {
+            "children_pct": 4.5,
+            "self_pct": 0.35,
+            "symbol": "_int_free_chunk"
+          },
+          {
+            "children_pct": 3.72,
+            "self_pct": 2.73,
+            "symbol": "_int_free_merge_chunk"
+          },
+          {
+            "children_pct": 2.73,
+            "self_pct": 0.0,
+            "symbol": "__libc_realloc (inlined)"
+          }
+        ]
+      },
+      {
+        "lane": "candidate",
+        "case": "docfloat",
+        "edits": 8,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-candidate-docfloat-e8-default/probe.stdout",
+          "bytes": 783276,
+          "sha256": "75e67b50fea948e6163ce2c8e128b90d59d99377246b844039930cb0cbeea282"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-candidate-docfloat-e8-default/perf.data",
+          "bytes": 16123760,
+          "sha256": "8f53ba47053060c306adb16c2cd8b1b292e8d2100553dcba807db97ac58d7a4c"
+        },
+        "report": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-candidate-docfloat-e8-default/perf.report.txt",
+          "bytes": 71500,
+          "sha256": "625979aaaa47b46bcb94c627c30585fffbb3f36831dce21d825d4f9567efd99e"
+        },
+        "samples": 3678,
+        "lost_samples": 0,
+        "operation_filter": {
+          "requested": "callchains containing doc_retention_probe_0917::measure_one",
+          "status": "unavailable",
+          "reason": "measure_one and run_case absent from perf script/report callchains despite DWARF debug sections and symbols"
+        },
+        "top_symbols": [
+          {
+            "children_pct": 20.62,
+            "self_pct": 19.94,
+            "symbol": "__memmove_avx512_unaligned_erms"
+          },
+          {
+            "children_pct": 10.8,
+            "self_pct": 10.8,
+            "symbol": "litchi_doc::sprm::parse_sprms"
+          },
+          {
+            "children_pct": 9.15,
+            "self_pct": 9.15,
+            "symbol": "sha2::sha256::x86_sha::compress"
+          },
+          {
+            "children_pct": 7.49,
+            "self_pct": 6.34,
+            "symbol": "_int_malloc"
+          },
+          {
+            "children_pct": 7.05,
+            "self_pct": 0.3,
+            "symbol": "__libc_malloc2"
+          },
+          {
+            "children_pct": 4.93,
+            "self_pct": 0.55,
+            "symbol": "_int_free_chunk"
+          },
+          {
+            "children_pct": 3.92,
+            "self_pct": 2.99,
+            "symbol": "_int_free_merge_chunk"
+          },
+          {
+            "children_pct": 2.64,
+            "self_pct": 2.64,
+            "symbol": "malloc"
+          }
+        ]
+      },
+      {
+        "lane": "baseline",
+        "case": "docfloat",
+        "edits": 32,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-baseline-docfloat-e32-default/probe.stdout",
+          "bytes": 1032596,
+          "sha256": "90966ea1baa0b283be0a135d893bbf053532c2898d3b31f9a65be2f7b91d95d5"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-baseline-docfloat-e32-default/perf.data",
+          "bytes": 29583184,
+          "sha256": "5c1d5c1a6bbd70af6ba2a970eb56d769a4eb1121ca70e6c1d110846324052dde"
+        },
+        "report": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-baseline-docfloat-e32-default/perf.report.txt",
+          "bytes": 45538,
+          "sha256": "7d88206a007d55bf64d732a81112d04f88694e0a8ad2762864c18e7535d11298"
+        },
+        "samples": 6702,
+        "lost_samples": 0,
+        "operation_filter": {
+          "requested": "callchains containing doc_retention_probe_0917::measure_one",
+          "status": "unavailable",
+          "reason": "measure_one and run_case absent from perf script/report callchains despite DWARF debug sections and symbols"
+        },
+        "top_symbols": [
+          {
+            "children_pct": 26.28,
+            "self_pct": 24.24,
+            "symbol": "__memmove_avx512_unaligned_erms"
+          },
+          {
+            "children_pct": 8.17,
+            "self_pct": 8.17,
+            "symbol": "litchi_doc::sprm::parse_sprms"
+          },
+          {
+            "children_pct": 8.12,
+            "self_pct": 6.68,
+            "symbol": "_int_malloc"
+          },
+          {
+            "children_pct": 7.43,
+            "self_pct": 7.43,
+            "symbol": "sha2::sha256::x86_sha::compress"
+          },
+          {
+            "children_pct": 7.33,
+            "self_pct": 0.53,
+            "symbol": "__libc_malloc2"
+          },
+          {
+            "children_pct": 4.44,
+            "self_pct": 0.5,
+            "symbol": "_int_free_chunk"
+          },
+          {
+            "children_pct": 4.09,
+            "self_pct": 0.0,
+            "symbol": "__libc_realloc (inlined)"
+          },
+          {
+            "children_pct": 4.05,
+            "self_pct": 0.34,
+            "symbol": "_int_realloc"
+          }
+        ]
+      },
+      {
+        "lane": "candidate",
+        "case": "docfloat",
+        "edits": 32,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-candidate-docfloat-e32-default/probe.stdout",
+          "bytes": 1029177,
+          "sha256": "3b05e530f82a1fd5b369860506affefc54b1e08fb9c1b6b13caede0cf2efb854"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-candidate-docfloat-e32-default/perf.data",
+          "bytes": 31336576,
+          "sha256": "fcbdb5564ea4703d0239a15774f601686d5bac27df48216b83e41458658b955f"
+        },
+        "report": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-candidate-docfloat-e32-default/perf.report.txt",
+          "bytes": 41428,
+          "sha256": "03480891f31c9cadfcc94b1e210865c253e975d10c0f5c3357db951a94656392"
+        },
+        "samples": 6982,
+        "lost_samples": 0,
+        "operation_filter": {
+          "requested": "callchains containing doc_retention_probe_0917::measure_one",
+          "status": "unavailable",
+          "reason": "measure_one and run_case absent from perf script/report callchains despite DWARF debug sections and symbols"
+        },
+        "top_symbols": [
+          {
+            "children_pct": 24.97,
+            "self_pct": 21.8,
+            "symbol": "__memmove_avx512_unaligned_erms"
+          },
+          {
+            "children_pct": 8.28,
+            "self_pct": 8.28,
+            "symbol": "litchi_doc::sprm::parse_sprms"
+          },
+          {
+            "children_pct": 7.49,
+            "self_pct": 6.49,
+            "symbol": "_int_malloc"
+          },
+          {
+            "children_pct": 7.43,
+            "self_pct": 7.43,
+            "symbol": "sha2::sha256::x86_sha::compress"
+          },
+          {
+            "children_pct": 6.61,
+            "self_pct": 0.44,
+            "symbol": "__libc_malloc2"
+          },
+          {
+            "children_pct": 4.59,
+            "self_pct": 0.4,
+            "symbol": "_int_free_chunk"
+          },
+          {
+            "children_pct": 3.67,
+            "self_pct": 3.0,
+            "symbol": "_int_free_merge_chunk"
+          },
+          {
+            "children_pct": 3.2,
+            "self_pct": 0.0,
+            "symbol": "__libc_realloc (inlined)"
+          }
+        ]
+      },
+      {
+        "lane": "baseline",
+        "case": "docnohf",
+        "edits": 32,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-baseline-docnohf-e32-default/probe.stdout",
+          "bytes": 1016056,
+          "sha256": "a76958cea356ea6e59264d53dd2b37e8ac704d5aaee3a19d773bb298d2ff90cc"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-baseline-docnohf-e32-default/perf.data",
+          "bytes": 3537504,
+          "sha256": "6360b0a31850eb6dbe85446182481ef979f2df2237d23d41c7f9981ea401fc40"
+        },
+        "report": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-baseline-docnohf-e32-default/perf.report.txt",
+          "bytes": 1346224,
+          "sha256": "b567cdf8ccddae7bc3861aa9630fbce9220f2d0be33e15660802bdeabd899404"
+        },
+        "samples": 804,
+        "lost_samples": 0,
+        "operation_filter": {
+          "requested": "callchains containing doc_retention_probe_0917::measure_one",
+          "status": "unavailable",
+          "reason": "measure_one and run_case absent from perf script/report callchains despite DWARF debug sections and symbols"
+        },
+        "top_symbols": [
+          {
+            "children_pct": 13.92,
+            "self_pct": 13.92,
+            "symbol": "__memmove_avx512_unaligned_erms"
+          },
+          {
+            "children_pct": 8.48,
+            "self_pct": 7.99,
+            "symbol": "_int_malloc"
+          },
+          {
+            "children_pct": 6.59,
+            "self_pct": 6.59,
+            "symbol": "sha2::sha256::x86_sha::compress"
+          },
+          {
+            "children_pct": 6.59,
+            "self_pct": 0.0,
+            "symbol": "compress (inlined)"
+          },
+          {
+            "children_pct": 3.86,
+            "self_pct": 0.0,
+            "symbol": "parse_sprms (inlined)"
+          },
+          {
+            "children_pct": 3.73,
+            "self_pct": 3.73,
+            "symbol": "litchi_doc::sprm::parse_sprms"
+          },
+          {
+            "children_pct": 3.62,
+            "self_pct": 3.62,
+            "symbol": "litchi_cfb::directory_name::directory_name_data_with"
+          },
+          {
+            "children_pct": 3.62,
+            "self_pct": 0.0,
+            "symbol": "directory_name_data_with (inlined)"
+          }
+        ]
+      },
+      {
+        "lane": "candidate",
+        "case": "docnohf",
+        "edits": 32,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-candidate-docnohf-e32-default/probe.stdout",
+          "bytes": 1016056,
+          "sha256": "fbd05d26bc3948e9cabac80d50101626043e0b096096fa88f425e0efdfc42583"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-candidate-docnohf-e32-default/perf.data",
+          "bytes": 3502728,
+          "sha256": "5f17a9d9364e0b520f73228d3106611da37c1a835e4b6b31b4a2e51e5f5f0115"
+        },
+        "report": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-record-candidate-docnohf-e32-default/perf.report.txt",
+          "bytes": 1532328,
+          "sha256": "04854b005b7549e071a3a1375c873405495dccf5bd6357bd46d0cf974360a042"
+        },
+        "samples": 796,
+        "lost_samples": 0,
+        "operation_filter": {
+          "requested": "callchains containing doc_retention_probe_0917::measure_one",
+          "status": "unavailable",
+          "reason": "measure_one and run_case absent from perf script/report callchains despite DWARF debug sections and symbols"
+        },
+        "top_symbols": [
+          {
+            "children_pct": 18.35,
+            "self_pct": 18.35,
+            "symbol": "__memmove_avx512_unaligned_erms"
+          },
+          {
+            "children_pct": 7.79,
+            "self_pct": 6.79,
+            "symbol": "_int_malloc"
+          },
+          {
+            "children_pct": 5.61,
+            "self_pct": 5.61,
+            "symbol": "sha2::sha256::x86_sha::compress"
+          },
+          {
+            "children_pct": 5.61,
+            "self_pct": 0.0,
+            "symbol": "compress (inlined)"
+          },
+          {
+            "children_pct": 3.25,
+            "self_pct": 0.0,
+            "symbol": "finish_grow<alloc::alloc::Global> (inlined)"
+          },
+          {
+            "children_pct": 3.23,
+            "self_pct": 0.0,
+            "symbol": "parse_sprms (inlined)"
+          },
+          {
+            "children_pct": 3.23,
+            "self_pct": 0.0,
+            "symbol": "parse_sprms_two_byte (inlined)"
+          },
+          {
+            "children_pct": 3.18,
+            "self_pct": 0.52,
+            "symbol": "__libc_malloc2"
+          }
+        ]
+      }
+    ],
+    "interpretation": "Whole-process context only because the requested operation-only callchain filter was unavailable."
+  },
+  "perf_stat": {
+    "count": 10,
+    "rows": [
+      {
+        "lane": "baseline",
+        "case": "docfloat",
+        "edits": 1,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-stat-valid-baseline-docfloat-e01-default/probe.stdout",
+          "bytes": 15486,
+          "sha256": "2afa045e22c14947dc4b63439660ab06f97b04dfe08e05015c2ace7024c19dde"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-stat-valid-baseline-docfloat-e01-default/perf.stat",
+          "bytes": 344,
+          "sha256": "ebefb795820b1102efbf8cdc05ef079848bb27edf479574ddfc968d9007484aa"
+        },
+        "events": {
+          "task-clock": 64.49,
+          "context-switches": 0.0,
+          "cpu-migrations": 0.0,
+          "page-faults": 3757.0,
+          "cycles": 161013181.0,
+          "instructions": 417937648.0,
+          "branches": 84610280.0,
+          "branch-misses": 859671.0
+        }
+      },
+      {
+        "lane": "candidate",
+        "case": "docfloat",
+        "edits": 1,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-stat-valid-candidate-docfloat-e01-default/probe.stdout",
+          "bytes": 15488,
+          "sha256": "4bba5573c692b16e4911df53e8be7bb3505e9be1d36d2d368b4a0f0e6b8bfd0e"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-stat-valid-candidate-docfloat-e01-default/perf.stat",
+          "bytes": 344,
+          "sha256": "b9ae0369389f34ab797c9fd08574915bac17d8b5c98a70705bc954b52ab8a74c"
+        },
+        "events": {
+          "task-clock": 42.25,
+          "context-switches": 0.0,
+          "cpu-migrations": 0.0,
+          "page-faults": 9551.0,
+          "cycles": 167336599.0,
+          "instructions": 417556125.0,
+          "branches": 84551229.0,
+          "branch-misses": 873805.0
+        },
+        "candidate_over_baseline_pct": {
+          "task-clock": -34.486,
+          "context-switches": null,
+          "cpu-migrations": null,
+          "page-faults": 154.219,
+          "cycles": 3.927,
+          "instructions": -0.091,
+          "branches": -0.07,
+          "branch-misses": 1.644
+        }
+      },
+      {
+        "lane": "baseline",
+        "case": "docfloat",
+        "edits": 2,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-stat-valid-baseline-docfloat-e02-default/probe.stdout",
+          "bytes": 15682,
+          "sha256": "38950e7eeb234425a4086e864d34fb49d2c27eb4cadcab28942c0c0a80a7a8e2"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-stat-valid-baseline-docfloat-e02-default/perf.stat",
+          "bytes": 344,
+          "sha256": "58317e9f0ddbbfeb95b8dbe49c45daecfa28a18cc4bdd5aa106856bd7705d55f"
+        },
+        "events": {
+          "task-clock": 41.09,
+          "context-switches": 0.0,
+          "cpu-migrations": 0.0,
+          "page-faults": 6138.0,
+          "cycles": 168571923.0,
+          "instructions": 428149186.0,
+          "branches": 86870336.0,
+          "branch-misses": 903263.0
+        }
+      },
+      {
+        "lane": "candidate",
+        "case": "docfloat",
+        "edits": 2,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-stat-valid-candidate-docfloat-e02-default/probe.stdout",
+          "bytes": 15682,
+          "sha256": "fa502a9b7aacc1084911c568a680d9d49c79474a916bd98bc4ea1ccdb2861905"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-stat-valid-candidate-docfloat-e02-default/perf.stat",
+          "bytes": 344,
+          "sha256": "485c3ef0887ac0fa04c22d871375bc9692488ee250a059420d78403a6368f631"
+        },
+        "events": {
+          "task-clock": 41.46,
+          "context-switches": 0.0,
+          "cpu-migrations": 0.0,
+          "page-faults": 6638.0,
+          "cycles": 168619316.0,
+          "instructions": 427811847.0,
+          "branches": 86815332.0,
+          "branch-misses": 902463.0
+        },
+        "candidate_over_baseline_pct": {
+          "task-clock": 0.9,
+          "context-switches": null,
+          "cpu-migrations": null,
+          "page-faults": 8.146,
+          "cycles": 0.028,
+          "instructions": -0.079,
+          "branches": -0.063,
+          "branch-misses": -0.089
+        }
+      },
+      {
+        "lane": "baseline",
+        "case": "docfloat",
+        "edits": 8,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-stat-valid-baseline-docfloat-e08-default/probe.stdout",
+          "bytes": 16834,
+          "sha256": "7de912eeb0dd676e459d4b40a0e061d5a4606e79a112373a874a5714df2cfbbf"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-stat-valid-baseline-docfloat-e08-default/perf.stat",
+          "bytes": 346,
+          "sha256": "6b6237a1f4029086a58caad90e91bf48b5aaec5a8573039bc124d8201f75cf2b"
+        },
+        "events": {
+          "task-clock": 48.56,
+          "context-switches": 0.0,
+          "cpu-migrations": 0.0,
+          "page-faults": 9779.0,
+          "cycles": 195386548.0,
+          "instructions": 493078338.0,
+          "branches": 101152595.0,
+          "branch-misses": 1073688.0
+        }
+      },
+      {
+        "lane": "candidate",
+        "case": "docfloat",
+        "edits": 8,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-stat-valid-candidate-docfloat-e08-default/probe.stdout",
+          "bytes": 16834,
+          "sha256": "5a4f89e6e7d75e8a0304f98bd7856a53a56bc31df4019f226e978249df6cd1b7"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-stat-valid-candidate-docfloat-e08-default/perf.stat",
+          "bytes": 346,
+          "sha256": "0b4f9d2bf9698dba8668f8a86962925d1cf1891f154082c9387ee414d845c26a"
+        },
+        "events": {
+          "task-clock": 48.55,
+          "context-switches": 0.0,
+          "cpu-migrations": 0.0,
+          "page-faults": 9554.0,
+          "cycles": 195036932.0,
+          "instructions": 492475892.0,
+          "branches": 101076148.0,
+          "branch-misses": 1061259.0
+        },
+        "candidate_over_baseline_pct": {
+          "task-clock": -0.021,
+          "context-switches": null,
+          "cpu-migrations": null,
+          "page-faults": -2.301,
+          "cycles": -0.179,
+          "instructions": -0.122,
+          "branches": -0.076,
+          "branch-misses": -1.158
+        }
+      },
+      {
+        "lane": "baseline",
+        "case": "docfloat",
+        "edits": 32,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-stat-valid-baseline-docfloat-e32-default/probe.stdout",
+          "bytes": 21583,
+          "sha256": "1b3f609aca8dd84c04fcd3655ece07e9a9f55802c31989dca70f3e032cdd8e86"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-stat-valid-baseline-docfloat-e32-default/perf.stat",
+          "bytes": 347,
+          "sha256": "9a7069cc43b9e3df0c61079f5525fc9a09d0012ba754d70ad638992bcec46158"
+        },
+        "events": {
+          "task-clock": 79.58,
+          "context-switches": 0.0,
+          "cpu-migrations": 0.0,
+          "page-faults": 22377.0,
+          "cycles": 311622919.0,
+          "instructions": 778938149.0,
+          "branches": 163200177.0,
+          "branch-misses": 1492240.0
+        }
+      },
+      {
+        "lane": "candidate",
+        "case": "docfloat",
+        "edits": 32,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-stat-valid-candidate-docfloat-e32-default/probe.stdout",
+          "bytes": 21539,
+          "sha256": "881ac3aebe5472a277d9ddb5e6d6818a772cb5ffefebafa3942fc8d4afa91f7a"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-stat-valid-candidate-docfloat-e32-default/perf.stat",
+          "bytes": 347,
+          "sha256": "71ccd0c7890b55dfab965f76dfd43423e09f23f01ae077452065e8a212228540"
+        },
+        "events": {
+          "task-clock": 82.44,
+          "context-switches": 0.0,
+          "cpu-migrations": 0.0,
+          "page-faults": 27375.0,
+          "cycles": 315594679.0,
+          "instructions": 777930129.0,
+          "branches": 163112689.0,
+          "branch-misses": 1479817.0
+        },
+        "candidate_over_baseline_pct": {
+          "task-clock": 3.594,
+          "context-switches": null,
+          "cpu-migrations": null,
+          "page-faults": 22.335,
+          "cycles": 1.275,
+          "instructions": -0.129,
+          "branches": -0.054,
+          "branch-misses": -0.833
+        }
+      },
+      {
+        "lane": "baseline",
+        "case": "docnohf",
+        "edits": 32,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-stat-valid-baseline-docnohf-e32-default/probe.stdout",
+          "bytes": 21361,
+          "sha256": "e9fc44edb67bf0a93ea406937253dc64f1e4affeef5d6cb6bfbc60dadc99bd19"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-stat-valid-baseline-docnohf-e32-default/perf.stat",
+          "bytes": 343,
+          "sha256": "f4d78b24eb1acfa71f32b2d1226c797b81987c1f722fda1fa5ed948ade614d8c"
+        },
+        "events": {
+          "task-clock": 11.45,
+          "context-switches": 0.0,
+          "cpu-migrations": 0.0,
+          "page-faults": 1593.0,
+          "cycles": 43747075.0,
+          "instructions": 108682626.0,
+          "branches": 21422620.0,
+          "branch-misses": 269862.0
+        }
+      },
+      {
+        "lane": "candidate",
+        "case": "docnohf",
+        "edits": 32,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-stat-valid-candidate-docnohf-e32-default/probe.stdout",
+          "bytes": 21359,
+          "sha256": "441a3d3803dfc021a86008646fc6ecb947399c6bc61c7a9c4389014ed8e46fe5"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/perf-stat-valid-candidate-docnohf-e32-default/perf.stat",
+          "bytes": 343,
+          "sha256": "1b0735f796cc44a8c13d553f442fb16d5ec1ce5d146569bf91ce7590c774d0f7"
+        },
+        "events": {
+          "task-clock": 10.81,
+          "context-switches": 0.0,
+          "cpu-migrations": 0.0,
+          "page-faults": 1151.0,
+          "cycles": 42119463.0,
+          "instructions": 108203875.0,
+          "branches": 21356138.0,
+          "branch-misses": 259404.0
+        },
+        "candidate_over_baseline_pct": {
+          "task-clock": -5.59,
+          "context-switches": null,
+          "cpu-migrations": null,
+          "page-faults": -27.746,
+          "cycles": -3.721,
+          "instructions": -0.441,
+          "branches": -0.31,
+          "branch-misses": -3.875
+        }
+      }
+    ],
+    "interpretation": "Whole-process one-child counters; not operation-local."
+  },
+  "strace": {
+    "count": 6,
+    "rows": [
+      {
+        "lane": "baseline",
+        "case": "docfloat",
+        "edits": 2,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/strace-valid-baseline-docfloat-e02-default/probe.stdout",
+          "bytes": 15682,
+          "sha256": "3b176373d832f329d6b0effa58b9104719009e2911105fefdc56101058aa301d"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/strace-valid-baseline-docfloat-e02-default/syscall.summary",
+          "bytes": 1935,
+          "sha256": "e838368a9ed99c682b2979609db6434db3cb50195016ca92e056ed9ac08d792b"
+        },
+        "total_seconds": 0.000144,
+        "total_calls": 304,
+        "total_errors": 15,
+        "selected_syscalls": {
+          "openat": {
+            "calls": 36,
+            "errors": 13,
+            "seconds": 0.0
+          }
+        }
+      },
+      {
+        "lane": "candidate",
+        "case": "docfloat",
+        "edits": 2,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/strace-valid-candidate-docfloat-e02-default/probe.stdout",
+          "bytes": 15682,
+          "sha256": "731ea622342df0ee662847df342d71aebbd47241386ca63885ff2bf7d037bb68"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/strace-valid-candidate-docfloat-e02-default/syscall.summary",
+          "bytes": 1935,
+          "sha256": "45e5329b4f66ec1c7fa7b715966f74fef8c20bf4749365824834d26b0e6cf906"
+        },
+        "total_seconds": 0.001078,
+        "total_calls": 300,
+        "total_errors": 15,
+        "selected_syscalls": {
+          "openat": {
+            "calls": 36,
+            "errors": 13,
+            "seconds": 8.1e-05
+          }
+        }
+      },
+      {
+        "lane": "baseline",
+        "case": "docfloat",
+        "edits": 32,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/strace-valid-baseline-docfloat-e32-default/probe.stdout",
+          "bytes": 21583,
+          "sha256": "de6f6fa9d2e45034f1d52bdd22c84c1bb666264fb240cf89221ccc9f352520b4"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/strace-valid-baseline-docfloat-e32-default/syscall.summary",
+          "bytes": 1935,
+          "sha256": "d5c152b8b8d3093764c7db585a6eb54f16c6988cfe05d9d79a2512fc250aa7d8"
+        },
+        "total_seconds": 0.001171,
+        "total_calls": 506,
+        "total_errors": 15,
+        "selected_syscalls": {
+          "openat": {
+            "calls": 36,
+            "errors": 13,
+            "seconds": 1e-06
+          }
+        }
+      },
+      {
+        "lane": "candidate",
+        "case": "docfloat",
+        "edits": 32,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/strace-valid-candidate-docfloat-e32-default/probe.stdout",
+          "bytes": 21539,
+          "sha256": "18e3fb31fd2140bd989e1608aa0a27ac141c8ead143002215efe267326f60c51"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/strace-valid-candidate-docfloat-e32-default/syscall.summary",
+          "bytes": 1935,
+          "sha256": "282773c5adf02935cb549848068ad655ba547792a7fffad83568ca285a3e67dd"
+        },
+        "total_seconds": 0.000818,
+        "total_calls": 598,
+        "total_errors": 15,
+        "selected_syscalls": {
+          "openat": {
+            "calls": 36,
+            "errors": 13,
+            "seconds": 6.4e-05
+          }
+        }
+      },
+      {
+        "lane": "baseline",
+        "case": "docnohf",
+        "edits": 32,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/strace-valid-baseline-docnohf-e32-default/probe.stdout",
+          "bytes": 21361,
+          "sha256": "96755362030248c855bf170213568bff7f7bd092597d5dfa14901b1dc849688a"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/strace-valid-baseline-docnohf-e32-default/syscall.summary",
+          "bytes": 1935,
+          "sha256": "f2395175a8d88e18f352a301e921c4314d568407e5a2f820380b3179404d51e8"
+        },
+        "total_seconds": 0.000745,
+        "total_calls": 338,
+        "total_errors": 15,
+        "selected_syscalls": {
+          "openat": {
+            "calls": 36,
+            "errors": 13,
+            "seconds": 8e-05
+          }
+        }
+      },
+      {
+        "lane": "candidate",
+        "case": "docnohf",
+        "edits": 32,
+        "exit_code": 0,
+        "probe": {
+          "path": "/tmp/litchi-performance-0921-profile/strace-valid-candidate-docnohf-e32-default/probe.stdout",
+          "bytes": 21361,
+          "sha256": "3c3bd98bf34dcc6240a316c95790cd59721711c5db6a7845fc82fe936da4e953"
+        },
+        "raw": {
+          "path": "/tmp/litchi-performance-0921-profile/strace-valid-candidate-docnohf-e32-default/syscall.summary",
+          "bytes": 1935,
+          "sha256": "537cc55e0adf08c2039be0abafaa6d6eed70ed753e125b1bb0f8732c2c0a9bb8"
+        },
+        "total_seconds": 0.000447,
+        "total_calls": 274,
+        "total_errors": 15,
+        "selected_syscalls": {
+          "openat": {
+            "calls": 36,
+            "errors": 13,
+            "seconds": 4.3e-05
+          }
+        }
+      }
+    ],
+    "interpretation": "Whole-process syscall controls; kernel tracepoints unavailable and no operation-local syscall claim."
+  },
+  "retained_0920_page_fault_context": {
+    "docfloat-e01": {
+      "source_glob": "docs/performance/results/change-0920/comparison-logs/native-r*-docfloat-e01-{baseline,candidate}-default.json",
+      "rounds": 12,
+      "baseline": {
+        "values": [
+          39037,
+          3596,
+          14994,
+          34312,
+          3779,
+          13092,
+          4819,
+          3777,
+          3850,
+          4335,
+          12803,
+          3820
+        ],
+        "median": 4577.0,
+        "mean": 11851.17
+      },
+      "candidate": {
+        "values": [
+          9148,
+          10967,
+          27814,
+          14336,
+          10749,
+          42414,
+          40038,
+          22356,
+          14810,
+          17506,
+          39439,
+          23933
+        ],
+        "median": 19931.0,
+        "mean": 22792.5
+      },
+      "paired_round_candidate_over_baseline_pct": {
+        "median": 216.01,
+        "mean": 259.16,
+        "min": -76.57,
+        "max": 730.84
+      }
+    },
+    "docfloat-e02": {
+      "source_glob": "docs/performance/results/change-0920/comparison-logs/native-r*-docfloat-e02-{baseline,candidate}-default.json",
+      "rounds": 12,
+      "baseline": {
+        "values": [
+          29566,
+          4333,
+          19240,
+          56870,
+          33807,
+          5188,
+          11456,
+          6715,
+          23403,
+          5398,
+          13397,
+          14607
+        ],
+        "median": 14002.0,
+        "mean": 18665
+      },
+      "candidate": {
+        "values": [
+          25292,
+          10509,
+          18381,
+          38322,
+          20335,
+          80910,
+          15818,
+          14960,
+          22725,
+          20491,
+          64858,
+          45388
+        ],
+        "median": 21608.0,
+        "mean": 31499.08
+      },
+      "paired_round_candidate_over_baseline_pct": {
+        "median": 80.43,
+        "mean": 211.93,
+        "min": -39.85,
+        "max": 1459.56
+      }
+    },
+    "docfloat-e08": {
+      "source_glob": "docs/performance/results/change-0920/comparison-logs/native-r*-docfloat-e08-{baseline,candidate}-default.json",
+      "rounds": 12,
+      "baseline": {
+        "values": [
+          57287,
+          46241,
+          103118,
+          77886,
+          78155,
+          61593,
+          58587,
+          97048,
+          82778,
+          5208,
+          98924,
+          53722
+        ],
+        "median": 69739.5,
+        "mean": 68378.92
+      },
+      "candidate": {
+        "values": [
+          98978,
+          102362,
+          86188,
+          24128,
+          39203,
+          45198,
+          35963,
+          101331,
+          42733,
+          94032,
+          91715,
+          66122
+        ],
+        "median": 76155.0,
+        "mean": 68996.08
+      },
+      "paired_round_candidate_over_baseline_pct": {
+        "median": -11.85,
+        "mean": 139.25,
+        "min": -69.02,
+        "max": 1705.53
+      }
+    },
+    "docfloat-e32": {
+      "source_glob": "docs/performance/results/change-0920/comparison-logs/native-r*-docfloat-e32-{baseline,candidate}-default.json",
+      "rounds": 12,
+      "baseline": {
+        "values": [
+          157951,
+          129930,
+          159840,
+          142704,
+          162476,
+          146040,
+          152432,
+          155764,
+          158806,
+          112579,
+          188259,
+          146013
+        ],
+        "median": 154098.0,
+        "mean": 151066.17
+      },
+      "candidate": {
+        "values": [
+          153596,
+          240479,
+          50185,
+          226062,
+          249419,
+          210519,
+          222489,
+          208474,
+          231674,
+          194787,
+          217298,
+          193509
+        ],
+        "median": 213908.5,
+        "mean": 199874.25
+      },
+      "paired_round_candidate_over_baseline_pct": {
+        "median": 45.02,
+        "mean": 34.7,
+        "min": -68.6,
+        "max": 85.08
+      }
+    },
+    "docnohf-e32": {
+      "source_glob": "docs/performance/results/change-0920/comparison-logs/native-r*-docnohf-e32-{baseline,candidate}-default.json",
+      "rounds": 12,
+      "baseline": {
+        "values": [
+          1914,
+          1635,
+          1839,
+          1983,
+          1722,
+          1769,
+          1948,
+          1320,
+          1489,
+          1644,
+          1626,
+          1735
+        ],
+        "median": 1728.5,
+        "mean": 1718.67
+      },
+      "candidate": {
+        "values": [
+          1851,
+          1750,
+          1774,
+          1630,
+          1836,
+          1594,
+          1737,
+          1779,
+          1516,
+          1427,
+          1780,
+          1460
+        ],
+        "median": 1743.5,
+        "mean": 1677.83
+      },
+      "paired_round_candidate_over_baseline_pct": {
+        "median": -3.41,
+        "mean": -1.22,
+        "min": -17.8,
+        "max": 34.77
+      }
+    }
+  },
+  "attempts": {
+    "invalid_initial_controls": {
+      "count": 16,
+      "external_globs": [
+        "/tmp/litchi-performance-0921-profile/perf-stat-{baseline,candidate}-*",
+        "/tmp/litchi-performance-0921-profile/strace-{baseline,candidate}-*"
+      ],
+      "reason": "Harness omitted required --input; ProbeError(\"missing --input\"); all exited 1 and are excluded from every result above."
+    },
+    "known_callgrind_warning": "Valgrind emitted brk segment overflow on scoped rows; all probes exited 0, emitted nonzero scoped events, and preserved exact output guards."
+  },
+  "diagnosis": {
+    "operation_cpu": "No added reservation CPU work is demonstrated inside measure_one: candidate Ir, Dr and Dw are lower in all five cells (Float e1 -1.594%, e2 -2.246%, e8 -2.390%, e32 -4.913%, NoHeadFoot e32 -5.424%).",
+    "operation_cache": "Simulated D1 read/write misses are lower in every cell; candidate Float e32 DLmw=921 versus baseline 1 is an isolated LLd write-miss anomaly and is not treated as native latency evidence.",
+    "publication": "At Float e02, inclusive Package::render_with_layout and candidate OleWriter::write_to_vec Ir are lower than the baseline Package::render_with_layout and OleWriter::write_to rows; the candidate does not show a scoped publication instruction increase.",
+    "native_context": "Whole-process perf samples are dominated by libc memmove, glibc malloc/free, DOC sprm parsing and SHA compression. This identifies copy/allocator work as the useful next boundary but cannot assign those samples to the reservation path.",
+    "page_faults": "One-child perf stat shows candidate page-fault deltas of +154.219%/+8.146%/-2.301%/+22.335%/-27.746% for Float e1/e2/e8/e32 and NoHeadFoot e32. Retained 12-round receipts are highly variable: paired median deltas are +216.01%, +80.43%, -11.85%, +45.02%, -3.41%; these are whole-process context, not proof of an operation-local cause.",
+    "syscalls": "The corrected strace controls show no consistent syscall increase: total calls are baseline/candidate 304/300 (Float e2), 506/598 (Float e32), and 338/274 (NoHeadFoot e32).",
+    "next_profile_hypothesis": "If diagnosis resumes, inspect source-line and branch/copy costs around Package::render_with_layout and write_to_vec together with page residency/allocator placement under a separately controlled launch. The retained evidence supports libc copy/allocator placement and launch-level page mapping as hypotheses for Float1/2/32 and the marginal Float8 timing result, not a reservation-loop CPU regression.",
+    "adoption": "No production adoption recommendation; 0920 rejection remains unchanged."
+  }
+}

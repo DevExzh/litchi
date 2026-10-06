@@ -1,0 +1,184 @@
+{
+  "schema": "litchi.performance.0921.comparison-tooling-validation.v1",
+  "generated_utc": "2026-10-06T07:17:05Z",
+  "status": "passed",
+  "scope": "Tooling, source/build custody, functional qualification, and freeze dry-run validation; no comparative performance child ran and no adoption or speedup claim is made.",
+  "runner": {
+    "path": "docs/performance/results/change-0921/comparison.py",
+    "bytes": 87482,
+    "sha256": "e23458b09f4927c5ab8f9aeebe511bdf17eda44e9b219cb39c9afcb86baf4942"
+  },
+  "controls_script": {
+    "path": "docs/performance/results/change-0921/comparison-controls.py",
+    "bytes": 9021,
+    "sha256": "48975043c232520ea9dac3b606fe72cea2f6f0ce953d90d8e651b2cdf91cfde3"
+  },
+  "replay_script": {
+    "path": "docs/performance/results/change-0921/comparison-replay.py",
+    "bytes": 7256,
+    "sha256": "0f5716eed13071e1240ad6c0cd8407be3660c86107e2e2bfae2dc18fc2c1ef44"
+  },
+  "qualification_replay_script": {
+    "path": "docs/performance/results/change-0921/comparison-qualification-replay.py",
+    "bytes": 6716,
+    "sha256": "5987eac51773622aabe08408f0ba0add30cd69f59d9a86fad4009c9d0689dd84"
+  },
+  "protocol": {
+    "path": "docs/performance/results/change-0921/comparison-protocol.json",
+    "bytes": 10828,
+    "sha256": "2e0b1d10a7b45b403aeb053fa3da24b2371d955fb92b5cb68a312ae7b19b4a53",
+    "candidate_source_head": null,
+    "candidate_base_revision": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+    "bootstrap_seed": 921,
+    "native_children": 192,
+    "allocator_children": 96
+  },
+  "validator": {
+    "path": "docs/performance/results/change-0917/capture.py",
+    "bytes": 69575,
+    "sha256": "fde5219539cf538d51b8bf92ec5527fd9959ac0f39eb2ea5412b8ddf8cd7a894"
+  },
+  "git_revision_validation": {
+    "valid_status": "accepted",
+    "negative_controls": [
+      "39-hex revision rejected",
+      "non-hex 40-character revision rejected",
+      "64-hex SHA-256-length revision rejected"
+    ]
+  },
+  "capacity_controls": {
+    "status": "passed",
+    "receipt": {
+      "path": "docs/performance/results/change-0921/capacity-controls.json",
+      "bytes": 2735,
+      "sha256": "46fcb8a7829459cad49b8108d7966e8d36f9c12cdd6e79b0a31890b301702b02",
+      "external_path": "/tmp/litchi-performance-0921-tooling/controls-20261006T070348Z/capacity-controls.json"
+    },
+    "negative_controls_rejected": [
+      "output",
+      "identity",
+      "refusal",
+      "ceiling",
+      "retainedtransition",
+      "mismatch",
+      "capacity_decrease",
+      "capacity_growth"
+    ],
+    "positive_exact_capacity": "accepted",
+    "planned_capacity_summary_bytes": 56161,
+    "performance_children_run": 0
+  },
+  "planned_reduction": {
+    "basis": "Retained qualified report templates expanded to the exact 192 native and 96 allocator schedule; no benchmark child ran.",
+    "receipt": {
+      "path": "/tmp/litchi-performance-0921-tooling/synthetic-full-reduction-20261006T070446Z.json",
+      "bytes": 535594,
+      "sha256": "3c255b603e61eaabea5eac71700355940f6d1a48961fd1a1ab071b75b6634d02"
+    },
+    "native_children": 192,
+    "allocator_children": 96,
+    "total_children": 288,
+    "reduction_bytes": 535594,
+    "packet_limit_bytes": 1048576,
+    "under_packet_limit": true,
+    "all_explicit_capacity_fields_equal": true,
+    "adoption": false,
+    "performance_children_run": 0,
+    "status": "passed",
+    "runner_replay_status": "current-runner synthetic schedule check"
+  },
+  "freeze_dry_run": {
+    "status": "passed",
+    "manifest": {
+      "path": "/tmp/litchi-performance-0921-tooling/freeze-dry-run-final-20261006T071626Z/comparison-manifest.json",
+      "bytes": 7624,
+      "sha256": "b45c72471f31507a0517884676bf9180065a52cb3781971e1fc74947779ec3dd"
+    },
+    "external_packet_receipts": "/tmp/litchi-performance-0921-tooling/freeze-dry-run-final-20261006T071626Z/packet-receipts",
+    "source_head_remains_null": true,
+    "base_revision_and_patch_bound": true,
+    "candidate_build_binding_verified": true,
+    "candidate_binary_hashes_verified": true,
+    "source_files_verified": 938,
+    "scratch_packet_removed_after_validation": true,
+    "command": "comparison.py freeze with fresh baseline/candidate source and build receipts, candidate.patch, unchanged 0917 probe/validator, and an external scratch root"
+  },
+  "qualification": {
+    "status": "passed",
+    "root": "/tmp/litchi-performance-0921-tooling/qualification-final-20261006T071547Z",
+    "baseline_results": {
+      "path": "/tmp/litchi-performance-0921-tooling/qualification-final-20261006T071547Z/baseline-results.json",
+      "bytes": 469621,
+      "sha256": "5c289d73ad2dad31c9dede404202d4862863541f6618d16b68f928644a7b3b9c"
+    },
+    "candidate_results": {
+      "path": "/tmp/litchi-performance-0921-tooling/qualification-final-20261006T071547Z/candidate-results.json",
+      "bytes": 470259,
+      "sha256": "6d3fb5c44113889f82c05fd2237efaa91156c6296f00e6cd98812b8ae40175f6"
+    },
+    "replay_receipt": {
+      "path": "/tmp/litchi-performance-0921-tooling/qualification-final-20261006T071547Z/qualification-replay.json",
+      "bytes": 1291,
+      "sha256": "0b7eaa5534bf548dced4c562e70ed031dbd7477ea7d065e3ef59f8ba31b5171f"
+    },
+    "baseline_reports": 48,
+    "candidate_reports": 48,
+    "total_reports": 96,
+    "capacity_pairs": 48,
+    "all_exact_capacities": true,
+    "candidate_adoption": false,
+    "performance_children_run": 0,
+    "command": "comparison.py qualify --warmup 0 --samples 1 repeated for both versions, both lanes, two fixtures, four edit counts, and three retention routes"
+  },
+  "source_build_binding": {
+    "baseline_source_receipt": {
+      "path": "/tmp/litchi-performance-0920-baseline/source-receipt.json",
+      "bytes": 118656,
+      "sha256": "4b7967901c42fccd89dcb4893f9147eaaad0f66106ef7be6ea4ac4112b074867"
+    },
+    "baseline_build_receipt": {
+      "path": "/tmp/litchi-performance-0921/receipts/baseline-build.json",
+      "bytes": 2953,
+      "sha256": "322745a20c11648d7511586107dbc509be631cfbd05e67640c62141e7692f884"
+    },
+    "candidate_source_receipt": {
+      "path": "/tmp/litchi-performance-0921/receipts/candidate-source-final.json",
+      "bytes": 172343,
+      "sha256": "cdefa28b0b27572947f2c9d73d152a6b10d71d8acc3fbf17769404100a4af9ad"
+    },
+    "candidate_build_receipt": {
+      "path": "/tmp/litchi-performance-0921/receipts/candidate-build.json",
+      "bytes": 3177,
+      "sha256": "f4ceda4c224031bfb8e42b2cc26948df32b7677dde3a5f0490d6317bfad277aa"
+    },
+    "candidate_patch": {
+      "path": "/tmp/litchi-performance-0921/receipts/candidate.patch",
+      "bytes": 22350,
+      "sha256": "7705c8ec7f12a5a5083b2ff29408451b0ee2afbbf8a25bb827c01b885aece67d"
+    },
+    "base_revision": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+    "candidate_source_head": null,
+    "candidate_manifest_sha256": "dceb2bd74acc8d0bb899368eb9ed0b7c0294e40eeb6272e87f8e4874d412a09f",
+    "candidate_build_binding": {
+      "revision": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+      "candidate_patch_sha256": "7705c8ec7f12a5a5083b2ff29408451b0ee2afbbf8a25bb827c01b885aece67d",
+      "candidate_manifest_sha256": "dceb2bd74acc8d0bb899368eb9ed0b7c0294e40eeb6272e87f8e4874d412a09f"
+    },
+    "source_file_count": {
+      "baseline": 938,
+      "candidate": 938
+    },
+    "modified_files": [
+      "crates/litchi-cfb/src/file.rs",
+      "crates/litchi-cfb/src/lib.rs",
+      "crates/litchi-cfb/src/stream_compare_tests.rs",
+      "crates/litchi-ole-common/src/object/codec.rs",
+      "crates/litchi-ole-common/src/object/editor.rs",
+      "crates/litchi-ole-common/src/object/model.rs"
+    ],
+    "toolchain": {
+      "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+      "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
+    }
+  }
+}

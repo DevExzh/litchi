@@ -1,0 +1,79 @@
+{
+  "schema": "litchi.performance.0921.focused-comparer-fixed.v1",
+  "cwd": "/tmp/litchi-performance-0921/source",
+  "toolchain": {
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
+  },
+  "start_utc": "2026-10-06T07:12:03.720387+00:00",
+  "end_utc": "2026-10-06T07:12:11.472395+00:00",
+  "elapsed_seconds": 7.783851701999083,
+  "source": {
+    "base_revision": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+    "candidate_manifest_sha256": "dceb2bd74acc8d0bb899368eb9ed0b7c0294e40eeb6272e87f8e4874d412a09f",
+    "candidate_patch_sha256": "7705c8ec7f12a5a5083b2ff29408451b0ee2afbbf8a25bb827c01b885aece67d"
+  },
+  "target_directory": "/tmp/litchi-performance-0921/review/focused-comparer-target",
+  "tests": [
+    {
+      "id": "source_bound_comparer_uses_the_reader_bytes",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-cfb",
+        "source_bound_comparer_uses_the_reader_bytes",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 7.276621156022884,
+      "artifacts": [
+        {
+          "path": "/tmp/litchi-performance-0921/review/focused-comparer-0.stdout",
+          "bytes": 1098,
+          "sha256": "5d4e6d9b85df49cc49e7ac6246397c1215bff6b8edc84d2e3578dd810228ee6d"
+        },
+        {
+          "path": "/tmp/litchi-performance-0921/review/focused-comparer-0.stderr",
+          "bytes": 2985,
+          "sha256": "885251c61afd00d3409c3abc48c267a0f1d526b4747de6418824d7257e8d4c25"
+        }
+      ]
+    },
+    {
+      "id": "every_fixture_stream_reaches_the_source_bound_verdict",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-cfb",
+        "every_fixture_stream_reaches_the_source_bound_verdict",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.4749984410009347,
+      "artifacts": [
+        {
+          "path": "/tmp/litchi-performance-0921/review/focused-comparer-1.stdout",
+          "bytes": 1108,
+          "sha256": "71116c71815e0a28cd568f87e8316e6bc7f3fbef9deecfe98361e418c6a49469"
+        },
+        {
+          "path": "/tmp/litchi-performance-0921/review/focused-comparer-1.stderr",
+          "bytes": 1489,
+          "sha256": "810bab57dfd603eab11e4244ad5f4506152a9235ff56eed4594daea89c94a82c"
+        }
+      ]
+    }
+  ],
+  "exit_code": 0,
+  "source_receipt": "/tmp/litchi-performance-0921/receipts/candidate-source.json"
+}

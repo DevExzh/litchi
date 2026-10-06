@@ -1,0 +1,8 @@
+{
+  "schema": "litchi.performance.0921.profile-root-audit.v1",
+  "utc": "2026-10-06T07:10:35.451927+00:00",
+  "summary_sha256": "d2a0ea65768f1c9a1d004146548ec97c777809bf01e8cb080f769d402bec2771",
+  "distinct_descriptors_checked": 95,
+  "errors": [],
+  "scope": "Root verifies all path/SHA descriptors recursively in final diagnostic summary; process-wide limitations remain unchanged."
+}

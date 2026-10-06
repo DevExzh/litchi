@@ -1,0 +1,25 @@
+{
+  "schema": "litchi.performance.0921.build-receipt-correction.v1",
+  "utc": "2026-10-06T07:09:03.018332+00:00",
+  "reason": "Initial candidate build receipt queried rustc/cargo versions in the launcher directory instead of the build source directory. It reported 1.98.1; actual build used 1.95.0 as shown by target rustc-info and matching 157 compiler fingerprints. Corrected receipt queries the source root.",
+  "source_or_binary_changed": false,
+  "performance_capture_before_correction": false,
+  "artifacts": [
+    {
+      "path": "/tmp/litchi-performance-0921/receipts/candidate-build-initial-toolchain-detection.json",
+      "bytes": 3143,
+      "sha256": "2218d29363e73e30fc59ae0c5b86cd801ef4dfc5de87165a68851ea56b1f164c"
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/receipts/candidate-build-before-clippy-fix.json",
+      "bytes": 3546,
+      "sha256": "003fb678def28489d6edcad7c04d6b9e057b1a29334335d5e7ffff0fe0e6f6b5"
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/candidate-target-before-clippy-fix/.rustc_info.json",
+      "bytes": 1040,
+      "sha256": "8fcff6af6f9610c25626b31588689eca31edd31111abb8968b9b772c70be4dcb"
+    }
+  ],
+  "scope": "Correction concerns the pre-lint build only; the final lint-only candidate was separately rebuilt with source-root toolchain detection. Historical candidate target and receipt were renamed before rebuild."
+}

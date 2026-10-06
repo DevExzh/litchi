@@ -1,5 +1,14 @@
 # Performance hotspot inventory
 
+## 0921 — recapture allocation reduction needs stronger latency evidence
+
+[0921](0921-source-bound-stream-recapture.md) eliminates redundant payload
+materialization in the isolated candidate. Every median timing ratio improves,
+but the two-edit FloatingPictures confidence bound misses the fixed gate. No
+selective recapture or relaxation follows. Separate profiling of 0920 finds
+lower operation instructions and no proven native cause; process-level
+allocation/page placement remains a hypothesis.
+
 ## 0920 — fewer output allocations do not establish lower latency
 
 [0920](0920-cfb-output-reservation-rejected.md) rejects exact output reservation:

@@ -1,0 +1,23 @@
+{
+  "schema": "litchi.performance.0921.root-source-verification.v1",
+  "utc": "2026-10-06T07:15:32.056541+00:00",
+  "baseline_files": 938,
+  "candidate_files": 938,
+  "modified_files": [
+    "crates/litchi-cfb/src/file.rs",
+    "crates/litchi-cfb/src/lib.rs",
+    "crates/litchi-cfb/src/stream_compare_tests.rs",
+    "crates/litchi-ole-common/src/object/codec.rs",
+    "crates/litchi-ole-common/src/object/editor.rs",
+    "crates/litchi-ole-common/src/object/model.rs"
+  ],
+  "source_hashes_match": true,
+  "probe_files_match": true,
+  "build_artifact_descriptors_match": true,
+  "candidate_patch": {
+    "path": "/tmp/litchi-performance-0921/receipts/candidate.patch",
+    "sha256": "7705c8ec7f12a5a5083b2ff29408451b0ee2afbbf8a25bb827c01b885aece67d"
+  },
+  "candidate_manifest_sha256": "dceb2bd74acc8d0bb899368eb9ed0b7c0294e40eeb6272e87f8e4874d412a09f",
+  "build_status": "Final reviewed patch rebuilt successfully; all build artifact hashes verified."
+}

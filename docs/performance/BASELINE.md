@@ -1,5 +1,14 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0921 — stream recapture candidate misses one confidence bound
+
+[0921](0921-source-bound-stream-recapture.md) compares source-bound stream
+reuse in 192 native and 96 allocator children. Both 32-edit fixtures save
+requested bytes (19.66% FloatingPictures, 15.89% NoHeadFoot), with exact
+capacities and unchanged peak-live bytes. Seven native cells pass;
+FloatingPictures 2 has lower 95% ratio bound 0.952076 below 0.952381. The
+candidate is rejected and production baseline unchanged.
+
 ## 0920 — CFB output reservation comparison rejected
 
 [0920](0920-cfb-output-reservation-rejected.md) completes 192 paired native

@@ -1,0 +1,32 @@
+{
+  "all_exact_capacities": true,
+  "baseline_reports": 48,
+  "baseline_results": {
+    "bytes": 469621,
+    "path": "/tmp/litchi-performance-0921-tooling/qualification-final-20261006T071547Z/baseline-results.json",
+    "sha256": "5c289d73ad2dad31c9dede404202d4862863541f6618d16b68f928644a7b3b9c"
+  },
+  "candidate_adoption": false,
+  "candidate_reports": 48,
+  "candidate_results": {
+    "bytes": 470259,
+    "path": "/tmp/litchi-performance-0921-tooling/qualification-final-20261006T071547Z/candidate-results.json",
+    "sha256": "6d3fb5c44113889f82c05fd2237efaa91156c6296f00e6cd98812b8ae40175f6"
+  },
+  "capacity_pairs": 48,
+  "performance_children_run": 0,
+  "reproduction": "Offline stdout replay only; no qualification or performance child is started.",
+  "runner": {
+    "bytes": 87482,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0921/comparison.py",
+    "sha256": "e23458b09f4927c5ab8f9aeebe511bdf17eda44e9b219cb39c9afcb86baf4942"
+  },
+  "schema": "litchi.performance.0921.qualification-replay.v1",
+  "status": "verified",
+  "total_reports": 96,
+  "validator": {
+    "bytes": 69575,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0917/capture.py",
+    "sha256": "fde5219539cf538d51b8bf92ec5527fd9959ac0f39eb2ea5412b8ddf8cd7a894"
+  }
+}

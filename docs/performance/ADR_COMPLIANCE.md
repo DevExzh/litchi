@@ -1,5 +1,13 @@
 # Performance optimization ADR-compliance matrix
 
+## 0921 — source-bound validation reviewed, candidate unadopted
+
+[0921](0921-source-bound-stream-recapture.md) keeps complete CFB comparison,
+fresh directory metadata, protection checks, limits, fallback readback and
+atomic publication. Independent review and 5,059 scoped functional passes
+support correctness; final lint-only cleanup passes focused tests and Clippy.
+No ADR exception or production change is introduced.
+
 ## 0920 — validated reservation candidate remains unadopted
 
 [0920](0920-cfb-output-reservation-rejected.md) reviews exact output reservation

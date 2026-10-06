@@ -1,0 +1,80 @@
+{
+  "schema": "litchi.performance.0921.baseline-build.v1",
+  "argv": [
+    "taskset",
+    "-c",
+    "14,15",
+    "cargo",
+    "build",
+    "--locked",
+    "--offline",
+    "-j2",
+    "--release",
+    "--manifest-path",
+    "/tmp/litchi-performance-0920-baseline/source/docs/performance/results/change-0917/probe/Cargo.toml",
+    "--bins"
+  ],
+  "cwd": "/tmp/litchi-performance-0920-baseline/source",
+  "environment_overrides": {
+    "CARGO_TARGET_DIR": "/tmp/litchi-performance-0921/baseline-target",
+    "CARGO_TERM_COLOR": "never",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS": "false",
+    "CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS": "false",
+    "CARGO_PROFILE_RELEASE_LTO": "false",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "16",
+    "CARGO_PROFILE_RELEASE_PANIC": "unwind",
+    "CARGO_PROFILE_RELEASE_INCREMENTAL": "false",
+    "CARGO_PROFILE_RELEASE_STRIP": "none",
+    "CARGO_PROFILE_RELEASE_SPLIT_DEBUGINFO": "off"
+  },
+  "removed_environment_names": [],
+  "toolchain": {
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
+  },
+  "start_utc": "2026-10-06T07:00:01.271615+00:00",
+  "exit_code": 0,
+  "end_utc": "2026-10-06T07:01:16.414129+00:00",
+  "elapsed_seconds": 75.14249170100084,
+  "source": {
+    "revision": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+    "baseline_archive_sha256": "869aa001cc81972c3881f972ea6d34fe47bccf2bc2dc2c90c3303662eb6a6d3f",
+    "probe_lock_sha256": "abd9f47a5aaa973a760cd61392de79c2b6143026c300dc1329831652aa54c06c"
+  },
+  "target_directory": "/tmp/litchi-performance-0921/baseline-target",
+  "artifacts": [
+    {
+      "path": "/tmp/litchi-performance-0921/logs/baseline-build.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/logs/baseline-build.stderr",
+      "bytes": 4270,
+      "sha256": "0292200929a1483fc66c27bf3e67b04fe220ace0d6083f03803c675a6a9c7498"
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/baseline-target/release/doc_retention_probe_alloc.d",
+      "bytes": 54393,
+      "sha256": "9058d49dea21f9bd0102699456fbc096ef944f8498a6b44d6f14cc84998aaa8b"
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/baseline-target/release/doc_retention_probe.d",
+      "bytes": 54382,
+      "sha256": "de7cdfcd99e45c71f6ea330570fa90ae5754200136a69fdb2927378334f1f8d9"
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/baseline-target/release/doc_retention_probe_alloc",
+      "bytes": 54800008,
+      "sha256": "20b96ebbdf611c22b7114b88580044a707d7fce2e4c8811c8084679feb1060dd"
+    },
+    {
+      "path": "/tmp/litchi-performance-0921/baseline-target/release/doc_retention_probe",
+      "bytes": 54795488,
+      "sha256": "9f3c2bb2c589ba8e7a47b99c051d4a4910e41002d28f1caa1d1edc036a7515e5"
+    }
+  ]
+}
