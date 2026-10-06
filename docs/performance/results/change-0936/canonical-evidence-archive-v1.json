@@ -1,0 +1,78 @@
+{
+  "archive": {
+    "bytes": 803923,
+    "path": "/home/zhuhe/litchi-performance-0936/archives/canonical-evidence-v1.tar.zst",
+    "sha256": "8e3a0da6a29784cc71b303dcc37693a3d1af160be2c09de549aa8a47c9975131"
+  },
+  "file_count": 689,
+  "generated_utc": "2026-10-06T19:19:47.048500Z",
+  "input_logical_bytes": 15882097,
+  "input_manifest": {
+    "bytes": 210306,
+    "path": "/home/zhuhe/litchi-performance-0936/archives/archive-inputs-v1.jsonl",
+    "sha256": "43870f4b8e3a22f7e88c6f2729b5ab76522483b715b76529e43a68b4cf82171e"
+  },
+  "member_list": {
+    "bytes": 48227,
+    "path": "/home/zhuhe/litchi-performance-0936/archives/archive-members-v1.nul",
+    "sha256": "20844f50fd1e3575f7f5df6dfad9513700839daecb1293401cb4b94d5fe9cf37"
+  },
+  "regeneration_argv": [
+    [
+      "/usr/bin/tar",
+      "--no-recursion",
+      "--sort=name",
+      "--mtime=@0",
+      "--owner=0",
+      "--group=0",
+      "--numeric-owner",
+      "-C",
+      "/home/zhuhe/litchi-performance-0936",
+      "--null",
+      "-T",
+      "/home/zhuhe/litchi-performance-0936/archives/archive-members-v1.nul",
+      "-cf",
+      "/home/zhuhe/litchi-performance-0936/archives/canonical-evidence-v1.tar"
+    ],
+    [
+      "/usr/bin/zstd",
+      "-19",
+      "-T2",
+      "-f",
+      "/home/zhuhe/litchi-performance-0936/archives/canonical-evidence-v1.tar",
+      "-o",
+      "/home/zhuhe/litchi-performance-0936/archives/canonical-evidence-v1.tar.zst"
+    ]
+  ],
+  "schema": "litchi.performance.0936.canonical-evidence-archive.v1",
+  "scope": {
+    "excluded": [
+      "source trees",
+      "executable binaries",
+      "target directories",
+      "boundary source tree",
+      "__pycache__",
+      "moved-packet duplicates"
+    ],
+    "repo_evidence": "/home/zhuhe/code/litchi/docs/performance/results/change-0936",
+    "repo_snapshot": "/home/zhuhe/litchi-performance-0936/committed-evidence-v1",
+    "source_root": "/home/zhuhe/litchi-performance-0936"
+  },
+  "terminal_records": [
+    {
+      "bytes": 588,
+      "path": "/home/zhuhe/litchi-performance-0936/archives/archive-v1-command-1.terminal.json",
+      "sha256": "455ac0e7be68b30bef6dc1792d4dfae9edbd45f8921a616f44649f9b022789cd"
+    },
+    {
+      "bytes": 621,
+      "path": "/home/zhuhe/litchi-performance-0936/archives/archive-v1-command-2.terminal.json",
+      "sha256": "065bda52197ad1d468aac397d70013e7a8d957ff50b70b353f0ffcb77ce67d6a"
+    }
+  ],
+  "uncompressed": {
+    "bytes": 16496640,
+    "path": "/home/zhuhe/litchi-performance-0936/archives/canonical-evidence-v1.tar",
+    "sha256": "e097bfee25d09c6f4b0213758ac053556052dc4882a1e612ddfd8f130bcab825"
+  }
+}

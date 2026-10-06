@@ -1,0 +1,95 @@
+{
+  "completed_utc": "2026-10-06T19:20:21.311645Z",
+  "logical_bytes_removed": 16706369219,
+  "removed": [
+    {
+      "files": 13814,
+      "logical_bytes": 14324935875,
+      "path": "/home/zhuhe/litchi-performance-0936/quality-target",
+      "status": "removed"
+    },
+    {
+      "files": 986,
+      "logical_bytes": 306683,
+      "path": "/home/zhuhe/litchi-performance-0936/target-candidate-normal/release/.fingerprint",
+      "status": "removed"
+    },
+    {
+      "files": 166,
+      "logical_bytes": 24865714,
+      "path": "/home/zhuhe/litchi-performance-0936/target-candidate-normal/release/build",
+      "status": "removed"
+    },
+    {
+      "files": 625,
+      "logical_bytes": 1167613372,
+      "path": "/home/zhuhe/litchi-performance-0936/target-candidate-normal/release/deps",
+      "status": "removed"
+    },
+    {
+      "files": 0,
+      "logical_bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0936/target-candidate-normal/release/examples",
+      "status": "removed"
+    },
+    {
+      "files": 0,
+      "logical_bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0936/target-candidate-normal/release/incremental",
+      "status": "removed"
+    },
+    {
+      "files": 986,
+      "logical_bytes": 314753,
+      "path": "/home/zhuhe/litchi-performance-0936/target-candidate-allocator/release/.fingerprint",
+      "status": "removed"
+    },
+    {
+      "files": 166,
+      "logical_bytes": 24870817,
+      "path": "/home/zhuhe/litchi-performance-0936/target-candidate-allocator/release/build",
+      "status": "removed"
+    },
+    {
+      "files": 625,
+      "logical_bytes": 1163462005,
+      "path": "/home/zhuhe/litchi-performance-0936/target-candidate-allocator/release/deps",
+      "status": "removed"
+    },
+    {
+      "files": 0,
+      "logical_bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0936/target-candidate-allocator/release/examples",
+      "status": "removed"
+    },
+    {
+      "files": 0,
+      "logical_bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0936/target-candidate-allocator/release/incremental",
+      "status": "removed"
+    }
+  ],
+  "retained": {
+    "binaries": [
+      {
+        "bytes": 69919624,
+        "path": "/home/zhuhe/litchi-performance-0936/target-candidate-normal/release/litchi-perf-baseline",
+        "sha256": "168cc1ee7f8c270f719e4bf9f4568409b8ab1226c4ef4c0f0eea76e1e4596b96"
+      },
+      {
+        "bytes": 68433920,
+        "path": "/home/zhuhe/litchi-performance-0936/target-candidate-allocator/release/litchi-perf-baseline-alloc",
+        "sha256": "38adcc6ee887d56edc144e03c229d7003000faf233a40f1e311ea6f753a44940"
+      }
+    ],
+    "receipts": "/home/zhuhe/litchi-performance-0936/receipts",
+    "source_trees": [
+      "/home/zhuhe/litchi-performance-0936/baseline-source",
+      "/home/zhuhe/litchi-performance-0936/candidate-source",
+      "/home/zhuhe/litchi-performance-0936/boundary-candidate-root-v1"
+    ]
+  },
+  "schema": "litchi.performance.0936.cleanup.v1",
+  "shared_checkout_target_touched": false,
+  "size_scope": "sum of regular-file lengths, not measured physical disk recovery"
+}

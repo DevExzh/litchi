@@ -1,0 +1,109 @@
+{
+  "benchmark_children_started": 0,
+  "capture_started": false,
+  "checker": {
+    "bytes": 39571,
+    "path": "/home/zhuhe/litchi-performance-0936/independent-allocator-check-0936-v3.py",
+    "sha256": "218148fba76eb4f69c4de1b5d80c2c47560580593a7cda22ad88a333f9dfe24b"
+  },
+  "negative_controls": [
+    {
+      "name": "allocator_source_fixture_hash",
+      "reason": "allocator-section-00016-shared_snapshot_clones-rep-01-baseline report: source fixture changed",
+      "rejected": true
+    },
+    {
+      "name": "allocator_output_fixture_hash",
+      "reason": "allocator-section-00016-shared_snapshot_clones-rep-01-baseline report: output fixture changed",
+      "rejected": true
+    },
+    {
+      "name": "allocator_exact_cap",
+      "reason": "allocator-section-00016-shared_snapshot_clones-rep-01-baseline report: retention boundary changed",
+      "rejected": true
+    },
+    {
+      "name": "allocator_observer_invalid",
+      "reason": "allocator-section-00016-shared_snapshot_clones-rep-01-baseline report: baseline: allocator observer invalid",
+      "rejected": true
+    },
+    {
+      "name": "allocator_absolute_phase_peak",
+      "reason": "allocator-section-00016-shared_snapshot_clones-rep-01-baseline report: after_snapshot_drop absolute region peak missing",
+      "rejected": true
+    },
+    {
+      "name": "terminal_source_receipt_binding",
+      "reason": "allocator-section-00016-shared_snapshot_clones-rep-01-baseline: source receipt binding changed",
+      "rejected": true
+    },
+    {
+      "name": "manifest_schedule",
+      "reason": "manifest schedule rows changed",
+      "rejected": true
+    },
+    {
+      "name": "packet_report_descriptor",
+      "reason": "negative report descriptor: packet descriptor changed",
+      "rejected": true
+    }
+  ],
+  "negative_controls_all_rejected": true,
+  "packet": {
+    "capture_state": {
+      "bytes": 78432,
+      "path": "/home/zhuhe/litchi-performance-0935/formal-packet-v1/capture-state.json",
+      "sha256": "f09ddba51f4a1957b85a4180d9c83429d552270906a1b50be16f79c4859d1b58"
+    },
+    "manifest": {
+      "bytes": 55085,
+      "path": "/home/zhuhe/litchi-performance-0935/formal-packet-v1/manifest.json",
+      "sha256": "7fa1ae4bc9a653419b1db1fd01b62731753281e302f9064ee02535700df786f8"
+    },
+    "root": "/home/zhuhe/litchi-performance-0935/formal-packet-v1",
+    "sample_report": {
+      "bytes": 7218,
+      "path": "/home/zhuhe/litchi-performance-0935/formal-packet-v1/children/allocator-section-00016-shared_snapshot_clones-rep-01-baseline/report.json",
+      "sha256": "4ca4158ba49b4a84d1fe892e95370fd66da9b48553282285512d7fc5a82e6e65"
+    },
+    "sample_terminal": {
+      "bytes": 3186,
+      "path": "/home/zhuhe/litchi-performance-0935/formal-packet-v1/children/allocator-section-00016-shared_snapshot_clones-rep-01-baseline/terminal.json",
+      "sha256": "3d4c6db0328e45dc792af12e3fd58daca1c160987ee69de2ab2fbc47428057f6"
+    }
+  },
+  "positive_sample": {
+    "local_path_positive": true,
+    "report_facts": {
+      "after_snapshot_drop_allocated_bytes_delta": 2108662,
+      "after_snapshot_drop_allocation_calls_delta": 28398,
+      "required_retained_base_bytes": 7280,
+      "source_archive_bytes": 1052,
+      "source_archive_sha256": "ac0e4a784d75f16c3c3d7f203e6f2a92b505b28d7db965b7a4ff54ad61f52726"
+    },
+    "report_schema": "docx_section_retention_v1",
+    "row_id": "allocator-section-00016-shared_snapshot_clones-rep-01-baseline",
+    "source_revision": "3ae856d76424f2f9b58d26dcd20fd074b8e97541",
+    "terminal_validation": {
+      "adaptation": "in-memory schema field only; original terminal bytes unchanged",
+      "adapted_schema": "litchi.performance.0936.formal-terminal.v2",
+      "original_schema": "litchi.performance.0935.formal-terminal.v2",
+      "original_terminal_descriptor": {
+        "bytes": 3186,
+        "path": "/home/zhuhe/litchi-performance-0935/formal-packet-v1/children/allocator-section-00016-shared_snapshot_clones-rep-01-baseline/terminal.json",
+        "sha256": "3d4c6db0328e45dc792af12e3fd58daca1c160987ee69de2ab2fbc47428057f6"
+      },
+      "passed": true
+    }
+  },
+  "regeneration": "PYTHONDONTWRITEBYTECODE=1 python3 -B /home/zhuhe/litchi-performance-0936/run-independent-checker-controls-v1.py",
+  "schedule": {
+    "children": 72,
+    "rows": 72,
+    "sha256": "0ac8e13ff21de9d86e8eef800de34ce2f9417e44bae6897c5f0e94bb9003865c",
+    "validated_by": "validate_schedule"
+  },
+  "schema": "litchi.performance.0936.independent-checker-controls.v1",
+  "scope": "historical 0935 packet controls only; no 0936 workload or capture",
+  "status": "passed"
+}

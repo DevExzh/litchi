@@ -1,0 +1,291 @@
+{
+  "capture": {
+    "authorized_manifest": {
+      "bytes": 52988,
+      "path": "/home/zhuhe/litchi-performance-0936/formal-manifest-authorized-v1.json",
+      "sha256": "8399ed47be3dbd0270b4104d86561e7034c537400a18cc12155b5eb817d0fb47"
+    },
+    "children_expected": 72,
+    "children_failed": 0,
+    "children_run": 72,
+    "failure_policy": "invalid cohort retained; no retry or selective recapture",
+    "outer_exit_code": 0,
+    "outer_start": {
+      "bytes": 1259,
+      "path": "/home/zhuhe/litchi-performance-0936/capture-outer-v1/start.json",
+      "sha256": "d99709277a0419ce8da5bca22628bc43b72163e833e82e7177967e7365bcb446"
+    },
+    "outer_terminal": {
+      "bytes": 1546,
+      "path": "/home/zhuhe/litchi-performance-0936/capture-outer-v1/terminal.json",
+      "sha256": "bef200581c275f68be2589a68fe009bf85926b4ac4a657734fc34b264d97f839"
+    },
+    "packet_capture_state": {
+      "bytes": 78432,
+      "path": "/home/zhuhe/litchi-performance-0936/formal-packet-v1/capture-state.json",
+      "sha256": "fe1707a0bf523a42765cfaffa4368de31ed0fc4a6c6866c27d6c91f28e07d904"
+    },
+    "packet_manifest": {
+      "bytes": 55556,
+      "path": "/home/zhuhe/litchi-performance-0936/formal-packet-v1/manifest.json",
+      "sha256": "f6a5b39a1b4772a3d6c2e10e9c0cbf9d4b43570644ad4bb4a6e5465aab77c5bc"
+    },
+    "recapture_count": 0,
+    "status": "completed",
+    "terminal_first": true
+  },
+  "created_utc": "2026-10-06T19:15:31.781930+00:00",
+  "no_retry_result": {
+    "canonical_replay_exit": 0,
+    "capture_children": 72,
+    "capture_failures": [],
+    "capture_recaptures": 0,
+    "moved_replay_exit": 0,
+    "no_capture_retry_or_replacement": true,
+    "offline_reduction_exit": 0
+  },
+  "reduction": {
+    "children": 72,
+    "offline": {
+      "command": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0936/comparison-runner.py",
+        "reduce",
+        "--packet",
+        "/home/zhuhe/litchi-performance-0936/formal-packet-v1",
+        "--output",
+        "/home/zhuhe/litchi-performance-0936/formal-reduction-v1.json"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "packet": "/home/zhuhe/litchi-performance-0936/formal-packet-v1",
+      "runner": {
+        "bytes": 81933,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0936/comparison-runner.py",
+        "sha256": "83fd51f57032f0cb9c95c3d645e47e87e34f1fae6426c2d95a8910e451dfba02"
+      },
+      "start": {
+        "bytes": 825,
+        "path": "/home/zhuhe/litchi-performance-0936/offline/canonical-reduce-v1/start.json",
+        "sha256": "aa38d3b1be1ef2e65ba4702c9853f2e31561d2db2f99bcee5c19b7feee50a5f3"
+      },
+      "stderr": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0936/offline/canonical-reduce-v1/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 27182,
+        "path": "/home/zhuhe/litchi-performance-0936/offline/canonical-reduce-v1/stdout.log",
+        "sha256": "a090b05689aa22d5708a8d8050eb630996158322ea36efcd17b2696e59f5a006"
+      },
+      "terminal": {
+        "bytes": 1381,
+        "path": "/home/zhuhe/litchi-performance-0936/offline/canonical-reduce-v1/terminal.json",
+        "sha256": "16b9532db11546103ce32bacb042778c924c533fcb76cd9521e91538b597ff27"
+      },
+      "terminal_first": true
+    },
+    "output": {
+      "bytes": 26986,
+      "path": "/home/zhuhe/litchi-performance-0936/formal-reduction-v1.json",
+      "sha256": "e7063bff294c7e46e57b97e89e1aa0ff98c9fb6c809f58c1df748e7ca471cc16"
+    },
+    "regeneration": {
+      "cwd": "/home/zhuhe/code/litchi",
+      "effective_argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0936/comparison-runner.py",
+        "reduce",
+        "--packet",
+        "/home/zhuhe/litchi-performance-0936/formal-packet-v1",
+        "--output",
+        "/home/zhuhe/litchi-performance-0936/formal-reduction-v1.json"
+      ],
+      "env_overrides": {
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "shell": "PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -B /home/zhuhe/litchi-performance-0936/run-offline-v1.py --kind reduce --packet /home/zhuhe/litchi-performance-0936/formal-packet-v1 --tag canonical-reduce-v1 --output /home/zhuhe/litchi-performance-0936/formal-reduction-v1.json"
+    },
+    "status": "passed"
+  },
+  "replay": {
+    "canonical": {
+      "command": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0936/comparison-runner.py",
+        "replay",
+        "--packet",
+        "/home/zhuhe/litchi-performance-0936/formal-packet-v1"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "packet": "/home/zhuhe/litchi-performance-0936/formal-packet-v1",
+      "result": {
+        "bytes": 26986,
+        "path": "/home/zhuhe/litchi-performance-0936/offline/canonical-replay-v1/replay-result.json",
+        "sha256": "e7063bff294c7e46e57b97e89e1aa0ff98c9fb6c809f58c1df748e7ca471cc16"
+      },
+      "runner": {
+        "bytes": 81933,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0936/comparison-runner.py",
+        "sha256": "83fd51f57032f0cb9c95c3d645e47e87e34f1fae6426c2d95a8910e451dfba02"
+      },
+      "start": {
+        "bytes": 741,
+        "path": "/home/zhuhe/litchi-performance-0936/offline/canonical-replay-v1/start.json",
+        "sha256": "9a4a176829094449306f17635dbf21ddf5ae5ab6f0cb3d4eddbd5d31c518d6da"
+      },
+      "stderr": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0936/offline/canonical-replay-v1/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 26986,
+        "path": "/home/zhuhe/litchi-performance-0936/offline/canonical-replay-v1/stdout.log",
+        "sha256": "e7063bff294c7e46e57b97e89e1aa0ff98c9fb6c809f58c1df748e7ca471cc16"
+      },
+      "terminal": {
+        "bytes": 1297,
+        "path": "/home/zhuhe/litchi-performance-0936/offline/canonical-replay-v1/terminal.json",
+        "sha256": "5f98c0bbdd1b7c15ca75ef7786d8d8c59060b90cc5d7e3d2e555bc3585037c1a"
+      },
+      "terminal_first": true
+    },
+    "canonical_packet": "/home/zhuhe/litchi-performance-0936/formal-packet-v1",
+    "comparison": {
+      "bytes": 788,
+      "path": "/home/zhuhe/litchi-performance-0936/offline/moved-replay-comparison-v1.json",
+      "sha256": "f102c27552bbe57d83dd2d7ca07d7e7d63658d770c126662d0543b5d63127603"
+    },
+    "moved": {
+      "command": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0936/comparison-runner.py",
+        "replay",
+        "--packet",
+        "/home/zhuhe/litchi-performance-0936/formal-packet-v1-moved"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "exit_code": 0,
+      "packet": "/home/zhuhe/litchi-performance-0936/formal-packet-v1-moved",
+      "result": {
+        "bytes": 26992,
+        "path": "/home/zhuhe/litchi-performance-0936/offline/moved-replay-v1/replay-result.json",
+        "sha256": "b84a86a484c0ef6d3363022a0003e91b4222bcf38be16e6083627c259874081d"
+      },
+      "runner": {
+        "bytes": 81933,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0936/comparison-runner.py",
+        "sha256": "83fd51f57032f0cb9c95c3d645e47e87e34f1fae6426c2d95a8910e451dfba02"
+      },
+      "start": {
+        "bytes": 749,
+        "path": "/home/zhuhe/litchi-performance-0936/offline/moved-replay-v1/start.json",
+        "sha256": "a4c2340ef82eb44cdc15adb94cf932c93c7f57e92c3acf6648041a10a73abce6"
+      },
+      "stderr": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0936/offline/moved-replay-v1/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 26992,
+        "path": "/home/zhuhe/litchi-performance-0936/offline/moved-replay-v1/stdout.log",
+        "sha256": "b84a86a484c0ef6d3363022a0003e91b4222bcf38be16e6083627c259874081d"
+      },
+      "terminal": {
+        "bytes": 1297,
+        "path": "/home/zhuhe/litchi-performance-0936/offline/moved-replay-v1/terminal.json",
+        "sha256": "a57bdb01aa80c97f6a0adb1f74594302211845c322bd58af1a2615e82900f132"
+      },
+      "terminal_first": true
+    },
+    "moved_packet": "/home/zhuhe/litchi-performance-0936/formal-packet-v1-moved",
+    "normalization": "only packet-root path replaced; metrics and all other result fields compared exactly",
+    "normalized_metrics_equal": true,
+    "regeneration": {
+      "canonical_effective_argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0936/comparison-runner.py",
+        "replay",
+        "--packet",
+        "/home/zhuhe/litchi-performance-0936/formal-packet-v1"
+      ],
+      "canonical_shell": "PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -B /home/zhuhe/litchi-performance-0936/run-offline-v1.py --kind replay --packet /home/zhuhe/litchi-performance-0936/formal-packet-v1 --tag canonical-replay-v1",
+      "cwd": "/home/zhuhe/code/litchi",
+      "env_overrides": {
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "moved_effective_argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0936/comparison-runner.py",
+        "replay",
+        "--packet",
+        "/home/zhuhe/litchi-performance-0936/formal-packet-v1-moved"
+      ],
+      "moved_shell": "PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -B /home/zhuhe/litchi-performance-0936/run-offline-v1.py --kind replay --packet /home/zhuhe/litchi-performance-0936/formal-packet-v1-moved --tag moved-replay-v1"
+    }
+  },
+  "schema": "litchi.performance.0936.comparison-postcapture-validation.v1",
+  "scope": "Post-capture custody, offline reduction, and canonical/moved replay only; no recapture or adoption decision.",
+  "source_binding": {
+    "base_revision": "3ae856d76424f2f9b58d26dcd20fd074b8e97541",
+    "baseline_source_receipt": {
+      "bytes": 3073,
+      "path": "/home/zhuhe/litchi-performance-0936/receipts/baseline-source-final-v1.json",
+      "sha256": "a388c6dfeadff05e8fc95d8ded72a8cedc82803da5f009efd51a1085b45b8ea9"
+    },
+    "candidate_patch": {
+      "bytes": 3431,
+      "path": "/home/zhuhe/litchi-performance-0936/candidate-footnote-scanner.patch",
+      "sha256": "ef1481aa9c19bb3b2edfbf4c25766bf14807e4469e5691405ee795a7c564c475"
+    },
+    "candidate_runtime_base": "0eae43dd007e63df5b7f406a46bed356a080d1be",
+    "candidate_source_receipt": {
+      "bytes": 3369,
+      "path": "/home/zhuhe/litchi-performance-0936/receipts/candidate-source-final-v1.json",
+      "sha256": "10ea0b9d8078dd196efbf1945318c0c63c889e24f0b2dc707f5b71240cba66b2"
+    },
+    "note": "Detailed source/build binding remains in comparison-tooling-validation-v3; this receipt references it without duplicating the large listing.",
+    "plan": {
+      "bytes": 22198,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0936/comparison-plan-v1.json",
+      "sha256": "d7c79f83487ef78eabb4dab14641795569382207bd2f304f21dc95f0e829d87d"
+    },
+    "pre_capture_validation_receipt": {
+      "bytes": 7903,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0936/comparison-tooling-validation-v3.json",
+      "sha256": "46541dc0f82197772efcfaa970407dede142767140311c880a56e4600975ec95"
+    },
+    "production_changed_paths": [
+      "crates/litchi-docx/src/section/footnote_columns/codec.rs"
+    ],
+    "runner": {
+      "bytes": 81933,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0936/comparison-runner.py",
+      "sha256": "83fd51f57032f0cb9c95c3d645e47e87e34f1fae6426c2d95a8910e451dfba02"
+    },
+    "source_listing": {
+      "bytes": 3729629,
+      "path": "/home/zhuhe/litchi-performance-0936/source-manifest-v1.jsonl",
+      "sha256": "7bd03c17ac429562e74a932b8806de2b593973340c9132bfdfa3186440d2fe23"
+    },
+    "test_overlay_identical": [
+      "crates/litchi-docx/src/section/footnote_columns/tests.rs"
+    ],
+    "validator": {
+      "bytes": 39792,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0936/comparison.py",
+      "sha256": "b70a2b38d098e3abd2b567d1bea70f40e9d27e62acaca8f80ff633dd2c596712"
+    }
+  },
+  "status": "passed"
+}

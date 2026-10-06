@@ -1,0 +1,74 @@
+{
+  "schema": "litchi.performance.0936.rejection-decision.v1",
+  "decision": "reject_production_candidate_retain_five_tests",
+  "head_before_batch": "0eae43dd007e63df5b7f406a46bed356a080d1be",
+  "allocation_gate": {
+    "required_minimum_each_cell": 0.1,
+    "observed_small_shared": 0.08249022365841467,
+    "observed_small_independent": 0.054785042569217776,
+    "all_cells_calls_strictly_lower": true,
+    "passed": false
+  },
+  "latency_gate": {
+    "required_primary_median_ratio": 1.05,
+    "observed_primary_median_ratio": 1.0028451508456522,
+    "bootstrap_lower95": 1.0014456273823358,
+    "bootstrap_upper95": 1.0052004577260512,
+    "seed": 936,
+    "draws": 10000,
+    "passed": false
+  },
+  "guardrails": {
+    "normal_reader_block1_candidate_over_baseline_p50": 1.0602635211104814,
+    "normal_reader_block1_candidate_over_baseline_rss": 1.0815023270916766,
+    "allocator_memory_flags": 0,
+    "review": "Individual reader regression retained; no gate waived."
+  },
+  "restored_production": {
+    "path": "/home/zhuhe/code/litchi/crates/litchi-docx/src/section/footnote_columns/codec.rs",
+    "bytes": 40435,
+    "sha256": "98886c4f99e541d35aec8e48a96ba4d65304451fe789bcf3b9f11b735497f14d"
+  },
+  "restored_equals_head_and_frozen_baseline": true,
+  "retained_tests": {
+    "path": "/home/zhuhe/code/litchi/crates/litchi-docx/src/section/footnote_columns/tests.rs",
+    "bytes": 19970,
+    "sha256": "0018f89ca9f073a714fd2d2569a7db2524bf517bf52396a3980503d7c8dc8536"
+  },
+  "external_candidate_patch": {
+    "path": "/home/zhuhe/litchi-performance-0936/candidate-footnote-scanner.patch",
+    "bytes": 3431,
+    "sha256": "ef1481aa9c19bb3b2edfbf4c25766bf14807e4469e5691405ee795a7c564c475"
+  },
+  "evidence": {
+    "allocator_original": {
+      "path": "/home/zhuhe/litchi-performance-0936/independent-allocator-audit-original-v1.json",
+      "bytes": 29235,
+      "sha256": "c9469c9b8990c57bf5e5f3bb8b9739af8d22ae43228de5a191aa20189aea231f"
+    },
+    "allocator_moved": {
+      "path": "/home/zhuhe/litchi-performance-0936/independent-allocator-audit-moved-v1.json",
+      "bytes": 29241,
+      "sha256": "a916c9b4ec1bc2efb50b999e8e0fcc01cd16993b1a5f2f61fa1fdd998c188cc9"
+    },
+    "normal_original_and_moved": {
+      "path": "/home/zhuhe/litchi-performance-0936/independent-normal-audit-original-peer-v2.json",
+      "bytes": 275167,
+      "sha256": "f996740d69024ba643c62e42ef3f2e100deb10649f144ebb4b443c341c899b49"
+    },
+    "outer_terminal": {
+      "path": "/home/zhuhe/litchi-performance-0936/capture-outer-v1/terminal.json",
+      "bytes": 1546,
+      "sha256": "bef200581c275f68be2589a68fe009bf85926b4ac4a657734fc34b264d97f839"
+    },
+    "reduction": {
+      "path": "/home/zhuhe/litchi-performance-0936/formal-reduction-v1.json",
+      "bytes": 26986,
+      "sha256": "e7063bff294c7e46e57b97e89e1aa0ff98c9fb6c809f58c1df748e7ca471cc16"
+    }
+  },
+  "formal_children": 72,
+  "failed_children": 0,
+  "recaptures": 0,
+  "scope": "Synthetic ordinary section fragments; no extension-specific or broad real-world DOCX performance claim. External frozen sources/binaries retained."
+}

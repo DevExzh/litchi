@@ -1,5 +1,6 @@
 //! Focused codec, package, snapshot, and atomic-edit coverage.
 
+use super::codec::{self, Context};
 use super::*;
 use crate::section::Section;
 use litchi_opc::PackURI;
@@ -412,4 +413,87 @@ fn rejects_overdeep_section_fragments() {
         "<x:n>".repeat(validation::MAX_XML_DEPTH) + &"</x:n>".repeat(validation::MAX_XML_DEPTH)
     );
     assert!(Snapshot::from_xml(section_xml(&nested).into_bytes()).is_err());
+}
+
+#[test]
+fn inherited_context_restores_prefix_after_nested_rebinding() {
+    let source = format!(
+        r#"<q:document xmlns:q="{W}" xmlns:x12="{W12}" xmlns:mc="{MC}" xmlns:x="urn:shadow" mc:Ignorable="x12"><q:body><q:sectPr><x:holder xmlns:x12="urn:shadow"><x12:opaque/></x:holder><x12:footnoteColumns q:val="02"/></q:sectPr></q:body></q:document>"#
+    );
+    let part = BlobPart::new(
+        PackURI::new("/word/document.xml").expect("URI"),
+        "application/xml".into(),
+        source.into_bytes(),
+    );
+    let sections = parse_part(&part).expect("document sections");
+    assert_eq!(sections.len(), 1);
+    assert_eq!(sections[0].layout(), Some(layout(2)));
+    assert_eq!(
+        sections[0].xml_bytes(),
+        br#"<q:sectPr><x:holder xmlns:x12="urn:shadow"><x12:opaque/></x:holder><x12:footnoteColumns q:val="02"/></q:sectPr>"#
+    );
+}
+
+#[test]
+fn qualified_end_names_are_refused_before_snapshot_publication() {
+    let mismatched_extension = format!(
+        r#"<w:sectPr xmlns:w="{W}" xmlns:w12="{W12}" xmlns:mc="{MC}" xmlns:other="urn:other" mc:Ignorable="w12"><w12:footnoteColumns w:val="2"></other:footnoteColumns></w:sectPr>"#
+    );
+    assert!(Snapshot::from_xml(mismatched_extension.into_bytes()).is_err());
+
+    let mismatched_root = format!(
+        r#"<w:sectPr xmlns:w="{W}" xmlns:q="{W}" xmlns:w12="{W12}" xmlns:mc="{MC}" mc:Ignorable="w12"><w12:footnoteColumns w:val="2"/></q:sectPr>"#
+    );
+    assert!(Snapshot::from_xml(mismatched_root.into_bytes()).is_err());
+}
+
+#[test]
+fn rejects_section_fragments_over_the_element_limit() {
+    let children = "<x:opaque/>".repeat(validation::MAX_XML_NODES);
+    let xml = format!(r#"<w:sectPr xmlns:w="{W}" xmlns:x="urn:opaque">{children}</w:sectPr>"#);
+    assert!(Snapshot::from_xml(xml.into_bytes()).is_err());
+}
+
+#[test]
+fn parsed_value_survives_source_buffer_drop() {
+    let xml = section_xml(r#"<w12:footnoteColumns w:val="3"/>"#).into_bytes();
+    let parsed = codec::read_with_context(&xml, &Context::default()).expect("parsed section");
+    drop(xml);
+    assert_eq!(parsed.value, Some(layout(3)));
+}
+
+#[test]
+fn public_snapshot_bytes_survive_source_part_drop() {
+    let expected = section_xml(r#"<w12:footnoteColumns w:val="4"/>"#).into_bytes();
+    let snapshot = Snapshot::from_xml(expected.clone()).expect("valid section");
+    assert_eq!(snapshot.layout(), Some(layout(4)));
+    assert_eq!(snapshot.xml_bytes(), expected.as_slice());
+
+    let package_snapshot = {
+        let part = BlobPart::new(
+            PackURI::new("/word/document.xml").expect("URI"),
+            "application/xml".into(),
+            format!(
+                r#"<w:document xmlns:w="{W}" xmlns:w12="{W12}" xmlns:mc="{MC}" mc:Ignorable="w12"><w:body><w:sectPr><w12:footnoteColumns w:val="4"/></w:sectPr></w:body></w:document>"#
+            )
+            .into_bytes(),
+        );
+        parse_part(&part)
+            .expect("document sections")
+            .pop()
+            .expect("section")
+    };
+    assert_eq!(package_snapshot.layout(), Some(layout(4)));
+    assert_eq!(
+        package_snapshot.xml_bytes(),
+        br#"<w:sectPr><w12:footnoteColumns w:val="4"/></w:sectPr>"#
+    );
+    let mut edit = package_snapshot.edit();
+    edit.set_layout(Some(layout(5))).expect("valid edit");
+    let changed = edit.commit().expect("edit after source drop");
+    assert_eq!(changed.snapshot().layout(), Some(layout(5)));
+    assert_eq!(
+        changed.snapshot().xml_bytes(),
+        br#"<w:sectPr><w12:footnoteColumns w:val="5"/></w:sectPr>"#
+    );
 }

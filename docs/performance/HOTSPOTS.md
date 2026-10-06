@@ -1,5 +1,16 @@
 # Performance hotspot inventory
 
+## 0936 — footnote scanner copies alone miss adoption thresholds
+
+[0936](0936-docx-borrowed-footnote-scanner.md) removes transient event and
+resolver copies in an external candidate. The 16-section shared and independent
+allocation reductions are 8.2490% and 5.4785%, below the frozen 10% all-cell
+gate; large cases reduce requests about 10.95%. Primary latency also misses
+the improvement gate, so the candidate is rejected. The adopted 0933 parser
+remains. A combined parse-reuse/scanner candidate requires its own prospective
+comparison; separate reductions are not additive evidence, and neither
+rejected cohort justifies lowering a threshold.
+
 ## 0935 — parse reuse alone misses adoption thresholds
 
 [0935](0935-docx-inventory-fragment-parse-reuse.md) removes a duplicate section

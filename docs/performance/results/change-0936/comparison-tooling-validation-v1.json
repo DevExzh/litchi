@@ -1,0 +1,73 @@
+{
+  "builds_started": false,
+  "candidate_allowlist_final": false,
+  "captures_started": false,
+  "checker_origin": {
+    "bytes": 39568,
+    "path": "/home/zhuhe/litchi-performance-0935/independent-allocator-check-0935-v3.py",
+    "sha256": "1a8258569bb72a70aafe919ee12779a342366eb0856651985ddfd365782ff805"
+  },
+  "checker_pending_copy": {
+    "bytes": 39568,
+    "path": "/home/zhuhe/litchi-performance-0936/independent-allocator-check-0936-v3.py",
+    "sha256": "47e20cff5af680afaebe13723163f730d006b84eedbcf2f3290ca3a118ab7d40"
+  },
+  "environment_note": "Build wrappers will record explicit selected/unset values and inherited-environment limits; no fully clean inherited build claim is made.",
+  "gate_correction": {
+    "bytes": 1050,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0936/comparison-formal-gate-correction-v1.json",
+    "sha256": "e50f69075ad00a57715f0a2a70449efe51f0d8305bc49e5e5f4b4b522e1a5d9f"
+  },
+  "gates": {
+    "allocator_calls": "strictly lower in every cell",
+    "allocator_requested_bytes_reduction_each_cell_at_least": 0.1,
+    "normal_primary_ratio": "baseline_p50 / candidate_p50 >= 1.05 with bootstrap lower95 > 1.0",
+    "tail_rss_peak_review": ">5% requires resolution"
+  },
+  "plan": {
+    "bytes": 15037,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0936/comparison-plan-v1.json",
+    "sha256": "5c86f4a3fc9dfb6d3c26e5463bd7d61548ffe96bfdd4c41753d29467e5d510c8"
+  },
+  "prepatch_listing": {
+    "bytes": 5675286,
+    "path": "/home/zhuhe/litchi-performance-0936/source-manifest-prepatch-v1.jsonl",
+    "sha256": "72c529b5b6d1c082ed9973e2561b2c225125805ee955502657ee9fa1dab58016"
+  },
+  "runner": {
+    "bytes": 82058,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0936/comparison-runner.py",
+    "sha256": "c51123cd8c550346db8443a077f35aaa2db00126c5c509fcf0bde1a1cbfa09af"
+  },
+  "schedule": {
+    "allocator_children": 24,
+    "check_output": {
+      "bytes": 563,
+      "path": "/home/zhuhe/litchi-performance-0936/schedule-check-v1.json",
+      "sha256": "c4214ab5c6937bc7837fb5a217d9c7cc8ff2aee25bc1a60ec893bb60093d1c59"
+    },
+    "children": 72,
+    "normal_children": 48,
+    "schedule_sha256": "0ac8e13ff21de9d86e8eef800de34ce2f9417e44bae6897c5f0e94bb9003865c"
+  },
+  "schema": "litchi.performance.0936.comparison-tooling-validation.v1",
+  "scope": "Inert 0936 tooling and source-copy preflight. No build, benchmark child, capture, or production edit was performed by this tooling owner.",
+  "source_binding": {
+    "baseline_origin": "/home/zhuhe/litchi-performance-0935/baseline-source",
+    "baseline_root": "/home/zhuhe/litchi-performance-0936/baseline-source",
+    "candidate_overlay": "pending reviewed footnote scanner borrow only",
+    "candidate_root": "/home/zhuhe/litchi-performance-0936/candidate-source",
+    "excluded": "0935 rejected fragment parse-reuse candidate-source and patch"
+  },
+  "source_copy_preflight": {
+    "bytes": 1581,
+    "path": "/home/zhuhe/litchi-performance-0936/source-copy-preflight-v1.json",
+    "sha256": "4e81ad79fd615c43c7e41f6a3e9bc1b413f1676809a3e10f91fb10f2a536f266"
+  },
+  "status": "prospective_source_review_pending",
+  "validator": {
+    "bytes": 39792,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0936/comparison.py",
+    "sha256": "b70a2b38d098e3abd2b567d1bea70f40e9d27e62acaca8f80ff633dd2c596712"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "schema": "litchi.performance.0936.static-review.v1",
+  "status": "approved_for_quality_and_capture_review",
+  "head": "0eae43dd007e63df5b7f406a46bed356a080d1be",
+  "adr_scope": ["0001","0002","0003","0004","0005","0006","0007","0008","0010","0011","0024","0030","0031","0032"],
+  "constraints": [
+    "lossless preservation and typed refusal precede speed",
+    "private reuse cannot change public API, lazy semantic timing, source identity, or error order",
+    "resource, cancellation, and size limits remain bounded and fail closed",
+    "measurement source, build, and report identities remain hash-bound",
+    "0935 fragment parse-reuse candidate remains excluded"
+  ],
+  "candidate_scope": {
+    "production_paths": ["crates/litchi-docx/src/section/footnote_columns/codec.rs"],
+    "test_overlay": "crates/litchi-docx/src/section/footnote_columns/tests.rs",
+    "test_overlay_sha256": "0018f89ca9f073a714fd2d2569a7db2524bf517bf52396a3980503d7c8dc8536",
+    "patch_sha256": "ef1481aa9c19bb3b2edfbf4c25766bf14807e4469e5691405ee795a7c564c475",
+    "source_listing_sha256": "7bd03c17ac429562e74a932b8806de2b593973340c9132bfdfa3186440d2fe23"
+  },
+  "semantic_review": "read_with_context borrows quick_xml events and resolver state for the iteration; Root retains an explicit resolver clone before reader advancement. Existing limits, namespace/context installation, refusal ordering, source ranges, authored bytes, transaction publication, and public API are unchanged.",
+  "quality_receipt": {
+    "path": "/home/zhuhe/litchi-performance-0936/quality/independent-quality-audit-v1.json",
+    "sha256": "e85403478aa2df739bd9ccef0924b4cab8abcd8c452a6404f0fd783a6bba372b",
+    "bytes": 17770
+  },
+  "boundary": {
+    "packages": 65,
+    "internal_declarations": 244,
+    "explicit_debt_items": 11,
+    "exit": 0,
+    "terminal_sha256": "9e0e2ab2ac2ef6b534622708ed674217fb34b69d81a73eb96caa3d7dfd0bedc1"
+  },
+  "nonverdict_probe": "A direct rustfmt invocation without --edition 2024 failed while parsing existing edition-2024 let chains in layout.rs; scoped cargo fmt passed and the failed probe was not retried."
+}

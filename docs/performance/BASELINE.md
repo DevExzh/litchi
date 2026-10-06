@@ -1,5 +1,17 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0936 — footnote scanner borrowing evaluated and rejected
+
+[0936](0936-docx-borrowed-footnote-scanner.md) evaluates borrowed transient XML
+events and namespace state in footnote validation across 72 fixed children.
+Construction requested bytes fall 5.48–10.96%, but both small cells miss the
+prospective 10% minimum. The primary latency ratio is 1.002845, below 1.05;
+one reader pair also exceeds the p50 and RSS review limits. The production
+change is removed and five regression tests remain. Candidate validation
+passes 1,936 DOCX tests and 78 doctests; independent original/moved replay
+agrees. The synthetic fixtures cover ordinary section validation rather than
+footnote-extension-heavy documents.
+
 ## 0935 — fragment parse reuse evaluated and rejected
 
 [0935](0935-docx-inventory-fragment-parse-reuse.md) evaluates a private single-parse
