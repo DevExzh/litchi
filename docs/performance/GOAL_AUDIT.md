@@ -1,5 +1,16 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0922 — FIB copy candidate measured and rejected
+
+[0922](0922-borrowed-fib-selection.md) completes another implementation,
+independent review, quality and source-bound comparison cycle. Allocation
+savings exceed the prospective threshold on both 32-edit fixtures, but
+FloatingPictures at one/two edits fails the unchanged latency confidence
+gate. The candidate remains isolated; no production optimization is claimed.
+The packet preserves every adverse row and replayable evidence while large
+artifacts and binaries remain external. Broad completeness and the 10×
+objective remain unproven; this batch is progress, not goal completion.
+
 ## 0921 — implemented and measured recapture candidate rejected
 
 [0921](0921-source-bound-stream-recapture.md) completes another

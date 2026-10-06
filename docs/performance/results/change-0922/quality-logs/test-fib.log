@@ -1,0 +1,15 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running unittests src/lib.rs (target/debug/deps/litchi_doc-f29233de2cb033e6)
+
+running 8 tests
+test parts::fib::tests::test_fib_table_stream_flag ... ok
+test parts::fib::tests::test_fib_magic_validation ... ok
+test parts::fib::tests::test_fib_min_size ... ok
+test parts::fib::tests::table_pointers_stop_at_the_declared_count ... ok
+test parts::fib::tests::borrowed_pointer_matches_owned_suffix_at_nonzero_offset ... ok
+test parts::fib::tests::test_fib_valid ... ok
+test parts::fib::tests::truncated_declared_table_pointer_array_is_unavailable ... ok
+test parts::fib::tests::word_95_uses_its_fixed_uncounted_pointer_array ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 1117 filtered out; finished in 0.00s
+

@@ -1,0 +1,4 @@
+    Checking zlib-rs v0.6.8
+    Checking litchi-doc v0.0.1 (/tmp/litchi-performance-0922/source/crates/litchi-doc)
+    Checking flate2 v1.1.10
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.41s

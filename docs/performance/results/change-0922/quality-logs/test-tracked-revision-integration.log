@@ -1,0 +1,18 @@
+   Compiling litchi-doc v0.0.1 (/tmp/litchi-performance-0922/source/crates/litchi-doc)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.47s
+     Running tests/doc_tracked_revision_editor.rs (target/debug/deps/doc_tracked_revision_editor-0c7e4046667e14ee)
+
+running 10 tests
+test unreadable_fixtures_remain_refused_at_open ... ok
+test malformed_ranges_controls_and_failed_updates_roll_back ... ok
+test shared_rsid_exposes_binary_insertion_and_deletion_as_a_move_pair ... ok
+test lists_authors_and_mutates_insertions_and_deletions_transactionally ... ok
+test accepts_deletion_rejects_insertion_and_pairs_moves_by_rsid ... ok
+test bundled_word_and_libreoffice_redline_fixtures_are_strictly_gated ... ok
+test tracked_insertion_at_the_saved_caret_keeps_the_caret_before_the_new_text ... ok
+test ordinary_tracked_revision_save_reuses_the_opened_doc_layout ... ok
+test tracked_insertions_keep_rebuilt_chpx_pages_readable ... ok
+test every_readable_fixture_accepts_a_tracked_insertion_at_cp_zero ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+

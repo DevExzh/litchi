@@ -1,0 +1,17 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling litchi-doc v0.0.1 (/tmp/litchi-performance-0922/source/crates/litchi-doc)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 13.22s
+     Running tests/saved_selection.rs (target/debug/deps/saved_selection-a767633407685839)
+
+running 8 tests
+test parses_fixed_record_and_preserves_ignored_fields ... ok
+test rejects_invalid_domains_and_cross_field_constraints ... ok
+test fib_range_requires_exact_size_and_deferred_errors_are_cached ... ok
+test body_saved_selection_edit_refuses_signed_changed_source_but_allows_noop ... ok
+test document_accessor_returns_selection_and_enforces_main_text_bound ... ok
+test saved_selection_changes_are_refused_by_body_three_way_planning ... ok
+test body_saved_selection_edit_is_source_bound_reversible_and_atomic ... ok
+test body_saved_selection_bounds_and_length_changes_are_checked_before_publish ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

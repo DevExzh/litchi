@@ -1,0 +1,171 @@
+{
+  "schema": "litchi.performance.0922.doc-comparison.protocol.v1",
+  "status": "prospective",
+  "created_utc": "2026-10-06T07:34:29Z",
+  "candidate_source_head": null,
+  "candidate_base_revision": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+  "baseline_source_head": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+  "purpose": "Prospective source-bound paired comparison of a candidate that removes whole-WordDocument copies during Selsf/FIB metadata reads through owner-level borrowed parsing, against a fresh baseline rebuild at the retained 0920 base revision, using the same unchanged 0917 probe.",
+  "candidate_scope": "Owner-level borrowed parsing for Selsf/FIB metadata reads, scoped to the three reviewed implementation files below. The unchanged 0917 probe, fixtures, ordinary facade semantics, retention policy, fallback behavior, source preservation, output identity, and every explicit capacity remain fixed.",
+  "candidate_source_files": [
+    "crates/litchi-doc/src/parts/fib.rs",
+    "crates/litchi-doc/src/parts/saved_selection.rs",
+    "crates/litchi-doc/src/tracked_revision/package.rs"
+  ],
+  "fixtures": [
+    {
+      "case": "docnohf",
+      "path": "test-data/ole/doc/NoHeadFoot.doc",
+      "bytes": 26112,
+      "sha256": "45e5df073f34314da6f39d2dad119fb2ef23470878fd2df67f632864cd92ea48"
+    },
+    {
+      "case": "docfloat",
+      "path": "test-data/ole/doc/FloatingPictures.doc",
+      "bytes": 335360,
+      "sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d"
+    }
+  ],
+  "edits": [
+    1,
+    2,
+    8,
+    32
+  ],
+  "operation": "Use the unchanged 0917 public probe. Each child opens a fresh source, performs the alternating paragraph-zero replacements, commits, copies the output, and validates all 0917 semantic, patch, preservation, and retention controls. Native comparison selects default retention; allocator comparison covers zero, default, and release routes.",
+  "retention_routes": [
+    "zero",
+    "default",
+    "release"
+  ],
+  "native": {
+    "cpu": 14,
+    "rounds": 12,
+    "versions": [
+      "baseline",
+      "candidate"
+    ],
+    "version_order": "odd rounds baseline then candidate; even rounds candidate then baseline",
+    "case_and_edit_order": "odd rounds use fixture order docnohf, docfloat and edit order 1, 2, 8, 32; even rounds reverse both",
+    "retention": "default",
+    "warmups_per_child": 5,
+    "samples_per_child": 50,
+    "children": 192,
+    "paired_cells": 96,
+    "timer": "The probe's complete public in-memory lifecycle; source file I/O, preparation, correctness checks, and JSON serialization are outside the probe clock."
+  },
+  "allocator": {
+    "cpu": 14,
+    "repetitions": 2,
+    "versions": [
+      "baseline",
+      "candidate"
+    ],
+    "version_order": "repetition one uses baseline then candidate in listed cell order; repetition two reverses case, edit, route, and version order",
+    "warmups_per_child": 0,
+    "samples_per_child": 1,
+    "children": 96,
+    "cells": 48,
+    "routes": [
+      "zero",
+      "default",
+      "release"
+    ],
+    "scope": "Separate System allocator lane. Compare requested allocated bytes, successful allocation calls, peak live bytes, retained output bytes, and explicit capacities. It makes no latency claim."
+  },
+  "bootstrap": {
+    "draws": 10000,
+    "seed": 922,
+    "unit": "matched round within fixed fixture/edit cell",
+    "statistic": "median of twelve baseline-p50/candidate-p50 ratios for native default retention",
+    "interval": "nearest-rank 2.5th and 97.5th percentiles",
+    "minimum_lower_ratio": 0.9523809523809523
+  },
+  "review_flags": {
+    "latency_increase_fraction": 0.05,
+    "peak_live_increase_fraction": 0.05,
+    "rss_increase_fraction": 0.05,
+    "allocation_increase_fraction": 0.01,
+    "meaning": "Flags retain adverse rows and never remove a mandatory gate."
+  },
+  "capacity_fields": {
+    "fields_checked_exactly": [
+      "$.output_capacity",
+      "$.route_outputs[retention].output_capacity",
+      "$.route_outputs[retention].final_retained_before_commit",
+      "$.route_outputs[retention].stages[index].before",
+      "$.route_outputs[retention].stages[index].after",
+      "$.route_outputs[retention].stages[index].after_release",
+      "$.samples[index].output_capacity",
+      "$.samples[index].stages[index].before",
+      "$.samples[index].stages[index].after",
+      "$.samples[index].stages[index].after_release",
+      "$.samples[index].allocation.retained_bytes",
+      "$.allocation.retained_bytes"
+    ],
+    "rules": [
+      "The unchanged 0917 validator runs for every version and sample before comparison.",
+      "All non-capacity identities, output/reference hashes and lengths, semantic values, edit counts, route names, source identity, correctness/refusal controls, retention ceilings, and stage predecessor presence must match exactly.",
+      "Routes are paired by retention name and stages by their explicit stage number; no positional or recursive capacity exemption is allowed.",
+      "Every candidate capacity listed above must equal its paired baseline value. Any numeric change or None-versus-integer transition is a rejection.",
+      "Each output capacity remains at least the output length, each retained capacity remains within the unchanged ceiling, and allocator retained_bytes remains equal to that version's output capacity.",
+      "Zero and release clearing behavior and default predecessor transitions remain exact."
+    ]
+  },
+  "mandatory_gates": [
+    "The two fixture lengths and SHA-256 values match this protocol for every child.",
+    "Every baseline and candidate report passes the unchanged 0917 validator with the frozen lane warmup/sample counts and all twenty correctness flags true.",
+    "Source identity, output/reference identity and lengths, semantic values, edit counts, retention ceilings, route names, stage transitions, and refusal controls match exactly within every pair.",
+    "Every explicitly enumerated capacity field must equal baseline; no capacity change is admitted.",
+    "At least one 32-edit real fixture default-route median allocated_bytes is at least 5 percent lower for the candidate.",
+    "Candidate allocated_bytes does not increase by more than 1 percent in any allocator cell or repetition.",
+    "Candidate peak_live_bytes does not increase by more than 5 percent in any allocator cell or repetition.",
+    "Every native default fixture/edit cell has a paired bootstrap 95 percent confidence lower bound at least 1/1.05 using seed 922.",
+    "All native, allocator, latency, peak-live, RSS, allocation, capacity, and correctness adverse rows remain visible.",
+    "A failed gate rejects adoption; source or binary identity is frozen only after candidate review and final build receipts are complete."
+  ],
+  "negative_controls": [
+    "changed output bytes or hash",
+    "changed source identity",
+    "changed refusal/correctness flag",
+    "changed retention ceiling",
+    "changed retained-stage transition",
+    "sample/top capacity mismatch including allocator retained-byte mismatch",
+    "candidate capacity differs from baseline"
+  ],
+  "positive_control": "A report pair with unchanged semantic/output identity and exactly equal capacities, stage transitions, and allocator retained bytes is accepted by the capacity comparator.",
+  "freeze_requirements": [
+    "Candidate source receipt binds the reviewed 40-hex base revision plus the exact isolated patch and candidate source-manifest hashes; no synthetic candidate commit is required.",
+    "candidate_source_files is the reviewed three-file changed-file list; freeze requires the candidate source receipt to match it exactly.",
+    "Candidate build receipt binds both binaries to that base revision and patch, unchanged probe source/lock, compiler, flags, allocator, and normalized dependency graph.",
+    "Fresh baseline source/build receipts and candidate receipts are copied hash-exactly before any performance child runs.",
+    "The capacity-controls receipt passes every listed negative control, accepts the legitimate exact-capacity control, and records a sub-MiB serialization check for the planned 192/96 population.",
+    "The final manifest is written once after coder review, reviewer disposition, qualification, and source/binary custody are complete; a prospective packet never writes it.",
+    "No performance child may run before root capture-readiness.json binds source review, final controls, qualification replay, shared-owner quality, and build parity, followed by an immutable comparison manifest."
+  ],
+  "capture_rules": [
+    "This prospective protocol does not authorize capture by itself. Root capture-readiness.json plus the subsequently frozen manifest admit the exact base-revision-plus-patch candidate; statistical gates and schedules remain unchanged.",
+    "Freeze the protocol, runner, replay, validator, probe source, fixture identities, source/build receipts, and binaries before capture.",
+    "Use an isolated external packet root for any scratch freeze or replay dry-run; never create an authoritative comparison manifest under the repository packet directory during preparation.",
+    "Use exclusive child and receipt writes. A failed attempt is retained and blocks reduction; no overwrite, selective rerun, dropped sample, or adverse-row replacement is permitted.",
+    "All raw artifacts at or above 1 MiB and every executable remain outside Git. Small packet artifacts are copied only after hash verification.",
+    "Record command, environment, binary, protocol, validator, timestamps, exit status, host metrics, and source/fixture hashes for every child."
+  ],
+  "interfaces": {
+    "probe": "--case docnohf|docfloat --input PATH --edits 1|2|8|32 --retention zero|default|release --warmup N --samples N",
+    "qualification": "comparison.py qualify --version baseline|candidate --lane native|allocator --binary PATH --case CASE --edits N --retention zero|default|release --warmup 0 --samples 1",
+    "capture": "comparison.py freeze ...; comparison.py run --lane native|allocator; comparison.py reduce",
+    "replay": "comparison-replay.py --packet PATH"
+  },
+  "identity_binding": {
+    "baseline_source_receipt": "/tmp/litchi-performance-0920-baseline/source-receipt.json",
+    "baseline_revision_must_be": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+    "candidate_base_revision_must_be": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0; this is the candidate's retained base revision plus the reviewed patch",
+    "candidate_source_head": "null while prospective; do not invent a commit identity",
+    "probe_source": "docs/performance/results/change-0917/probe",
+    "validator": "docs/performance/results/change-0917/capture.py",
+    "binary_hashes": "Bound in comparison-manifest.json at freeze time and repeated in every child receipt.",
+    "candidate_revision_must_be": "Reviewed base revision plus exact patch and candidate manifest hashes; candidate_source_head remains null because this is an isolated uncommitted candidate. The reviewed changed-file list is the three-file owner-level borrowed parsing scope recorded in candidate_source_files.",
+    "packet_root": "Set LITCHI_PERF_0922_PACKET_ROOT to an external scratch directory for dry-runs; repository-root packets are reserved for an authorized final freeze."
+  }
+}

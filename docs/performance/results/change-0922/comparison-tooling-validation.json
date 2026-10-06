@@ -1,0 +1,257 @@
+{
+  "capacity_controls": {
+    "negative_controls_rejected": [
+      "output",
+      "identity",
+      "refusal",
+      "ceiling",
+      "retainedtransition",
+      "mismatch",
+      "capacity_decrease",
+      "capacity_growth"
+    ],
+    "performance_children_run": 0,
+    "planned_capacity_summary_bytes": 55585,
+    "positive_exact_capacity": "accepted",
+    "receipt": {
+      "bytes": 2726,
+      "path": "/tmp/litchi-performance-0922-tooling/controls-final/capacity-controls.json",
+      "sha256": "f7ac606cfc63b4765377fdadd11a9d59027d608bec46adb08570f70182ecf9a7"
+    },
+    "status": "passed"
+  },
+  "commands": [
+    "PYTHONPYCACHEPREFIX=/tmp/litchi-performance-0922-tooling/pycache python3 -B docs/performance/results/change-0922/comparison-controls.py --report /tmp/litchi-performance-0920-baseline/qualification/allocator-docnohf-e32-default/stdout --output /tmp/litchi-performance-0922-tooling/controls-final/capacity-controls.json",
+    "comparison.py qualify --warmup 0 --samples 1 for both versions, both lanes, 2 fixtures, 4 edit counts, and 3 routes (96 children) with --qualification-root /tmp/litchi-performance-0922/qualification-final-v2",
+    "comparison-qualification-replay.py --baseline-results /tmp/litchi-performance-0922/qualification-final-v2/baseline-results-v2.json --candidate-results /tmp/litchi-performance-0922/qualification-final-v2/candidate-results-v2.json --output /tmp/litchi-performance-0922/qualification-final-v2/qualification-replay-v2.json",
+    "LITCHI_PERF_0922_PACKET_ROOT=/tmp/litchi-performance-0922/freeze-dry-run-20261006T075935Z/packet comparison.py freeze with final source/build receipts, candidate.patch, retained baseline binaries, and candidate binaries",
+    "LITCHI_PERF_0922_PACKET_ROOT=/tmp/litchi-performance-0922/freeze-dry-run-20261006T075935Z/packet python3 -B: comparison.py load_manifest()"
+  ],
+  "controls_script": {
+    "bytes": 9021,
+    "path": "docs/performance/results/change-0922/comparison-controls.py",
+    "sha256": "a7c3b8065dc9444be66d8ffb857f399c802fa8068f08dbedd374d681ae686c3c"
+  },
+  "freeze_dry_run": {
+    "candidate_delta_verified": [
+      "crates/litchi-doc/src/parts/fib.rs",
+      "crates/litchi-doc/src/parts/saved_selection.rs",
+      "crates/litchi-doc/src/tracked_revision/package.rs"
+    ],
+    "candidate_source_head": null,
+    "comparative_children_run": 0,
+    "external_root": "/tmp/litchi-performance-0922/freeze-dry-run-20261006T075935Z/external",
+    "manifest": {
+      "bytes": 7635,
+      "path": "/tmp/litchi-performance-0922/freeze-dry-run-20261006T075935Z/packet/comparison-manifest.json",
+      "sha256": "23e0cfcc2bd73cb7e50dd0d3ba7885b2915d130f8f6466f8c41053cce9001e9c"
+    },
+    "manifest_loaded_and_revalidated": true,
+    "native_capture_started": false,
+    "packet_root": "/tmp/litchi-performance-0922/freeze-dry-run-20261006T075935Z/packet",
+    "repository_manifest_created": false,
+    "repository_reduced_created": false,
+    "status": "passed"
+  },
+  "generated_utc": "2026-10-06T08:01:22Z",
+  "planned_reduction": {
+    "adoption": false,
+    "all_children_and_controls_validated": true,
+    "all_explicit_capacity_fields_equal": true,
+    "allocator_children": 96,
+    "bytes": 535640,
+    "comparative_children_run": 0,
+    "native_children": 192,
+    "packet_limit_bytes": 1048576,
+    "receipt": {
+      "bytes": 535640,
+      "path": "/tmp/litchi-performance-0922-tooling/synthetic-full-reduction-final.json",
+      "sha256": "5b9b2e4df8cf4a7032bf985055c6a56f60a3f9eb938c1786fc0f2c893d5b28ed"
+    },
+    "status": "passed",
+    "total_children": 288,
+    "under_packet_limit": true
+  },
+  "protocol": {
+    "allocator_children": 96,
+    "baseline_source_head": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+    "bootstrap_seed": 922,
+    "bytes": 11316,
+    "candidate_base_revision": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+    "candidate_source_files": [
+      "crates/litchi-doc/src/parts/fib.rs",
+      "crates/litchi-doc/src/parts/saved_selection.rs",
+      "crates/litchi-doc/src/tracked_revision/package.rs"
+    ],
+    "candidate_source_head": null,
+    "native_children": 192,
+    "path": "docs/performance/results/change-0922/comparison-protocol.json",
+    "sha256": "eec1b594b8c9e385bcbaa56aefd7a79156a26ea43b89730c14a6f065627fca5e",
+    "source_allowlist_status": "final reviewed three-file list",
+    "status": "prospective"
+  },
+  "qualification": {
+    "all_exact_capacities": true,
+    "baseline_reports": 48,
+    "baseline_results": {
+      "bytes": 348060,
+      "path": "/tmp/litchi-performance-0922/qualification-final-v2/baseline-results-v2.json",
+      "sha256": "c049aafe31b2b5f853950b298c098f2fa1766eeeaffab2579936a5f3b9b8e847"
+    },
+    "candidate_reports": 48,
+    "candidate_results": {
+      "bytes": 348204,
+      "path": "/tmp/litchi-performance-0922/qualification-final-v2/candidate-results-v2.json",
+      "sha256": "a2e7bb998b232f24a3213a18c933555ecdb29ceb2fba52c5ec8bc93f31eca93f"
+    },
+    "capacity_pairs": 48,
+    "comparative_children_run": 0,
+    "first_attempt_retained": {
+      "children_started": 1,
+      "failed": 0,
+      "passed": 1,
+      "reason": "Local orchestrator expected a lane-prefixed receipt path while the default runner label omitted the lane; retained and excluded from final v2 envelope.",
+      "root": "/tmp/litchi-performance-0922/qualification-final",
+      "status": "superseded_before_matrix_completion"
+    },
+    "initial_replay_packaging_attempt": {
+      "children_started": 0,
+      "reason": "Initial envelopes included version in labels; corrected v2 envelopes use matching 48 labels and replay verified.",
+      "status": "failed_before_comparison"
+    },
+    "qualification_children": 96,
+    "replay_receipt": {
+      "bytes": 1253,
+      "path": "/tmp/litchi-performance-0922/qualification-final-v2/qualification-replay-v2.json",
+      "sha256": "091c5f258b4bd3d94d392f5188fdc608d8b70b59e510e2bdb7a2dc6de333fdd2"
+    },
+    "root": "/tmp/litchi-performance-0922/qualification-final-v2",
+    "status": "passed"
+  },
+  "qualification_replay_script": {
+    "bytes": 6716,
+    "path": "docs/performance/results/change-0922/comparison-qualification-replay.py",
+    "sha256": "0b0f9670b2260693d8b5493e8c9e9d1ce2532cb7a6f1d5244bae489b2e56d230"
+  },
+  "replay_script": {
+    "bytes": 8226,
+    "path": "docs/performance/results/change-0922/comparison-replay.py",
+    "sha256": "72443ee9af1f52443f8f5ebbfc982aba9dcf2e45809fe057bf7000cf1089e148"
+  },
+  "review_disposition": {
+    "baseline_unrelated_failures": [
+      "workspace-wide fmt failure in unrelated iWork files",
+      "strict DOC rustdoc baseline private intra-doc-link failures"
+    ],
+    "findings": [
+      "The shared FIB base and pointer-layout helpers preserve minimum-size, magic, legacy fixed-array, counted-array, and deferred truncation semantics.",
+      "SavedSelection borrowed parsing preserves missing/zero pointer as None, while strict table range keeps unavailable and malformed pointers as errors.",
+      "Nonzero-FIB raw_data suffix behavior remains covered against the borrowed pointer verdict; public parse, parse_at, and raw_data contracts are unchanged.",
+      "The saved-selection preflight completes before candidate table mutation, preserving existing failure atomicity and ambiguity refusals."
+    ],
+    "passed_affected_checks": 9,
+    "production_files": [
+      "crates/litchi-doc/src/parts/fib.rs",
+      "crates/litchi-doc/src/parts/saved_selection.rs",
+      "crates/litchi-doc/src/tracked_revision/package.rs"
+    ],
+    "quality_status": "pass_with_recorded_baseline_failures",
+    "selection_record": {
+      "bytes": 3420,
+      "path": "docs/performance/results/change-0922/candidate-selection.md",
+      "sha256": "06f5afccc5f4f44c4a2a067061f88ce56cba8df413aee9d03c5d0b1ec4b1b838"
+    },
+    "shared_owner_quality": {
+      "bytes": 8802,
+      "path": "docs/performance/results/change-0922/shared-owner-quality.json",
+      "sha256": "6f2bbed6e38efc578271fdd8921081a29534cf94b59ee476fb6148710f24547e"
+    },
+    "shared_owner_quality_sha256": "6f2bbed6e38efc578271fdd8921081a29534cf94b59ee476fb6148710f24547e",
+    "status": "approved_for_qualification_and_external_freeze_dry_run"
+  },
+  "runner": {
+    "bytes": 87919,
+    "path": "docs/performance/results/change-0922/comparison.py",
+    "sha256": "f92483b30a711ba2b9885d1fea5248a85a9e6a1fbc6436a47edab6968a26a9ca"
+  },
+  "schema": "litchi.performance.0922.comparison-tooling-validation.v1",
+  "scope": "Final source/build custody, capacity controls, 96 qualification children, offline qualification replay, and external freeze dry-run. No native comparative capture or adoption claim was made.",
+  "scratch_artifacts": {
+    "controls_receipt": "/tmp/litchi-performance-0922-tooling/controls-final/capacity-controls.json",
+    "freeze_packet_root": "/tmp/litchi-performance-0922/freeze-dry-run-20261006T075935Z/packet",
+    "qualification_root": "/tmp/litchi-performance-0922/qualification-final-v2",
+    "reduction_receipt": "/tmp/litchi-performance-0922-tooling/synthetic-full-reduction-final.json",
+    "safe_to_remove_after_root_review": true
+  },
+  "source_build_binding": {
+    "base_revision": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+    "baseline_build_receipt": {
+      "bytes": 2953,
+      "path": "/tmp/litchi-performance-0921/receipts/baseline-build.json",
+      "sha256": "322745a20c11648d7511586107dbc509be631cfbd05e67640c62141e7692f884"
+    },
+    "baseline_source_receipt": {
+      "bytes": 118656,
+      "path": "/tmp/litchi-performance-0920-baseline/source-receipt.json",
+      "sha256": "4b7967901c42fccd89dcb4893f9147eaaad0f66106ef7be6ea4ac4112b074867"
+    },
+    "binaries": {
+      "baseline_allocator": {
+        "bytes": 54800008,
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/doc_retention_probe_alloc",
+        "sha256": "20b96ebbdf611c22b7114b88580044a707d7fce2e4c8811c8084679feb1060dd"
+      },
+      "baseline_native": {
+        "bytes": 54795488,
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/doc_retention_probe",
+        "sha256": "9f3c2bb2c589ba8e7a47b99c051d4a4910e41002d28f1caa1d1edc036a7515e5"
+      },
+      "candidate_allocator": {
+        "bytes": 47791664,
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/doc_retention_probe_alloc",
+        "sha256": "9604febbe947daca1547f8b5985404b5608723f9966849cf58347a594d0a970b"
+      },
+      "candidate_native": {
+        "bytes": 47787144,
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/doc_retention_probe",
+        "sha256": "556bb8271fa78e21dc968d1954ddd141a6df2aa338dacdf656bfee8d6b2dd933"
+      }
+    },
+    "build_source_binding": {
+      "candidate_manifest_sha256": "e2a8893bc67999ea20aa5320d8bef3484b41ba50a4cfafa26a72916efa2ff2ea",
+      "candidate_patch_sha256": "dd7f0bafb81c23a3762e74246eccf991b56ff1f7e62816087e27441db636bd84",
+      "revision": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0"
+    },
+    "candidate_build_receipt": {
+      "bytes": 5510,
+      "path": "/tmp/litchi-performance-0922/receipts/candidate-build-final.json",
+      "sha256": "f6ee6133561e6f2302c886ee8810fdbab450296f23b238be5b4c328360d6d6c7"
+    },
+    "candidate_file_count": 938,
+    "candidate_manifest_sha256": "e2a8893bc67999ea20aa5320d8bef3484b41ba50a4cfafa26a72916efa2ff2ea",
+    "candidate_patch": {
+      "bytes": 19215,
+      "path": "/tmp/litchi-performance-0922/receipts/candidate.patch",
+      "sha256": "dd7f0bafb81c23a3762e74246eccf991b56ff1f7e62816087e27441db636bd84"
+    },
+    "candidate_patch_sha256": "dd7f0bafb81c23a3762e74246eccf991b56ff1f7e62816087e27441db636bd84",
+    "candidate_source_receipt": {
+      "bytes": 173041,
+      "path": "/tmp/litchi-performance-0922/receipts/candidate-source-final.json",
+      "sha256": "5101e37b599a7450e9dfe90de672d1306b05c42d7816367b01f3d205022a5838"
+    },
+    "probe_lock_sha256": "abd9f47a5aaa973a760cd61392de79c2b6143026c300dc1329831652aa54c06c",
+    "quality_lock_sha256": "10cfe9377162d26618ad1c9c2c9028d3444fead3869c7f7d3294663269723ca9",
+    "status": "passed",
+    "toolchain": {
+      "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+      "rustc": "rustc 1.95.0 (59807616e 2026-04-14)"
+    }
+  },
+  "status": "passed",
+  "validator": {
+    "bytes": 69575,
+    "path": "docs/performance/results/change-0917/capture.py",
+    "sha256": "fde5219539cf538d51b8bf92ec5527fd9959ac0f39eb2ea5412b8ddf8cd7a894"
+  }
+}

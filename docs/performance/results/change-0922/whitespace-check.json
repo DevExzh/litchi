@@ -1,0 +1,40 @@
+{
+  "scope": "Staged whitespace check passes excluding only the listed immutable patch and raw command logs. Source diff check passes independently. Context markers and command-output trailing blank lines are preserved hash-exactly.",
+  "excluded_immutable_artifacts": [
+    {
+      "path": "docs/performance/results/change-0922/comparison-receipts/candidate.patch",
+      "bytes": 19215,
+      "sha256": "dd7f0bafb81c23a3762e74246eccf991b56ff1f7e62816087e27441db636bd84"
+    },
+    {
+      "path": "docs/performance/results/change-0922/quality-logs/fmt-check.log",
+      "bytes": 6979,
+      "sha256": "b8055c463761030aa6dd457004f26c81298a2e33eac5fb800a4abe809da55d66"
+    },
+    {
+      "path": "docs/performance/results/change-0922/quality-logs/test-doc-lib-tests.log",
+      "bytes": 117159,
+      "sha256": "b10abaae743f138f136ccbcdd5538ade25dbaa944857f5278d5cc95e24d4c8f0"
+    },
+    {
+      "path": "docs/performance/results/change-0922/quality-logs/test-fib.log",
+      "bytes": 804,
+      "sha256": "67f9886ed43f9a46f775708e5dbd34eb056d4bfea3f4e24d29412a7083b6fbf6"
+    },
+    {
+      "path": "docs/performance/results/change-0922/quality-logs/test-saved-selection-integration.log",
+      "bytes": 1018,
+      "sha256": "3f6a8d6fe0b662b9fe6fcf4d481bb8cee5b5f0cc273b36ea2cf19b3512b0e19c"
+    },
+    {
+      "path": "docs/performance/results/change-0922/quality-logs/test-saved-selection-unit.log",
+      "bytes": 1781,
+      "sha256": "2a53d570c2a6150b52c1e8017f514ae6ab6c225502472b3e011dfc9f56a81fa2"
+    },
+    {
+      "path": "docs/performance/results/change-0922/quality-logs/test-tracked-revision-integration.log",
+      "bytes": 1111,
+      "sha256": "0b4341aec89f4ff9f6f913d33f5f85ba851c0237ca7322b2cf7e7220441c8dd0"
+    }
+  ]
+}

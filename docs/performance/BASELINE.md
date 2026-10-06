@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0922 — borrowed FIB selection candidate fails two latency bounds
+
+[0922](0922-borrowed-fib-selection.md) measures a three-file DOC candidate
+against unchanged `bb19` source with the same 0917 probe. All 192 native and
+96 allocator children validate exact outputs, semantics, retention and
+capacities. At 32 edits, default-route allocation bytes fall 7.55% for
+FloatingPictures and 11.64% for NoHeadFoot; peak-live bytes are unchanged.
+FloatingPictures one/two-edit bootstrap lower ratios are 0.939564/0.900294,
+below 0.952381. Adoption is rejected; production source remains unchanged.
+
 ## 0921 — stream recapture candidate misses one confidence bound
 
 [0921](0921-source-bound-stream-recapture.md) compares source-bound stream

@@ -1,0 +1,23 @@
+{
+  "schema": "litchi.performance.0922.baseline-reuse.v1",
+  "utc": "2026-10-06T07:37:57.484805+00:00",
+  "current_head": "b972bc13d411c17c399db1a6b1185705e73b04b5",
+  "measured_base": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+  "compared_paths": [
+    "crates",
+    "Cargo.toml",
+    "Cargo.lock",
+    "rust-toolchain.toml",
+    ".cargo",
+    "clippy.toml"
+  ],
+  "changed_tracked_paths": [],
+  "source_receipt": "/tmp/litchi-performance-0920-baseline/source-receipt.json",
+  "build_receipt": {
+    "path": "/tmp/litchi-performance-0921/receipts/baseline-build.json",
+    "bytes": 2953,
+    "sha256": "322745a20c11648d7511586107dbc509be631cfbd05e67640c62141e7692f884"
+  },
+  "artifacts_reverified": 6,
+  "reason": "0921 rebuilt baseline with pinned Rust1.95.0/profile and reproduced retained binary hashes. Production/build paths remain unchanged; reuse exact artifacts rather than rebuild identical baseline."
+}

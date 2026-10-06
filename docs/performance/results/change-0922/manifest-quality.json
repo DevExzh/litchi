@@ -1,0 +1,14 @@
+{
+  "schema": "litchi.performance.0922.manifest-quality.v1",
+  "created_utc": "2026-10-06T07:54:58.326838+00:00",
+  "cwd": "/home/zhuhe/code/litchi",
+  "status": "pass",
+  "checks": [
+    "audit_manifest_inventory",
+    "audit_manifest_dependency_inventory",
+    "audit_snapshot"
+  ],
+  "scope": "Manifest inventory and crate dependency direction; excludes unrelated iWork leaf API checker. Candidate modifies no manifests or dependencies.",
+  "command": "python3 -B: sys.path.insert(0, 'tools'); import check_crate_boundaries as c; policy=c.load_policy(c.parse_args([]).policy); snapshot=c.snapshot_from_metadata(c.cargo_metadata()); c.audit_manifest_inventory(snapshot); c.audit_manifest_dependency_inventory(policy=policy); c.audit_snapshot(snapshot,policy)",
+  "checker_sha256": "e74594d8ab28732fe84308d18876cc5f01e533dd6bfa9a2ff7eedc8ba39c05d9"
+}

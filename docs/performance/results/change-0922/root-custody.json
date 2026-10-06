@@ -1,0 +1,13 @@
+{
+  "created_utc": "2026-10-06T07:56:25.850788+00:00",
+  "status": "pass",
+  "source_files_checked_each": 938,
+  "modified_files": [
+    "crates/litchi-doc/src/parts/fib.rs",
+    "crates/litchi-doc/src/parts/saved_selection.rs",
+    "crates/litchi-doc/src/tracked_revision/package.rs"
+  ],
+  "build_artifacts_checked_each": 6,
+  "candidate_patch_sha256": "dd7f0bafb81c23a3762e74246eccf991b56ff1f7e62816087e27441db636bd84",
+  "candidate_manifest_sha256": "e2a8893bc67999ea20aa5320d8bef3484b41ba50a4cfafa26a72916efa2ff2ea"
+}

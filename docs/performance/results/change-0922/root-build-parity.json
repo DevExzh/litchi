@@ -1,0 +1,1291 @@
+{
+  "schema": "litchi.performance.0922.root-build-parity.v1",
+  "created_utc": "2026-10-06T08:03:11.145429+00:00",
+  "equal": true,
+  "fingerprint_count_each": 157,
+  "fields_compared_as_multiset": [
+    "rustc",
+    "features",
+    "declared_features",
+    "target",
+    "profile",
+    "rustflags",
+    "config",
+    "compile_kind"
+  ],
+  "fingerprint_records": [
+    [
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/autocfg-5bcca43b692cd4eb/lib-autocfg.json",
+        "sha256": "dd556f9b884ebc2ff29eb05acde616da3619e5f5bc758c7fb78f363a0b731206"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/base16ct-988e08b3cc3a1b50/lib-base16ct.json",
+        "sha256": "392108540a4d0c57a7223f5e81382ee67030b19d0f0a5a668b9457810a72c928"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/base64-9973a34f980260a1/lib-base64.json",
+        "sha256": "71eacb08bee90826ea153f6786b773a8ec960eceac6cc08e6eb8dfb8df4d0485"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/base64ct-4d43faf9b9256455/lib-base64ct.json",
+        "sha256": "ea0d1b4e1a185f76e71cd850480225790d3d850129c9d73ddbdfa18edd4cffb3"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/bitflags-4841484a6266b096/lib-bitflags.json",
+        "sha256": "14e5050ea8d9f8e89568412879a9c236a9f79b6da07e011e50c6d34aa8702c60"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/block-buffer-1c2fdb5ae1044182/lib-block_buffer.json",
+        "sha256": "cc691c471078eaa525f52122717cc2754de3e6ab7bfc92238b8663dda6aff123"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/block-buffer-ae6333ef05148fa1/lib-block_buffer.json",
+        "sha256": "88153329d9c28c9a8597dbad4d13ae5440eefc38ac8e173aac2c90c3f25f0205"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/bumpalo-5db6277aad56388e/lib-bumpalo.json",
+        "sha256": "2d6969caa183c1a96ba0f2261a05fb11b2b1380e435ecc8146fbc4d25ca05c2c"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/cfg-if-cfa148b4c484155e/lib-cfg_if.json",
+        "sha256": "1b6e0dd1f9c3067dd3270bdd9f7f446bcfd0eb1b3dde8bc953e741002f777b94"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/chacha20-939d4793cbb6d2e3/lib-chacha20.json",
+        "sha256": "99be77d031b51e9195bb5898b92eaf0c3cb665bdcd14aff4b1863293699be736"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/chrono-ea4d5a755f638753/lib-chrono.json",
+        "sha256": "6cf46c17a62e0ea0124d2f6bb737ccd31ae25f8708a4f4733d81086dde4d26d1"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/cipher-95ab85d605c783b0/lib-cipher.json",
+        "sha256": "7c76aaf390e60cd9a6f00a6459f5dd5cbb17e07b36dd3bcded867273d145a49a"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/const-oid-95cfcbd67a839197/lib-const_oid.json",
+        "sha256": "243c3fdd9c4dc016d601e49ed1893659eda5546d36a8af8353b87b5fa62a0125"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/const-oid-db2cf47dff4e9901/lib-const_oid.json",
+        "sha256": "cc3ee005d05c69ec226af613dd1c07773b4ce7bd3455bd85cc3c2ab42a6313f9"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/core_detect-eca997995e1af5b2/lib-core_detect.json",
+        "sha256": "1b1dd76634d725f65235551dbce4acb98afe2d68e8a8be7c55242a68fde0eae2"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/cpufeatures-7f50c04eb6a576a4/lib-cpufeatures.json",
+        "sha256": "33c53f4ce240fc07fdb179e9d94188e390da56ee4f9d7d1d9e8176b27c0569a1"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/cpufeatures-b8ead7899b24548b/lib-cpufeatures.json",
+        "sha256": "6ec3da923305b3f89b812af6316f2ad5e88bd63b120b2e7aa0c72af6b7e09b10"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/crossbeam-deque-3dc184ebdf30689a/lib-crossbeam_deque.json",
+        "sha256": "4f8ba99adc80ee6a73c9fb2b6bb58d6a8af03bd3031714e85e5c2a9b562b8c6c"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/crossbeam-deque-8bb3d32006db3ef8/build-script-build-script-build.json",
+        "sha256": "b95645dd57cecced28a9464f9d0bfb1c2fe77f62bd7029b24de408256b7f66c4"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/crossbeam-deque-c78b5fec69b57ec5/run-build-script-build-script-build.json",
+        "sha256": "8fd350c9a8ad5f1c11426fa7cf8c9a3f9b35f731c51b3f3d58ae6fb46cf5410c"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/crossbeam-epoch-14f0146026132053/build-script-build-script-build.json",
+        "sha256": "72e797525b3ce12d1623c0e6703cb35cc3e04b4beec97a069086b573870cbcad"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/crossbeam-epoch-6533b2f75f78e324/run-build-script-build-script-build.json",
+        "sha256": "dcfa6b31004ba745061e58ee64516ce2c89ff69c4934575aed24f9a3419227b3"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/crossbeam-epoch-8bbeff7d0c32100c/lib-crossbeam_epoch.json",
+        "sha256": "48f26d2db1f172f768dc2502cedb2a05af5cd6712f047ea830a56dd94ff26f29"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/crossbeam-utils-0173ef3b133d07b5/build-script-build-script-build.json",
+        "sha256": "5a78d38e0fe6735cf667935fbbd63f4dcd047afc4a148d2f5cbfdf7e7b139537"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/crossbeam-utils-59330cb3a76d6b8b/run-build-script-build-script-build.json",
+        "sha256": "adf5a86e0294ba3c98916f90dd6dcf25ff617f2a70deade7a157a7a1f3a226f6"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/crossbeam-utils-72b5f64775962a44/lib-crossbeam_utils.json",
+        "sha256": "d3a8aeb00ff14ab8c83e4b23ecc586ae67bcf6a9447b7a21213b5e0bbe89a551"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/crypto-bigint-279cdec48ea44950/lib-crypto_bigint.json",
+        "sha256": "acc9a82f718126fdf63c3942b8b7a08432952115bd786b9e71ce3756c5a9be60"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/crypto-common-7a4204bdfc59da1f/lib-crypto_common.json",
+        "sha256": "daf43bdc784ec54536526e2c99aa213d6fa391246444563edd73408fae7281ae"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/crypto-common-9e42fae4dee90444/lib-crypto_common.json",
+        "sha256": "2456be5f576ab067f6f9a99c168a51c8d167f56ae498858e13fc4cfb33522872"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/der-e7e5502564095c24/lib-der.json",
+        "sha256": "7997f3b83c4b4e88ab777ea61b09874978d76aa8370a90735e35ef79820dc7b7"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/der_derive-e740918e2cdd795e/lib-der_derive.json",
+        "sha256": "470f5d9eebd1e3d63d2ff9430986d9b31d6f75aff2846be26704a71ed1a2683f"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/digest-a8b820dbf3257d92/lib-digest.json",
+        "sha256": "ad1ef563c54deee3a8a45ab7508b4d36a492026bc814aec06cd4edb17bee18ea"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/digest-ad84da5c4894895b/lib-digest.json",
+        "sha256": "20034f4a82e53770c89a0174299cc5f13bef1663a992f9fcbb4a431b7ca9a673"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/doc-retention-probe-0917-27383246c4e7d193/bin-doc_retention_probe_alloc.json",
+        "sha256": "cea45238827b9b569feef34c090d05350e138f94e4b1461e8e0f20129ad38647"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/doc-retention-probe-0917-355458614f584f3e/lib-doc_retention_probe_0917.json",
+        "sha256": "091982a6e9eeff4f4dba4f46937f63b951173b11b51e578d74a4a580d70b592e"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/doc-retention-probe-0917-756ae8460402defa/bin-doc_retention_probe.json",
+        "sha256": "e7d4a10f15a4714048b18c652f31ffb97dbcff625bfb659f90d851777b20d47f"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/ecdsa-dfb50157f097bb0a/lib-ecdsa.json",
+        "sha256": "865e074b6a4a6cbce2f02fd657cd2ae98f070841cd49497a3b6c61f9765dce19"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/either-c7bf59acd15add2c/lib-either.json",
+        "sha256": "8dcc1c00cee570fcad81c8f0e5d80a6349e5e0467f6e7681f6e8e9aab2143475"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/elliptic-curve-aacd064dfb34b95d/lib-elliptic_curve.json",
+        "sha256": "cd4a0cb0edab124d28fcdc5f5f89169743f7439e60a025218797d5439a0d27e3"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/encoding_rs-59fac9a0cafe62df/run-build-script-build-script-build.json",
+        "sha256": "5fdbfee3a76118f84949db5d794adef9f375e587bef8dca9a4e4575faef9b1d7"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/encoding_rs-b0b781634b6e57b5/lib-encoding_rs.json",
+        "sha256": "367ac0fbc874880496711c991943043d5ee3c91d0cbeb6d2bf384f30a7081fef"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/encoding_rs-dae16e22e958dfd4/build-script-build-script-build.json",
+        "sha256": "6d20462bc144f14291bf8551faf65b31ee205e3fd7e8c3af5c357b3fedb2f046"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/fast-float2-ed15c1dc1a1e12a8/lib-fast_float2.json",
+        "sha256": "a44795574fb40ff38159472d77026eed0a0751a01f25e995cc020cd62c15085b"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/ff-f4a90db32e40f617/lib-ff.json",
+        "sha256": "5c2ef295de84076faa823ff1c0a8b3c3ed22837d853f099494d1d177c66e0b8b"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/fixedbitset-2da8e4b6ba48b528/lib-fixedbitset.json",
+        "sha256": "87ef8295147810963427847427bc861b20b16877c1a7094736b351c0dc4c27d9"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/flagset-0f47bc60f76af245/lib-flagset.json",
+        "sha256": "a5de9b7388f7070cc1199b1facef10a803170f0af6ce6654f8a12254e811d411"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/generic-array-4fa8bce00ebb9a6c/run-build-script-build-script-build.json",
+        "sha256": "a753a4c66b032f31ca6b27df1930b7b3c1c5de5099ca73a3bd871cd5d8fcfae3"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/generic-array-7c79b6baa37c2a46/build-script-build-script-build.json",
+        "sha256": "7b12121fc1dd07ec80fdf032b3f7b27b426be1496265a8db2b934581bb3c62a5"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/generic-array-8987626e353f7161/lib-generic_array.json",
+        "sha256": "712f814f101baf54e2ddaecebff066549097bec8625562c95e222d46e546ec64"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/getrandom-080140cc969d137e/lib-getrandom.json",
+        "sha256": "47e7cecad465ae75de050fabbb805a0c47339ee7c10c06809f29ab2280497211"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/getrandom-4257c8448c77b589/build-script-build-script-build.json",
+        "sha256": "6345e10513bd979f11e93c76051374733ca7c199f0672bd8a40da5fe345a8a89"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/getrandom-8c2d8f1dfc778931/run-build-script-build-script-build.json",
+        "sha256": "66ab46060ae3369bc318349c90e1fd1aabf5aedf70b87830d7aa379e5e165643"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/getrandom-e9a79658f8884f00/lib-getrandom.json",
+        "sha256": "7a6bd17ca756c1de6c7c26c0e748e509b65df970ad3ac159342c4f63837c37ce"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/group-e5aef6ff7bed2f75/lib-group.json",
+        "sha256": "664c2b1c03acfc56b2584a49d2109b71fd6744ca6adf3941b245fd9be48cc52a"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/hmac-2a0a0a390b3bc5fc/lib-hmac.json",
+        "sha256": "4a0cb22ced397353ecc6b4a5c9e6ce4f8192671aa7a377a3356ea6abddc51a49"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/hybrid-array-e0fadf55e7986c8e/lib-hybrid_array.json",
+        "sha256": "59f04ca26f5395065b434df61a102c179bafe53ba6c2f174c2cb2dff75bf63a7"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/iana-time-zone-6258ec30574e0210/lib-iana_time_zone.json",
+        "sha256": "9ac3ecf5bdcf1d3b59695ecdbbae56e2014ed069a94bd7f7a92a06b9fe2330d9"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/inout-e71cb23526c0449d/lib-inout.json",
+        "sha256": "d7ddb80396b0b38c7e6c4e37eda4c5510796c757cb9041d9fbb6d6b24d72a9a7"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/itoa-160233f4f5bfa7bb/lib-itoa.json",
+        "sha256": "2c9457bcc8e7cc55c757cce86dc848fe700111fa95de04990a1543814a275e4f"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/lazy_static-0e7515a57166ba98/lib-lazy_static.json",
+        "sha256": "77fccec83ad2a2a4b0d4af4580478fb23007a893853f91a5cee6012760852936"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/libc-3d51869c7bcc7e32/run-build-script-build-script-build.json",
+        "sha256": "4ecd0004cd1ec8d7b8bbd60e1f01d2e10a15666a7596a18bc5c7367b415d2a1d"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/libc-82266bb4d95b1403/lib-libc.json",
+        "sha256": "74afff1482a7b43a661ed20ccc3f685d2adb2a625e9471fe543f7497a76667d7"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/libc-bfe405946939e22e/build-script-build-script-build.json",
+        "sha256": "d068a528aabb5247b7e9635d26b829223afdaf34c5ef68d80264a9463baba743"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/libm-0bdec669581feb94/build-script-build-script-build.json",
+        "sha256": "ea148a7caf6ba2c5518cdf1ac9cf44b50e4e36e882e8de3dbcb01e01632f884c"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/libm-0ee7d6fad9277d04/run-build-script-build-script-build.json",
+        "sha256": "ccaff5a8696d3457130e9434186615a7059c5ff1bc18103b8787fb24bda0e322"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/libm-ffed39ab76c1b487/lib-libm.json",
+        "sha256": "e0fd0ec035445f981c8ddc18ff24d5ec2088eef00807cf204ec55247c6f6ff70"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/litchi-cfb-af9cd3590351b726/lib-litchi_cfb.json",
+        "sha256": "048a3a54d308908742cdc8fe87879f3fa2da4c73c279915600818c68a281d63b"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/litchi-codepage-d8df1aa749b8f130/lib-litchi_codepage.json",
+        "sha256": "67a7bf234ea363a1c768cc6a0876976a9f618b78b486258dbfe8dd9c331cf6f2"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/litchi-core-ff8996cc396be92f/lib-litchi_core.json",
+        "sha256": "81138485ed998d7b5bc24ae97cef71b84e762ef7d5c932d2362b3c5e38bbb749"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/litchi-crypto-0728b79ca7ef55a8/lib-litchi_crypto.json",
+        "sha256": "aa5412539379308cdb433e2ef646b4a8633cdcc3bc1141eba8cd4e1a8052c0ff"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/litchi-doc-6b0d2563d21ea9fe/lib-litchi_doc.json",
+        "sha256": "a828d4417c8cbf1daa9c59264969fcc445b2354d4adc52f0b98776b04f462767"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/litchi-odraw-8231c973a563775c/lib-litchi_odraw.json",
+        "sha256": "0156b81a988e0b5c25e4a63a3e3f022f168b65d778580e61e5bae66687b8c6ef"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/litchi-ole-common-622e55d7991c1ee0/lib-litchi_ole_common.json",
+        "sha256": "cb933655b81352326b200bd1fc6c705c8b5d1e6a273093e2c77beb86c3972291"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/litchi-sign-d85ecb7c11315f53/lib-litchi_sign.json",
+        "sha256": "65b2fbb753aaab6bfceb4ee84503a534d31200bf84d1688fa7122dff2f84b827"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/litchi-vba-f58b69a67e7a259d/lib-litchi_vba.json",
+        "sha256": "a00089e85df983fb809d0d57dcc1496635f3a3c93d8f7578a7ee686e0125399f"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/md-5-3c52527e7f3b18b2/lib-md5.json",
+        "sha256": "0b30665acbfee07303708baa728d6d9f06629affbf142a450d42b8e32da3291c"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/memchr-ee25ebeca1096c73/lib-memchr.json",
+        "sha256": "9a9baa631d17dd5dcd48d2962b3accafc574b6c1564db08f7dac06f0b599bd10"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/multiversion-97c6f0f3c6d1e36e/lib-multiversion.json",
+        "sha256": "5922c885797cd0d8d164b5700842bc42c1ec68ec17a3f2b08156f93e6d206454"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/multiversion-macros-8dbe51f3a4376b7d/lib-multiversion_macros.json",
+        "sha256": "23bd3657f33fd32d104a70cca0ea7a64b96541a7412ea7dc6563a66e939f0c7b"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/multiversion_no_op-850550223098c537/lib-multiversion_no_op.json",
+        "sha256": "683b70f70af9e5bfe1ad8f9040ea841719c1176b423b76282b655e2dcebcd565"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/num-bigint-dig-23e54dfa2fcae27f/run-build-script-build-script-build.json",
+        "sha256": "cdcd4405acaffa2eabad315029fcb1f8995758ac4366c593fe2bd286f21afeb7"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/num-bigint-dig-9adec17fb0800ce0/lib-num_bigint_dig.json",
+        "sha256": "b173d97bee8b663174de63b5df501f06be199eac58eebd17a99a6603914be90f"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/num-bigint-dig-d2cd6a07c01f1c68/build-script-build-script-build.json",
+        "sha256": "a121ad228ca5dfe6f75e34e1dcb65e26bb79faee6b677139545f884fff72b75e"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/num-integer-a4b9b9bf1a0e2f72/lib-num_integer.json",
+        "sha256": "610ffc9edd4ad481fa4e14fa021254a74de9fd7360561f4871c8347e5a2f8349"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/num-iter-a0ce77dc9dc6e42f/lib-num_iter.json",
+        "sha256": "01290eca5b5a7462d66e932c82b2f6c56fa8bcd0ff5849e5c05451a6d7dcff3e"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/num-traits-1e131bf9d9cec2df/lib-num_traits.json",
+        "sha256": "6c1906c177790df3ad19cfe9dc39dde32803714ed49aae019ccb9998652cb651"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/num-traits-64190261f528948c/build-script-build-script-build.json",
+        "sha256": "f879d7734ffac71bef32efe60e7c9f927073d45a32878e88be5f0a95795a33f1"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/num-traits-e64cd01fc117c459/run-build-script-build-script-build.json",
+        "sha256": "aecd93a5f3da0d94502e1714f7d35b1835f4b6c2ff924b6ef171fd65982e9844"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/once_cell-3d429b49ff237cf4/lib-once_cell.json",
+        "sha256": "8913ebbcaa6c83244e979e19b011c56c7e549950942e1b85819ea6d7e2b423a1"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/p256-c25f394ccc8b90a9/lib-p256.json",
+        "sha256": "df37c6f79f155982390fc869b306a32e997f3139e12c3665d25f9a69d91c6682"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/pem-rfc7468-8ffaf421d6f2bd4f/lib-pem_rfc7468.json",
+        "sha256": "e0ad046d03ebfca203e341e528905294f5d58d71acbe89357bd0a4446ee7376d"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/pkcs1-9204bea1fba7af13/lib-pkcs1.json",
+        "sha256": "149064498e711121ba2a7d19b5dcbd33353e68837bcdba37179f356370e1c97c"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/pkcs8-7a7dc4962d73f515/lib-pkcs8.json",
+        "sha256": "5eac475da25376e0daf0e75309c1de1e0b34bd9c670bd67e1ce078a088b5d629"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/ppv-lite86-15aadb12b958bb59/lib-ppv_lite86.json",
+        "sha256": "cf3d2188f1aa1a7a9dbee8d866933f4016ea439c2cb7f17faaedf59f6d1cda85"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/primeorder-9b82b7b96480462c/lib-primeorder.json",
+        "sha256": "fb31662f35d80553b0f628a994a7e907a6e5654bc2e7f3e097872f6fb0d92b98"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/proc-macro2-5db6c79e3ae6cd8a/lib-proc_macro2.json",
+        "sha256": "0c85e5436b149bc8c7a9992a5e1cbc92a530022d3a7009963e8f61a1abd1b07d"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/proc-macro2-88eb659be27e7cc5/build-script-build-script-build.json",
+        "sha256": "66ea5082557ff5bedb262ad968400b83bba4839f5cfd6f688921810205857982"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/proc-macro2-d0dfdc57efcd507e/run-build-script-build-script-build.json",
+        "sha256": "c4f656da2fd351c1cb3fd80cc623471bccb5ca31a1dcf05d332848fd183229ce"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/quick-xml-a2eaa3a8c207ce6b/lib-quick_xml.json",
+        "sha256": "f3202893173da2ae5d4bd9ebd2233b833f356ffc08aebfc09f427fe0da218507"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/quote-24daa5d133888760/run-build-script-build-script-build.json",
+        "sha256": "5db2d95ee93f717e5ceaeb245c74e12963f764bb1da5ceb9ba086fec1469bbaf"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/quote-89adcffc1d948aaf/build-script-build-script-build.json",
+        "sha256": "379f8a88f95f20281c2d361fdfa58ae0241a5a6bed6ba4f60a5c33974eb52742"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/quote-957874c4117ab8c4/lib-quote.json",
+        "sha256": "047f5ed92add19fa16fe9b9e77e946401f44b389b448e3851dc506db338b3d52"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/rand-54b2e3c26cc89869/lib-rand.json",
+        "sha256": "ee2c2c8e61ab0853250858666c420058ab602f5d188809b17821957538b84024"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/rand-60db8df2a3490b6b/lib-rand.json",
+        "sha256": "3ecd8815f49a8a66eccdf7587fdc3e193285955bff0d1cd2bb231fea86345217"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/rand_chacha-e7f49b62c45e04af/lib-rand_chacha.json",
+        "sha256": "82ca6b179aed90a7a5c7c475102d5bb363c4c90d05eafaa09db4f54edec46d8e"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/rand_core-582c7a4dc1faf02e/lib-rand_core.json",
+        "sha256": "dc4c7c0614ac3202c04f4ea307f3172979a1e5ea5f77da000d8af83aa79588f9"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/rand_core-95e925f5239f74df/lib-rand_core.json",
+        "sha256": "af156d36b7083aa228da1d8b70db62ea08c588d6167c71113735be1ead31ea18"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/rayon-core-9bee35cdae2fa5bf/run-build-script-build-script-build.json",
+        "sha256": "28b4ff7f0dc6c6dd8e2640d34ea23a0fbeedea8879ba1a8e103845863aee85c6"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/rayon-core-a1b70ce2a51bd87b/build-script-build-script-build.json",
+        "sha256": "f7438efb46230e2602a5771bdc7cac71ca4061ec60f4afeb94477b624b80f883"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/rayon-core-e1579458130c89ae/lib-rayon_core.json",
+        "sha256": "1821870d5cb0d2a35301bdd003407eec06249508ebc2daadea0d18a119437d8b"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/rayon-e93d3ebaa9aa587e/lib-rayon.json",
+        "sha256": "5766ba3f86e39bbe4946a20d6bcb325b4892b05b4afbeebde2e6fa1f8d8b0baa"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/rc4-0b0bd1d1eb3ba2b1/lib-rc4.json",
+        "sha256": "81207f267669e0e8fc0a416097d8ebc4fddfff063d2cf16a5ac345b23f44f616"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/rfc6979-108ed89de6dd61d4/lib-rfc6979.json",
+        "sha256": "472fdd2958e39e78b9a9231c1535c75a4c8d320f53a1e105871e31da87d173a9"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/rsa-9129ae18c1b7f812/lib-rsa.json",
+        "sha256": "87fe212d03346044f027147e5f1d95350b483bd239c9c5031bd735f5952daf03"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/rustversion-3afd395b05244b81/build-script-build-script-build.json",
+        "sha256": "ece7326395ad958bbb163193a51f05534d671dc3864f020c1afcd9017d894dde"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/rustversion-6d4f661f3f0954fc/run-build-script-build-script-build.json",
+        "sha256": "e8cbe625d75bd7fe5b88a67d396e6f6656560b4fe5b7a86d64905b8f2f8a2efe"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/rustversion-ace473a92c2bdb22/lib-rustversion.json",
+        "sha256": "6130272563e6c6fad30b1ed3bd16d7b748faf4a45fd76465819a4474a6b5a594"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/scopeguard-9488441410ae8e24/lib-scopeguard.json",
+        "sha256": "9fe7e03f92a7ffa677c9c65efb1f57dd1f35232ccaa0234800785280353c1bf6"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/sec1-6afda1e9b3fe9bd6/lib-sec1.json",
+        "sha256": "c397a10658bef7fb7a2fd87c4963393d0456e264baf9d77f3d1dad782422de07"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/serde-23ed0b3a57d781a4/build-script-build-script-build.json",
+        "sha256": "57268576570e80c2b0e93d09269a8c5d3c36784795b70c2af212a6b015179921"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/serde-5402c6f737099d0e/run-build-script-build-script-build.json",
+        "sha256": "31d2e3ea26d9addc6f39c14b68022931a1d0db3160a1cfdd43d15f6b95769fc8"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/serde-ffd7c6e89ae15c36/lib-serde.json",
+        "sha256": "705d118c922397cf0e1709225ce6bb07c9b387f951b9faac109ea3bc9a10ffc9"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/serde_core-6c0033760a1c3d25/run-build-script-build-script-build.json",
+        "sha256": "3da5940cd62d0e8da708581ecc5edb931a590f6d2ea0d05b1353998d63758b98"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/serde_core-797decdad9a1f83c/lib-serde_core.json",
+        "sha256": "3d60f29b5efd6e9fc380e512edaa58adb82a51ba297db5b8fb3b22cbaaa1260a"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/serde_core-e0e18428796259b2/build-script-build-script-build.json",
+        "sha256": "1233ed47024102d0f4bb6f9b2b8d413db03e3faa976322beea1bec06aa2b705f"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/serde_derive-6138468e5c275c27/lib-serde_derive.json",
+        "sha256": "107cac03f58f7d8ab19f865479b17a8559ada871d51c3097d042f8eff57732ef"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/serde_json-0a208c8465803560/run-build-script-build-script-build.json",
+        "sha256": "a4e607db02e468318bd7e8a66c8a1b176eac4e9e6194c3c1afedfceddfd1862d"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/serde_json-17ba6c5364314d66/lib-serde_json.json",
+        "sha256": "dd8c2e9b0dfc12911e1286d05001f6cef7f300e360fd79780fb606385142b9c6"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/serde_json-f323520226a6be8c/build-script-build-script-build.json",
+        "sha256": "510a417ecf32534ad42eddfcb0fd3dbf85c26839d3c21723e2f26918a5d4a585"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/sha1-80df74cbb515ca61/lib-sha1.json",
+        "sha256": "9432f01fa0865ffed32fd10d0c8fd8c8fa6b4ee3bfb9b526e50ec432509080d6"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/sha1-c1ed2c515a30b926/lib-sha1.json",
+        "sha256": "3ac4fc94c5187673a89499816ffe0d9c53d0f8006306407f38636643525052eb"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/sha2-bc2ee725e85229eb/lib-sha2.json",
+        "sha256": "27c31d5bd05252d67365a3b939523af5bacbeb50b64a4777a044ce8e51fa2ac9"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/sha2-f663fea8112d4557/lib-sha2.json",
+        "sha256": "664986d6bbdb90152d85512e0b74cc5b32495e62b11f5a9ddbf7df5019a8dfd0"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/signature-4594c4d27b3dc9f4/lib-signature.json",
+        "sha256": "7dc2c73fe287eff253e8458f7b94093e0245a45ab7d19675ccd08fa462bce871"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/simdutf8-5b6154235190a7e9/lib-simdutf8.json",
+        "sha256": "e15ce88db4ac8e5efe1bc2f06440c70c682c0ae9653b6c5944604b9b1908c0c7"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/smallvec-b40411273ced4336/lib-smallvec.json",
+        "sha256": "1e4fc5e4796925a803fb57d0e780016bd6fb071c007bcb52c7b738627ddfa497"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/spin-207c2c325c21c986/lib-spin.json",
+        "sha256": "4f1342b8544c0e138d38f9c1b5d7f826ffb39e25db4dc0107a6a1d79ea6e0dcd"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/spki-a2a149abddd59257/lib-spki.json",
+        "sha256": "c0103f2dd82b8b20abb6ff1713553fd9ed6652a9f781e5ad6ee34366e2858dcd"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/subtle-665458b5ff4db58e/lib-subtle.json",
+        "sha256": "053bbf629ebeb70cfb5b6078d07e8be81704869f9a72befbfbd1520631205c1d"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/syn-4adc80eb96874a9d/lib-syn.json",
+        "sha256": "caae486901b9ff350bcb4c279ec8fb7cd0b52d321708b260b5b7c1b49d18ca35"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/syn-ab0b4f51723754ac/lib-syn.json",
+        "sha256": "432e98a96422ed52c103374b58d21d9158e49fe0ac42eb91f770eafad65a830f"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/thiserror-78d41e94e149c549/build-script-build-script-build.json",
+        "sha256": "9cff8dc85b14ec59a90336d2d040a317ed953a236cfe527bd970f9b8b66b784e"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/thiserror-ce61f343e74a5e27/lib-thiserror.json",
+        "sha256": "aa56e13b7fcc1c92a8b66e13b28b65abd879255395ea836b87193df3aa004bb3"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/thiserror-d0602d83a6b8b7a2/run-build-script-build-script-build.json",
+        "sha256": "a70df6d4d5c3881f81a9cd7cfad626b49a5d438b03422652c91cbc0edcbda2c5"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/thiserror-impl-29ed2506bfdd796f/lib-thiserror_impl.json",
+        "sha256": "6254c8aa5a3942f44f6c1b9dc82c9b7158ce5617df1fb0872648e5bf1ed3d35a"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/typenum-512db11a77ff862a/lib-typenum.json",
+        "sha256": "23554c871baff4dc943d741832d4d446548f697577166d6ebeaa0477d8e1d4b5"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/unicode-ident-3b00325ce2e91e69/lib-unicode_ident.json",
+        "sha256": "4c83cb6d58f2ca121d5bb6b42226d556af9fde2de5a40a56b82f6e3ea86b5f99"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/version_check-cc84f9b09bc7bf54/lib-version_check.json",
+        "sha256": "708ac06c6e7137d9491281d3a8b58f30d00c408cf782ccb16e5b3bfbc060fde4"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/x509-cert-d0a0381875c14a6c/lib-x509_cert.json",
+        "sha256": "ae7327ac3eae4c52e7d55ab0bc165186eb263ed42b254cab808b221040ad17f7"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/zerocopy-1cab4708e90f97ac/build-script-build-script-build.json",
+        "sha256": "b3a826b5e151e8037269bb2d257bb48ffbfa87fd63d4d85f0a7ad89eeb96989f"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/zerocopy-921177a1f80cdcfd/lib-zerocopy.json",
+        "sha256": "b00a600657c1af44fad61a12b037696209c95129e867e8e4b0ce942d0dcaec78"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/zerocopy-derive-ce87d263e4590128/lib-zerocopy_derive.json",
+        "sha256": "61808c2522e892d382bf063053982e16b6d05e9956b69cc2863d8c26823f2ef2"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/zerocopy-e4c29fa52aa29721/run-build-script-build-script-build.json",
+        "sha256": "9910f97da03c540ff30287733c5d9a503f3aaa4fbf5f8cd5de1dc18bc293e051"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/zeroize-3aa23f92a80b57db/lib-zeroize.json",
+        "sha256": "51ea3bd6f61053f06756bf4be7f63b6f1bf3958f96bb4b6f4d1a8c7a8e2b542e"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/zmij-67933fef6ea43baa/run-build-script-build-script-build.json",
+        "sha256": "23d12157b5e76b48d891d9752fb51e0628afbed56574776f06de9f914c51d7f2"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/zmij-af04d5d483d7cdda/build-script-build-script-build.json",
+        "sha256": "ba61ac92e76bc0c570601f26539584f7269313607c7c3fe6401e8ba096086dc1"
+      },
+      {
+        "path": "/tmp/litchi-performance-0921/baseline-target/release/.fingerprint/zmij-babacfcf4fd817b0/lib-zmij.json",
+        "sha256": "d18ff2b7683d7ac552d388ea9c5c330dc6258ab7e1c65b96716222224d3fd30d"
+      }
+    ],
+    [
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/autocfg-5bcca43b692cd4eb/lib-autocfg.json",
+        "sha256": "dd556f9b884ebc2ff29eb05acde616da3619e5f5bc758c7fb78f363a0b731206"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/base16ct-988e08b3cc3a1b50/lib-base16ct.json",
+        "sha256": "392108540a4d0c57a7223f5e81382ee67030b19d0f0a5a668b9457810a72c928"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/base64-9973a34f980260a1/lib-base64.json",
+        "sha256": "71eacb08bee90826ea153f6786b773a8ec960eceac6cc08e6eb8dfb8df4d0485"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/base64ct-4d43faf9b9256455/lib-base64ct.json",
+        "sha256": "ea0d1b4e1a185f76e71cd850480225790d3d850129c9d73ddbdfa18edd4cffb3"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/bitflags-4841484a6266b096/lib-bitflags.json",
+        "sha256": "14e5050ea8d9f8e89568412879a9c236a9f79b6da07e011e50c6d34aa8702c60"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/block-buffer-1c2fdb5ae1044182/lib-block_buffer.json",
+        "sha256": "cc691c471078eaa525f52122717cc2754de3e6ab7bfc92238b8663dda6aff123"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/block-buffer-ae6333ef05148fa1/lib-block_buffer.json",
+        "sha256": "88153329d9c28c9a8597dbad4d13ae5440eefc38ac8e173aac2c90c3f25f0205"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/bumpalo-5db6277aad56388e/lib-bumpalo.json",
+        "sha256": "2d6969caa183c1a96ba0f2261a05fb11b2b1380e435ecc8146fbc4d25ca05c2c"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/cfg-if-cfa148b4c484155e/lib-cfg_if.json",
+        "sha256": "1b6e0dd1f9c3067dd3270bdd9f7f446bcfd0eb1b3dde8bc953e741002f777b94"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/chacha20-939d4793cbb6d2e3/lib-chacha20.json",
+        "sha256": "99be77d031b51e9195bb5898b92eaf0c3cb665bdcd14aff4b1863293699be736"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/chrono-ea4d5a755f638753/lib-chrono.json",
+        "sha256": "6cf46c17a62e0ea0124d2f6bb737ccd31ae25f8708a4f4733d81086dde4d26d1"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/cipher-95ab85d605c783b0/lib-cipher.json",
+        "sha256": "7c76aaf390e60cd9a6f00a6459f5dd5cbb17e07b36dd3bcded867273d145a49a"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/const-oid-95cfcbd67a839197/lib-const_oid.json",
+        "sha256": "243c3fdd9c4dc016d601e49ed1893659eda5546d36a8af8353b87b5fa62a0125"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/const-oid-db2cf47dff4e9901/lib-const_oid.json",
+        "sha256": "cc3ee005d05c69ec226af613dd1c07773b4ce7bd3455bd85cc3c2ab42a6313f9"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/core_detect-eca997995e1af5b2/lib-core_detect.json",
+        "sha256": "1b1dd76634d725f65235551dbce4acb98afe2d68e8a8be7c55242a68fde0eae2"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/cpufeatures-7f50c04eb6a576a4/lib-cpufeatures.json",
+        "sha256": "33c53f4ce240fc07fdb179e9d94188e390da56ee4f9d7d1d9e8176b27c0569a1"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/cpufeatures-b8ead7899b24548b/lib-cpufeatures.json",
+        "sha256": "6ec3da923305b3f89b812af6316f2ad5e88bd63b120b2e7aa0c72af6b7e09b10"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/crossbeam-deque-3dc184ebdf30689a/lib-crossbeam_deque.json",
+        "sha256": "4f8ba99adc80ee6a73c9fb2b6bb58d6a8af03bd3031714e85e5c2a9b562b8c6c"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/crossbeam-deque-8bb3d32006db3ef8/build-script-build-script-build.json",
+        "sha256": "b95645dd57cecced28a9464f9d0bfb1c2fe77f62bd7029b24de408256b7f66c4"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/crossbeam-deque-c78b5fec69b57ec5/run-build-script-build-script-build.json",
+        "sha256": "8fd350c9a8ad5f1c11426fa7cf8c9a3f9b35f731c51b3f3d58ae6fb46cf5410c"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/crossbeam-epoch-14f0146026132053/build-script-build-script-build.json",
+        "sha256": "72e797525b3ce12d1623c0e6703cb35cc3e04b4beec97a069086b573870cbcad"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/crossbeam-epoch-6533b2f75f78e324/run-build-script-build-script-build.json",
+        "sha256": "dcfa6b31004ba745061e58ee64516ce2c89ff69c4934575aed24f9a3419227b3"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/crossbeam-epoch-8bbeff7d0c32100c/lib-crossbeam_epoch.json",
+        "sha256": "48f26d2db1f172f768dc2502cedb2a05af5cd6712f047ea830a56dd94ff26f29"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/crossbeam-utils-0173ef3b133d07b5/build-script-build-script-build.json",
+        "sha256": "5a78d38e0fe6735cf667935fbbd63f4dcd047afc4a148d2f5cbfdf7e7b139537"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/crossbeam-utils-59330cb3a76d6b8b/run-build-script-build-script-build.json",
+        "sha256": "adf5a86e0294ba3c98916f90dd6dcf25ff617f2a70deade7a157a7a1f3a226f6"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/crossbeam-utils-72b5f64775962a44/lib-crossbeam_utils.json",
+        "sha256": "d3a8aeb00ff14ab8c83e4b23ecc586ae67bcf6a9447b7a21213b5e0bbe89a551"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/crypto-bigint-279cdec48ea44950/lib-crypto_bigint.json",
+        "sha256": "acc9a82f718126fdf63c3942b8b7a08432952115bd786b9e71ce3756c5a9be60"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/crypto-common-7a4204bdfc59da1f/lib-crypto_common.json",
+        "sha256": "daf43bdc784ec54536526e2c99aa213d6fa391246444563edd73408fae7281ae"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/crypto-common-9e42fae4dee90444/lib-crypto_common.json",
+        "sha256": "2456be5f576ab067f6f9a99c168a51c8d167f56ae498858e13fc4cfb33522872"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/der-e7e5502564095c24/lib-der.json",
+        "sha256": "7997f3b83c4b4e88ab777ea61b09874978d76aa8370a90735e35ef79820dc7b7"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/der_derive-e740918e2cdd795e/lib-der_derive.json",
+        "sha256": "470f5d9eebd1e3d63d2ff9430986d9b31d6f75aff2846be26704a71ed1a2683f"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/digest-a8b820dbf3257d92/lib-digest.json",
+        "sha256": "ad1ef563c54deee3a8a45ab7508b4d36a492026bc814aec06cd4edb17bee18ea"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/digest-ad84da5c4894895b/lib-digest.json",
+        "sha256": "20034f4a82e53770c89a0174299cc5f13bef1663a992f9fcbb4a431b7ca9a673"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/doc-retention-probe-0917-bdd615030a2d216b/bin-doc_retention_probe.json",
+        "sha256": "d8ac4d73bdd5d55baaa7ec839b72c5fbed5cca3c4589f2f6e0f884fc3f492dc5"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/doc-retention-probe-0917-c4f8be55b8ee8b9f/lib-doc_retention_probe_0917.json",
+        "sha256": "2fe17a51af83fbfb4316a3f8a216bff94eb3da522b590583597a43a161950891"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/doc-retention-probe-0917-ca54f7f96a4012d0/bin-doc_retention_probe_alloc.json",
+        "sha256": "532134e1a560c53fe30cc897bdb8d79869bf681819ac9b81dbe4adcb4c311903"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/ecdsa-dfb50157f097bb0a/lib-ecdsa.json",
+        "sha256": "865e074b6a4a6cbce2f02fd657cd2ae98f070841cd49497a3b6c61f9765dce19"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/either-c7bf59acd15add2c/lib-either.json",
+        "sha256": "8dcc1c00cee570fcad81c8f0e5d80a6349e5e0467f6e7681f6e8e9aab2143475"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/elliptic-curve-aacd064dfb34b95d/lib-elliptic_curve.json",
+        "sha256": "cd4a0cb0edab124d28fcdc5f5f89169743f7439e60a025218797d5439a0d27e3"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/encoding_rs-59fac9a0cafe62df/run-build-script-build-script-build.json",
+        "sha256": "5fdbfee3a76118f84949db5d794adef9f375e587bef8dca9a4e4575faef9b1d7"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/encoding_rs-b0b781634b6e57b5/lib-encoding_rs.json",
+        "sha256": "367ac0fbc874880496711c991943043d5ee3c91d0cbeb6d2bf384f30a7081fef"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/encoding_rs-dae16e22e958dfd4/build-script-build-script-build.json",
+        "sha256": "6d20462bc144f14291bf8551faf65b31ee205e3fd7e8c3af5c357b3fedb2f046"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/fast-float2-ed15c1dc1a1e12a8/lib-fast_float2.json",
+        "sha256": "a44795574fb40ff38159472d77026eed0a0751a01f25e995cc020cd62c15085b"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/ff-f4a90db32e40f617/lib-ff.json",
+        "sha256": "5c2ef295de84076faa823ff1c0a8b3c3ed22837d853f099494d1d177c66e0b8b"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/fixedbitset-2da8e4b6ba48b528/lib-fixedbitset.json",
+        "sha256": "87ef8295147810963427847427bc861b20b16877c1a7094736b351c0dc4c27d9"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/flagset-0f47bc60f76af245/lib-flagset.json",
+        "sha256": "a5de9b7388f7070cc1199b1facef10a803170f0af6ce6654f8a12254e811d411"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/generic-array-4fa8bce00ebb9a6c/run-build-script-build-script-build.json",
+        "sha256": "a753a4c66b032f31ca6b27df1930b7b3c1c5de5099ca73a3bd871cd5d8fcfae3"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/generic-array-7c79b6baa37c2a46/build-script-build-script-build.json",
+        "sha256": "7b12121fc1dd07ec80fdf032b3f7b27b426be1496265a8db2b934581bb3c62a5"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/generic-array-8987626e353f7161/lib-generic_array.json",
+        "sha256": "712f814f101baf54e2ddaecebff066549097bec8625562c95e222d46e546ec64"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/getrandom-080140cc969d137e/lib-getrandom.json",
+        "sha256": "47e7cecad465ae75de050fabbb805a0c47339ee7c10c06809f29ab2280497211"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/getrandom-4257c8448c77b589/build-script-build-script-build.json",
+        "sha256": "6345e10513bd979f11e93c76051374733ca7c199f0672bd8a40da5fe345a8a89"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/getrandom-8c2d8f1dfc778931/run-build-script-build-script-build.json",
+        "sha256": "66ab46060ae3369bc318349c90e1fd1aabf5aedf70b87830d7aa379e5e165643"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/getrandom-e9a79658f8884f00/lib-getrandom.json",
+        "sha256": "7a6bd17ca756c1de6c7c26c0e748e509b65df970ad3ac159342c4f63837c37ce"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/group-e5aef6ff7bed2f75/lib-group.json",
+        "sha256": "664c2b1c03acfc56b2584a49d2109b71fd6744ca6adf3941b245fd9be48cc52a"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/hmac-2a0a0a390b3bc5fc/lib-hmac.json",
+        "sha256": "4a0cb22ced397353ecc6b4a5c9e6ce4f8192671aa7a377a3356ea6abddc51a49"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/hybrid-array-e0fadf55e7986c8e/lib-hybrid_array.json",
+        "sha256": "59f04ca26f5395065b434df61a102c179bafe53ba6c2f174c2cb2dff75bf63a7"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/iana-time-zone-6258ec30574e0210/lib-iana_time_zone.json",
+        "sha256": "9ac3ecf5bdcf1d3b59695ecdbbae56e2014ed069a94bd7f7a92a06b9fe2330d9"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/inout-e71cb23526c0449d/lib-inout.json",
+        "sha256": "d7ddb80396b0b38c7e6c4e37eda4c5510796c757cb9041d9fbb6d6b24d72a9a7"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/itoa-160233f4f5bfa7bb/lib-itoa.json",
+        "sha256": "2c9457bcc8e7cc55c757cce86dc848fe700111fa95de04990a1543814a275e4f"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/lazy_static-0e7515a57166ba98/lib-lazy_static.json",
+        "sha256": "77fccec83ad2a2a4b0d4af4580478fb23007a893853f91a5cee6012760852936"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/libc-3d51869c7bcc7e32/run-build-script-build-script-build.json",
+        "sha256": "4ecd0004cd1ec8d7b8bbd60e1f01d2e10a15666a7596a18bc5c7367b415d2a1d"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/libc-82266bb4d95b1403/lib-libc.json",
+        "sha256": "74afff1482a7b43a661ed20ccc3f685d2adb2a625e9471fe543f7497a76667d7"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/libc-bfe405946939e22e/build-script-build-script-build.json",
+        "sha256": "d068a528aabb5247b7e9635d26b829223afdaf34c5ef68d80264a9463baba743"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/libm-0bdec669581feb94/build-script-build-script-build.json",
+        "sha256": "ea148a7caf6ba2c5518cdf1ac9cf44b50e4e36e882e8de3dbcb01e01632f884c"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/libm-0ee7d6fad9277d04/run-build-script-build-script-build.json",
+        "sha256": "ccaff5a8696d3457130e9434186615a7059c5ff1bc18103b8787fb24bda0e322"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/libm-ffed39ab76c1b487/lib-libm.json",
+        "sha256": "e0fd0ec035445f981c8ddc18ff24d5ec2088eef00807cf204ec55247c6f6ff70"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/litchi-cfb-db414d327e0c9e46/lib-litchi_cfb.json",
+        "sha256": "86d39a6673c2669001dbe816a090a42f6ccec658ebb22e8f4cd235aa2de542e3"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/litchi-codepage-5edd0f8e7df65300/lib-litchi_codepage.json",
+        "sha256": "4f4b39e0aeafb1108675f09c678370d63debf695719ef326701f849c93ca4084"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/litchi-core-ad6a4de062eb14b0/lib-litchi_core.json",
+        "sha256": "e875be0bafb6cb4eb6c6e19619de3406d4041544880a1e8b61f20ef252dc2798"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/litchi-crypto-4062fe4310edd778/lib-litchi_crypto.json",
+        "sha256": "01c2d8fc87863a3f1cd7ce8fd84c6e4619e246d3dd5d80c7dff222def16141aa"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/litchi-doc-c8296ba2dcc19e9d/lib-litchi_doc.json",
+        "sha256": "7379b2ee4adfbc6543f47bdb686d011667d254bde70ae40475ff023a058c3ab0"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/litchi-odraw-53219d3ba4ca87f7/lib-litchi_odraw.json",
+        "sha256": "38a8b2636153f410cfed879fefb85a9c35a9879f6685e5ecd6523e6ecf54b07b"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/litchi-ole-common-86cc968c8d034878/lib-litchi_ole_common.json",
+        "sha256": "89e433c330b91d342ec6b54f5710636e3eb75d33ce14e986108e8ffa518dc45b"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/litchi-sign-f8b60499cb675599/lib-litchi_sign.json",
+        "sha256": "75368b4c3fea72e516fef478f5486bf9d357fc3f87a108eadc5da22f18a4fc29"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/litchi-vba-c9f096ca13d9be6e/lib-litchi_vba.json",
+        "sha256": "e0b8742d7f3bc89a2f5a8f7b8e1ef1c307ed207883d90f0b14a7e1d3990d4ef4"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/md-5-3c52527e7f3b18b2/lib-md5.json",
+        "sha256": "0b30665acbfee07303708baa728d6d9f06629affbf142a450d42b8e32da3291c"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/memchr-ee25ebeca1096c73/lib-memchr.json",
+        "sha256": "9a9baa631d17dd5dcd48d2962b3accafc574b6c1564db08f7dac06f0b599bd10"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/multiversion-97c6f0f3c6d1e36e/lib-multiversion.json",
+        "sha256": "5922c885797cd0d8d164b5700842bc42c1ec68ec17a3f2b08156f93e6d206454"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/multiversion-macros-8dbe51f3a4376b7d/lib-multiversion_macros.json",
+        "sha256": "23bd3657f33fd32d104a70cca0ea7a64b96541a7412ea7dc6563a66e939f0c7b"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/multiversion_no_op-850550223098c537/lib-multiversion_no_op.json",
+        "sha256": "683b70f70af9e5bfe1ad8f9040ea841719c1176b423b76282b655e2dcebcd565"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/num-bigint-dig-23e54dfa2fcae27f/run-build-script-build-script-build.json",
+        "sha256": "cdcd4405acaffa2eabad315029fcb1f8995758ac4366c593fe2bd286f21afeb7"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/num-bigint-dig-9adec17fb0800ce0/lib-num_bigint_dig.json",
+        "sha256": "b173d97bee8b663174de63b5df501f06be199eac58eebd17a99a6603914be90f"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/num-bigint-dig-d2cd6a07c01f1c68/build-script-build-script-build.json",
+        "sha256": "a121ad228ca5dfe6f75e34e1dcb65e26bb79faee6b677139545f884fff72b75e"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/num-integer-a4b9b9bf1a0e2f72/lib-num_integer.json",
+        "sha256": "610ffc9edd4ad481fa4e14fa021254a74de9fd7360561f4871c8347e5a2f8349"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/num-iter-a0ce77dc9dc6e42f/lib-num_iter.json",
+        "sha256": "01290eca5b5a7462d66e932c82b2f6c56fa8bcd0ff5849e5c05451a6d7dcff3e"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/num-traits-1e131bf9d9cec2df/lib-num_traits.json",
+        "sha256": "6c1906c177790df3ad19cfe9dc39dde32803714ed49aae019ccb9998652cb651"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/num-traits-64190261f528948c/build-script-build-script-build.json",
+        "sha256": "f879d7734ffac71bef32efe60e7c9f927073d45a32878e88be5f0a95795a33f1"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/num-traits-e64cd01fc117c459/run-build-script-build-script-build.json",
+        "sha256": "aecd93a5f3da0d94502e1714f7d35b1835f4b6c2ff924b6ef171fd65982e9844"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/once_cell-3d429b49ff237cf4/lib-once_cell.json",
+        "sha256": "8913ebbcaa6c83244e979e19b011c56c7e549950942e1b85819ea6d7e2b423a1"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/p256-c25f394ccc8b90a9/lib-p256.json",
+        "sha256": "df37c6f79f155982390fc869b306a32e997f3139e12c3665d25f9a69d91c6682"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/pem-rfc7468-8ffaf421d6f2bd4f/lib-pem_rfc7468.json",
+        "sha256": "e0ad046d03ebfca203e341e528905294f5d58d71acbe89357bd0a4446ee7376d"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/pkcs1-9204bea1fba7af13/lib-pkcs1.json",
+        "sha256": "149064498e711121ba2a7d19b5dcbd33353e68837bcdba37179f356370e1c97c"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/pkcs8-7a7dc4962d73f515/lib-pkcs8.json",
+        "sha256": "5eac475da25376e0daf0e75309c1de1e0b34bd9c670bd67e1ce078a088b5d629"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/ppv-lite86-15aadb12b958bb59/lib-ppv_lite86.json",
+        "sha256": "cf3d2188f1aa1a7a9dbee8d866933f4016ea439c2cb7f17faaedf59f6d1cda85"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/primeorder-9b82b7b96480462c/lib-primeorder.json",
+        "sha256": "fb31662f35d80553b0f628a994a7e907a6e5654bc2e7f3e097872f6fb0d92b98"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/proc-macro2-5db6c79e3ae6cd8a/lib-proc_macro2.json",
+        "sha256": "0c85e5436b149bc8c7a9992a5e1cbc92a530022d3a7009963e8f61a1abd1b07d"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/proc-macro2-88eb659be27e7cc5/build-script-build-script-build.json",
+        "sha256": "66ea5082557ff5bedb262ad968400b83bba4839f5cfd6f688921810205857982"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/proc-macro2-d0dfdc57efcd507e/run-build-script-build-script-build.json",
+        "sha256": "c4f656da2fd351c1cb3fd80cc623471bccb5ca31a1dcf05d332848fd183229ce"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/quick-xml-a2eaa3a8c207ce6b/lib-quick_xml.json",
+        "sha256": "f3202893173da2ae5d4bd9ebd2233b833f356ffc08aebfc09f427fe0da218507"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/quote-24daa5d133888760/run-build-script-build-script-build.json",
+        "sha256": "5db2d95ee93f717e5ceaeb245c74e12963f764bb1da5ceb9ba086fec1469bbaf"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/quote-89adcffc1d948aaf/build-script-build-script-build.json",
+        "sha256": "379f8a88f95f20281c2d361fdfa58ae0241a5a6bed6ba4f60a5c33974eb52742"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/quote-957874c4117ab8c4/lib-quote.json",
+        "sha256": "047f5ed92add19fa16fe9b9e77e946401f44b389b448e3851dc506db338b3d52"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/rand-54b2e3c26cc89869/lib-rand.json",
+        "sha256": "ee2c2c8e61ab0853250858666c420058ab602f5d188809b17821957538b84024"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/rand-60db8df2a3490b6b/lib-rand.json",
+        "sha256": "3ecd8815f49a8a66eccdf7587fdc3e193285955bff0d1cd2bb231fea86345217"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/rand_chacha-e7f49b62c45e04af/lib-rand_chacha.json",
+        "sha256": "82ca6b179aed90a7a5c7c475102d5bb363c4c90d05eafaa09db4f54edec46d8e"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/rand_core-582c7a4dc1faf02e/lib-rand_core.json",
+        "sha256": "dc4c7c0614ac3202c04f4ea307f3172979a1e5ea5f77da000d8af83aa79588f9"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/rand_core-95e925f5239f74df/lib-rand_core.json",
+        "sha256": "af156d36b7083aa228da1d8b70db62ea08c588d6167c71113735be1ead31ea18"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/rayon-core-9bee35cdae2fa5bf/run-build-script-build-script-build.json",
+        "sha256": "28b4ff7f0dc6c6dd8e2640d34ea23a0fbeedea8879ba1a8e103845863aee85c6"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/rayon-core-a1b70ce2a51bd87b/build-script-build-script-build.json",
+        "sha256": "f7438efb46230e2602a5771bdc7cac71ca4061ec60f4afeb94477b624b80f883"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/rayon-core-e1579458130c89ae/lib-rayon_core.json",
+        "sha256": "1821870d5cb0d2a35301bdd003407eec06249508ebc2daadea0d18a119437d8b"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/rayon-e93d3ebaa9aa587e/lib-rayon.json",
+        "sha256": "5766ba3f86e39bbe4946a20d6bcb325b4892b05b4afbeebde2e6fa1f8d8b0baa"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/rc4-0b0bd1d1eb3ba2b1/lib-rc4.json",
+        "sha256": "81207f267669e0e8fc0a416097d8ebc4fddfff063d2cf16a5ac345b23f44f616"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/rfc6979-108ed89de6dd61d4/lib-rfc6979.json",
+        "sha256": "472fdd2958e39e78b9a9231c1535c75a4c8d320f53a1e105871e31da87d173a9"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/rsa-9129ae18c1b7f812/lib-rsa.json",
+        "sha256": "87fe212d03346044f027147e5f1d95350b483bd239c9c5031bd735f5952daf03"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/rustversion-3afd395b05244b81/build-script-build-script-build.json",
+        "sha256": "ece7326395ad958bbb163193a51f05534d671dc3864f020c1afcd9017d894dde"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/rustversion-6d4f661f3f0954fc/run-build-script-build-script-build.json",
+        "sha256": "e8cbe625d75bd7fe5b88a67d396e6f6656560b4fe5b7a86d64905b8f2f8a2efe"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/rustversion-ace473a92c2bdb22/lib-rustversion.json",
+        "sha256": "6130272563e6c6fad30b1ed3bd16d7b748faf4a45fd76465819a4474a6b5a594"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/scopeguard-9488441410ae8e24/lib-scopeguard.json",
+        "sha256": "9fe7e03f92a7ffa677c9c65efb1f57dd1f35232ccaa0234800785280353c1bf6"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/sec1-6afda1e9b3fe9bd6/lib-sec1.json",
+        "sha256": "c397a10658bef7fb7a2fd87c4963393d0456e264baf9d77f3d1dad782422de07"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/serde-23ed0b3a57d781a4/build-script-build-script-build.json",
+        "sha256": "57268576570e80c2b0e93d09269a8c5d3c36784795b70c2af212a6b015179921"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/serde-5402c6f737099d0e/run-build-script-build-script-build.json",
+        "sha256": "31d2e3ea26d9addc6f39c14b68022931a1d0db3160a1cfdd43d15f6b95769fc8"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/serde-ffd7c6e89ae15c36/lib-serde.json",
+        "sha256": "705d118c922397cf0e1709225ce6bb07c9b387f951b9faac109ea3bc9a10ffc9"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/serde_core-6c0033760a1c3d25/run-build-script-build-script-build.json",
+        "sha256": "3da5940cd62d0e8da708581ecc5edb931a590f6d2ea0d05b1353998d63758b98"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/serde_core-797decdad9a1f83c/lib-serde_core.json",
+        "sha256": "3d60f29b5efd6e9fc380e512edaa58adb82a51ba297db5b8fb3b22cbaaa1260a"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/serde_core-e0e18428796259b2/build-script-build-script-build.json",
+        "sha256": "1233ed47024102d0f4bb6f9b2b8d413db03e3faa976322beea1bec06aa2b705f"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/serde_derive-6138468e5c275c27/lib-serde_derive.json",
+        "sha256": "107cac03f58f7d8ab19f865479b17a8559ada871d51c3097d042f8eff57732ef"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/serde_json-0a208c8465803560/run-build-script-build-script-build.json",
+        "sha256": "a4e607db02e468318bd7e8a66c8a1b176eac4e9e6194c3c1afedfceddfd1862d"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/serde_json-17ba6c5364314d66/lib-serde_json.json",
+        "sha256": "dd8c2e9b0dfc12911e1286d05001f6cef7f300e360fd79780fb606385142b9c6"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/serde_json-f323520226a6be8c/build-script-build-script-build.json",
+        "sha256": "510a417ecf32534ad42eddfcb0fd3dbf85c26839d3c21723e2f26918a5d4a585"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/sha1-80df74cbb515ca61/lib-sha1.json",
+        "sha256": "9432f01fa0865ffed32fd10d0c8fd8c8fa6b4ee3bfb9b526e50ec432509080d6"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/sha1-c1ed2c515a30b926/lib-sha1.json",
+        "sha256": "3ac4fc94c5187673a89499816ffe0d9c53d0f8006306407f38636643525052eb"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/sha2-bc2ee725e85229eb/lib-sha2.json",
+        "sha256": "27c31d5bd05252d67365a3b939523af5bacbeb50b64a4777a044ce8e51fa2ac9"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/sha2-f663fea8112d4557/lib-sha2.json",
+        "sha256": "664986d6bbdb90152d85512e0b74cc5b32495e62b11f5a9ddbf7df5019a8dfd0"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/signature-4594c4d27b3dc9f4/lib-signature.json",
+        "sha256": "7dc2c73fe287eff253e8458f7b94093e0245a45ab7d19675ccd08fa462bce871"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/simdutf8-5b6154235190a7e9/lib-simdutf8.json",
+        "sha256": "e15ce88db4ac8e5efe1bc2f06440c70c682c0ae9653b6c5944604b9b1908c0c7"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/smallvec-b40411273ced4336/lib-smallvec.json",
+        "sha256": "1e4fc5e4796925a803fb57d0e780016bd6fb071c007bcb52c7b738627ddfa497"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/spin-207c2c325c21c986/lib-spin.json",
+        "sha256": "4f1342b8544c0e138d38f9c1b5d7f826ffb39e25db4dc0107a6a1d79ea6e0dcd"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/spki-a2a149abddd59257/lib-spki.json",
+        "sha256": "c0103f2dd82b8b20abb6ff1713553fd9ed6652a9f781e5ad6ee34366e2858dcd"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/subtle-665458b5ff4db58e/lib-subtle.json",
+        "sha256": "053bbf629ebeb70cfb5b6078d07e8be81704869f9a72befbfbd1520631205c1d"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/syn-4adc80eb96874a9d/lib-syn.json",
+        "sha256": "caae486901b9ff350bcb4c279ec8fb7cd0b52d321708b260b5b7c1b49d18ca35"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/syn-ab0b4f51723754ac/lib-syn.json",
+        "sha256": "432e98a96422ed52c103374b58d21d9158e49fe0ac42eb91f770eafad65a830f"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/thiserror-78d41e94e149c549/build-script-build-script-build.json",
+        "sha256": "9cff8dc85b14ec59a90336d2d040a317ed953a236cfe527bd970f9b8b66b784e"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/thiserror-ce61f343e74a5e27/lib-thiserror.json",
+        "sha256": "aa56e13b7fcc1c92a8b66e13b28b65abd879255395ea836b87193df3aa004bb3"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/thiserror-d0602d83a6b8b7a2/run-build-script-build-script-build.json",
+        "sha256": "a70df6d4d5c3881f81a9cd7cfad626b49a5d438b03422652c91cbc0edcbda2c5"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/thiserror-impl-29ed2506bfdd796f/lib-thiserror_impl.json",
+        "sha256": "6254c8aa5a3942f44f6c1b9dc82c9b7158ce5617df1fb0872648e5bf1ed3d35a"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/typenum-512db11a77ff862a/lib-typenum.json",
+        "sha256": "23554c871baff4dc943d741832d4d446548f697577166d6ebeaa0477d8e1d4b5"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/unicode-ident-3b00325ce2e91e69/lib-unicode_ident.json",
+        "sha256": "4c83cb6d58f2ca121d5bb6b42226d556af9fde2de5a40a56b82f6e3ea86b5f99"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/version_check-cc84f9b09bc7bf54/lib-version_check.json",
+        "sha256": "708ac06c6e7137d9491281d3a8b58f30d00c408cf782ccb16e5b3bfbc060fde4"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/x509-cert-d0a0381875c14a6c/lib-x509_cert.json",
+        "sha256": "ae7327ac3eae4c52e7d55ab0bc165186eb263ed42b254cab808b221040ad17f7"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/zerocopy-1cab4708e90f97ac/build-script-build-script-build.json",
+        "sha256": "b3a826b5e151e8037269bb2d257bb48ffbfa87fd63d4d85f0a7ad89eeb96989f"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/zerocopy-921177a1f80cdcfd/lib-zerocopy.json",
+        "sha256": "b00a600657c1af44fad61a12b037696209c95129e867e8e4b0ce942d0dcaec78"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/zerocopy-derive-ce87d263e4590128/lib-zerocopy_derive.json",
+        "sha256": "61808c2522e892d382bf063053982e16b6d05e9956b69cc2863d8c26823f2ef2"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/zerocopy-e4c29fa52aa29721/run-build-script-build-script-build.json",
+        "sha256": "9910f97da03c540ff30287733c5d9a503f3aaa4fbf5f8cd5de1dc18bc293e051"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/zeroize-3aa23f92a80b57db/lib-zeroize.json",
+        "sha256": "51ea3bd6f61053f06756bf4be7f63b6f1bf3958f96bb4b6f4d1a8c7a8e2b542e"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/zmij-67933fef6ea43baa/run-build-script-build-script-build.json",
+        "sha256": "23d12157b5e76b48d891d9752fb51e0628afbed56574776f06de9f914c51d7f2"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/zmij-af04d5d483d7cdda/build-script-build-script-build.json",
+        "sha256": "ba61ac92e76bc0c570601f26539584f7269313607c7c3fe6401e8ba096086dc1"
+      },
+      {
+        "path": "/tmp/litchi-performance-0922/candidate-target/release/.fingerprint/zmij-babacfcf4fd817b0/lib-zmij.json",
+        "sha256": "d18ff2b7683d7ac552d388ea9c5c330dc6258ab7e1c65b96716222224d3fd30d"
+      }
+    ]
+  ],
+  "dependency_package_count": 144,
+  "dependency_graphs": [
+    {
+      "path": "docs/performance/results/change-0922/baseline-dependency-graph.json",
+      "sha256": "4318b349e472e807eaea16562fe7fdfeab8e1a8009dafcc0c16a3ebafe9d619f"
+    },
+    {
+      "path": "docs/performance/results/change-0922/candidate-dependency-graph.json",
+      "sha256": "7e1e679ed75886dcf0b61b6e54cde89246a04c7971eb24b3e415f3b6f68673b4"
+    }
+  ],
+  "dependency_comparison": "Exact structures after sorting target lists, dependency feature lists, and dependency declarations. Version, source, requirements, flags, kinds and member identities unchanged.",
+  "canonical_graph_sha256": "7d827b096fd3befc7524544f3cdf4b5618ca15bee19a561ae135e736837f84af"
+}

@@ -1,0 +1,42 @@
+{
+  "schema": "litchi.performance.0922.root-replay.v1",
+  "created_utc": "2026-10-06T08:07:41.252121+00:00",
+  "status": "verified",
+  "adoption": false,
+  "native_children": 192,
+  "allocator_children": 96,
+  "canonical_reports": {
+    "reports": 288,
+    "canonical_sha256": "956b45d732360db78ff666d170d84a299bb11ec92ac1fdd3f1f56a5d4cf7128e"
+  },
+  "commands": [
+    "python3 -B docs/performance/results/change-0922/comparison.py replay",
+    "python3 -B docs/performance/results/change-0922/comparison-replay.py --packet docs/performance/results/change-0922"
+  ],
+  "exit_codes": [
+    0,
+    0
+  ],
+  "bindings": [
+    {
+      "path": "docs/performance/results/change-0922/comparison-manifest.json",
+      "bytes": 7450,
+      "sha256": "f502b69f8b6514ec694fc3c1f296135193510eb486274a2be1cbd8fd3f9b5ff1"
+    },
+    {
+      "path": "docs/performance/results/change-0922/comparison-reduced.json",
+      "bytes": 560459,
+      "sha256": "cfe89f3da7b8b989697cb623932398b100b38ccf04e41a6514916a66d88ea846"
+    },
+    {
+      "path": "docs/performance/results/change-0922/comparison.py",
+      "bytes": 87919,
+      "sha256": "f92483b30a711ba2b9885d1fea5248a85a9e6a1fbc6436a47edab6968a26a9ca"
+    },
+    {
+      "path": "docs/performance/results/change-0922/comparison-replay.py",
+      "bytes": 8226,
+      "sha256": "72443ee9af1f52443f8f5ebbfc982aba9dcf2e45809fe057bf7000cf1089e148"
+    }
+  ]
+}

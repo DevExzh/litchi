@@ -1,0 +1,98 @@
+{
+  "schema": "litchi.performance.0922.capture-readiness.v1",
+  "utc": "2026-10-06T08:04:22.876339+00:00",
+  "status": "admitted_to_comparative_capture_only",
+  "production_adoption": false,
+  "candidate_patch_sha256": "dd7f0bafb81c23a3762e74246eccf991b56ff1f7e62816087e27441db636bd84",
+  "bindings": [
+    {
+      "path": "docs/performance/results/change-0922/shared-owner-quality.json",
+      "bytes": 8802,
+      "sha256": "6f2bbed6e38efc578271fdd8921081a29534cf94b59ee476fb6148710f24547e"
+    },
+    {
+      "path": "docs/performance/results/change-0922/shared-owner-quality.md",
+      "bytes": 1341,
+      "sha256": "8cbc9d7b879653466995bb158f766693fae3007b0eaab18d3133a61393055284"
+    },
+    {
+      "path": "docs/performance/results/change-0922/manifest-quality.json",
+      "bytes": 852,
+      "sha256": "bca1ed3aed6dc02ce2c201349f4e29e5c4bad2172e14967123371378eb67554e"
+    },
+    {
+      "path": "docs/performance/results/change-0922/comparison-tooling-validation.json",
+      "bytes": 12410,
+      "sha256": "538a4dbbc8b2fbbb7c21e2d22305894cec9fee006b33d16f884e3a6cd3d23b93"
+    },
+    {
+      "path": "docs/performance/results/change-0922/capacity-controls.json",
+      "bytes": 2726,
+      "sha256": "f7ac606cfc63b4765377fdadd11a9d59027d608bec46adb08570f70182ecf9a7"
+    },
+    {
+      "path": "docs/performance/results/change-0922/qualification-replay-final.json",
+      "bytes": 1253,
+      "sha256": "091c5f258b4bd3d94d392f5188fdc608d8b70b59e510e2bdb7a2dc6de333fdd2"
+    },
+    {
+      "path": "docs/performance/results/change-0922/baseline-qualification.json",
+      "bytes": 348060,
+      "sha256": "c049aafe31b2b5f853950b298c098f2fa1766eeeaffab2579936a5f3b9b8e847"
+    },
+    {
+      "path": "docs/performance/results/change-0922/candidate-qualification.json",
+      "bytes": 348204,
+      "sha256": "a2e7bb998b232f24a3213a18c933555ecdb29ceb2fba52c5ec8bc93f31eca93f"
+    },
+    {
+      "path": "docs/performance/results/change-0922/root-build-parity.json",
+      "bytes": 76129,
+      "sha256": "94c02998d61900d9b36a0c7e15419cf16b88c0f429ed447f61260a2e748b60fe"
+    },
+    {
+      "path": "docs/performance/results/change-0922/root-custody.json",
+      "bytes": 523,
+      "sha256": "332f1a037a69d6ec5ac51878b6a3ccdd00933c21747d594f9af3fa2427d12a43"
+    },
+    {
+      "path": "docs/performance/results/change-0922/comparison.py",
+      "bytes": 87919,
+      "sha256": "f92483b30a711ba2b9885d1fea5248a85a9e6a1fbc6436a47edab6968a26a9ca"
+    },
+    {
+      "path": "docs/performance/results/change-0922/comparison-replay.py",
+      "bytes": 8226,
+      "sha256": "72443ee9af1f52443f8f5ebbfc982aba9dcf2e45809fe057bf7000cf1089e148"
+    },
+    {
+      "path": "docs/performance/results/change-0922/comparison-protocol.json",
+      "bytes": 11316,
+      "sha256": "eec1b594b8c9e385bcbaa56aefd7a79156a26ea43b89730c14a6f065627fca5e"
+    },
+    {
+      "path": "docs/performance/results/change-0922/cleanup.json",
+      "bytes": 3626,
+      "sha256": "48bf86812ccaa9d74069f3e26b5ad43f784f3eb9ce1f3b2879dbb7865fdaed48"
+    }
+  ],
+  "root_rechecks": {
+    "baseline_source_files": 938,
+    "candidate_source_files": 938,
+    "modified_files": 3,
+    "release_fingerprint_records": 157,
+    "dependency_packages": 144,
+    "quality_log_descriptors": 11,
+    "tooling_descriptors": 23,
+    "qualification_reports": 96,
+    "qualification_pairs": 48,
+    "exact_capacities": true
+  },
+  "performance_children_run_before_readiness": 0,
+  "disposition": "Final independent source review, scoped DOC quality, controls, qualification and replay, source custody, compiler/profile/features and dependency parity pass. Build/test/profile jobs idle; unused build intermediates removed.",
+  "limitations": [
+    "Existing workspace formatting and four unchanged private rustdoc links remain; no whole-workspace claim.",
+    "One preliminary qualification child passed but was superseded due label-path packaging; all attempts retained, no comparative child was rerun.",
+    "Candidate binary size differs; source closure, compiler fingerprints, dependency graph, flags and probe are verified; no binary-size performance claim."
+  ]
+}

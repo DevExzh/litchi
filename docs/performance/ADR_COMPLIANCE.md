@@ -1,5 +1,16 @@
 # Performance optimization ADR-compliance matrix
 
+## 0922 — shared borrowed pointer lookup reviewed, not adopted
+
+[0922](0922-borrowed-fib-selection.md) factors validation into the DOC FIB
+owner and reuses it for saved-selection reads. Review verifies public owned
+suffix behavior, declared-array bounds, Selsf absence/error distinctions and
+existing mutation atomicity. All 1,349 DOC tests pass (two ignored), as do
+scoped format, Clippy and dependency checks. Existing unrelated formatting
+and private rustdoc links remain recorded. The candidate is retained only
+as a hash-bound patch because two latency bounds fail; no ADR exception or
+production dependency change is introduced.
+
 ## 0921 — source-bound validation reviewed, candidate unadopted
 
 [0921](0921-source-bound-stream-recapture.md) keeps complete CFB comparison,

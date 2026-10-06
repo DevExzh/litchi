@@ -1,0 +1,472 @@
+diff --git a/crates/litchi-doc/src/parts/fib.rs b/crates/litchi-doc/src/parts/fib.rs
+index 8e8e5d8..1e34e37 100644
+--- a/crates/litchi-doc/src/parts/fib.rs
++++ b/crates/litchi-doc/src/parts/fib.rs
+@@ -27,6 +27,79 @@ const COUNTED_TABLE_POINTER_NFIB: u16 = 0x0069;
+ /// describes. Anything lower is a Word 6.0/95 file with a different layout.
+ pub const WORD_97_NFIB: u16 = 0x00C1;
+ 
++#[derive(Clone, Copy)]
++struct FibBaseFields {
++    nfib: u16,
++    flags: u16,
++    l_key: u32,
++    which_table_stream: bool,
++    lid: u16,
++}
++
++fn fib_data_at(word_document: &[u8], offset: usize) -> Result<&[u8]> {
++    word_document.get(offset..).ok_or_else(|| {
++        PackageError::Corrupted(format!(
++            "FIB offset {offset} is beyond the WordDocument stream"
++        ))
++    })
++}
++
++fn parse_fib_base(data: &[u8]) -> Result<FibBaseFields> {
++    if data.len() < FIB_BASE_SIZE {
++        return Err(PackageError::Corrupted(
++            "WordDocument stream too short for FIB".to_string(),
++        ));
++    }
++
++    // Read the base FIB fields (little-endian).
++    let magic = U16::<LE>::read_from_bytes(&data[0..2]).map_or(0, U16::get);
++    let nfib = U16::<LE>::read_from_bytes(&data[2..4]).map_or(0, U16::get);
++    let lid = U16::<LE>::read_from_bytes(&data[6..8]).map_or(0, U16::get);
++    let flags = U16::<LE>::read_from_bytes(&data[10..12]).map_or(0, U16::get);
++    let l_key = U32::<LE>::read_from_bytes(&data[14..18]).map_or(0, U32::get);
++
++    // Validate magic number.
++    if magic != 0xA5EC && magic != 0xA5DC {
++        // 0xA5DC for Word 6.0/95, 0xA5EC for Word 97+.
++        return Err(PackageError::InvalidFormat(format!(
++            "Invalid FIB magic number: 0x{magic:04X}"
++        )));
++    }
++
++    Ok(FibBaseFields {
++        nfib,
++        flags,
++        l_key,
++        which_table_stream: (flags & 0x0200) != 0,
++        lid,
++    })
++}
++
++fn table_pointer_layout(data: &[u8], nfib: u16) -> Option<(usize, usize)> {
++    let (offset, count) = if nfib < COUNTED_TABLE_POINTER_NFIB {
++        (TABLE_POINTER_COUNT_OFFSET, LEGACY_TABLE_POINTER_COUNT)
++    } else {
++        let count_bytes = data.get(TABLE_POINTER_COUNT_OFFSET..TABLE_POINTERS_OFFSET)?;
++        let count = usize::from(U16::<LE>::read_from_bytes(count_bytes).map_or(0, U16::get));
++        (TABLE_POINTERS_OFFSET, count)
++    };
++    let byte_len = count.checked_mul(TABLE_POINTER_SIZE)?;
++    let end = offset.checked_add(byte_len)?;
++    (end <= data.len()).then_some((offset, count))
++}
++
++fn table_pointer_at(data: &[u8], nfib: u16, index: usize) -> Option<(u32, u32)> {
++    let (base_offset, count) = table_pointer_layout(data, nfib)?;
++    if index >= count {
++        return None;
++    }
++    let entry_offset = base_offset.checked_add(index.checked_mul(TABLE_POINTER_SIZE)?)?;
++    let entry = data.get(entry_offset..entry_offset.checked_add(TABLE_POINTER_SIZE)?)?;
++    let offset = U32::<LE>::read_from_bytes(&entry[..4]).map_or(0, U32::get);
++    let length = U32::<LE>::read_from_bytes(&entry[4..]).map_or(0, U32::get);
++    Some((offset, length))
++}
++
+ /// File Information Block.
+ ///
+ /// The FIB is the primary metadata structure in a DOC file.
+@@ -90,11 +163,7 @@ impl FileInformationBlock {
+     /// The returned object owns only the suffix beginning at the requested FIB,
+     /// rather than copying the prefix that precedes it.
+     pub fn parse_at(word_document: &[u8], offset: usize) -> Result<Self> {
+-        let data = word_document.get(offset..).ok_or_else(|| {
+-            PackageError::Corrupted(format!(
+-                "FIB offset {offset} is beyond the WordDocument stream"
+-            ))
+-        })?;
++        let data = fib_data_at(word_document, offset)?;
+         Self::parse_shared(Arc::new(data.to_vec()), 0)
+     }
+ 
+@@ -105,47 +174,37 @@ impl FileInformationBlock {
+     /// exactly that suffix, so every reader sees the same bytes as
+     /// [`Self::parse_at`] would have handed it.
+     pub(crate) fn parse_shared(word_document: Arc<Vec<u8>>, offset: usize) -> Result<Self> {
+-        let data = word_document.get(offset..).ok_or_else(|| {
+-            PackageError::Corrupted(format!(
+-                "FIB offset {offset} is beyond the WordDocument stream"
+-            ))
+-        })?;
+-        if data.len() < FIB_BASE_SIZE {
+-            return Err(PackageError::Corrupted(
+-                "WordDocument stream too short for FIB".to_string(),
+-            ));
+-        }
+-
+-        // Read the base FIB fields (little-endian)
+-        let magic = U16::<LE>::read_from_bytes(&data[0..2]).map_or(0, U16::get);
+-        let nfib = U16::<LE>::read_from_bytes(&data[2..4]).map_or(0, U16::get);
+-        let lid = U16::<LE>::read_from_bytes(&data[6..8]).map_or(0, U16::get);
+-        let flags = U16::<LE>::read_from_bytes(&data[10..12]).map_or(0, U16::get);
+-        let l_key = U32::<LE>::read_from_bytes(&data[14..18]).map_or(0, U32::get);
+-
+-        // Validate magic number
+-        if magic != 0xA5EC && magic != 0xA5DC {
+-            // 0xA5DC for Word 6.0/95, 0xA5EC for Word 97+
+-            return Err(PackageError::InvalidFormat(format!(
+-                "Invalid FIB magic number: 0x{magic:04X}"
+-            )));
+-        }
+-
+-        // Extract which table stream to use (bit 9 of flags at offset 0x0A)
+-        // This is the fWhichTblStm flag
+-        let which_table_stream = (flags & 0x0200) != 0;
++        let data = fib_data_at(&word_document, offset)?;
++        let base = parse_fib_base(data)?;
+ 
+         Ok(Self {
+-            nfib,
+-            flags,
+-            l_key,
+-            which_table_stream,
+-            lid,
++            nfib: base.nfib,
++            flags: base.flags,
++            l_key: base.l_key,
++            which_table_stream: base.which_table_stream,
++            lid: base.lid,
+             stream: word_document,
+             offset,
+         })
+     }
+ 
++    /// Resolve one table pointer directly from borrowed WordDocument bytes.
++    ///
++    /// The same base FIB validation and declared-pointer-array bounds as the
++    /// owning parser are applied. This owner-only seam avoids materializing a
++    /// complete FIB suffix when a caller needs one pointer for an in-place
++    /// validation step; public [`Self::parse_at`] and [`Self::raw_data`] keep
++    /// their owning suffix contract.
++    pub(crate) fn table_pointer_from_bytes(
++        word_document: &[u8],
++        offset: usize,
++        index: usize,
++    ) -> Result<Option<(u32, u32)>> {
++        let data = fib_data_at(word_document, offset)?;
++        let base = parse_fib_base(data)?;
++        Ok(table_pointer_at(data, base.nfib, index))
++    }
++
+     /// The FIB's own bytes: the shared stream from this FIB's offset onwards.
+     #[inline]
+     fn data(&self) -> &[u8] {
+@@ -285,19 +344,7 @@ impl FileInformationBlock {
+     /// entry is outside the FIB-declared array or that array is truncated.
+     #[must_use]
+     pub fn get_table_pointer(&self, index: usize) -> Option<(u32, u32)> {
+-        let (base_offset, count) = self.table_pointer_layout()?;
+-        if index >= count {
+-            return None;
+-        }
+-        let entry_offset = base_offset.checked_add(index.checked_mul(TABLE_POINTER_SIZE)?)?;
+-        let entry = self
+-            .data()
+-            .get(entry_offset..entry_offset.checked_add(TABLE_POINTER_SIZE)?)?;
+-
+-        let offset = U32::<LE>::read_from_bytes(&entry[..4]).map_or(0, U32::get);
+-        let length = U32::<LE>::read_from_bytes(&entry[4..]).map_or(0, U32::get);
+-
+-        Some((offset, length))
++        table_pointer_at(self.data(), self.nfib, index)
+     }
+ 
+     /// Number of `FibRgFcLcb` offset/length pairs declared by this FIB.
+@@ -311,18 +358,7 @@ impl FileInformationBlock {
+     }
+ 
+     fn table_pointer_layout(&self) -> Option<(usize, usize)> {
+-        let (offset, count) = if self.nfib < COUNTED_TABLE_POINTER_NFIB {
+-            (TABLE_POINTER_COUNT_OFFSET, LEGACY_TABLE_POINTER_COUNT)
+-        } else {
+-            let count_bytes = self
+-                .data()
+-                .get(TABLE_POINTER_COUNT_OFFSET..TABLE_POINTERS_OFFSET)?;
+-            let count = usize::from(U16::<LE>::read_from_bytes(count_bytes).map_or(0, U16::get));
+-            (TABLE_POINTERS_OFFSET, count)
+-        };
+-        let byte_len = count.checked_mul(TABLE_POINTER_SIZE)?;
+-        let end = offset.checked_add(byte_len)?;
+-        (end <= self.data().len()).then_some((offset, count))
++        table_pointer_layout(self.data(), self.nfib)
+     }
+ 
+     /// Minimum byte extent occupied by this FIB through its declared pointer array.
+@@ -547,6 +583,7 @@ mod tests {
+         let short_data = vec![0u8; 16];
+         let result = FileInformationBlock::parse(&short_data);
+         assert!(result.is_err());
++        assert!(FileInformationBlock::table_pointer_from_bytes(&short_data, 0, 0).is_err());
+     }
+ 
+     #[test]
+@@ -558,6 +595,7 @@ mod tests {
+ 
+         let result = FileInformationBlock::parse(&data);
+         assert!(result.is_err());
++        assert!(FileInformationBlock::table_pointer_from_bytes(&data, 0, 0).is_err());
+     }
+ 
+     #[test]
+@@ -576,6 +614,10 @@ mod tests {
+         let fib = result.unwrap();
+         assert_eq!(fib.version(), 0x00C1);
+         assert!(!fib.is_encrypted());
++        assert_eq!(
++            FileInformationBlock::table_pointer_from_bytes(&data, 0, 0).unwrap(),
++            fib.get_table_pointer(0)
++        );
+     }
+ 
+     #[test]
+@@ -614,6 +656,14 @@ mod tests {
+         assert_eq!(fib.table_pointer_count(), Some(1));
+         assert_eq!(fib.get_table_pointer(0), Some((17, 23)));
+         assert_eq!(fib.get_table_pointer(1), None);
++        assert_eq!(
++            FileInformationBlock::table_pointer_from_bytes(&data, 0, 0).unwrap(),
++            Some((17, 23))
++        );
++        assert_eq!(
++            FileInformationBlock::table_pointer_from_bytes(&data, 0, 1).unwrap(),
++            None
++        );
+     }
+ 
+     #[test]
+@@ -627,6 +677,10 @@ mod tests {
+         let fib = FileInformationBlock::parse(&data).unwrap();
+         assert_eq!(fib.table_pointer_count(), None);
+         assert_eq!(fib.get_table_pointer(0), None);
++        assert_eq!(
++            FileInformationBlock::table_pointer_from_bytes(&data, 0, 0).unwrap(),
++            None
++        );
+     }
+ 
+     #[test]
+@@ -643,5 +697,40 @@ mod tests {
+         let fib = FileInformationBlock::parse(&data).unwrap();
+         assert_eq!(fib.table_pointer_count(), Some(LEGACY_TABLE_POINTER_COUNT));
+         assert_eq!(fib.get_table_pointer(0), Some((31, 37)));
++        assert_eq!(
++            FileInformationBlock::table_pointer_from_bytes(&data, 0, 0).unwrap(),
++            Some((31, 37))
++        );
++    }
++
++    #[test]
++    fn borrowed_pointer_matches_owned_suffix_at_nonzero_offset() {
++        let offset = 23usize;
++        let suffix_len = TABLE_POINTERS_OFFSET + 31 * TABLE_POINTER_SIZE + 11;
++        let mut data = vec![0xA5u8; offset + suffix_len];
++        let suffix = &mut data[offset..];
++        suffix[0..2].copy_from_slice(&0xA5ECu16.to_le_bytes());
++        suffix[2..4].copy_from_slice(&0x00C1u16.to_le_bytes());
++        suffix[TABLE_POINTER_COUNT_OFFSET..TABLE_POINTERS_OFFSET]
++            .copy_from_slice(&31u16.to_le_bytes());
++        let pointer = TABLE_POINTERS_OFFSET + 30 * TABLE_POINTER_SIZE;
++        suffix[pointer..pointer + 4].copy_from_slice(&17u32.to_le_bytes());
++        suffix[pointer + 4..pointer + 8].copy_from_slice(&36u32.to_le_bytes());
++
++        let fib = FileInformationBlock::parse_at(&data, offset).unwrap();
++        assert_eq!(fib.raw_data(), &data[offset..]);
++        assert_eq!(
++            FileInformationBlock::table_pointer_from_bytes(&data, offset, 30).unwrap(),
++            fib.get_table_pointer(30)
++        );
++
++        let short = &data[..offset + FIB_BASE_SIZE - 1];
++        let owned_error = FileInformationBlock::parse_at(short, offset)
++            .unwrap_err()
++            .to_string();
++        let borrowed_error = FileInformationBlock::table_pointer_from_bytes(short, offset, 30)
++            .unwrap_err()
++            .to_string();
++        assert_eq!(borrowed_error, owned_error);
+     }
+ }
+diff --git a/crates/litchi-doc/src/parts/saved_selection.rs b/crates/litchi-doc/src/parts/saved_selection.rs
+index 708a1aa..593faa0 100644
+--- a/crates/litchi-doc/src/parts/saved_selection.rs
++++ b/crates/litchi-doc/src/parts/saved_selection.rs
+@@ -158,7 +158,24 @@ impl Eq for SavedSelection {}
+ impl SavedSelection {
+     /// Parse the optional `Selsf` selected by FIB index 30.
+     pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Option<Self>> {
+-        let Some((offset, length)) = fib.get_table_pointer(FIB_INDEX_WSS) else {
++        Self::parse_table_pointer(fib.get_table_pointer(FIB_INDEX_WSS), table_stream)
++    }
++
++    /// Parse the optional `Selsf` from a borrowed WordDocument owner.
++    pub(crate) fn parse_borrowed(
++        word_document: &[u8],
++        table_stream: &[u8],
++    ) -> Result<Option<Self>> {
++        let pointer =
++            FileInformationBlock::table_pointer_from_bytes(word_document, 0, FIB_INDEX_WSS)?;
++        Self::parse_table_pointer(pointer, table_stream)
++    }
++
++    fn parse_table_pointer(
++        pointer: Option<(u32, u32)>,
++        table_stream: &[u8],
++    ) -> Result<Option<Self>> {
++        let Some((offset, length)) = pointer else {
+             return Ok(None);
+         };
+         if length == 0 {
+@@ -1021,7 +1038,22 @@ pub(crate) fn table_range(
+     fib: &FileInformationBlock,
+     table_stream_len: usize,
+ ) -> Result<(usize, usize)> {
+-    let Some((offset, length)) = fib.get_table_pointer(FIB_INDEX_WSS) else {
++    table_range_from_pointer(fib.get_table_pointer(FIB_INDEX_WSS), table_stream_len)
++}
++
++pub(crate) fn table_range_borrowed(
++    word_document: &[u8],
++    table_stream_len: usize,
++) -> Result<(usize, usize)> {
++    let pointer = FileInformationBlock::table_pointer_from_bytes(word_document, 0, FIB_INDEX_WSS)?;
++    table_range_from_pointer(pointer, table_stream_len)
++}
++
++fn table_range_from_pointer(
++    pointer: Option<(u32, u32)>,
++    table_stream_len: usize,
++) -> Result<(usize, usize)> {
++    let Some((offset, length)) = pointer else {
+         return Err(corrupted("Selsf table pointer is unavailable"));
+     };
+     let length =
+@@ -1566,6 +1598,17 @@ mod tests {
+ 
+         let mut table_stream = vec![0xCC; 80];
+         table_stream[offset as usize..offset as usize + SELSF_SIZE].copy_from_slice(source.bytes());
++        assert_eq!(
++            SavedSelection::parse_borrowed(&fib_data, &table_stream)
++                .unwrap()
++                .unwrap()
++                .bytes(),
++            source.bytes()
++        );
++        assert_eq!(
++            table_range_borrowed(&fib_data, table_stream.len()).unwrap(),
++            (offset as usize, offset as usize + SELSF_SIZE)
++        );
+         let outside_before = table_stream[..offset as usize].to_vec();
+         commit
+             .patch()
+@@ -1585,4 +1628,59 @@ mod tests {
+             source.bytes()
+         );
+     }
++
++    #[test]
++    fn borrowed_selsf_boundary_verdicts_match_owned() {
++        const POINTER_COUNT_OFFSET: usize = 152;
++        const POINTERS_OFFSET: usize = 154;
++        const POINTER_SIZE: usize = 8;
++
++        fn word(pointer: Option<(u32, u32)>, count: u16) -> Vec<u8> {
++            let mut data = vec![0; POINTERS_OFFSET + 31 * POINTER_SIZE];
++            data[0..2].copy_from_slice(&0xA5ECu16.to_le_bytes());
++            data[2..4].copy_from_slice(&0x00C1u16.to_le_bytes());
++            data[POINTER_COUNT_OFFSET..POINTERS_OFFSET].copy_from_slice(&count.to_le_bytes());
++            if let Some((offset, length)) = pointer {
++                let start = POINTERS_OFFSET + FIB_INDEX_WSS * POINTER_SIZE;
++                data[start..start + 4].copy_from_slice(&offset.to_le_bytes());
++                data[start + 4..start + 8].copy_from_slice(&length.to_le_bytes());
++            }
++            data
++        }
++
++        fn parse_verdict(result: Result<Option<SavedSelection>>) -> String {
++            match result {
++                Ok(None) => "none".to_owned(),
++                Ok(Some(selection)) => format!("some:{:?}", selection.bytes()),
++                Err(error) => format!("error:{error}"),
++            }
++        }
++
++        fn range_verdict(result: Result<(usize, usize)>) -> String {
++            match result {
++                Ok(range) => format!("ok:{range:?}"),
++                Err(error) => format!("error:{error}"),
++            }
++        }
++
++        let cases = [
++            (word(None, 30), vec![]),
++            (word(Some((0, 0)), 31), vec![]),
++            (word(Some((8, 35)), 31), vec![0; 43]),
++            (word(Some((8, SELSF_SIZE as u32)), 31), vec![0; 43]),
++            (word(Some((0, SELSF_SIZE as u32)), 31), record(1 << 14)),
++        ];
++
++        for (word, table) in cases {
++            let fib = FileInformationBlock::parse(&word).unwrap();
++            assert_eq!(
++                parse_verdict(SavedSelection::parse_borrowed(&word, &table)),
++                parse_verdict(SavedSelection::parse(&fib, &table))
++            );
++            assert_eq!(
++                range_verdict(table_range_borrowed(&word, table.len())),
++                range_verdict(table_range(&fib, table.len()))
++            );
++        }
++    }
+ }
+diff --git a/crates/litchi-doc/src/tracked_revision/package.rs b/crates/litchi-doc/src/tracked_revision/package.rs
+index defb9b3..a008544 100644
+--- a/crates/litchi-doc/src/tracked_revision/package.rs
++++ b/crates/litchi-doc/src/tracked_revision/package.rs
+@@ -18,7 +18,7 @@ use crate::parts::dofr::{DofrArray, DofrPatch};
+ use crate::parts::fib::FileInformationBlock;
+ use crate::parts::protection::{EditProtection, ProtectionPolicy};
+ use crate::parts::saved_selection::{
+-    SavedSelection, SavedSelectionPatch, SavedSelectionSpliceError, table_range,
++    SavedSelection, SavedSelectionPatch, SavedSelectionSpliceError, table_range_borrowed,
+ };
+ use crate::sprm_operations::{
+     SPRM_C_DTTM_RMARK, SPRM_C_DTTM_RMARK_DEL, SPRM_C_F_BOLD, SPRM_C_F_ITALIC, SPRM_C_F_OBJ,
+@@ -2258,10 +2258,8 @@ impl RevisionEditor {
+         Option<[u8; crate::parts::saved_selection::SELSF_SIZE]>,
+         SavedSelectionSpliceError,
+     > {
+-        let fib =
+-            FileInformationBlock::parse(&self.word).map_err(SavedSelectionSpliceError::Invalid)?;
+-        let selection =
+-            SavedSelection::parse(&fib, &self.table).map_err(SavedSelectionSpliceError::Invalid)?;
++        let selection = SavedSelection::parse_borrowed(&self.word, &self.table)
++            .map_err(SavedSelectionSpliceError::Invalid)?;
+         let Some(selection) = selection else {
+             return Ok(None);
+         };
+@@ -2305,8 +2303,7 @@ impl RevisionEditor {
+         &mut self,
+         replacement: [u8; crate::parts::saved_selection::SELSF_SIZE],
+     ) -> Result<()> {
+-        let fib = FileInformationBlock::parse(&self.word)?;
+-        let (start, end) = table_range(&fib, self.table.len())?;
++        let (start, end) = table_range_borrowed(&self.word, self.table.len())?;
+         self.table[start..end].copy_from_slice(&replacement);
+         Ok(())
+     }

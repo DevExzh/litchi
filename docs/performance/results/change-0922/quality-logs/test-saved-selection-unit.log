@@ -1,0 +1,22 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running unittests src/lib.rs (target/debug/deps/litchi_doc-f29233de2cb033e6)
+
+running 15 tests
+test parts::saved_selection::tests::accepts_every_normative_sty_value ... ok
+test parts::saved_selection::tests::rejects_invalid_insertion_and_reserved_fields ... ok
+test parts::saved_selection::tests::parses_typed_text_block_and_table_flags ... ok
+test parts::saved_selection::tests::an_object_selection_moves_after_text_inserted_at_its_first_cp ... ok
+test parts::saved_selection::tests::an_object_that_also_claims_a_frame_prefix_cells_or_block_is_refused_at_its_first_cp ... ok
+test parts::saved_selection::tests::a_list_prefix_selection_refuses_text_at_its_first_cp_unless_it_is_empty ... ok
+test parts::saved_selection::tests::rejects_normative_cross_field_violations ... ok
+test parts::saved_selection::tests::table_transition_normalizes_ignored_edges_and_setters_check_applicability ... ok
+test parts::saved_selection::tests::a_text_frame_keeps_its_first_cp_and_grows_by_text_inserted_there ... ok
+test parts::saved_selection::tests::transaction_preserves_unknown_bytes_and_checks_ranges ... ok
+test parts::saved_selection::tests::patch_updates_only_the_declared_table_range ... ok
+test parts::saved_selection::tests::borrowed_selsf_boundary_verdicts_match_owned ... ok
+test parts::saved_selection::tests::semantic_noops_preserve_ignored_union_and_shape_insertion_bytes ... ok
+test parts::saved_selection::tests::block_anchor_shrink_remaps_and_context_bounds_cover_all_active_cps ... ok
+test parts::saved_selection::tests::pure_insertion_at_a_recorded_cp_keeps_the_position_before_the_new_text ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 1110 filtered out; finished in 0.00s
+

@@ -1,0 +1,155 @@
+Diff in /tmp/litchi-performance-0922/source/crates/soapberry-zip/src/office.rs:785:
+     };
+     let mut add_map = |capacity: usize, entry_bytes: usize| -> Result<(), Error> {
+         let bytes = capacity
+-            .checked_mul(
+-                entry_bytes
+-                    .checked_add(map_slot_overhead)
+-                    .ok_or_else(|| {
+-                        Error::from(ErrorKind::InvalidInput {
+-                            msg: "archive reader map census overflows usize".to_string(),
+-                        })
+-                    })?,
+-            )
++            .checked_mul(entry_bytes.checked_add(map_slot_overhead).ok_or_else(|| {
++                Error::from(ErrorKind::InvalidInput {
++                    msg: "archive reader map census overflows usize".to_string(),
++                })
++            })?)
+             .and_then(|bytes| bytes.checked_mul(2))
+             .ok_or_else(|| {
+                 Error::from(ErrorKind::InvalidInput {
+Diff in /tmp/litchi-performance-0922/source/crates/litchi-iwa-archive/src/package.rs:1586:
+             retained_bytes: self
+                 .retained_bytes
+                 .checked_add(other.retained_bytes)
+-                .ok_or_else(|| Error::InvalidBundle("catalog retained bytes overflow".to_owned()))?,
++                .ok_or_else(|| {
++                    Error::InvalidBundle("catalog retained bytes overflow".to_owned())
++                })?,
+             traversal_bytes: self
+                 .traversal_bytes
+                 .checked_add(other.traversal_bytes)
+Diff in /tmp/litchi-performance-0922/source/crates/litchi-iwa-archive/src/package.rs:1593:
+-                .ok_or_else(|| Error::InvalidBundle("catalog traversal bytes overflow".to_owned()))?,
++                .ok_or_else(|| {
++                    Error::InvalidBundle("catalog traversal bytes overflow".to_owned())
++                })?,
+             allocations: self
+                 .allocations
+                 .checked_add(other.allocations)
+Diff in /tmp/litchi-performance-0922/source/crates/litchi-iwa-archive/src/package.rs:1597:
+-                .ok_or_else(|| Error::InvalidBundle("catalog allocation count overflow".to_owned()))?,
++                .ok_or_else(|| {
++                    Error::InvalidBundle("catalog allocation count overflow".to_owned())
++                })?,
+         })
+     }
+ 
+Diff in /tmp/litchi-performance-0922/source/crates/litchi-iwa-archive/src/package.rs:1992:
+             (entries, semantic_profile.is_none(), None)
+         } else if let Some(index_name) = nested_name {
+             let prefix: Box<[u8]> = legacy_raw_outer_prefix(&archive, &index_name)?.into();
+-            physical_storage = physical_storage
+-                .add_owned(prefix.len(), usize::from(!prefix.is_empty()))?;
++            physical_storage =
++                physical_storage.add_owned(prefix.len(), usize::from(!prefix.is_empty()))?;
+             let (entries, nested_storage) = if semantic_profile.is_some() {
+                 collect_semantic_legacy(
+                     &archive,
+Diff in /tmp/litchi-performance-0922/source/crates/litchi-iwa-archive/src/package.rs:5195:
+             Error::InvalidBundle(format!("legacy package index: {error}"))
+         }
+     })?;
+-    let storage = index
+-        .storage_requirements()?
+-        .add_owned(
+-            index_source
+-                .as_ref()
+-                .len()
+-                .checked_add(usize::from(index_is_deflated))
+-                .ok_or_else(|| Error::InvalidBundle("legacy index storage overflow".to_owned()))?,
+-            2,
+-        )?;
++    let storage = index.storage_requirements()?.add_owned(
++        index_source
++            .as_ref()
++            .len()
++            .checked_add(usize::from(index_is_deflated))
++            .ok_or_else(|| Error::InvalidBundle("legacy index storage overflow".to_owned()))?,
++        2,
++    )?;
+ 
+     let mut entries = Vec::new();
+     let mut seen = HashSet::new();
+Diff in /tmp/litchi-performance-0922/source/crates/litchi-iwa-archive/src/package.rs:5289:
+             Error::InvalidBundle(format!("legacy package index: {error}"))
+         }
+     })?;
+-    let storage = index
+-        .storage_requirements()?
+-        .add_owned(
+-            index_source
+-                .as_ref()
+-                .len()
+-                .checked_add(usize::from(index_is_deflated))
+-                .ok_or_else(|| Error::InvalidBundle("legacy index storage overflow".to_owned()))?,
+-            2,
+-        )?;
++    let storage = index.storage_requirements()?.add_owned(
++        index_source
++            .as_ref()
++            .len()
++            .checked_add(usize::from(index_is_deflated))
++            .ok_or_else(|| Error::InvalidBundle("legacy index storage overflow".to_owned()))?,
++        2,
++    )?;
+ 
+     preflight_semantic_iwa_entries(&index, true)?;
+ 
+Diff in /tmp/litchi-performance-0922/source/crates/litchi-iwa-archive/src/package.rs:5374:
+         )
+         .and_then(|bytes| bytes.checked_mul(2))
+         .and_then(|bytes| {
+-            seen.iter().try_fold(bytes, |total, name| {
+-                total.checked_add(name.capacity())
+-            })
++            seen.iter()
++                .try_fold(bytes, |total, name| total.checked_add(name.capacity()))
+         })
+         .ok_or_else(|| Error::InvalidBundle("entry census overflow".to_owned()))?;
+     let entry_slack = entries_capacity
+Diff in /tmp/litchi-performance-0922/source/crates/litchi-iwa-archive/src/package.rs:5384:
+         .and_then(|bytes| bytes.checked_mul(size_of::<Entry>()))
+         .ok_or_else(|| Error::InvalidBundle("entry census overflow".to_owned()))?;
+     let allocations = usize::from(seen.capacity() != 0)
+-        .checked_add(
+-            seen.iter()
+-                .filter(|name| name.capacity() != 0)
+-                .count(),
+-        )
++        .checked_add(seen.iter().filter(|name| name.capacity() != 0).count())
+         .and_then(|value| value.checked_add(usize::from(entry_slack != 0)))
+         .ok_or_else(|| Error::InvalidBundle("entry allocation census overflow".to_owned()))?;
+     let retained = seen_bytes
+Diff in /tmp/litchi-performance-0922/source/crates/litchi-iwa-archive/src/zip.rs:5:
+ 
+ use crate::catalog::DirectoryIndexReport;
+ use crate::catalog::{Component, parse_component};
+-use crate::{Error, Limits, Result};
+ use crate::package::CatalogStorageRequirements;
++use crate::{Error, Limits, Result};
+ 
+ pub(crate) const ZIP_CENTRAL_FIXED_METADATA_BYTES: u64 = 46;
+ 
+Diff in /tmp/litchi-performance-0922/source/crates/litchi-iwa-archive/src/zip.rs:274:
+                         .count(),
+                     )
+                 })
+-                .ok_or_else(|| Error::InvalidBundle("physical ZIP allocation overflow".to_owned()))?;
++                .ok_or_else(|| {
++                    Error::InvalidBundle("physical ZIP allocation overflow".to_owned())
++                })?;
+         }
+ 
+         Ok(CatalogStorageRequirements::from_parts(

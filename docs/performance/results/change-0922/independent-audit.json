@@ -1,0 +1,126 @@
+{
+  "schema": "litchi.performance.0922.independent-audit.v1",
+  "status": "verified",
+  "disposition": "adoption_rejected",
+  "no_benchmark_rerun": true,
+  "custody": {
+    "manifest": {
+      "path": "docs/performance/results/change-0922/comparison-manifest.json",
+      "bytes": 7450,
+      "sha256": "f502b69f8b6514ec694fc3c1f296135193510eb486274a2be1cbd8fd3f9b5ff1"
+    },
+    "reduction": {
+      "path": "docs/performance/results/change-0922/comparison-reduced.json",
+      "bytes": 560459,
+      "sha256": "cfe89f3da7b8b989697cb623932398b100b38ccf04e41a6514916a66d88ea846"
+    },
+    "protocol_sha256": "eec1b594b8c9e385bcbaa56aefd7a79156a26ea43b89730c14a6f065627fca5e",
+    "candidate_base_revision": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+    "baseline_source_head": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+    "candidate_source_head": null,
+    "candidate_patch": {
+      "bytes": 19215,
+      "sha256": "dd7f0bafb81c23a3762e74246eccf991b56ff1f7e62816087e27441db636bd84"
+    },
+    "candidate_source_delta": {
+      "files": [
+        "crates/litchi-doc/src/parts/fib.rs",
+        "crates/litchi-doc/src/parts/saved_selection.rs",
+        "crates/litchi-doc/src/tracked_revision/package.rs"
+      ],
+      "candidate_manifest_sha256": "e2a8893bc67999ea20aa5320d8bef3484b41ba50a4cfafa26a72916efa2ff2ea"
+    },
+    "source_receipts": {
+      "baseline": "4b7967901c42fccd89dcb4893f9147eaaad0f66106ef7be6ea4ac4112b074867",
+      "candidate": "5101e37b599a7450e9dfe90de672d1306b05c42d7816367b01f3d205022a5838"
+    },
+    "build_receipts": {
+      "baseline": "322745a20c11648d7511586107dbc509be631cfbd05e67640c62141e7692f884",
+      "candidate": "f6ee6133561e6f2302c886ee8810fdbab450296f23b238be5b4c328360d6d6c7"
+    },
+    "synthetic_setup_commit": "excluded; candidate_source_head is null and all source/build bindings use the canonical base revision"
+  },
+  "binaries": {
+    "baseline_native": {
+      "bytes": 54795488,
+      "sha256": "9f3c2bb2c589ba8e7a47b99c051d4a4910e41002d28f1caa1d1edc036a7515e5"
+    },
+    "baseline_allocator": {
+      "bytes": 54800008,
+      "sha256": "20b96ebbdf611c22b7114b88580044a707d7fce2e4c8811c8084679feb1060dd"
+    },
+    "candidate_native": {
+      "bytes": 47787144,
+      "sha256": "556bb8271fa78e21dc968d1954ddd141a6df2aa338dacdf656bfee8d6b2dd933"
+    },
+    "candidate_allocator": {
+      "bytes": 47791664,
+      "sha256": "9604febbe947daca1547f8b5985404b5608723f9966849cf58347a594d0a970b"
+    }
+  },
+  "artifacts": {
+    "children": 288,
+    "native_children": 192,
+    "allocator_children": 96,
+    "validator_reports": 288,
+    "packet_artifacts": 864,
+    "external_artifacts": 864,
+    "packet_raw_files": 864,
+    "external_child_files": 864,
+    "all_external_hashes_checked": true,
+    "all_packet_round_trips_checked": true,
+    "canonical_reports": 288,
+    "canonical_sha256": "956b45d732360db78ff666d170d84a299bb11ec92ac1fdd3f1f56a5d4cf7128e"
+  },
+  "replay": {
+    "repository": "verified",
+    "copied_packet": "verified",
+    "copied_packet_inputs": [
+      "change-0917/capture.py",
+      "change-0917/native-protocol.json",
+      "change-0917/probe",
+      "test-data/ole/doc/NoHeadFoot.doc",
+      "test-data/ole/doc/FloatingPictures.doc"
+    ],
+    "copied_packet_result": {
+      "native_children": 192,
+      "allocator_children": 96,
+      "canonical_reports": 288,
+      "canonical_sha256": "956b45d732360db78ff666d170d84a299bb11ec92ac1fdd3f1f56a5d4cf7128e",
+      "adoption": false
+    },
+    "benchmark_started": false
+  },
+  "reduction": {
+    "native_cells": 8,
+    "native_rounds": 96,
+    "allocator_cells": 48,
+    "allocator_children": 96,
+    "required_latency_lower_bound": 0.9523809523809523,
+    "adverse_latency_cells": [
+      {"case": "docfloat", "edits": 1, "lower": 0.9395640088249162},
+      {"case": "docfloat", "edits": 2, "lower": 0.9002944110515873}
+    ],
+    "adverse_rows_retained": true,
+    "admission_targets": [
+      {"case": "docfloat", "baseline": 164233879, "candidate": 151835305, "candidate_over_baseline": 0.9245065995183612},
+      {"case": "docnohf", "baseline": 16781690, "candidate": 14828154, "candidate_over_baseline": 0.8835912235299306}
+    ],
+    "gates": {
+      "all_children_and_controls_validated": true,
+      "all_explicit_capacity_fields_equal": true,
+      "all_native_default_latency_lower_bounds": false,
+      "candidate_saves_at_least_5_percent_allocated_bytes_in_one_32_edit_default_fixture": true,
+      "no_allocator_allocated_bytes_increase_over_1_percent": true,
+      "no_allocator_peak_live_increase_over_5_percent": true,
+      "adoption": false
+    }
+  },
+  "packet_size_guard": {
+    "files_including_audit_receipts": 1198,
+    "evidence_files_before_audit_receipts": 1196,
+    "max_file_bytes": 560459,
+    "files_at_or_above_1MiB": 0,
+    "ELF_files": 0
+  }
+}

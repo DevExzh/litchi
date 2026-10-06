@@ -1,0 +1,74 @@
+{
+  "schema": "litchi.performance.0922.cleanup.v1",
+  "utc": "2026-10-06T07:32:39.023885+00:00",
+  "removed": [
+    {
+      "path": "/tmp/litchi-performance-0921/source/docs/performance",
+      "files_removed": 232654,
+      "logical_bytes": 5290629125,
+      "reason": "Unneeded archived performance documentation/evidence copied into prior isolated source. All938 measured source/probe files reverified and retained; original committed packets and external raw evidence untouched."
+    },
+    {
+      "path": "/tmp/litchi-performance-0922/source/target/debug",
+      "files_removed": 9901,
+      "logical_bytes": 9177688709,
+      "reason": "Completed quality/build intermediates; final standalone binaries, release fingerprints, dependency files, source and logs retained."
+    },
+    {
+      "path": "/tmp/litchi-performance-0922/source/target/doc",
+      "files_removed": 3489,
+      "logical_bytes": 67336549,
+      "reason": "Completed quality/build intermediates; final standalone binaries, release fingerprints, dependency files, source and logs retained."
+    },
+    {
+      "path": "/tmp/litchi-performance-0922/candidate-target-before-final/debug/deps",
+      "files_removed": 514,
+      "logical_bytes": 584680904,
+      "reason": "Completed quality/build intermediates; final standalone binaries, release fingerprints, dependency files, source and logs retained."
+    },
+    {
+      "path": "/tmp/litchi-performance-0922/candidate-target-before-final/debug/build",
+      "files_removed": 129,
+      "logical_bytes": 160022031,
+      "reason": "Completed quality/build intermediates; final standalone binaries, release fingerprints, dependency files, source and logs retained."
+    },
+    {
+      "path": "/tmp/litchi-performance-0922/candidate-target-before-final/debug/incremental",
+      "files_removed": 1719,
+      "logical_bytes": 900487608,
+      "reason": "Completed quality/build intermediates; final standalone binaries, release fingerprints, dependency files, source and logs retained."
+    },
+    {
+      "path": "/tmp/litchi-performance-0922/candidate-target-before-final/debug/examples",
+      "files_removed": 0,
+      "logical_bytes": 0,
+      "reason": "Completed quality/build intermediates; final standalone binaries, release fingerprints, dependency files, source and logs retained."
+    },
+    {
+      "path": "/tmp/litchi-performance-0922/candidate-target/release/deps",
+      "files_removed": 342,
+      "logical_bytes": 546280005,
+      "reason": "Completed quality/build intermediates; final standalone binaries, release fingerprints, dependency files, source and logs retained."
+    },
+    {
+      "path": "/tmp/litchi-performance-0922/candidate-target/release/build",
+      "files_removed": 144,
+      "logical_bytes": 177382306,
+      "reason": "Completed quality/build intermediates; final standalone binaries, release fingerprints, dependency files, source and logs retained."
+    },
+    {
+      "path": "/tmp/litchi-performance-0922/candidate-target/release/incremental",
+      "files_removed": 0,
+      "logical_bytes": 0,
+      "reason": "Completed quality/build intermediates; final standalone binaries, release fingerprints, dependency files, source and logs retained."
+    },
+    {
+      "path": "/tmp/litchi-performance-0922/candidate-target/release/examples",
+      "files_removed": 0,
+      "logical_bytes": 0,
+      "reason": "Completed quality/build intermediates; final standalone binaries, release fingerprints, dependency files, source and logs retained."
+    }
+  ],
+  "completed_utc": "2026-10-06T08:04:02.261287+00:00",
+  "total_logical_bytes_removed": 16904507237
+}

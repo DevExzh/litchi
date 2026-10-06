@@ -1,0 +1,11 @@
+# Independent 0922 evidence audit
+
+The frozen comparison packet is internally consistent and portable. Repository replay and a replay from a copied packet both verified 288 canonical reports, 192 native children, 96 allocator children, and canonical report aggregate SHA-256 `956b45d732360db78ff666d170d84a299bb11ec92ac1fdd3f1f56a5d4cf7128e`. The copied replay reconstructed only the validator, protocol, probe, and two fixture inputs; it started no benchmark.
+
+All 288 receipts were independently checked against the frozen schedule and 0917 validator. Their 864 packet gzip artifacts and 864 external raw artifacts were each hashed, and every packet gzip was decompressed and matched to its external bytes. The packet contains exactly 864 retained raw gzip files and the external `children/` tree contains exactly 864 corresponding raw files. The source, build, patch, and binary descriptors also matched their recorded bytes and SHA-256 values.
+
+The candidate is bound to base revision `bb19ca74bd52044fbd2c1c7cc9875e975bb334c0`; `candidate_source_head` is null. The candidate patch SHA-256 is `dd7f0bafb81c23a3762e74246eccf991b56ff1f7e62816087e27441db636bd84`, with the three reviewed source files recorded in the manifest. Any synthetic setup commit in the external source workspace is excluded from source identity.
+
+The deterministic reduction replay found 8 native scenario cells with 96 paired rounds and 48 allocator cells. Allocation targets pass: docfloat 164,233,879 to 151,835,305 bytes (0.9245066) and docnohf 16,781,690 to 14,828,154 bytes (0.8835912). Capacity, allocator allocation, allocator peak-live, and child/control gates pass. Adoption remains rejected because docfloat edits 1 and 2 have bootstrap latency lower bounds 0.9395640088 and 0.9002944111, below the required 0.9523809524. Both adverse rows remain in the reduction; no rows were dropped.
+
+The retained manifest SHA-256 is `f502b69f8b6514ec694fc3c1f296135193510eb486274a2be1cbd8fd3f9b5ff1`; the retained reduction SHA-256 is `cfe89f3da7b8b989697cb623932398b100b38ccf04e41a6514916a66d88ea846`. The packet has 1,196 evidence files before these two audit receipts (1,198 including them), maximum file size 560,459 bytes, no file at or above 1 MiB, and no ELF file. No source or benchmark artifact was changed by this audit.

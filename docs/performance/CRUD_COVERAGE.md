@@ -1,5 +1,15 @@
 # Performance CRUD coverage
 
+## 0922 — repeated DOC selection-aware editing qualification
+
+[0922](0922-borrowed-fib-selection.md) reuses the existing NoHeadFoot and
+FloatingPictures one/two/eight/32-edit scenarios across zero/default/release
+retention. All 96 qualification reports and 288 comparison children preserve
+correctness, output and capacity identity. Added differential tests cover
+malformed selection records, pointer bounds and nonzero FIB offsets. This
+adds evidence for existing scenarios, not new format/CRUD coverage. Failed
+latency gates prevent production adoption; iWork remains excluded.
+
 ## 0921 — repeated DOC edits, unchanged scenario population
 
 [0921](0921-source-bound-stream-recapture.md) covers existing NoHeadFoot and

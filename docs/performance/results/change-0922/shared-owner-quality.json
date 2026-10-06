@@ -1,0 +1,188 @@
+{
+  "schema": "litchi.performance.0922.shared-owner-quality.v1",
+  "created_utc": "2026-10-06T07:56:49.918Z",
+  "status": "pass_with_recorded_baseline_failures",
+  "scope": "Independent DOC owner-level borrowed FIB/Selsf review and affected quality gates. iWork is excluded. No benchmark or comparison run.",
+  "candidate": {
+    "cwd": "/tmp/litchi-performance-0922/source",
+    "base_commit": "bb19ca74bd52044fbd2c1c7cc9875e975bb334c0",
+    "production_files": [
+      "crates/litchi-doc/src/parts/fib.rs",
+      "crates/litchi-doc/src/parts/saved_selection.rs",
+      "crates/litchi-doc/src/tracked_revision/package.rs"
+    ],
+    "source_sha256": {
+      "crates/litchi-doc/src/parts/fib.rs": "c3033f9687b39e977a53f00242112f3b6099d2b81eeca92a842090050ad643d6",
+      "crates/litchi-doc/src/parts/saved_selection.rs": "4499dea0d95a715328721d9f83258795987bb52ee2bcb8d2ca25e9ac21fc6d05",
+      "crates/litchi-doc/src/tracked_revision/package.rs": "0a5b02f45448c6ac580ea85fa54528007fef2e848a44418462dd3bb0f40c9fa5"
+    },
+    "source_patch": {
+      "path": "/tmp/litchi-performance-0922/review/candidate-source-diff-final.patch",
+      "bytes": 19215,
+      "sha256": "dd7f0bafb81c23a3762e74246eccf991b56ff1f7e62816087e27441db636bd84"
+    },
+    "setup_inclusive_patch": {
+      "path": "/tmp/litchi-performance-0922/review/candidate-diff-final.patch",
+      "bytes": 43932,
+      "sha256": "256fb585c8c94deedc67ca45aa2810646f28356b4327b2ff29a55f074722284a",
+      "note": "Includes isolated quality Cargo.lock regeneration; do not use as production patch."
+    },
+    "local_setup_commit": "7288d50d3e16c9b67c30cce525ce8c91dc8ea3f9"
+  },
+  "quality_lock": {
+    "original_path": "/tmp/litchi-performance-0922/review/Cargo.lock.baseline",
+    "original_sha256": "cc7d3578cf7570a96351db585288209dd9510fa4872c7b3514eb896d6b4500dd",
+    "regenerated_path": "/tmp/litchi-performance-0922/source/Cargo.lock",
+    "regenerated_sha256": "10cfe9377162d26618ad1c9c2c9028d3444fead3869c7f7d3294663269723ca9",
+    "argv": "cargo generate-lockfile --offline",
+    "cwd": "/tmp/litchi-performance-0922/source",
+    "log": {
+      "path": "/tmp/litchi-performance-0922/review/lock-regenerate.log",
+      "sha256": "90b65f3f6d8e9d321c5dcd5a9ba23d5e45300a70e11db500b25a09d5a3d0726d",
+      "bytes": 3802
+    },
+    "note": "Regenerated only in the external quality workspace to make --locked offline checks reproducible; excluded from the three-file production patch and probe manifests."
+  },
+  "checks": [
+    {
+      "name": "scoped rustfmt",
+      "argv": "rustfmt --edition 2024 --check crates/litchi-doc/src/parts/fib.rs crates/litchi-doc/src/parts/saved_selection.rs crates/litchi-doc/src/tracked_revision/package.rs",
+      "exit": 0,
+      "log": {
+        "path": "/tmp/litchi-performance-0922/review/rustfmt-changed.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      }
+    },
+    {
+      "name": "git diff whitespace",
+      "argv": "git diff --check",
+      "exit": 0,
+      "log": {
+        "path": "/tmp/litchi-performance-0922/review/diff-check.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      }
+    },
+    {
+      "name": "FIB unit tests",
+      "argv": "cargo test --offline --locked -p litchi-doc --lib parts::fib::tests",
+      "exit": 0,
+      "result": "8 passed; 0 failed; 0 ignored; 1117 filtered out",
+      "log": {
+        "path": "/tmp/litchi-performance-0922/review/test-fib.log",
+        "sha256": "67f9886ed43f9a46f775708e5dbd34eb056d4bfea3f4e24d29412a7083b6fbf6",
+        "bytes": 804
+      }
+    },
+    {
+      "name": "SavedSelection unit tests",
+      "argv": "cargo test --offline --locked -p litchi-doc --lib parts::saved_selection::tests",
+      "exit": 0,
+      "result": "15 passed; 0 failed; 0 ignored; 1110 filtered out",
+      "log": {
+        "path": "/tmp/litchi-performance-0922/review/test-saved-selection-unit.log",
+        "sha256": "2a53d570c2a6150b52c1e8017f514ae6ab6c225502472b3e011dfc9f56a81fa2",
+        "bytes": 1781
+      }
+    },
+    {
+      "name": "saved-selection integration tests",
+      "argv": "cargo test --offline --locked -p litchi-doc --test saved_selection",
+      "exit": 0,
+      "result": "8 passed; 0 failed; 0 ignored",
+      "log": {
+        "path": "/tmp/litchi-performance-0922/review/test-saved-selection-integration.log",
+        "sha256": "3f6a8d6fe0b662b9fe6fcf4d481bb8cee5b5f0cc273b36ea2cf19b3512b0e19c",
+        "bytes": 1018
+      }
+    },
+    {
+      "name": "tracked-revision integration tests",
+      "argv": "cargo test --offline --locked -p litchi-doc --test doc_tracked_revision_editor",
+      "exit": 0,
+      "result": "10 passed; 0 failed; 0 ignored",
+      "log": {
+        "path": "/tmp/litchi-performance-0922/review/test-tracked-revision-integration.log",
+        "sha256": "0b4341aec89f4ff9f6f913d33f5f85ba851c0237ca7322b2cf7e7220441c8dd0",
+        "bytes": 1111
+      }
+    },
+    {
+      "name": "full DOC library and integration tests",
+      "argv": "cargo test --offline --locked -p litchi-doc --lib --tests",
+      "exit": 0,
+      "result": "47 result groups; 1349 passed; 0 failed; 2 ignored",
+      "log": {
+        "path": "/tmp/litchi-performance-0922/review/test-doc-lib-tests.log",
+        "sha256": "b10abaae743f138f136ccbcdd5538ade25dbaa944857f5278d5cc95e24d4c8f0",
+        "bytes": 117159
+      }
+    },
+    {
+      "name": "DOC clippy",
+      "argv": "cargo clippy --offline --locked -p litchi-doc --all-targets -- -D warnings",
+      "exit": 0,
+      "result": "clean; warnings denied",
+      "log": {
+        "path": "/tmp/litchi-performance-0922/review/clippy-doc.log",
+        "sha256": "040e5023d9490df0b34fd75682e80572b793bdca1645d7d2219bac7b02b0f9c7",
+        "bytes": 216
+      }
+    },
+    {
+      "name": "rustdoc with baseline private-link allowance",
+      "argv": "RUSTDOCFLAGS='-D warnings -A rustdoc::private-intra-doc-links' cargo doc --offline --locked -p litchi-doc --no-deps",
+      "exit": 0,
+      "result": "documentation generated; warnings denied except known baseline lint",
+      "log": {
+        "path": "/tmp/litchi-performance-0922/review/rustdoc-doc-allow-baseline.log",
+        "sha256": "4c7e06d655556605515888d95d3017d2b6d58ff059a8858f57bef4b685a46cdd",
+        "bytes": 241
+      }
+    }
+  ],
+  "baseline_failures": [
+    {
+      "name": "workspace-wide fmt",
+      "argv": "cargo fmt --all --check",
+      "exit": 1,
+      "result": "baseline failure in unrelated iWork files: crates/soapberry-zip/src/office.rs; crates/litchi-iwa-archive/src/package.rs; crates/litchi-iwa-archive/src/zip.rs",
+      "log": {
+        "path": "/tmp/litchi-performance-0922/review/fmt-check.log",
+        "sha256": "b8055c463761030aa6dd457004f26c81298a2e33eac5fb800a4abe809da55d66",
+        "bytes": 6979
+      }
+    },
+    {
+      "name": "strict DOC rustdoc",
+      "argv": "RUSTDOCFLAGS='-D warnings' cargo doc --offline --locked -p litchi-doc --no-deps",
+      "exit": 101,
+      "result": "baseline private intra-doc links in unchanged crates/litchi-doc/src/parts/bookmarks.rs:20, comments.rs:125, rsids.rs:51, sections/codec.rs:42",
+      "log": {
+        "path": "/tmp/litchi-performance-0922/review/rustdoc-doc.log",
+        "sha256": "7836439e8201ac5a82f9196cc86403be74864bcbe1cb8ef84318626f666714b5",
+        "bytes": 2433
+      }
+    }
+  ],
+  "review_findings": [
+    "The shared FIB base and pointer-layout helpers preserve minimum-size, magic, legacy fixed-array, counted-array, and deferred truncation semantics.",
+    "SavedSelection borrowed parsing preserves missing/zero pointer as None, while strict table range keeps unavailable and malformed pointers as errors.",
+    "Nonzero-FIB raw_data suffix behavior remains covered against the borrowed pointer verdict; public parse, parse_at, and raw_data contracts are unchanged.",
+    "The saved-selection preflight completes before candidate table mutation, preserving existing failure atomicity and ambiguity refusals."
+  ],
+  "cleanup": {
+    "main_checkout_changed": false,
+    "quality_target": "/tmp/litchi-performance-0922/source/target",
+    "quality_target_state": "idle after final gates; retained pending root cleanup coordination",
+    "large_artifacts": "retained outside repository under /tmp/litchi-performance-0922/review"
+  },
+  "execution": {
+    "cwd": "/tmp/litchi-performance-0922/source",
+    "rustup_toolchain": "1.95.0-x86_64-unknown-linux-gnu (overridden by /tmp/litchi-performance-0922/source/rust-toolchain.toml)",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "note": "All listed quality commands use this cwd and toolchain unless their argv sets an environment variable such as RUSTDOCFLAGS."
+  }
+}

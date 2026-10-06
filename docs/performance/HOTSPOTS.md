@@ -1,5 +1,15 @@
 # Performance hotspot inventory
 
+## 0922 — saved-selection suffix copies measured, candidate unadopted
+
+[0922](0922-borrowed-fib-selection.md) removes full WordDocument suffix copies
+from owner-level Selsf pointer reads in an isolated candidate. The three
+0919 FIB traces total 12,394,734 bytes; the similarly sized commit-handoff
+trace is excluded. Measured FloatingPictures 32-edit savings are 12,398,574
+bytes, but one/two-edit latency confidence gates fail. No source is adopted.
+The rejection supplies allocation evidence without a proven latency cause;
+it does not justify weakening gates or selectively recapturing cells.
+
 ## 0921 — recapture allocation reduction needs stronger latency evidence
 
 [0921](0921-source-bound-stream-recapture.md) eliminates redundant payload
