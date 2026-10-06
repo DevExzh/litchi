@@ -1,0 +1,101 @@
+{
+  "schema": "litchi.performance.0938.variability-plan.v1",
+  "created_utc": "2026-10-06T20:09:29.469451721Z",
+  "purpose": "Measure paired run-to-run variability with one retained normal binary. A and B are metadata labels only; this is not a candidate comparison or adoption experiment.",
+  "claim_scope": "Descriptive identical-binary control; do not infer causality, probability, optimization, or adoption.",
+  "children": 96,
+  "blocks": 12,
+  "routes": [
+    "generic_read_at",
+    "owned_vec",
+    "owned_reader",
+    "range_short"
+  ],
+  "labels": [
+    "A",
+    "B"
+  ],
+  "warmups": 5,
+  "samples": 50,
+  "cpu": 12,
+  "deadline_seconds": 900,
+  "schedule_sha256": "a9780ffb84bd1dfe16a91031a61e64c724922d16645e0fc1b8e16469e11f7676",
+  "route_order_odd_blocks": [
+    "generic_read_at",
+    "owned_vec",
+    "owned_reader",
+    "range_short"
+  ],
+  "route_order_even_blocks": [
+    "range_short",
+    "owned_reader",
+    "owned_vec",
+    "generic_read_at"
+  ],
+  "label_order_odd_blocks": [
+    "A",
+    "B"
+  ],
+  "label_order_even_blocks": [
+    "B",
+    "A"
+  ],
+  "pairing": "Each block and route is one A/B pair; there are twelve pairs per route.",
+  "binary": {
+    "path": "/home/zhuhe/litchi-performance-0933/target-candidate-normal/release/litchi-perf-baseline",
+    "bytes": 69934624,
+    "sha256": "8a81df641151e5ed06b8f700c5d4cf068d0fee9c9e131fa147bf707a799c4c66"
+  },
+  "source_revision": "3ae856d76424f2f9b58d26dcd20fd074b8e97541",
+  "current_head": "3e4ea43db4a5c2bd2d2fd8e16ba18d9c887b7809",
+  "current_head_scope": "The current HEAD delta from e3b5acdd is documentation/evidence only for this retained runtime binary.",
+  "source_receipt": {
+    "path": "/home/zhuhe/litchi-performance-0937/receipts/baseline-source-final-v1.json",
+    "bytes": 3129,
+    "sha256": "7c05ace57d66de90ac3657855d62bf5683e058522b2bfdc2f30a4c22a55fc2bb"
+  },
+  "source_equivalence": {
+    "path": "/home/zhuhe/litchi-performance-0937/retained-baseline-runtime-equivalence-v1.json",
+    "bytes": 3036,
+    "sha256": "e0d3b32f7eac59b175986d43027fd19490991832ad77987a1f63ed2a867a2a10"
+  },
+  "build_receipt": {
+    "path": "/home/zhuhe/litchi-performance-0937/receipts/baseline-normal-build-bound-v1.json",
+    "bytes": 5956,
+    "sha256": "26e9592fe312ca097d10effa0a0251ffc911182851e3b4d4f81a41cbb44bd0ca"
+  },
+  "validator_dependency": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0937/comparison.py",
+    "bytes": 39792,
+    "sha256": "b70a2b38d098e3abd2b567d1bea70f40e9d27e62acaca8f80ff633dd2c596712"
+  },
+  "child_environment": {
+    "PATH": "/usr/bin:/bin",
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC",
+    "RUST_BACKTRACE": "0"
+  },
+  "route_selector": "LITCHI_DOCX_INGRESS_ROUTE",
+  "command_identity": "Both labels use the same executable, case, route selector, sample count, warmup count, CPU affinity, and environment. Only the report output path differs; labels are packet metadata.",
+  "time_metrics": [
+    "rss_bytes",
+    "major_page_faults",
+    "minor_page_faults",
+    "user_cpu_seconds",
+    "system_cpu_seconds",
+    "voluntary_context_switches",
+    "involuntary_context_switches"
+  ],
+  "summary_statistics": {
+    "p50": "child_p50_ns.p50, the median of the twelve child medians per route and label",
+    "p95_p99": "nearest-rank quantiles of all 600 raw elapsed samples per route and label",
+    "spread": "max minus min of all 600 raw elapsed samples per route and label",
+    "process_metrics": "median of twelve child terminal metrics per route and label",
+    "paired_p50_bootstrap": "10000 deterministic resamples of the twelve paired p50 ratios, seed 938; descriptive interval only"
+  },
+  "terminal_policy": "Write the child terminal record before report validation; poll the original process group until terminal; retain failures and never retry, selectively recapture, or replace a child.",
+  "source_and_build_policy": "Reuse the retained source/build receipts and executable; do not copy source or build a new binary for this diagnostic.",
+  "iwork": "excluded",
+  "evidence_policy": "Keep raw reports, streams, time logs, and packets outside the repository; commit only compact descriptors and summaries below 1 MiB."
+}

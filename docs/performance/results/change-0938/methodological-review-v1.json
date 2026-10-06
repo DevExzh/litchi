@@ -1,0 +1,112 @@
+{
+  "can_establish": [
+    "Whether same-binary owned-reader pair excursions recur at comparable frequency or magnitude.",
+    "Whether excursions are route-specific, pair-position-specific, or associated with first/second label order.",
+    "Whether total p50 differences track preparation, open, query, edit, commit, or publication phase differences.",
+    "A descriptive null distribution for whole-child RSS under the retained binary and fixed protocol."
+  ],
+  "cannot_establish": [
+    "That a prior candidate caused or did not cause a reader p50/RSS regression.",
+    "A causal attribution to ASLR, allocator arenas, page faults, scheduler/frequency drift, or reader/parser code.",
+    "Phase-local RSS: current normal RSS is a whole-child maximum including warmups, checks and JSON serialization.",
+    "A population-wide performance claim, a production quality pass, threshold relaxation, or retroactive adoption."
+  ],
+  "created_utc": "2026-10-06T20:19:10.147502Z",
+  "harness_boundaries": [
+    {
+      "finding": "expected package/oracle, output, payload ranges and optional staged file are prepared before the sample loop",
+      "lines": "50743-50784",
+      "path": "tools/perf-baseline/src/lib.rs"
+    },
+    {
+      "finding": "preparation timing includes per-sample source Vec cloning, observer/adapter/sink setup and owned-reader input preparation",
+      "lines": "50850-50970",
+      "path": "tools/perf-baseline/src/lib.rs"
+    },
+    {
+      "finding": "open, query, edit, commit and publication are separate timed phases; owned-reader construction and Package::from_reader are in open",
+      "lines": "50972-51037",
+      "path": "tools/perf-baseline/src/lib.rs"
+    },
+    {
+      "finding": "provider snapshots and correctness/reopen/inverse/digest/source checks follow publication and are outside timed phases",
+      "lines": "51046-51180",
+      "path": "tools/perf-baseline/src/lib.rs"
+    },
+    {
+      "finding": "measured vectors are stored in elapsed-rank order while sample_order retains original sample indices; chronological analysis requires reconstructing with that permutation and was not performed here",
+      "lines": "51234-51310",
+      "path": "tools/perf-baseline/src/lib.rs"
+    },
+    {
+      "finding": "JSON report serialization occurs after the workload; whole-child time/RSS still includes it when wrapped by the runner",
+      "lines": "13002-13004,61773-61781",
+      "path": "tools/perf-baseline/src/lib.rs"
+    },
+    {
+      "finding": "one fresh subprocess is launched per child; terminal RSS is whole-process and the report path is outside phase timing",
+      "lines": "429-498,522-528",
+      "path": "docs/performance/results/change-0938/comparison-runner.py"
+    }
+  ],
+  "interpretation_guardrails": [
+    "Verify identical binary SHA, retained source revision, corpus/output hashes, environment, compiler/profile and CPU affinity for every child; route selector is the intended route difference.",
+    "Use equal-length report paths on the same filesystem because report writing is outside phase timing but inside whole-child RSS/time.",
+    "Pair all 12 fixed pairs per route, preserve every terminal/noisy child, and never retry or replace a child after observing its result.",
+    "Use neutral symmetric A/A ratios or log-ratios; do not label either run baseline/candidate or apply the production improvement gate.",
+    "Report total and all six phases, both pair directions, child position, and elapsed-rank/sample_order metadata; chronological within-child analysis requires reconstructing with sample_order and was not performed here.",
+    "State that warmups and measured samples share one child process and allocator; process isolation is child-level, not fresh-process-per-sample.",
+    "Treat a same-binary reader flag as evidence of protocol/host variability consistent with the null, not proof of harmlessness; absence of a flag does not prove prior candidate causality."
+  ],
+  "outcome": {
+    "archive_or_cleanup_run": false,
+    "build_run": false,
+    "capture_run": false,
+    "causal_claim": false,
+    "population_claim": false,
+    "production_source_changed": false,
+    "retroactive_adoption_claim": false
+  },
+  "prior_reader_observations": [
+    {
+      "observation": "owned-reader block 2: p50 +5.1278%, p95 +5.4210%, p99 +5.0818%; no normal RSS pair over 5%",
+      "report": "docs/performance/0935-docx-inventory-fragment-parse-reuse.md:152-156"
+    },
+    {
+      "observation": "owned-reader block 1: p50 +6.0264%, process RSS +8.1502%; no individual p95/p99 pair over 5%",
+      "report": "docs/performance/0936-docx-borrowed-footnote-scanner.md:159-162"
+    },
+    {
+      "observation": "owned-reader block 3 p50 ratio 1.0538246832 and RSS ratio 1.0571879937; block 6 p99 ratio 1.0611420004",
+      "report": "docs/performance/0937-docx-combined-fragment-validation.md:144-151"
+    }
+  ],
+  "required_follow_up_fields": [
+    "pair_id, route, block, first/second position and A/A label",
+    "binary SHA, source revision, corpus/input/output SHA, exact argv/environment and report-path parent",
+    "total p50/p95/p99 and per-phase preparation/open/query/edit/commit/publication summaries, plus sorted sample ranks/sample_order metadata (not chronological execution order)",
+    "both directional pair ratios or symmetric log-ratios, spread flags, and whole-process max RSS",
+    "terminal status, process isolation/CPU binding and preserved raw child evidence"
+  ],
+  "schema": "litchi.performance.0938.methodological-review.v1",
+  "scope": {
+    "children": 96,
+    "cpu": 12,
+    "design": "identical-binary A/A null diagnostic",
+    "difference_from_pair": "route selector, A/A position label, and report path only",
+    "expected_binary_sha256": "8a81df641151e5ed06b8f700c5d4cf068d0fee9c9e131fa147bf707a799c4c66",
+    "expected_source_revision": "3ae856d76424f2f9b58d26dcd20fd074b8e97541",
+    "label_order": "alternate first/second position by block",
+    "pairs_per_route": 12,
+    "route_order": "forward odd blocks, reverse even blocks",
+    "routes": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader",
+      "range_short"
+    ],
+    "samples_per_child": 50,
+    "warmups_per_child": 5
+  },
+  "status": "read_only_review_complete"
+}

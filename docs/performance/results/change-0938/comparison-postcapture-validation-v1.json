@@ -1,0 +1,102 @@
+{
+  "schema": "litchi.performance.0938.comparison-postcapture-validation.v1",
+  "created_utc": "2026-10-06T20:23:36.207059930Z",
+  "status": "completed_failed_frozen_runner_recovered",
+  "scope": "One authorized identical-binary A/A cohort. The frozen runner's validation-contract failure is retained; offline recovery validates and reduces the original raw reports without claiming the original runner passed.",
+  "runner": {
+    "path": "docs/performance/results/change-0938/comparison-runner.py",
+    "bytes": 40484,
+    "sha256": "1b660ffbc21b2e45e9748b076583c215ce36197c0eb5a94d8224fcbc227acc41"
+  },
+  "recovery_script": {
+    "path": "docs/performance/results/change-0938/comparison-recover-v1.py",
+    "bytes": 13855,
+    "sha256": "2f3727f2735645e7b23ab22c02b7d565659f3aac6c272456410d36b35d30df9e"
+  },
+  "plan": {
+    "path": "docs/performance/results/change-0938/comparison-plan-v1.json",
+    "bytes": 4192,
+    "sha256": "401eb99455ba444b8ef984b284be381c9a91e84cc3203513da50da7a33060774"
+  },
+  "gate": {
+    "path": "docs/performance/results/change-0938/comparison-gate-v1.json",
+    "bytes": 912,
+    "sha256": "2b2d2690f86da46e3233fc3a0e8f356d4eaca4d524ffb47ed98101b143d54d42"
+  },
+  "authorized_manifest": {
+    "path": "/home/zhuhe/litchi-performance-0938/formal-manifest-authorized-v1.json",
+    "bytes": 49549,
+    "sha256": "1e199d17f3b788e0885056002c0c338f0e5d36f5c9f0999c81c436469b426b67",
+    "authorized_from": {
+      "path": "/home/zhuhe/litchi-performance-0938/formal-manifest-unauthorized-v5.json",
+      "sha256": "45656ab6002af33f16e4274c4fdfb41ea73188db462f5d99c45cc6ad44072e43"
+    },
+    "children": 96,
+    "retries": 0,
+    "recaptures": 0
+  },
+  "outer_terminal": {
+    "path": "/home/zhuhe/litchi-performance-0938/capture-outer-terminal-v1.json",
+    "bytes": 2585,
+    "sha256": "7a5086c45854ea55e2644df8db704df332f3fa321fb90b99e8164607d2e60009",
+    "exit_code": 0,
+    "session_id": 67343
+  },
+  "capture_packet": {
+    "original": {
+      "path": "/home/zhuhe/litchi-performance-0938/formal-packet-v1",
+      "files": 678,
+      "bytes": 11554110,
+      "tree_sha256": "46d163d8b4b7dbb977cfb4a830c0cace69371abecedb8b3b8b112b33cd9376e6"
+    },
+    "moved": {
+      "path": "/home/zhuhe/litchi-performance-0938/formal-packet-v1-moved",
+      "files": 678,
+      "bytes": 11554110,
+      "tree_sha256": "46d163d8b4b7dbb977cfb4a830c0cace69371abecedb8b3b8b112b33cd9376e6"
+    },
+    "capture_state": {
+      "path": "formal-packet-v1/capture-state.json",
+      "bytes": 84664,
+      "sha256": "79bc7d7acc8396b284b1d9c1c23d8f970d7e28cecbfa79288713bee659c147db",
+      "status": "failed",
+      "completed": 96,
+      "failed": 96,
+      "retries": 0,
+      "recaptures": 0
+    }
+  },
+  "frozen_validation_failure": {
+    "count": 96,
+    "error": "KeyError: 'output_sha256'",
+    "meaning": "The 0937 validator checked report output identity but omitted output_sha256 from its returned result; the frozen runner indexed that absent return key after each child exited successfully.",
+    "raw_reports_revalidated_offline": 96,
+    "report_output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec"
+  },
+  "offline_recovery": {
+    "original": {
+      "path": "/home/zhuhe/litchi-performance-0938/offline-recovery-original-v2.json",
+      "bytes": 179736,
+      "sha256": "762f3cb1e0e14a1ea2394ab9d3002e7ae982f74a6efabea3645ba1e373cff707"
+    },
+    "moved": {
+      "path": "/home/zhuhe/litchi-performance-0938/offline-recovery-moved-v2.json",
+      "bytes": 179754,
+      "sha256": "87731c73d87f3ed3e62c0f0838a563b821627a3374c08f9cd29b8aecedaf303c"
+    },
+    "equivalence": {
+      "path": "/home/zhuhe/litchi-performance-0938/offline-recovery-equivalence-v1.json",
+      "bytes": 1853,
+      "sha256": "656d7237eba964346a8fb965e55d6331dbfeb3bfc445ce055c2050a483d3be79",
+      "normalized_metrics_equal": true
+    }
+  },
+  "commands": {
+    "capture": "LITCHI_PERF_0938_CAPTURE_APPROVED=1 PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -B docs/performance/results/change-0938/comparison-runner.py capture --manifest /home/zhuhe/litchi-performance-0938/formal-manifest-authorized-v1.json --packet /home/zhuhe/litchi-performance-0938/formal-packet-v1",
+    "recovery_original": "PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -B docs/performance/results/change-0938/comparison-recover-v1.py --manifest /home/zhuhe/litchi-performance-0938/formal-manifest-authorized-v1.json --packet /home/zhuhe/litchi-performance-0938/formal-packet-v1 --outer-terminal /home/zhuhe/litchi-performance-0938/capture-outer-terminal-v1.json --output /home/zhuhe/litchi-performance-0938/offline-recovery-original-v2.json",
+    "recovery_moved": "PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -B docs/performance/results/change-0938/comparison-recover-v1.py --manifest /home/zhuhe/litchi-performance-0938/formal-manifest-authorized-v1.json --packet /home/zhuhe/litchi-performance-0938/formal-packet-v1-moved --outer-terminal /home/zhuhe/litchi-performance-0938/capture-outer-terminal-v1.json --output /home/zhuhe/litchi-performance-0938/offline-recovery-moved-v2.json"
+  },
+  "no_retry_or_recapture": true,
+  "no_adoption_or_causal_claim": true,
+  "iwork": "excluded"
+}

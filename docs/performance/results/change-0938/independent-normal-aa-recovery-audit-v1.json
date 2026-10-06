@@ -1,0 +1,102 @@
+{
+  "schema": "litchi.performance.0938.independent-normal-aa-recovery-audit.v1",
+  "status": "descriptive_recovery_audited_frozen_validation_failed",
+  "scope": "Independent read-only audit of the one completed 96-child identical-binary control packet; no workload, build, recapture, or packet mutation.",
+  "formal_interpretation": "The raw reports and time records are descriptively usable after independent revalidation. Terminal custody remained valid; the formal capture state remains failed because the frozen runner encountered a validation/result-contract error while writing validation.json.",
+  "outer_terminal": {
+    "path": "/home/zhuhe/litchi-performance-0938/capture-outer-terminal-v1.json",
+    "bytes": 2585,
+    "sha256": "7a5086c45854ea55e2644df8db704df332f3fa321fb90b99e8164607d2e60009",
+    "status": "completed_outer_runner_failed_children",
+    "outer_exit_code": 0,
+    "children_run": 96,
+    "children_passed": 0,
+    "children_failed": 96,
+    "retries": 0,
+    "recaptures": 0,
+    "terminal_first": true
+  },
+  "authorized_manifest": {
+    "path": "/home/zhuhe/litchi-performance-0938/formal-manifest-authorized-v1.json",
+    "bytes": 49549,
+    "sha256": "1e199d17f3b788e0885056002c0c338f0e5d36f5c9f0999c81c436469b426b67"
+  },
+  "packet": {
+    "path": "/home/zhuhe/litchi-performance-0938/formal-packet-v1",
+    "files": 678,
+    "bytes": 11554110,
+    "manifest": {
+      "bytes": 50277,
+      "sha256": "4d6572febfff39c4611f8e745cb9ebb8b90038f8e864c66ef350fd02e91ed81a"
+    },
+    "capture_state": {
+      "bytes": 84664,
+      "sha256": "79bc7d7acc8396b284b1d9c1c23d8f970d7e28cecbfa79288713bee659c147db"
+    },
+    "max_file_bytes": 130927
+  },
+  "raw_state_findings": {
+    "children": 96,
+    "state_status": "failed",
+    "state_failed": 96,
+    "child_exit_code_zero": 96,
+    "terminal_status_terminal": 96,
+    "terminal_deadline_exceeded_false": 96,
+    "terminal_runner_error_null": 96,
+    "terminal_process_group_closed": 96,
+    "frozen_validation_error": {
+      "message": "KeyError: 'output_sha256'",
+      "count": 96,
+      "validator_path": "docs/performance/results/change-0937/comparison.py",
+      "validator_sha256": "b70a2b38d098e3abd2b567d1bea70f40e9d27e62acaca8f80ff633dd2c596712"
+    },
+    "descriptor_checks": "All 96 terminal, report, and validation descriptors matched retained bytes and SHA-256 values.",
+    "report_revalidation": {
+      "method": "comparison.py validate_report(report, route, warmups=5, samples=50, binary=manifest binary)",
+      "passed": 96,
+      "failed": 0,
+      "expected_output_sha256": "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+      "reports_with_expected_output_sha256": 96,
+      "reports_with_other_output_sha256": 0
+    },
+    "schedule_and_identity_checks": "All 96 terminal schedule/label rows, binary identity, source revision, and clean child environment matched their retained manifest/terminal bindings; all seven retained /usr/bin/time -v fields parsed exactly to each terminal time_metrics object."
+  },
+  "recovered_reduction": {
+    "original": {
+      "path": "/home/zhuhe/litchi-performance-0938/offline-recovery-original-v2.json",
+      "bytes": 179736,
+      "sha256": "762f3cb1e0e14a1ea2394ab9d3002e7ae982f74a6efabea3645ba1e373cff707"
+    },
+    "moved": {
+      "path": "/home/zhuhe/litchi-performance-0938/offline-recovery-moved-v2.json",
+      "bytes": 179754,
+      "sha256": "87731c73d87f3ed3e62c0f0838a563b821627a3374c08f9cd29b8aecedaf303c"
+    },
+    "records_per_packet": 96,
+    "pairs_per_route": 12,
+    "samples_per_label_per_route": 600,
+    "route_directional_counts": {
+      "generic_read_at": {"a_over_b_gt_1_05": 0, "b_over_a_gt_1_05": 1},
+      "owned_reader": {"a_over_b_gt_1_05": 4, "b_over_a_gt_1_05": 2},
+      "owned_vec": {"a_over_b_gt_1_05": 0, "b_over_a_gt_1_05": 0},
+      "range_short": {"a_over_b_gt_1_05": 1, "b_over_a_gt_1_05": 0}
+    },
+    "equivalence": {
+      "path": "/home/zhuhe/litchi-performance-0938/offline-recovery-equivalence-v1.json",
+      "bytes": 1853,
+      "sha256": "656d7237eba964346a8fb965e55d6331dbfeb3bfc445ce055c2050a483d3be79",
+      "status": "passed_moved_packet_replay",
+      "packet_tree_equal": true,
+      "normalized_metrics_equal": true,
+      "no_retry_or_recapture": true
+    }
+  },
+  "reproduction_and_limits": {
+    "audit": "Read-only Python -B enumeration of retained packet descriptors/terminals/reports/time logs plus comparison.py report validation; no files written.",
+    "recovery_status": "The versioned offline recovery records the frozen validator contract failure and independently revalidates raw reports; it does not convert the failed formal state into a passed cohort.",
+    "adoption_claim": "none",
+    "causal_claim": "none",
+    "capture_retries": 0,
+    "capture_recaptures": 0
+  }
+}

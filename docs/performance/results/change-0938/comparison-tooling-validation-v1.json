@@ -1,0 +1,101 @@
+{
+  "schema": "litchi.performance.0938.comparison-tooling-validation.v1",
+  "created_utc": "2026-10-06T20:17:35.716929694Z",
+  "status": "prospective_ready_no_capture",
+  "scope": "Identical-binary normal-lane variability control; no candidate, allocator, adoption, or causal claim.",
+  "runner": {
+    "path": "docs/performance/results/change-0938/comparison-runner.py",
+    "bytes": 40484,
+    "sha256": "1b660ffbc21b2e45e9748b076583c215ce36197c0eb5a94d8224fcbc227acc41"
+  },
+  "plan": {
+    "path": "docs/performance/results/change-0938/comparison-plan-v1.json",
+    "bytes": 4192,
+    "sha256": "401eb99455ba444b8ef984b284be381c9a91e84cc3203513da50da7a33060774"
+  },
+  "gate": {
+    "path": "docs/performance/results/change-0938/comparison-gate-v1.json",
+    "bytes": 912,
+    "sha256": "2b2d2690f86da46e3233fc3a0e8f356d4eaca4d524ffb47ed98101b143d54d42"
+  },
+  "manifest": {
+    "path": "/home/zhuhe/litchi-performance-0938/formal-manifest-unauthorized-v5.json",
+    "bytes": 49139,
+    "sha256": "45656ab6002af33f16e4274c4fdfb41ea73188db462f5d99c45cc6ad44072e43",
+    "capture_authorized": false,
+    "children_run": 0
+  },
+  "controls": {
+    "path": "/home/zhuhe/litchi-performance-0938/controls-v5.json",
+    "bytes": 882,
+    "sha256": "7170d6a463b9c306042b4aa864ed349e14dfe5722033fc4d3c604628e16341eb",
+    "status": "passed",
+    "negative_controls": [
+      "wrong binary identity rejected",
+      "phase sum mutation rejected"
+    ],
+    "positive_controls": [
+      "96-row schedule and alternating order",
+      "synthetic report validation",
+      "same A/B command and clean environment after report-path normalization"
+    ]
+  },
+  "schedule": {
+    "children": 96,
+    "blocks": 12,
+    "routes": [
+      "generic_read_at",
+      "owned_vec",
+      "owned_reader",
+      "range_short"
+    ],
+    "labels": [
+      "A",
+      "B"
+    ],
+    "warmups": 5,
+    "samples": 50,
+    "cpu": 12,
+    "sha256": "a9780ffb84bd1dfe16a91031a61e64c724922d16645e0fc1b8e16469e11f7676",
+    "bootstrap_seed": 938,
+    "bootstrap_draws": 10000
+  },
+  "source_and_build": {
+    "source_revision": "3ae856d76424f2f9b58d26dcd20fd074b8e97541",
+    "source_receipt_sha256": "7c05ace57d66de90ac3657855d62bf5683e058522b2bfdc2f30a4c22a55fc2bb",
+    "source_equivalence_sha256": "e0d3b32f7eac59b175986d43027fd19490991832ad77987a1f63ed2a867a2a10",
+    "build_receipt_sha256": "26e9592fe312ca097d10effa0a0251ffc911182851e3b4d4f81a41cbb44bd0ca",
+    "binary_path": "/home/zhuhe/litchi-performance-0933/target-candidate-normal/release/litchi-perf-baseline",
+    "binary_bytes": 69934624,
+    "binary_sha256": "8a81df641151e5ed06b8f700c5d4cf068d0fee9c9e131fa147bf707a799c4c66",
+    "validator_dependency_sha256": "b70a2b38d098e3abd2b567d1bea70f40e9d27e62acaca8f80ff633dd2c596712"
+  },
+  "commands": [
+    "PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -B docs/performance/results/change-0938/comparison-runner.py check-schedule",
+    "PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -B docs/performance/results/change-0938/comparison-runner.py freeze --plan docs/performance/results/change-0938/comparison-plan-v1.json --gate docs/performance/results/change-0938/comparison-gate-v1.json --manifest /home/zhuhe/litchi-performance-0938/formal-manifest-unauthorized-v5.json",
+    "PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -B docs/performance/results/change-0938/comparison-runner.py controls --manifest /home/zhuhe/litchi-performance-0938/formal-manifest-unauthorized-v5.json --output /home/zhuhe/litchi-performance-0938/controls-v5.json",
+    "PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -B -m py_compile docs/performance/results/change-0938/comparison-runner.py",
+    "PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -B <verify_manifest unauthorized v3>"
+  ],
+  "terminal_policy": "A future authorized run must write each child terminal record before report validation, poll the original process group, retain every failure, and never retry or recapture.",
+  "superseded_external": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0938/formal-manifest-unauthorized-v1-pre-control-fix.json",
+      "reason": "schedule-control assertion was corrected before any child started"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0938/formal-manifest-unauthorized-v2-pre-summary-fix.json",
+      "reason": "summary now distinguishes child medians from pooled raw quantiles before any child started"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0938/formal-manifest-unauthorized-v3-pre-bootstrap-fix.json",
+      "reason": "final runner now emits deterministic paired-p50 bootstrap summaries and RSS ratio statistics before any child started"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0938/formal-manifest-unauthorized-v4-pre-replay-claim-fix.json",
+      "reason": "replay provenance wording was narrowed to the descriptors it actually rehashes before any child started"
+    }
+  ],
+  "iwork": "excluded",
+  "repo_artifact_limit_verified": true
+}

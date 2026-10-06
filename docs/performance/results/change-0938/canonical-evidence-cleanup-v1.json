@@ -1,0 +1,65 @@
+{
+  "commands": {
+    "remove": "rm -- /home/zhuhe/litchi-performance-0938/archives/canonical-evidence-v1.tar /home/zhuhe/litchi-performance-0938/__pycache__/independent-normal-aa-audit-v3.cpython-314.pyc",
+    "remove_empty_cache_dir": "rmdir -- /home/zhuhe/litchi-performance-0938/__pycache__",
+    "verification": "LITCHI_PERF_0938_VERIFY_APPROVED=1 PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -B /home/zhuhe/litchi-performance-0938/archive-allowlist-0938-v1.py verify --allowlist /home/zhuhe/litchi-performance-0938/archive-allowlist-v1.json"
+  },
+  "created_utc": "2026-10-06T20:33:45.414005Z",
+  "removed": [
+    {
+      "bytes": 76185600,
+      "path": "/home/zhuhe/litchi-performance-0938/archives/canonical-evidence-v1.tar",
+      "reason": "uncompressed tar removed after exact member and zstd verification",
+      "sha256": "fe1516fcd40c11b969ce2af1e8a286593c8d33e145e1dfffe8dbbdaa59d72d84"
+    },
+    {
+      "bytes": 72915,
+      "path": "/home/zhuhe/litchi-performance-0938/__pycache__/independent-normal-aa-audit-v3.cpython-314.pyc",
+      "reason": "0938-owned interpreter cache removed",
+      "sha256": "8685cfb92d71454a56d35606aad36a5d68381c164348f014f54d3d44f6094940"
+    }
+  ],
+  "removed_logical_bytes": 76258515,
+  "retained": {
+    "archive_allowlist": {
+      "bytes": 633400,
+      "path": "/home/zhuhe/litchi-performance-0938/archive-allowlist-v1.json",
+      "sha256": "15a84865ab039567c7ef438a62cb67929a5ca7b1af9e1158ab56b7eea4c70de0"
+    },
+    "archive_binding_receipt": {
+      "bytes": 6643,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0938/canonical-evidence-archive-v1.json",
+      "sha256": "0c50ce61556d313fde061098e5d350048875436ff3084c772f736d97920bffcc"
+    },
+    "compressed_archive": {
+      "bytes": 604061,
+      "path": "/home/zhuhe/litchi-performance-0938/archives/canonical-evidence-v1.tar.zst",
+      "sha256": "2fc5e91775e246002fdfb40bf937ef10fe70049336135f3b2a6521ca712491d3"
+    },
+    "input_manifest": {
+      "bytes": 1636055,
+      "path": "/home/zhuhe/litchi-performance-0938/archives/archive-inputs-v1.jsonl",
+      "sha256": "f9ab975d9141020942d171f50b7a301567de62d7b50f0eea8e79124399018df4"
+    },
+    "integrity_terminal": {
+      "bytes": 417,
+      "path": "/home/zhuhe/litchi-performance-0938/archives/archive-integrity.terminal.json",
+      "sha256": "aae166ad91086e807dca5980baedd24d4d94f948326a3748887bbe137d772d47"
+    },
+    "member_list": {
+      "bytes": 364609,
+      "path": "/home/zhuhe/litchi-performance-0938/archives/archive-members-v1.nul",
+      "sha256": "335e10c9b4dee0fbf4a5b172a1c66d782214966fe8e879e7356b7723bed0dc96"
+    }
+  },
+  "schema": "litchi.performance.0938.repository-archive-cleanup.v1",
+  "scope": {
+    "moved_formal_packet_retained": true,
+    "only_0938_owned_paths_removed": true,
+    "other_batch_paths_touched": false,
+    "raw_formal_packet_retained": true,
+    "scripts_and_receipts_retained": true,
+    "shared_checkout_target_touched": false,
+    "synthetic_packets_retained": true
+  }
+}

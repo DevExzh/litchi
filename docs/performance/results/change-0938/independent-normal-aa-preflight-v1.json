@@ -1,0 +1,59 @@
+{
+  "checker": {
+    "bytes": 45369,
+    "path": "/home/zhuhe/litchi-performance-0938/independent-normal-aa-audit-v1.py",
+    "sha256": "aa4a1f6a6a2d17e5442893af52f7784d58607a7a0b6c9cff2655960859bea3b6"
+  },
+  "interpretation": "Synthetic controls exercise custody/report/argv/order/time parsing. They are not formal capture evidence and make no performance claim.",
+  "manifest_schema": "litchi.performance.0938.variability-manifest.v1",
+  "manifest_sha256": "45656ab6002af33f16e4274c4fdfb41ea73188db462f5d99c45cc6ad44072e43",
+  "manifest_v5": {
+    "bytes": 49139,
+    "path": "/home/zhuhe/litchi-performance-0938/formal-manifest-unauthorized-v5.json",
+    "sha256": "45656ab6002af33f16e4274c4fdfb41ea73188db462f5d99c45cc6ad44072e43"
+  },
+  "negative_controls": [
+    {
+      "kind": "argv_warmup_mutation",
+      "packet": "/home/zhuhe/litchi-performance-0938/preflight-negative-argv-packet-v5",
+      "reason": "terminal argv workload arguments changed",
+      "result": {
+        "bytes": 526,
+        "path": "/home/zhuhe/litchi-performance-0938/preflight-negative-argv-audit-v3.json",
+        "sha256": "56758cd76034e90e61d0ea2f9fe74a401c7430e45c2ace5289161e4e2c628144"
+      },
+      "status": "audit_failed"
+    },
+    {
+      "kind": "report_phase_sum_mutation",
+      "packet": "/home/zhuhe/litchi-performance-0938/preflight-negative-report-packet-v5",
+      "reason": "phase sum mismatch at sample 0",
+      "result": {
+        "bytes": 516,
+        "path": "/home/zhuhe/litchi-performance-0938/preflight-negative-report-audit-v2.json",
+        "sha256": "f909a2e25332850bdaeb53e7e9d5ae627bde0b4baa766b255760ebdd2b85ac34"
+      },
+      "status": "audit_failed"
+    }
+  ],
+  "positive": {
+    "children": 96,
+    "packet": "/home/zhuhe/litchi-performance-0938/preflight-positive-packet-v5",
+    "result": {
+      "bytes": 544921,
+      "path": "/home/zhuhe/litchi-performance-0938/preflight-positive-audit-v3.json",
+      "sha256": "f3e79d05fbd7f6327c5ceca4174eaf057bb76f169440623163df2da34ffa277e"
+    },
+    "status": "passed_identity_descriptive_audit"
+  },
+  "retained_fixture_controls": {
+    "historical_time_log_sha256": "1d0b6f3dd8d54b1bbc89de9e067e38a1395f1096d682619d2694d2f08cc8001f",
+    "missing_field_negative": "rejected",
+    "positive": "passed"
+  },
+  "runner_sha256": "1b660ffbc21b2e45e9748b076583c215ce36197c0eb5a94d8224fcbc227acc41",
+  "schedule_sha256": "a9780ffb84bd1dfe16a91031a61e64c724922d16645e0fc1b8e16469e11f7676",
+  "schema": "litchi.performance.0938.independent-normal-aa-preflight.v1",
+  "scope": "offline synthetic packet validation only; no formal 0938 workload, build, or source mutation",
+  "status": "synthetic_controls_passed"
+}

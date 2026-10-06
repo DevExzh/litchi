@@ -1,0 +1,27 @@
+{
+  "schema": "litchi.performance.0938.variability-gate.v1",
+  "seed": 938,
+  "bootstrap_draws": 10000,
+  "per_route_pairs": 12,
+  "directional_threshold": 1.05,
+  "primary_statistic": "For each route, report the median of the twelve paired child p50 ratios and count pairs above 1.05 in both B/A and A/B directions.",
+  "reported_quantiles": [
+    "p50",
+    "p95",
+    "p99",
+    "spread"
+  ],
+  "reported_process_metrics": [
+    "rss_bytes",
+    "major_page_faults",
+    "minor_page_faults",
+    "user_cpu_seconds",
+    "system_cpu_seconds",
+    "voluntary_context_switches",
+    "involuntary_context_switches"
+  ],
+  "no_adoption_gate": true,
+  "no_causal_probability_claim": true,
+  "no_candidate_comparison": true,
+  "interpretation": "This control quantifies variability of one identical executable. It does not set, relax, or waive any optimization gate and cannot support a causal probability claim."
+}
