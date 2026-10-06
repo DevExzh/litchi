@@ -11,8 +11,8 @@
       "sha256": "1eb10ce0b86d76b11ce055dcd41511b0b065ee9893bdc3301d829a2824c68f07"
     },
     "decode_fp_phase_ancestry_v1.py": {
-      "bytes": 22302,
-      "sha256": "10e2670a5b5227b1c2a89f27df9b374bd9caae8775890ab9ab1ffc59e7031b71"
+      "bytes": 22394,
+      "sha256": "76eebc616dfa042e96729cabfb2ee0885138a12ab39d5e8531bc83d073966d34"
     },
     "fp-negative-binary-v3.json": {
       "bytes": 23586,
@@ -28,7 +28,7 @@
     },
     "fp-phase-decoder-review-v4.md": {
       "bytes": 3071,
-      "sha256": "0ca808bf6d405a254fbb03f8e47f65ad3f8af4e7804b4ac9e275aeb547c2f126"
+      "sha256": "97661e1ba3d63a11cdcabafb98d13a0a279dfa8c20bcc482f0be26ea9e9dcba4"
     },
     "fp-phase-decoder-summary-v6.json": {
       "bytes": 23573,
@@ -95,7 +95,8 @@
       "mapped_without_required_callee_samples": 1,
       "moved_to_unknown_period": 3996483,
       "publication_samples": 2804,
-      "query_samples": 1504
+      "query_samples": 1504,
+      "required_dso": "/tmp/litchi-performance-0929/target-fp/release/litchi-perf-baseline"
     }
   }
 }
