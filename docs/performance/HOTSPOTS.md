@@ -1,5 +1,19 @@
 # Performance hotspot inventory
 
+## 0962 — source admission and output validation dominate selected stage ancestry
+
+[0962](0962-xlsx-native-cpu-attribution.md) replaces allocation-traffic guesses
+with qualified frame-pointer attribution. Original-source admission contributes
+60.74–62.00% of selected stage period; rewritten-value readback contributes
+34.01–36.25%. Full output XML validation is a nested 28.35–31.05% of that
+stage denominator. Original admission already combines validation, facts and
+parsing in one reader pass. Investigate shared work in rewritten-output
+validation/readback while retaining every validation authority and fallback.
+Census omission routes first: reduced readback cannot reuse a full-output
+parser without changing materialization or adding a proven omission-aware
+contract. No validator bypass or candidate is adopted. These are diagnostic-build
+sampled shares; ordinary native/allocator screening remains required.
+
 ## 0961 — staging traffic is not a qualifying end-to-end signal
 
 [0961](0961-xlsx-edit-staging-capacity-trial.md) rejects the bounded iterator-hint

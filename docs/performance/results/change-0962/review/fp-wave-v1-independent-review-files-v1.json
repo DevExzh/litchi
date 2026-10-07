@@ -1,0 +1,321 @@
+{
+  "files": [
+    {
+      "bytes": 2,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-00-buildid-list.rc",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-00-buildid-list.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 302,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-00-buildid-list.txt",
+      "sha256": "7e99759e8f3a15e98ac9591d3c245672750b895d956529400409e8ddff62336b"
+    },
+    {
+      "bytes": 2,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-00-header.rc",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-00-header.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1819,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-00-header.txt",
+      "sha256": "8474e0afb1c5470e2c3ace04a667e02770a3d25719f63541152f6dbde416b9fa"
+    },
+    {
+      "bytes": 1305,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-00-mapping-events.txt",
+      "sha256": "7ca8be1dbec818319fe9b9aab024cc0b3e1b06d6b34737891d2a5a7a001ae8df"
+    },
+    {
+      "bytes": 2,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-00-mapping.rc",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "bytes": 25,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-00-mapping.stderr",
+      "sha256": "d760457f9a459836db8c86aa1e430280f8b3c8762575616f72e4aee52e767536"
+    },
+    {
+      "bytes": 8965,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-00-metadata-v1.json",
+      "sha256": "8cad59f756ceebae5231403160a816d178c29860959928609fe936c32e70ce62"
+    },
+    {
+      "bytes": 2,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-01-buildid-list.rc",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-01-buildid-list.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 302,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-01-buildid-list.txt",
+      "sha256": "7e99759e8f3a15e98ac9591d3c245672750b895d956529400409e8ddff62336b"
+    },
+    {
+      "bytes": 2,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-01-header.rc",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-01-header.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1819,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-01-header.txt",
+      "sha256": "6581901397b7b8ddb9b7fff955072ef94570084e9693e48903384769fa4016ca"
+    },
+    {
+      "bytes": 1305,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-01-mapping-events.txt",
+      "sha256": "69403c2579ba54e9987e8a8b32f87982f3de90723f1cfd28f2363002047463b3"
+    },
+    {
+      "bytes": 2,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-01-mapping.rc",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "bytes": 25,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-01-mapping.stderr",
+      "sha256": "d760457f9a459836db8c86aa1e430280f8b3c8762575616f72e4aee52e767536"
+    },
+    {
+      "bytes": 9055,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-01-metadata-v1.json",
+      "sha256": "9a1304d31bf9c9df093873ebb735988ef4522a6918ac8c5c4e03d2c8fbae7565"
+    },
+    {
+      "bytes": 2,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-02-buildid-list.rc",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-02-buildid-list.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 302,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-02-buildid-list.txt",
+      "sha256": "7e99759e8f3a15e98ac9591d3c245672750b895d956529400409e8ddff62336b"
+    },
+    {
+      "bytes": 2,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-02-header.rc",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-02-header.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1819,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-02-header.txt",
+      "sha256": "33c6c56f3c14b6496ebeb7aaccda2a26f1ee18925dfad35e6c103fde9f4b3a35"
+    },
+    {
+      "bytes": 1305,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-02-mapping-events.txt",
+      "sha256": "309be6080ff68284166a13d1ea7bad19e290ab8d1a92029b6ebe1148a8585bd2"
+    },
+    {
+      "bytes": 2,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-02-mapping.rc",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "bytes": 25,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-02-mapping.stderr",
+      "sha256": "d760457f9a459836db8c86aa1e430280f8b3c8762575616f72e4aee52e767536"
+    },
+    {
+      "bytes": 8920,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-02-metadata-v1.json",
+      "sha256": "dad9616f78cab92f37cf62d45b356442594591d6ffe8dafbc688f6297659069f"
+    },
+    {
+      "bytes": 2,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-buildid-list.rc",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-buildid-list.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 302,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-buildid-list.txt",
+      "sha256": "7e99759e8f3a15e98ac9591d3c245672750b895d956529400409e8ddff62336b"
+    },
+    {
+      "bytes": 2,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-header.rc",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-header.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1819,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-header.txt",
+      "sha256": "02b36eda0ba1004b9ac15c385b0b4605091444b32eadc7c6ce6978099e307186"
+    },
+    {
+      "bytes": 1305,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-mapping-events.txt",
+      "sha256": "1049e74a27c646d0d4cda341a43953b085ea9a53c33ea96ff1de91b06fbcdb69"
+    },
+    {
+      "bytes": 2,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-mapping.rc",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "bytes": 25,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-mapping.stderr",
+      "sha256": "d760457f9a459836db8c86aa1e430280f8b3c8762575616f72e4aee52e767536"
+    },
+    {
+      "bytes": 8920,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-metadata-v1.json",
+      "sha256": "ff3c6a2c2edb5deec118200cfb97b4f4e9713dd3f09bec5a7d648eba0a38d10f"
+    },
+    {
+      "bytes": 2,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-04-buildid-list.rc",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-04-buildid-list.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 368,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-04-buildid-list.txt",
+      "sha256": "80507345a1177847b16145499a6aba6a1164141f01e027c6feced7f6180e4a78"
+    },
+    {
+      "bytes": 2,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-04-header.rc",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-04-header.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1819,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-04-header.txt",
+      "sha256": "971b959a6f22e7e8d43f748f7d21b9bade4fc06003ec142819437994839785de"
+    },
+    {
+      "bytes": 1305,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-04-mapping-events.txt",
+      "sha256": "4db9dcb4cd10a0fe29fc446a419ab6ac9ec574878f5e7c92cc9e0897b3e36ffe"
+    },
+    {
+      "bytes": 2,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-04-mapping.rc",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "bytes": 25,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-04-mapping.stderr",
+      "sha256": "d760457f9a459836db8c86aa1e430280f8b3c8762575616f72e4aee52e767536"
+    },
+    {
+      "bytes": 9089,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-04-metadata-v1.json",
+      "sha256": "5d71dab3b4000939ae5e773bf4a4347d6d690eb2e5be33fbcb0d0f745ed66e21"
+    },
+    {
+      "bytes": 2,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-05-buildid-list.rc",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-05-buildid-list.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 302,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-05-buildid-list.txt",
+      "sha256": "7e99759e8f3a15e98ac9591d3c245672750b895d956529400409e8ddff62336b"
+    },
+    {
+      "bytes": 2,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-05-header.rc",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-05-header.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1819,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-05-header.txt",
+      "sha256": "dcbaa9d554fc18e13dfd9bb7f457151e9c3dba1fbdee2e4cf6f69744a61ebc0d"
+    },
+    {
+      "bytes": 1305,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-05-mapping-events.txt",
+      "sha256": "e147ea424520eab78e595c25d43cd3c0d7a74caa66f1bcaf6a04d481a20ce293"
+    },
+    {
+      "bytes": 2,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-05-mapping.rc",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "bytes": 25,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-05-mapping.stderr",
+      "sha256": "d760457f9a459836db8c86aa1e430280f8b3c8762575616f72e4aee52e767536"
+    },
+    {
+      "bytes": 8965,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-05-metadata-v1.json",
+      "sha256": "d60b256f0fccedc3095e6bfc35012b2eb8b0c1fffec9ee80e8eea16d0fba69a3"
+    },
+    {
+      "bytes": 7100,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-independent-cpu-summary-v1.json",
+      "sha256": "c241dfa09ea154ecb3b73e14fd7d4786d87e179497852293af7caa216cf0b169"
+    },
+    {
+      "bytes": 62073,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-metadata-summary-v1.json",
+      "sha256": "52194504442c8c7bc6a921aba1c321880a52ead5c16d954bc8d1b0acfa43d653"
+    },
+    {
+      "bytes": 10469,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-terminal-receipts-v1.json",
+      "sha256": "3a7f2294240d281816275db511d43a14d43c0d903216022e3a7a5f99d1d66517"
+    }
+  ],
+  "generated_utc": "2026-10-07T20:19:59.826277+00:00",
+  "schema": "litchi.performance.0962.fp-wave-independent-review-files.v1"
+}

@@ -1,0 +1,8 @@
+       perf-exec       0 [000]     0.000000: PERF_RECORD_COMM: perf-exec:3194037/3194037
+ xlsx_managed_co 3194037 [015] 269726.867158: PERF_RECORD_COMM exec: xlsx_managed_co:3194037/3194037
+ xlsx_managed_co 3194037 [015] 269726.867181: PERF_RECORD_MMAP2 3194037/3194037: [0x645cdc1a7000(0x5b8000) @ 0x12a000 <7eb92ba2f0f8f3b248b77d8691e27b80b114fb22>]: r-xp /home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1
+ xlsx_managed_co 3194037 [015] 269726.867194: PERF_RECORD_MMAP2 3194037/3194037: [0x798396219000(0x2e000) @ 0x1000 <6dbcc212bd69ba855952520ce65be161ee87e5ed>]: r-xp /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+ xlsx_managed_co 3194037 [015] 269726.867203: PERF_RECORD_MMAP2 3194037/3194037: [0x798396216000(0x2000) @ 0 00:00 0 0]: r-xp [vdso]
+ xlsx_managed_co 3194037 [015] 269726.867399: PERF_RECORD_MMAP2 3194037/3194037: [0x798395e28000(0x19d000) @ 0x28000 <4ec69afdf3da96ce7388640dcd27c6d0c1b256ef>]: r-xp /usr/lib/x86_64-linux-gnu/libc.so.6
+ xlsx_managed_co 3194037 [015] 269726.867425: PERF_RECORD_MMAP2 3194037/3194037: [0x7983961d1000(0x23000) @ 0x4000 <f71912323276f11c4a956407fa12ad49a1a0de78>]: r-xp /usr/lib/x86_64-linux-gnu/libgcc_s.so.1
+ xlsx_managed_co 3194037 [015] 269744.421211: PERF_RECORD_EXIT(3194037:3194037):(3194036:3194036)

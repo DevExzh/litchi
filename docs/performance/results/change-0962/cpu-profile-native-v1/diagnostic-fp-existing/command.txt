@@ -1,0 +1,2 @@
+2026-10-07T19:36:05.578870682Z
+taskset -c 12-15 perf record --no-buildid-cache -F 99 -e cycles:u --call-graph fp -o diagnostic-fp-existing/perf.data -- binary --shape medium --workload one-percent --workers 1 --warmup 1 --samples 5 --output diagnostic-fp-existing/output

@@ -1,0 +1,41 @@
+{
+  "finished_utc": "2026-10-07T19:50:28.504489Z",
+  "launch_error": null,
+  "pid": 3175894,
+  "process_group": 3175894,
+  "returncode": 0,
+  "schema": "litchi.performance.0962.diagnostic-fp-v1.build-terminal",
+  "source_verification_end": {
+    "actual_bytes": 273429543,
+    "actual_file_count": 10932,
+    "file_count": 10932,
+    "manifest": {
+      "bytes": 2267268,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0957/source-manifest-v2.json",
+      "sha256": "f5fd1ee75b734bb7efaa1882be0397defea98c76c835be0bdf1f565c573ef617"
+    },
+    "manifest_bytes": 273429543,
+    "mismatch_count": 0,
+    "mismatches": [],
+    "source_root": "/home/zhuhe/litchi-performance-0957/source-v1",
+    "tree_digest_from_manifest": "1d2cdd4fd438a01913244c6c52bb1239e26ec10a3be586c8c2b3daa03bb1d141",
+    "tree_digest_from_source": "1d2cdd4fd438a01913244c6c52bb1239e26ec10a3be586c8c2b3daa03bb1d141",
+    "verified": true
+  },
+  "source_verification_error": null,
+  "stderr": {
+    "bytes": 8672,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0962/builds/diagnostic-fp-v1/build.stderr.log",
+    "sha256": "abc73414014bbca57f013ca32538d7ea023b5d9f4e633d56a51cf050a7c4564f"
+  },
+  "stdout": {
+    "bytes": 0,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0962/builds/diagnostic-fp-v1/build.stdout.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "terminal_before_binary_parse": true,
+  "timed_out": false
+}

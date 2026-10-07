@@ -1,0 +1,36 @@
+{
+  "utc": "2026-10-07T19:55:27.936554+00:00",
+  "no_cargo_or_rustc_running_before_cleanup": true,
+  "retained_binary_verified": true,
+  "rows": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0962/target-fp-diagnostic-retained",
+      "files": 1331,
+      "logical_bytes": 729778754,
+      "kind": "disposable build/temp cache",
+      "removed": true
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0962/target-fp-diagnostic-v2",
+      "files": 1765,
+      "logical_bytes": 2293542562,
+      "kind": "disposable build/temp cache",
+      "removed": true
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0962/target-diagnostic-fp-v1",
+      "files": 1781,
+      "logical_bytes": 2971500386,
+      "kind": "disposable build/temp cache",
+      "removed": true
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0962/tmp",
+      "files": 0,
+      "logical_bytes": 0,
+      "kind": "disposable build/temp cache",
+      "removed": true
+    }
+  ],
+  "total_logical_bytes": 5994821702
+}

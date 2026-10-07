@@ -1,0 +1,25 @@
+{
+  "argv": [
+    "/usr/bin/perf",
+    "script",
+    "--show-lost-events",
+    "--demangle",
+    "--no-inline",
+    "--full-source-path",
+    "-F",
+    "comm,pid,tid,time,event,period,ip,sym,symoff,dso,srcline",
+    "-i",
+    "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent/perf.data"
+  ],
+  "cwd": "/home/zhuhe/litchi-performance-0962",
+  "deadline_seconds": 900,
+  "failure": null,
+  "finished_utc": "2026-10-07T20:24:04.316477+00:00",
+  "pid": 3197942,
+  "process_group_clear": true,
+  "returncode": 0,
+  "schema": "litchi.performance.0962.fp-wave-decoder.v2.terminal",
+  "started_utc": "2026-10-07T20:24:03.851960+00:00",
+  "terminal_before_parse": true,
+  "timeout": false
+}

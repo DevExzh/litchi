@@ -1,0 +1,1789 @@
+{
+  "children": [
+    {
+      "analyzer": {
+        "bytes": 314382,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent/offline-decode-v2/analyzer.json",
+        "sha256": "e957362b2621dbe72e6330698b43d88415b3fca8b1f7aee60b1a7d1f797f4674"
+      },
+      "conservation": {
+        "inline_period_sum_pass": true,
+        "inline_sample_count_pass": true,
+        "physical_input_period": 91053217040,
+        "physical_input_samples": 20922
+      },
+      "decode_control": {
+        "bytes": 15413,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent/offline-decode-v2/decode-control.json",
+        "sha256": "8ee4104882980f7a6bec74a2a2277b5f809d0cfee86e2634e5f6c0d8f6acda2a"
+      },
+      "directory": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent",
+      "pairing": {
+        "exact_pairing_pass": true,
+        "header_multiset_equal": true,
+        "inline_samples": 20922,
+        "paired_samples": 20922,
+        "physical_samples": 20922,
+        "unmatched_inline_samples": 0,
+        "unmatched_physical_samples": 0
+      },
+      "qualification_gate": {
+        "admitted": true,
+        "admitted_without_lost_record_binding": false,
+        "lost_records": 0,
+        "lost_records_zero": true,
+        "minimum_period": 100000,
+        "minimum_samples": 100,
+        "qualified_period": 8347974970,
+        "qualified_period_min_pass": true,
+        "qualified_samples": 1899,
+        "qualified_samples_min_pass": true
+      },
+      "qualified": {
+        "period": 8347974970,
+        "period_share": 0.09168237258802954,
+        "samples": 1899
+      },
+      "source_leaf_coverage": {
+        "resolved_period": 7583136187,
+        "resolved_period_fraction_of_qualified": 0.9083803214853194,
+        "resolved_sample_fraction_of_qualified": 0.9083728278041074,
+        "resolved_samples": 1725,
+        "unresolved_leaf_groups": [
+          {
+            "key": "branch<litchi_xlsx::cell::Stored, litchi_xlsx::error::Error> [[dso-omitted]]",
+            "period": 131872906,
+            "period_share": 0.01579699345936108,
+            "samples": 30
+          },
+          {
+            "key": "deref<str> [[dso-omitted]]",
+            "period": 114252393,
+            "period_share": 0.01368624048473878,
+            "samples": 26
+          },
+          {
+            "key": "branch<alloc::borrow::Cow<str>, quick_xml::escape::EscapeError> [[dso-omitted]]",
+            "period": 101071323,
+            "period_share": 0.0121072863015544,
+            "samples": 23
+          },
+          {
+            "key": "finish_cell [[dso-omitted]]",
+            "period": 83577954,
+            "period_share": 0.010011763846963236,
+            "samples": 19
+          },
+          {
+            "key": "next [[dso-omitted]]",
+            "period": 61533796,
+            "period_share": 0.0073711045159015375,
+            "samples": 14
+          },
+          {
+            "key": "read_until_close<&[u8], ()> [[dso-omitted]]",
+            "period": 21983292,
+            "period_share": 0.0026333682215149237,
+            "samples": 5
+          },
+          {
+            "key": "branch<core::option::Option<alloc::string::String>, litchi_ooxml_common::xml::XmlError> [[dso-omitted]]",
+            "period": 21964506,
+            "period_share": 0.0026311178554000864,
+            "samples": 5
+          },
+          {
+            "key": "read_with<quick_xml::parser::element::ElementParser> [[dso-omitted]]",
+            "period": 17602915,
+            "period_share": 0.002108644918469371,
+            "samples": 4
+          },
+          {
+            "key": "find_key_index<alloc::collections::btree::node::marker::Immut, litchi_sheet::Cell, litchi_xlsx::raw::worksheet::edit::model::Action, alloc::collections::btree::node::marker::LeafOrInternal, litchi_sheet::Cell> [[dso-omitted]]",
+            "period": 13200217,
+            "period_share": 0.0015812477933196294,
+            "samples": 3
+          },
+          {
+            "key": "finish_grow<alloc::alloc::Global> [[dso-omitted]]",
+            "period": 13198095,
+            "period_share": 0.0015809935999364884,
+            "samples": 3
+          },
+          {
+            "key": "cell [[dso-omitted]]",
+            "period": 13196962,
+            "period_share": 0.0015808578783987417,
+            "samples": 3
+          },
+          {
+            "key": "inflate_fast_help_impl<1> [[dso-omitted]]",
+            "period": 13169598,
+            "period_share": 0.0015775799576936201,
+            "samples": 3
+          },
+          {
+            "key": "check_for_duplicates [[dso-omitted]]",
+            "period": 8813986,
+            "period_share": 0.0010558232423641299,
+            "samples": 2
+          },
+          {
+            "key": "eq<u8, u8> [[dso-omitted]]",
+            "period": 8801213,
+            "period_share": 0.001054293170694545,
+            "samples": 2
+          },
+          {
+            "key": "read_text [[dso-omitted]]",
+            "period": 8791396,
+            "period_share": 0.0010531171968763103,
+            "samples": 2
+          },
+          {
+            "key": "run_utf8_validation [[dso-omitted]]",
+            "period": 8784394,
+            "period_share": 0.0010522784305856633,
+            "samples": 2
+          },
+          {
+            "key": "emit_start [[dso-omitted]]",
+            "period": 8782585,
+            "period_share": 0.0010520617313254834,
+            "samples": 2
+          },
+          {
+            "key": "recover [[dso-omitted]]",
+            "period": 8771689,
+            "period_share": 0.001050756504604134,
+            "samples": 2
+          },
+          {
+            "key": "checked_sub [[dso-omitted]]",
+            "period": 4406815,
+            "period_share": 0.0005278902986456846,
+            "samples": 1
+          },
+          {
+            "key": "deref<[u8]> [[dso-omitted]]",
+            "period": 4401530,
+            "period_share": 0.0005272572109784368,
+            "samples": 1
+          },
+          {
+            "key": "contains [[dso-omitted]]",
+            "period": 4400748,
+            "period_share": 0.0005271635355657996,
+            "samples": 1
+          },
+          {
+            "key": "next<litchi_xlsx::raw::worksheet::model::RawCell> [[dso-omitted]]",
+            "period": 4399354,
+            "period_share": 0.0005269965489606637,
+            "samples": 1
+          },
+          {
+            "key": "get_offset_len_noubcheck<u8> [[dso-omitted]]",
+            "period": 4399208,
+            "period_share": 0.0005269790596892506,
+            "samples": 1
+          },
+          {
+            "key": "copy_nonoverlapping<u8> [[dso-omitted]]",
+            "period": 4399100,
+            "period_share": 0.0005269661224199862,
+            "samples": 1
+          },
+          {
+            "key": "checked_add [[dso-omitted]]",
+            "period": 4398488,
+            "period_share": 0.0005268928112274875,
+            "samples": 1
+          },
+          {
+            "key": "branch<litchi_xlsx::cell_values::validation::Admission, litchi_xlsx::error::Error> [[dso-omitted]]",
+            "period": 4398369,
+            "period_share": 0.0005268785562733905,
+            "samples": 1
+          },
+          {
+            "key": "observe_inner [[dso-omitted]]",
+            "period": 4398289,
+            "period_share": 0.0005268689731109723,
+            "samples": 1
+          },
+          {
+            "key": "cell_fields<litchi_xlsx::raw::worksheet::codec::{impl#0}::start_cell::{closure_env#1}> [[dso-omitted]]",
+            "period": 4398276,
+            "period_share": 0.0005268674158470794,
+            "samples": 1
+          },
+          {
+            "key": "emit_end [[dso-omitted]]",
+            "period": 4398085,
+            "period_share": 0.0005268445360468061,
+            "samples": 1
+          },
+          {
+            "key": "splitpoint [[dso-omitted]]",
+            "period": 4398074,
+            "period_share": 0.0005268432183619736,
+            "samples": 1
+          },
+          {
+            "key": "transition [[dso-omitted]]",
+            "period": 4397868,
+            "period_share": 0.0005268185417187469,
+            "samples": 1
+          },
+          {
+            "key": "branch<&str, core::str::error::Utf8Error> [[dso-omitted]]",
+            "period": 4397699,
+            "period_share": 0.0005267982972881386,
+            "samples": 1
+          },
+          {
+            "key": "read<litchi_xlsx::raw::worksheet::edit::codec::snapshot::facts::Kind> [[dso-omitted]]",
+            "period": 4395552,
+            "period_share": 0.000526541109166742,
+            "samples": 1
+          },
+          {
+            "key": "parse_source_with_observer<litchi_xlsx::cell_values::snapshot::{impl#1}::from_source_selected::{closure_env#0}, litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source::{closure_env#0}<litchi_xlsx::cell_values::snapshot::{impl#1}::from_source_selected::{closure_env#0}>> [[dso-omitted]]",
+            "period": 4395191,
+            "period_share": 0.0005264978651463302,
+            "samples": 1
+          },
+          {
+            "key": "scan_attributes [[dso-omitted]]",
+            "period": 4394634,
+            "period_share": 0.000526431142377994,
+            "samples": 1
+          },
+          {
+            "key": "next_back<fn(char) -> bool> [[dso-omitted]]",
+            "period": 4394470,
+            "period_share": 0.0005264114968950368,
+            "samples": 1
+          },
+          {
+            "key": "write<core::hash::sip::Sip13Rounds> [[dso-omitted]]",
+            "period": 4393285,
+            "period_share": 0.0005262695463017183,
+            "samples": 1
+          },
+          {
+            "key": "next<u8> [[dso-omitted]]",
+            "period": 4391328,
+            "period_share": 0.0005260351181910647,
+            "samples": 1
+          },
+          {
+            "key": "process_event<&[u8]> [[dso-omitted]]",
+            "period": 4391050,
+            "period_share": 0.0005260018167016617,
+            "samples": 1
+          },
+          {
+            "key": "branch<litchi_xlsx::raw::worksheet::codec::OpenLaneCell, litchi_xlsx::error::Error> [[dso-omitted]]",
+            "period": 4381921,
+            "period_share": 0.0005249082580802228,
+            "samples": 1
+          },
+          {
+            "key": "scan_cell_attributes [[dso-omitted]]",
+            "period": 4371431,
+            "period_share": 0.0005236516659081453,
+            "samples": 1
+          },
+          {
+            "key": "push [[dso-omitted]]",
+            "period": 4368798,
+            "period_share": 0.0005233362600750586,
+            "samples": 1
+          }
+        ],
+        "unresolved_period_fraction_of_qualified": 0.09161967851468054,
+        "unresolved_period_quarantined": 764838783,
+        "unresolved_sample_fraction_of_qualified": 0.09162717219589257,
+        "unresolved_samples_quarantined": 174
+      },
+      "whole_process": {
+        "period": 91053217040,
+        "period_share": 1.0,
+        "samples": 20922
+      }
+    },
+    {
+      "analyzer": {
+        "bytes": 482521,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v2/analyzer.json",
+        "sha256": "d9fd52ed412172ec1666caa17a38b750de9cff4fedc5f32a1948b9dbed1e0eb6"
+      },
+      "conservation": {
+        "inline_period_sum_pass": true,
+        "inline_sample_count_pass": true,
+        "physical_input_period": 124104865620,
+        "physical_input_samples": 28627
+      },
+      "decode_control": {
+        "bytes": 15557,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v2/decode-control.json",
+        "sha256": "39158b316ce826bf10614a53ff41d67cb12c08331824522e60b16a6821129c06"
+      },
+      "directory": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent",
+      "pairing": {
+        "exact_pairing_pass": true,
+        "header_multiset_equal": true,
+        "inline_samples": 28627,
+        "paired_samples": 28627,
+        "physical_samples": 28627,
+        "unmatched_inline_samples": 0,
+        "unmatched_physical_samples": 0
+      },
+      "qualification_gate": {
+        "admitted": true,
+        "admitted_without_lost_record_binding": false,
+        "lost_records": 0,
+        "lost_records_zero": true,
+        "minimum_period": 100000,
+        "minimum_samples": 100,
+        "qualified_period": 15898003220,
+        "qualified_period_min_pass": true,
+        "qualified_samples": 3722,
+        "qualified_samples_min_pass": true
+      },
+      "qualified": {
+        "period": 15898003220,
+        "period_share": 0.12810136927812743,
+        "samples": 3722
+      },
+      "source_leaf_coverage": {
+        "resolved_period": 14460897495,
+        "resolved_period_fraction_of_qualified": 0.9096046399593067,
+        "resolved_sample_fraction_of_qualified": 0.9094572810317034,
+        "resolved_samples": 3385,
+        "unresolved_leaf_groups": [
+          {
+            "key": "branch<alloc::borrow::Cow<str>, quick_xml::escape::EscapeError> [[dso-omitted]]",
+            "period": 198985094,
+            "period_share": 0.012516357636012606,
+            "samples": 47
+          },
+          {
+            "key": "branch<litchi_xlsx::cell::Stored, litchi_xlsx::error::Error> [[dso-omitted]]",
+            "period": 191471456,
+            "period_share": 0.012043742434214955,
+            "samples": 44
+          },
+          {
+            "key": "deref<str> [[dso-omitted]]",
+            "period": 191417595,
+            "period_share": 0.012040354524472162,
+            "samples": 44
+          },
+          {
+            "key": "finish_cell [[dso-omitted]]",
+            "period": 138175544,
+            "period_share": 0.008691377281026869,
+            "samples": 33
+          },
+          {
+            "key": "next [[dso-omitted]]",
+            "period": 101385750,
+            "period_share": 0.006377263144119554,
+            "samples": 24
+          },
+          {
+            "key": "check_for_duplicates [[dso-omitted]]",
+            "period": 46625415,
+            "period_share": 0.002932784347492414,
+            "samples": 11
+          },
+          {
+            "key": "find_key_index<alloc::collections::btree::node::marker::Immut, litchi_sheet::Cell, litchi_xlsx::raw::worksheet::edit::model::Action, alloc::collections::btree::node::marker::LeafOrInternal, litchi_sheet::Cell> [[dso-omitted]]",
+            "period": 43729617,
+            "period_share": 0.002750635812237557,
+            "samples": 10
+          },
+          {
+            "key": "read_text [[dso-omitted]]",
+            "period": 30477094,
+            "period_share": 0.001917039113544726,
+            "samples": 7
+          },
+          {
+            "key": "read_until_close<&[u8], ()> [[dso-omitted]]",
+            "period": 28707958,
+            "period_share": 0.0018057587234530702,
+            "samples": 7
+          },
+          {
+            "key": "inflate_fast_help_impl<1> [[dso-omitted]]",
+            "period": 22024875,
+            "period_share": 0.0013853862460093274,
+            "samples": 5
+          },
+          {
+            "key": "eq<u8, u8> [[dso-omitted]]",
+            "period": 21030389,
+            "period_share": 0.0013228321009234264,
+            "samples": 5
+          },
+          {
+            "key": "branch<&str, core::str::error::Utf8Error> [[dso-omitted]]",
+            "period": 20752997,
+            "period_share": 0.0013053838719753385,
+            "samples": 5
+          },
+          {
+            "key": "cell [[dso-omitted]]",
+            "period": 20701907,
+            "period_share": 0.0013021702608511613,
+            "samples": 5
+          },
+          {
+            "key": "read_with<quick_xml::parser::element::ElementParser> [[dso-omitted]]",
+            "period": 16842639,
+            "period_share": 0.0010594185173400663,
+            "samples": 4
+          },
+          {
+            "key": "overflowing_mul [[dso-omitted]]",
+            "period": 16731672,
+            "period_share": 0.0010524385841708239,
+            "samples": 4
+          },
+          {
+            "key": "process_event<&[u8]> [[dso-omitted]]",
+            "period": 16512113,
+            "period_share": 0.0010386281076624415,
+            "samples": 4
+          },
+          {
+            "key": "add<litchi_xlsx::cell::Stored> [[dso-omitted]]",
+            "period": 13197570,
+            "period_share": 0.0008301401010786813,
+            "samples": 3
+          },
+          {
+            "key": "emit_end [[dso-omitted]]",
+            "period": 13182708,
+            "period_share": 0.0008292052666976376,
+            "samples": 3
+          },
+          {
+            "key": "materialize [[dso-omitted]]",
+            "period": 13057437,
+            "period_share": 0.0008213255978948028,
+            "samples": 3
+          },
+          {
+            "key": "deref<[u8]> [[dso-omitted]]",
+            "period": 12951991,
+            "period_share": 0.0008146929410421896,
+            "samples": 3
+          },
+          {
+            "key": "try_fold<core::iter::adapters::zip::Zip<core::ops::range::RangeFrom<usize>, core::slice::iter::Iter<u8>>, (), core::iter::traits::iterator::Iterator::find::check::{closure_env#0}<(usize, &u8), quick_xml::events::attributes::{impl#17}::next::{closure_env#3}>, core::ops::control_flow::ControlFlow<(usize, &u8), ()>> [[dso-omitted]]",
+            "period": 12881319,
+            "period_share": 0.0008102476029061969,
+            "samples": 3
+          },
+          {
+            "key": "branch<litchi_xlsx::cell_values::validation::Admission, litchi_xlsx::error::Error> [[dso-omitted]]",
+            "period": 12779311,
+            "period_share": 0.0008038311996265906,
+            "samples": 3
+          },
+          {
+            "key": "finish_grow<alloc::alloc::Global> [[dso-omitted]]",
+            "period": 12650741,
+            "period_share": 0.0007957440204871213,
+            "samples": 3
+          },
+          {
+            "key": "checked_add [[dso-omitted]]",
+            "period": 12612583,
+            "period_share": 0.000793343844850473,
+            "samples": 3
+          },
+          {
+            "key": "{closure#0} [[dso-omitted]]",
+            "period": 12503080,
+            "period_share": 0.0007864559987175547,
+            "samples": 3
+          },
+          {
+            "key": "unlikely [[dso-omitted]]",
+            "period": 11911001,
+            "period_share": 0.000749213648731416,
+            "samples": 3
+          },
+          {
+            "key": "contains [[dso-omitted]]",
+            "period": 8808921,
+            "period_share": 0.0005540897732941836,
+            "samples": 2
+          },
+          {
+            "key": "raw_attribute [[dso-omitted]]",
+            "period": 8764146,
+            "period_share": 0.0005512733818656253,
+            "samples": 2
+          },
+          {
+            "key": "max<u32> [[dso-omitted]]",
+            "period": 8756087,
+            "period_share": 0.0005507664628589753,
+            "samples": 2
+          },
+          {
+            "key": "branch<core::option::Option<alloc::string::String>, litchi_ooxml_common::xml::XmlError> [[dso-omitted]]",
+            "period": 8736291,
+            "period_share": 0.0005495212750372055,
+            "samples": 2
+          },
+          {
+            "key": "index<u8> [[dso-omitted]]",
+            "period": 8674106,
+            "period_share": 0.0005456097775277718,
+            "samples": 2
+          },
+          {
+            "key": "row_number [[dso-omitted]]",
+            "period": 8538466,
+            "period_share": 0.0005370778884519562,
+            "samples": 2
+          },
+          {
+            "key": "push [[dso-omitted]]",
+            "period": 8523841,
+            "period_share": 0.0005361579616034321,
+            "samples": 2
+          },
+          {
+            "key": "next_back<fn(char) -> bool> [[dso-omitted]]",
+            "period": 8392164,
+            "period_share": 0.0005278753491156986,
+            "samples": 2
+          },
+          {
+            "key": "fwd_byte_by_byte<memchr::arch::x86_64::avx2::memchr::{impl#0}::find_raw::{closure_env#0}> [[dso-omitted]]",
+            "period": 8391544,
+            "period_share": 0.0005278363505074193,
+            "samples": 2
+          },
+          {
+            "key": "next<u8> [[dso-omitted]]",
+            "period": 8336311,
+            "period_share": 0.0005243621406185626,
+            "samples": 2
+          },
+          {
+            "key": "element [[dso-omitted]]",
+            "period": 8245337,
+            "period_share": 0.0005186397867643658,
+            "samples": 2
+          },
+          {
+            "key": "recover [[dso-omitted]]",
+            "period": 8156323,
+            "period_share": 0.0005130407188331165,
+            "samples": 2
+          },
+          {
+            "key": "get_offset_len_noubcheck<u8> [[dso-omitted]]",
+            "period": 8126141,
+            "period_share": 0.0005111422414216871,
+            "samples": 2
+          },
+          {
+            "key": "transpose<u32, litchi_xlsx::error::Error> [[dso-omitted]]",
+            "period": 7938036,
+            "period_share": 0.0004993102523726876,
+            "samples": 2
+          },
+          {
+            "key": "min<usize> [[dso-omitted]]",
+            "period": 4409958,
+            "period_share": 0.00027739068479066517,
+            "samples": 1
+          },
+          {
+            "key": "len_and_friends [[dso-omitted]]",
+            "period": 4409891,
+            "period_share": 0.0002773864704249318,
+            "samples": 1
+          },
+          {
+            "key": "partition_hoare_branchy_cyclic<litchi_xlsx::cell::Stored, core::slice::{impl#0}::sort_unstable_by_key::{closure_env#0}<litchi_xlsx::cell::Stored, litchi_sheet::Cell, litchi_xlsx::cell::{impl#36}::from_unsorted::{closure_env#0}>> [[dso-omitted]]",
+            "period": 4405164,
+            "period_share": 0.00027708913748729255,
+            "samples": 1
+          },
+          {
+            "key": "clone [[dso-omitted]]",
+            "period": 4386282,
+            "period_share": 0.00027590144116224427,
+            "samples": 1
+          },
+          {
+            "key": "classify [[dso-omitted]]",
+            "period": 4385294,
+            "period_share": 0.00027583929499292175,
+            "samples": 1
+          },
+          {
+            "key": "materialize_cell [[dso-omitted]]",
+            "period": 4377413,
+            "period_share": 0.0002753435723609068,
+            "samples": 1
+          },
+          {
+            "key": "inflate_table [[dso-omitted]]",
+            "period": 4370220,
+            "period_share": 0.0002748911256038857,
+            "samples": 1
+          },
+          {
+            "key": "dispatch [[dso-omitted]]",
+            "period": 4352375,
+            "period_share": 0.0002737686575962336,
+            "samples": 1
+          },
+          {
+            "key": "parse_value [[dso-omitted]]",
+            "period": 4351141,
+            "period_share": 0.0002736910377855616,
+            "samples": 1
+          },
+          {
+            "key": "__rustc::__rust_alloc [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 4297977,
+            "period_share": 0.0002703469700265918,
+            "samples": 1
+          },
+          {
+            "key": "add<u8> [[dso-omitted]]",
+            "period": 4272533,
+            "period_share": 0.0002687465174635938,
+            "samples": 1
+          },
+          {
+            "key": "run_utf8_validation [[dso-omitted]]",
+            "period": 4268082,
+            "period_share": 0.00026846654519673696,
+            "samples": 1
+          },
+          {
+            "key": "resolve_event [[dso-omitted]]",
+            "period": 4259063,
+            "period_share": 0.0002678992412482352,
+            "samples": 1
+          },
+          {
+            "key": "non_null<alloc::alloc::Global, core::ops::range::Range<usize>> [[dso-omitted]]",
+            "period": 4258870,
+            "period_share": 0.00026788710135888376,
+            "samples": 1
+          },
+          {
+            "key": "push_mut<core::ops::range::Range<usize>, alloc::alloc::Global> [[dso-omitted]]",
+            "period": 4192263,
+            "period_share": 0.00026369745571104493,
+            "samples": 1
+          },
+          {
+            "key": "scan_attributes [[dso-omitted]]",
+            "period": 4136279,
+            "period_share": 0.0002601760071853854,
+            "samples": 1
+          },
+          {
+            "key": "transition [[dso-omitted]]",
+            "period": 4114493,
+            "period_share": 0.0002588056464112353,
+            "samples": 1
+          },
+          {
+            "key": "try_fold<core::iter::adapters::zip::Zip<core::ops::range::RangeFrom<usize>, core::slice::iter::Iter<u8>>, (), core::iter::traits::iterator::Iterator::find::check::{closure_env#0}<(usize, &u8), quick_xml::events::attributes::{impl#17}::next::{closure_env#0}>, core::ops::control_flow::ControlFlow<(usize, &u8), ()>> [[dso-omitted]]",
+            "period": 4113144,
+            "period_share": 0.00025872079298773726,
+            "samples": 1
+          },
+          {
+            "key": "checked_sub [[dso-omitted]]",
+            "period": 4041405,
+            "period_share": 0.0002542083395049155,
+            "samples": 1
+          },
+          {
+            "key": "emit_start [[dso-omitted]]",
+            "period": 4016308,
+            "period_share": 0.0002526297135823577,
+            "samples": 1
+          }
+        ],
+        "unresolved_period_fraction_of_qualified": 0.0903953600406932,
+        "unresolved_period_quarantined": 1437105725,
+        "unresolved_sample_fraction_of_qualified": 0.09054271896829662,
+        "unresolved_samples_quarantined": 337
+      },
+      "whole_process": {
+        "period": 124104865620,
+        "period_share": 1.0,
+        "samples": 28627
+      }
+    },
+    {
+      "analyzer": {
+        "bytes": 123716,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/offline-decode-v2/analyzer.json",
+        "sha256": "817728318ff037416a2a456d8816abc7d007ca1311c4fd21e3ecbfb36406c106"
+      },
+      "conservation": {
+        "inline_period_sum_pass": true,
+        "inline_sample_count_pass": true,
+        "physical_input_period": 74724898225,
+        "physical_input_samples": 17428
+      },
+      "decode_control": {
+        "bytes": 15343,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/offline-decode-v2/decode-control.json",
+        "sha256": "6f978553cc9e6ebb88f101ec70d7943b1cfe4e92f68efb413e193a21500118b3"
+      },
+      "directory": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit",
+      "pairing": {
+        "exact_pairing_pass": true,
+        "header_multiset_equal": true,
+        "inline_samples": 17428,
+        "paired_samples": 17428,
+        "physical_samples": 17428,
+        "unmatched_inline_samples": 0,
+        "unmatched_physical_samples": 0
+      },
+      "qualification_gate": {
+        "admitted": true,
+        "admitted_without_lost_record_binding": false,
+        "lost_records": 0,
+        "lost_records_zero": true,
+        "minimum_period": 100000,
+        "minimum_samples": 100,
+        "qualified_period": 2195986095,
+        "qualified_period_min_pass": true,
+        "qualified_samples": 499,
+        "qualified_samples_min_pass": true
+      },
+      "qualified": {
+        "period": 2195986095,
+        "period_share": 0.02938760904548559,
+        "samples": 499
+      },
+      "source_leaf_coverage": {
+        "resolved_period": 2011020743,
+        "resolved_period_fraction_of_qualified": 0.9157711642978322,
+        "resolved_sample_fraction_of_qualified": 0.9158316633266533,
+        "resolved_samples": 457,
+        "unresolved_leaf_groups": [
+          {
+            "key": "branch<alloc::borrow::Cow<str>, quick_xml::escape::EscapeError> [[dso-omitted]]",
+            "period": 39649189,
+            "period_share": 0.018055300573294387,
+            "samples": 9
+          },
+          {
+            "key": "finish_cell [[dso-omitted]]",
+            "period": 26402176,
+            "period_share": 0.0120229249447957,
+            "samples": 6
+          },
+          {
+            "key": "next [[dso-omitted]]",
+            "period": 17619237,
+            "period_share": 0.008023382771009759,
+            "samples": 4
+          },
+          {
+            "key": "check_for_duplicates [[dso-omitted]]",
+            "period": 13238450,
+            "period_share": 0.0060284762413306625,
+            "samples": 3
+          },
+          {
+            "key": "push_mut<core::ops::range::Range<usize>, alloc::alloc::Global> [[dso-omitted]]",
+            "period": 13222318,
+            "period_share": 0.0060211301110265,
+            "samples": 3
+          },
+          {
+            "key": "branch<litchi_xlsx::cell::Stored, litchi_xlsx::error::Error> [[dso-omitted]]",
+            "period": 8806090,
+            "period_share": 0.004010084590266952,
+            "samples": 2
+          },
+          {
+            "key": "__rustc::__rust_alloc [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 4414904,
+            "period_share": 0.0020104426025520893,
+            "samples": 1
+          },
+          {
+            "key": "overflowing_mul [[dso-omitted]]",
+            "period": 4411760,
+            "period_share": 0.0020090108994975215,
+            "samples": 1
+          },
+          {
+            "key": "dispatch [[dso-omitted]]",
+            "period": 4410459,
+            "period_share": 0.002008418454944725,
+            "samples": 1
+          },
+          {
+            "key": "cell [[dso-omitted]]",
+            "period": 4410100,
+            "period_share": 0.002008254974856751,
+            "samples": 1
+          },
+          {
+            "key": "process_event<&[u8]> [[dso-omitted]]",
+            "period": 4409256,
+            "period_share": 0.002007870637268311,
+            "samples": 1
+          },
+          {
+            "key": "copy_nonoverlapping<u8> [[dso-omitted]]",
+            "period": 4408183,
+            "period_share": 0.002007382018509548,
+            "samples": 1
+          },
+          {
+            "key": "add<u8> [[dso-omitted]]",
+            "period": 4407984,
+            "period_share": 0.0020072913986279133,
+            "samples": 1
+          },
+          {
+            "key": "invert [[dso-omitted]]",
+            "period": 4407963,
+            "period_share": 0.0020072818357258315,
+            "samples": 1
+          },
+          {
+            "key": "non_null<alloc::alloc::Global, core::ops::range::Range<usize>> [[dso-omitted]]",
+            "period": 4407536,
+            "period_share": 0.0020070873900501635,
+            "samples": 1
+          },
+          {
+            "key": "read_with<quick_xml::parser::element::ElementParser> [[dso-omitted]]",
+            "period": 4405609,
+            "period_share": 0.002006209879940064,
+            "samples": 1
+          },
+          {
+            "key": "transition [[dso-omitted]]",
+            "period": 4403859,
+            "period_share": 0.0020054129714332275,
+            "samples": 1
+          },
+          {
+            "key": "branch<core::option::Option<alloc::string::String>, litchi_ooxml_common::xml::XmlError> [[dso-omitted]]",
+            "period": 4401056,
+            "period_share": 0.0020041365516934207,
+            "samples": 1
+          },
+          {
+            "key": "emit_start [[dso-omitted]]",
+            "period": 4398061,
+            "period_share": 0.002002772699706006,
+            "samples": 1
+          },
+          {
+            "key": "index<u8> [[dso-omitted]]",
+            "period": 4396256,
+            "period_share": 0.0020019507455032405,
+            "samples": 1
+          },
+          {
+            "key": "branch<&str, core::str::error::Utf8Error> [[dso-omitted]]",
+            "period": 4334906,
+            "period_share": 0.001974013410135004,
+            "samples": 1
+          }
+        ],
+        "unresolved_period_fraction_of_qualified": 0.08422883570216777,
+        "unresolved_period_quarantined": 184965352,
+        "unresolved_sample_fraction_of_qualified": 0.0841683366733467,
+        "unresolved_samples_quarantined": 42
+      },
+      "whole_process": {
+        "period": 74724898225,
+        "period_share": 1.0,
+        "samples": 17428
+      }
+    },
+    {
+      "analyzer": {
+        "bytes": 135430,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/offline-decode-v2/analyzer.json",
+        "sha256": "4fdd2631221555207a7544323136b7f5feef6cf1e1b58dc0edc957e26e79d018"
+      },
+      "conservation": {
+        "inline_period_sum_pass": true,
+        "inline_sample_count_pass": true,
+        "physical_input_period": 74690580281,
+        "physical_input_samples": 17409
+      },
+      "decode_control": {
+        "bytes": 15343,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/offline-decode-v2/decode-control.json",
+        "sha256": "81506b1ceb294bbbee662a49efbd9ebee2e6a4f00573f70ced23e46dec94d0eb"
+      },
+      "directory": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit",
+      "pairing": {
+        "exact_pairing_pass": true,
+        "header_multiset_equal": true,
+        "inline_samples": 17409,
+        "paired_samples": 17409,
+        "physical_samples": 17409,
+        "unmatched_inline_samples": 0,
+        "unmatched_physical_samples": 0
+      },
+      "qualification_gate": {
+        "admitted": true,
+        "admitted_without_lost_record_binding": false,
+        "lost_records": 0,
+        "lost_records_zero": true,
+        "minimum_period": 100000,
+        "minimum_samples": 100,
+        "qualified_period": 2068701002,
+        "qualified_period_min_pass": true,
+        "qualified_samples": 470,
+        "qualified_samples_min_pass": true
+      },
+      "qualified": {
+        "period": 2068701002,
+        "period_share": 0.02769694644514955,
+        "samples": 470
+      },
+      "source_leaf_coverage": {
+        "resolved_period": 1927759146,
+        "resolved_period_fraction_of_qualified": 0.9318693925010242,
+        "resolved_sample_fraction_of_qualified": 0.9319148936170213,
+        "resolved_samples": 438,
+        "unresolved_leaf_groups": [
+          {
+            "key": "finish_cell [[dso-omitted]]",
+            "period": 26415238,
+            "period_share": 0.012768997537325116,
+            "samples": 6
+          },
+          {
+            "key": "next [[dso-omitted]]",
+            "period": 22038515,
+            "period_share": 0.010653310932171145,
+            "samples": 5
+          },
+          {
+            "key": "branch<alloc::borrow::Cow<str>, quick_xml::escape::EscapeError> [[dso-omitted]]",
+            "period": 22022989,
+            "period_share": 0.010645805739306157,
+            "samples": 5
+          },
+          {
+            "key": "rposition<u8, quick_xml::reader::state::{impl#0}::emit_end::{closure_env#0}> [[dso-omitted]]",
+            "period": 4411385,
+            "period_share": 0.002132442047321056,
+            "samples": 1
+          },
+          {
+            "key": "eq<u8, u8> [[dso-omitted]]",
+            "period": 4410642,
+            "period_share": 0.0021320828847358,
+            "samples": 1
+          },
+          {
+            "key": "read_with<quick_xml::parser::element::ElementParser> [[dso-omitted]]",
+            "period": 4408114,
+            "period_share": 0.0021308608618346866,
+            "samples": 1
+          },
+          {
+            "key": "len_and_friends [[dso-omitted]]",
+            "period": 4407868,
+            "period_share": 0.002130741946631493,
+            "samples": 1
+          },
+          {
+            "key": "inflate_fast_help_impl<1> [[dso-omitted]]",
+            "period": 4407793,
+            "period_share": 0.002130705691996373,
+            "samples": 1
+          },
+          {
+            "key": "right_edge<alloc::collections::btree::node::marker::Immut, litchi_sheet::Cell, litchi_xlsx::raw::worksheet::edit::model::Action, alloc::collections::btree::node::marker::Leaf> [[dso-omitted]]",
+            "period": 4405283,
+            "period_share": 0.0021294923702076885,
+            "samples": 1
+          },
+          {
+            "key": "emit_start [[dso-omitted]]",
+            "period": 4405128,
+            "period_share": 0.002129417443961774,
+            "samples": 1
+          },
+          {
+            "key": "run_utf8_validation [[dso-omitted]]",
+            "period": 4404306,
+            "period_share": 0.002129020093160858,
+            "samples": 1
+          },
+          {
+            "key": "scan_attributes [[dso-omitted]]",
+            "period": 4404096,
+            "period_share": 0.002128918580182522,
+            "samples": 1
+          },
+          {
+            "key": "try_fold<core::iter::adapters::zip::Zip<core::ops::range::RangeFrom<usize>, core::slice::iter::Iter<u8>>, (), core::iter::traits::iterator::Iterator::find::check::{closure_env#0}<(usize, &u8), quick_xml::events::attributes::{impl#17}::next::{closure_env#0}>, core::ops::control_flow::ControlFlow<(usize, &u8), ()>> [[dso-omitted]]",
+            "period": 4403646,
+            "period_share": 0.0021287010523718015,
+            "samples": 1
+          },
+          {
+            "key": "memchr_raw [[dso-omitted]]",
+            "period": 4402359,
+            "period_share": 0.0021280789228331413,
+            "samples": 1
+          },
+          {
+            "key": "validate_element [[dso-omitted]]",
+            "period": 4401293,
+            "period_share": 0.0021275636236193014,
+            "samples": 1
+          },
+          {
+            "key": "escape_xml [[dso-omitted]]",
+            "period": 4400721,
+            "period_share": 0.0021272871216021193,
+            "samples": 1
+          },
+          {
+            "key": "non_null<alloc::alloc::Global, (&str, alloc::string::String)> [[dso-omitted]]",
+            "period": 4399418,
+            "period_share": 0.0021266572577413,
+            "samples": 1
+          },
+          {
+            "key": "index<u8> [[dso-omitted]]",
+            "period": 4399398,
+            "period_share": 0.0021266475898386017,
+            "samples": 1
+          },
+          {
+            "key": "overflowing_mul [[dso-omitted]]",
+            "period": 4393664,
+            "period_share": 0.0021238758021348897,
+            "samples": 1
+          }
+        ],
+        "unresolved_period_fraction_of_qualified": 0.06813060749897583,
+        "unresolved_period_quarantined": 140941856,
+        "unresolved_sample_fraction_of_qualified": 0.06808510638297872,
+        "unresolved_samples_quarantined": 32
+      },
+      "whole_process": {
+        "period": 74690580281,
+        "period_share": 1.0,
+        "samples": 17409
+      }
+    },
+    {
+      "analyzer": {
+        "bytes": 461243,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent/offline-decode-v2/analyzer.json",
+        "sha256": "11a60ba8f52468600b0431342436084ce7675a808c474e140a6444dbeabf8623"
+      },
+      "conservation": {
+        "inline_period_sum_pass": true,
+        "inline_sample_count_pass": true,
+        "physical_input_period": 128069447035,
+        "physical_input_samples": 29543
+      },
+      "decode_control": {
+        "bytes": 15557,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent/offline-decode-v2/decode-control.json",
+        "sha256": "a9511eb85faaf091a6a42af31bf124d5d694c2aaa9ed24ba53d630f1e0cd5a55"
+      },
+      "directory": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent",
+      "pairing": {
+        "exact_pairing_pass": true,
+        "header_multiset_equal": true,
+        "inline_samples": 29543,
+        "paired_samples": 29543,
+        "physical_samples": 29543,
+        "unmatched_inline_samples": 0,
+        "unmatched_physical_samples": 0
+      },
+      "qualification_gate": {
+        "admitted": true,
+        "admitted_without_lost_record_binding": false,
+        "lost_records": 0,
+        "lost_records_zero": true,
+        "minimum_period": 100000,
+        "minimum_samples": 100,
+        "qualified_period": 15992963474,
+        "qualified_period_min_pass": true,
+        "qualified_samples": 3747,
+        "qualified_samples_min_pass": true
+      },
+      "qualified": {
+        "period": 15992963474,
+        "period_share": 0.12487727435591485,
+        "samples": 3747
+      },
+      "source_leaf_coverage": {
+        "resolved_period": 14873909972,
+        "resolved_period_fraction_of_qualified": 0.930028383806462,
+        "resolved_sample_fraction_of_qualified": 0.9295436349079264,
+        "resolved_samples": 3483,
+        "unresolved_leaf_groups": [
+          {
+            "key": "finish_cell [[dso-omitted]]",
+            "period": 206856930,
+            "period_share": 0.01293424638506118,
+            "samples": 50
+          },
+          {
+            "key": "branch<litchi_xlsx::cell::Stored, litchi_xlsx::error::Error> [[dso-omitted]]",
+            "period": 191322818,
+            "period_share": 0.011962937219924023,
+            "samples": 44
+          },
+          {
+            "key": "branch<alloc::borrow::Cow<str>, quick_xml::escape::EscapeError> [[dso-omitted]]",
+            "period": 140373399,
+            "period_share": 0.0087771974986504,
+            "samples": 34
+          },
+          {
+            "key": "next [[dso-omitted]]",
+            "period": 81380354,
+            "period_share": 0.005088509964541672,
+            "samples": 19
+          },
+          {
+            "key": "read_text [[dso-omitted]]",
+            "period": 25446803,
+            "period_share": 0.0015911249369992778,
+            "samples": 6
+          },
+          {
+            "key": "check_for_duplicates [[dso-omitted]]",
+            "period": 24600685,
+            "period_share": 0.0015382192950039373,
+            "samples": 6
+          },
+          {
+            "key": "branch<core::option::Option<alloc::string::String>, litchi_ooxml_common::xml::XmlError> [[dso-omitted]]",
+            "period": 21128549,
+            "period_share": 0.0013211153163920494,
+            "samples": 5
+          },
+          {
+            "key": "scan_attributes [[dso-omitted]]",
+            "period": 20978636,
+            "period_share": 0.001311741631505961,
+            "samples": 5
+          },
+          {
+            "key": "deref<[u8]> [[dso-omitted]]",
+            "period": 20770025,
+            "period_share": 0.0012986977075115653,
+            "samples": 5
+          },
+          {
+            "key": "inflate_fast_help_impl<1> [[dso-omitted]]",
+            "period": 17565137,
+            "period_share": 0.00109830407782497,
+            "samples": 4
+          },
+          {
+            "key": "read_with<quick_xml::parser::element::ElementParser> [[dso-omitted]]",
+            "period": 17506460,
+            "period_share": 0.001094635151794132,
+            "samples": 4
+          },
+          {
+            "key": "push_mut<core::ops::range::Range<usize>, alloc::alloc::Global> [[dso-omitted]]",
+            "period": 16930790,
+            "period_share": 0.0010586399467193582,
+            "samples": 4
+          },
+          {
+            "key": "next_back<fn(char) -> bool> [[dso-omitted]]",
+            "period": 16814005,
+            "period_share": 0.0010513376728043416,
+            "samples": 4
+          },
+          {
+            "key": "branch<&str, core::str::error::Utf8Error> [[dso-omitted]]",
+            "period": 16799543,
+            "period_share": 0.001050433400120701,
+            "samples": 4
+          },
+          {
+            "key": "process_event<&[u8]> [[dso-omitted]]",
+            "period": 13173864,
+            "period_share": 0.0008237287618030859,
+            "samples": 3
+          },
+          {
+            "key": "recover [[dso-omitted]]",
+            "period": 13163668,
+            "period_share": 0.0008230912314281447,
+            "samples": 3
+          },
+          {
+            "key": "find_key_index<alloc::collections::btree::node::marker::Immut, litchi_sheet::Cell, litchi_xlsx::raw::worksheet::edit::model::Action, alloc::collections::btree::node::marker::LeafOrInternal, litchi_sheet::Cell> [[dso-omitted]]",
+            "period": 13115160,
+            "period_share": 0.0008200581475297878,
+            "samples": 3
+          },
+          {
+            "key": "emit_start [[dso-omitted]]",
+            "period": 12997032,
+            "period_share": 0.000812671899184255,
+            "samples": 3
+          },
+          {
+            "key": "finish_grow<alloc::alloc::Global> [[dso-omitted]]",
+            "period": 12934042,
+            "period_share": 0.0008087332920522869,
+            "samples": 3
+          },
+          {
+            "key": "validate_element [[dso-omitted]]",
+            "period": 12603491,
+            "period_share": 0.0007880647648879887,
+            "samples": 3
+          },
+          {
+            "key": "transpose<u32, litchi_xlsx::error::Error> [[dso-omitted]]",
+            "period": 11925189,
+            "period_share": 0.0007456522375847952,
+            "samples": 3
+          },
+          {
+            "key": "add<u8> [[dso-omitted]]",
+            "period": 8782797,
+            "period_share": 0.0005491663264458976,
+            "samples": 2
+          },
+          {
+            "key": "non_null<alloc::alloc::Global, core::ops::range::Range<usize>> [[dso-omitted]]",
+            "period": 8781954,
+            "period_share": 0.0005491136157646427,
+            "samples": 2
+          },
+          {
+            "key": "min<usize> [[dso-omitted]]",
+            "period": 8773328,
+            "period_share": 0.0005485742535623826,
+            "samples": 2
+          },
+          {
+            "key": "max<u32> [[dso-omitted]]",
+            "period": 8768152,
+            "period_share": 0.0005482506112300272,
+            "samples": 2
+          },
+          {
+            "key": "emit_end [[dso-omitted]]",
+            "period": 8739713,
+            "period_share": 0.0005464723916995298,
+            "samples": 2
+          },
+          {
+            "key": "index<u8> [[dso-omitted]]",
+            "period": 8711420,
+            "period_share": 0.0005447033011838166,
+            "samples": 2
+          },
+          {
+            "key": "transition [[dso-omitted]]",
+            "period": 8620788,
+            "period_share": 0.000539036308937674,
+            "samples": 2
+          },
+          {
+            "key": "push [[dso-omitted]]",
+            "period": 8601504,
+            "period_share": 0.0005378305286561552,
+            "samples": 2
+          },
+          {
+            "key": "unlikely [[dso-omitted]]",
+            "period": 8585079,
+            "period_share": 0.0005368035144929139,
+            "samples": 2
+          },
+          {
+            "key": "memchr_raw [[dso-omitted]]",
+            "period": 8408066,
+            "period_share": 0.0005257353343968501,
+            "samples": 2
+          },
+          {
+            "key": "observe_inner [[dso-omitted]]",
+            "period": 8267746,
+            "period_share": 0.0005169614758040934,
+            "samples": 2
+          },
+          {
+            "key": "try_fold<core::iter::adapters::zip::Zip<core::ops::range::RangeFrom<usize>, core::slice::iter::Iter<u8>>, (), core::iter::traits::iterator::Iterator::find::check::{closure_env#0}<(usize, &u8), quick_xml::events::attributes::{impl#17}::next::{closure_env#0}>, core::ops::control_flow::ControlFlow<(usize, &u8), ()>> [[dso-omitted]]",
+            "period": 8213182,
+            "period_share": 0.0005135497253746808,
+            "samples": 2
+          },
+          {
+            "key": "fwd_byte_by_byte<memchr::arch::x86_64::avx2::memchr::{impl#0}::find_raw::{closure_env#0}> [[dso-omitted]]",
+            "period": 8185561,
+            "period_share": 0.0005118226533379751,
+            "samples": 2
+          },
+          {
+            "key": "finish [[dso-omitted]]",
+            "period": 8159264,
+            "period_share": 0.000510178367709314,
+            "samples": 2
+          },
+          {
+            "key": "drop_in_place<alloc::borrow::Cow<[u8]>> [[dso-omitted]]",
+            "period": 4406192,
+            "period_share": 0.0002755081637723498,
+            "samples": 1
+          },
+          {
+            "key": "add<litchi_xlsx::cell::Stored> [[dso-omitted]]",
+            "period": 4402233,
+            "period_share": 0.000275260617405697,
+            "samples": 1
+          },
+          {
+            "key": "contains [[dso-omitted]]",
+            "period": 4400930,
+            "period_share": 0.00027517914407512137,
+            "samples": 1
+          },
+          {
+            "key": "start_cell [[dso-omitted]]",
+            "period": 4395923,
+            "period_share": 0.0002748660688900164,
+            "samples": 1
+          },
+          {
+            "key": "clone [[dso-omitted]]",
+            "period": 4393678,
+            "period_share": 0.0002747256946558321,
+            "samples": 1
+          },
+          {
+            "key": "__rustc::__rust_alloc [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 4390438,
+            "period_share": 0.00027452310556061736,
+            "samples": 1
+          },
+          {
+            "key": "map_or<litchi_sheet::Rect, litchi_sheet::Rect, litchi_xlsx::raw::worksheet::edit::package::expanded_dimension_from_facts::{closure_env#0}> [[dso-omitted]]",
+            "period": 4384693,
+            "period_share": 0.00027416388508160237,
+            "samples": 1
+          },
+          {
+            "key": "classify [[dso-omitted]]",
+            "period": 4382409,
+            "period_share": 0.00027402107227497566,
+            "samples": 1
+          },
+          {
+            "key": "append_elements<u8, alloc::alloc::Global> [[dso-omitted]]",
+            "period": 4382217,
+            "period_share": 0.00027400906699525925,
+            "samples": 1
+          },
+          {
+            "key": "rewrite_from_facts [[dso-omitted]]",
+            "period": 4376043,
+            "period_share": 0.00027362302221937783,
+            "samples": 1
+          },
+          {
+            "key": "read_until_close<&[u8], ()> [[dso-omitted]]",
+            "period": 4374557,
+            "period_share": 0.00027353010635657255,
+            "samples": 1
+          },
+          {
+            "key": "from_rewritten_value_source [[dso-omitted]]",
+            "period": 4373408,
+            "period_share": 0.00027345826226076955,
+            "samples": 1
+          },
+          {
+            "key": "cell [[dso-omitted]]",
+            "period": 4370355,
+            "period_share": 0.0002732673658077786,
+            "samples": 1
+          },
+          {
+            "key": "write_replacement_row_from_facts [[dso-omitted]]",
+            "period": 4368484,
+            "period_share": 0.00027315037685804195,
+            "samples": 1
+          },
+          {
+            "key": "find_or_find_insert_index_inner [[dso-omitted]]",
+            "period": 4363981,
+            "period_share": 0.0002728688155321926,
+            "samples": 1
+          },
+          {
+            "key": "try_fold<core::iter::adapters::zip::Zip<core::ops::range::RangeFrom<usize>, core::slice::iter::Iter<u8>>, (), core::iter::traits::iterator::Iterator::find::check::{closure_env#0}<(usize, &u8), quick_xml::events::attributes::{impl#17}::next::{closure_env#3}>, core::ops::control_flow::ControlFlow<(usize, &u8), ()>> [[dso-omitted]]",
+            "period": 4363629,
+            "period_share": 0.00027284680585271245,
+            "samples": 1
+          },
+          {
+            "key": "scan_cell_attributes [[dso-omitted]]",
+            "period": 4363511,
+            "period_share": 0.00027283942760788674,
+            "samples": 1
+          },
+          {
+            "key": "decoded_and_normalized_value_with<fn(&str) -> core::option::Option<&str>> [[dso-omitted]]",
+            "period": 4312451,
+            "period_share": 0.00026964677353329895,
+            "samples": 1
+          },
+          {
+            "key": "reserve<alloc::alloc::Global> [[dso-omitted]]",
+            "period": 4202546,
+            "period_share": 0.0002627746888081213,
+            "samples": 1
+          },
+          {
+            "key": "at [[dso-omitted]]",
+            "period": 4065380,
+            "period_share": 0.00025419804194570626,
+            "samples": 1
+          },
+          {
+            "key": "branch<litchi_xlsx::raw::worksheet::model::Context, litchi_xlsx::error::Error> [[dso-omitted]]",
+            "period": 3995310,
+            "period_share": 0.00024981674012419493,
+            "samples": 1
+          }
+        ],
+        "unresolved_period_fraction_of_qualified": 0.06997161619353799,
+        "unresolved_period_quarantined": 1119053502,
+        "unresolved_sample_fraction_of_qualified": 0.07045636509207366,
+        "unresolved_samples_quarantined": 264
+      },
+      "whole_process": {
+        "period": 128069447035,
+        "period_share": 1.0,
+        "samples": 29543
+      }
+    },
+    {
+      "analyzer": {
+        "bytes": 298360,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/05-medium-one-percent/offline-decode-v2/analyzer.json",
+        "sha256": "b6da35bdf6fa85cc39a3866c206b40bc697947b37671cf8ce82fc744a8721fe5"
+      },
+      "conservation": {
+        "inline_period_sum_pass": true,
+        "inline_sample_count_pass": true,
+        "physical_input_period": 91000573917,
+        "physical_input_samples": 21040
+      },
+      "decode_control": {
+        "bytes": 15413,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/05-medium-one-percent/offline-decode-v2/decode-control.json",
+        "sha256": "29629ad09add1e988555765c0f6ec011875caa0d365a08baafccdb72dd59be7a"
+      },
+      "directory": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/05-medium-one-percent",
+      "pairing": {
+        "exact_pairing_pass": true,
+        "header_multiset_equal": true,
+        "inline_samples": 21040,
+        "paired_samples": 21040,
+        "physical_samples": 21040,
+        "unmatched_inline_samples": 0,
+        "unmatched_physical_samples": 0
+      },
+      "qualification_gate": {
+        "admitted": true,
+        "admitted_without_lost_record_binding": false,
+        "lost_records": 0,
+        "lost_records_zero": true,
+        "minimum_period": 100000,
+        "minimum_samples": 100,
+        "qualified_period": 8349018017,
+        "qualified_period_min_pass": true,
+        "qualified_samples": 1982,
+        "qualified_samples_min_pass": true
+      },
+      "qualified": {
+        "period": 8349018017,
+        "period_share": 0.09174687210890549,
+        "samples": 1982
+      },
+      "source_leaf_coverage": {
+        "resolved_period": 7728613586,
+        "resolved_period_fraction_of_qualified": 0.9256913292393486,
+        "resolved_sample_fraction_of_qualified": 0.9253279515640767,
+        "resolved_samples": 1834,
+        "unresolved_leaf_groups": [
+          {
+            "key": "branch<alloc::borrow::Cow<str>, quick_xml::escape::EscapeError> [[dso-omitted]]",
+            "period": 170889980,
+            "period_share": 0.020468272993547188,
+            "samples": 41
+          },
+          {
+            "key": "finish_cell [[dso-omitted]]",
+            "period": 113685835,
+            "period_share": 0.013616671417945989,
+            "samples": 27
+          },
+          {
+            "key": "branch<litchi_xlsx::cell::Stored, litchi_xlsx::error::Error> [[dso-omitted]]",
+            "period": 82932241,
+            "period_share": 0.009933173078694532,
+            "samples": 20
+          },
+          {
+            "key": "branch<core::option::Option<alloc::string::String>, litchi_ooxml_common::xml::XmlError> [[dso-omitted]]",
+            "period": 21297900,
+            "period_share": 0.002550946704945888,
+            "samples": 5
+          },
+          {
+            "key": "next [[dso-omitted]]",
+            "period": 21052626,
+            "period_share": 0.002521569118324254,
+            "samples": 5
+          },
+          {
+            "key": "cell [[dso-omitted]]",
+            "period": 20797040,
+            "period_share": 0.0024909564163897767,
+            "samples": 5
+          },
+          {
+            "key": "read_text [[dso-omitted]]",
+            "period": 16782387,
+            "period_share": 0.0020101031002482265,
+            "samples": 4
+          },
+          {
+            "key": "check_for_duplicates [[dso-omitted]]",
+            "period": 13018497,
+            "period_share": 0.0015592848133148304,
+            "samples": 3
+          },
+          {
+            "key": "emit_end [[dso-omitted]]",
+            "period": 12398423,
+            "period_share": 0.0014850157197834203,
+            "samples": 3
+          },
+          {
+            "key": "emit_start [[dso-omitted]]",
+            "period": 12383443,
+            "period_share": 0.0014832214968018077,
+            "samples": 3
+          },
+          {
+            "key": "read_until_close<&[u8], ()> [[dso-omitted]]",
+            "period": 8713025,
+            "period_share": 0.0010435987779950672,
+            "samples": 2
+          },
+          {
+            "key": "find_key_index<alloc::collections::btree::node::marker::Immut, litchi_sheet::Cell, litchi_xlsx::raw::worksheet::edit::model::Action, alloc::collections::btree::node::marker::LeafOrInternal, litchi_sheet::Cell> [[dso-omitted]]",
+            "period": 8587078,
+            "period_share": 0.0010285135308745615,
+            "samples": 2
+          },
+          {
+            "key": "recover [[dso-omitted]]",
+            "period": 8575608,
+            "period_share": 0.0010271397166156098,
+            "samples": 2
+          },
+          {
+            "key": "checked_sub [[dso-omitted]]",
+            "period": 8529254,
+            "period_share": 0.0010215876864360586,
+            "samples": 2
+          },
+          {
+            "key": "inflate_fast_help_impl<1> [[dso-omitted]]",
+            "period": 8448521,
+            "period_share": 0.0010119179264911629,
+            "samples": 2
+          },
+          {
+            "key": "index<u8> [[dso-omitted]]",
+            "period": 8361174,
+            "period_share": 0.0010014559775742785,
+            "samples": 2
+          },
+          {
+            "key": "start [[dso-omitted]]",
+            "period": 4400448,
+            "period_share": 0.0005270617443919693,
+            "samples": 1
+          },
+          {
+            "key": "next<u8> [[dso-omitted]]",
+            "period": 4346324,
+            "period_share": 0.0005205790658434508,
+            "samples": 1
+          },
+          {
+            "key": "copy_nonoverlapping<litchi_xlsx::cell::Stored> [[dso-omitted]]",
+            "period": 4342783,
+            "period_share": 0.0005201549441092792,
+            "samples": 1
+          },
+          {
+            "key": "write_sheet_data_from_facts [[dso-omitted]]",
+            "period": 4294651,
+            "period_share": 0.0005143899547534059,
+            "samples": 1
+          },
+          {
+            "key": "rposition<u8, quick_xml::reader::state::{impl#0}::emit_end::{closure_env#0}> [[dso-omitted]]",
+            "period": 4293727,
+            "period_share": 0.0005142792830554745,
+            "samples": 1
+          },
+          {
+            "key": "binary_search_by<litchi_xlsx::cell::Stored, core::slice::{impl#0}::binary_search_by_key::{closure_env#0}<litchi_xlsx::cell::Stored, litchi_sheet::Cell, litchi_xlsx::cell::{impl#36}::entry::{closure_env#0}>> [[dso-omitted]]",
+            "period": 4265898,
+            "period_share": 0.0005109460766899672,
+            "samples": 1
+          },
+          {
+            "key": "copy_nonoverlapping<u8> [[dso-omitted]]",
+            "period": 4264227,
+            "period_share": 0.000510745933392085,
+            "samples": 1
+          },
+          {
+            "key": "materialize [[dso-omitted]]",
+            "period": 4249398,
+            "period_share": 0.0005089697963697663,
+            "samples": 1
+          },
+          {
+            "key": "add<u8> [[dso-omitted]]",
+            "period": 4238642,
+            "period_share": 0.000507681501150125,
+            "samples": 1
+          },
+          {
+            "key": "parse_source_with_observer<litchi_xlsx::cell_values::snapshot::{impl#1}::from_source_selected::{closure_env#0}, litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source::{closure_env#0}<litchi_xlsx::cell_values::snapshot::{impl#1}::from_source_selected::{closure_env#0}>> [[dso-omitted]]",
+            "period": 4236321,
+            "period_share": 0.0005074035043850834,
+            "samples": 1
+          },
+          {
+            "key": "finish [[dso-omitted]]",
+            "period": 4222089,
+            "period_share": 0.0005056988727779864,
+            "samples": 1
+          },
+          {
+            "key": "branch<litchi_xlsx::raw::worksheet::model::Context, litchi_xlsx::error::Error> [[dso-omitted]]",
+            "period": 4209161,
+            "period_share": 0.0005041504272034679,
+            "samples": 1
+          },
+          {
+            "key": "push_mut<core::ops::range::Range<usize>, alloc::alloc::Global> [[dso-omitted]]",
+            "period": 4177148,
+            "period_share": 0.0005003160840585834,
+            "samples": 1
+          },
+          {
+            "key": "min<usize> [[dso-omitted]]",
+            "period": 4124291,
+            "period_share": 0.0004939851598837435,
+            "samples": 1
+          },
+          {
+            "key": "get_offset_len_noubcheck<u8> [[dso-omitted]]",
+            "period": 4121511,
+            "period_share": 0.0004936521865934308,
+            "samples": 1
+          },
+          {
+            "key": "transition [[dso-omitted]]",
+            "period": 4095058,
+            "period_share": 0.0004904837900291717,
+            "samples": 1
+          },
+          {
+            "key": "scan_attributes [[dso-omitted]]",
+            "period": 4088491,
+            "period_share": 0.0004896972304617318,
+            "samples": 1
+          },
+          {
+            "key": "read_with<quick_xml::parser::element::ElementParser> [[dso-omitted]]",
+            "period": 4023112,
+            "period_share": 0.0004818664891857066,
+            "samples": 1
+          },
+          {
+            "key": "raw_attribute [[dso-omitted]]",
+            "period": 4017948,
+            "period_share": 0.00048124797333276613,
+            "samples": 1
+          },
+          {
+            "key": "process_event<&[u8]> [[dso-omitted]]",
+            "period": 3940171,
+            "period_share": 0.00047193226700159845,
+            "samples": 1
+          }
+        ],
+        "unresolved_period_fraction_of_qualified": 0.07430867076065144,
+        "unresolved_period_quarantined": 620404431,
+        "unresolved_sample_fraction_of_qualified": 0.07467204843592332,
+        "unresolved_samples_quarantined": 148
+      },
+      "whole_process": {
+        "period": 91000573917,
+        "period_share": 1.0,
+        "samples": 21040
+      }
+    }
+  ],
+  "generated_utc": "2026-10-07T20:24:51.505483+00:00",
+  "helper": {
+    "bytes": 62780,
+    "path": "/home/zhuhe/litchi-performance-0962/tools/analyze_native_cpu_v1.py",
+    "sha256": "f5f7a387f99ba3a587eeb8f27c8f422a9fa696306c2ae47724952b861910bd3d"
+  },
+  "owner_claim_scope": "source-owner claims are quarantined to qualified deepest leaf groups carrying source file:line; unresolved leaf rows remain in the qualified denominator and receive no source-owner claim",
+  "schema": "litchi.performance.0962.fp-wave-source-leaf-coverage.v1",
+  "status": "passed"
+}

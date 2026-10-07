@@ -1,0 +1,274 @@
+{
+  "capture_terminal": {
+    "bytes": 2852,
+    "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/capture-terminal.json",
+    "sha256": "5f209fb52d04a9e44965c93b78166a2d27f2abc82f88b2d8c5635708d6466af0"
+  },
+  "children": [
+    {
+      "child": "00-medium-one-percent",
+      "index": 0,
+      "launch": {
+        "bytes": 94,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent/launch.json",
+        "sha256": "f799511e1e4c4ca86aa8695c3ffd5a6b310591d8c9f1927d2f629f150f05239a"
+      },
+      "report": {
+        "bytes": 155259,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent/output/report.json",
+        "sha256": "e660a16289d438c2bd301215af1415444009726773c63946e0355aaaa2ada843"
+      },
+      "start": {
+        "bytes": 1629,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent/start.json",
+        "sha256": "cf1dda7cdc897d1a219ac47b0531767ad49a46a8eae098903f73a1075f9a21a6"
+      },
+      "terminal": {
+        "bytes": 188,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent/terminal.json",
+        "sha256": "a3852ade2875f7fdaca991b3f7e23e4de8a8df2849a4b13fc1a717945a13de6f"
+      },
+      "terminal_values": {
+        "failure": null,
+        "pid": 3193623,
+        "process_group_clear": true,
+        "returncode": 0,
+        "terminal_before_parse": true,
+        "timeout": false,
+        "utc": "2026-10-07T20:13:21.852117+00:00"
+      },
+      "validation": {
+        "bytes": 869,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent/validation.json",
+        "sha256": "c377d3d04b1c434d205f0d85da8cbcc1bbbefddd45d241a5b79cb29106d95be0"
+      },
+      "validation_values": {
+        "binary_unchanged": true,
+        "samples": 200,
+        "status": "passed"
+      }
+    },
+    {
+      "child": "01-dense-sparse-one-percent",
+      "index": 1,
+      "launch": {
+        "bytes": 94,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/launch.json",
+        "sha256": "5d10dd31cc9ec05d516de94476fc20e58d939c834e97cb430b93777105387768"
+      },
+      "report": {
+        "bytes": 155731,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/output/report.json",
+        "sha256": "1686000ca05442a41be8208888f5ece5916430fc23cb44b25b742e19fd1851c2"
+      },
+      "start": {
+        "bytes": 1647,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/start.json",
+        "sha256": "2e1cc5985c775a89e26d8925de7aa47ed868753dfef671a3b6b75f432d447875"
+      },
+      "terminal": {
+        "bytes": 188,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/terminal.json",
+        "sha256": "83238df90016baf991d0a4f1c822e88c8f97dd6f353e24e6d3845e7fdd46cbf6"
+      },
+      "terminal_values": {
+        "failure": null,
+        "pid": 3193747,
+        "process_group_clear": true,
+        "returncode": 0,
+        "terminal_before_parse": true,
+        "timeout": false,
+        "utc": "2026-10-07T20:13:50.902282+00:00"
+      },
+      "validation": {
+        "bytes": 887,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/validation.json",
+        "sha256": "55dd18a3c9a7446bad384a4e43f798641114c17fd8fd49f80953823393d1d287"
+      },
+      "validation_values": {
+        "binary_unchanged": true,
+        "samples": 200,
+        "status": "passed"
+      }
+    },
+    {
+      "child": "02-medium-one-edit",
+      "index": 2,
+      "launch": {
+        "bytes": 94,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/launch.json",
+        "sha256": "b461d7e76e1c363f3d023ebaf01bd34993ea03e7ced1fef99ccb0f1caabedf92"
+      },
+      "report": {
+        "bytes": 154852,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/output/report.json",
+        "sha256": "250758be883f0b070c54f1c8937867641811bd0bd5ab55d1953b968b4a413b2a"
+      },
+      "start": {
+        "bytes": 1620,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/start.json",
+        "sha256": "9e252946baae7fcdfc8460916ea33371486f22622186874a301ff01b4fa2643b"
+      },
+      "terminal": {
+        "bytes": 188,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/terminal.json",
+        "sha256": "6b50ce96c135d7d6fa86ae2802981f55719fa9bddf286c9df477df45652d799a"
+      },
+      "terminal_values": {
+        "failure": null,
+        "pid": 3193899,
+        "process_group_clear": true,
+        "returncode": 0,
+        "terminal_before_parse": true,
+        "timeout": false,
+        "utc": "2026-10-07T20:14:08.736440+00:00"
+      },
+      "validation": {
+        "bytes": 860,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/validation.json",
+        "sha256": "fc1dd42aac4b65632b3a29147014f7b33f3c48212f67639b2487a1e70bd4818a"
+      },
+      "validation_values": {
+        "binary_unchanged": true,
+        "samples": 200,
+        "status": "passed"
+      }
+    },
+    {
+      "child": "03-medium-one-edit",
+      "index": 3,
+      "launch": {
+        "bytes": 94,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/launch.json",
+        "sha256": "21491c6c43eff0efc06d66e9caad2c61d1477a8297a1ee10ccb41c0ca1d321d4"
+      },
+      "report": {
+        "bytes": 154850,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/output/report.json",
+        "sha256": "f58d768798338ac2319939808188c0234960e95a4b6be2ead4cd9c1c96835c0c"
+      },
+      "start": {
+        "bytes": 1620,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/start.json",
+        "sha256": "e80432b80a8c2c2321f7c71d7767a06400c3e7a6cd2ba5f498eacb6e55a2200a"
+      },
+      "terminal": {
+        "bytes": 188,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/terminal.json",
+        "sha256": "f0327c35b0c46849a50152964b0ac5772e6749c148c6483b337ff9c4a5db014f"
+      },
+      "terminal_values": {
+        "failure": null,
+        "pid": 3194036,
+        "process_group_clear": true,
+        "returncode": 0,
+        "terminal_before_parse": true,
+        "timeout": false,
+        "utc": "2026-10-07T20:14:26.524004+00:00"
+      },
+      "validation": {
+        "bytes": 860,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/validation.json",
+        "sha256": "813a248f6073f91dda89a97018266458ebce52df42f6ac989684b82d13c5631f"
+      },
+      "validation_values": {
+        "binary_unchanged": true,
+        "samples": 200,
+        "status": "passed"
+      }
+    },
+    {
+      "child": "04-dense-sparse-one-percent",
+      "index": 4,
+      "launch": {
+        "bytes": 94,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent/launch.json",
+        "sha256": "c912c670a4bb6876464640b9ec5e9a7958a2d2106d306d2705833a05a7dce67c"
+      },
+      "report": {
+        "bytes": 155755,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent/output/report.json",
+        "sha256": "57a64a3a1aee680b4c1765703cbf1dcd4f5f4e28fc62b2964da5d4d8aff97db6"
+      },
+      "start": {
+        "bytes": 1647,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent/start.json",
+        "sha256": "adfba3d3eb358d55810cebd3988b5da3b5ac6b326a68ef15275ef9f5dfd65a4e"
+      },
+      "terminal": {
+        "bytes": 188,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent/terminal.json",
+        "sha256": "960dbb343e1962721854088310808cf7477ddd0ea66d345898bce1a948765ac0"
+      },
+      "terminal_values": {
+        "failure": null,
+        "pid": 3194146,
+        "process_group_clear": true,
+        "returncode": 0,
+        "terminal_before_parse": true,
+        "timeout": false,
+        "utc": "2026-10-07T20:14:56.473922+00:00"
+      },
+      "validation": {
+        "bytes": 887,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent/validation.json",
+        "sha256": "61987e35722a765a22578296e30c0d46062301f60d9a2702d1e6924fd0acac5b"
+      },
+      "validation_values": {
+        "binary_unchanged": true,
+        "samples": 200,
+        "status": "passed"
+      }
+    },
+    {
+      "child": "05-medium-one-percent",
+      "index": 5,
+      "launch": {
+        "bytes": 94,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/05-medium-one-percent/launch.json",
+        "sha256": "98268c6a65c1cd4905a73e74098ad353ec56b47b68ebebdc2877a485b3d142f3"
+      },
+      "report": {
+        "bytes": 155278,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/05-medium-one-percent/output/report.json",
+        "sha256": "e303effcce5f5d31f82188d192fcc6c43d8d372befc70b682cd99f8f099b0371"
+      },
+      "start": {
+        "bytes": 1629,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/05-medium-one-percent/start.json",
+        "sha256": "71762a45fe1ad8304d47640205b55f8edb0515dade4d6437d6b682be61eeaaf5"
+      },
+      "terminal": {
+        "bytes": 188,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/05-medium-one-percent/terminal.json",
+        "sha256": "b8ec9f3f80525d857981193c31204c90c1a148e239737dbdefeec6624d848fab"
+      },
+      "terminal_values": {
+        "failure": null,
+        "pid": 3194374,
+        "process_group_clear": true,
+        "returncode": 0,
+        "terminal_before_parse": true,
+        "timeout": false,
+        "utc": "2026-10-07T20:15:17.867717+00:00"
+      },
+      "validation": {
+        "bytes": 869,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/05-medium-one-percent/validation.json",
+        "sha256": "6b39c1912938e3dccb24820afc30f2670dad874efee642cc8852279c7cba5991"
+      },
+      "validation_values": {
+        "binary_unchanged": true,
+        "samples": 200,
+        "status": "passed"
+      }
+    }
+  ],
+  "execution_plan": {
+    "bytes": 1960,
+    "path": "/home/zhuhe/litchi-performance-0962/fp-wave-execution-v1.json",
+    "sha256": "b0919fc7d8ce9d0a440ae976ff039d2bb2b1fd68b7adfbbc4c88770099f58a14"
+  },
+  "generated_utc": "2026-10-07T20:19:59.826277+00:00",
+  "schema": "litchi.performance.0962.fp-wave-terminal-receipts.v1"
+}

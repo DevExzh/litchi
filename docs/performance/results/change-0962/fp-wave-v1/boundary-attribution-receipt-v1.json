@@ -1,0 +1,27 @@
+{
+  "boundary_partition_is_disjoint": true,
+  "children": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "expected_selected_samples": 12319,
+  "frozen_analyzer_sha256": "f5f7a387f99ba3a587eeb8f27c8f422a9fa696306c2ae47724952b861910bd3d",
+  "generated_utc": "2026-10-07T20:29:01.637255+00:00",
+  "outputs": [
+    "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent/offline-decode-v2/boundary-attribution-v1.json",
+    "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v2/boundary-attribution-v1.json",
+    "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/offline-decode-v2/boundary-attribution-v1.json",
+    "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/offline-decode-v2/boundary-attribution-v1.json",
+    "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent/offline-decode-v2/boundary-attribution-v1.json",
+    "/home/zhuhe/litchi-performance-0962/fp-wave-v1/05-medium-one-percent/offline-decode-v2/boundary-attribution-v1.json"
+  ],
+  "physical_self_excludes_callee_costs": true,
+  "schema": "litchi.performance.0962.rewrite-boundaries.v1.receipt",
+  "selected_period": 52852646778,
+  "selected_samples": 12319,
+  "status": "passed"
+}

@@ -1,0 +1,2 @@
+[ perf record: Woken up 20 times to write data ]
+[ perf record: Captured and wrote 4.951 MB /home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/perf.data ]

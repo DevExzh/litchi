@@ -1,0 +1,21 @@
+{
+  "binaries": {
+    "xlsx_managed_compression_benchmark": {
+      "build_id": "7eb92ba2f0f8f3b248b77d8691e27b80b114fb22",
+      "bytes": 104819848,
+      "exists": true,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0962/target-diagnostic-fp-v1/release/examples/xlsx_managed_compression_benchmark",
+      "readelf_returncode": 0,
+      "readelf_sha256": "f7ecd880b19c43c03993228dc984f0b27cc0aeb84ae63ce553c88d5fdcfdb983",
+      "sha256": "843ae35a0f5131a8cba965f917b2a4c5fccb6926ae3d66862e5f78512820fb33"
+    }
+  },
+  "schema": "litchi.performance.0962.diagnostic-fp-v1.build-binaries",
+  "terminal_receipt": {
+    "bytes": 1485,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0962/receipts/diagnostic-fp-v1-build-terminal.json",
+    "sha256": "e9239d56ed2bc4c8984612f8eee9442b1b52e6c0da8cc2174c0f71cec40e8d2a"
+  }
+}

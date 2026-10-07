@@ -1,0 +1,62 @@
+{
+  "schema": "litchi.performance.0962.native-cpu-profile-schedule.v1",
+  "status": "frozen",
+  "created_utc": "2026-10-07T19:30:00Z",
+  "purpose": "bounded descriptive native CPU stack attribution for the retained XLSX managed-compression benchmark",
+  "binary": {
+    "path": "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+    "bytes": 43259328,
+    "sha256": "5886b0f86a697bae757994d5a757cffae4a7e8d61a2769ff1c967029cd1912c3",
+    "role": "retained_native_baseline_executable"
+  },
+  "source": {
+    "head": "dfb777544c828901363c40cdb2292c5fe4ad766b",
+    "revalidation": "/home/zhuhe/litchi-performance-0962/root-source-revalidation.json",
+    "retained_manifest": "/home/zhuhe/litchi-performance-0957/source-manifest-v2.json",
+    "mismatches": 0
+  },
+  "host": {
+    "perf": "/usr/bin/perf",
+    "perf_version": "7.0.14",
+    "perf_event_paranoid": 1,
+    "event": "cycles:u",
+    "frequency_hz": 99,
+    "call_graph": "dwarf,8192",
+    "cpu_affinity": "12-15",
+    "workers": 1
+  },
+  "cases": [
+    {
+      "case_id": "medium-one-percent",
+      "shape": "medium",
+      "workload": "one-percent",
+      "workers": 1,
+      "warmup": 10,
+      "samples": 120
+    },
+    {
+      "case_id": "dense-sparse-one-percent",
+      "shape": "dense-sparse",
+      "workload": "one-percent",
+      "workers": 1,
+      "warmup": 10,
+      "samples": 120
+    },
+    {
+      "case_id": "medium-one-edit",
+      "shape": "medium",
+      "workload": "one-edit",
+      "workers": 1,
+      "warmup": 10,
+      "samples": 120
+    }
+  ],
+  "interpretation": "perf samples cover the complete benchmark process; stack percentages are descriptive attribution only and do not establish latency, speedup, allocation, RSS, physical I/O, or production causality",
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "TZ": "UTC",
+    "RUST_BACKTRACE": "0",
+    "PATH": "/usr/bin:/bin"
+  }
+}

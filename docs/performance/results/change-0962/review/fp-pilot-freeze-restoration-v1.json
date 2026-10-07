@@ -1,0 +1,16 @@
+{
+  "utc": "2026-10-07T20:15:07.684122+00:00",
+  "status": "exact_frozen_bytes_restored",
+  "frozen": {
+    "path": "/home/zhuhe/litchi-performance-0962/review/fp-pilot-admission-v2.json",
+    "bytes": 15268,
+    "sha256": "2e36ec426abb29402e95d1372623c96d35ffdda14b294d456a08d7ff48b9dbed"
+  },
+  "preserved_postfreeze_correction": {
+    "path": "/home/zhuhe/litchi-performance-0962/review/fp-pilot-admission-v2-postfreeze-pid-correction.json",
+    "bytes": 15289,
+    "sha256": "8d465634154a7ecf8723fd076cd73fe498140bb94648e647dda8d19176b7d0fd"
+  },
+  "only_changed_field": "identity.workload_pid_observed_in_mapping: [] -> [3184407]",
+  "note": "Reviewer corrected an identity display field after root bound v2 and launched wave. Original frozen bytes reconstructed exactly and SHA verified; corrected bytes retained separately. Selection, gates, capture commands and input artifacts unchanged. No workload retry."
+}

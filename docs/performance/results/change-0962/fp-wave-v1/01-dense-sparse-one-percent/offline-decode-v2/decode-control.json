@@ -1,0 +1,387 @@
+{
+  "analyzer": {
+    "bytes": 62780,
+    "path": "/home/zhuhe/litchi-performance-0962/tools/analyze_native_cpu_v1.py",
+    "sha256": "f5f7a387f99ba3a587eeb8f27c8f422a9fa696306c2ae47724952b861910bd3d"
+  },
+  "binary": {
+    "bytes": 104819848,
+    "path": "/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+    "sha256": "843ae35a0f5131a8cba965f917b2a4c5fccb6926ae3d66862e5f78512820fb33"
+  },
+  "capture_perf_data": {
+    "bytes": 5232656,
+    "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/perf.data",
+    "sha256": "602b049c814454d5f40431ae1d1aff9ce27273b2df8a078e69b1e84dc1ffc53f"
+  },
+  "capture_terminal": {
+    "attribution_status": "pending offline decode; no wave admission claim",
+    "children": [
+      {
+        "case": "medium-one-percent",
+        "command": [
+          "/usr/bin/python3",
+          "/home/zhuhe/litchi-performance-0962/tools/capture_fp_v1.py",
+          "--plan",
+          "/home/zhuhe/litchi-performance-0962/fp-plan-v1.json",
+          "--case",
+          "medium-one-percent",
+          "--output",
+          "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent"
+        ],
+        "index": 0,
+        "returncode": 0
+      },
+      {
+        "case": "dense-sparse-one-percent",
+        "command": [
+          "/usr/bin/python3",
+          "/home/zhuhe/litchi-performance-0962/tools/capture_fp_v1.py",
+          "--plan",
+          "/home/zhuhe/litchi-performance-0962/fp-plan-v1.json",
+          "--case",
+          "dense-sparse-one-percent",
+          "--output",
+          "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent"
+        ],
+        "index": 1,
+        "returncode": 0
+      },
+      {
+        "case": "medium-one-edit",
+        "command": [
+          "/usr/bin/python3",
+          "/home/zhuhe/litchi-performance-0962/tools/capture_fp_v1.py",
+          "--plan",
+          "/home/zhuhe/litchi-performance-0962/fp-plan-v1.json",
+          "--case",
+          "medium-one-edit",
+          "--output",
+          "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit"
+        ],
+        "index": 2,
+        "returncode": 0
+      },
+      {
+        "case": "medium-one-edit",
+        "command": [
+          "/usr/bin/python3",
+          "/home/zhuhe/litchi-performance-0962/tools/capture_fp_v1.py",
+          "--plan",
+          "/home/zhuhe/litchi-performance-0962/fp-plan-v1.json",
+          "--case",
+          "medium-one-edit",
+          "--output",
+          "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit"
+        ],
+        "index": 3,
+        "returncode": 0
+      },
+      {
+        "case": "dense-sparse-one-percent",
+        "command": [
+          "/usr/bin/python3",
+          "/home/zhuhe/litchi-performance-0962/tools/capture_fp_v1.py",
+          "--plan",
+          "/home/zhuhe/litchi-performance-0962/fp-plan-v1.json",
+          "--case",
+          "dense-sparse-one-percent",
+          "--output",
+          "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent"
+        ],
+        "index": 4,
+        "returncode": 0
+      },
+      {
+        "case": "medium-one-percent",
+        "command": [
+          "/usr/bin/python3",
+          "/home/zhuhe/litchi-performance-0962/tools/capture_fp_v1.py",
+          "--plan",
+          "/home/zhuhe/litchi-performance-0962/fp-plan-v1.json",
+          "--case",
+          "medium-one-percent",
+          "--output",
+          "/home/zhuhe/litchi-performance-0962/fp-wave-v1/05-medium-one-percent"
+        ],
+        "index": 5,
+        "returncode": 0
+      }
+    ],
+    "status": "capture_validated",
+    "utc": "2026-10-07T20:15:17.930497+00:00"
+  },
+  "case_directory": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent",
+  "conservation": {
+    "header_multiset_pass": true,
+    "inline_classified_period": 124104865620,
+    "inline_classified_samples": 28627,
+    "inline_input_period": 124104865620,
+    "inline_input_samples": 28627,
+    "inline_period_sum_pass": true,
+    "inline_sample_count_pass": true,
+    "paired_stream_population_pass": true,
+    "physical_input_period": 124104865620,
+    "physical_input_samples": 28627,
+    "physical_pair_population": 28627
+  },
+  "deadline_seconds": 900,
+  "decoder": {
+    "command": [
+      "/usr/bin/python3",
+      "/home/zhuhe/litchi-performance-0962/tools/analyze_native_cpu_v1.py",
+      "--script",
+      "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v1/perf-script-inline.txt",
+      "--physical-script",
+      "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v2/perf-script-physical.txt",
+      "--binary",
+      "/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+      "--output",
+      "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v2/analyzer.json"
+    ],
+    "output": {
+      "bytes": 482521,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v2/analyzer.json",
+      "sha256": "d9fd52ed412172ec1666caa17a38b750de9cff4fedc5f32a1948b9dbed1e0eb6"
+    },
+    "stderr": {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v2/analyzer.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout": {
+      "bytes": 291,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v2/analyzer.stdout",
+      "sha256": "80c33229e274601718f66a8bdf9df1e317c270c0058f088eafba095e02f56214"
+    },
+    "terminal": {
+      "argv": [
+        "/usr/bin/python3",
+        "/home/zhuhe/litchi-performance-0962/tools/analyze_native_cpu_v1.py",
+        "--script",
+        "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v1/perf-script-inline.txt",
+        "--physical-script",
+        "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v2/perf-script-physical.txt",
+        "--binary",
+        "/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+        "--output",
+        "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v2/analyzer.json"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0962",
+      "deadline_seconds": 900,
+      "failure": null,
+      "finished_utc": "2026-10-07T20:24:19.297609+00:00",
+      "pid": 3197947,
+      "process_group_clear": true,
+      "returncode": 0,
+      "schema": "litchi.performance.0962.fp-wave-decoder.v2.terminal",
+      "started_utc": "2026-10-07T20:24:04.263721+00:00",
+      "terminal_before_parse": true,
+      "timeout": false
+    }
+  },
+  "environment": {
+    "sha256": "eabb59344b1b6e20c9e6d8d4bcf6da38288267b4071a6d15bf1fd126a9ed4a78",
+    "visible": {
+      "LANG": "C",
+      "LC_ALL": "C",
+      "PATH": "/home/zhuhe/.local/bin:/home/zhuhe/.codex/packages/standalone/releases/0.161.0-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0/codex-arg0ZxO1ap:/home/zhuhe/.codex/tmp/arg0/codex-arg0q72NIO:/home/zhuhe/.codex/packages/standalone/releases/0.160.1-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0/codex-arg01OELl0:/home/zhuhe/.codex/packages/standalone/releases/0.160.0-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0/codex-arg0bpOmy9:/home/zhuhe/.codex/packages/standalone/releases/0.160.0-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.local/bin:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/1624262_1791179898176/bin:/home/zhuhe/.local/bin:/home/zhuhe/.moon/bin:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/1623971_1791179866663/bin:/home/zhuhe/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/zhuhe/.fzf/bin:/home/zhuhe/go/bin:/home/zhuhe/go/bin",
+      "TZ": "UTC"
+    }
+  },
+  "execution_plan": {
+    "bytes": 1960,
+    "path": "/home/zhuhe/litchi-performance-0962/fp-wave-execution-v1.json",
+    "sha256": "b0919fc7d8ce9d0a440ae976ff039d2bb2b1fd68b7adfbbc4c88770099f58a14"
+  },
+  "exports": {
+    "inline": {
+      "command": [
+        "/usr/bin/perf",
+        "script",
+        "--show-lost-events",
+        "--demangle",
+        "--inline",
+        "--full-source-path",
+        "-F",
+        "comm,pid,tid,time,event,period,ip,sym,symoff,dso,srcline",
+        "-i",
+        "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/perf.data"
+      ],
+      "late_clearance": {
+        "late_process_group_clear": true,
+        "observed_utc": "2026-10-07T20:24:03.848861+00:00",
+        "reused_without_rerunning_perf_script": true,
+        "schema": "litchi.performance.0962.fp-wave-decoder.v2.late-clearance",
+        "source_script": {
+          "bytes": 161276877,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v1/perf-script-inline.txt",
+          "sha256": "51a5c3d582a5d74e0058f6cd9aacf9854233b3609804219f99c1da7b37641e73"
+        },
+        "source_stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v1/perf-script-inline.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "source_terminal": {
+          "bytes": 706,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v1/inline-terminal.json",
+          "sha256": "2005d8c412f8584ea5fb532588dbb16de9c3f9b98f779b5a1b0f2647995b3e17"
+        },
+        "source_terminal_value": {
+          "argv": [
+            "/usr/bin/perf",
+            "script",
+            "--show-lost-events",
+            "--demangle",
+            "--inline",
+            "--full-source-path",
+            "-F",
+            "comm,pid,tid,time,event,period,ip,sym,symoff,dso,srcline",
+            "-i",
+            "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/perf.data"
+          ],
+          "cwd": "/home/zhuhe/litchi-performance-0962",
+          "deadline_seconds": 900,
+          "failure": null,
+          "finished_utc": "2026-10-07T20:22:27.315260+00:00",
+          "pid": 3194664,
+          "process_group_clear": false,
+          "returncode": 0,
+          "schema": "litchi.performance.0962.fp-wave-decoder.v1.terminal",
+          "started_utc": "2026-10-07T20:15:36.743161+00:00",
+          "terminal_before_parse": true,
+          "timeout": false
+        }
+      },
+      "reused_from_prior_controller": true,
+      "script": {
+        "bytes": 161276877,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v1/perf-script-inline.txt",
+        "sha256": "51a5c3d582a5d74e0058f6cd9aacf9854233b3609804219f99c1da7b37641e73"
+      },
+      "stderr": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v1/perf-script-inline.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "terminal": {
+        "argv": [
+          "/usr/bin/perf",
+          "script",
+          "--show-lost-events",
+          "--demangle",
+          "--inline",
+          "--full-source-path",
+          "-F",
+          "comm,pid,tid,time,event,period,ip,sym,symoff,dso,srcline",
+          "-i",
+          "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/perf.data"
+        ],
+        "cwd": "/home/zhuhe/litchi-performance-0962",
+        "deadline_seconds": 900,
+        "failure": null,
+        "finished_utc": "2026-10-07T20:22:27.315260+00:00",
+        "pid": 3194664,
+        "process_group_clear": false,
+        "returncode": 0,
+        "schema": "litchi.performance.0962.fp-wave-decoder.v1.terminal",
+        "started_utc": "2026-10-07T20:15:36.743161+00:00",
+        "terminal_before_parse": true,
+        "timeout": false
+      }
+    },
+    "physical": {
+      "command": [
+        "/usr/bin/perf",
+        "script",
+        "--show-lost-events",
+        "--demangle",
+        "--no-inline",
+        "--full-source-path",
+        "-F",
+        "comm,pid,tid,time,event,period,ip,sym,symoff,dso,srcline",
+        "-i",
+        "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/perf.data"
+      ],
+      "script": {
+        "bytes": 93976058,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v2/perf-script-physical.txt",
+        "sha256": "0028be076d7a9828bf69e39a726488566835a8d5498f368beea981659c767799"
+      },
+      "stderr": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v2/perf-script-physical.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "terminal": {
+        "argv": [
+          "/usr/bin/perf",
+          "script",
+          "--show-lost-events",
+          "--demangle",
+          "--no-inline",
+          "--full-source-path",
+          "-F",
+          "comm,pid,tid,time,event,period,ip,sym,symoff,dso,srcline",
+          "-i",
+          "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/perf.data"
+        ],
+        "cwd": "/home/zhuhe/litchi-performance-0962",
+        "deadline_seconds": 900,
+        "failure": null,
+        "finished_utc": "2026-10-07T20:24:04.263496+00:00",
+        "pid": 3197941,
+        "process_group_clear": true,
+        "returncode": 0,
+        "schema": "litchi.performance.0962.fp-wave-decoder.v2.terminal",
+        "started_utc": "2026-10-07T20:24:03.849213+00:00",
+        "terminal_before_parse": true,
+        "timeout": false
+      }
+    }
+  },
+  "index": 1,
+  "pairing": {
+    "duplicate_inline_key_details": [],
+    "duplicate_inline_keys": 0,
+    "duplicate_inline_records": 0,
+    "duplicate_physical_key_details": [],
+    "duplicate_physical_keys": 0,
+    "duplicate_physical_records": 0,
+    "exact_pairing_pass": true,
+    "header_count_equal": true,
+    "header_key_multiplicity_equal": true,
+    "header_multiset_equal": true,
+    "header_period_equal": true,
+    "inline_header_count": 28627,
+    "inline_only_key_details": [],
+    "inline_period": 124104865620,
+    "inline_samples": 28627,
+    "paired_samples": 28627,
+    "physical_header_count": 28627,
+    "physical_only_key_details": [],
+    "physical_pair_population": 28627,
+    "physical_period": 124104865620,
+    "physical_samples": 28627,
+    "queue_duplicate_physical_records": 0,
+    "unmatched_inline_period": 0,
+    "unmatched_inline_samples": 0,
+    "unmatched_physical_period": 0,
+    "unmatched_physical_samples": 0
+  },
+  "qualification_gate": {
+    "admitted": true,
+    "admitted_without_lost_record_binding": false,
+    "lost_records": 0,
+    "lost_records_zero": true,
+    "minimum_period": 100000,
+    "minimum_samples": 100,
+    "qualified_period": 15898003220,
+    "qualified_period_min_pass": true,
+    "qualified_samples": 3722,
+    "qualified_samples_min_pass": true
+  },
+  "schema": "litchi.performance.0962.fp-wave-decoder.v2",
+  "status": "passed"
+}

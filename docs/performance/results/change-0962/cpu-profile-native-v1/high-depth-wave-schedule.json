@@ -1,0 +1,39 @@
+{
+  "schema": "litchi.performance.0962.native-cpu-profile-high-depth.v1",
+  "status": "frozen",
+  "created_utc": "2026-10-07T19:31:00Z",
+  "reason": "the initial 8192-byte DWARF stack truncated the approximately 10.9 KiB path to timed_iteration and yielded too few exact-stage ancestors",
+  "binary": {
+    "path": "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+    "sha256": "5886b0f86a697bae757994d5a757cffae4a7e8d61a2769ff1c967029cd1912c3",
+    "bytes": 43259328
+  },
+  "source": {
+    "head": "dfb777544c828901363c40cdb2292c5fe4ad766b",
+    "revalidation": "/home/zhuhe/litchi-performance-0962/root-source-revalidation.json",
+    "mismatches": 0
+  },
+  "profiler": {
+    "perf": "/usr/bin/perf",
+    "version": "7.0.14",
+    "event": "cycles:u",
+    "frequency_hz": 997,
+    "call_graph": "dwarf,65528",
+    "cpu_affinity": "12-15",
+    "workers": 1,
+    "warmup": 10,
+    "samples": 200,
+    "max_sample_rate_sysctl": 25000
+  },
+  "passes": [
+    {
+      "pass_id": "forward",
+      "case_order": ["medium-one-percent", "dense-sparse-one-percent", "medium-one-edit"]
+    },
+    {
+      "pass_id": "reverse",
+      "case_order": ["medium-one-edit", "dense-sparse-one-percent", "medium-one-percent"]
+    }
+  ],
+  "interpretation": "high-depth samples are for stack recovery and descriptive attribution. The harness has no phase marker, so a recovered timed_iteration ancestor still does not by itself prove an edit_commit-only denominator; all phase labels remain qualified by source line and inline call frames. No speedup, latency, allocation, RSS, physical-I/O, or production causal claim is permitted."
+}

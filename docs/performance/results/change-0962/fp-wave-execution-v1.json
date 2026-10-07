@@ -1,0 +1,39 @@
+{
+  "schema": "litchi.performance.0962.fp-wave-execution.v1",
+  "created_utc": "2026-10-07T20:13:00.574769+00:00",
+  "status": "authorized",
+  "purpose": "diagnostic CPU attribution only",
+  "capture_plan": {
+    "path": "/home/zhuhe/litchi-performance-0962/fp-plan-v1.json",
+    "bytes": 5028,
+    "sha256": "b4494abbe8da21ca7e54a4f022b92bb13b4700e09d5ff4a42b8772d213fa5bea"
+  },
+  "pilot_admission": {
+    "path": "/home/zhuhe/litchi-performance-0962/review/fp-pilot-admission-v2.json",
+    "bytes": 15268,
+    "sha256": "2e36ec426abb29402e95d1372623c96d35ffdda14b294d456a08d7ff48b9dbed"
+  },
+  "capture_helper": {
+    "path": "/home/zhuhe/litchi-performance-0962/tools/capture_fp_v1.py",
+    "bytes": 5420,
+    "sha256": "7a71f067f292c346569c3c1f2eaadd5a4847736dd6e973258dd8d673f8bdda34"
+  },
+  "analyzer": {
+    "path": "/home/zhuhe/litchi-performance-0962/tools/analyze_native_cpu_v1.py",
+    "bytes": 62780,
+    "sha256": "f5f7a387f99ba3a587eeb8f27c8f422a9fa696306c2ae47724952b861910bd3d"
+  },
+  "wave_helper": {
+    "path": "/home/zhuhe/litchi-performance-0962/tools/run_fp_wave_v1.py",
+    "bytes": 1937,
+    "sha256": "d0c7be5e6088cfc9a17a741f465359cbbf920b10754f4c52f9a29e7b319281b3"
+  },
+  "execution": "Capture six scheduled children serially; validate semantic/terminal state before next. No offline decoder runs during capture lane. Then decode independently in parallel with frozen analyzer and full source paths. Any failed attribution gate rejects entire wave; no replacement. Stop immediately on any known capture failure.",
+  "offline_requirements": [
+    "paired physical/inline identity, conserved counts and periods, zero lost",
+    "each child minimum100 qualifiedsamples and100000period",
+    "exact binary mapping/buildID, sampleCPU subset12-15, inheritedthreads retained",
+    "source unresolved leafrows stay denominator but no sourceownerclaim",
+    "pilot owner ranking withheld; wave source ranking needs independent review"
+  ]
+}

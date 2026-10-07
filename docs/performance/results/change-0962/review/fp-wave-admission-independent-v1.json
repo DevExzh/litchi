@@ -1,0 +1,2413 @@
+{
+  "aggregate": {
+    "children": 6,
+    "measured_iterations": 1200,
+    "qualified_period": 52852646778,
+    "qualified_samples": 12319,
+    "qualified_share_of_whole_period": 0.09055637446779008,
+    "root_summary_descriptor": {
+      "bytes": 427884,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-wave-summary-v1.json",
+      "sha256": "b8a705803103b7cc3dc0216e3df25b9d18f729d7c663f9ae9bb43051bb89a37a"
+    },
+    "root_summary_status": "passed_conservation",
+    "whole_period": 583643582118,
+    "whole_samples": 134969
+  },
+  "children": [
+    {
+      "analyzer": {
+        "ambiguous_classification_keys": [],
+        "binary_binding": {
+          "bytes": 104819848,
+          "elf_build_id": "7eb92ba2f0f8f3b248b77d8691e27b80b114fb22",
+          "mode": 509,
+          "path": "/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+          "sha256": "843ae35a0f5131a8cba965f917b2a4c5fccb6926ae3d66862e5f78512820fb33"
+        },
+        "classification": {
+          "no_phase_marker": {
+            "period": 77428631406,
+            "period_share": 0.8503667846462287,
+            "samples": 17822
+          },
+          "qualified": {
+            "period": 8347974970,
+            "period_share": 0.09168237258802954,
+            "samples": 1899
+          },
+          "source_invalid": {
+            "period": 4411419,
+            "period_share": 4.8448798882768174e-05,
+            "samples": 1
+          },
+          "unknown_frames": {
+            "period": 108440888,
+            "period_share": 0.0011909616323864925,
+            "samples": 25
+          },
+          "unqualified_phase": {
+            "period": 5163758357,
+            "period_share": 0.05671143233447252,
+            "samples": 1175
+          }
+        },
+        "conservation": {
+          "header_multiset_pass": true,
+          "inline_classified_period": 91053217040,
+          "inline_classified_samples": 20922,
+          "inline_input_period": 91053217040,
+          "inline_input_samples": 20922,
+          "inline_period_sum_pass": true,
+          "inline_sample_count_pass": true,
+          "paired_stream_population_pass": true,
+          "physical_input_period": 91053217040,
+          "physical_input_samples": 20922,
+          "physical_pair_population": 20922
+        },
+        "multiple_marker_reason_keys": [],
+        "pairing": {
+          "duplicate_inline_keys": 0,
+          "duplicate_physical_keys": 0,
+          "exact_pairing_pass": true,
+          "inline_period": 91053217040,
+          "inline_samples": 20922,
+          "paired_samples": 20922,
+          "physical_period": 91053217040,
+          "physical_samples": 20922,
+          "unmatched_inline_period": 0,
+          "unmatched_inline_samples": 0,
+          "unmatched_physical_period": 0,
+          "unmatched_physical_samples": 0
+        },
+        "qualification_gate": {
+          "admitted": true,
+          "admitted_without_lost_record_binding": false,
+          "lost_records": 0,
+          "lost_records_zero": true,
+          "minimum_period": 100000,
+          "minimum_samples": 100,
+          "qualified_period": 8347974970,
+          "qualified_period_min_pass": true,
+          "qualified_samples": 1899,
+          "qualified_samples_min_pass": true
+        },
+        "qualified": {
+          "period": 8347974970,
+          "period_share": 0.09168237258802954,
+          "samples": 1899
+        },
+        "reasons": {
+          "no_timer_marker_in_inline_rendering": {
+            "period": 77428631406,
+            "period_share": 0.8503667846462287,
+            "samples": 17822
+          },
+          "paired_physical_timed_and_inline_stage_with_source_checks": {
+            "period": 8347974970,
+            "period_share": 0.09168237258802954,
+            "samples": 1899
+          },
+          "physical_timed_source_check_failed": {
+            "period": 4411419,
+            "period_share": 4.8448798882768174e-05,
+            "samples": 1
+          },
+          "stage_marker_missing": {
+            "period": 5163758357,
+            "period_share": 0.05671143233447252,
+            "samples": 1175
+          },
+          "unknown_frame_in_inline_or_physical_callchain": {
+            "period": 108440888,
+            "period_share": 0.0011909616323864925,
+            "samples": 25
+          }
+        },
+        "source_line_checks": {
+          "pass": {
+            "period": 21864119716,
+            "period_share": 0.24012462630941436,
+            "samples": 4974
+          },
+          "physical_missing_line": {
+            "period": 4411419,
+            "period_share": 4.8448798882768174e-05,
+            "samples": 1
+          },
+          "physical_pass": {
+            "period": 13511733327,
+            "period_share": 0.14839380492250207,
+            "samples": 3074
+          },
+          "wrong_line": {
+            "period": 4411419,
+            "period_share": 4.8448798882768174e-05,
+            "samples": 1
+          }
+        },
+        "status": "pass",
+        "whole_process": {
+          "period": 91053217040,
+          "period_share": 1.0,
+          "samples": 20922
+        }
+      },
+      "buildid": {
+        "export": {
+          "bytes": 302,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-00-buildid-list.txt",
+          "sha256": "7e99759e8f3a15e98ac9591d3c245672750b895d956529400409e8ddff62336b"
+        },
+        "returncode_receipt": {
+          "bytes": 2,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-00-buildid-list.rc",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+        },
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-00-buildid-list.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "target_lines": [
+          "7eb92ba2f0f8f3b248b77d8691e27b80b114fb22 /home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1"
+        ]
+      },
+      "capture": {
+        "perf_data": {
+          "bytes": 3896512,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent/perf.data",
+          "sha256": "a59354815c97b367ea2e037a643127bd1cb8458b64a22a7404dce58c7406de51"
+        },
+        "process_group_clear": true,
+        "returncode": 0,
+        "semantic_samples": 200,
+        "semantic_status": "passed",
+        "start": {
+          "bytes": 1629,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent/start.json",
+          "sha256": "cf1dda7cdc897d1a219ac47b0531767ad49a46a8eae098903f73a1075f9a21a6"
+        },
+        "terminal": {
+          "bytes": 188,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent/terminal.json",
+          "sha256": "a3852ade2875f7fdaca991b3f7e23e4de8a8df2849a4b13fc1a717945a13de6f"
+        },
+        "validation": {
+          "bytes": 869,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent/validation.json",
+          "sha256": "c377d3d04b1c434d205f0d85da8cbcc1bbbefddd45d241a5b79cb29106d95be0"
+        }
+      },
+      "case": "medium-one-percent",
+      "cpu": {
+        "command": [
+          "/usr/bin/perf",
+          "script",
+          "--show-lost-events",
+          "--no-inline",
+          "-F",
+          "cpu,pid,tid,time,event,period,ip,sym,symoff,dso",
+          "-i",
+          "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent/perf.data"
+        ],
+        "cpu_counts": {
+          "15": 20922
+        },
+        "event_counts": {
+          "cycles:u": 20922
+        },
+        "lost_record_lines": 0,
+        "observed_pid_tid_pairs": [
+          {
+            "pid": 3193624,
+            "tid": 3193624
+          }
+        ],
+        "parser": "split sample header: pid/tid [cpu] timestamp: period event:",
+        "period_sum": 91053217040,
+        "pid_counts": {
+          "3193624": 20922
+        },
+        "sample_count": 20922,
+        "tid_counts": {
+          "3193624": 20922
+        }
+      },
+      "header": {
+        "contract_pass": true,
+        "export": {
+          "bytes": 1819,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-00-header.txt",
+          "sha256": "8474e0afb1c5470e2c3ace04a667e02770a3d25719f63541152f6dbde416b9fa"
+        },
+        "returncode_receipt": {
+          "bytes": 2,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-00-header.rc",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+        },
+        "selected_event_line": "# event : name = cycles:u, , id = { 2623, 2624, 2625, 2626, 2627, 2628, 2629, 2630, 2631, 2632, 2633, 2634, 2635, 2636, 2637, 2638, 2639, 2640, 2641, 2642, 2643, 2644, 2645, 2646, 2647, 2648, 2649, 2650, 2651, 2652, 2653, 2654 }, type = 0 (PERF_TYPE_HARDWARE), size = 144, config = 0 (PERF_COUNT_HW_CPU_CYCLES), { sample_period, sample_freq } = 997, sample_type = IP|TID|TIME|CALLCHAIN|CPU|PERIOD, read_format = ID|LOST, disabled = 1, inherit = 1, exclude_kernel = 1, exclude_hv = 1, mmap = 1, comm = 1, freq = 1, enable_on_exec = 1, task = 1, sample_id_all = 1, exclude_callchain_kernel = 1, mmap2 = 1, comm_exec = 1, ksymbol = 1, bpf_event = 1, build_id = 1",
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-00-header.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "index": 0,
+      "mapping": {
+        "export": {
+          "bytes": 1305,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-00-mapping-events.txt",
+          "sha256": "7ca8be1dbec818319fe9b9aab024cc0b3e1b06d6b34737891d2a5a7a001ae8df"
+        },
+        "misordered_timestamp_lines": [
+          "Misordered timestamps: 0"
+        ],
+        "returncode_receipt": {
+          "bytes": 2,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-00-mapping.rc",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+        },
+        "stderr": {
+          "bytes": 25,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-00-mapping.stderr",
+          "sha256": "d760457f9a459836db8c86aa1e430280f8b3c8762575616f72e4aee52e767536"
+        },
+        "target_mapping_line": " xlsx_managed_co 3193624 [015] 269658.730917: PERF_RECORD_MMAP2 3193624/3193624: [0x5b231708e000(0x5b8000) @ 0x12a000 <7eb92ba2f0f8f3b248b77d8691e27b80b114fb22>]: r-xp /home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+        "target_pid_tid_pairs": [
+          {
+            "pid": 3193624,
+            "tid": 3193624
+          }
+        ]
+      },
+      "metadata_v3": {
+        "bytes": 9665,
+        "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-00-metadata-v3.json",
+        "sha256": "56773cea8b109b3f5822b9f79d5fbe8425c5181171f18633b7fa114a5f4b21f9"
+      },
+      "offline_decode": {
+        "analyzer": {
+          "bytes": 314382,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent/offline-decode-v2/analyzer.json",
+          "sha256": "e957362b2621dbe72e6330698b43d88415b3fca8b1f7aee60b1a7d1f797f4674"
+        },
+        "control": {
+          "bytes": 15413,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent/offline-decode-v2/decode-control.json",
+          "sha256": "8ee4104882980f7a6bec74a2a2277b5f809d0cfee86e2634e5f6c0d8f6acda2a"
+        },
+        "inline_script": {
+          "bytes": 121827387,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent/offline-decode-v1/perf-script-inline.txt",
+          "sha256": "449dbd74047e19d5a39543a5f9694c9938311de134efa6580e216bfa27593dbd"
+        },
+        "inline_terminal_initial": {
+          "bytes": 700,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent/offline-decode-v1/inline-terminal.json",
+          "sha256": "acf72b4b5f62a9d8109652c52bd1b39c77a06fd55fddd15338dd7d5215e5186e"
+        },
+        "inline_terminal_late_clearance": {
+          "bytes": 1747,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent/offline-decode-v1/inline-terminal-late-clearance-v2.json",
+          "sha256": "5118ca3388e3125a09932e3f45b0d8cd1355ee6141c866b12f3e9b4be3b228dc"
+        },
+        "physical_script": {
+          "bytes": 70279951,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent/offline-decode-v2/perf-script-physical.txt",
+          "sha256": "22cbc78c3d3ff8be7178484babd7bcf74a78a5562fdfefbc317ebee042c3ee5d"
+        },
+        "physical_terminal": {
+          "bytes": 702,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent/offline-decode-v2/physical-terminal.json",
+          "sha256": "ad637b67118c580c605b426bddf222a5332c7c4084a45e2ca3411465b1a12795"
+        }
+      },
+      "physical_review": {
+        "conservation_pass": true,
+        "key_policy": "Exclusive sampled self including inline callees; full symbol+DSO; raw IP/source line removed; out-of-line descendants excluded.",
+        "top10": [
+          {
+            "key": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 606606388,
+            "samples": 138,
+            "share_of_qualified_period": 0.07266509425099534
+          },
+          {
+            "key": "quick_xml::reader::ns_reader::NsReader<R>::process_event [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 597813822,
+            "samples": 136,
+            "share_of_qualified_period": 0.07161183690036867
+          },
+          {
+            "key": "quick_xml::name::NamespaceResolver::resolve_event [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 593402838,
+            "samples": 135,
+            "share_of_qualified_period": 0.07108344719917147
+          },
+          {
+            "key": "quick_xml::name::NamespaceResolver::push [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 461581062,
+            "samples": 105,
+            "share_of_qualified_period": 0.055292578578490875
+          },
+          {
+            "key": "litchi_xlsx::cell_values::validation::validate_xml [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 391124645,
+            "samples": 89,
+            "share_of_qualified_period": 0.046852637484609036
+          },
+          {
+            "key": "litchi_xlsx::cell_values::validation::scan_attributes [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 369186877,
+            "samples": 84,
+            "share_of_qualified_period": 0.04422472256166815
+          },
+          {
+            "key": "__memmove_avx512_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+            "period": 356065486,
+            "samples": 81,
+            "share_of_qualified_period": 0.04265291729785817
+          },
+          {
+            "key": "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 347350770,
+            "samples": 79,
+            "share_of_qualified_period": 0.04160898556215963
+          },
+          {
+            "key": "__memcmp_evex_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+            "period": 298883514,
+            "samples": 68,
+            "share_of_qualified_period": 0.03580311573454562
+          },
+          {
+            "key": "quick_xml::encoding::Decoder::decode_cow [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 285685009,
+            "samples": 65,
+            "share_of_qualified_period": 0.03422207302090174
+          }
+        ]
+      },
+      "source_review": {
+        "conservation_pass": true,
+        "qualified_period": 8347974970,
+        "qualified_samples": 1899,
+        "ranking_released": false,
+        "resolved_absolute_path_period": 2998049248,
+        "resolved_absolute_path_period_share": 0.35913491101423367,
+        "unresolved_period": 5349925722,
+        "unresolved_period_share": 0.6408650889857663,
+        "unresolved_samples": 1217
+      }
+    },
+    {
+      "analyzer": {
+        "ambiguous_classification_keys": [],
+        "binary_binding": {
+          "bytes": 104819848,
+          "elf_build_id": "7eb92ba2f0f8f3b248b77d8691e27b80b114fb22",
+          "mode": 509,
+          "path": "/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+          "sha256": "843ae35a0f5131a8cba965f917b2a4c5fccb6926ae3d66862e5f78512820fb33"
+        },
+        "classification": {
+          "no_phase_marker": {
+            "period": 96980433752,
+            "period_share": 0.7814394163154488,
+            "samples": 22354
+          },
+          "qualified": {
+            "period": 15898003220,
+            "period_share": 0.12810136927812743,
+            "samples": 3722
+          },
+          "unknown_frames": {
+            "period": 162371657,
+            "period_share": 0.0013083423940618904,
+            "samples": 38
+          },
+          "unqualified_phase": {
+            "period": 11064056991,
+            "period_share": 0.08915087201236196,
+            "samples": 2513
+          }
+        },
+        "conservation": {
+          "header_multiset_pass": true,
+          "inline_classified_period": 124104865620,
+          "inline_classified_samples": 28627,
+          "inline_input_period": 124104865620,
+          "inline_input_samples": 28627,
+          "inline_period_sum_pass": true,
+          "inline_sample_count_pass": true,
+          "paired_stream_population_pass": true,
+          "physical_input_period": 124104865620,
+          "physical_input_samples": 28627,
+          "physical_pair_population": 28627
+        },
+        "multiple_marker_reason_keys": [],
+        "pairing": {
+          "duplicate_inline_keys": 0,
+          "duplicate_physical_keys": 0,
+          "exact_pairing_pass": true,
+          "inline_period": 124104865620,
+          "inline_samples": 28627,
+          "paired_samples": 28627,
+          "physical_period": 124104865620,
+          "physical_samples": 28627,
+          "unmatched_inline_period": 0,
+          "unmatched_inline_samples": 0,
+          "unmatched_physical_period": 0,
+          "unmatched_physical_samples": 0
+        },
+        "qualification_gate": {
+          "admitted": true,
+          "admitted_without_lost_record_binding": false,
+          "lost_records": 0,
+          "lost_records_zero": true,
+          "minimum_period": 100000,
+          "minimum_samples": 100,
+          "qualified_period": 15898003220,
+          "qualified_period_min_pass": true,
+          "qualified_samples": 3722,
+          "qualified_samples_min_pass": true
+        },
+        "qualified": {
+          "period": 15898003220,
+          "period_share": 0.12810136927812743,
+          "samples": 3722
+        },
+        "reasons": {
+          "no_timer_marker_in_inline_rendering": {
+            "period": 96980433752,
+            "period_share": 0.7814394163154488,
+            "samples": 22354
+          },
+          "paired_physical_timed_and_inline_stage_with_source_checks": {
+            "period": 15898003220,
+            "period_share": 0.12810136927812743,
+            "samples": 3722
+          },
+          "stage_marker_missing": {
+            "period": 11064056991,
+            "period_share": 0.08915087201236196,
+            "samples": 2513
+          },
+          "unknown_frame_in_inline_or_physical_callchain": {
+            "period": 162371657,
+            "period_share": 0.0013083423940618904,
+            "samples": 38
+          }
+        },
+        "source_line_checks": {
+          "pass": {
+            "period": 42860063431,
+            "period_share": 0.3453536105686168,
+            "samples": 9957
+          },
+          "physical_pass": {
+            "period": 26962060211,
+            "period_share": 0.21725224129048937,
+            "samples": 6235
+          }
+        },
+        "status": "pass",
+        "whole_process": {
+          "period": 124104865620,
+          "period_share": 1.0,
+          "samples": 28627
+        }
+      },
+      "buildid": {
+        "export": {
+          "bytes": 302,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-01-buildid-list.txt",
+          "sha256": "7e99759e8f3a15e98ac9591d3c245672750b895d956529400409e8ddff62336b"
+        },
+        "returncode_receipt": {
+          "bytes": 2,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-01-buildid-list.rc",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+        },
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-01-buildid-list.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "target_lines": [
+          "7eb92ba2f0f8f3b248b77d8691e27b80b114fb22 /home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1"
+        ]
+      },
+      "capture": {
+        "perf_data": {
+          "bytes": 5232656,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/perf.data",
+          "sha256": "602b049c814454d5f40431ae1d1aff9ce27273b2df8a078e69b1e84dc1ffc53f"
+        },
+        "process_group_clear": true,
+        "returncode": 0,
+        "semantic_samples": 200,
+        "semantic_status": "passed",
+        "start": {
+          "bytes": 1647,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/start.json",
+          "sha256": "2e1cc5985c775a89e26d8925de7aa47ed868753dfef671a3b6b75f432d447875"
+        },
+        "terminal": {
+          "bytes": 188,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/terminal.json",
+          "sha256": "83238df90016baf991d0a4f1c822e88c8f97dd6f353e24e6d3845e7fdd46cbf6"
+        },
+        "validation": {
+          "bytes": 887,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/validation.json",
+          "sha256": "55dd18a3c9a7446bad384a4e43f798641114c17fd8fd49f80953823393d1d287"
+        }
+      },
+      "case": "dense-sparse-one-percent",
+      "cpu": {
+        "command": [
+          "/usr/bin/perf",
+          "script",
+          "--show-lost-events",
+          "--no-inline",
+          "-F",
+          "cpu,pid,tid,time,event,period,ip,sym,symoff,dso",
+          "-i",
+          "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/perf.data"
+        ],
+        "cpu_counts": {
+          "13": 28627
+        },
+        "event_counts": {
+          "cycles:u": 28627
+        },
+        "lost_record_lines": 0,
+        "observed_pid_tid_pairs": [
+          {
+            "pid": 3193748,
+            "tid": 3193748
+          }
+        ],
+        "parser": "split sample header: pid/tid [cpu] timestamp: period event:",
+        "period_sum": 124104865620,
+        "pid_counts": {
+          "3193748": 28627
+        },
+        "sample_count": 28627,
+        "tid_counts": {
+          "3193748": 28627
+        }
+      },
+      "header": {
+        "contract_pass": true,
+        "export": {
+          "bytes": 1819,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-01-header.txt",
+          "sha256": "6581901397b7b8ddb9b7fff955072ef94570084e9693e48903384769fa4016ca"
+        },
+        "returncode_receipt": {
+          "bytes": 2,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-01-header.rc",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+        },
+        "selected_event_line": "# event : name = cycles:u, , id = { 2662, 2663, 2664, 2665, 2666, 2667, 2668, 2669, 2670, 2671, 2672, 2673, 2674, 2675, 2676, 2677, 2678, 2679, 2680, 2681, 2682, 2683, 2684, 2685, 2686, 2687, 2688, 2689, 2690, 2691, 2692, 2693 }, type = 0 (PERF_TYPE_HARDWARE), size = 144, config = 0 (PERF_COUNT_HW_CPU_CYCLES), { sample_period, sample_freq } = 997, sample_type = IP|TID|TIME|CALLCHAIN|CPU|PERIOD, read_format = ID|LOST, disabled = 1, inherit = 1, exclude_kernel = 1, exclude_hv = 1, mmap = 1, comm = 1, freq = 1, enable_on_exec = 1, task = 1, sample_id_all = 1, exclude_callchain_kernel = 1, mmap2 = 1, comm_exec = 1, ksymbol = 1, bpf_event = 1, build_id = 1",
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-01-header.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "index": 1,
+      "mapping": {
+        "export": {
+          "bytes": 1305,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-01-mapping-events.txt",
+          "sha256": "69403c2579ba54e9987e8a8b32f87982f3de90723f1cfd28f2363002047463b3"
+        },
+        "misordered_timestamp_lines": [
+          "Misordered timestamps: 0"
+        ],
+        "returncode_receipt": {
+          "bytes": 2,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-01-mapping.rc",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+        },
+        "stderr": {
+          "bytes": 25,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-01-mapping.stderr",
+          "sha256": "d760457f9a459836db8c86aa1e430280f8b3c8762575616f72e4aee52e767536"
+        },
+        "target_mapping_line": " xlsx_managed_co 3193748 [013] 269679.982035: PERF_RECORD_MMAP2 3193748/3193748: [0x570acc3ce000(0x5b8000) @ 0x12a000 <7eb92ba2f0f8f3b248b77d8691e27b80b114fb22>]: r-xp /home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+        "target_pid_tid_pairs": [
+          {
+            "pid": 3193748,
+            "tid": 3193748
+          }
+        ]
+      },
+      "metadata_v3": {
+        "bytes": 9756,
+        "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-01-metadata-v3.json",
+        "sha256": "5eca3731d77920b8e64fe4ca02efa529f179e049991b8135cd4c912e2ee3ea2e"
+      },
+      "offline_decode": {
+        "analyzer": {
+          "bytes": 482521,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v2/analyzer.json",
+          "sha256": "d9fd52ed412172ec1666caa17a38b750de9cff4fedc5f32a1948b9dbed1e0eb6"
+        },
+        "control": {
+          "bytes": 15557,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v2/decode-control.json",
+          "sha256": "39158b316ce826bf10614a53ff41d67cb12c08331824522e60b16a6821129c06"
+        },
+        "inline_script": {
+          "bytes": 161276877,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v1/perf-script-inline.txt",
+          "sha256": "51a5c3d582a5d74e0058f6cd9aacf9854233b3609804219f99c1da7b37641e73"
+        },
+        "inline_terminal_initial": {
+          "bytes": 706,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v1/inline-terminal.json",
+          "sha256": "2005d8c412f8584ea5fb532588dbb16de9c3f9b98f779b5a1b0f2647995b3e17"
+        },
+        "inline_terminal_late_clearance": {
+          "bytes": 1771,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v1/inline-terminal-late-clearance-v2.json",
+          "sha256": "caf4f9446175cac2dd16cf7a1c56cda02a17d44fcc2abcd48493ee6f9037f3a8"
+        },
+        "physical_script": {
+          "bytes": 93976058,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v2/perf-script-physical.txt",
+          "sha256": "0028be076d7a9828bf69e39a726488566835a8d5498f368beea981659c767799"
+        },
+        "physical_terminal": {
+          "bytes": 708,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v2/physical-terminal.json",
+          "sha256": "7815a52a2bdefb59cfac1370a25b920ac4d208ebe2acf195a984b7d4552cbb5e"
+        }
+      },
+      "physical_review": {
+        "conservation_pass": true,
+        "key_policy": "Exclusive sampled self including inline callees; full symbol+DSO; raw IP/source line removed; out-of-line descendants excluded.",
+        "top10": [
+          {
+            "key": "quick_xml::reader::ns_reader::NsReader<R>::process_event [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 1138046707,
+            "samples": 266,
+            "share_of_qualified_period": 0.07158425440298785
+          },
+          {
+            "key": "quick_xml::name::NamespaceResolver::resolve_event [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 1091140241,
+            "samples": 253,
+            "share_of_qualified_period": 0.06863379167185751
+          },
+          {
+            "key": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 951937748,
+            "samples": 227,
+            "share_of_qualified_period": 0.05987781829119544
+          },
+          {
+            "key": "litchi_xlsx::cell_values::validation::validate_xml [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 855683207,
+            "samples": 195,
+            "share_of_qualified_period": 0.05382331322738278
+          },
+          {
+            "key": "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 688666278,
+            "samples": 165,
+            "share_of_qualified_period": 0.04331778453369819
+          },
+          {
+            "key": "__memmove_avx512_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+            "period": 619412696,
+            "samples": 143,
+            "share_of_qualified_period": 0.03896166628150928
+          },
+          {
+            "key": "litchi_xlsx::cell_values::validation::scan_attributes [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 587273644,
+            "samples": 137,
+            "share_of_qualified_period": 0.03694008837922477
+          },
+          {
+            "key": "quick_xml::name::NamespaceResolver::push [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 577770372,
+            "samples": 135,
+            "share_of_qualified_period": 0.036342323246805835
+          },
+          {
+            "key": "__memcmp_evex_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+            "period": 570312532,
+            "samples": 135,
+            "share_of_qualified_period": 0.03587321779395136
+          },
+          {
+            "key": "quick_xml::reader::Reader<R>::read_event_impl [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 517790134,
+            "samples": 121,
+            "share_of_qualified_period": 0.0325695074302545
+          }
+        ]
+      },
+      "source_review": {
+        "conservation_pass": true,
+        "qualified_period": 15898003220,
+        "qualified_samples": 3722,
+        "ranking_released": false,
+        "resolved_absolute_path_period": 5866525463,
+        "resolved_absolute_path_period_share": 0.36901020724538514,
+        "unresolved_period": 10031477757,
+        "unresolved_period_share": 0.6309897927546149,
+        "unresolved_samples": 2351
+      }
+    },
+    {
+      "analyzer": {
+        "ambiguous_classification_keys": [],
+        "binary_binding": {
+          "bytes": 104819848,
+          "elf_build_id": "7eb92ba2f0f8f3b248b77d8691e27b80b114fb22",
+          "mode": 509,
+          "path": "/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+          "sha256": "843ae35a0f5131a8cba965f917b2a4c5fccb6926ae3d66862e5f78512820fb33"
+        },
+        "classification": {
+          "empty_frames": {
+            "period": 4386923,
+            "period_share": 5.870764770787347e-05,
+            "samples": 1
+          },
+          "no_phase_marker": {
+            "period": 71077348495,
+            "period_share": 0.9511869562001,
+            "samples": 16598
+          },
+          "qualified": {
+            "period": 2195986095,
+            "period_share": 0.02938760904548559,
+            "samples": 499
+          },
+          "unknown_frames": {
+            "period": 49919730,
+            "period_share": 0.0006680468115150785,
+            "samples": 12
+          },
+          "unqualified_phase": {
+            "period": 1397256982,
+            "period_share": 0.01869868029519153,
+            "samples": 318
+          }
+        },
+        "conservation": {
+          "header_multiset_pass": true,
+          "inline_classified_period": 74724898225,
+          "inline_classified_samples": 17428,
+          "inline_input_period": 74724898225,
+          "inline_input_samples": 17428,
+          "inline_period_sum_pass": true,
+          "inline_sample_count_pass": true,
+          "paired_stream_population_pass": true,
+          "physical_input_period": 74724898225,
+          "physical_input_samples": 17428,
+          "physical_pair_population": 17428
+        },
+        "multiple_marker_reason_keys": [],
+        "pairing": {
+          "duplicate_inline_keys": 0,
+          "duplicate_physical_keys": 0,
+          "exact_pairing_pass": true,
+          "inline_period": 74724898225,
+          "inline_samples": 17428,
+          "paired_samples": 17428,
+          "physical_period": 74724898225,
+          "physical_samples": 17428,
+          "unmatched_inline_period": 0,
+          "unmatched_inline_samples": 0,
+          "unmatched_physical_period": 0,
+          "unmatched_physical_samples": 0
+        },
+        "qualification_gate": {
+          "admitted": true,
+          "admitted_without_lost_record_binding": false,
+          "lost_records": 0,
+          "lost_records_zero": true,
+          "minimum_period": 100000,
+          "minimum_samples": 100,
+          "qualified_period": 2195986095,
+          "qualified_period_min_pass": true,
+          "qualified_samples": 499,
+          "qualified_samples_min_pass": true
+        },
+        "qualified": {
+          "period": 2195986095,
+          "period_share": 0.02938760904548559,
+          "samples": 499
+        },
+        "reasons": {
+          "empty_callchain_in_one_rendering": {
+            "period": 4386923,
+            "period_share": 5.870764770787347e-05,
+            "samples": 1
+          },
+          "no_timer_marker_in_inline_rendering": {
+            "period": 71077348495,
+            "period_share": 0.9511869562001,
+            "samples": 16598
+          },
+          "paired_physical_timed_and_inline_stage_with_source_checks": {
+            "period": 2195986095,
+            "period_share": 0.02938760904548559,
+            "samples": 499
+          },
+          "stage_marker_missing": {
+            "period": 1397256982,
+            "period_share": 0.01869868029519153,
+            "samples": 318
+          },
+          "unknown_frame_in_inline_or_physical_callchain": {
+            "period": 49919730,
+            "period_share": 0.0006680468115150785,
+            "samples": 12
+          }
+        },
+        "source_line_checks": {
+          "pass": {
+            "period": 5789229172,
+            "period_share": 0.07747389838616271,
+            "samples": 1316
+          },
+          "physical_missing_line": {
+            "period": 4400729,
+            "period_share": 5.889240540347354e-05,
+            "samples": 1
+          },
+          "physical_pass": {
+            "period": 3588842348,
+            "period_share": 0.04802739693527364,
+            "samples": 816
+          }
+        },
+        "status": "pass",
+        "whole_process": {
+          "period": 74724898225,
+          "period_share": 1.0,
+          "samples": 17428
+        }
+      },
+      "buildid": {
+        "export": {
+          "bytes": 302,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-02-buildid-list.txt",
+          "sha256": "7e99759e8f3a15e98ac9591d3c245672750b895d956529400409e8ddff62336b"
+        },
+        "returncode_receipt": {
+          "bytes": 2,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-02-buildid-list.rc",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+        },
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-02-buildid-list.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "target_lines": [
+          "7eb92ba2f0f8f3b248b77d8691e27b80b114fb22 /home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1"
+        ]
+      },
+      "capture": {
+        "perf_data": {
+          "bytes": 3297680,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/perf.data",
+          "sha256": "ee581bf5c63668ebdab69ac66a1ae1169e79c780b88d45878e9442bbce8fe58c"
+        },
+        "process_group_clear": true,
+        "returncode": 0,
+        "semantic_samples": 200,
+        "semantic_status": "passed",
+        "start": {
+          "bytes": 1620,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/start.json",
+          "sha256": "9e252946baae7fcdfc8460916ea33371486f22622186874a301ff01b4fa2643b"
+        },
+        "terminal": {
+          "bytes": 188,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/terminal.json",
+          "sha256": "6b50ce96c135d7d6fa86ae2802981f55719fa9bddf286c9df477df45652d799a"
+        },
+        "validation": {
+          "bytes": 860,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/validation.json",
+          "sha256": "fc1dd42aac4b65632b3a29147014f7b33f3c48212f67639b2487a1e70bd4818a"
+        }
+      },
+      "case": "medium-one-edit",
+      "cpu": {
+        "command": [
+          "/usr/bin/perf",
+          "script",
+          "--show-lost-events",
+          "--no-inline",
+          "-F",
+          "cpu,pid,tid,time,event,period,ip,sym,symoff,dso",
+          "-i",
+          "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/perf.data"
+        ],
+        "cpu_counts": {
+          "14": 17428
+        },
+        "event_counts": {
+          "cycles:u": 17428
+        },
+        "lost_record_lines": 0,
+        "observed_pid_tid_pairs": [
+          {
+            "pid": 3193900,
+            "tid": 3193900
+          }
+        ],
+        "parser": "split sample header: pid/tid [cpu] timestamp: period event:",
+        "period_sum": 74724898225,
+        "pid_counts": {
+          "3193900": 17428
+        },
+        "sample_count": 17428,
+        "tid_counts": {
+          "3193900": 17428
+        }
+      },
+      "header": {
+        "contract_pass": true,
+        "export": {
+          "bytes": 1819,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-02-header.txt",
+          "sha256": "33c6c56f3c14b6496ebeb7aaccda2a26f1ee18925dfad35e6c103fde9f4b3a35"
+        },
+        "returncode_receipt": {
+          "bytes": 2,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-02-header.rc",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+        },
+        "selected_event_line": "# event : name = cycles:u, , id = { 2701, 2702, 2703, 2704, 2705, 2706, 2707, 2708, 2709, 2710, 2711, 2712, 2713, 2714, 2715, 2716, 2717, 2718, 2719, 2720, 2721, 2722, 2723, 2724, 2725, 2726, 2727, 2728, 2729, 2730, 2731, 2732 }, type = 0 (PERF_TYPE_HARDWARE), size = 144, config = 0 (PERF_COUNT_HW_CPU_CYCLES), { sample_period, sample_freq } = 997, sample_type = IP|TID|TIME|CALLCHAIN|CPU|PERIOD, read_format = ID|LOST, disabled = 1, inherit = 1, exclude_kernel = 1, exclude_hv = 1, mmap = 1, comm = 1, freq = 1, enable_on_exec = 1, task = 1, sample_id_all = 1, exclude_callchain_kernel = 1, mmap2 = 1, comm_exec = 1, ksymbol = 1, bpf_event = 1, build_id = 1",
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-02-header.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "index": 2,
+      "mapping": {
+        "export": {
+          "bytes": 1305,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-02-mapping-events.txt",
+          "sha256": "309be6080ff68284166a13d1ea7bad19e290ab8d1a92029b6ebe1148a8585bd2"
+        },
+        "misordered_timestamp_lines": [
+          "Misordered timestamps: 0"
+        ],
+        "returncode_receipt": {
+          "bytes": 2,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-02-mapping.rc",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+        },
+        "stderr": {
+          "bytes": 25,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-02-mapping.stderr",
+          "sha256": "d760457f9a459836db8c86aa1e430280f8b3c8762575616f72e4aee52e767536"
+        },
+        "target_mapping_line": " xlsx_managed_co 3193900 [014] 269709.032836: PERF_RECORD_MMAP2 3193900/3193900: [0x5631cec43000(0x5b8000) @ 0x12a000 <7eb92ba2f0f8f3b248b77d8691e27b80b114fb22>]: r-xp /home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+        "target_pid_tid_pairs": [
+          {
+            "pid": 3193900,
+            "tid": 3193900
+          }
+        ]
+      },
+      "metadata_v3": {
+        "bytes": 9620,
+        "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-02-metadata-v3.json",
+        "sha256": "ee042f6a01c843547cb56b5567bda5b6c9cd52d8f4b4452bdebfe554e29eff8d"
+      },
+      "offline_decode": {
+        "analyzer": {
+          "bytes": 123716,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/offline-decode-v2/analyzer.json",
+          "sha256": "817728318ff037416a2a456d8816abc7d007ca1311c4fd21e3ecbfb36406c106"
+        },
+        "control": {
+          "bytes": 15343,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/offline-decode-v2/decode-control.json",
+          "sha256": "6f978553cc9e6ebb88f101ec70d7943b1cfe4e92f68efb413e193a21500118b3"
+        },
+        "inline_script": {
+          "bytes": 106161388,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/offline-decode-v1/perf-script-inline.txt",
+          "sha256": "0e0a72ce2592818d41f4f059e6f28ad20dc55e8c3d7b86fb77e25c1ef0b8f7fe"
+        },
+        "inline_terminal_initial": {
+          "bytes": 697,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/offline-decode-v1/inline-terminal.json",
+          "sha256": "dc3ee69bb46d15e8b5d709de3558e4bf3a7c350269afc818c9a90e3b5c1cd6ca"
+        },
+        "inline_terminal_late_clearance": {
+          "bytes": 1735,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/offline-decode-v1/inline-terminal-late-clearance-v2.json",
+          "sha256": "edb50bf607e366c1e9f5b1bdbb7d1fc28476a8c4f78055e5f967c196dca6a233"
+        },
+        "physical_script": {
+          "bytes": 59675780,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/offline-decode-v2/perf-script-physical.txt",
+          "sha256": "bdf91f64224acd397b042e0fe956c476d7f94bf65ffb93cc36809700eb406949"
+        },
+        "physical_terminal": {
+          "bytes": 699,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/offline-decode-v2/physical-terminal.json",
+          "sha256": "29b6311072e64b18e7fae9f78c3e6de4972a503c87f675336474b64aee0ec4bb"
+        }
+      },
+      "physical_review": {
+        "conservation_pass": true,
+        "key_policy": "Exclusive sampled self including inline callees; full symbol+DSO; raw IP/source line removed; out-of-line descendants excluded.",
+        "top10": [
+          {
+            "key": "quick_xml::reader::ns_reader::NsReader<R>::process_event [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 233018030,
+            "samples": 53,
+            "share_of_qualified_period": 0.10611088591615149
+          },
+          {
+            "key": "quick_xml::name::NamespaceResolver::resolve_event [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 171641208,
+            "samples": 39,
+            "share_of_qualified_period": 0.07816133644507435
+          },
+          {
+            "key": "litchi_xlsx::cell_values::validation::scan_attributes [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 158481363,
+            "samples": 36,
+            "share_of_qualified_period": 0.07216865505698933
+          },
+          {
+            "key": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 153962399,
+            "samples": 35,
+            "share_of_qualified_period": 0.0701108259977393
+          },
+          {
+            "key": "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 114507039,
+            "samples": 26,
+            "share_of_qualified_period": 0.05214379055528583
+          },
+          {
+            "key": "quick_xml::encoding::Decoder::decode_cow [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 88065473,
+            "samples": 20,
+            "share_of_qualified_period": 0.04010292833844196
+          },
+          {
+            "key": "litchi_xlsx::cell_values::validation::validate_xml [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 83619486,
+            "samples": 19,
+            "share_of_qualified_period": 0.038078331274679585
+          },
+          {
+            "key": "quick_xml::name::NamespaceResolver::push [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 79268784,
+            "samples": 18,
+            "share_of_qualified_period": 0.03609712474067373
+          },
+          {
+            "key": "quick_xml::events::attributes::IterState::check_for_duplicates [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 74862498,
+            "samples": 17,
+            "share_of_qualified_period": 0.034090606570985595
+          },
+          {
+            "key": "quick_xml::reader::Reader<R>::read_event_impl [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 70451281,
+            "samples": 16,
+            "share_of_qualified_period": 0.032081842940813336
+          }
+        ]
+      },
+      "source_review": {
+        "conservation_pass": true,
+        "qualified_period": 2195986095,
+        "qualified_samples": 499,
+        "ranking_released": false,
+        "resolved_absolute_path_period": 985383337,
+        "resolved_absolute_path_period_share": 0.448720207857236,
+        "unresolved_period": 1210602758,
+        "unresolved_period_share": 0.551279792142764,
+        "unresolved_samples": 275
+      }
+    },
+    {
+      "analyzer": {
+        "ambiguous_classification_keys": [],
+        "binary_binding": {
+          "bytes": 104819848,
+          "elf_build_id": "7eb92ba2f0f8f3b248b77d8691e27b80b114fb22",
+          "mode": 509,
+          "path": "/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+          "sha256": "843ae35a0f5131a8cba965f917b2a4c5fccb6926ae3d66862e5f78512820fb33"
+        },
+        "classification": {
+          "empty_frames": {
+            "period": 4366046,
+            "period_share": 5.845510884470457e-05,
+            "samples": 1
+          },
+          "no_phase_marker": {
+            "period": 71063008974,
+            "period_share": 0.951432010658474,
+            "samples": 16584
+          },
+          "qualified": {
+            "period": 2068701002,
+            "period_share": 0.02769694644514955,
+            "samples": 470
+          },
+          "unknown_frames": {
+            "period": 52307169,
+            "period_share": 0.0007003181499355153,
+            "samples": 12
+          },
+          "unqualified_phase": {
+            "period": 1502197090,
+            "period_share": 0.02011226963759623,
+            "samples": 342
+          }
+        },
+        "conservation": {
+          "header_multiset_pass": true,
+          "inline_classified_period": 74690580281,
+          "inline_classified_samples": 17409,
+          "inline_input_period": 74690580281,
+          "inline_input_samples": 17409,
+          "inline_period_sum_pass": true,
+          "inline_sample_count_pass": true,
+          "paired_stream_population_pass": true,
+          "physical_input_period": 74690580281,
+          "physical_input_samples": 17409,
+          "physical_pair_population": 17409
+        },
+        "multiple_marker_reason_keys": [],
+        "pairing": {
+          "duplicate_inline_keys": 0,
+          "duplicate_physical_keys": 0,
+          "exact_pairing_pass": true,
+          "inline_period": 74690580281,
+          "inline_samples": 17409,
+          "paired_samples": 17409,
+          "physical_period": 74690580281,
+          "physical_samples": 17409,
+          "unmatched_inline_period": 0,
+          "unmatched_inline_samples": 0,
+          "unmatched_physical_period": 0,
+          "unmatched_physical_samples": 0
+        },
+        "qualification_gate": {
+          "admitted": true,
+          "admitted_without_lost_record_binding": false,
+          "lost_records": 0,
+          "lost_records_zero": true,
+          "minimum_period": 100000,
+          "minimum_samples": 100,
+          "qualified_period": 2068701002,
+          "qualified_period_min_pass": true,
+          "qualified_samples": 470,
+          "qualified_samples_min_pass": true
+        },
+        "qualified": {
+          "period": 2068701002,
+          "period_share": 0.02769694644514955,
+          "samples": 470
+        },
+        "reasons": {
+          "empty_callchain_in_one_rendering": {
+            "period": 4366046,
+            "period_share": 5.845510884470457e-05,
+            "samples": 1
+          },
+          "no_timer_marker_in_inline_rendering": {
+            "period": 71063008974,
+            "period_share": 0.951432010658474,
+            "samples": 16584
+          },
+          "paired_physical_timed_and_inline_stage_with_source_checks": {
+            "period": 2068701002,
+            "period_share": 0.02769694644514955,
+            "samples": 470
+          },
+          "stage_marker_missing": {
+            "period": 1502197090,
+            "period_share": 0.02011226963759623,
+            "samples": 342
+          },
+          "unknown_frame_in_inline_or_physical_callchain": {
+            "period": 52307169,
+            "period_share": 0.0007003181499355153,
+            "samples": 12
+          }
+        },
+        "source_line_checks": {
+          "pass": {
+            "period": 5635202030,
+            "period_share": 0.07544729213241229,
+            "samples": 1281
+          },
+          "physical_missing_line": {
+            "period": 4397064,
+            "period_share": 5.887039548303707e-05,
+            "samples": 1
+          },
+          "physical_pass": {
+            "period": 3566501028,
+            "period_share": 0.04775034568726274,
+            "samples": 811
+          },
+          "wrong_file": {
+            "period": 4397064,
+            "period_share": 5.887039548303707e-05,
+            "samples": 1
+          }
+        },
+        "status": "pass",
+        "whole_process": {
+          "period": 74690580281,
+          "period_share": 1.0,
+          "samples": 17409
+        }
+      },
+      "buildid": {
+        "export": {
+          "bytes": 302,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-buildid-list.txt",
+          "sha256": "7e99759e8f3a15e98ac9591d3c245672750b895d956529400409e8ddff62336b"
+        },
+        "returncode_receipt": {
+          "bytes": 2,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-buildid-list.rc",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+        },
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-buildid-list.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "target_lines": [
+          "7eb92ba2f0f8f3b248b77d8691e27b80b114fb22 /home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1"
+        ]
+      },
+      "capture": {
+        "perf_data": {
+          "bytes": 3295360,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/perf.data",
+          "sha256": "a79e275db70d00f09f54abea1ecc9009b86edbd5864829ccd646b5a20eb166ae"
+        },
+        "process_group_clear": true,
+        "returncode": 0,
+        "semantic_samples": 200,
+        "semantic_status": "passed",
+        "start": {
+          "bytes": 1620,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/start.json",
+          "sha256": "e80432b80a8c2c2321f7c71d7767a06400c3e7a6cd2ba5f498eacb6e55a2200a"
+        },
+        "terminal": {
+          "bytes": 188,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/terminal.json",
+          "sha256": "f0327c35b0c46849a50152964b0ac5772e6749c148c6483b337ff9c4a5db014f"
+        },
+        "validation": {
+          "bytes": 860,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/validation.json",
+          "sha256": "813a248f6073f91dda89a97018266458ebce52df42f6ac989684b82d13c5631f"
+        }
+      },
+      "case": "medium-one-edit",
+      "cpu": {
+        "command": [
+          "/usr/bin/perf",
+          "script",
+          "--show-lost-events",
+          "--no-inline",
+          "-F",
+          "cpu,pid,tid,time,event,period,ip,sym,symoff,dso",
+          "-i",
+          "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/perf.data"
+        ],
+        "cpu_counts": {
+          "15": 17409
+        },
+        "event_counts": {
+          "cycles:u": 17409
+        },
+        "lost_record_lines": 0,
+        "observed_pid_tid_pairs": [
+          {
+            "pid": 3194037,
+            "tid": 3194037
+          }
+        ],
+        "parser": "split sample header: pid/tid [cpu] timestamp: period event:",
+        "period_sum": 74690580281,
+        "pid_counts": {
+          "3194037": 17409
+        },
+        "sample_count": 17409,
+        "tid_counts": {
+          "3194037": 17409
+        }
+      },
+      "header": {
+        "contract_pass": true,
+        "export": {
+          "bytes": 1819,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-header.txt",
+          "sha256": "02b36eda0ba1004b9ac15c385b0b4605091444b32eadc7c6ce6978099e307186"
+        },
+        "returncode_receipt": {
+          "bytes": 2,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-header.rc",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+        },
+        "selected_event_line": "# event : name = cycles:u, , id = { 2740, 2741, 2742, 2743, 2744, 2745, 2746, 2747, 2748, 2749, 2750, 2751, 2752, 2753, 2754, 2755, 2756, 2757, 2758, 2759, 2760, 2761, 2762, 2763, 2764, 2765, 2766, 2767, 2768, 2769, 2770, 2771 }, type = 0 (PERF_TYPE_HARDWARE), size = 144, config = 0 (PERF_COUNT_HW_CPU_CYCLES), { sample_period, sample_freq } = 997, sample_type = IP|TID|TIME|CALLCHAIN|CPU|PERIOD, read_format = ID|LOST, disabled = 1, inherit = 1, exclude_kernel = 1, exclude_hv = 1, mmap = 1, comm = 1, freq = 1, enable_on_exec = 1, task = 1, sample_id_all = 1, exclude_callchain_kernel = 1, mmap2 = 1, comm_exec = 1, ksymbol = 1, bpf_event = 1, build_id = 1",
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-header.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "index": 3,
+      "mapping": {
+        "export": {
+          "bytes": 1305,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-mapping-events.txt",
+          "sha256": "1049e74a27c646d0d4cda341a43953b085ea9a53c33ea96ff1de91b06fbcdb69"
+        },
+        "misordered_timestamp_lines": [
+          "Misordered timestamps: 0"
+        ],
+        "returncode_receipt": {
+          "bytes": 2,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-mapping.rc",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+        },
+        "stderr": {
+          "bytes": 25,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-mapping.stderr",
+          "sha256": "d760457f9a459836db8c86aa1e430280f8b3c8762575616f72e4aee52e767536"
+        },
+        "target_mapping_line": " xlsx_managed_co 3194037 [015] 269726.867181: PERF_RECORD_MMAP2 3194037/3194037: [0x645cdc1a7000(0x5b8000) @ 0x12a000 <7eb92ba2f0f8f3b248b77d8691e27b80b114fb22>]: r-xp /home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+        "target_pid_tid_pairs": [
+          {
+            "pid": 3194037,
+            "tid": 3194037
+          }
+        ]
+      },
+      "metadata_v3": {
+        "bytes": 9620,
+        "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-metadata-v3.json",
+        "sha256": "9a0513091c08d4f5f143d6c9b088baefa3942e0e6b20597d46efc20fdcadef08"
+      },
+      "offline_decode": {
+        "analyzer": {
+          "bytes": 135430,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/offline-decode-v2/analyzer.json",
+          "sha256": "4fdd2631221555207a7544323136b7f5feef6cf1e1b58dc0edc957e26e79d018"
+        },
+        "control": {
+          "bytes": 15343,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/offline-decode-v2/decode-control.json",
+          "sha256": "81506b1ceb294bbbee662a49efbd9ebee2e6a4f00573f70ced23e46dec94d0eb"
+        },
+        "inline_script": {
+          "bytes": 106002574,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/offline-decode-v1/perf-script-inline.txt",
+          "sha256": "1c8d9867e652f4395d54dffd7c8ba9392449f4ad25fbba6dd2b204d1a12ae1b6"
+        },
+        "inline_terminal_initial": {
+          "bytes": 697,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/offline-decode-v1/inline-terminal.json",
+          "sha256": "9b5d116fe56af93f6eae0f908d5159bfc2744ded462d72fda8f2709c1edc006c"
+        },
+        "inline_terminal_late_clearance": {
+          "bytes": 1735,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/offline-decode-v1/inline-terminal-late-clearance-v2.json",
+          "sha256": "3ac63b26bcb4846f8e6b8c736abb1a98fafab740662e2e25e3d43c530c33dfde"
+        },
+        "physical_script": {
+          "bytes": 59606963,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/offline-decode-v2/perf-script-physical.txt",
+          "sha256": "d0fe5e6c984fd2b20f363c6eee68c76b8ccf08fd1bcd07f8fd94a243fa188bc0"
+        },
+        "physical_terminal": {
+          "bytes": 699,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/offline-decode-v2/physical-terminal.json",
+          "sha256": "2799d11600e6950808f6cd6b8ebfcc8022bd29bd2fa16735d197a413fea47d94"
+        }
+      },
+      "physical_review": {
+        "conservation_pass": true,
+        "key_policy": "Exclusive sampled self including inline callees; full symbol+DSO; raw IP/source line removed; out-of-line descendants excluded.",
+        "top10": [
+          {
+            "key": "quick_xml::name::NamespaceResolver::resolve_event [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 202562564,
+            "samples": 46,
+            "share_of_qualified_period": 0.09791775795736768
+          },
+          {
+            "key": "litchi_xlsx::cell_values::validation::scan_attributes [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 149381487,
+            "samples": 34,
+            "share_of_qualified_period": 0.07221028406501444
+          },
+          {
+            "key": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 127722485,
+            "samples": 29,
+            "share_of_qualified_period": 0.06174042787068752
+          },
+          {
+            "key": "quick_xml::reader::ns_reader::NsReader<R>::process_event [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 110043285,
+            "samples": 25,
+            "share_of_qualified_period": 0.053194388601161414
+          },
+          {
+            "key": "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 105720781,
+            "samples": 24,
+            "share_of_qualified_period": 0.05110491119682843
+          },
+          {
+            "key": "litchi_xlsx::cell_values::validation::validate_xml [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 100979884,
+            "samples": 23,
+            "share_of_qualified_period": 0.04881318465180499
+          },
+          {
+            "key": "quick_xml::name::NamespaceResolver::push [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 83614790,
+            "samples": 19,
+            "share_of_qualified_period": 0.04041898269453248
+          },
+          {
+            "key": "quick_xml::encoding::Decoder::decode_cow [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 74617467,
+            "samples": 17,
+            "share_of_qualified_period": 0.03606972052890222
+          },
+          {
+            "key": "__memcmp_evex_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+            "period": 70455679,
+            "samples": 16,
+            "share_of_qualified_period": 0.0340579324570753
+          },
+          {
+            "key": "quick_xml::events::attributes::IterState::next [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 66064843,
+            "samples": 15,
+            "share_of_qualified_period": 0.031935423696382005
+          }
+        ]
+      },
+      "source_review": {
+        "conservation_pass": true,
+        "qualified_period": 2068701002,
+        "qualified_samples": 470,
+        "ranking_released": false,
+        "resolved_absolute_path_period": 761135413,
+        "resolved_absolute_path_period_share": 0.36792915567022094,
+        "unresolved_period": 1307565589,
+        "unresolved_period_share": 0.6320708443297791,
+        "unresolved_samples": 297
+      }
+    },
+    {
+      "analyzer": {
+        "ambiguous_classification_keys": [],
+        "binary_binding": {
+          "bytes": 104819848,
+          "elf_build_id": "7eb92ba2f0f8f3b248b77d8691e27b80b114fb22",
+          "mode": 509,
+          "path": "/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+          "sha256": "843ae35a0f5131a8cba965f917b2a4c5fccb6926ae3d66862e5f78512820fb33"
+        },
+        "classification": {
+          "no_phase_marker": {
+            "period": 101228158351,
+            "period_share": 0.7904161429176424,
+            "samples": 23331
+          },
+          "qualified": {
+            "period": 15992963474,
+            "period_share": 0.12487727435591485,
+            "samples": 3747
+          },
+          "unknown_frames": {
+            "period": 111555352,
+            "period_share": 0.0008710535930518473,
+            "samples": 26
+          },
+          "unqualified_phase": {
+            "period": 10736769858,
+            "period_share": 0.08383552913339086,
+            "samples": 2439
+          }
+        },
+        "conservation": {
+          "header_multiset_pass": true,
+          "inline_classified_period": 128069447035,
+          "inline_classified_samples": 29543,
+          "inline_input_period": 128069447035,
+          "inline_input_samples": 29543,
+          "inline_period_sum_pass": true,
+          "inline_sample_count_pass": true,
+          "paired_stream_population_pass": true,
+          "physical_input_period": 128069447035,
+          "physical_input_samples": 29543,
+          "physical_pair_population": 29543
+        },
+        "multiple_marker_reason_keys": [],
+        "pairing": {
+          "duplicate_inline_keys": 0,
+          "duplicate_physical_keys": 0,
+          "exact_pairing_pass": true,
+          "inline_period": 128069447035,
+          "inline_samples": 29543,
+          "paired_samples": 29543,
+          "physical_period": 128069447035,
+          "physical_samples": 29543,
+          "unmatched_inline_period": 0,
+          "unmatched_inline_samples": 0,
+          "unmatched_physical_period": 0,
+          "unmatched_physical_samples": 0
+        },
+        "qualification_gate": {
+          "admitted": true,
+          "admitted_without_lost_record_binding": false,
+          "lost_records": 0,
+          "lost_records_zero": true,
+          "minimum_period": 100000,
+          "minimum_samples": 100,
+          "qualified_period": 15992963474,
+          "qualified_period_min_pass": true,
+          "qualified_samples": 3747,
+          "qualified_samples_min_pass": true
+        },
+        "qualified": {
+          "period": 15992963474,
+          "period_share": 0.12487727435591485,
+          "samples": 3747
+        },
+        "reasons": {
+          "no_timer_marker_in_inline_rendering": {
+            "period": 101228158351,
+            "period_share": 0.7904161429176424,
+            "samples": 23331
+          },
+          "paired_physical_timed_and_inline_stage_with_source_checks": {
+            "period": 15992963474,
+            "period_share": 0.12487727435591485,
+            "samples": 3747
+          },
+          "stage_marker_missing": {
+            "period": 10736769858,
+            "period_share": 0.08383552913339086,
+            "samples": 2439
+          },
+          "unknown_frame_in_inline_or_physical_callchain": {
+            "period": 111555352,
+            "period_share": 0.0008710535930518473,
+            "samples": 26
+          }
+        },
+        "source_line_checks": {
+          "pass": {
+            "period": 42722696806,
+            "period_share": 0.33359007784522055,
+            "samples": 9933
+          },
+          "physical_pass": {
+            "period": 26734144267,
+            "period_share": 0.20874724523245458,
+            "samples": 6187
+          },
+          "wrong_file": {
+            "period": 4410935,
+            "period_share": 3.444174314889123e-05,
+            "samples": 1
+          }
+        },
+        "status": "pass",
+        "whole_process": {
+          "period": 128069447035,
+          "period_share": 1.0,
+          "samples": 29543
+        }
+      },
+      "buildid": {
+        "export": {
+          "bytes": 368,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-04-buildid-list.txt",
+          "sha256": "80507345a1177847b16145499a6aba6a1164141f01e027c6feced7f6180e4a78"
+        },
+        "returncode_receipt": {
+          "bytes": 2,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-04-buildid-list.rc",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+        },
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-04-buildid-list.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "target_lines": [
+          "7eb92ba2f0f8f3b248b77d8691e27b80b114fb22 /home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1"
+        ]
+      },
+      "capture": {
+        "perf_data": {
+          "bytes": 5409480,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent/perf.data",
+          "sha256": "e02f3fd2cef53067bc78b0679db74e9f17a53b03e2ce2d1cfa5986643c32ec29"
+        },
+        "process_group_clear": true,
+        "returncode": 0,
+        "semantic_samples": 200,
+        "semantic_status": "passed",
+        "start": {
+          "bytes": 1647,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent/start.json",
+          "sha256": "adfba3d3eb358d55810cebd3988b5da3b5ac6b326a68ef15275ef9f5dfd65a4e"
+        },
+        "terminal": {
+          "bytes": 188,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent/terminal.json",
+          "sha256": "960dbb343e1962721854088310808cf7477ddd0ea66d345898bce1a948765ac0"
+        },
+        "validation": {
+          "bytes": 887,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent/validation.json",
+          "sha256": "61987e35722a765a22578296e30c0d46062301f60d9a2702d1e6924fd0acac5b"
+        }
+      },
+      "case": "dense-sparse-one-percent",
+      "cpu": {
+        "command": [
+          "/usr/bin/perf",
+          "script",
+          "--show-lost-events",
+          "--no-inline",
+          "-F",
+          "cpu,pid,tid,time,event,period,ip,sym,symoff,dso",
+          "-i",
+          "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent/perf.data"
+        ],
+        "cpu_counts": {
+          "13": 29543
+        },
+        "event_counts": {
+          "cycles:u": 29543
+        },
+        "lost_record_lines": 0,
+        "observed_pid_tid_pairs": [
+          {
+            "pid": 3194147,
+            "tid": 3194147
+          }
+        ],
+        "parser": "split sample header: pid/tid [cpu] timestamp: period event:",
+        "period_sum": 128069447035,
+        "pid_counts": {
+          "3194147": 29543
+        },
+        "sample_count": 29543,
+        "tid_counts": {
+          "3194147": 29543
+        }
+      },
+      "header": {
+        "contract_pass": true,
+        "export": {
+          "bytes": 1819,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-04-header.txt",
+          "sha256": "971b959a6f22e7e8d43f748f7d21b9bade4fc06003ec142819437994839785de"
+        },
+        "returncode_receipt": {
+          "bytes": 2,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-04-header.rc",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+        },
+        "selected_event_line": "# event : name = cycles:u, , id = { 2779, 2780, 2781, 2782, 2783, 2784, 2785, 2786, 2787, 2788, 2789, 2790, 2791, 2792, 2793, 2794, 2795, 2796, 2797, 2798, 2799, 2800, 2801, 2802, 2803, 2804, 2805, 2806, 2807, 2808, 2809, 2810 }, type = 0 (PERF_TYPE_HARDWARE), size = 144, config = 0 (PERF_COUNT_HW_CPU_CYCLES), { sample_period, sample_freq } = 997, sample_type = IP|TID|TIME|CALLCHAIN|CPU|PERIOD, read_format = ID|LOST, disabled = 1, inherit = 1, exclude_kernel = 1, exclude_hv = 1, mmap = 1, comm = 1, freq = 1, enable_on_exec = 1, task = 1, sample_id_all = 1, exclude_callchain_kernel = 1, mmap2 = 1, comm_exec = 1, ksymbol = 1, bpf_event = 1, build_id = 1",
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-04-header.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "index": 4,
+      "mapping": {
+        "export": {
+          "bytes": 1305,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-04-mapping-events.txt",
+          "sha256": "4db9dcb4cd10a0fe29fc446a419ab6ac9ec574878f5e7c92cc9e0897b3e36ffe"
+        },
+        "misordered_timestamp_lines": [
+          "Misordered timestamps: 0"
+        ],
+        "returncode_receipt": {
+          "bytes": 2,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-04-mapping.rc",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+        },
+        "stderr": {
+          "bytes": 25,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-04-mapping.stderr",
+          "sha256": "d760457f9a459836db8c86aa1e430280f8b3c8762575616f72e4aee52e767536"
+        },
+        "target_mapping_line": " xlsx_managed_co 3194147 [013] 269744.652846: PERF_RECORD_MMAP2 3194147/3194147: [0x59fa3142d000(0x5b8000) @ 0x12a000 <7eb92ba2f0f8f3b248b77d8691e27b80b114fb22>]: r-xp /home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+        "target_pid_tid_pairs": [
+          {
+            "pid": 3194147,
+            "tid": 3194147
+          }
+        ]
+      },
+      "metadata_v3": {
+        "bytes": 9790,
+        "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-04-metadata-v3.json",
+        "sha256": "6998b945ba6bbda48b9d60592e7e811ba71f224b454fa64f03745cc1dd0af1b5"
+      },
+      "offline_decode": {
+        "analyzer": {
+          "bytes": 461243,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent/offline-decode-v2/analyzer.json",
+          "sha256": "11a60ba8f52468600b0431342436084ce7675a808c474e140a6444dbeabf8623"
+        },
+        "control": {
+          "bytes": 15557,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent/offline-decode-v2/decode-control.json",
+          "sha256": "a9511eb85faaf091a6a42af31bf124d5d694c2aaa9ed24ba53d630f1e0cd5a55"
+        },
+        "inline_script": {
+          "bytes": 167491834,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent/offline-decode-v1/perf-script-inline.txt",
+          "sha256": "4670bb845b494710c3faefe35f45dc524139dfa3fe4a9960129601a44a52acae"
+        },
+        "inline_terminal_initial": {
+          "bytes": 706,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent/offline-decode-v1/inline-terminal.json",
+          "sha256": "197248aa07dc94ad57c340d2f2c7ad0482d76ad0299406cf030542bf9431360d"
+        },
+        "inline_terminal_late_clearance": {
+          "bytes": 1771,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent/offline-decode-v1/inline-terminal-late-clearance-v2.json",
+          "sha256": "66676b38f3483beda88d13bbf5ca006573f98f3bed4185b6280d7d0817756a0c"
+        },
+        "physical_script": {
+          "bytes": 97311363,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent/offline-decode-v2/perf-script-physical.txt",
+          "sha256": "2b37bac9a0c354d23ebb6e9b789acd1bec389ce96f27971ad3623e4c01ec28e8"
+        },
+        "physical_terminal": {
+          "bytes": 708,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent/offline-decode-v2/physical-terminal.json",
+          "sha256": "3065a745b545d4eaa479cda9155c5d6ca0af895a91acb6073b7ed4c316ca4c07"
+        }
+      },
+      "physical_review": {
+        "conservation_pass": true,
+        "key_policy": "Exclusive sampled self including inline callees; full symbol+DSO; raw IP/source line removed; out-of-line descendants excluded.",
+        "top10": [
+          {
+            "key": "quick_xml::reader::ns_reader::NsReader<R>::process_event [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 1358070599,
+            "samples": 318,
+            "share_of_qualified_period": 0.08491675737319326
+          },
+          {
+            "key": "quick_xml::name::NamespaceResolver::resolve_event [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 1258510943,
+            "samples": 292,
+            "share_of_qualified_period": 0.0786915411296962
+          },
+          {
+            "key": "litchi_xlsx::cell_values::validation::scan_attributes [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 1109252169,
+            "samples": 259,
+            "share_of_qualified_period": 0.0693587633588564
+          },
+          {
+            "key": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 1061359306,
+            "samples": 253,
+            "share_of_qualified_period": 0.06636414243835845
+          },
+          {
+            "key": "litchi_xlsx::cell_values::validation::validate_xml [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 697337960,
+            "samples": 159,
+            "share_of_qualified_period": 0.04360279826397858
+          },
+          {
+            "key": "quick_xml::name::NamespaceResolver::push [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 669952339,
+            "samples": 157,
+            "share_of_qualified_period": 0.041890443887347806
+          },
+          {
+            "key": "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 606768077,
+            "samples": 146,
+            "share_of_qualified_period": 0.037939690038461725
+          },
+          {
+            "key": "__memmove_avx512_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+            "period": 573849397,
+            "samples": 133,
+            "share_of_qualified_period": 0.03588136732338041
+          },
+          {
+            "key": "quick_xml::events::attributes::IterState::next [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 483862659,
+            "samples": 114,
+            "share_of_qualified_period": 0.03025472169598979
+          },
+          {
+            "key": "quick_xml::reader::Reader<R>::read_event_impl [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 454631965,
+            "samples": 106,
+            "share_of_qualified_period": 0.028426999520076563
+          }
+        ]
+      },
+      "source_review": {
+        "conservation_pass": true,
+        "qualified_period": 15992963474,
+        "qualified_samples": 3747,
+        "ranking_released": false,
+        "resolved_absolute_path_period": 6420400180,
+        "resolved_absolute_path_period_share": 0.4014515627724493,
+        "unresolved_period": 9572563294,
+        "unresolved_period_share": 0.5985484372275507,
+        "unresolved_samples": 2246
+      }
+    },
+    {
+      "analyzer": {
+        "ambiguous_classification_keys": [],
+        "binary_binding": {
+          "bytes": 104819848,
+          "elf_build_id": "7eb92ba2f0f8f3b248b77d8691e27b80b114fb22",
+          "mode": 509,
+          "path": "/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+          "sha256": "843ae35a0f5131a8cba965f917b2a4c5fccb6926ae3d66862e5f78512820fb33"
+        },
+        "classification": {
+          "no_phase_marker": {
+            "period": 77259383602,
+            "period_share": 0.8489988609573705,
+            "samples": 17824
+          },
+          "qualified": {
+            "period": 8349018017,
+            "period_share": 0.09174687210890549,
+            "samples": 1982
+          },
+          "source_invalid": {
+            "period": 4220605,
+            "period_share": 4.637998221692028e-05,
+            "samples": 1
+          },
+          "unknown_frames": {
+            "period": 108539213,
+            "period_share": 0.0011927310821028083,
+            "samples": 26
+          },
+          "unqualified_phase": {
+            "period": 5279412480,
+            "period_share": 0.05801515586940428,
+            "samples": 1207
+          }
+        },
+        "conservation": {
+          "header_multiset_pass": true,
+          "inline_classified_period": 91000573917,
+          "inline_classified_samples": 21040,
+          "inline_input_period": 91000573917,
+          "inline_input_samples": 21040,
+          "inline_period_sum_pass": true,
+          "inline_sample_count_pass": true,
+          "paired_stream_population_pass": true,
+          "physical_input_period": 91000573917,
+          "physical_input_samples": 21040,
+          "physical_pair_population": 21040
+        },
+        "multiple_marker_reason_keys": [],
+        "pairing": {
+          "duplicate_inline_keys": 0,
+          "duplicate_physical_keys": 0,
+          "exact_pairing_pass": true,
+          "inline_period": 91000573917,
+          "inline_samples": 21040,
+          "paired_samples": 21040,
+          "physical_period": 91000573917,
+          "physical_samples": 21040,
+          "unmatched_inline_period": 0,
+          "unmatched_inline_samples": 0,
+          "unmatched_physical_period": 0,
+          "unmatched_physical_samples": 0
+        },
+        "qualification_gate": {
+          "admitted": true,
+          "admitted_without_lost_record_binding": false,
+          "lost_records": 0,
+          "lost_records_zero": true,
+          "minimum_period": 100000,
+          "minimum_samples": 100,
+          "qualified_period": 8349018017,
+          "qualified_period_min_pass": true,
+          "qualified_samples": 1982,
+          "qualified_samples_min_pass": true
+        },
+        "qualified": {
+          "period": 8349018017,
+          "period_share": 0.09174687210890549,
+          "samples": 1982
+        },
+        "reasons": {
+          "no_timer_marker_in_inline_rendering": {
+            "period": 77259383602,
+            "period_share": 0.8489988609573705,
+            "samples": 17824
+          },
+          "paired_physical_timed_and_inline_stage_with_source_checks": {
+            "period": 8349018017,
+            "period_share": 0.09174687210890549,
+            "samples": 1982
+          },
+          "physical_timed_source_check_failed": {
+            "period": 4220605,
+            "period_share": 4.637998221692028e-05,
+            "samples": 1
+          },
+          "stage_marker_missing": {
+            "period": 5279412480,
+            "period_share": 0.05801515586940428,
+            "samples": 1207
+          },
+          "unknown_frame_in_inline_or_physical_callchain": {
+            "period": 108539213,
+            "period_share": 0.0011927310821028083,
+            "samples": 26
+          }
+        },
+        "source_line_checks": {
+          "pass": {
+            "period": 21981669119,
+            "period_share": 0.2415552800694322,
+            "samples": 5172
+          },
+          "physical_missing_line": {
+            "period": 4220605,
+            "period_share": 4.637998221692028e-05,
+            "samples": 1
+          },
+          "physical_pass": {
+            "period": 13628430497,
+            "period_share": 0.14976202797830976,
+            "samples": 3189
+          },
+          "wrong_file": {
+            "period": 4220605,
+            "period_share": 4.637998221692028e-05,
+            "samples": 1
+          }
+        },
+        "status": "pass",
+        "whole_process": {
+          "period": 91000573917,
+          "period_share": 1.0,
+          "samples": 21040
+        }
+      },
+      "buildid": {
+        "export": {
+          "bytes": 302,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-05-buildid-list.txt",
+          "sha256": "7e99759e8f3a15e98ac9591d3c245672750b895d956529400409e8ddff62336b"
+        },
+        "returncode_receipt": {
+          "bytes": 2,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-05-buildid-list.rc",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+        },
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-05-buildid-list.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "target_lines": [
+          "7eb92ba2f0f8f3b248b77d8691e27b80b114fb22 /home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1"
+        ]
+      },
+      "capture": {
+        "perf_data": {
+          "bytes": 3916776,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/05-medium-one-percent/perf.data",
+          "sha256": "0d984c67686d6cda5bb4bc819c5e9c0d155199acc7114b720a153637733225b1"
+        },
+        "process_group_clear": true,
+        "returncode": 0,
+        "semantic_samples": 200,
+        "semantic_status": "passed",
+        "start": {
+          "bytes": 1629,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/05-medium-one-percent/start.json",
+          "sha256": "71762a45fe1ad8304d47640205b55f8edb0515dade4d6437d6b682be61eeaaf5"
+        },
+        "terminal": {
+          "bytes": 188,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/05-medium-one-percent/terminal.json",
+          "sha256": "b8ec9f3f80525d857981193c31204c90c1a148e239737dbdefeec6624d848fab"
+        },
+        "validation": {
+          "bytes": 869,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/05-medium-one-percent/validation.json",
+          "sha256": "6b39c1912938e3dccb24820afc30f2670dad874efee642cc8852279c7cba5991"
+        }
+      },
+      "case": "medium-one-percent",
+      "cpu": {
+        "command": [
+          "/usr/bin/perf",
+          "script",
+          "--show-lost-events",
+          "--no-inline",
+          "-F",
+          "cpu,pid,tid,time,event,period,ip,sym,symoff,dso",
+          "-i",
+          "/home/zhuhe/litchi-performance-0962/fp-wave-v1/05-medium-one-percent/perf.data"
+        ],
+        "cpu_counts": {
+          "14": 21040
+        },
+        "event_counts": {
+          "cycles:u": 21040
+        },
+        "lost_record_lines": 0,
+        "observed_pid_tid_pairs": [
+          {
+            "pid": 3194375,
+            "tid": 3194375
+          }
+        ],
+        "parser": "split sample header: pid/tid [cpu] timestamp: period event:",
+        "period_sum": 91000573917,
+        "pid_counts": {
+          "3194375": 21040
+        },
+        "sample_count": 21040,
+        "tid_counts": {
+          "3194375": 21040
+        }
+      },
+      "header": {
+        "contract_pass": true,
+        "export": {
+          "bytes": 1819,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-05-header.txt",
+          "sha256": "dcbaa9d554fc18e13dfd9bb7f457151e9c3dba1fbdee2e4cf6f69744a61ebc0d"
+        },
+        "returncode_receipt": {
+          "bytes": 2,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-05-header.rc",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+        },
+        "selected_event_line": "# event : name = cycles:u, , id = { 2818, 2819, 2820, 2821, 2822, 2823, 2824, 2825, 2826, 2827, 2828, 2829, 2830, 2831, 2832, 2833, 2834, 2835, 2836, 2837, 2838, 2839, 2840, 2841, 2842, 2843, 2844, 2845, 2846, 2847, 2848, 2849 }, type = 0 (PERF_TYPE_HARDWARE), size = 144, config = 0 (PERF_COUNT_HW_CPU_CYCLES), { sample_period, sample_freq } = 997, sample_type = IP|TID|TIME|CALLCHAIN|CPU|PERIOD, read_format = ID|LOST, disabled = 1, inherit = 1, exclude_kernel = 1, exclude_hv = 1, mmap = 1, comm = 1, freq = 1, enable_on_exec = 1, task = 1, sample_id_all = 1, exclude_callchain_kernel = 1, mmap2 = 1, comm_exec = 1, ksymbol = 1, bpf_event = 1, build_id = 1",
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-05-header.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "index": 5,
+      "mapping": {
+        "export": {
+          "bytes": 1305,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-05-mapping-events.txt",
+          "sha256": "e147ea424520eab78e595c25d43cd3c0d7a74caa66f1bcaf6a04d481a20ce293"
+        },
+        "misordered_timestamp_lines": [
+          "Misordered timestamps: 0"
+        ],
+        "returncode_receipt": {
+          "bytes": 2,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-05-mapping.rc",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+        },
+        "stderr": {
+          "bytes": 25,
+          "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-05-mapping.stderr",
+          "sha256": "d760457f9a459836db8c86aa1e430280f8b3c8762575616f72e4aee52e767536"
+        },
+        "target_mapping_line": " xlsx_managed_co 3194375 [014] 269774.603679: PERF_RECORD_MMAP2 3194375/3194375: [0x589883882000(0x5b8000) @ 0x12a000 <7eb92ba2f0f8f3b248b77d8691e27b80b114fb22>]: r-xp /home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+        "target_pid_tid_pairs": [
+          {
+            "pid": 3194375,
+            "tid": 3194375
+          }
+        ]
+      },
+      "metadata_v3": {
+        "bytes": 9665,
+        "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-05-metadata-v3.json",
+        "sha256": "e411a3e350487715ab6c618a9962a508f83e9fcd96e63ad96815854ce4eea226"
+      },
+      "offline_decode": {
+        "analyzer": {
+          "bytes": 298360,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/05-medium-one-percent/offline-decode-v2/analyzer.json",
+          "sha256": "b6da35bdf6fa85cc39a3866c206b40bc697947b37671cf8ce82fc744a8721fe5"
+        },
+        "control": {
+          "bytes": 15413,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/05-medium-one-percent/offline-decode-v2/decode-control.json",
+          "sha256": "29629ad09add1e988555765c0f6ec011875caa0d365a08baafccdb72dd59be7a"
+        },
+        "inline_script": {
+          "bytes": 122888338,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/05-medium-one-percent/offline-decode-v1/perf-script-inline.txt",
+          "sha256": "b91b0d26d7a0e31ee4304b6282803a143bbea28f30215c4d4837d7a8f6430f09"
+        },
+        "inline_terminal_initial": {
+          "bytes": 700,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/05-medium-one-percent/offline-decode-v1/inline-terminal.json",
+          "sha256": "5616f3efd7468eee831adb2fc24351b1f15ed701e971824e28d00b1a43f6d12b"
+        },
+        "inline_terminal_late_clearance": {
+          "bytes": 1747,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/05-medium-one-percent/offline-decode-v1/inline-terminal-late-clearance-v2.json",
+          "sha256": "44e7b42ececcc68ebd95f0312daff3d5194da748665c4b2b28d078e6a834f240"
+        },
+        "physical_script": {
+          "bytes": 70652103,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/05-medium-one-percent/offline-decode-v2/perf-script-physical.txt",
+          "sha256": "a6c5e7ed9b0ad87d1ba1d426f6cfe06d904a6e1bcaba3680fecd1b6b47b55bdc"
+        },
+        "physical_terminal": {
+          "bytes": 702,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/05-medium-one-percent/offline-decode-v2/physical-terminal.json",
+          "sha256": "72f3a117570fa3d22ecc79258931e5e1fa9898e61caf56300124a954f364cf9a"
+        }
+      },
+      "physical_review": {
+        "conservation_pass": true,
+        "key_policy": "Exclusive sampled self including inline callees; full symbol+DSO; raw IP/source line removed; out-of-line descendants excluded.",
+        "top10": [
+          {
+            "key": "quick_xml::reader::ns_reader::NsReader<R>::process_event [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 752162078,
+            "samples": 178,
+            "share_of_qualified_period": 0.09008988559714112
+          },
+          {
+            "key": "litchi_xlsx::cell_values::validation::scan_attributes [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 737026150,
+            "samples": 174,
+            "share_of_qualified_period": 0.0882769864071788
+          },
+          {
+            "key": "quick_xml::name::NamespaceResolver::resolve_event [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 589774968,
+            "samples": 139,
+            "share_of_qualified_period": 0.0706400401579107
+          },
+          {
+            "key": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 574159746,
+            "samples": 138,
+            "share_of_qualified_period": 0.06876973373765807
+          },
+          {
+            "key": "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 438582372,
+            "samples": 106,
+            "share_of_qualified_period": 0.05253101276185688
+          },
+          {
+            "key": "quick_xml::name::NamespaceResolver::push [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 392171808,
+            "samples": 93,
+            "share_of_qualified_period": 0.04697220765381899
+          },
+          {
+            "key": "__memmove_avx512_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+            "period": 346867843,
+            "samples": 82,
+            "share_of_qualified_period": 0.041545944959481336
+          },
+          {
+            "key": "quick_xml::encoding::Decoder::decode_cow [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 254177430,
+            "samples": 61,
+            "share_of_qualified_period": 0.03044399107565131
+          },
+          {
+            "key": "litchi_xlsx::cell_values::validation::validate_xml [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 249122897,
+            "samples": 58,
+            "share_of_qualified_period": 0.029838586585002456
+          },
+          {
+            "key": "quick_xml::reader::Reader<R>::read_event_impl [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+            "period": 223716295,
+            "samples": 53,
+            "share_of_qualified_period": 0.026795521885864437
+          }
+        ]
+      },
+      "source_review": {
+        "conservation_pass": true,
+        "qualified_period": 8349018017,
+        "qualified_samples": 1982,
+        "ranking_released": false,
+        "resolved_absolute_path_period": 3624560124,
+        "resolved_absolute_path_period_share": 0.43413011166340615,
+        "unresolved_period": 4724457893,
+        "unresolved_period_share": 0.5658698883365938,
+        "unresolved_samples": 1123
+      }
+    }
+  ],
+  "frozen_inputs": {
+    "analyzer": {
+      "bytes": 62780,
+      "path": "/home/zhuhe/litchi-performance-0962/tools/analyze_native_cpu_v1.py",
+      "sha256": "f5f7a387f99ba3a587eeb8f27c8f422a9fa696306c2ae47724952b861910bd3d"
+    },
+    "binary": {
+      "bytes": 104819848,
+      "path": "/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+      "sha256": "843ae35a0f5131a8cba965f917b2a4c5fccb6926ae3d66862e5f78512820fb33"
+    },
+    "binary_build_id": "7eb92ba2f0f8f3b248b77d8691e27b80b114fb22",
+    "capture_helper": {
+      "bytes": 5420,
+      "path": "/home/zhuhe/litchi-performance-0962/tools/capture_fp_v1.py",
+      "sha256": "7a71f067f292c346569c3c1f2eaadd5a4847736dd6e973258dd8d673f8bdda34"
+    },
+    "capture_plan": {
+      "bytes": 5028,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-plan-v1.json",
+      "sha256": "b4494abbe8da21ca7e54a4f022b92bb13b4700e09d5ff4a42b8772d213fa5bea"
+    },
+    "capture_terminal": {
+      "bytes": 2852,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/capture-terminal.json",
+      "sha256": "5f209fb52d04a9e44965c93b78166a2d27f2abc82f88b2d8c5635708d6466af0"
+    },
+    "execution_plan": {
+      "bytes": 1960,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-wave-execution-v1.json",
+      "sha256": "b0919fc7d8ce9d0a440ae976ff039d2bb2b1fd68b7adfbbc4c88770099f58a14"
+    },
+    "independent_cpu_summary_v2": {
+      "bytes": 11658,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-independent-cpu-summary-v2.json",
+      "sha256": "5bb0d86ce3e725137c1d52cbafd55fa1f474c059aed87bcc259aeeefa2159c4b"
+    },
+    "pilot_admission_v2": {
+      "bytes": 15268,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-pilot-admission-v2.json",
+      "sha256": "2e36ec426abb29402e95d1372623c96d35ffdda14b294d456a08d7ff48b9dbed"
+    },
+    "root_summary": {
+      "bytes": 427884,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-wave-summary-v1.json",
+      "sha256": "b8a705803103b7cc3dc0216e3df25b9d18f729d7c663f9ae9bb43051bb89a37a"
+    }
+  },
+  "gates": {
+    "aggregate_matches_root_summary": true,
+    "all_capture_and_semantic_terminals": true,
+    "authorized_diagnostic_plan": true,
+    "binary_binding_exact": true,
+    "exact_pairing_and_conservation": true,
+    "mapping_buildid_header_cpu_identity": true,
+    "no_ambiguous_or_multiple_marker_rows": true,
+    "physical_source_additive_conservation": true,
+    "qualified_minimums": true,
+    "zero_lost_records": true
+  },
+  "generated_utc": "2026-10-07T20:31:00.897759+00:00",
+  "independent_cpu": {
+    "event": "cycles:u",
+    "lost_record_lines": 0,
+    "population_note": "Each child has one observed workload PID/TID and one CPU in mask; actual population, not worker-permit inference.",
+    "requested_cpu_mask": "12-15",
+    "summary": {
+      "bytes": 11658,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-independent-cpu-summary-v2.json",
+      "sha256": "5bb0d86ce3e725137c1d52cbafd55fa1f474c059aed87bcc259aeeefa2159c4b"
+    },
+    "supersedes": "fp-wave-v1-independent-cpu-summary-v1.json (over-escaped parser reported zero; no raw capture changed).",
+    "whole_period": 583643582118,
+    "whole_samples": 134969
+  },
+  "interpretation_limits": [
+    "Qualified rows require inline stage_timed_commit lines 382-402 inside inline timed_iteration lines 404-449, exact paired non-inline physical timed_iteration ancestry, and source checks. This is conservative ancestry, not timed phase measurement.",
+    "Whole-process cycles:u includes startup/loader, corpus/preflight/setup, timed route, verification, and teardown. Periods are sampled event weights, not elapsed time or exact cycle totals. FP/debug2 generated code differs from native baseline; no latency/speedup comparison follows.",
+    "Source-owner ranking is withheld. Strict source grouping accepts absolute deepest source file:line only; unresolved rows remain denominator. Physical full-symbol+DSO groups are additive exclusive sampled self including inline callees and excluding out-of-line descendants.",
+    "Inclusive tags/heuristic owner categories overlap and are not additive; generic next is not a source owner without full source key and ancestry.",
+    "Header BUILD_ID missing-features note is retained; MMAP2 mapping/buildid-list exports bind every target to analyzer ELF ID/SHA-256.",
+    "Inline export rc0 initially had process_group_clear=false; late-clearance receipt and exact sealed stream are bound. Physical export/analyzer terminal receipts cleared before parse."
+  ],
+  "purpose": "Independent read-only admission of completed six-child FP/debug2 CPU attribution wave.",
+  "reviewer": "cpu_review",
+  "schedule": {
+    "callgraph": "fp",
+    "cases": [
+      "medium-one-percent",
+      "dense-sparse-one-percent",
+      "medium-one-edit",
+      "medium-one-edit",
+      "dense-sparse-one-percent",
+      "medium-one-percent"
+    ],
+    "event": "cycles:u",
+    "frequency_hz": 997,
+    "inherit": true,
+    "no_capture_replacement": true,
+    "offline_decode_after_capture": true,
+    "requested_cpu_mask": "12-15",
+    "samples_per_child": 200,
+    "serial_capture_lane": true,
+    "thread_scope": "inherit enabled; all threads retained in denominator; qualified ancestry thread-local.",
+    "warmup": 0,
+    "wave_indices": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "workers": 1
+  },
+  "schema": "litchi.performance.0962.fp-wave-independent-admission.v1",
+  "scope": "Diagnostic sampled CPU ancestry only: custody, binary/thread/sample identity, exact paired decoding, and additive conservation. No elapsed phase, whole-process CPU fraction, speedup, allocation/RSS, production, CI, or baseline-comparison claim.",
+  "status": "passed_diagnostic_wave_admission"
+}

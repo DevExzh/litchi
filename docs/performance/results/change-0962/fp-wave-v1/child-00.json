@@ -1,0 +1,15 @@
+{
+  "index": 0,
+  "case": "medium-one-percent",
+  "command": [
+    "/usr/bin/python3",
+    "/home/zhuhe/litchi-performance-0962/tools/capture_fp_v1.py",
+    "--plan",
+    "/home/zhuhe/litchi-performance-0962/fp-plan-v1.json",
+    "--case",
+    "medium-one-percent",
+    "--output",
+    "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent"
+  ],
+  "returncode": 0
+}

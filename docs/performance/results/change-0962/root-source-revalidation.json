@@ -1,0 +1,12 @@
+{
+  "utc": "2026-10-07T19:23:18.451775+00:00",
+  "head": "dfb777544c828901363c40cdb2292c5fe4ad766b",
+  "previous_turn": "progress:0961 screening rejected, independently audited, committed and caches cleaned",
+  "source_comparison": "HEAD export excluding performance/report vs retained0957 full source manifest; bytes/hash/executable bit; read/write permission differences are irrelevant to source identity",
+  "files": 10932,
+  "retained_manifest": {
+    "path": "/home/zhuhe/litchi-performance-0957/source-manifest-v2.json",
+    "sha256": "f5fd1ee75b734bb7efaa1882be0397defea98c76c835be0bdf1f565c573ef617"
+  },
+  "mismatches": []
+}

@@ -1,0 +1,37 @@
+{
+  "all_binaries_present": true,
+  "binary_parse_after_terminal": true,
+  "binary_receipt": {
+    "bytes": 852,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0962/receipts/diagnostic-fp-v1-build-binaries.json",
+    "sha256": "5abedbd53117e940f61e2a578eea91374e6fdc948d9bcb3793c2995f1f1dab12"
+  },
+  "launch_error": null,
+  "retained_executables": true,
+  "retention_receipt": {
+    "bytes": 1672,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0962/receipts/diagnostic-fp-v1-retention.json",
+    "sha256": "1ce7e237d36e781e1f2f22c92948493e487e77bc188ec052fef06c6f2b5886fe"
+  },
+  "returncode": 0,
+  "schema": "litchi.performance.0962.diagnostic-fp-v1.build-result",
+  "source_error": null,
+  "source_unchanged": true,
+  "source_verification_end_pass": true,
+  "source_verification_start_pass": true,
+  "start_receipt": {
+    "bytes": 4454,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0962/receipts/diagnostic-fp-v1-build-start.json",
+    "sha256": "9f4838351d191b3a1d26b042597bdde9848474f6e6ca3add36c6343d2b051361"
+  },
+  "terminal_receipt": {
+    "bytes": 1485,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0962/receipts/diagnostic-fp-v1-build-terminal.json",
+    "sha256": "e9239d56ed2bc4c8984612f8eee9442b1b52e6c0da8cc2174c0f71cec40e8d2a"
+  },
+  "timed_out": false
+}

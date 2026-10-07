@@ -1,0 +1,20 @@
+{
+  "schema": "litchi.performance.0962.native-cpu-profile-followup.v1",
+  "status": "frozen",
+  "created_utc": "2026-10-07T19:27:00Z",
+  "reason": "increase stack sample count for the measured timed_iteration body after the initial 99 Hz pass",
+  "binary_sha256": "5886b0f86a697bae757994d5a757cffae4a7e8d61a2769ff1c967029cd1912c3",
+  "event": "cycles:u",
+  "frequency_hz": 199,
+  "call_graph": "dwarf,8192",
+  "cpu_affinity": "12-15",
+  "workers": 1,
+  "warmup": 10,
+  "samples": 200,
+  "cases": [
+    ["medium", "one-percent", "medium-one-percent"],
+    ["dense-sparse", "one-percent", "dense-sparse-one-percent"],
+    ["medium", "one-edit", "medium-one-edit"]
+  ],
+  "interpretation": "samples cover the complete process and can be filtered to the timed_iteration/stage_timed_commit inline frames; without phase markers they do not prove an exact edit_commit-only denominator or causal hotness"
+}

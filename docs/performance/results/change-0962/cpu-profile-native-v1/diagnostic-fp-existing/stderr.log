@@ -1,0 +1,2 @@
+[ perf record: Woken up 1 times to write data ]
+[ perf record: Captured and wrote 0.008 MB /home/zhuhe/litchi-performance-0962/cpu-profile-native-v1/diagnostic-fp-existing/perf.data ]

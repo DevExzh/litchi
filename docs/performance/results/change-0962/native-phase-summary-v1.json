@@ -1,0 +1,220 @@
+{
+  "schema": "litchi.performance.0962.retained-native-phase-summary.v1",
+  "source_plan": "/home/zhuhe/litchi-performance-0961/protocol/plan-final-v1.json",
+  "source_plan_sha256": "c68775e0f88c367f5f137031fe4188834e334b692d9c4a8d59f980ae808537f7",
+  "scope": "0961 baseline-only unprofiled native samples; ratios of phase sums to total sums per process. Not a new benchmark or causal speedup prediction.",
+  "bindings": [
+    {
+      "child_id": "native__medium-one-percent__b00__p0",
+      "report": "/home/zhuhe/litchi-performance-0961/capture-native-v1/children/native__medium-one-percent__b00__p0/output/report.json",
+      "bytes": 48755,
+      "sha256": "bfec6e8cf2a70429e96ee441f42aa79b9633161f05f3923cec72e3636c1f3edb"
+    },
+    {
+      "child_id": "native__medium-one-percent__b00__p3",
+      "report": "/home/zhuhe/litchi-performance-0961/capture-native-v1/children/native__medium-one-percent__b00__p3/output/report.json",
+      "bytes": 48753,
+      "sha256": "3b7d57483793f5fec703011116e196a96a0026420f0d386b7d046d16cd63772d"
+    },
+    {
+      "child_id": "native__medium-one-percent__b01__p1",
+      "report": "/home/zhuhe/litchi-performance-0961/capture-native-v1/children/native__medium-one-percent__b01__p1/output/report.json",
+      "bytes": 48752,
+      "sha256": "d2ce876249cf4f7ad5f9ab0323853b3cd319027c37dbac8432fffbcb88466a4e"
+    },
+    {
+      "child_id": "native__medium-one-percent__b01__p2",
+      "report": "/home/zhuhe/litchi-performance-0961/capture-native-v1/children/native__medium-one-percent__b01__p2/output/report.json",
+      "bytes": 48757,
+      "sha256": "244bdc874711231b9ed4ec8b08e6d0e97a711e5acdbee8be5d97fa2749891975"
+    },
+    {
+      "child_id": "native__medium-one-percent__b02__p0",
+      "report": "/home/zhuhe/litchi-performance-0961/capture-native-v1/children/native__medium-one-percent__b02__p0/output/report.json",
+      "bytes": 48752,
+      "sha256": "7391c444e3f6618161fa6425cb229d49b1288f47a642e700237edd6c482ed292"
+    },
+    {
+      "child_id": "native__medium-one-percent__b02__p3",
+      "report": "/home/zhuhe/litchi-performance-0961/capture-native-v1/children/native__medium-one-percent__b02__p3/output/report.json",
+      "bytes": 48771,
+      "sha256": "e379f9b50cbd879a2e672887530b8c87e272e836f79dd57755e26a0d94c5a835"
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b00__p0",
+      "report": "/home/zhuhe/litchi-performance-0961/capture-native-v1/children/native__dense-sparse-one-percent__b00__p0/output/report.json",
+      "bytes": 48908,
+      "sha256": "416b2d2f626904ab6d180e5f9583f0fdd6a3b2cf6138bd2be040f213bd39a36c"
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b00__p3",
+      "report": "/home/zhuhe/litchi-performance-0961/capture-native-v1/children/native__dense-sparse-one-percent__b00__p3/output/report.json",
+      "bytes": 48948,
+      "sha256": "f122a050105bc14631402ed35ef97dac674ab916070fd5a7b98a379ba79b1f92"
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b01__p1",
+      "report": "/home/zhuhe/litchi-performance-0961/capture-native-v1/children/native__dense-sparse-one-percent__b01__p1/output/report.json",
+      "bytes": 48902,
+      "sha256": "a9673bd9f6028057069d9cee10cdb7782a110b76b9632d4ae13486941a59c497"
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b01__p2",
+      "report": "/home/zhuhe/litchi-performance-0961/capture-native-v1/children/native__dense-sparse-one-percent__b01__p2/output/report.json",
+      "bytes": 48897,
+      "sha256": "f13615c52e07fb6d59583a2d01513911512fa0d7603abb328f3439ce994025ee"
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b02__p0",
+      "report": "/home/zhuhe/litchi-performance-0961/capture-native-v1/children/native__dense-sparse-one-percent__b02__p0/output/report.json",
+      "bytes": 48899,
+      "sha256": "87ce46813784ea6720e39ba3ffc513229e6400a3c5f2ac469b3b2f17d66019b3"
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b02__p3",
+      "report": "/home/zhuhe/litchi-performance-0961/capture-native-v1/children/native__dense-sparse-one-percent__b02__p3/output/report.json",
+      "bytes": 48899,
+      "sha256": "894d88c46c8f9c6e1caa2e7a6f52dd302ca102818e34a7c008716bfc7c72b982"
+    },
+    {
+      "child_id": "native__medium-one-edit__b00__p0",
+      "report": "/home/zhuhe/litchi-performance-0961/capture-native-v1/children/native__medium-one-edit__b00__p0/output/report.json",
+      "bytes": 48622,
+      "sha256": "5e105f82b9adfaeb46b96d00f79d580df9ca00211a1f6f1587552bdb081accc8"
+    },
+    {
+      "child_id": "native__medium-one-edit__b00__p3",
+      "report": "/home/zhuhe/litchi-performance-0961/capture-native-v1/children/native__medium-one-edit__b00__p3/output/report.json",
+      "bytes": 48623,
+      "sha256": "c9bbdaeac5bd6e8a3ac690f613d880fa8a90c8d73997ae6c669ce355471b7ba0"
+    },
+    {
+      "child_id": "native__medium-one-edit__b01__p1",
+      "report": "/home/zhuhe/litchi-performance-0961/capture-native-v1/children/native__medium-one-edit__b01__p1/output/report.json",
+      "bytes": 48622,
+      "sha256": "8ebe7f4ede0b9c8c0de0a9aaa12832ee58d777d76d53661fab0f86b4e0ef8255"
+    },
+    {
+      "child_id": "native__medium-one-edit__b01__p2",
+      "report": "/home/zhuhe/litchi-performance-0961/capture-native-v1/children/native__medium-one-edit__b01__p2/output/report.json",
+      "bytes": 48623,
+      "sha256": "1f6848817a40ddea4897ce6bbf1ab2ff77858d39acab02be0a3c7c7f10a20f17"
+    },
+    {
+      "child_id": "native__medium-one-edit__b02__p0",
+      "report": "/home/zhuhe/litchi-performance-0961/capture-native-v1/children/native__medium-one-edit__b02__p0/output/report.json",
+      "bytes": 48622,
+      "sha256": "07cce96c0afc70009d074559d78c145390d5f3abb64b62fd030916bd4a06f7ff"
+    },
+    {
+      "child_id": "native__medium-one-edit__b02__p3",
+      "report": "/home/zhuhe/litchi-performance-0961/capture-native-v1/children/native__medium-one-edit__b02__p3/output/report.json",
+      "bytes": 48622,
+      "sha256": "e84c48e6dfa0efe44aaa70f09112cf90d42f94bf1c5c7990fee25c472c201ea3"
+    }
+  ],
+  "cases": {
+    "dense-sparse-one-percent": {
+      "processes": 6,
+      "samples": 360,
+      "phases": {
+        "ingress_ns": {
+          "median_process_fraction": 0.0031866722516400697,
+          "min_process_fraction": 0.0031155247717913163,
+          "max_process_fraction": 0.0036114558923929395,
+          "median_ns_across_360_samples": 94150.5
+        },
+        "edit_commit_ns": {
+          "median_process_fraction": 0.5867742323535192,
+          "min_process_fraction": 0.5846075317214536,
+          "max_process_fraction": 0.589396948409849,
+          "median_ns_across_360_samples": 17483541.0
+        },
+        "publication_ns": {
+          "median_process_fraction": 0.3997495713767814,
+          "min_process_fraction": 0.3973695974613706,
+          "max_process_fraction": 0.4019784006509612,
+          "median_ns_across_360_samples": 11897843.0
+        },
+        "commit_drop_ns": {
+          "median_process_fraction": 0.010215410394282518,
+          "min_process_fraction": 0.010103574769553206,
+          "max_process_fraction": 0.010250274419762891,
+          "median_ns_across_360_samples": 302691.5
+        }
+      },
+      "total_median_ns_across_360_samples": 29801810.0,
+      "ideal_edit_phase_removal_ceiling": 2.4199846144529666,
+      "ideal_edit_phase_10x_total_speedup": 2.1190786994496205,
+      "model_caveat": "Amdahl model assumes other phases unchanged and no overlap; fraction is workload-specific, not measured acceleration."
+    },
+    "medium-one-edit": {
+      "processes": 6,
+      "samples": 360,
+      "phases": {
+        "ingress_ns": {
+          "median_process_fraction": 0.020798726950564644,
+          "min_process_fraction": 0.02040294478413405,
+          "max_process_fraction": 0.021319741715586406,
+          "median_ns_across_360_samples": 81275.5
+        },
+        "edit_commit_ns": {
+          "median_process_fraction": 0.5720903436503347,
+          "min_process_fraction": 0.5681378684384963,
+          "max_process_fraction": 0.5759475120877073,
+          "median_ns_across_360_samples": 2255039.0
+        },
+        "publication_ns": {
+          "median_process_fraction": 0.3959177490836747,
+          "min_process_fraction": 0.39259574735765923,
+          "max_process_fraction": 0.3993671580864295,
+          "median_ns_across_360_samples": 1562496.0
+        },
+        "commit_drop_ns": {
+          "median_process_fraction": 0.011089934354910604,
+          "min_process_fraction": 0.010935822800287548,
+          "max_process_fraction": 0.011219282291311881,
+          "median_ns_across_360_samples": 43385.0
+        }
+      },
+      "total_median_ns_across_360_samples": 3945575.5,
+      "ideal_edit_phase_removal_ceiling": 2.3369418875250916,
+      "ideal_edit_phase_10x_total_speedup": 2.0613512097972455,
+      "model_caveat": "Amdahl model assumes other phases unchanged and no overlap; fraction is workload-specific, not measured acceleration."
+    },
+    "medium-one-percent": {
+      "processes": 6,
+      "samples": 360,
+      "phases": {
+        "ingress_ns": {
+          "median_process_fraction": 0.0057490441988423575,
+          "min_process_fraction": 0.005481115004437651,
+          "max_process_fraction": 0.0063035049973461255,
+          "median_ns_across_360_samples": 84766.0
+        },
+        "edit_commit_ns": {
+          "median_process_fraction": 0.6139013559000843,
+          "min_process_fraction": 0.5896883210862107,
+          "max_process_fraction": 0.6174544125136192,
+          "median_ns_across_360_samples": 9177992.0
+        },
+        "publication_ns": {
+          "median_process_fraction": 0.36947844539037017,
+          "min_process_fraction": 0.36596916119556244,
+          "max_process_fraction": 0.3935144680562258,
+          "median_ns_across_360_samples": 5551282.5
+        },
+        "commit_drop_ns": {
+          "median_process_fraction": 0.010854762502962825,
+          "min_process_fraction": 0.01046084715174332,
+          "max_process_fraction": 0.011058314056845184,
+          "median_ns_across_360_samples": 162650.5
+        }
+      },
+      "total_median_ns_across_360_samples": 15042499.0,
+      "ideal_edit_phase_removal_ceiling": 2.590011685566078,
+      "ideal_edit_phase_10x_total_speedup": 2.234692902675514,
+      "model_caveat": "Amdahl model assumes other phases unchanged and no overlap; fraction is workload-specific, not measured acceleration."
+    }
+  }
+}

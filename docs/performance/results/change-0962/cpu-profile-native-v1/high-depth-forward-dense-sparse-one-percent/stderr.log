@@ -1,0 +1,2 @@
+[ perf record: Woken up 7319 times to write data ]
+[ perf record: Captured and wrote 1829.770 MB /home/zhuhe/litchi-performance-0962/cpu-profile-native-v1/high-depth-forward-dense-sparse-one-percent/perf.data ]

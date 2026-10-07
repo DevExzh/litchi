@@ -1,0 +1,1 @@
+error: profile `profiling` is missing an `inherits` directive (`inherits` is required for all profiles except `dev` or `release`)

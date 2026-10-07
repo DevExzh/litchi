@@ -1,5 +1,16 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0962 — managed edit-stage CPU attribution qualifies
+
+[0962](0962-xlsx-native-cpu-attribution.md) qualifies a separate same-source
+frame-pointer/debug2 build after DWARF stack reconstruction failed. Six
+captures pass 1,200 semantic iterations; 12,319 selected stage samples conserve
+exactly and independently match raw CPU totals. Original-source admission
+accounts for 60.74–62.00% of qualified sampled period, rewritten readback
+34.01–36.25%, and nested output XML validation 28.35–31.05%. These are
+diagnostic ancestry shares, not elapsed time or a new production baseline.
+Source-file attribution remains limited by relative/missing DWARF locations.
+
 ## 0961 — edit-staging reservation screen rejected
 
 [0961](0961-xlsx-edit-staging-capacity-trial.md) completed and validated 36

@@ -1,0 +1,2 @@
+[ perf record: Woken up 37 times to write data ]
+[ perf record: Captured and wrote 9.056 MB /home/zhuhe/litchi-performance-0962/cpu-profile-native-v1/medium-one-edit/perf.data ]

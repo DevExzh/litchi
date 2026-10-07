@@ -1,0 +1,46 @@
+{
+  "late_process_group_clear": true,
+  "observed_utc": "2026-10-07T20:24:03.784680+00:00",
+  "reused_without_rerunning_perf_script": true,
+  "schema": "litchi.performance.0962.fp-wave-decoder.v2.late-clearance",
+  "source_script": {
+    "bytes": 106161388,
+    "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/offline-decode-v1/perf-script-inline.txt",
+    "sha256": "0e0a72ce2592818d41f4f059e6f28ad20dc55e8c3d7b86fb77e25c1ef0b8f7fe"
+  },
+  "source_stderr": {
+    "bytes": 0,
+    "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/offline-decode-v1/perf-script-inline.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "source_terminal": {
+    "bytes": 697,
+    "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/offline-decode-v1/inline-terminal.json",
+    "sha256": "dc3ee69bb46d15e8b5d709de3558e4bf3a7c350269afc818c9a90e3b5c1cd6ca"
+  },
+  "source_terminal_value": {
+    "argv": [
+      "/usr/bin/perf",
+      "script",
+      "--show-lost-events",
+      "--demangle",
+      "--inline",
+      "--full-source-path",
+      "-F",
+      "comm,pid,tid,time,event,period,ip,sym,symoff,dso,srcline",
+      "-i",
+      "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/perf.data"
+    ],
+    "cwd": "/home/zhuhe/litchi-performance-0962",
+    "deadline_seconds": 900,
+    "failure": null,
+    "finished_utc": "2026-10-07T20:19:05.207317+00:00",
+    "pid": 3194666,
+    "process_group_clear": false,
+    "returncode": 0,
+    "schema": "litchi.performance.0962.fp-wave-decoder.v1.terminal",
+    "started_utc": "2026-10-07T20:15:36.743314+00:00",
+    "terminal_before_parse": true,
+    "timeout": false
+  }
+}

@@ -1,0 +1,247 @@
+{
+  "analyzer_sha256": "f5f7a387f99ba3a587eeb8f27c8f422a9fa696306c2ae47724952b861910bd3d",
+  "children": [
+    {
+      "case": "medium-one-percent",
+      "conservation": {
+        "inline_period_sum_pass": true,
+        "inline_sample_count_pass": true
+      },
+      "decoder_terminal": {
+        "bytes": 1026,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent/offline-decode-v2/decoder-terminal.json",
+        "sha256": "8b06f26468b9722f971ce69662edc3375eae9016fc005c3ca6c1d305bfb1a346"
+      },
+      "helper_sha256": "f5f7a387f99ba3a587eeb8f27c8f422a9fa696306c2ae47724952b861910bd3d",
+      "index": 0,
+      "output": {
+        "bytes": 314382,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent/offline-decode-v2/analyzer.json",
+        "sha256": "e957362b2621dbe72e6330698b43d88415b3fca8b1f7aee60b1a7d1f797f4674"
+      },
+      "pairing": {
+        "exact_pairing_pass": true,
+        "header_multiset_equal": true
+      },
+      "process_group_clear": true,
+      "qualification_gate": {
+        "admitted": true,
+        "admitted_without_lost_record_binding": false,
+        "lost_records": 0,
+        "lost_records_zero": true,
+        "minimum_period": 100000,
+        "minimum_samples": 100,
+        "qualified_period": 8347974970,
+        "qualified_period_min_pass": true,
+        "qualified_samples": 1899,
+        "qualified_samples_min_pass": true
+      },
+      "returncode": 0,
+      "status": "passed",
+      "timeout": false
+    },
+    {
+      "case": "dense-sparse-one-percent",
+      "conservation": {
+        "inline_period_sum_pass": true,
+        "inline_sample_count_pass": true
+      },
+      "decoder_terminal": {
+        "bytes": 1044,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v2/decoder-terminal.json",
+        "sha256": "001cc150c7bcc06c662ac47848e7fec9e354cb3983f431387ae83e1539fb115f"
+      },
+      "helper_sha256": "f5f7a387f99ba3a587eeb8f27c8f422a9fa696306c2ae47724952b861910bd3d",
+      "index": 1,
+      "output": {
+        "bytes": 482521,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v2/analyzer.json",
+        "sha256": "d9fd52ed412172ec1666caa17a38b750de9cff4fedc5f32a1948b9dbed1e0eb6"
+      },
+      "pairing": {
+        "exact_pairing_pass": true,
+        "header_multiset_equal": true
+      },
+      "process_group_clear": true,
+      "qualification_gate": {
+        "admitted": true,
+        "admitted_without_lost_record_binding": false,
+        "lost_records": 0,
+        "lost_records_zero": true,
+        "minimum_period": 100000,
+        "minimum_samples": 100,
+        "qualified_period": 15898003220,
+        "qualified_period_min_pass": true,
+        "qualified_samples": 3722,
+        "qualified_samples_min_pass": true
+      },
+      "returncode": 0,
+      "status": "passed",
+      "timeout": false
+    },
+    {
+      "case": "medium-one-edit",
+      "conservation": {
+        "inline_period_sum_pass": true,
+        "inline_sample_count_pass": true
+      },
+      "decoder_terminal": {
+        "bytes": 1017,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/offline-decode-v2/decoder-terminal.json",
+        "sha256": "69066e9042894a8e62be362fd3d60be1ef1b27ee9c303ee7934cc971c1a82821"
+      },
+      "helper_sha256": "f5f7a387f99ba3a587eeb8f27c8f422a9fa696306c2ae47724952b861910bd3d",
+      "index": 2,
+      "output": {
+        "bytes": 123716,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/offline-decode-v2/analyzer.json",
+        "sha256": "817728318ff037416a2a456d8816abc7d007ca1311c4fd21e3ecbfb36406c106"
+      },
+      "pairing": {
+        "exact_pairing_pass": true,
+        "header_multiset_equal": true
+      },
+      "process_group_clear": true,
+      "qualification_gate": {
+        "admitted": true,
+        "admitted_without_lost_record_binding": false,
+        "lost_records": 0,
+        "lost_records_zero": true,
+        "minimum_period": 100000,
+        "minimum_samples": 100,
+        "qualified_period": 2195986095,
+        "qualified_period_min_pass": true,
+        "qualified_samples": 499,
+        "qualified_samples_min_pass": true
+      },
+      "returncode": 0,
+      "status": "passed",
+      "timeout": false
+    },
+    {
+      "case": "medium-one-edit",
+      "conservation": {
+        "inline_period_sum_pass": true,
+        "inline_sample_count_pass": true
+      },
+      "decoder_terminal": {
+        "bytes": 1017,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/offline-decode-v2/decoder-terminal.json",
+        "sha256": "5fadb7500c2ad1fdafa4b919770aabc2536c6b0b736c031fc0ff6d607c8ae75e"
+      },
+      "helper_sha256": "f5f7a387f99ba3a587eeb8f27c8f422a9fa696306c2ae47724952b861910bd3d",
+      "index": 3,
+      "output": {
+        "bytes": 135430,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/offline-decode-v2/analyzer.json",
+        "sha256": "4fdd2631221555207a7544323136b7f5feef6cf1e1b58dc0edc957e26e79d018"
+      },
+      "pairing": {
+        "exact_pairing_pass": true,
+        "header_multiset_equal": true
+      },
+      "process_group_clear": true,
+      "qualification_gate": {
+        "admitted": true,
+        "admitted_without_lost_record_binding": false,
+        "lost_records": 0,
+        "lost_records_zero": true,
+        "minimum_period": 100000,
+        "minimum_samples": 100,
+        "qualified_period": 2068701002,
+        "qualified_period_min_pass": true,
+        "qualified_samples": 470,
+        "qualified_samples_min_pass": true
+      },
+      "returncode": 0,
+      "status": "passed",
+      "timeout": false
+    },
+    {
+      "case": "dense-sparse-one-percent",
+      "conservation": {
+        "inline_period_sum_pass": true,
+        "inline_sample_count_pass": true
+      },
+      "decoder_terminal": {
+        "bytes": 1044,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent/offline-decode-v2/decoder-terminal.json",
+        "sha256": "2f8afd0597fce1a18ff21e1e09492f136c69386b20a3054b72b2121aebf9a1c4"
+      },
+      "helper_sha256": "f5f7a387f99ba3a587eeb8f27c8f422a9fa696306c2ae47724952b861910bd3d",
+      "index": 4,
+      "output": {
+        "bytes": 461243,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent/offline-decode-v2/analyzer.json",
+        "sha256": "11a60ba8f52468600b0431342436084ce7675a808c474e140a6444dbeabf8623"
+      },
+      "pairing": {
+        "exact_pairing_pass": true,
+        "header_multiset_equal": true
+      },
+      "process_group_clear": true,
+      "qualification_gate": {
+        "admitted": true,
+        "admitted_without_lost_record_binding": false,
+        "lost_records": 0,
+        "lost_records_zero": true,
+        "minimum_period": 100000,
+        "minimum_samples": 100,
+        "qualified_period": 15992963474,
+        "qualified_period_min_pass": true,
+        "qualified_samples": 3747,
+        "qualified_samples_min_pass": true
+      },
+      "returncode": 0,
+      "status": "passed",
+      "timeout": false
+    },
+    {
+      "case": "medium-one-percent",
+      "conservation": {
+        "inline_period_sum_pass": true,
+        "inline_sample_count_pass": true
+      },
+      "decoder_terminal": {
+        "bytes": 1026,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/05-medium-one-percent/offline-decode-v2/decoder-terminal.json",
+        "sha256": "3a9521e939b11b88393ad382df8b2d68485162cb495a3ff50cdcc00a62e95347"
+      },
+      "helper_sha256": "f5f7a387f99ba3a587eeb8f27c8f422a9fa696306c2ae47724952b861910bd3d",
+      "index": 5,
+      "output": {
+        "bytes": 298360,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/05-medium-one-percent/offline-decode-v2/analyzer.json",
+        "sha256": "b6da35bdf6fa85cc39a3866c206b40bc697947b37671cf8ce82fc744a8721fe5"
+      },
+      "pairing": {
+        "exact_pairing_pass": true,
+        "header_multiset_equal": true
+      },
+      "process_group_clear": true,
+      "qualification_gate": {
+        "admitted": true,
+        "admitted_without_lost_record_binding": false,
+        "lost_records": 0,
+        "lost_records_zero": true,
+        "minimum_period": 100000,
+        "minimum_samples": 100,
+        "qualified_period": 8349018017,
+        "qualified_period_min_pass": true,
+        "qualified_samples": 1982,
+        "qualified_samples_min_pass": true
+      },
+      "returncode": 0,
+      "status": "passed",
+      "timeout": false
+    }
+  ],
+  "controller": {
+    "bytes": 18858,
+    "path": "/home/zhuhe/litchi-performance-0962/tools/decode_fp_wave_v2.py",
+    "sha256": "1865d184b6e58ed7fe56d39b3499fdfe6942a1754ede4dd2ba09a0fff92709f4"
+  },
+  "generated_utc": "2026-10-07T20:25:18.034412+00:00",
+  "schema": "litchi.performance.0962.fp-wave-offline-decode-terminal.v2",
+  "status": "passed"
+}

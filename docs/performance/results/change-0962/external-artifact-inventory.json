@@ -1,0 +1,2443 @@
+{
+  "schema": "litchi.performance.0962.external-artifact-inventory.v1",
+  "created_utc": "2026-10-07T20:33:26.989066+00:00",
+  "external_root": "/home/zhuhe/litchi-performance-0962",
+  "files": [
+    {
+      "path": "EVIDENCE.md",
+      "bytes": 2567,
+      "sha256": "cc657d478194c4e872208ad784dec537936f8401daa00cfda1ff400b380c5687",
+      "bounded_copy": true
+    },
+    {
+      "path": "build-cache-cleanup-v1.json",
+      "bytes": 1013,
+      "sha256": "d97b80bc3779161e4f31f2e2a8bf54122f80aacf4635dade99a28cd08e28f01b",
+      "bounded_copy": true
+    },
+    {
+      "path": "build-tools/build_diagnostic_fp_v1.py",
+      "bytes": 12982,
+      "sha256": "239337bb453b50ace7b792f4f51cdffc7146fcb0ea55b574e8fb642a7be34965",
+      "bounded_copy": true
+    },
+    {
+      "path": "build-tools/seal_evidence_v1.py",
+      "bytes": 1994,
+      "sha256": "470aabe2b8a7c25b96ea79ea73b74a459018d7fda2aec37ae7e0db8ad45eb2b5",
+      "bounded_copy": true
+    },
+    {
+      "path": "builds/diagnostic-fp-v1/build.stderr.log",
+      "bytes": 8672,
+      "sha256": "abc73414014bbca57f013ca32538d7ea023b5d9f4e633d56a51cf050a7c4564f",
+      "bounded_copy": true
+    },
+    {
+      "path": "builds/diagnostic-fp-v1/build.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": true
+    },
+    {
+      "path": "capture-controls-v1.json",
+      "bytes": 678,
+      "sha256": "d8b03a2df696af9eee40155e2d37939c097431c5ecb19198b74434048bcb3873",
+      "bounded_copy": true
+    },
+    {
+      "path": "closure-v1.json",
+      "bytes": 1688,
+      "sha256": "bfe9791dd13fdac9eb5a58ee32f496313f8a67773e59c4825810e62c659ca2d0",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/build-fp-diagnostic/build.stderr.log",
+      "bytes": 130,
+      "sha256": "2b9660ae66e04235206c126b13d6149edc5080fec7fb4b0b146810e18083a1a3",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/build-fp-diagnostic/build.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/build-fp-diagnostic/command.txt",
+      "bytes": 409,
+      "sha256": "b600f400339247fc22d50de894c38be231763e5cc4077250bd2e8deb83715306",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/build-fp-diagnostic/end-utc.txt",
+      "bytes": 31,
+      "sha256": "3b06a8939881a5c0aeeeb151970d818392b2764c78124865b11f16183611b0a6",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/build-fp-diagnostic/returncode.txt",
+      "bytes": 4,
+      "sha256": "39b8dc3fc8b44765c8e6f1adee04c5b465e555ab791cc42d0d9e810d5b64297c",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/build-fp-diagnostic/start-utc.txt",
+      "bytes": 31,
+      "sha256": "386feed82f9e2e89b1d87cad9f5150639be906fe2d94ad3bf6f0636b0189a0ce",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/build-fp-diagnostic-retained/build.stderr.log",
+      "bytes": 4983,
+      "sha256": "09db8ed1544d3d60dcf57936a06b624290a6dd338e3c7ee36e1d3eef6a4f729a",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/build-fp-diagnostic-retained/build.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/build-fp-diagnostic-retained/command.txt",
+      "bytes": 594,
+      "sha256": "14e8f007e9b5375edae10c6fa9086a267cad7e38cc273a4cb00b7b55eea533c7",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/build-fp-diagnostic-retained/start-utc.txt",
+      "bytes": 31,
+      "sha256": "aad9ccb42367b389661100cf396e8b452fb68b767467168822f0a2a3bebc0877",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/build-fp-diagnostic-v2/build.stderr.log",
+      "bytes": 7870,
+      "sha256": "e5010e27a7f853979c4c1a1539c882c295bcc00c031ee9023d7618ebde4630dc",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/build-fp-diagnostic-v2/build.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/build-fp-diagnostic-v2/command.txt",
+      "bytes": 394,
+      "sha256": "6bb7ad6621c44eaa12357894577eeefdff244e938b3f6d2f732c67bcc169742d",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/build-fp-diagnostic-v2/start-utc.txt",
+      "bytes": 31,
+      "sha256": "74fe147a87189dff39cd6bca03148d189ec770a523d77809f8ebf282b2e8ff3f",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/dense-sparse-one-percent/command.txt",
+      "bytes": 459,
+      "sha256": "8f04a208c75713ee3c0d0cca3fd5cc40ee6a14eb751d221cd0bcedfd4155b2a5",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/dense-sparse-one-percent/end-utc.txt",
+      "bytes": 21,
+      "sha256": "567cc391b025d8361698997e9e99a07ec521b14c4bede85caa5469487a443a40",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/dense-sparse-one-percent/output/report.json",
+      "bytes": 94691,
+      "sha256": "451ddfd5664f84ba8cd97bbf91ed124d971c0a14f250e6685b3ab13110436654",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/dense-sparse-one-percent/perf.data",
+      "bytes": 15434184,
+      "sha256": "c2e84bd9706b5fc40270f8f74d3f91d85b4d8a4021af3713f1fc84768afc661d",
+      "bounded_copy": false
+    },
+    {
+      "path": "cpu-profile-native-v1/dense-sparse-one-percent/returncode.txt",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/dense-sparse-one-percent/start-utc.txt",
+      "bytes": 21,
+      "sha256": "8711e19d63b812483ebd3ded8134ac20e6aa4ff9e80110b429b76be76ef08692",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/dense-sparse-one-percent/stderr.log",
+      "bytes": 188,
+      "sha256": "0427be5aaf735221044e77821b8fb0367b787c9c1684fc306a27b1771dc49e45",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/dense-sparse-one-percent/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/dense-sparse-one-percent/time-v.txt",
+      "bytes": 1251,
+      "sha256": "71e134b95c6bdb824d07638c40f95571863f1e662dd2ee6e30b24c5a8c3f245e",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/diagnostic-fp-existing/command.txt",
+      "bytes": 271,
+      "sha256": "fa252079df8359a80e465fbaada469e736cd5a57b92e37fe27a0196cac2e13dd",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/diagnostic-fp-existing/end-utc.txt",
+      "bytes": 31,
+      "sha256": "63ee7812ad2ca131815668ef97647c4df10adeed4a89b4e08fc9b7bbfed99fef",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/diagnostic-fp-existing/output/report.json",
+      "bytes": 6953,
+      "sha256": "96488d4689831af2abb221e9e3135ba3058836d95badafdd7fb3b64b813cef23",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/diagnostic-fp-existing/perf.data",
+      "bytes": 49832,
+      "sha256": "4605caf0e1da8d9f49b83bd9198391d74087d1e55c330e01810919515efee859",
+      "bounded_copy": false
+    },
+    {
+      "path": "cpu-profile-native-v1/diagnostic-fp-existing/returncode.txt",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/diagnostic-fp-existing/start-utc.txt",
+      "bytes": 31,
+      "sha256": "0026e07aaba53d246b3772ae31c513c9bdbfc42c54800cddf3b433d8ef8d1d45",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/diagnostic-fp-existing/stderr.log",
+      "bytes": 184,
+      "sha256": "6b2e37c385b358d38ae25e2ee0c377492e9856fd7a14491050cb303142cee55c",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/diagnostic-fp-existing/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/followup-medium-one-percent/command.txt",
+      "bytes": 460,
+      "sha256": "2551c5fbb4124d91504c77fc741dd5f849ff2309873d1b80ad137949cbd5a65c",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/followup-medium-one-percent/end-utc.txt",
+      "bytes": 21,
+      "sha256": "95b58ab73b9f673edd828c045f90b00f7cd80a889746afc7ccd9b00b82c07120",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/followup-medium-one-percent/output/report.json",
+      "bytes": 155269,
+      "sha256": "7ec85c4b11b96a2791201b0a0345c1d783ebbac6953f6bf6d11fdce38b2a62fe",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/followup-medium-one-percent/perf.data",
+      "bytes": 35809208,
+      "sha256": "55e538d556e1be18e0b633e04912f784f733dfeebe43555bf2c926c483f17ee2",
+      "bounded_copy": false
+    },
+    {
+      "path": "cpu-profile-native-v1/followup-medium-one-percent/returncode.txt",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/followup-medium-one-percent/start-utc.txt",
+      "bytes": 21,
+      "sha256": "268df133fcc4df75395ed69b67a2ecf8ca1bd6feed1a26526cdd9432367cc679",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/followup-medium-one-percent/stderr.log",
+      "bytes": 192,
+      "sha256": "f6c8e1c33e3963a454bc8c034daab3230b4f0e9b166d3f3c9142831c159da2a3",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/followup-medium-one-percent/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/followup-medium-one-percent/time-v.txt",
+      "bytes": 1253,
+      "sha256": "7896663f3ad3dd975e759bea7dcb3ff44f2c8ca12b3f18b6662f79742b866b3e",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/high-depth-forward-dense-sparse-one-percent/command.txt",
+      "bytes": 499,
+      "sha256": "7cee9a63d0a12c125d2db481f45d924821913bf366c9c4a3d0bb9b5a0c60b58a",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/high-depth-forward-dense-sparse-one-percent/end-utc.txt",
+      "bytes": 21,
+      "sha256": "c7ab4b67bc7f48618a881bb8fa7bff4d079a715540ff6502f740567058d3b7f5",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/high-depth-forward-dense-sparse-one-percent/output/report.json",
+      "bytes": 155873,
+      "sha256": "2b33add80f64494a1c36a39ef6de47d3ee126bd2fa5907fb24d090dc1b7fdc11",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/high-depth-forward-dense-sparse-one-percent/perf.data",
+      "bytes": 1918693600,
+      "sha256": "04d6136620a474cd0e5bcb801324c875ac1d446a40b40936249000bf9892dd19",
+      "bounded_copy": false
+    },
+    {
+      "path": "cpu-profile-native-v1/high-depth-forward-dense-sparse-one-percent/returncode.txt",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/high-depth-forward-dense-sparse-one-percent/start-utc.txt",
+      "bytes": 21,
+      "sha256": "d1348fa7a33b68c6209c03f2a39aeb04af98772627cb9de15f38b9d0f8d8494d",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/high-depth-forward-dense-sparse-one-percent/stderr.log",
+      "bytes": 211,
+      "sha256": "8a972bdac1c942ac0ad4b9c24798658d2872ded720c8f9e06441ccbac72b7bd3",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/high-depth-forward-dense-sparse-one-percent/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/high-depth-forward-dense-sparse-one-percent/time-v.txt",
+      "bytes": 1296,
+      "sha256": "d5f4085f17991c5fe7c896ad2422a340cb5c22d2f9f31179c21d4c6e5343c0cd",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/high-depth-forward-medium-one-percent/command.txt",
+      "bytes": 481,
+      "sha256": "b6467f47fe6df3cfc284a7442a405422a6f1db4930535f8a597f309b0bc9257c",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/high-depth-forward-medium-one-percent/end-utc.txt",
+      "bytes": 21,
+      "sha256": "89326a5628115f4ededfd99d72e77bd5d15d994bf6a920183627cc2024336b32",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/high-depth-forward-medium-one-percent/marker-count.json",
+      "bytes": 739,
+      "sha256": "5a1291c914b49a302778a6c950c8263601ce484e75e2e881737a61b2791809ab",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/high-depth-forward-medium-one-percent/output/report.json",
+      "bytes": 155295,
+      "sha256": "184eadd3d62d2b23ef5352cdb9ebd324599e297eee0ce0e6a3db1f361f35c88c",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/high-depth-forward-medium-one-percent/perf-report-self.txt",
+      "bytes": 742845,
+      "sha256": "2db42caf3a15600316235664e8f3d992247352046f5288535da58fb7ee9712f5",
+      "bounded_copy": false,
+      "copy_exclusion": "raw profiler text formatting retained unchanged externally"
+    },
+    {
+      "path": "cpu-profile-native-v1/high-depth-forward-medium-one-percent/perf.data",
+      "bytes": 1408562784,
+      "sha256": "def5870200f94ec20fef85818a93ab3732438be08fb008bab3bc6357755f9376",
+      "bounded_copy": false
+    },
+    {
+      "path": "cpu-profile-native-v1/high-depth-forward-medium-one-percent/returncode.txt",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/high-depth-forward-medium-one-percent/start-utc.txt",
+      "bytes": 21,
+      "sha256": "e998459d5ab2359029c6c1ed99b06b44ab5fcb591774930113fd7fd0d868ee4f",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/high-depth-forward-medium-one-percent/stderr.log",
+      "bytes": 205,
+      "sha256": "8c6db36cacea0cbf3e9a9e3fc36a32015ed1841249e1200b26f151754f6b80a9",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/high-depth-forward-medium-one-percent/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/high-depth-forward-medium-one-percent/time-v.txt",
+      "bytes": 1278,
+      "sha256": "6d7cb9fe389424b0fb328d3be3ea59d0257b0965a82a088010fa87978c498bfb",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/high-depth-wave-schedule.json",
+      "bytes": 1654,
+      "sha256": "6864e5b4a01c0fce543b9698047353180df9cc38578a50cd936222f4de52388c",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/medium-one-edit/command.txt",
+      "bytes": 432,
+      "sha256": "3bf1d626d7659e47cf476862a850650f885c7b6d334aea59513928a8926a7d91",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/medium-one-edit/end-utc.txt",
+      "bytes": 21,
+      "sha256": "d70979bebc267826305e55e819910ad81e973671283a975cf3ecfb056359ae81",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/medium-one-edit/output/report.json",
+      "bytes": 94132,
+      "sha256": "e4e0d031711b7ba9bf06de069ae4872f4b2acd5e9db34369d5b94ab8d12b65b6",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/medium-one-edit/perf.data",
+      "bytes": 9537104,
+      "sha256": "5e5f4c5e366eccfddbf482f4d5719441399ab11b3872adeb403c79f9569d489f",
+      "bounded_copy": false
+    },
+    {
+      "path": "cpu-profile-native-v1/medium-one-edit/returncode.txt",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/medium-one-edit/start-utc.txt",
+      "bytes": 21,
+      "sha256": "68e9c3d720fcfd183310708cd155803c523d9c80b7e7c57360b81d092afeff0a",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/medium-one-edit/stderr.log",
+      "bytes": 178,
+      "sha256": "c0892179749ee04ef3d34434358c5cbfef6850f18f6b03454dae0c942c55a708",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/medium-one-edit/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/medium-one-edit/time-v.txt",
+      "bytes": 1224,
+      "sha256": "bd6b3464365acd669173d089c29897412113dce547bb547942e7996aefa4c9f0",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/medium-one-percent/command.txt",
+      "bytes": 441,
+      "sha256": "91d0061b088488713029df60a1902a161786236e22eaebacb65aa791cdcda5c8",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/medium-one-percent/end-utc.txt",
+      "bytes": 21,
+      "sha256": "813b3a0d7e4b7705d53fa9142d289abe937da471e42e9ecd4df1a209812034a1",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/medium-one-percent/output/report.json",
+      "bytes": 94383,
+      "sha256": "feda9be8a0bcfdf9ce2aa111f947cf78b9ebdb051c4250157b5f2c38572c5390",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/medium-one-percent/perf-report-parent.txt",
+      "bytes": 62678,
+      "sha256": "519bccd1472c074e1f843bd838f528ca25b93619d3a16ba70e714f2a6a2694ad",
+      "bounded_copy": false,
+      "copy_exclusion": "raw profiler text formatting retained unchanged externally"
+    },
+    {
+      "path": "cpu-profile-native-v1/medium-one-percent/perf-report-self.txt",
+      "bytes": 60014,
+      "sha256": "79137b518fe74aab2b35e9cd6b9a284d058230b0c6ea70bc199fab7d6749abcf",
+      "bounded_copy": false,
+      "copy_exclusion": "raw profiler text formatting retained unchanged externally"
+    },
+    {
+      "path": "cpu-profile-native-v1/medium-one-percent/perf.data",
+      "bytes": 11253992,
+      "sha256": "5d03827383659c347f6134635642e95d82fd20ce85b82d56fbe18dbcbb112a2b",
+      "bounded_copy": false
+    },
+    {
+      "path": "cpu-profile-native-v1/medium-one-percent/returncode.txt",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/medium-one-percent/start-utc.txt",
+      "bytes": 21,
+      "sha256": "dcd1441a62e3b42b09b99b6b3078adccf0dbcba3defab3a59529f4814229fc33",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/medium-one-percent/stderr.log",
+      "bytes": 182,
+      "sha256": "0d21f55c4f0abf4bc7c37ab77d1e9f84c40ec4f0d939140e670a97abbbfd2151",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/medium-one-percent/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/medium-one-percent/time-v.txt",
+      "bytes": 1233,
+      "sha256": "5c34cd1ce2d5d772781af52dabfb82cfecc6e3e303747802651e2101a774dc35",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/phase-followup-schedule.json",
+      "bytes": 899,
+      "sha256": "bd4c0628073c7adb96d664334a3618aff5c39583d990dcc8cc43691ab9cedf9f",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/probe/functions.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "cpu-profile-native-v1/probe/functions.stdout",
+      "bytes": 426316,
+      "sha256": "d680bfa94045f300129ea20f91ee2c75dfcf043095af05df32b7818a76ec08f2",
+      "bounded_copy": false
+    },
+    {
+      "path": "cpu-profile-native-v1/probe/line24.stderr",
+      "bytes": 482,
+      "sha256": "a5a4217bcd6c11855a6a80f599a7d52a43270cb672ccabfde254be36a0abb81d",
+      "bounded_copy": false
+    },
+    {
+      "path": "cpu-profile-native-v1/probe/line24.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "cpu-profile-native-v1/probe/line25.stderr",
+      "bytes": 482,
+      "sha256": "a5a4217bcd6c11855a6a80f599a7d52a43270cb672ccabfde254be36a0abb81d",
+      "bounded_copy": false
+    },
+    {
+      "path": "cpu-profile-native-v1/probe/line25.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "cpu-profile-native-v1/probe/line30.stderr",
+      "bytes": 482,
+      "sha256": "a5a4217bcd6c11855a6a80f599a7d52a43270cb672ccabfde254be36a0abb81d",
+      "bounded_copy": false
+    },
+    {
+      "path": "cpu-profile-native-v1/probe/line30.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "cpu-profile-native-v1/probe/line404.stderr",
+      "bytes": 482,
+      "sha256": "a5a4217bcd6c11855a6a80f599a7d52a43270cb672ccabfde254be36a0abb81d",
+      "bounded_copy": false
+    },
+    {
+      "path": "cpu-profile-native-v1/probe/line404.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "cpu-profile-native-v1/probe/output/report.json",
+      "bytes": 6954,
+      "sha256": "698521fbb40793aa11e3af1c936e976da1f71b3d0fb8dd71ab749c1c4e767ff7",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/probe/perf-probe-lines.stderr",
+      "bytes": 538,
+      "sha256": "7fae7a631b9957ebab3b7987ac8af00e9dfd94108ea043db59f61726af45bcd7",
+      "bounded_copy": false
+    },
+    {
+      "path": "cpu-profile-native-v1/probe/perf-probe-lines.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "cpu-profile-native-v1/probe/perf.data",
+      "bytes": 988688,
+      "sha256": "ecf97ff4026ff4833380e5cd120fbc34f94879c8d3c4556f0d298b4d8e73316c",
+      "bounded_copy": false
+    },
+    {
+      "path": "cpu-profile-native-v1/probe/stderr.log",
+      "bytes": 167,
+      "sha256": "969bdc7e87a1d4b95041561cd845f33672ecde1ef4c6d80aefaf33c6597fae85",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/probe/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/probe/time-v.txt",
+      "bytes": 1199,
+      "sha256": "6a38d4d6b0c66d9c6e803ea0760def6602af2b732e5036a0a3fbfb5881ea2a2c",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/probe/timed-fn.stderr",
+      "bytes": 534,
+      "sha256": "08226c506a5e48d2f9ef5884e3df6499de0123c6af0a2a43df61b6f3ac04fa34",
+      "bounded_copy": false
+    },
+    {
+      "path": "cpu-profile-native-v1/probe/timed-fn.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "cpu-profile-native-v1/probe/timed-short.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "cpu-profile-native-v1/probe/timed-short.stdout",
+      "bytes": 3153,
+      "sha256": "706a989a836120ccdf4ee53c7df9d5cfac15aba7d336ddbf5b87afdf026f3c65",
+      "bounded_copy": false
+    },
+    {
+      "path": "cpu-profile-native-v1/probe/timed.stderr",
+      "bytes": 534,
+      "sha256": "08226c506a5e48d2f9ef5884e3df6499de0123c6af0a2a43df61b6f3ac04fa34",
+      "bounded_copy": false
+    },
+    {
+      "path": "cpu-profile-native-v1/probe/timed.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "cpu-profile-native-v1/probe/timed0.stderr",
+      "bytes": 534,
+      "sha256": "08226c506a5e48d2f9ef5884e3df6499de0123c6af0a2a43df61b6f3ac04fa34",
+      "bounded_copy": false
+    },
+    {
+      "path": "cpu-profile-native-v1/probe/timed0.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "cpu-profile-native-v1/schedule-timestamp-correction.json",
+      "bytes": 1682,
+      "sha256": "78dab6b52fed70cdfd561380d48d75500832a9ff9c1b97df54a1a5be5b71487f",
+      "bounded_copy": true
+    },
+    {
+      "path": "cpu-profile-native-v1/schedule.json",
+      "bytes": 1920,
+      "sha256": "43fdb3c01bc7509706e7b685de73f6559cdad695c29f54c4b65aa228587b7bd5",
+      "bounded_copy": true
+    },
+    {
+      "path": "diagnostics/legacy-scratch/0962-dense-sparse-one-percent.perf-script",
+      "bytes": 546087,
+      "sha256": "30e3f97a89095d723e4ceaac0fb4e3eb2002a66d4af815357ae6d728594384c6",
+      "bounded_copy": false
+    },
+    {
+      "path": "diagnostics/legacy-scratch/0962-followup-medium.perf-script",
+      "bytes": 1074418,
+      "sha256": "6924766e1502e0ae4dea20a3e7e711e4b2c5d8a046a842a2ea6e65331c7d14e6",
+      "bounded_copy": false
+    },
+    {
+      "path": "diagnostics/legacy-scratch/0962-medium-one-edit.perf-script",
+      "bytes": 324787,
+      "sha256": "65a094e77da9c54e7ca778c428c2fda67b854a14c6f33b0336327dbec3fb61ef",
+      "bounded_copy": false
+    },
+    {
+      "path": "diagnostics/legacy-scratch/0962-medium-one-percent.perf-script",
+      "bytes": 388372,
+      "sha256": "c9a8dac824dea813d8eb5c7eb87e3e161230669e48eeb4b155b67c5711dcd008",
+      "bounded_copy": false
+    },
+    {
+      "path": "diagnostics/legacy-scratch/disasm-0962-timed.txt",
+      "bytes": 68315,
+      "sha256": "0153db09c8d47360e838df1bf159aa9f1fd04914f74574f1c37c8067efbf0594",
+      "bounded_copy": true
+    },
+    {
+      "path": "diagnostics/legacy-scratch/err0962",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "diagnostics/legacy-scratch/out0962",
+      "bytes": 392450,
+      "sha256": "e16111fc89ebb0122d62ae5033f8a2d45690fc28aef5b5f8443be8269291f7f6",
+      "bounded_copy": false
+    },
+    {
+      "path": "executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+      "bytes": 104819848,
+      "sha256": "843ae35a0f5131a8cba965f917b2a4c5fccb6926ae3d66862e5f78512820fb33",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-pilot-v1/analyzer-paired-v1.json",
+      "bytes": 50825,
+      "sha256": "8ce06ae282826a4557ad5e4f6a6d761f63554cfc397a91291d1830c7b8e4a86e",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-pilot-v1/analyzer-paired-v2.json",
+      "bytes": 9098,
+      "sha256": "76dab6beb68beb64aab2a782bf3d7fc174dca1601a169aa97e3116a2363da41a",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-pilot-v1/analyzer-paired-v3.json",
+      "bytes": 215190,
+      "sha256": "7a5ff3d6fc7611e6690f4e247548988a64d34bddf59c47a20304f60adf7bec97",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-pilot-v1/analyzer-paired-v4.json",
+      "bytes": 214727,
+      "sha256": "3ab192e15696fcb2d6a821d11b0a704c81bd19a78d602b417b30b5cd2ae394fa",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-pilot-v1/analyzer-paired-v5.json",
+      "bytes": 271915,
+      "sha256": "6eb0863fc1507ea206ba900fc8d6347112e52568e7626e1d4d5fbf01778c03aa",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-pilot-v1/launch.json",
+      "bytes": 94,
+      "sha256": "8d2e6c4adf98313d75fce48a113b7ad10ee5394d809ec89d39e5125d47cf740f",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-pilot-v1/output/report.json",
+      "bytes": 155270,
+      "sha256": "485f1ba38094184ca178c8a2840c4210604493490a4428236d8f7596e8d91983",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-pilot-v1/perf-script-inline-v1.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-pilot-v1/perf-script-inline-v1.txt",
+      "bytes": 96343267,
+      "sha256": "c03f506e569fee1d56f09b34ecc13491d1cb63d01e108c629641fa82a147a82f",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-pilot-v1/perf-script-physical-v1.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-pilot-v1/perf-script-physical-v1.txt",
+      "bytes": 58246058,
+      "sha256": "13596bcecdc1583a340e161d20fd67116050139ad3674b22a9a84d3b7167dfea",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-pilot-v1/perf.data",
+      "bytes": 3912112,
+      "sha256": "7b764957a7e47b2a9e36817c10c81666e00fb88011f693c12fe56fd15e2f91f9",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-pilot-v1/pilot-decoder-controls-v1.json",
+      "bytes": 4341,
+      "sha256": "376a9a79d451bfc75f4e5a16bf24b580baf1489dbbc584dd427de79375b240ee",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-pilot-v1/start.json",
+      "bytes": 1587,
+      "sha256": "27fc9d82a5654dcc2bd19074eecfe5bb2f2f1fd36f2d4060951a6834c4ad720e",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-pilot-v1/stderr.log",
+      "bytes": 152,
+      "sha256": "5379a130af58a3987df97a48c106c9a90a92e80ba2d7d7b18431c4de547dba6e",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-pilot-v1/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-pilot-v1/terminal.json",
+      "bytes": 188,
+      "sha256": "d124ce57cf7c6fc77ba49c4609241acd106c9e66548e6c3eaadbeae4a09075d0",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-pilot-v1/validation.json",
+      "bytes": 806,
+      "sha256": "7d16690af33ad19300757db30c8ae42c88b13fb07dbc4f15a2761dd1d551880f",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-plan-v1.json",
+      "bytes": 5028,
+      "sha256": "b4494abbe8da21ca7e54a4f022b92bb13b4700e09d5ff4a42b8772d213fa5bea",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-execution-v1.json",
+      "bytes": 1960,
+      "sha256": "b0919fc7d8ce9d0a440ae976ff039d2bb2b1fd68b7adfbbc4c88770099f58a14",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-summary-v1.json",
+      "bytes": 427884,
+      "sha256": "b8a705803103b7cc3dc0216e3df25b9d18f729d7c663f9ae9bb43051bb89a37a",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/00-medium-one-percent/launch.json",
+      "bytes": 94,
+      "sha256": "f799511e1e4c4ca86aa8695c3ffd5a6b310591d8c9f1927d2f629f150f05239a",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/00-medium-one-percent/offline-decode-v1/inline-terminal-late-clearance-v2.json",
+      "bytes": 1747,
+      "sha256": "5118ca3388e3125a09932e3f45b0d8cd1355ee6141c866b12f3e9b4be3b228dc",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/00-medium-one-percent/offline-decode-v1/inline-terminal.json",
+      "bytes": 700,
+      "sha256": "acf72b4b5f62a9d8109652c52bd1b39c77a06fd55fddd15338dd7d5215e5186e",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/00-medium-one-percent/offline-decode-v1/perf-script-inline.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/00-medium-one-percent/offline-decode-v1/perf-script-inline.txt",
+      "bytes": 121827387,
+      "sha256": "449dbd74047e19d5a39543a5f9694c9938311de134efa6580e216bfa27593dbd",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/00-medium-one-percent/offline-decode-v2/analyzer.json",
+      "bytes": 314382,
+      "sha256": "e957362b2621dbe72e6330698b43d88415b3fca8b1f7aee60b1a7d1f797f4674",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/00-medium-one-percent/offline-decode-v2/analyzer.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/00-medium-one-percent/offline-decode-v2/analyzer.stdout",
+      "bytes": 285,
+      "sha256": "92d79bf383d1dcc2c6fc86bb91f1e366574463425a341fb614a215113cb5c48e",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/00-medium-one-percent/offline-decode-v2/boundary-attribution-v1.json",
+      "bytes": 206201,
+      "sha256": "0e087bd9bc47e4382cb5bed39bb53d183e09c465e546aa931235657123bf0301",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/00-medium-one-percent/offline-decode-v2/decode-control.json",
+      "bytes": 15413,
+      "sha256": "8ee4104882980f7a6bec74a2a2277b5f809d0cfee86e2634e5f6c0d8f6acda2a",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/00-medium-one-percent/offline-decode-v2/decoder-terminal.json",
+      "bytes": 1026,
+      "sha256": "8b06f26468b9722f971ce69662edc3375eae9016fc005c3ca6c1d305bfb1a346",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/00-medium-one-percent/offline-decode-v2/perf-script-physical.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/00-medium-one-percent/offline-decode-v2/perf-script-physical.txt",
+      "bytes": 70279951,
+      "sha256": "22cbc78c3d3ff8be7178484babd7bcf74a78a5562fdfefbc317ebee042c3ee5d",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/00-medium-one-percent/offline-decode-v2/physical-terminal.json",
+      "bytes": 702,
+      "sha256": "ad637b67118c580c605b426bddf222a5332c7c4084a45e2ca3411465b1a12795",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/00-medium-one-percent/output/report.json",
+      "bytes": 155259,
+      "sha256": "e660a16289d438c2bd301215af1415444009726773c63946e0355aaaa2ada843",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/00-medium-one-percent/perf.data",
+      "bytes": 3896512,
+      "sha256": "a59354815c97b367ea2e037a643127bd1cb8458b64a22a7404dce58c7406de51",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/00-medium-one-percent/start.json",
+      "bytes": 1629,
+      "sha256": "cf1dda7cdc897d1a219ac47b0531767ad49a46a8eae098903f73a1075f9a21a6",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/00-medium-one-percent/stderr.log",
+      "bytes": 173,
+      "sha256": "7953212c9e3833cf8ad3dbf35e2c61262a05e91a7faa7187e19af7a7e58b96a1",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/00-medium-one-percent/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/00-medium-one-percent/terminal.json",
+      "bytes": 188,
+      "sha256": "a3852ade2875f7fdaca991b3f7e23e4de8a8df2849a4b13fc1a717945a13de6f",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/00-medium-one-percent/validation.json",
+      "bytes": 869,
+      "sha256": "c377d3d04b1c434d205f0d85da8cbcc1bbbefddd45d241a5b79cb29106d95be0",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/01-dense-sparse-one-percent/launch.json",
+      "bytes": 94,
+      "sha256": "5d10dd31cc9ec05d516de94476fc20e58d939c834e97cb430b93777105387768",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v1/inline-terminal-late-clearance-v2.json",
+      "bytes": 1771,
+      "sha256": "caf4f9446175cac2dd16cf7a1c56cda02a17d44fcc2abcd48493ee6f9037f3a8",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v1/inline-terminal.json",
+      "bytes": 706,
+      "sha256": "2005d8c412f8584ea5fb532588dbb16de9c3f9b98f779b5a1b0f2647995b3e17",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v1/perf-script-inline.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v1/perf-script-inline.txt",
+      "bytes": 161276877,
+      "sha256": "51a5c3d582a5d74e0058f6cd9aacf9854233b3609804219f99c1da7b37641e73",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v2/analyzer.json",
+      "bytes": 482521,
+      "sha256": "d9fd52ed412172ec1666caa17a38b750de9cff4fedc5f32a1948b9dbed1e0eb6",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v2/analyzer.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v2/analyzer.stdout",
+      "bytes": 291,
+      "sha256": "80c33229e274601718f66a8bdf9df1e317c270c0058f088eafba095e02f56214",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v2/boundary-attribution-v1.json",
+      "bytes": 336144,
+      "sha256": "c4efa685c620faf17fbc4c10bc58e44116c140cd30511d8db62128ae2f1dcf9f",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v2/decode-control.json",
+      "bytes": 15557,
+      "sha256": "39158b316ce826bf10614a53ff41d67cb12c08331824522e60b16a6821129c06",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v2/decoder-terminal.json",
+      "bytes": 1044,
+      "sha256": "001cc150c7bcc06c662ac47848e7fec9e354cb3983f431387ae83e1539fb115f",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v2/perf-script-physical.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v2/perf-script-physical.txt",
+      "bytes": 93976058,
+      "sha256": "0028be076d7a9828bf69e39a726488566835a8d5498f368beea981659c767799",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v2/physical-terminal.json",
+      "bytes": 708,
+      "sha256": "7815a52a2bdefb59cfac1370a25b920ac4d208ebe2acf195a984b7d4552cbb5e",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/01-dense-sparse-one-percent/output/report.json",
+      "bytes": 155731,
+      "sha256": "1686000ca05442a41be8208888f5ece5916430fc23cb44b25b742e19fd1851c2",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/01-dense-sparse-one-percent/perf.data",
+      "bytes": 5232656,
+      "sha256": "602b049c814454d5f40431ae1d1aff9ce27273b2df8a078e69b1e84dc1ffc53f",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/01-dense-sparse-one-percent/start.json",
+      "bytes": 1647,
+      "sha256": "2e1cc5985c775a89e26d8925de7aa47ed868753dfef671a3b6b75f432d447875",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/01-dense-sparse-one-percent/stderr.log",
+      "bytes": 179,
+      "sha256": "54c93304061f781c800e5f79a1a12501941fd76689ea55bea9ed0a22d6d4e75a",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/01-dense-sparse-one-percent/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/01-dense-sparse-one-percent/terminal.json",
+      "bytes": 188,
+      "sha256": "83238df90016baf991d0a4f1c822e88c8f97dd6f353e24e6d3845e7fdd46cbf6",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/01-dense-sparse-one-percent/validation.json",
+      "bytes": 887,
+      "sha256": "55dd18a3c9a7446bad384a4e43f798641114c17fd8fd49f80953823393d1d287",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/02-medium-one-edit/launch.json",
+      "bytes": 94,
+      "sha256": "b461d7e76e1c363f3d023ebaf01bd34993ea03e7ced1fef99ccb0f1caabedf92",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/02-medium-one-edit/offline-decode-v1/inline-terminal-late-clearance-v2.json",
+      "bytes": 1735,
+      "sha256": "edb50bf607e366c1e9f5b1bdbb7d1fc28476a8c4f78055e5f967c196dca6a233",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/02-medium-one-edit/offline-decode-v1/inline-terminal.json",
+      "bytes": 697,
+      "sha256": "dc3ee69bb46d15e8b5d709de3558e4bf3a7c350269afc818c9a90e3b5c1cd6ca",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/02-medium-one-edit/offline-decode-v1/perf-script-inline.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/02-medium-one-edit/offline-decode-v1/perf-script-inline.txt",
+      "bytes": 106161388,
+      "sha256": "0e0a72ce2592818d41f4f059e6f28ad20dc55e8c3d7b86fb77e25c1ef0b8f7fe",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/02-medium-one-edit/offline-decode-v2/analyzer.json",
+      "bytes": 123716,
+      "sha256": "817728318ff037416a2a456d8816abc7d007ca1311c4fd21e3ecbfb36406c106",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/02-medium-one-edit/offline-decode-v2/analyzer.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/02-medium-one-edit/offline-decode-v2/analyzer.stdout",
+      "bytes": 282,
+      "sha256": "eecb58b08846ffc53391fc8d51bcd5b70bcd76b5e6f7c23d32715ca1ff57caf6",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/02-medium-one-edit/offline-decode-v2/boundary-attribution-v1.json",
+      "bytes": 74411,
+      "sha256": "a21679ab0e8f12d264e7847951e4454431bf9d577eea1a077fa8ec1704450215",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/02-medium-one-edit/offline-decode-v2/decode-control.json",
+      "bytes": 15343,
+      "sha256": "6f978553cc9e6ebb88f101ec70d7943b1cfe4e92f68efb413e193a21500118b3",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/02-medium-one-edit/offline-decode-v2/decoder-terminal.json",
+      "bytes": 1017,
+      "sha256": "69066e9042894a8e62be362fd3d60be1ef1b27ee9c303ee7934cc971c1a82821",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/02-medium-one-edit/offline-decode-v2/perf-script-physical.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/02-medium-one-edit/offline-decode-v2/perf-script-physical.txt",
+      "bytes": 59675780,
+      "sha256": "bdf91f64224acd397b042e0fe956c476d7f94bf65ffb93cc36809700eb406949",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/02-medium-one-edit/offline-decode-v2/physical-terminal.json",
+      "bytes": 699,
+      "sha256": "29b6311072e64b18e7fae9f78c3e6de4972a503c87f675336474b64aee0ec4bb",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/02-medium-one-edit/output/report.json",
+      "bytes": 154852,
+      "sha256": "250758be883f0b070c54f1c8937867641811bd0bd5ab55d1953b968b4a413b2a",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/02-medium-one-edit/perf.data",
+      "bytes": 3297680,
+      "sha256": "ee581bf5c63668ebdab69ac66a1ae1169e79c780b88d45878e9442bbce8fe58c",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/02-medium-one-edit/start.json",
+      "bytes": 1620,
+      "sha256": "9e252946baae7fcdfc8460916ea33371486f22622186874a301ff01b4fa2643b",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/02-medium-one-edit/stderr.log",
+      "bytes": 170,
+      "sha256": "ef9ba2c42a1a9208dbf5342560166aa513c545b675c41afeeb3ce46088656745",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/02-medium-one-edit/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/02-medium-one-edit/terminal.json",
+      "bytes": 188,
+      "sha256": "6b50ce96c135d7d6fa86ae2802981f55719fa9bddf286c9df477df45652d799a",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/02-medium-one-edit/validation.json",
+      "bytes": 860,
+      "sha256": "fc1dd42aac4b65632b3a29147014f7b33f3c48212f67639b2487a1e70bd4818a",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/03-medium-one-edit/launch.json",
+      "bytes": 94,
+      "sha256": "21491c6c43eff0efc06d66e9caad2c61d1477a8297a1ee10ccb41c0ca1d321d4",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/03-medium-one-edit/offline-decode-v1/inline-terminal-late-clearance-v2.json",
+      "bytes": 1735,
+      "sha256": "3ac63b26bcb4846f8e6b8c736abb1a98fafab740662e2e25e3d43c530c33dfde",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/03-medium-one-edit/offline-decode-v1/inline-terminal.json",
+      "bytes": 697,
+      "sha256": "9b5d116fe56af93f6eae0f908d5159bfc2744ded462d72fda8f2709c1edc006c",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/03-medium-one-edit/offline-decode-v1/perf-script-inline.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/03-medium-one-edit/offline-decode-v1/perf-script-inline.txt",
+      "bytes": 106002574,
+      "sha256": "1c8d9867e652f4395d54dffd7c8ba9392449f4ad25fbba6dd2b204d1a12ae1b6",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/03-medium-one-edit/offline-decode-v2/analyzer.json",
+      "bytes": 135430,
+      "sha256": "4fdd2631221555207a7544323136b7f5feef6cf1e1b58dc0edc957e26e79d018",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/03-medium-one-edit/offline-decode-v2/analyzer.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/03-medium-one-edit/offline-decode-v2/analyzer.stdout",
+      "bytes": 282,
+      "sha256": "4744d117fe9ae5e1df06efc7fb51656ec4174a064e9ee3dbc0f864b54b461969",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/03-medium-one-edit/offline-decode-v2/boundary-attribution-v1.json",
+      "bytes": 81556,
+      "sha256": "ed2335966c0d1508fd4a30a39460741b851f4fa661c2be59cb6abea549937d3b",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/03-medium-one-edit/offline-decode-v2/decode-control.json",
+      "bytes": 15343,
+      "sha256": "81506b1ceb294bbbee662a49efbd9ebee2e6a4f00573f70ced23e46dec94d0eb",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/03-medium-one-edit/offline-decode-v2/decoder-terminal.json",
+      "bytes": 1017,
+      "sha256": "5fadb7500c2ad1fdafa4b919770aabc2536c6b0b736c031fc0ff6d607c8ae75e",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/03-medium-one-edit/offline-decode-v2/perf-script-physical.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/03-medium-one-edit/offline-decode-v2/perf-script-physical.txt",
+      "bytes": 59606963,
+      "sha256": "d0fe5e6c984fd2b20f363c6eee68c76b8ccf08fd1bcd07f8fd94a243fa188bc0",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/03-medium-one-edit/offline-decode-v2/physical-terminal.json",
+      "bytes": 699,
+      "sha256": "2799d11600e6950808f6cd6b8ebfcc8022bd29bd2fa16735d197a413fea47d94",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/03-medium-one-edit/output/report.json",
+      "bytes": 154850,
+      "sha256": "f58d768798338ac2319939808188c0234960e95a4b6be2ead4cd9c1c96835c0c",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/03-medium-one-edit/perf.data",
+      "bytes": 3295360,
+      "sha256": "a79e275db70d00f09f54abea1ecc9009b86edbd5864829ccd646b5a20eb166ae",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/03-medium-one-edit/start.json",
+      "bytes": 1620,
+      "sha256": "e80432b80a8c2c2321f7c71d7767a06400c3e7a6cd2ba5f498eacb6e55a2200a",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/03-medium-one-edit/stderr.log",
+      "bytes": 170,
+      "sha256": "c53692b240019ec4f79c5988eb7a34dffe02cf071894909afeb5b6fdace3fc42",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/03-medium-one-edit/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/03-medium-one-edit/terminal.json",
+      "bytes": 188,
+      "sha256": "f0327c35b0c46849a50152964b0ac5772e6749c148c6483b337ff9c4a5db014f",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/03-medium-one-edit/validation.json",
+      "bytes": 860,
+      "sha256": "813a248f6073f91dda89a97018266458ebce52df42f6ac989684b82d13c5631f",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/04-dense-sparse-one-percent/launch.json",
+      "bytes": 94,
+      "sha256": "c912c670a4bb6876464640b9ec5e9a7958a2d2106d306d2705833a05a7dce67c",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/04-dense-sparse-one-percent/offline-decode-v1/inline-terminal-late-clearance-v2.json",
+      "bytes": 1771,
+      "sha256": "66676b38f3483beda88d13bbf5ca006573f98f3bed4185b6280d7d0817756a0c",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/04-dense-sparse-one-percent/offline-decode-v1/inline-terminal.json",
+      "bytes": 706,
+      "sha256": "197248aa07dc94ad57c340d2f2c7ad0482d76ad0299406cf030542bf9431360d",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/04-dense-sparse-one-percent/offline-decode-v1/perf-script-inline.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/04-dense-sparse-one-percent/offline-decode-v1/perf-script-inline.txt",
+      "bytes": 167491834,
+      "sha256": "4670bb845b494710c3faefe35f45dc524139dfa3fe4a9960129601a44a52acae",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/04-dense-sparse-one-percent/offline-decode-v2/analyzer.json",
+      "bytes": 461243,
+      "sha256": "11a60ba8f52468600b0431342436084ce7675a808c474e140a6444dbeabf8623",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/04-dense-sparse-one-percent/offline-decode-v2/analyzer.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/04-dense-sparse-one-percent/offline-decode-v2/analyzer.stdout",
+      "bytes": 291,
+      "sha256": "7a83768a64aea6bcbee737b8499a9d0ff9eea602699bf57d5a03adf1db70aab6",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/04-dense-sparse-one-percent/offline-decode-v2/boundary-attribution-v1.json",
+      "bytes": 321262,
+      "sha256": "7c3735597da645166582915a278068f48f1e470b4b966685338a2c41b390b33f",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/04-dense-sparse-one-percent/offline-decode-v2/decode-control.json",
+      "bytes": 15557,
+      "sha256": "a9511eb85faaf091a6a42af31bf124d5d694c2aaa9ed24ba53d630f1e0cd5a55",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/04-dense-sparse-one-percent/offline-decode-v2/decoder-terminal.json",
+      "bytes": 1044,
+      "sha256": "2f8afd0597fce1a18ff21e1e09492f136c69386b20a3054b72b2121aebf9a1c4",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/04-dense-sparse-one-percent/offline-decode-v2/perf-script-physical.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/04-dense-sparse-one-percent/offline-decode-v2/perf-script-physical.txt",
+      "bytes": 97311363,
+      "sha256": "2b37bac9a0c354d23ebb6e9b789acd1bec389ce96f27971ad3623e4c01ec28e8",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/04-dense-sparse-one-percent/offline-decode-v2/physical-terminal.json",
+      "bytes": 708,
+      "sha256": "3065a745b545d4eaa479cda9155c5d6ca0af895a91acb6073b7ed4c316ca4c07",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/04-dense-sparse-one-percent/output/report.json",
+      "bytes": 155755,
+      "sha256": "57a64a3a1aee680b4c1765703cbf1dcd4f5f4e28fc62b2964da5d4d8aff97db6",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/04-dense-sparse-one-percent/perf.data",
+      "bytes": 5409480,
+      "sha256": "e02f3fd2cef53067bc78b0679db74e9f17a53b03e2ce2d1cfa5986643c32ec29",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/04-dense-sparse-one-percent/start.json",
+      "bytes": 1647,
+      "sha256": "adfba3d3eb358d55810cebd3988b5da3b5ac6b326a68ef15275ef9f5dfd65a4e",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/04-dense-sparse-one-percent/stderr.log",
+      "bytes": 179,
+      "sha256": "552cf4494c21cb0fcbe32efdd8c0626c3ec8e92c6b1e7ad434b8d917ece380e3",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/04-dense-sparse-one-percent/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/04-dense-sparse-one-percent/terminal.json",
+      "bytes": 188,
+      "sha256": "960dbb343e1962721854088310808cf7477ddd0ea66d345898bce1a948765ac0",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/04-dense-sparse-one-percent/validation.json",
+      "bytes": 887,
+      "sha256": "61987e35722a765a22578296e30c0d46062301f60d9a2702d1e6924fd0acac5b",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/05-medium-one-percent/launch.json",
+      "bytes": 94,
+      "sha256": "98268c6a65c1cd4905a73e74098ad353ec56b47b68ebebdc2877a485b3d142f3",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/05-medium-one-percent/offline-decode-v1/inline-terminal-late-clearance-v2.json",
+      "bytes": 1747,
+      "sha256": "44e7b42ececcc68ebd95f0312daff3d5194da748665c4b2b28d078e6a834f240",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/05-medium-one-percent/offline-decode-v1/inline-terminal.json",
+      "bytes": 700,
+      "sha256": "5616f3efd7468eee831adb2fc24351b1f15ed701e971824e28d00b1a43f6d12b",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/05-medium-one-percent/offline-decode-v1/perf-script-inline.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/05-medium-one-percent/offline-decode-v1/perf-script-inline.txt",
+      "bytes": 122888338,
+      "sha256": "b91b0d26d7a0e31ee4304b6282803a143bbea28f30215c4d4837d7a8f6430f09",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/05-medium-one-percent/offline-decode-v2/analyzer.json",
+      "bytes": 298360,
+      "sha256": "b6da35bdf6fa85cc39a3866c206b40bc697947b37671cf8ce82fc744a8721fe5",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/05-medium-one-percent/offline-decode-v2/analyzer.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/05-medium-one-percent/offline-decode-v2/analyzer.stdout",
+      "bytes": 285,
+      "sha256": "948eb7183368dd21967daf465e3253413be9b77dbe6d18c915f2f57479858199",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/05-medium-one-percent/offline-decode-v2/boundary-attribution-v1.json",
+      "bytes": 193994,
+      "sha256": "9b50c4bf732c7599ba431e68192720e1660bf2f8179400850dca9aa18750b1ef",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/05-medium-one-percent/offline-decode-v2/decode-control.json",
+      "bytes": 15413,
+      "sha256": "29629ad09add1e988555765c0f6ec011875caa0d365a08baafccdb72dd59be7a",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/05-medium-one-percent/offline-decode-v2/decoder-terminal.json",
+      "bytes": 1026,
+      "sha256": "3a9521e939b11b88393ad382df8b2d68485162cb495a3ff50cdcc00a62e95347",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/05-medium-one-percent/offline-decode-v2/perf-script-physical.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/05-medium-one-percent/offline-decode-v2/perf-script-physical.txt",
+      "bytes": 70652103,
+      "sha256": "a6c5e7ed9b0ad87d1ba1d426f6cfe06d904a6e1bcaba3680fecd1b6b47b55bdc",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/05-medium-one-percent/offline-decode-v2/physical-terminal.json",
+      "bytes": 702,
+      "sha256": "72f3a117570fa3d22ecc79258931e5e1fa9898e61caf56300124a954f364cf9a",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/05-medium-one-percent/output/report.json",
+      "bytes": 155278,
+      "sha256": "e303effcce5f5d31f82188d192fcc6c43d8d372befc70b682cd99f8f099b0371",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/05-medium-one-percent/perf.data",
+      "bytes": 3916776,
+      "sha256": "0d984c67686d6cda5bb4bc819c5e9c0d155199acc7114b720a153637733225b1",
+      "bounded_copy": false
+    },
+    {
+      "path": "fp-wave-v1/05-medium-one-percent/start.json",
+      "bytes": 1629,
+      "sha256": "71762a45fe1ad8304d47640205b55f8edb0515dade4d6437d6b682be61eeaaf5",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/05-medium-one-percent/stderr.log",
+      "bytes": 173,
+      "sha256": "ca8fb598026d601d650698e881f090db1b47f0454e9ca12ee4170913022c8ad9",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/05-medium-one-percent/stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/05-medium-one-percent/terminal.json",
+      "bytes": 188,
+      "sha256": "b8ec9f3f80525d857981193c31204c90c1a148e239737dbdefeec6624d848fab",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/05-medium-one-percent/validation.json",
+      "bytes": 869,
+      "sha256": "6b39c1912938e3dccb24820afc30f2670dad874efee642cc8852279c7cba5991",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/boundary-attribution-receipt-v1.json",
+      "bytes": 1260,
+      "sha256": "a1ad56bfecc3370c81fb4e8ec496be6bc7ce4989ff1e4e4e322d70e5e812badb",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/boundary-attribution-summary-v1.json",
+      "bytes": 9820,
+      "sha256": "14fa5e02723da074f0cf06c494f2ff48e1389bb489e2f189fb09ad6ce08ea477",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/capture-terminal.json",
+      "bytes": 2852,
+      "sha256": "5f209fb52d04a9e44965c93b78166a2d27f2abc82f88b2d8c5635708d6466af0",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/child-00.json",
+      "bytes": 382,
+      "sha256": "544cd82cae5f78da3d4c6139fc75b8a6818f4145d9479b4ea422a9c863ab87fd",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/child-01.json",
+      "bytes": 400,
+      "sha256": "56a7b5fac7b27727dacfefae700354ca1b692d7afb26e07624b383f152dfaece",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/child-02.json",
+      "bytes": 373,
+      "sha256": "f505fdad106125c11f7777180af507f1bc432f2062886f7447bc7e42b2fe6e96",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/child-03.json",
+      "bytes": 373,
+      "sha256": "6d6a40c4f67ecae0ffc6b7a0a1891585ecf105133d0b9f26d5ee64b29376283c",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/child-04.json",
+      "bytes": 400,
+      "sha256": "4a18074a30fede4b154ebc5635fc6564092c30260d3e7d5359f9370d5304d59c",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/child-05.json",
+      "bytes": 382,
+      "sha256": "de1e893dff2ac32c160383f4fd3948479f311ef17efdeb355a472945d4a35cee",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/offline-decode-terminal-v2.json",
+      "bytes": 9003,
+      "sha256": "30edcfa3652350f674358f7fd2f2b9abb0d9e33eca790a73f6dbd968365b9e6b",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/source-leaf-coverage-v1.json",
+      "bytes": 64108,
+      "sha256": "8ab4520006c8040279062616caafaaa78167eca97e363f1b1f257141a243096c",
+      "bounded_copy": true
+    },
+    {
+      "path": "fp-wave-v1/start.json",
+      "bytes": 242,
+      "sha256": "2bedea413003e47a23259ab0c4be47ee481144901f8824baa2c0e662878b4a79",
+      "bounded_copy": true
+    },
+    {
+      "path": "native-phase-summary-v1.json",
+      "bytes": 10478,
+      "sha256": "cc0556be49182312f0ab884b71faf5aee830ad73a6e4e286c46547f02eafc085",
+      "bounded_copy": true
+    },
+    {
+      "path": "normative-inputs.json",
+      "bytes": 6284,
+      "sha256": "5a2d08a44e8654220aff02c19c952f83da983ea7dc5d553b0720fe3673fc738e",
+      "bounded_copy": true
+    },
+    {
+      "path": "perf-record-probe.stderr",
+      "bytes": 145,
+      "sha256": "daf16b0de153a61d5c06c1af1a2341a0ab1eecbdc3ca52c9eace5826f0c0be21",
+      "bounded_copy": false
+    },
+    {
+      "path": "perf-record-probe.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "perf-stat-probe.stderr",
+      "bytes": 433,
+      "sha256": "dbe1c673d70e48cb5dcc2f25908c32efd6fd5395dc90b8e2a8ae685f7c7e4228",
+      "bounded_copy": false
+    },
+    {
+      "path": "perf-stat-probe.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "probe/perf.data",
+      "bytes": 43304,
+      "sha256": "86906a0f9e292a1a006449708aa356c338de0304483dfad8b13d27f0a6ff1687",
+      "bounded_copy": false
+    },
+    {
+      "path": "receipts/diagnostic-fp-v1-build-binaries.json",
+      "bytes": 852,
+      "sha256": "5abedbd53117e940f61e2a578eea91374e6fdc948d9bcb3793c2995f1f1dab12",
+      "bounded_copy": true
+    },
+    {
+      "path": "receipts/diagnostic-fp-v1-build-result.json",
+      "bytes": 1333,
+      "sha256": "dbf25c2a53595a80b8c92b0262aa67c783a173eed1a22807ea1cb23d3eaa3df4",
+      "bounded_copy": true
+    },
+    {
+      "path": "receipts/diagnostic-fp-v1-build-start.json",
+      "bytes": 4454,
+      "sha256": "9f4838351d191b3a1d26b042597bdde9848474f6e6ca3add36c6343d2b051361",
+      "bounded_copy": true
+    },
+    {
+      "path": "receipts/diagnostic-fp-v1-build-terminal.json",
+      "bytes": 1485,
+      "sha256": "e9239d56ed2bc4c8984612f8eee9442b1b52e6c0da8cc2174c0f71cec40e8d2a",
+      "bounded_copy": true
+    },
+    {
+      "path": "receipts/diagnostic-fp-v1-retention.json",
+      "bytes": 1672,
+      "sha256": "1ce7e237d36e781e1f2f22c92948493e487e77bc188ec052fef06c6f2b5886fe",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-pilot-admission-v1.json",
+      "bytes": 9209,
+      "sha256": "a84a733a4d340c026c4941310ba1c06694d907eae7e1a589f23bd1d0c4eb56d3",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-pilot-admission-v2-postfreeze-pid-correction.json",
+      "bytes": 15289,
+      "sha256": "8d465634154a7ecf8723fd076cd73fe498140bb94648e647dda8d19176b7d0fd",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-pilot-admission-v2.json",
+      "bytes": 15268,
+      "sha256": "2e36ec426abb29402e95d1372623c96d35ffdda14b294d456a08d7ff48b9dbed",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-pilot-freeze-restoration-v1.json",
+      "bytes": 918,
+      "sha256": "e99fed4b2611ce7a5b4d4e88388451496ec62c091ba8ac181b6770d6b4b2a603",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-pilot-v1-buildid-list.rc",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-pilot-v1-buildid-list.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-pilot-v1-buildid-list.txt",
+      "bytes": 302,
+      "sha256": "7e99759e8f3a15e98ac9591d3c245672750b895d956529400409e8ddff62336b",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-pilot-v1-header.rc",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-pilot-v1-header.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-pilot-v1-header.txt",
+      "bytes": 1819,
+      "sha256": "053de946fd986075f0964b5de5e67ea90aef134a6d162ee3bd084f10a15450cc",
+      "bounded_copy": false,
+      "copy_exclusion": "raw profiler text formatting retained unchanged externally"
+    },
+    {
+      "path": "review/fp-pilot-v1-mapping-events.txt",
+      "bytes": 1345,
+      "sha256": "50af3bd1e385531011c6a7a52e1bcca0b08abe8b045b871b59576ac9587e442a",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-pilot-v1-mapping.rc",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-pilot-v1-mapping.stderr",
+      "bytes": 25,
+      "sha256": "d760457f9a459836db8c86aa1e430280f8b3c8762575616f72e4aee52e767536",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-pilot-v2-independent/analyzer.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-pilot-v2-independent/analyzer.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-admission-independent-v1.json",
+      "bytes": 103854,
+      "sha256": "7be4886ac97ad85c1f29a207d826530ebe11676a53e7d77ecb87d77fb29d8da1",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-audit-independent-v1.json",
+      "bytes": 12471,
+      "sha256": "ac7bc7c8356f9b904cd011546ed2d17e10bedf18e43c8e42dbb565735560523f",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-00-buildid-list.rc",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-00-buildid-list.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-00-buildid-list.txt",
+      "bytes": 302,
+      "sha256": "7e99759e8f3a15e98ac9591d3c245672750b895d956529400409e8ddff62336b",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-00-header.rc",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-00-header.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-00-header.txt",
+      "bytes": 1819,
+      "sha256": "8474e0afb1c5470e2c3ace04a667e02770a3d25719f63541152f6dbde416b9fa",
+      "bounded_copy": false,
+      "copy_exclusion": "raw profiler text formatting retained unchanged externally"
+    },
+    {
+      "path": "review/fp-wave-v1-00-mapping-events.txt",
+      "bytes": 1305,
+      "sha256": "7ca8be1dbec818319fe9b9aab024cc0b3e1b06d6b34737891d2a5a7a001ae8df",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-00-mapping.rc",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-00-mapping.stderr",
+      "bytes": 25,
+      "sha256": "d760457f9a459836db8c86aa1e430280f8b3c8762575616f72e4aee52e767536",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-00-metadata-v1.json",
+      "bytes": 8965,
+      "sha256": "8cad59f756ceebae5231403160a816d178c29860959928609fe936c32e70ce62",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-00-metadata-v2.json",
+      "bytes": 9566,
+      "sha256": "059c5e74fbb243a0f00a2f3fc208042e097a01ed3f51fc75daabecca6aef8578",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-00-metadata-v3.json",
+      "bytes": 9665,
+      "sha256": "56773cea8b109b3f5822b9f79d5fbe8425c5181171f18633b7fa114a5f4b21f9",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-01-buildid-list.rc",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-01-buildid-list.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-01-buildid-list.txt",
+      "bytes": 302,
+      "sha256": "7e99759e8f3a15e98ac9591d3c245672750b895d956529400409e8ddff62336b",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-01-header.rc",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-01-header.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-01-header.txt",
+      "bytes": 1819,
+      "sha256": "6581901397b7b8ddb9b7fff955072ef94570084e9693e48903384769fa4016ca",
+      "bounded_copy": false,
+      "copy_exclusion": "raw profiler text formatting retained unchanged externally"
+    },
+    {
+      "path": "review/fp-wave-v1-01-mapping-events.txt",
+      "bytes": 1305,
+      "sha256": "69403c2579ba54e9987e8a8b32f87982f3de90723f1cfd28f2363002047463b3",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-01-mapping.rc",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-01-mapping.stderr",
+      "bytes": 25,
+      "sha256": "d760457f9a459836db8c86aa1e430280f8b3c8762575616f72e4aee52e767536",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-01-metadata-v1.json",
+      "bytes": 9055,
+      "sha256": "9a1304d31bf9c9df093873ebb735988ef4522a6918ac8c5c4e03d2c8fbae7565",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-01-metadata-v2.json",
+      "bytes": 9657,
+      "sha256": "4be2ada5f977c533428a85e60c7ac955b054c4461100dcf21145c4b786b7285f",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-01-metadata-v3.json",
+      "bytes": 9756,
+      "sha256": "5eca3731d77920b8e64fe4ca02efa529f179e049991b8135cd4c912e2ee3ea2e",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-02-buildid-list.rc",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-02-buildid-list.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-02-buildid-list.txt",
+      "bytes": 302,
+      "sha256": "7e99759e8f3a15e98ac9591d3c245672750b895d956529400409e8ddff62336b",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-02-header.rc",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-02-header.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-02-header.txt",
+      "bytes": 1819,
+      "sha256": "33c6c56f3c14b6496ebeb7aaccda2a26f1ee18925dfad35e6c103fde9f4b3a35",
+      "bounded_copy": false,
+      "copy_exclusion": "raw profiler text formatting retained unchanged externally"
+    },
+    {
+      "path": "review/fp-wave-v1-02-mapping-events.txt",
+      "bytes": 1305,
+      "sha256": "309be6080ff68284166a13d1ea7bad19e290ab8d1a92029b6ebe1148a8585bd2",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-02-mapping.rc",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-02-mapping.stderr",
+      "bytes": 25,
+      "sha256": "d760457f9a459836db8c86aa1e430280f8b3c8762575616f72e4aee52e767536",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-02-metadata-v1.json",
+      "bytes": 8920,
+      "sha256": "dad9616f78cab92f37cf62d45b356442594591d6ffe8dafbc688f6297659069f",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-02-metadata-v2.json",
+      "bytes": 9521,
+      "sha256": "49e4994bac4b1406042add17debbda0514d4cbb33b50f838768986259f7105b6",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-02-metadata-v3.json",
+      "bytes": 9620,
+      "sha256": "ee042f6a01c843547cb56b5567bda5b6c9cd52d8f4b4452bdebfe554e29eff8d",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-03-buildid-list.rc",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-03-buildid-list.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-03-buildid-list.txt",
+      "bytes": 302,
+      "sha256": "7e99759e8f3a15e98ac9591d3c245672750b895d956529400409e8ddff62336b",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-03-header.rc",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-03-header.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-03-header.txt",
+      "bytes": 1819,
+      "sha256": "02b36eda0ba1004b9ac15c385b0b4605091444b32eadc7c6ce6978099e307186",
+      "bounded_copy": false,
+      "copy_exclusion": "raw profiler text formatting retained unchanged externally"
+    },
+    {
+      "path": "review/fp-wave-v1-03-mapping-events.txt",
+      "bytes": 1305,
+      "sha256": "1049e74a27c646d0d4cda341a43953b085ea9a53c33ea96ff1de91b06fbcdb69",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-03-mapping.rc",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-03-mapping.stderr",
+      "bytes": 25,
+      "sha256": "d760457f9a459836db8c86aa1e430280f8b3c8762575616f72e4aee52e767536",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-03-metadata-v1.json",
+      "bytes": 8920,
+      "sha256": "ff3c6a2c2edb5deec118200cfb97b4f4e9713dd3f09bec5a7d648eba0a38d10f",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-03-metadata-v2.json",
+      "bytes": 9521,
+      "sha256": "fb7ca3d020a2a84507fabf1747acd8a4715a9eb98128005c4a7cfcdb5676a0e2",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-03-metadata-v3.json",
+      "bytes": 9620,
+      "sha256": "9a0513091c08d4f5f143d6c9b088baefa3942e0e6b20597d46efc20fdcadef08",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-04-buildid-list.rc",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-04-buildid-list.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-04-buildid-list.txt",
+      "bytes": 368,
+      "sha256": "80507345a1177847b16145499a6aba6a1164141f01e027c6feced7f6180e4a78",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-04-header.rc",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-04-header.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-04-header.txt",
+      "bytes": 1819,
+      "sha256": "971b959a6f22e7e8d43f748f7d21b9bade4fc06003ec142819437994839785de",
+      "bounded_copy": false,
+      "copy_exclusion": "raw profiler text formatting retained unchanged externally"
+    },
+    {
+      "path": "review/fp-wave-v1-04-mapping-events.txt",
+      "bytes": 1305,
+      "sha256": "4db9dcb4cd10a0fe29fc446a419ab6ac9ec574878f5e7c92cc9e0897b3e36ffe",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-04-mapping.rc",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-04-mapping.stderr",
+      "bytes": 25,
+      "sha256": "d760457f9a459836db8c86aa1e430280f8b3c8762575616f72e4aee52e767536",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-04-metadata-v1.json",
+      "bytes": 9089,
+      "sha256": "5d71dab3b4000939ae5e773bf4a4347d6d690eb2e5be33fbcb0d0f745ed66e21",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-04-metadata-v2.json",
+      "bytes": 9691,
+      "sha256": "a100946c6d049ada4607d3b531170fc7c7e1d70029c8139d4098ec127c065e80",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-04-metadata-v3.json",
+      "bytes": 9790,
+      "sha256": "6998b945ba6bbda48b9d60592e7e811ba71f224b454fa64f03745cc1dd0af1b5",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-05-buildid-list.rc",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-05-buildid-list.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-05-buildid-list.txt",
+      "bytes": 302,
+      "sha256": "7e99759e8f3a15e98ac9591d3c245672750b895d956529400409e8ddff62336b",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-05-header.rc",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-05-header.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-05-header.txt",
+      "bytes": 1819,
+      "sha256": "dcbaa9d554fc18e13dfd9bb7f457151e9c3dba1fbdee2e4cf6f69744a61ebc0d",
+      "bounded_copy": false,
+      "copy_exclusion": "raw profiler text formatting retained unchanged externally"
+    },
+    {
+      "path": "review/fp-wave-v1-05-mapping-events.txt",
+      "bytes": 1305,
+      "sha256": "e147ea424520eab78e595c25d43cd3c0d7a74caa66f1bcaf6a04d481a20ce293",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-05-mapping.rc",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-05-mapping.stderr",
+      "bytes": 25,
+      "sha256": "d760457f9a459836db8c86aa1e430280f8b3c8762575616f72e4aee52e767536",
+      "bounded_copy": false
+    },
+    {
+      "path": "review/fp-wave-v1-05-metadata-v1.json",
+      "bytes": 8965,
+      "sha256": "d60b256f0fccedc3095e6bfc35012b2eb8b0c1fffec9ee80e8eea16d0fba69a3",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-05-metadata-v2.json",
+      "bytes": 9566,
+      "sha256": "12dc149a6728ce0694a6029c7dda3e1a4ce4512cfc78b71d169f3badf7b98da1",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-05-metadata-v3.json",
+      "bytes": 9665,
+      "sha256": "e411a3e350487715ab6c618a9962a508f83e9fcd96e63ad96815854ce4eea226",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-independent-cpu-summary-v1.json",
+      "bytes": 7100,
+      "sha256": "c241dfa09ea154ecb3b73e14fd7d4786d87e179497852293af7caa216cf0b169",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-independent-cpu-summary-v2.json",
+      "bytes": 11658,
+      "sha256": "5bb0d86ce3e725137c1d52cbafd55fa1f474c059aed87bcc259aeeefa2159c4b",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-independent-review-files-v1.json",
+      "bytes": 13051,
+      "sha256": "e965e0c780580db39124a4d16ed53b5b89d8184fb8fea73295de291650439d47",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-metadata-summary-v1.json",
+      "bytes": 62073,
+      "sha256": "52194504442c8c7bc6a921aba1c321880a52ead5c16d954bc8d1b0acfa43d653",
+      "bounded_copy": true
+    },
+    {
+      "path": "review/fp-wave-v1-terminal-receipts-v1.json",
+      "bytes": 10469,
+      "sha256": "3a7f2294240d281816275db511d43a14d43c0d903216022e3a7a5f99d1d66517",
+      "bounded_copy": true
+    },
+    {
+      "path": "root-source-revalidation.json",
+      "bytes": 634,
+      "sha256": "6a724bf2cbcdc8a088f29374562b36721a8b107d21724260c4d8d3664e84f643",
+      "bounded_copy": true
+    },
+    {
+      "path": "scratch-retention-v1.json",
+      "bytes": 2229,
+      "sha256": "5febef1e423809aee2afcc5b3c0869b59dd214fc6253302e3c6ba2940fe34ff8",
+      "bounded_copy": true
+    },
+    {
+      "path": "source-followup-v1.md",
+      "bytes": 5816,
+      "sha256": "488800b637d1502c32f550e51403e36ebb291c5d3ced9719c972b082c0ecb9e4",
+      "bounded_copy": true
+    },
+    {
+      "path": "source-fusion-caveat-v1.md",
+      "bytes": 2540,
+      "sha256": "b0dea99d614bd96022f87ec15a72078218b14401294686b992a9da736f100898",
+      "bounded_copy": true
+    },
+    {
+      "path": "tools/analyze_native_cpu_v1.py",
+      "bytes": 62780,
+      "sha256": "f5f7a387f99ba3a587eeb8f27c8f422a9fa696306c2ae47724952b861910bd3d",
+      "bounded_copy": true
+    },
+    {
+      "path": "tools/analyze_rewrite_boundaries_v1.py",
+      "bytes": 13490,
+      "sha256": "e14ed4a52b1801191a5eddc26cd59d41869ae898db435ef61d71464cc1c78473",
+      "bounded_copy": true
+    },
+    {
+      "path": "tools/capture_fp_v1.py",
+      "bytes": 5420,
+      "sha256": "7a71f067f292c346569c3c1f2eaadd5a4847736dd6e973258dd8d673f8bdda34",
+      "bounded_copy": true
+    },
+    {
+      "path": "tools/decode_fp_wave_v1.py",
+      "bytes": 16334,
+      "sha256": "fd9c39b644df2f60ab94056030c9b1c7fcb8467f721a36f86443c91f8d96e674",
+      "bounded_copy": true
+    },
+    {
+      "path": "tools/decode_fp_wave_v2.py",
+      "bytes": 18858,
+      "sha256": "1865d184b6e58ed7fe56d39b3499fdfe6942a1754ede4dd2ba09a0fff92709f4",
+      "bounded_copy": true
+    },
+    {
+      "path": "tools/run_fp_wave_v1.py",
+      "bytes": 1937,
+      "sha256": "d0c7be5e6088cfc9a17a741f465359cbbf920b10754f4c52f9a29e7b319281b3",
+      "bounded_copy": true
+    },
+    {
+      "path": "tools/summarize_fp_wave_v1.py",
+      "bytes": 4420,
+      "sha256": "1075ff4ee95b4237cb637980fe7de66100c7e1e535bfe236da0234ea2efe43b7",
+      "bounded_copy": true
+    },
+    {
+      "path": "tools/summarize_native_phases_v1.py",
+      "bytes": 2747,
+      "sha256": "fb2d060e92c03da43c6b8b077205cd4a906e964597db7223289759c2ed7b05b8",
+      "bounded_copy": true
+    },
+    {
+      "path": "tools/test_analyze_native_cpu_v1.py",
+      "bytes": 17830,
+      "sha256": "fccd14fb990a5a06854623d67891770c3796d8f86595c89a5202cd9f75a90ed7",
+      "bounded_copy": true
+    },
+    {
+      "path": "tools/test_capture_fp_v1.py",
+      "bytes": 1651,
+      "sha256": "87d03a7a376767b751409f685423642b1c0b6dd60a0b5b0c35c563622ffc1283",
+      "bounded_copy": true
+    }
+  ],
+  "regeneration": "Exact build/capture commands, environment and source identities are in retained receipts/start records and source helpers. Commands target create-only paths: use a fresh external root or restore the declared layout. Decode original perf.data with the recorded paired perf-script commands. Failed DWARF profiles remain diagnostic only; invalid build attempts are not regeneration authority.",
+  "projection_note": "Raw profiler text files with trailing padding remain external; their hashes and paths stay in this inventory. All retained copies are byte-exact; raw text was not normalized."
+}

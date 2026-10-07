@@ -1,0 +1,21 @@
+{
+  "status": "passed",
+  "samples": 200,
+  "oracles": "source/output/semantic hashes; preflight inverse; per-row fixture inverse, phase conservation, sink bounds and resource drain",
+  "report": {
+    "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/output/report.json",
+    "bytes": 154850,
+    "sha256": "f58d768798338ac2319939808188c0234960e95a4b6be2ead4cd9c1c96835c0c"
+  },
+  "binary_unchanged": true,
+  "perf_data": {
+    "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/perf.data",
+    "bytes": 3295360,
+    "sha256": "a79e275db70d00f09f54abea1ecc9009b86edbd5864829ccd646b5a20eb166ae"
+  },
+  "stderr": {
+    "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/stderr.log",
+    "bytes": 170,
+    "sha256": "c53692b240019ec4f79c5988eb7a34dffe02cf071894909afeb5b6fdace3fc42"
+  }
+}

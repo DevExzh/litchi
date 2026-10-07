@@ -1,0 +1,1339 @@
+{
+  "boundary_partition": {
+    "neither": {
+      "period": 66088815,
+      "period_share": 0.030095279360136385,
+      "samples": 15
+    },
+    "rewritten_value_source": {
+      "period": 796096709,
+      "period_share": 0.36252356552376075,
+      "samples": 181
+    },
+    "source_selected": {
+      "period": 1333800571,
+      "period_share": 0.6073811551161029,
+      "samples": 303
+    }
+  },
+  "case_directory": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit",
+  "frozen_analyzer_sha256": "f5f7a387f99ba3a587eeb8f27c8f422a9fa696306c2ae47724952b861910bd3d",
+  "index": 2,
+  "inputs": {
+    "inline": {
+      "bytes": 106161388,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/offline-decode-v1/perf-script-inline.txt",
+      "sha256": "0e0a72ce2592818d41f4f059e6f28ad20dc55e8c3d7b86fb77e25c1ef0b8f7fe"
+    },
+    "physical": {
+      "bytes": 59675780,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/offline-decode-v2/perf-script-physical.txt",
+      "sha256": "bdf91f64224acd397b042e0fe956c476d7f94bf65ffb93cc36809700eb406949"
+    },
+    "prior_analyzer": {
+      "bytes": 123716,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/offline-decode-v2/analyzer.json",
+      "sha256": "817728318ff037416a2a456d8816abc7d007ca1311c4fd21e3ecbfb36406c106"
+    }
+  },
+  "interpretation": "Boundary rows are disjoint presence classes over qualified physical stacks; nested validate_xml is reported as a subset and no frame-level callee periods are added.",
+  "partition_conservation": {
+    "partition_period": 2195986095,
+    "partition_samples": 499,
+    "period_sum_pass": true,
+    "sample_sum_pass": true,
+    "selected_period": 2195986095,
+    "selected_samples": 499
+  },
+  "physical_binary_dso": "/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+  "physical_self": {
+    "groups": [
+      {
+        "key": "0x5631cec84ea2 quick_xml::reader::ns_reader::NsReader<R>::process_event [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:93)",
+        "period": 162857716,
+        "period_share": 0.07416154244820025,
+        "samples": 37
+      },
+      {
+        "key": "0x5631ceeeaac3 litchi_xlsx::cell_values::validation::scan_attributes [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-opc/src/xml_attributes.rs:237)",
+        "period": 140850696,
+        "period_share": 0.0641400673349892,
+        "samples": 32
+      },
+      {
+        "key": "0x5631cf15bc2b quick_xml::encoding::Decoder::decode_cow [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/encoding.rs:131)",
+        "period": 88065473,
+        "period_share": 0.04010292833844196,
+        "samples": 20
+      },
+      {
+        "key": "0x5631cf159525 quick_xml::name::NamespaceResolver::resolve_event [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/name.rs:938)",
+        "period": 87963740,
+        "period_share": 0.040056601542369966,
+        "samples": 20
+      },
+      {
+        "key": "0x5631cf1594eb quick_xml::name::NamespaceResolver::resolve_event [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/name.rs:939)",
+        "period": 83677468,
+        "period_share": 0.038104734902704385,
+        "samples": 19
+      },
+      {
+        "key": "0x5631cf1598bd quick_xml::name::NamespaceResolver::push [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/events/mod.rs:288)",
+        "period": 66054110,
+        "period_share": 0.030079475526005095,
+        "samples": 15
+      },
+      {
+        "key": "0x5631cef21e3c litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-opc/src/xml_attributes.rs:237)",
+        "period": 52826942,
+        "period_share": 0.024056136839973933,
+        "samples": 12
+      },
+      {
+        "key": "0x5631cefa6d3f litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/raw/worksheet/codec.rs:1666)",
+        "period": 48237194,
+        "period_share": 0.021966074425439384,
+        "samples": 11
+      },
+      {
+        "key": "0x5631ceee8426 litchi_xlsx::cell_values::validation::validate_xml [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:967)",
+        "period": 44003273,
+        "period_share": 0.02003804718991174,
+        "samples": 10
+      },
+      {
+        "key": "0x5631cf15c811 quick_xml::events::attributes::Attribute::decoded_and_normalized_value [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+        "period": 39649189,
+        "period_share": 0.018055300573294387,
+        "samples": 9
+      },
+      {
+        "key": "0x5631cefaaa00 litchi_xlsx::raw::worksheet::edit::codec::snapshot::facts::FactsBuilder::push_cell [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs:1917)",
+        "period": 39619335,
+        "period_share": 0.018041705769544045,
+        "samples": 9
+      },
+      {
+        "key": "0x5631cef23fb9 litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell::{{closure}} [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:967)",
+        "period": 39614324,
+        "period_share": 0.018039423878956757,
+        "samples": 9
+      },
+      {
+        "key": "0x5631cec84e81 quick_xml::reader::ns_reader::NsReader<R>::process_event [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:99)",
+        "period": 39335147,
+        "period_share": 0.017912293292549286,
+        "samples": 9
+      },
+      {
+        "key": "0x5631ced1774c litchi_ooxml_common::xml::unqualified_attribute_value [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-opc/src/xml_attributes.rs:237)",
+        "period": 35234330,
+        "period_share": 0.01604487846267533,
+        "samples": 8
+      },
+      {
+        "key": "0x5631cef1c4ca litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::transition [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/raw/worksheet/codec.rs:746)",
+        "period": 35214160,
+        "period_share": 0.016035693522913678,
+        "samples": 8
+      },
+      {
+        "key": "0x5631cef619b7 litchi_xlsx::cell::Store::merge_omitted_cells [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/cell.rs:646)",
+        "period": 35187363,
+        "period_share": 0.01602349080448071,
+        "samples": 8
+      },
+      {
+        "key": "0x7e90e69bc193 __memmove_avx512_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6] (../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:266)",
+        "period": 30631360,
+        "period_share": 0.013948795062839412,
+        "samples": 7
+      },
+      {
+        "key": "0x5631cf151965 memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/arch/generic/memchr.rs:679)",
+        "period": 26442177,
+        "period_share": 0.012041140451756822,
+        "samples": 6
+      },
+      {
+        "key": "0x5631cef18dd0 litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::finish [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+        "period": 26402176,
+        "period_share": 0.0120229249447957,
+        "samples": 6
+      },
+      {
+        "key": "0x5631cefa6633 litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/const_ptr.rs:619)",
+        "period": 22023465,
+        "period_share": 0.010028963776293857,
+        "samples": 5
+      },
+      {
+        "key": "0x5631cefa6646 litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/raw/worksheet/mod.rs:372)",
+        "period": 17643048,
+        "period_share": 0.00803422573584192,
+        "samples": 4
+      },
+      {
+        "key": "0x5631ceea8859 quick_xml::reader::Reader<R>::read_event_impl [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/parser/element.rs:59)",
+        "period": 17635148,
+        "period_share": 0.008030628263153915,
+        "samples": 4
+      },
+      {
+        "key": "0x5631cefa6dbe litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/raw/worksheet/codec.rs:1679)",
+        "period": 17626696,
+        "period_share": 0.008026779422754041,
+        "samples": 4
+      },
+      {
+        "key": "0x5631cef220ae litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2174)",
+        "period": 17611425,
+        "period_share": 0.008019825371435241,
+        "samples": 4
+      },
+      {
+        "key": "0x5631cf151f52 memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/arch/generic/memchr.rs:972)",
+        "period": 17609620,
+        "period_share": 0.008019003417232476,
+        "samples": 4
+      },
+      {
+        "key": "0x5631ceee84b3 litchi_xlsx::cell_values::validation::validate_xml [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/cell_values/validation.rs:342)",
+        "period": 17604815,
+        "period_share": 0.008016815334160848,
+        "samples": 4
+      },
+      {
+        "key": "0x5631cef221ed litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/raw/worksheet/codec.rs:258)",
+        "period": 13228290,
+        "period_share": 0.006023849618228116,
+        "samples": 3
+      },
+      {
+        "key": "0x5631cf15194e memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/arch/generic/memchr.rs:677)",
+        "period": 13225210,
+        "period_share": 0.006022447059256083,
+        "samples": 3
+      },
+      {
+        "key": "0x5631cf151b33 memchr::arch::x86_64::memchr::memchr3_raw::find_avx2 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/../../stdarch/crates/core_arch/src/simd.rs:56)",
+        "period": 13221741,
+        "period_share": 0.006020867358907389,
+        "samples": 3
+      },
+      {
+        "key": "0x7e90e69b2b65 __memcmp_evex_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6] (../sysdeps/x86_64/multiarch/memcmp-evex-movbe.S:133)",
+        "period": 13220864,
+        "period_share": 0.006020467993901392,
+        "samples": 3
+      },
+      {
+        "key": "0x5631cf157b93 alloc::raw_vec::RawVec<T,A>::grow_one [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2173)",
+        "period": 13220787,
+        "period_share": 0.00602043292992709,
+        "samples": 3
+      },
+      {
+        "key": "0x5631cef22cc2 litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2174)",
+        "period": 13219858,
+        "period_share": 0.006020009885354033,
+        "samples": 3
+      },
+      {
+        "key": "0x5631cf15187d memchr::arch::x86_64::avx2::memchr::Two::find_raw [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/arch/x86_64/avx2/memchr.rs:693)",
+        "period": 13214370,
+        "period_share": 0.0060175107802765936,
+        "samples": 3
+      },
+      {
+        "key": "0x5631cf151f3c memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/../../stdarch/crates/core_arch/src/x86/avx2.rs:699)",
+        "period": 13200692,
+        "period_share": 0.00601128214338716,
+        "samples": 3
+      },
+      {
+        "key": "0x5631cf15a54c quick_xml::events::attributes::IterState::check_for_duplicates [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+        "period": 8824477,
+        "period_share": 0.004018457594104211,
+        "samples": 2
+      },
+      {
+        "key": "0x5631cf15a0b3 quick_xml::events::attributes::IterState::next [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+        "period": 8819454,
+        "period_share": 0.004016170239001445,
+        "samples": 2
+      },
+      {
+        "key": "0x5631cf15a55e quick_xml::events::attributes::IterState::check_for_duplicates [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+        "period": 8819092,
+        "period_share": 0.004016005392784602,
+        "samples": 2
+      },
+      {
+        "key": "0x5631cf1578b8 alloc::raw_vec::RawVecInner<A>::finish_grow [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:566)",
+        "period": 8813454,
+        "period_share": 0.00401343798126372,
+        "samples": 2
+      },
+      {
+        "key": "0x5631cf15dfa6 quick_xml::reader::state::ReaderState::emit_start [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/mod.rs:2725)",
+        "period": 8809002,
+        "period_share": 0.0040114106460223285,
+        "samples": 2
+      },
+      {
+        "key": "0x7e90e69b2e08 __memcmp_evex_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6] (../sysdeps/x86_64/multiarch/memcmp-evex-movbe.S:454)",
+        "period": 8808370,
+        "period_share": 0.004011122848207288,
+        "samples": 2
+      },
+      {
+        "key": "0x5631cec557d4 core::str::converts::from_utf8 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (library/core/src/str/validations.rs:241)",
+        "period": 8808301,
+        "period_share": 0.004011091427243304,
+        "samples": 2
+      },
+      {
+        "key": "0x5631cf151f48 memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/../../stdarch/crates/core_arch/src/x86/avx2.rs:2315)",
+        "period": 8808151,
+        "period_share": 0.004011023120799861,
+        "samples": 2
+      },
+      {
+        "key": "0x5631cefab3cd litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::finish_parse [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+        "period": 8806090,
+        "period_share": 0.004010084590266952,
+        "samples": 2
+      },
+      {
+        "key": "0x5631ceee841f litchi_xlsx::cell_values::validation::validate_xml [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:967)",
+        "period": 8805271,
+        "period_share": 0.004009711637085753,
+        "samples": 2
+      },
+      {
+        "key": "0x5631cf15a566 quick_xml::events::attributes::IterState::check_for_duplicates [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs:1917)",
+        "period": 8804656,
+        "period_share": 0.004009431580667636,
+        "samples": 2
+      },
+      {
+        "key": "0x5631cef1c154 litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::transition [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/raw/worksheet/codec.rs:717)",
+        "period": 8803240,
+        "period_share": 0.004008786767841533,
+        "samples": 2
+      },
+      {
+        "key": "0x5631cf15777d alloc::raw_vec::RawVecInner<A>::finish_grow [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:542)",
+        "period": 8802836,
+        "period_share": 0.004008602795820527,
+        "samples": 2
+      },
+      {
+        "key": "0x5631cefa6678 litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs:153)",
+        "period": 8800816,
+        "period_share": 0.004007682935715492,
+        "samples": 2
+      },
+      {
+        "key": "0x5631cec84e74 quick_xml::reader::ns_reader::NsReader<R>::process_event [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2173)",
+        "period": 8800632,
+        "period_share": 0.004007599146478202,
+        "samples": 2
+      },
+      {
+        "key": "0x5631cefa6da2 litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/raw/worksheet/codec.rs:1679)",
+        "period": 8798933,
+        "period_share": 0.004006825462162136,
+        "samples": 2
+      },
+      {
+        "key": "0x5631cf15a585 quick_xml::events::attributes::IterState::check_for_duplicates [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/events/attributes.rs:1154)",
+        "period": 8797018,
+        "period_share": 0.004005953416567513,
+        "samples": 2
+      },
+      {
+        "key": "0x5631cefa663d litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/index.rs:219)",
+        "period": 8796834,
+        "period_share": 0.004005869627330222,
+        "samples": 2
+      },
+      {
+        "key": "0x7e90e69b2b6b __memcmp_evex_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6] (../sysdeps/x86_64/multiarch/memcmp-evex-movbe.S:136)",
+        "period": 8791085,
+        "period_share": 0.0040032516690411924,
+        "samples": 2
+      },
+      {
+        "key": "0x5631cf157889 alloc::raw_vec::RawVecInner<A>::finish_grow [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:562)",
+        "period": 8782722,
+        "period_share": 0.003999443357131093,
+        "samples": 2
+      },
+      {
+        "key": "0x5631ceefa7af litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::lane_body [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/raw/worksheet/lane.rs:325)",
+        "period": 8760447,
+        "period_share": 0.003989299850279789,
+        "samples": 2
+      },
+      {
+        "key": "0x5631cec47690 __rustc::__rust_alloc [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+        "period": 4414904,
+        "period_share": 0.0020104426025520893,
+        "samples": 1
+      },
+      {
+        "key": "0x7e90e69bc394 __memmove_avx512_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6] (../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:486)",
+        "period": 4414468,
+        "period_share": 0.002010244058489815,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf15a488 quick_xml::events::attributes::IterState::check_for_duplicates [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+        "period": 4413973,
+        "period_share": 0.0020100186472264527,
+        "samples": 1
+      },
+      {
+        "key": "0x7e90e68bd449 malloc [/usr/lib/x86_64-linux-gnu/libc.so.6] (./malloc/malloc.c:3039)",
+        "period": 4413694,
+        "period_share": 0.0020098915972416483,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf159c93 quick_xml::name::NamespaceResolver::push [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs:805)",
+        "period": 4413406,
+        "period_share": 0.0020097604488702376,
+        "samples": 1
+      },
+      {
+        "key": "0x7e90e69bc3af __memmove_avx512_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6] (../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:490)",
+        "period": 4413293,
+        "period_share": 0.0020097089913495105,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf1f953b zlib_rs::inflate::inflate_fast_help_avx2 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/inflate.rs:2142)",
+        "period": 4413119,
+        "period_share": 0.002009629755875116,
+        "samples": 1
+      },
+      {
+        "key": "0x7e90e68bd930 cfree@GLIBC_2.2.5 [/usr/lib/x86_64-linux-gnu/libc.so.6] (./malloc/malloc.c:3319)",
+        "period": 4412884,
+        "period_share": 0.0020095227424470554,
+        "samples": 1
+      },
+      {
+        "key": "0x5631ceea8337 quick_xml::reader::Reader<R>::read_event_impl [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/option.rs:2126)",
+        "period": 4412695,
+        "period_share": 0.002009436676328317,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf157b81 alloc::raw_vec::RawVec<T,A>::grow_one [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:527)",
+        "period": 4412533,
+        "period_share": 0.0020093629053693986,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf151f4c memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/../../stdarch/crates/core_arch/src/x86/avx2.rs:2163)",
+        "period": 4412489,
+        "period_share": 0.0020093428688126554,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf15dbe0 quick_xml::reader::state::ReaderState::emit_end [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/reader/state.rs:193)",
+        "period": 4412124,
+        "period_share": 0.0020091766564669434,
+        "samples": 1
+      },
+      {
+        "key": "0x5631ceea8b03 quick_xml::reader::Reader<R>::read_event_impl [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/const_ptr.rs:863)",
+        "period": 4412005,
+        "period_share": 0.0020091224666884786,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf151363 memchr::arch::x86_64::avx2::memchr::One::find_raw [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/arch/generic/memchr.rs:1162)",
+        "period": 4411928,
+        "period_share": 0.002009087402714178,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf157796 alloc::raw_vec::RawVecInner<A>::finish_grow [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+        "period": 4411760,
+        "period_share": 0.0020090108994975215,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cefa79bf litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/cell_values/validation.rs:292)",
+        "period": 4411584,
+        "period_share": 0.0020089307532705483,
+        "samples": 1
+      },
+      {
+        "key": "0x7e90e68bad55 _int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6] (./malloc/malloc.c:4147)",
+        "period": 4411360,
+        "period_share": 0.0020088287489816734,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf15dc8a quick_xml::reader::state::ReaderState::emit_end [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/reader/state.rs:224)",
+        "period": 4411329,
+        "period_share": 0.002008814632316695,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf151baf memchr::arch::x86_64::memchr::memchr3_raw::find_avx2 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/arch/x86_64/memchr.rs:86)",
+        "period": 4411254,
+        "period_share": 0.0020087804790949737,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cef17d2e litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::finish [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/raw/worksheet/codec.rs:1521)",
+        "period": 4411169,
+        "period_share": 0.0020087417721103558,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cef1c15d litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::transition [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/raw/worksheet/codec.rs:717)",
+        "period": 4411000,
+        "period_share": 0.00200866481351741,
+        "samples": 1
+      },
+      {
+        "key": "0x5631ceec0558 litchi_xlsx::raw::catalog::WorkbookInfo::parse_processed [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/raw/catalog.rs:166)",
+        "period": 4410872,
+        "period_share": 0.0020086065253523385,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cec628ae <flate2::mem::Decompress as flate2::zio::Ops>::run [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+        "period": 4410459,
+        "period_share": 0.002008418454944725,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cef1dbea litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/raw/worksheet/codec.rs:977)",
+        "period": 4410222,
+        "period_share": 0.0020083105307640847,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cefad284 litchi_xlsx::raw::worksheet::edit::codec::snapshot::facts::FactsBuilder::cell [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+        "period": 4410100,
+        "period_share": 0.002008254974856751,
+        "samples": 1
+      },
+      {
+        "key": "0x5631ceea8098 quick_xml::reader::Reader<R>::read_event_impl [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:978)",
+        "period": 4409929,
+        "period_share": 0.002008177105511226,
+        "samples": 1
+      },
+      {
+        "key": "0x7e90e68bd42f malloc [/usr/lib/x86_64-linux-gnu/libc.so.6] (./malloc/malloc.c:3030)",
+        "period": 4409872,
+        "period_share": 0.0020081511490627176,
+        "samples": 1
+      },
+      {
+        "key": "0x5631ceeeaabb litchi_xlsx::cell_values::validation::scan_attributes [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-opc/src/xml_attributes.rs:237)",
+        "period": 4409823,
+        "period_share": 0.0020081288356245263,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cef1d0d1 litchi_xlsx::raw::namespace::is_spreadsheetml_name [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/raw/namespace.rs:30)",
+        "period": 4409746,
+        "period_share": 0.0020080937716502253,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cec84f0f quick_xml::reader::ns_reader::NsReader<R>::process_event [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:101)",
+        "period": 4409701,
+        "period_share": 0.0020080732797171925,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cec8328b <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next.1763 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:700)",
+        "period": 4409670,
+        "period_share": 0.002008059163052214,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf1f9354 zlib_rs::inflate::inflate_fast_help_avx2 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/inflate.rs:1979)",
+        "period": 4409409,
+        "period_share": 0.002007940309840623,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cec84eff quick_xml::reader::ns_reader::NsReader<R>::process_event [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+        "period": 4409256,
+        "period_share": 0.002007870637268311,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cec83239 <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next.1763 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:698)",
+        "period": 4409172,
+        "period_share": 0.002007832385659983,
+        "samples": 1
+      },
+      {
+        "key": "0x7e90e68bd423 malloc [/usr/lib/x86_64-linux-gnu/libc.so.6] (./malloc/malloc.c:3293)",
+        "period": 4408943,
+        "period_share": 0.00200772810448966,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cefa6d43 litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/raw/worksheet/codec.rs:1666)",
+        "period": 4408940,
+        "period_share": 0.002007726738360791,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cefaa6f4 litchi_xlsx::raw::worksheet::edit::codec::snapshot::facts::FactsBuilder::element [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/raw/worksheet/edit/codec/snapshot/facts.rs:288)",
+        "period": 4408931,
+        "period_share": 0.0020077226399741843,
+        "samples": 1
+      },
+      {
+        "key": "0x7e90e68bd3e0 malloc [/usr/lib/x86_64-linux-gnu/libc.so.6] (./malloc/malloc.c:3283)",
+        "period": 4408887,
+        "period_share": 0.002007702603417441,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cef237a2 litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_value [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/raw/worksheet/codec.rs:1378)",
+        "period": 4408881,
+        "period_share": 0.0020076998711597033,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cef21d5a litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/raw/worksheet/codec.rs:241)",
+        "period": 4408874,
+        "period_share": 0.002007696683525676,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cef1d031 litchi_xlsx::raw::namespace::is_spreadsheetml_name [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/raw/namespace.rs:18)",
+        "period": 4408829,
+        "period_share": 0.002007676191592643,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cef1c4b7 litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::transition [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:2997)",
+        "period": 4408791,
+        "period_share": 0.0020076588872936373,
+        "samples": 1
+      },
+      {
+        "key": "0x5631ceeeac43 litchi_xlsx::cell_values::validation::scan_attributes [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-opc/src/xml_attributes.rs:237)",
+        "period": 4408703,
+        "period_share": 0.002007618814180151,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf15a5a5 quick_xml::events::attributes::IterState::check_for_duplicates [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:612)",
+        "period": 4408636,
+        "period_share": 0.0020075883039687463,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cec83246 <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next.1763 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:698)",
+        "period": 4408607,
+        "period_share": 0.002007575098056347,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cef23ea7 litchi_xlsx::raw::worksheet::codec::decode_cell_attribute [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+        "period": 4408183,
+        "period_share": 0.002007382018509548,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cec83227 <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next.1763 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:697)",
+        "period": 4408122,
+        "period_share": 0.002007354240555881,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf151368 memchr::arch::x86_64::avx2::memchr::One::find_raw [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/arch/generic/memchr.rs:1161)",
+        "period": 4408045,
+        "period_share": 0.00200731917658158,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf15a002 quick_xml::events::attributes::IterState::next [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+        "period": 4407984,
+        "period_share": 0.0020072913986279133,
+        "samples": 1
+      },
+      {
+        "key": "0x5631ceca2542 hashbrown::raw::RawTable<T,A>::reserve_rehash [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+        "period": 4407963,
+        "period_share": 0.0020072818357258315,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf159f8a quick_xml::events::attributes::IterState::next [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/events/attributes.rs:1222)",
+        "period": 4407886,
+        "period_share": 0.0020072467717515306,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf151b97 memchr::arch::x86_64::memchr::memchr3_raw::find_avx2 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/arch/x86_64/avx2/memchr.rs:940)",
+        "period": 4407866,
+        "period_share": 0.002007237664225738,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cec55793 core::str::converts::from_utf8 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (library/core/src/str/validations.rs:165)",
+        "period": 4407770,
+        "period_share": 0.0020071939481019346,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cec84e32 quick_xml::reader::ns_reader::NsReader<R>::process_event [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:81)",
+        "period": 4407730,
+        "period_share": 0.00200717573305035,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cefa7b2f litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/raw/worksheet/codec.rs:1699)",
+        "period": 4407646,
+        "period_share": 0.0020071374814420216,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cef226cf litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/raw/worksheet/codec.rs:1313)",
+        "period": 4407610,
+        "period_share": 0.002007121087895595,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf15a494 quick_xml::events::attributes::IterState::check_for_duplicates [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+        "period": 4407536,
+        "period_share": 0.0020070873900501635,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cec557a6 core::str::converts::from_utf8 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (library/core/src/str/validations.rs:245)",
+        "period": 4407532,
+        "period_share": 0.002007085568545005,
+        "samples": 1
+      },
+      {
+        "key": "0x7e90e69b2b86 __memcmp_evex_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6] (../sysdeps/x86_64/multiarch/memcmp-evex-movbe.S:166)",
+        "period": 4407387,
+        "period_share": 0.0020070195389830098,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf15a0bf quick_xml::events::attributes::IterState::next [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/events/attributes.rs:1287)",
+        "period": 4407283,
+        "period_share": 0.0020069721798488893,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cefad477 litchi_xlsx::raw::worksheet::edit::codec::snapshot::facts::FactsBuilder::cell [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/raw/worksheet/edit/codec/snapshot/facts.rs:432)",
+        "period": 4407098,
+        "period_share": 0.0020068879352353095,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf15a598 quick_xml::events::attributes::IterState::check_for_duplicates [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1029)",
+        "period": 4407015,
+        "period_share": 0.002006850139003271,
+        "samples": 1
+      },
+      {
+        "key": "0x5631ceea887d quick_xml::reader::Reader<R>::read_event_impl [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/parser/element.rs:59)",
+        "period": 4407007,
+        "period_share": 0.002006846495992954,
+        "samples": 1
+      },
+      {
+        "key": "0x5631ceeeaa9d litchi_xlsx::cell_values::validation::scan_attributes [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-opc/src/xml_attributes.rs:235)",
+        "period": 4406910,
+        "period_share": 0.0020068023244928608,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf1521e9 memchr::arch::x86_64::memchr::count_raw::find_avx2 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/arch/generic/memchr.rs:1213)",
+        "period": 4406786,
+        "period_share": 0.002006745857832948,
+        "samples": 1
+      },
+      {
+        "key": "0x7e90e69b2e17 __memcmp_evex_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6] (../sysdeps/x86_64/multiarch/memcmp-evex-movbe.S:457)",
+        "period": 4406612,
+        "period_share": 0.002006666622358554,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf151953 memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/../../stdarch/crates/core_arch/src/x86/avx2.rs:699)",
+        "period": 4406292,
+        "period_share": 0.002006520901945875,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cefa7c92 litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1034)",
+        "period": 4406221,
+        "period_share": 0.002006488570229312,
+        "samples": 1
+      },
+      {
+        "key": "0x7e90e68bd3e4 malloc [/usr/lib/x86_64-linux-gnu/libc.so.6] (./malloc/malloc.c:1269)",
+        "period": 4406205,
+        "period_share": 0.002006481284208678,
+        "samples": 1
+      },
+      {
+        "key": "0x5631ceea81a8 quick_xml::reader::Reader<R>::read_event_impl [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:263)",
+        "period": 4406173,
+        "period_share": 0.0020064667121674103,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cec857ef core::ptr::drop_in_place<litchi_opc::xml_attributes::Phase> [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs:805)",
+        "period": 4406164,
+        "period_share": 0.0020064626137808036,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf15dd2d quick_xml::reader::state::ReaderState::emit_end [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:2791)",
+        "period": 4406064,
+        "period_share": 0.0020064170761518413,
+        "samples": 1
+      },
+      {
+        "key": "0x7e90e68bc191 __libc_malloc2 [/usr/lib/x86_64-linux-gnu/libc.so.6] (./malloc/malloc.c:3247)",
+        "period": 4406030,
+        "period_share": 0.0020064015933579944,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf15a451 quick_xml::events::attributes::IterState::check_for_duplicates [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/events/attributes.rs:1135)",
+        "period": 4405988,
+        "period_share": 0.0020063824675538304,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf15dc76 quick_xml::reader::state::ReaderState::emit_end [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:2795)",
+        "period": 4405987,
+        "period_share": 0.002006382012177541,
+        "samples": 1
+      },
+      {
+        "key": "0x5631ceea80ac quick_xml::reader::Reader<R>::read_event_impl [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:263)",
+        "period": 4405624,
+        "period_share": 0.0020062167105844085,
+        "samples": 1
+      },
+      {
+        "key": "0x5631ceea881f quick_xml::reader::Reader<R>::read_event_impl [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+        "period": 4405609,
+        "period_share": 0.002006209879940064,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf151180 memchr::arch::x86_64::memchr::memchr_raw::find_avx2 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/arch/x86_64/memchr.rs:85)",
+        "period": 4405577,
+        "period_share": 0.002006195307898796,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf151337 memchr::arch::x86_64::avx2::memchr::One::find_raw [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/arch/x86_64/avx2/memchr.rs:184)",
+        "period": 4405528,
+        "period_share": 0.0020061729944606047,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf159cda quick_xml::name::NamespaceResolver::push [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/name.rs:729)",
+        "period": 4405450,
+        "period_share": 0.002006137475110014,
+        "samples": 1
+      },
+      {
+        "key": "0x7e90e69bc29d __memmove_avx512_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6] (../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:396)",
+        "period": 4405446,
+        "period_share": 0.0020061356536048556,
+        "samples": 1
+      },
+      {
+        "key": "0x7e90e68bd428 malloc [/usr/lib/x86_64-linux-gnu/libc.so.6] (./malloc/malloc.c:3293)",
+        "period": 4405305,
+        "period_share": 0.0020060714455480194,
+        "samples": 1
+      },
+      {
+        "key": "0x5631ceeeaa76 litchi_xlsx::cell_values::validation::scan_attributes [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-opc/src/xml_attributes.rs:231)",
+        "period": 4405231,
+        "period_share": 0.0020060377477025874,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf157b6f alloc::raw_vec::RawVec<T,A>::grow_one [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/cmp.rs:1037)",
+        "period": 4405159,
+        "period_share": 0.0020060049606097346,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf15a325 quick_xml::events::attributes::IterState::next [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/non_null.rs:1720)",
+        "period": 4404963,
+        "period_share": 0.002005915706856969,
+        "samples": 1
+      },
+      {
+        "key": "0x5631ceee8444 litchi_xlsx::cell_values::validation::validate_xml [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2174)",
+        "period": 4404940,
+        "period_share": 0.002005905233202308,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf157ba0 alloc::raw_vec::RawVec<T,A>::grow_one [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:189)",
+        "period": 4404887,
+        "period_share": 0.002005881098258958,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf1577c2 alloc::raw_vec::RawVecInner<A>::finish_grow [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:632)",
+        "period": 4404768,
+        "period_share": 0.0020058269084804927,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cee70571 litchi_xlsx::cell_values::source::MultiSourceEdit::apply_batch [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2173)",
+        "period": 4404601,
+        "period_share": 0.002005750860640126,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cef00b8f litchi_xlsx::cell::Store::from_unsorted [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/cmp.rs:1076)",
+        "period": 4404512,
+        "period_share": 0.00200571033215035,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cefaa885 litchi_xlsx::raw::worksheet::edit::codec::snapshot::facts::FactsBuilder::element [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/raw/worksheet/edit/codec/snapshot/facts.rs:260)",
+        "period": 4404511,
+        "period_share": 0.0020057098767740605,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf15a550 quick_xml::events::attributes::IterState::check_for_duplicates [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1028)",
+        "period": 4404445,
+        "period_share": 0.0020056798219389455,
+        "samples": 1
+      },
+      {
+        "key": "0x5631ceea81b0 quick_xml::reader::Reader<R>::read_event_impl [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:263)",
+        "period": 4404317,
+        "period_share": 0.002005621533773874,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf15dd06 quick_xml::reader::state::ReaderState::emit_end [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1773)",
+        "period": 4404091,
+        "period_share": 0.0020055186187324194,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf15a582 quick_xml::events::attributes::IterState::check_for_duplicates [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/events/attributes.rs:1153)",
+        "period": 4404055,
+        "period_share": 0.0020055022251859933,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cec557b7 core::str::converts::from_utf8 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (library/core/src/str/validations.rs:224)",
+        "period": 4403870,
+        "period_share": 0.0020054179805724134,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cef1c167 litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::transition [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+        "period": 4403859,
+        "period_share": 0.0020054129714332275,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf15a074 quick_xml::events::attributes::IterState::next [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/events/attributes.rs:1360)",
+        "period": 4403856,
+        "period_share": 0.0020054116053043586,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf15df80 quick_xml::reader::state::ReaderState::emit_start [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/reader/state.rs:312)",
+        "period": 4403788,
+        "period_share": 0.0020053806397166644,
+        "samples": 1
+      },
+      {
+        "key": "0x5631ceea87ba quick_xml::reader::Reader<R>::read_event_impl [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/parser/element.rs:59)",
+        "period": 4403783,
+        "period_share": 0.0020053783628352162,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf153ded memchr::arch::x86_64::avx2::packedpair::Finder::find_prefilter_impl [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/arch/generic/packedpair.rs:192)",
+        "period": 4403597,
+        "period_share": 0.0020052936628453468,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cef00215 litchi_xlsx::raw::worksheet::semantic::materialize [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/raw/worksheet/semantic.rs:130)",
+        "period": 4403412,
+        "period_share": 0.002005209418231767,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cec55789 core::str::converts::from_utf8 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (library/core/src/str/validations.rs:145)",
+        "period": 4403299,
+        "period_share": 0.00200515796071104,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cef21e58 litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/raw/worksheet/codec.rs:241)",
+        "period": 4403257,
+        "period_share": 0.002005138834906876,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf15a55a quick_xml::events::attributes::IterState::check_for_duplicates [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+        "period": 4403226,
+        "period_share": 0.0020051247182418974,
+        "samples": 1
+      },
+      {
+        "key": "0x7e90e68bd43f malloc [/usr/lib/x86_64-linux-gnu/libc.so.6] (./malloc/malloc.c:3034)",
+        "period": 4403127,
+        "period_share": 0.002005079635989225,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cec8330f <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next.1763 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:703)",
+        "period": 4403025,
+        "period_share": 0.002005033187607684,
+        "samples": 1
+      },
+      {
+        "key": "0x5631ceea8948 quick_xml::reader::Reader<R>::read_event_impl [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:983)",
+        "period": 4402978,
+        "period_share": 0.0020050117849220715,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cec83235 <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next.1763 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:698)",
+        "period": 4402822,
+        "period_share": 0.002004940746220891,
+        "samples": 1
+      },
+      {
+        "key": "0x5631ceee8464 litchi_xlsx::cell_values::validation::validate_xml [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/cell_values/validation.rs:337)",
+        "period": 4402735,
+        "period_share": 0.0020049011284836936,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf151657 memchr::arch::x86_64::memchr::memchr2_raw::find_avx2 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/arch/x86_64/memchr.rs:86)",
+        "period": 4402478,
+        "period_share": 0.0020047840967772615,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cec557c7 core::str::converts::from_utf8 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (library/core/src/str/validations.rs:241)",
+        "period": 4402413,
+        "period_share": 0.002004754497318436,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cef1a8ce litchi_xlsx::raw::worksheet::validation::optional_u32 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+        "period": 4401056,
+        "period_share": 0.0020041365516934207,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cefa7ad6 litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/raw/worksheet/edit/codec/snapshot/facts.rs:181)",
+        "period": 4401022,
+        "period_share": 0.0020041210688995733,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cef22b27 litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/raw/worksheet/codec.rs:1324)",
+        "period": 4400783,
+        "period_share": 0.002004012233966354,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cee6cbd3 <litchi_xlsx::cell_values::snapshot::PartState as core::clone::Clone>::clone [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/sync/atomic.rs:3923)",
+        "period": 4400604,
+        "period_share": 0.002003930721610512,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf151603 memchr::arch::x86_64::memchr::memchr2_raw::find_avx2 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/../../stdarch/crates/core_arch/src/simd.rs:56)",
+        "period": 4400560,
+        "period_share": 0.0020039106850537687,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cec84e11 quick_xml::reader::ns_reader::NsReader<R>::process_event [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:80)",
+        "period": 4400063,
+        "period_share": 0.002003684363037827,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cef237a3 litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_value [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/raw/worksheet/codec.rs:1378)",
+        "period": 4400038,
+        "period_share": 0.0020036729786305865,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cec83282 <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next.1763 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+        "period": 4400016,
+        "period_share": 0.0020036629603522147,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cef3cbe7 <litchi_xlsx::cell_values::snapshot::Snapshot as core::clone::Clone>::clone.5069 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/sync.rs:2405)",
+        "period": 4399999,
+        "period_share": 0.0020036552189552914,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf15a257 quick_xml::events::attributes::IterState::next [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+        "period": 4399767,
+        "period_share": 0.002003549571656099,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cef2371b litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_value [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/option.rs:767)",
+        "period": 4399615,
+        "period_share": 0.002003480354460077,
+        "samples": 1
+      },
+      {
+        "key": "0x5631ceee849a litchi_xlsx::cell_values::validation::validate_xml [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/cell_values/validation.rs:342)",
+        "period": 4398452,
+        "period_share": 0.002002950751835248,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf15116e memchr::arch::x86_64::memchr::memchr_raw::find_avx2 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/arch/x86_64/avx2/memchr.rs:70)",
+        "period": 4398339,
+        "period_share": 0.0020028992943145205,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf15194a memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/arch/generic/memchr.rs:676)",
+        "period": 4398321,
+        "period_share": 0.0020028910975413076,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cec8323d <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next.1763 [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:698)",
+        "period": 4398227,
+        "period_share": 0.002002848292170083,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf15e088 quick_xml::reader::state::ReaderState::emit_start [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+        "period": 4398061,
+        "period_share": 0.002002772699706006,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cec84e2b quick_xml::reader::ns_reader::NsReader<R>::process_event [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:81)",
+        "period": 4397785,
+        "period_share": 0.0020026470158500706,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cef1c148 litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::transition [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/raw/worksheet/codec.rs:717)",
+        "period": 4397638,
+        "period_share": 0.0020025800755354966,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf15dedd quick_xml::reader::state::ReaderState::emit_end [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/reader/state.rs:254)",
+        "period": 4397019,
+        "period_share": 0.0020022981976122213,
+        "samples": 1
+      },
+      {
+        "key": "0x7e90e68bd994 cfree@GLIBC_2.2.5 [/usr/lib/x86_64-linux-gnu/libc.so.6] (./malloc/malloc.c:3353)",
+        "period": 4396824,
+        "period_share": 0.002002209399235745,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf15df9d quick_xml::reader::state::ReaderState::emit_start [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+        "period": 4396256,
+        "period_share": 0.0020019507455032405,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf159891 quick_xml::name::NamespaceResolver::push [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/name.rs:708)",
+        "period": 4395818,
+        "period_share": 0.0020017512906883865,
+        "samples": 1
+      },
+      {
+        "key": "0x7e90e69bc1ec __memmove_avx512_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6] (../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:319)",
+        "period": 4395780,
+        "period_share": 0.002001733986389381,
+        "samples": 1
+      },
+      {
+        "key": "0x5631ceea8aff quick_xml::reader::Reader<R>::read_event_impl [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/slice_reader.rs:345)",
+        "period": 4393277,
+        "period_share": 0.00200059417953646,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cef23722 litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_value [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/option.rs:767)",
+        "period": 4391726,
+        "period_share": 0.001999887890911258,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf158bbc <quick_xml::name::NamespaceResolver as core::default::Default>::default [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (src/name.rs:588)",
+        "period": 4391330,
+        "period_share": 0.0019997075619005685,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cef1835c litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::finish [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/count.rs:28)",
+        "period": 4390168,
+        "period_share": 0.001999178414652029,
+        "samples": 1
+      },
+      {
+        "key": "0x7e90e69bc180 __memmove_avx512_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6] (../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:255)",
+        "period": 4389919,
+        "period_share": 0.0019990650259559136,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf157b87 alloc::raw_vec::RawVec<T,A>::grow_one [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:527)",
+        "period": 4389907,
+        "period_share": 0.001999059561440438,
+        "samples": 1
+      },
+      {
+        "key": "0x7e90e68bc293 __libc_malloc2 [/usr/lib/x86_64-linux-gnu/libc.so.6] (./malloc/malloc.c:3279)",
+        "period": 4382690,
+        "period_share": 0.0019957731107582448,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf15dca3 quick_xml::reader::state::ReaderState::emit_end [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/index.rs:89)",
+        "period": 4378563,
+        "period_share": 0.0019938937728109793,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf15e04e quick_xml::reader::state::ReaderState::emit_start [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:2881)",
+        "period": 4376214,
+        "period_share": 0.00199282409390666,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf15a5a1 quick_xml::events::attributes::IterState::check_for_duplicates [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:612)",
+        "period": 4362381,
+        "period_share": 0.0019865248736923354,
+        "samples": 1
+      },
+      {
+        "key": "0x5631ceea8785 quick_xml::reader::Reader<R>::read_event_impl [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/const_ptr.rs:619)",
+        "period": 4352736,
+        "period_share": 0.0019821327693789427,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf1f866b zlib_rs::inflate::inftrees::inflate_table [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/non_null.rs:1720)",
+        "period": 4346638,
+        "period_share": 0.001979355884764835,
+        "samples": 1
+      },
+      {
+        "key": "0x5631cf15c769 quick_xml::events::attributes::Attribute::decoded_and_normalized_value [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1]",
+        "period": 4334906,
+        "period_share": 0.001974013410135004,
+        "samples": 1
+      },
+      {
+        "key": "0x5631ceeea7ce litchi_xlsx::cell_values::validation::bind_dialect [/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1] (/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/cmp.rs:154)",
+        "period": 4044651,
+        "period_share": 0.0018418381651911142,
+        "samples": 1
+      }
+    ],
+    "scope": "deepest physical frame only; sampled period is charged once and callee frames are excluded"
+  },
+  "qualification_replay": {
+    "classification": {
+      "empty_frames": {
+        "period": 4386923,
+        "period_share": 5.870764770787347e-05,
+        "samples": 1
+      },
+      "no_phase_marker": {
+        "period": 71077348495,
+        "period_share": 0.9511869562001,
+        "samples": 16598
+      },
+      "qualified": {
+        "period": 2195986095,
+        "period_share": 0.02938760904548559,
+        "samples": 499
+      },
+      "unknown_frames": {
+        "period": 49919730,
+        "period_share": 0.0006680468115150785,
+        "samples": 12
+      },
+      "unqualified_phase": {
+        "period": 1397256982,
+        "period_share": 0.01869868029519153,
+        "samples": 318
+      }
+    },
+    "inline_parser": {
+      "frames": 666492,
+      "headers": 17428,
+      "source_locations": 666478
+    },
+    "physical_parser": {
+      "build_id_lines": 34818,
+      "frames": 267337,
+      "headers": 17428,
+      "source_locations": 232505
+    }
+  },
+  "schema": "litchi.performance.0962.rewrite-boundaries.v1",
+  "selected_qualified": {
+    "period": 2195986095,
+    "period_share": 1.0,
+    "samples": 499
+  },
+  "status": "passed",
+  "validate_xml": {
+    "any_selected": {
+      "period": 690550198,
+      "period_share": 0.31446018696215833,
+      "samples": 157
+    },
+    "exact_symbol": "litchi_xlsx::cell_values::validation::validate_xml",
+    "nested_subset_pass": true,
+    "nested_under_rewritten": {
+      "period": 681750165,
+      "period_share": 0.31045286058607763,
+      "samples": 155
+    }
+  }
+}

@@ -1,0 +1,258 @@
+{
+  "buildid_export": {
+    "command": [
+      "/usr/bin/perf",
+      "buildid-list",
+      "-i",
+      "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/perf.data"
+    ],
+    "lines": [
+      "7eb92ba2f0f8f3b248b77d8691e27b80b114fb22 /home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+      "6dbcc212bd69ba855952520ce65be161ee87e5ed /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+      "4ec69afdf3da96ce7388640dcd27c6d0c1b256ef /usr/lib/x86_64-linux-gnu/libc.so.6"
+    ],
+    "returncode": 0,
+    "returncode_receipt": {
+      "bytes": 2,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-buildid-list.rc",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    "stderr": {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-buildid-list.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout": {
+      "bytes": 302,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-buildid-list.txt",
+      "sha256": "7e99759e8f3a15e98ac9591d3c245672750b895d956529400409e8ddff62336b"
+    },
+    "target_count": 1,
+    "target_lines": [
+      "7eb92ba2f0f8f3b248b77d8691e27b80b114fb22 /home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1"
+    ]
+  },
+  "capture_start": {
+    "binary": {
+      "bytes": 104819848,
+      "path": "/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+      "sha256": "843ae35a0f5131a8cba965f917b2a4c5fccb6926ae3d66862e5f78512820fb33"
+    },
+    "command": [
+      "/usr/bin/taskset",
+      "--cpu-list",
+      "12-15",
+      "/usr/bin/perf",
+      "record",
+      "-e",
+      "cycles:u",
+      "-F",
+      "997",
+      "--call-graph",
+      "fp",
+      "--period",
+      "--timestamp",
+      "--sample-cpu",
+      "--buildid-all",
+      "--no-buildid-cache",
+      "--strict-freq",
+      "--user-callchains",
+      "-o",
+      "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/perf.data",
+      "--",
+      "/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+      "--shape",
+      "medium",
+      "--workload",
+      "one-edit",
+      "--workers",
+      "1",
+      "--warmup",
+      "0",
+      "--samples",
+      "200",
+      "--output",
+      "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/output"
+    ],
+    "helper": {
+      "bytes": 5420,
+      "path": "/home/zhuhe/litchi-performance-0962/tools/capture_fp_v1.py",
+      "sha256": "7a71f067f292c346569c3c1f2eaadd5a4847736dd6e973258dd8d673f8bdda34"
+    },
+    "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/start.json",
+    "plan": {
+      "bytes": 5028,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-plan-v1.json",
+      "sha256": "b4494abbe8da21ca7e54a4f022b92bb13b4700e09d5ff4a42b8772d213fa5bea"
+    },
+    "utc": "2026-10-07T20:14:08.879072+00:00"
+  },
+  "child": "03-medium-one-edit",
+  "correction": {
+    "corrected_at_utc": "2026-10-07T20:27:00Z",
+    "reason": "v2 mapping target_pid_tid_pairs was empty because its diagnostic regex was over-escaped; v3 parses the sealed MMAP2 line token directly. CPU counts and all exports are unchanged."
+  },
+  "cpu_check": {
+    "command": [
+      "/usr/bin/perf",
+      "script",
+      "--show-lost-events",
+      "--no-inline",
+      "-F",
+      "cpu,pid,tid,time,event,period,ip,sym,symoff,dso",
+      "-i",
+      "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/perf.data"
+    ],
+    "cpu_counts": {
+      "15": 17409
+    },
+    "event_counts": {
+      "cycles:u": 17409
+    },
+    "lost_record_lines": 0,
+    "parser": "split sample header: pid/tid [cpu] timestamp: period event:",
+    "period_sum": 74690580281,
+    "pid_counts": {
+      "3194037": 17409
+    },
+    "returncode": 0,
+    "sample_count": 17409,
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tid_counts": {
+      "3194037": 17409
+    }
+  },
+  "generated_utc": "2026-10-07T20:19:59.826277+00:00",
+  "header_export": {
+    "command": [
+      "/usr/bin/perf",
+      "report",
+      "--header-only",
+      "--stdio",
+      "-i",
+      "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/perf.data"
+    ],
+    "returncode": 0,
+    "returncode_receipt": {
+      "bytes": 2,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-header.rc",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    "selected_lines": [
+      "# perf version : 7.0.14",
+      "# arch : x86_64",
+      "# nrcpus online : 32",
+      "# event : name = cycles:u, , id = { 2740, 2741, 2742, 2743, 2744, 2745, 2746, 2747, 2748, 2749, 2750, 2751, 2752, 2753, 2754, 2755, 2756, 2757, 2758, 2759, 2760, 2761, 2762, 2763, 2764, 2765, 2766, 2767, 2768, 2769, 2770, 2771 }, type = 0 (PERF_TYPE_HARDWARE), size = 144, config = 0 (PERF_COUNT_HW_CPU_CYCLES), { sample_period, sample_freq } = 997, sample_type = IP|TID|TIME|CALLCHAIN|CPU|PERIOD, read_format = ID|LOST, disabled = 1, inherit = 1, exclude_kernel = 1, exclude_hv = 1, mmap = 1, comm = 1, freq = 1, enable_on_exec = 1, task = 1, sample_id_all = 1, exclude_callchain_kernel = 1, mmap2 = 1, comm_exec = 1, ksymbol = 1, bpf_event = 1, build_id = 1"
+    ],
+    "stderr": {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-header.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout": {
+      "bytes": 1819,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-header.txt",
+      "sha256": "02b36eda0ba1004b9ac15c385b0b4605091444b32eadc7c6ce6978099e307186"
+    }
+  },
+  "index": 3,
+  "mapping_export": {
+    "comm_lines": 2,
+    "command": [
+      "/usr/bin/perf",
+      "script",
+      "--debug-mode",
+      "--show-mmap-events",
+      "--show-task-events",
+      "--show-lost-events",
+      "--hide-call-graph",
+      "-i",
+      "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/perf.data"
+    ],
+    "exit_lines": 1,
+    "mapping_lines": 5,
+    "misordered_timestamp_lines": [
+      "Misordered timestamps: 0"
+    ],
+    "returncode": 0,
+    "returncode_receipt": {
+      "bytes": 2,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-mapping.rc",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    "stderr": {
+      "bytes": 25,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-mapping.stderr",
+      "sha256": "d760457f9a459836db8c86aa1e430280f8b3c8762575616f72e4aee52e767536"
+    },
+    "stdout": {
+      "bytes": 1305,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-mapping-events.txt",
+      "sha256": "1049e74a27c646d0d4cda341a43953b085ea9a53c33ea96ff1de91b06fbcdb69"
+    },
+    "target_mapping_count": 1,
+    "target_mapping_lines": [
+      " xlsx_managed_co 3194037 [015] 269726.867181: PERF_RECORD_MMAP2 3194037/3194037: [0x645cdc1a7000(0x5b8000) @ 0x12a000 <7eb92ba2f0f8f3b248b77d8691e27b80b114fb22>]: r-xp /home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1"
+    ],
+    "target_pid_tid_pairs": [
+      {
+        "pid": 3194037,
+        "tid": 3194037
+      }
+    ]
+  },
+  "perf_data": {
+    "bytes": 3295360,
+    "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/perf.data",
+    "sha256": "a79e275db70d00f09f54abea1ecc9009b86edbd5864829ccd646b5a20eb166ae"
+  },
+  "schema": "litchi.performance.0962.fp-wave-child-metadata.v3",
+  "source_receipts": {
+    "launch.json": {
+      "bytes": 94,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/launch.json",
+      "sha256": "21491c6c43eff0efc06d66e9caad2c61d1477a8297a1ee10ccb41c0ca1d321d4"
+    },
+    "report.json": {
+      "bytes": 154850,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/output/report.json",
+      "sha256": "f58d768798338ac2319939808188c0234960e95a4b6be2ead4cd9c1c96835c0c"
+    },
+    "start.json": {
+      "bytes": 1620,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/start.json",
+      "sha256": "e80432b80a8c2c2321f7c71d7767a06400c3e7a6cd2ba5f498eacb6e55a2200a"
+    },
+    "terminal.json": {
+      "bytes": 188,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/terminal.json",
+      "sha256": "f0327c35b0c46849a50152964b0ac5772e6749c148c6483b337ff9c4a5db014f"
+    },
+    "validation.json": {
+      "bytes": 860,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/validation.json",
+      "sha256": "813a248f6073f91dda89a97018266458ebce52df42f6ac989684b82d13c5631f"
+    }
+  },
+  "supersedes": {
+    "bytes": 9521,
+    "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-v1-03-metadata-v2.json",
+    "sha256": "fb7ca3d020a2a84507fabf1747acd8a4715a9eb98128005c4a7cfcdb5676a0e2"
+  },
+  "terminal": {
+    "failure": null,
+    "pid": 3194036,
+    "process_group_clear": true,
+    "returncode": 0,
+    "terminal_before_parse": true,
+    "timeout": false,
+    "utc": "2026-10-07T20:14:26.524004+00:00"
+  },
+  "validation": {
+    "binary_unchanged": true,
+    "oracles": "source/output/semantic hashes; preflight inverse; per-row fixture inverse, phase conservation, sink bounds and resource drain",
+    "samples": 200,
+    "status": "passed"
+  }
+}

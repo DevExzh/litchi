@@ -1,0 +1,31 @@
+{
+  "marker_periods": {
+    "both": 12886698,
+    "multi_commit": 0,
+    "publish_multi_commit": 0,
+    "stage_timed_commit": 12886698,
+    "timed_iteration": 39247401
+  },
+  "marker_sample_counts": {
+    "both": 3,
+    "multi_commit": 0,
+    "publish_multi_commit": 0,
+    "stage_timed_commit": 3,
+    "timed_iteration": 9
+  },
+  "marker_weighted_percent": {
+    "both": 0.013947,
+    "multi_commit": 0.0,
+    "publish_multi_commit": 0.0,
+    "stage_timed_commit": 0.013947,
+    "timed_iteration": 0.042477
+  },
+  "max_stack_lines": 30,
+  "perf_script_rc": 0,
+  "samples": 21487,
+  "samples_with_ellipsis": 0,
+  "samples_with_unknown": 14298,
+  "stack_capture_bytes": 65528,
+  "stack_lines_p95": 10,
+  "total_event_period": 92397431987
+}

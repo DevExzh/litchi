@@ -1,0 +1,1519 @@
+
+/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+000000000039fb40 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x5f0>:
+  39fb40:	mov    $0x28,%edi
+  39fb45:	call   *0x37a815(%rip)        # 71a360 <malloc@GLIBC_2.2.5>
+  39fb4b:	test   %rax,%rax
+  39fb4e:	jne    39f699 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x149>
+  39fb54:	mov    $0x8,%edi
+  39fb59:	mov    $0x28,%esi
+  39fb5e:	call   1471d2 <alloc::alloc::handle_alloc_error>
+  39fb63:	jmp    3a3858 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x4308>
+  39fb68:	call   6d2350 <<std::sys::pal::unix::time::Timespec>::now>
+  39fb6d:	mov    %rax,0x50(%rsp)
+  39fb72:	mov    %edx,0x12c(%rsp)
+  39fb79:	mov    0x8(%r15),%r14
+  39fb7d:	mov    0x10(%r15),%rbx
+  39fb81:	lea    0x498(%rsp),%rdi
+  39fb89:	mov    %r14,%rsi
+  39fb8c:	mov    %rbx,%rdx
+  39fb8f:	call   373150 <litchi_perf_baseline::xlsx_update_sheet_selectors>
+  39fb94:	lea    0xe80(%rsp),%rdi
+  39fb9c:	lea    0x23b0(%rsp),%rsi
+  39fba4:	lea    0x498(%rsp),%rdx
+  39fbac:	call   373550 <litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets>
+  39fbb1:	movzbl 0xe80(%rsp),%eax
+  39fbb9:	cmp    $0x25,%al
+  39fbbb:	jne    39ff18 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x9c8>
+  39fbc1:	mov    %r13,0x48(%rsp)
+  39fbc6:	movdqu 0xe88(%rsp),%xmm0
+  39fbcf:	movdqu 0xe98(%rsp),%xmm1
+  39fbd8:	movups 0xea8(%rsp),%xmm2
+  39fbe0:	movdqa %xmm0,0x500(%rsp)
+  39fbe9:	movdqa %xmm1,0x510(%rsp)
+  39fbf2:	movaps %xmm2,0x520(%rsp)
+  39fbfa:	test   %rbx,%rbx
+  39fbfd:	je     39fd33 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x7e3>
+  39fc03:	lea    (%rbx,%rbx,2),%rax
+  39fc07:	lea    (%r14,%rax,8),%r13
+  39fc0b:	movabs $0x8000000000000036,%r15
+  39fc15:	add    $0xffffffffffffffcb,%r15
+  39fc19:	nopl   0x0(%rax)
+  39fc20:	mov    0x8(%r14),%r12
+  39fc24:	mov    %r12,%rcx
+  39fc27:	shr    $0x20,%rcx
+  39fc2b:	jne    3a00a2 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xb52>
+  39fc31:	mov    0x10(%r14),%rbx
+  39fc35:	mov    %rbx,%rcx
+  39fc38:	shr    $0x20,%rcx
+  39fc3c:	jne    3a00a2 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xb52>
+  39fc42:	cmp    $0xfffff,%r12
+  39fc49:	ja     3a00b9 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xb69>
+  39fc4f:	cmp    $0x4000,%rbx
+  39fc56:	jae    3a00bd <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xb6d>
+  39fc5c:	mov    (%r14),%rbp
+  39fc5f:	mov    %rbp,%rax
+  39fc62:	shr    $0x1f,%rax
+  39fc66:	jne    3a31a3 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x3c53>
+  39fc6c:	imul   $0xf4240,%ebp,%eax
+  39fc72:	imul   $0x3e8,%r12d,%ecx
+  39fc79:	add    %eax,%ecx
+  39fc7b:	lea    (%rbx,%rcx,1),%esi
+  39fc7e:	inc    %esi
+  39fc80:	lea    0x2d0(%rsp),%rdi
+  39fc88:	call   6618b0 <<litchi_xlsx::cell::Value as core::convert::From<i32>>::from>
+  39fc8d:	mov    0x2e0(%rsp),%rax
+  39fc95:	lea    0x1594(%rsp),%rcx
+  39fc9d:	mov    %rax,0x10(%rcx)
+  39fca1:	movups 0x2d0(%rsp),%xmm0
+  39fca9:	movups %xmm0,(%rcx)
+  39fcac:	movdqu 0x1590(%rsp),%xmm0
+  39fcb5:	movdqu 0x159c(%rsp),%xmm1
+  39fcbe:	lea    0x554(%rsp),%rax
+  39fcc6:	movdqu %xmm1,0xc(%rax)
+  39fccb:	movdqu %xmm0,(%rax)
+  39fccf:	mov    %r15,0x530(%rsp)
+  39fcd7:	mov    %rbp,0x538(%rsp)
+  39fcdf:	movl   $0x1,0x548(%rsp)
+  39fcea:	mov    %r12d,0x54c(%rsp)
+  39fcf2:	mov    %ebx,0x550(%rsp)
+  39fcf9:	lea    0xe80(%rsp),%rdi
+  39fd01:	lea    0x500(%rsp),%rsi
+  39fd09:	lea    0x530(%rsp),%rdx
+  39fd11:	call   374670 <litchi_xlsx::cell_values::source::MultiSourceEdit::apply_batch>
+  39fd16:	cmpb   $0x25,0xe80(%rsp)
+  39fd1e:	jne    3a011f <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xbcf>
+  39fd24:	add    $0x18,%r14
+  39fd28:	mov    %ebx,%eax
+  39fd2a:	cmp    %r13,%r14
+  39fd2d:	jne    39fc20 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x6d0>
+  39fd33:	lea    0xe80(%rsp),%rdi
+  39fd3b:	lea    0x500(%rsp),%rsi
+  39fd43:	mov    0x30(%rsp),%r12
+  39fd48:	call   4a3770 <litchi_xlsx::cell_values::source::MultiSourceEdit::commit>
+  39fd4d:	mov    0x48(%rsp),%r13
+  39fd52:	movzbl 0xe80(%rsp),%eax
+  39fd5a:	lea    0xe98(%rsp),%rcx
+  39fd62:	cmp    $0x25,%al
+  39fd64:	jne    3a000a <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xaba>
+  39fd6a:	movdqu 0xeb8(%rsp),%xmm0
+  39fd73:	mov    0xeb8(%rsp),%rax
+  39fd7b:	mov    0xe88(%rsp),%r14
+  39fd83:	mov    0xe90(%rsp),%rbx
+  39fd8b:	movdqu (%rcx),%xmm1
+  39fd8f:	movups 0x10(%rcx),%xmm2
+  39fd93:	movdqa %xmm1,0x1ca0(%rsp)
+  39fd9c:	movaps %xmm2,0x1cb0(%rsp)
+  39fda4:	test   %rax,%rax
+  39fda7:	setne  %cl
+  39fdaa:	mov    $0x1,%r15b
+  39fdad:	test   %r15b,%r15b
+  39fdb0:	je     3a01e3 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xc93>
+  39fdb6:	mov    %cl,0x67(%rsp)
+  39fdba:	mov    %rax,0x480(%rsp)
+  39fdc2:	movdqa 0x1ca0(%rsp),%xmm1
+  39fdcb:	movaps 0x1cb0(%rsp),%xmm2
+  39fdd3:	movups %xmm2,0x450(%rsp)
+  39fddb:	movdqu %xmm1,0x440(%rsp)
+  39fde4:	movdqu %xmm0,0x460(%rsp)
+  39fded:	mov    %r14,0x430(%rsp)
+  39fdf5:	mov    %rbx,0x438(%rsp)
+  39fdfd:	call   6d2350 <<std::sys::pal::unix::time::Timespec>::now>
+  39fe02:	mov    %rax,0x1590(%rsp)
+  39fe0a:	mov    %edx,0x1598(%rsp)
+  39fe11:	mov    0x50(%rsp),%rax
+  39fe16:	mov    %rax,0xe80(%rsp)
+  39fe1e:	mov    0x12c(%rsp),%eax
+  39fe25:	mov    %eax,0xe88(%rsp)
+  39fe2c:	lea    0x530(%rsp),%rdi
+  39fe34:	lea    0x1590(%rsp),%rsi
+  39fe3c:	lea    0xe80(%rsp),%rdx
+  39fe44:	call   6d2280 <<std::sys::pal::unix::time::Timespec>::sub_timespec>
+  39fe49:	mov    $0x3b9aca00,%eax
+  39fe4e:	mulq   0x538(%rsp)
+  39fe56:	mov    0x540(%rsp),%ecx
+  39fe5d:	add    %rcx,%rax
+  39fe60:	adc    $0x0,%rdx
+  39fe64:	xor    %ecx,%ecx
+  39fe66:	cmpb   $0x0,0x530(%rsp)
+  39fe6e:	cmovne %rcx,%rax
+  39fe72:	cmovne %rcx,%rdx
+  39fe76:	test   %rdx,%rdx
+  39fe79:	je     3a0226 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xcd6>
+  39fe7f:	mov    $0x3a,%edi
+  39fe84:	call   *0x37a4d6(%rip)        # 71a360 <malloc@GLIBC_2.2.5>
+  39fe8a:	test   %rax,%rax
+  39fe8d:	mov    0x30(%rsp),%r12
+  39fe92:	je     3a36d1 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x4181>
+  39fe98:	mov    %rax,%r14
+  39fe9b:	movups -0x343e45(%rip),%xmm0        # 5c05d <crc32fast::table::CRC32_TABLE+0x285f1>
+  39fea2:	movups %xmm0,0x2a(%rax)
+  39fea6:	movups -0x343e5a(%rip),%xmm0        # 5c053 <crc32fast::table::CRC32_TABLE+0x285e7>
+  39fead:	movups %xmm0,0x20(%rax)
+  39feb1:	movups -0x343e75(%rip),%xmm0        # 5c043 <crc32fast::table::CRC32_TABLE+0x285d7>
+  39feb8:	movups %xmm0,0x10(%rax)
+  39febc:	movdqu -0x343e91(%rip),%xmm0        # 5c033 <crc32fast::table::CRC32_TABLE+0x285c7>
+  39fec4:	movdqu %xmm0,(%rax)
+  39fec8:	mov    $0x18,%edi
+  39fecd:	call   *0x37a48d(%rip)        # 71a360 <malloc@GLIBC_2.2.5>
+  39fed3:	test   %rax,%rax
+  39fed6:	je     3a0e68 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1918>
+  39fedc:	movq   $0x3a,(%rax)
+  39fee3:	mov    %r14,0x8(%rax)
+  39fee7:	movq   $0x3a,0x10(%rax)
+  39feef:	mov    %rax,0x0(%r13)
+  39fef3:	lea    0x36d096(%rip),%rax        # 70cf90 <__frame_dummy_init_array_entry+0x1e0>
+  39fefa:	mov    %rax,0x8(%r13)
+  39fefe:	movb   $0x2,0xb8(%r13)
+  39ff06:	lea    0x430(%rsp),%rdi
+  39ff0e:	call   343ad0 <core::ptr::drop_in_place<litchi_xlsx::cell_values::patch::MultiCommit>>
+  39ff13:	jmp    3a01f3 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xca3>
+  39ff18:	mov    0xeb0(%rsp),%rcx
+  39ff20:	mov    %rcx,0x15bf(%rsp)
+  39ff28:	movups 0xe81(%rsp),%xmm0
+  39ff30:	movdqu 0xe91(%rsp),%xmm1
+  39ff39:	movups 0xea1(%rsp),%xmm2
+  39ff41:	movaps %xmm2,0x15b0(%rsp)
+  39ff49:	movdqa %xmm1,0x15a0(%rsp)
+  39ff52:	movaps %xmm0,0x1590(%rsp)
+  39ff5a:	movups 0xeb8(%rsp),%xmm2
+  39ff62:	movups %xmm2,0x568(%rsp)
+  39ff6a:	movups %xmm0,0x531(%rsp)
+  39ff72:	movdqu %xmm1,0x541(%rsp)
+  39ff7b:	movdqa 0x15b0(%rsp),%xmm0
+  39ff84:	movdqu %xmm0,0x551(%rsp)
+  39ff8d:	mov    0x15bf(%rsp),%rcx
+  39ff95:	mov    %rcx,0x560(%rsp)
+  39ff9d:	mov    %al,0x530(%rsp)
+  39ffa4:	mov    $0x48,%edi
+  39ffa9:	call   *0x37a3b1(%rip)        # 71a360 <malloc@GLIBC_2.2.5>
+  39ffaf:	test   %rax,%rax
+  39ffb2:	je     3a076c <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x121c>
+  39ffb8:	mov    %rax,%r14
+  39ffbb:	mov    0x570(%rsp),%rax
+  39ffc3:	mov    %rax,0x40(%r14)
+  39ffc7:	movdqu 0x530(%rsp),%xmm0
+  39ffd0:	movdqu 0x540(%rsp),%xmm1
+  39ffd9:	movups 0x550(%rsp),%xmm2
+  39ffe1:	movups 0x560(%rsp),%xmm3
+  39ffe9:	movups %xmm3,0x30(%r14)
+  39ffee:	movups %xmm2,0x20(%r14)
+  39fff3:	movdqu %xmm1,0x10(%r14)
+  39fff9:	movdqu %xmm0,(%r14)
+  39fffe:	lea    0x371753(%rip),%rbx        # 711758 <chrono::format::strftime::D_T_FMT::{{nested}}+0x3c68>
+  3a0005:	jmp    3a01e3 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xc93>
+  3a000a:	mov    0xe81(%rsp),%edx
+  3a0011:	mov    0xe84(%rsp),%esi
+  3a0018:	mov    %esi,0x534(%rsp)
+  3a001f:	mov    %edx,0x531(%rsp)
+  3a0026:	movdqu (%rcx),%xmm0
+  3a002a:	movdqu 0x10(%rcx),%xmm1
+  3a002f:	movdqa %xmm0,0x1590(%rsp)
+  3a0038:	movdqa %xmm1,0x15a0(%rsp)
+  3a0041:	movups 0xeb8(%rsp),%xmm2
+  3a0049:	movups 0xe88(%rsp),%xmm3
+  3a0051:	movups %xmm3,0x538(%rsp)
+  3a0059:	movdqu %xmm1,0x558(%rsp)
+  3a0062:	movdqu %xmm0,0x548(%rsp)
+  3a006b:	mov    %al,0x530(%rsp)
+  3a0072:	movups %xmm2,0x568(%rsp)
+  3a007a:	mov    $0x48,%edi
+  3a007f:	call   *0x37a2db(%rip)        # 71a360 <malloc@GLIBC_2.2.5>
+  3a0085:	test   %rax,%rax
+  3a0088:	jne    39ffb8 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xa68>
+  3a008e:	mov    $0x8,%edi
+  3a0093:	mov    $0x48,%esi
+  3a0098:	call   1471d2 <alloc::alloc::handle_alloc_error>
+  3a009d:	jmp    3a3858 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x4308>
+  3a00a2:	mov    $0x1,%r14d
+  3a00a8:	lea    0x3715b9(%rip),%rbx        # 711668 <chrono::format::strftime::D_T_FMT::{{nested}}+0x3b78>
+  3a00af:	mov    0x30(%rsp),%r12
+  3a00b4:	jmp    3a01d1 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xc81>
+  3a00b9:	xor    %ecx,%ecx
+  3a00bb:	jmp    3a00c5 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xb75>
+  3a00bd:	mov    $0x1,%ecx
+  3a00c2:	mov    %ebx,%r12d
+  3a00c5:	mov    %ecx,0x530(%rsp)
+  3a00cc:	mov    %r12d,0x534(%rsp)
+  3a00d4:	mov    %eax,0x538(%rsp)
+  3a00db:	mov    $0x20,%edi
+  3a00e0:	call   *0x37a27a(%rip)        # 71a360 <malloc@GLIBC_2.2.5>
+  3a00e6:	test   %rax,%rax
+  3a00e9:	mov    0x48(%rsp),%r13
+  3a00ee:	je     3a08e0 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1390>
+  3a00f4:	mov    %rax,%r14
+  3a00f7:	movups 0x530(%rsp),%xmm0
+  3a00ff:	movups 0x540(%rsp),%xmm1
+  3a0107:	movups %xmm1,0x10(%rax)
+  3a010b:	movups %xmm0,(%rax)
+  3a010e:	lea    0x371743(%rip),%rbx        # 711858 <chrono::format::strftime::D_T_FMT::{{nested}}+0x3d68>
+  3a0115:	mov    0x30(%rsp),%r12
+  3a011a:	jmp    3a01d6 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xc86>
+  3a011f:	mov    0xec0(%rsp),%rax
+  3a0127:	mov    %rax,0x570(%rsp)
+  3a012f:	movups 0xe80(%rsp),%xmm0
+  3a0137:	movups 0xe90(%rsp),%xmm1
+  3a013f:	movups 0xea0(%rsp),%xmm2
+  3a0147:	movups 0xeb0(%rsp),%xmm3
+  3a014f:	movaps %xmm3,0x560(%rsp)
+  3a0157:	movaps %xmm2,0x550(%rsp)
+  3a015f:	movaps %xmm1,0x540(%rsp)
+  3a0167:	movaps %xmm0,0x530(%rsp)
+  3a016f:	mov    $0x48,%edi
+  3a0174:	call   *0x37a1e6(%rip)        # 71a360 <malloc@GLIBC_2.2.5>
+  3a017a:	test   %rax,%rax
+  3a017d:	mov    0x30(%rsp),%r12
+  3a0182:	je     3a0cfc <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x17ac>
+  3a0188:	mov    %rax,%r14
+  3a018b:	mov    0x570(%rsp),%rax
+  3a0193:	mov    %rax,0x40(%r14)
+  3a0197:	movaps 0x530(%rsp),%xmm0
+  3a019f:	movaps 0x540(%rsp),%xmm1
+  3a01a7:	movaps 0x550(%rsp),%xmm2
+  3a01af:	movaps 0x560(%rsp),%xmm3
+  3a01b7:	movups %xmm3,0x30(%r14)
+  3a01bc:	movups %xmm2,0x20(%r14)
+  3a01c1:	movups %xmm1,0x10(%r14)
+  3a01c6:	movups %xmm0,(%r14)
+  3a01ca:	lea    0x371587(%rip),%rbx        # 711758 <chrono::format::strftime::D_T_FMT::{{nested}}+0x3c68>
+  3a01d1:	mov    0x48(%rsp),%r13
+  3a01d6:	lea    0x500(%rsp),%rdi
+  3a01de:	call   343b90 <core::ptr::drop_in_place<litchi_xlsx::cell_values::source::MultiSourceEdit>>
+  3a01e3:	mov    %r14,0x0(%r13)
+  3a01e7:	mov    %rbx,0x8(%r13)
+  3a01eb:	movb   $0x2,0xb8(%r13)
+  3a01f3:	lea    0x23b0(%rsp),%rdi
+  3a01fb:	call   32cde0 <core::ptr::drop_in_place<litchi_opc::source_backed::SourceBackedPackage>>
+  3a0200:	lock decq (%r12)
+  3a0205:	jne    3a0214 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xcc4>
+  3a0207:	lea    0x2c8(%rsp),%rdi
+  3a020f:	call   170890 <alloc::sync::Arc<T,A>::drop_slow>
+  3a0214:	add    $0x2ab8,%rsp
+  3a021b:	pop    %rbx
+  3a021c:	pop    %r12
+  3a021e:	pop    %r13
+  3a0220:	pop    %r14
+  3a0222:	pop    %r15
+  3a0224:	pop    %rbp
+  3a0225:	ret
+  3a0226:	mov    %rax,0x2b8(%rsp)
+  3a022e:	mov    0x30(%rsp),%rax
+  3a0233:	mov    0xa8(%rax),%rcx
+  3a023a:	mov    %rcx,0x478(%rsp)
+  3a0242:	mov    0x78(%rax),%rax
+  3a0246:	mov    %rax,0x470(%rsp)
+  3a024e:	call   6d2350 <<std::sys::pal::unix::time::Timespec>::now>
+  3a0253:	mov    %edx,0x12c(%rsp)
+  3a025a:	mov    %rax,%rbx
+  3a025d:	lea    0x1ca0(%rsp),%rdi
+  3a0265:	lea    0x23b0(%rsp),%rsi
+  3a026d:	mov    $0x708,%edx
+  3a0272:	call   *0x37a0e0(%rip)        # 71a358 <memcpy@GLIBC_2.14>
+  3a0278:	cmpq   $0x0,0x21f0(%rsp)
+  3a0281:	je     3a02ad <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xd5d>
+  3a0283:	mov    0x21f8(%rsp),%rax
+  3a028b:	movzbl 0x10(%rax),%eax
+  3a028f:	test   %al,%al
+  3a0291:	je     3a02ad <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xd5d>
+  3a0293:	movabs $0x8000000000000036,%r14
+  3a029d:	add    $0xffffffffffffffe5,%r14
+  3a02a1:	xor    %ebp,%ebp
+  3a02a3:	movb   $0x9,0x8(%rsp)
+  3a02a8:	jmp    3a14f5 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1fa5>
+  3a02ad:	mov    %rbx,0x58(%rsp)
+  3a02b2:	mov    0x440(%rsp),%r15
+  3a02ba:	mov    0x448(%rsp),%rdx
+  3a02c2:	mov    $0x1,%bl
+  3a02c4:	lea    0x530(%rsp),%rdi
+  3a02cc:	lea    0x1ca0(%rsp),%rcx
+  3a02d4:	mov    %r15,%rsi
+  3a02d7:	mov    %rdx,0x50(%rsp)
+  3a02dc:	call   4a9970 <litchi_xlsx::cell_values::snapshot::MultiSnapshot::matches_source_backed>
+  3a02e1:	movzbl 0x530(%rsp),%ebp
+  3a02e9:	movzbl 0x531(%rsp),%eax
+  3a02f1:	cmp    $0x25,%bpl
+  3a02f5:	jne    3a03ae <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xe5e>
+  3a02fb:	movzbl %al,%eax
+  3a02fe:	test   %eax,%eax
+  3a0300:	je     3a0445 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xef5>
+  3a0306:	cmp    $0x1,%eax
+  3a0309:	jne    3a04c6 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xf76>
+  3a030f:	mov    $0x1f,%bpl
+  3a0312:	cmpq   $0x0,0x50(%rsp)
+  3a0318:	je     3a05a1 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1051>
+  3a031e:	sub    $0xffffffffffffff80,%r15
+  3a0322:	movq   $0x0,0x530(%rsp)
+  3a032e:	movq   $0x1,0x538(%rsp)
+  3a033a:	movq   $0x0,0x540(%rsp)
+  3a0346:	mov    %r15,0xe80(%rsp)
+  3a034e:	lea    -0x21e155(%rip),%rax        # 182200 <<alloc::string::String as core::fmt::Display>::fmt>
+  3a0355:	mov    %rax,0xe88(%rsp)
+  3a035d:	lea    0x3712b4(%rip),%rsi        # 711618 <chrono::format::strftime::D_T_FMT::{{nested}}+0x3b28>
+  3a0364:	lea    -0x37b585(%rip),%rdx        # 24de6 <serde_json::ser::Formatter::write_char_escape::HEX_DIGITS+0x12bd6>
+  3a036b:	lea    0x530(%rsp),%rdi
+  3a0373:	lea    0xe80(%rsp),%rcx
+  3a037b:	call   152eb0 <core::fmt::write>
+  3a0380:	mov    0x58(%rsp),%rbx
+  3a0385:	test   %al,%al
+  3a0387:	jne    3a3281 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x3d31>
+  3a038d:	mov    0x530(%rsp),%r14
+  3a0395:	mov    0x538(%rsp),%r12
+  3a039d:	mov    0x540(%rsp),%rax
+  3a03a5:	mov    %rax,(%rsp)
+  3a03a9:	jmp    3a02a8 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xd58>
+  3a03ae:	mov    %al,0x10(%rsp)
+  3a03b2:	movzwl 0x536(%rsp),%eax
+  3a03ba:	mov    %ax,0x8c(%rsp)
+  3a03c2:	mov    0x532(%rsp),%eax
+  3a03c9:	mov    %eax,0x88(%rsp)
+  3a03d0:	mov    0x538(%rsp),%r14
+  3a03d8:	mov    0x540(%rsp),%r12
+  3a03e0:	mov    0x548(%rsp),%rax
+  3a03e8:	mov    %rax,(%rsp)
+  3a03ec:	movups 0x550(%rsp),%xmm0
+  3a03f4:	movaps %xmm0,0x70(%rsp)
+  3a03f9:	movzbl 0x560(%rsp),%eax
+  3a0401:	mov    %al,0x8(%rsp)
+  3a0405:	movdqu 0x561(%rsp),%xmm0
+  3a040e:	movdqa %xmm0,0x250(%rsp)
+  3a0417:	mov    0x570(%rsp),%rax
+  3a041f:	mov    %rax,0x25f(%rsp)
+  3a0427:	mov    0x58(%rsp),%rbx
+  3a042c:	jmp    3a14f5 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1fa5>
+  3a0431:	mov    $0x8,%edi
+  3a0436:	mov    $0x28,%esi
+  3a043b:	call   1471d2 <alloc::alloc::handle_alloc_error>
+  3a0440:	jmp    3a3858 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x4308>
+  3a0445:	movq   $0x0,0x178(%rsp)
+  3a0451:	movq   $0x0,0x40(%rsp)
+  3a045a:	mov    0x458(%rsp),%r15
+  3a0462:	cmp    %r15,0x50(%rsp)
+  3a0467:	jne    3a0f09 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x19b9>
+  3a046d:	mov    0x440(%rsp),%r14
+  3a0475:	mov    0x450(%rsp),%rsi
+  3a047d:	lea    -0x308(%r14),%rbx
+  3a0484:	mov    $0xffffffffffffffff,%r13
+  3a048b:	mov    %rsi,%r12
+  3a048e:	inc    %r13
+  3a0491:	cmp    %r13,0x50(%rsp)
+  3a0496:	je     3a0713 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x11c3>
+  3a049c:	add    $0x308,%rbx
+  3a04a3:	lea    0x308(%rsi),%rbp
+  3a04aa:	mov    %rbx,%rdi
+  3a04ad:	call   3f92b0 <litchi_xlsx::cell_values::snapshot::Snapshot::same_source>
+  3a04b2:	mov    %rbp,%rsi
+  3a04b5:	test   %al,%al
+  3a04b7:	jne    3a048e <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xf3e>
+  3a04b9:	mov    %r12,%rdi
+  3a04bc:	mov    0x48(%rsp),%r13
+  3a04c1:	jmp    3a0f11 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x19c1>
+  3a04c6:	movabs $0x8000000000000036,%r14
+  3a04d0:	cmpq   $0x0,0x21f0(%rsp)
+  3a04d9:	je     3a04f5 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xfa5>
+  3a04db:	mov    0x21f8(%rsp),%rax
+  3a04e3:	movzbl 0x10(%rax),%eax
+  3a04e7:	test   %al,%al
+  3a04e9:	je     3a04f5 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xfa5>
+  3a04eb:	add    $0xffffffffffffffe5,%r14
+  3a04ef:	xor    %ebp,%ebp
+  3a04f1:	mov    $0x9,%cl
+  3a04f3:	jmp    3a053f <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xfef>
+  3a04f5:	mov    0x1fa0(%rsp),%rax
+  3a04fd:	mov    0x1fa8(%rsp),%rcx
+  3a0505:	mov    0x10(%rcx),%rdx
+  3a0509:	dec    %rdx
+  3a050c:	and    $0xfffffffffffffff0,%rdx
+  3a0510:	lea    (%rax,%rdx,1),%rsi
+  3a0514:	add    $0x10,%rsi
+  3a0518:	lea    0x530(%rsp),%rdi
+  3a0520:	call   *0x38(%rcx)
+  3a0523:	cmpl   $0x1,0x530(%rsp)
+  3a052b:	jne    3a05bc <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x106c>
+  3a0531:	mov    0x538(%rsp),%r12
+  3a0539:	add    $0xffffffffffffffe9,%r14
+  3a053d:	xor    %ebp,%ebp
+  3a053f:	mov    0x58(%rsp),%rbx
+  3a0544:	mov    %cl,0x8(%rsp)
+  3a0548:	movzwl 0xe4(%rsp),%eax
+  3a0550:	mov    %ax,0x8c(%rsp)
+  3a0558:	mov    0xe0(%rsp),%eax
+  3a055f:	mov    %eax,0x88(%rsp)
+  3a0566:	movdqa 0x130(%rsp),%xmm0
+  3a056f:	movdqa %xmm0,0x250(%rsp)
+  3a0578:	mov    0x13f(%rsp),%rax
+  3a0580:	mov    %rax,0x25f(%rsp)
+  3a0588:	jmp    3a14f5 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1fa5>
+  3a058d:	mov    $0x8,%edi
+  3a0592:	mov    $0x48,%esi
+  3a0597:	call   1471d2 <alloc::alloc::handle_alloc_error>
+  3a059c:	jmp    3a3858 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x4308>
+  3a05a1:	mov    $0x1,%r12d
+  3a05a7:	movq   $0x0,(%rsp)
+  3a05af:	xor    %r14d,%r14d
+  3a05b2:	mov    0x58(%rsp),%rbx
+  3a05b7:	jmp    3a14f5 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1fa5>
+  3a05bc:	mov    %r15,0x80(%rsp)
+  3a05c4:	movdqu 0x538(%rsp),%xmm1
+  3a05cd:	mov    0x1fc0(%rsp),%r12
+  3a05d5:	mov    0x1fc8(%rsp),%rdx
+  3a05dd:	movq   %xmm1,%rsi
+  3a05e2:	mov    %rsi,%rax
+  3a05e5:	xor    %r12,%rax
+  3a05e8:	pshufd $0xee,%xmm1,%xmm0
+  3a05ed:	movq   %xmm0,%rdi
+  3a05f2:	mov    %rdi,%rcx
+  3a05f5:	xor    %rdx,%rcx
+  3a05f8:	or     %rax,%rcx
+  3a05fb:	jne    3a0757 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1207>
+  3a0601:	mov    %rdi,0x178(%rsp)
+  3a0609:	mov    %rsi,0x118(%rsp)
+  3a0611:	movq   $0x0,0x208(%rsp)
+  3a061d:	mov    $0x600,%r15d
+  3a0623:	mov    $0x600,%edi
+  3a0628:	call   *0x379d32(%rip)        # 71a360 <malloc@GLIBC_2.2.5>
+  3a062e:	test   %rax,%rax
+  3a0631:	je     3a07ab <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x125b>
+  3a0637:	mov    %rax,%rbx
+  3a063a:	mov    %rax,0x200(%rsp)
+  3a0642:	movq   $0x40,0x1f8(%rsp)
+  3a064e:	cmpq   $0x0,0x50(%rsp)
+  3a0654:	je     3a07d9 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1289>
+  3a065a:	imul   $0x308,0x50(%rsp),%rax
+  3a0663:	mov    %rax,0x8(%rsp)
+  3a0668:	mov    $0x8,%r15d
+  3a066e:	xor    %r12d,%r12d
+  3a0671:	lea    0x1f8(%rsp),%rax
+  3a0679:	mov    %rax,(%rsp)
+  3a067d:	xor    %ebp,%ebp
+  3a067f:	jmp    3a06b7 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1167>
+  3a0681:	mov    0x200(%rsp),%rbx
+  3a0689:	lea    -0x35(%r14),%rax
+  3a068d:	mov    %rax,-0x8(%rbx,%r15,1)
+  3a0692:	mov    %r13,(%rbx,%r15,1)
+  3a0696:	inc    %r12
+  3a0699:	mov    %r12,0x208(%rsp)
+  3a06a1:	add    $0x18,%r15
+  3a06a5:	add    $0x308,%rbp
+  3a06ac:	cmp    %rbp,0x8(%rsp)
+  3a06b1:	je     3a07d9 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1289>
+  3a06b7:	mov    0x80(%rsp),%rax
+  3a06bf:	mov    0x2f8(%rax,%rbp,1),%r13
+  3a06c7:	lea    0x530(%rsp),%rdi
+  3a06cf:	lea    0x1ca0(%rsp),%rsi
+  3a06d7:	call   2790f0 <litchi_opc::source_backed::SourceBackedPackage::check_execution>
+  3a06dc:	mov    0x530(%rsp),%rax
+  3a06e4:	cmp    %r14,%rax
+  3a06e7:	jne    3a0930 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x13e0>
+  3a06ed:	cmp    $0x40,%r12
+  3a06f1:	je     3a09cc <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x147c>
+  3a06f7:	cmp    0x1f8(%rsp),%r12
+  3a06ff:	jne    3a0689 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1139>
+  3a0701:	lea    0x1f8(%rsp),%rdi
+  3a0709:	call   332e00 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  3a070e:	jmp    3a0681 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1131>
+  3a0713:	cmpb   $0x0,0x178(%rsp)
+  3a071b:	je     3a0780 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1230>
+  3a071d:	xor    %ebp,%ebp
+  3a071f:	mov    0x40(%rsp),%rax
+  3a0724:	mov    %rax,0x28(%rsp)
+  3a0729:	mov    0x18(%rsp),%rax
+  3a072e:	mov    %rax,0x80(%rsp)
+  3a0736:	mov    %r12,%rsi
+  3a0739:	mov    0x48(%rsp),%r13
+  3a073e:	jmp    3a0f3a <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x19ea>
+  3a0743:	mov    $0x8,%edi
+  3a0748:	mov    $0x18,%esi
+  3a074d:	call   1471d2 <alloc::alloc::handle_alloc_error>
+  3a0752:	jmp    3a3858 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x4308>
+  3a0757:	movdqa %xmm1,0x70(%rsp)
+  3a075d:	mov    %rdx,(%rsp)
+  3a0761:	add    $0xffffffffffffffec,%r14
+  3a0765:	xor    %ebp,%ebp
+  3a0767:	jmp    3a053f <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xfef>
+  3a076c:	mov    $0x8,%edi
+  3a0771:	mov    $0x48,%esi
+  3a0776:	call   1471d2 <alloc::alloc::handle_alloc_error>
+  3a077b:	jmp    3a3858 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x4308>
+  3a0780:	xor    %ebp,%ebp
+  3a0782:	mov    %r14,%rdi
+  3a0785:	mov    0x50(%rsp),%rsi
+  3a078a:	call   360140 <<alloc::boxed::Box<[T],A> as core::clone::Clone>::clone>
+  3a078f:	mov    %rax,0x28(%rsp)
+  3a0794:	mov    %rdx,0x80(%rsp)
+  3a079c:	mov    0x48(%rsp),%r13
+  3a07a1:	xor    %ebp,%ebp
+  3a07a3:	mov    %r12,%rsi
+  3a07a6:	jmp    3a0f3a <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x19ea>
+  3a07ab:	movq   %r15,%xmm0
+  3a07b0:	movdqa %xmm0,0x70(%rsp)
+  3a07b6:	mov    $0x8,%eax
+  3a07bb:	mov    %rax,(%rsp)
+  3a07bf:	mov    $0x1d,%r12d
+  3a07c5:	lea    -0x345a54(%rip),%r14        # 5ad78 <crc32fast::table::CRC32_TABLE+0x2730c>
+  3a07cc:	mov    $0x11,%bpl
+  3a07cf:	mov    0x48(%rsp),%r13
+  3a07d4:	jmp    3a053f <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xfef>
+  3a07d9:	mov    0x208(%rsp),%rax
+  3a07e1:	mov    %rax,0xa0(%rsp)
+  3a07e9:	mov    0x1f8(%rsp),%rax
+  3a07f1:	mov    %rax,0x90(%rsp)
+  3a07f9:	mov    0x200(%rsp),%rax
+  3a0801:	mov    %rax,0x98(%rsp)
+  3a0809:	movq   $0x0,0x218(%rsp)
+  3a0815:	movq   $0x8,0x220(%rsp)
+  3a0821:	movq   $0x0,0x228(%rsp)
+  3a082d:	mov    $0xc200,%ebx
+  3a0832:	mov    $0xc200,%edi
+  3a0837:	call   *0x379b23(%rip)        # 71a360 <malloc@GLIBC_2.2.5>
+  3a083d:	mov    %rax,0x28(%rsp)
+  3a0842:	test   %rax,%rax
+  3a0845:	je     3a08f4 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x13a4>
+  3a084b:	mov    0x28(%rsp),%rax
+  3a0850:	mov    %rax,0x220(%rsp)
+  3a0858:	movq   $0x40,0x218(%rsp)
+  3a0864:	cmpq   $0x40,0xa0(%rsp)
+  3a086d:	jbe    3a0a66 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1516>
+  3a0873:	lea    -0x38dba2(%rip),%rax        # 12cd8 <serde_json::ser::Formatter::write_char_escape::HEX_DIGITS+0xac8>
+  3a087a:	mov    %rax,0x530(%rsp)
+  3a0882:	lea    -0x242f29(%rip),%rax        # 15d960 <<u64 as core::fmt::Display>::fmt>
+  3a0889:	mov    %rax,0x538(%rsp)
+  3a0891:	mov    $0x1,%r12b
+  3a0894:	lea    -0x37c576(%rip),%rsi        # 24325 <serde_json::ser::Formatter::write_char_escape::HEX_DIGITS+0x12115>
+  3a089b:	lea    0x2d0(%rsp),%rdi
+  3a08a3:	lea    0x530(%rsp),%rdx
+  3a08ab:	mov    $0x1,%bl
+  3a08ad:	call   147790 <alloc::fmt::format::format_inner>
+  3a08b2:	mov    0x2d0(%rsp),%rax
+  3a08ba:	mov    %rax,0x20(%rsp)
+  3a08bf:	mov    0x2d8(%rsp),%rax
+  3a08c7:	mov    %rax,0x18(%rsp)
+  3a08cc:	mov    $0x10,%bpl
+  3a08cf:	mov    0x2e0(%rsp),%rax
+  3a08d7:	mov    %rax,(%rsp)
+  3a08db:	jmp    3a0b63 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1613>
+  3a08e0:	mov    $0x8,%edi
+  3a08e5:	mov    $0x20,%esi
+  3a08ea:	call   1471d2 <alloc::alloc::handle_alloc_error>
+  3a08ef:	jmp    3a3858 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x4308>
+  3a08f4:	movq   %rbx,%xmm0
+  3a08f9:	movdqa %xmm0,0x70(%rsp)
+  3a08ff:	mov    $0x11,%bpl
+  3a0902:	lea    -0x345b74(%rip),%rax        # 5ad95 <crc32fast::table::CRC32_TABLE+0x27329>
+  3a0909:	mov    %rax,0x20(%rsp)
+  3a090e:	mov    $0x1a,%eax
+  3a0913:	mov    %rax,0x18(%rsp)
+  3a0918:	mov    $0x8,%eax
+  3a091d:	mov    %rax,0x28(%rsp)
+  3a0922:	mov    $0x8,%eax
+  3a0927:	mov    %rax,(%rsp)
+  3a092b:	jmp    3a0b63 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1613>
+  3a0930:	mov    %rax,0x20(%rsp)
+  3a0935:	mov    0x538(%rsp),%rax
+  3a093d:	mov    %rax,0x18(%rsp)
+  3a0942:	mov    0x540(%rsp),%rax
+  3a094a:	mov    %rax,(%rsp)
+  3a094e:	movups 0x548(%rsp),%xmm0
+  3a0956:	movaps %xmm0,0x70(%rsp)
+  3a095b:	movzbl 0x558(%rsp),%eax
+  3a0963:	mov    %al,0x8(%rsp)
+  3a0967:	movups 0x559(%rsp),%xmm0
+  3a096f:	movaps %xmm0,0x130(%rsp)
+  3a0977:	mov    0x568(%rsp),%rax
+  3a097f:	mov    %rax,0x13f(%rsp)
+  3a0987:	mov    0x200(%rsp),%r14
+  3a098f:	xor    %ebp,%ebp
+  3a0991:	test   %r12,%r12
+  3a0994:	jne    3a0a3d <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x14ed>
+  3a099a:	cmpq   $0x0,0x1f8(%rsp)
+  3a09a3:	je     3a09ae <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x145e>
+  3a09a5:	mov    %r14,%rdi
+  3a09a8:	call   *0x3799c2(%rip)        # 71a370 <free@GLIBC_2.2.5>
+  3a09ae:	mov    0x48(%rsp),%r13
+  3a09b3:	mov    0x58(%rsp),%rbx
+  3a09b8:	mov    0x18(%rsp),%r12
+  3a09bd:	mov    0x20(%rsp),%r14
+  3a09c2:	movzbl 0x8(%rsp),%ecx
+  3a09c7:	jmp    3a0544 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xff4>
+  3a09cc:	lea    -0x38dcfb(%rip),%rax        # 12cd8 <serde_json::ser::Formatter::write_char_escape::HEX_DIGITS+0xac8>
+  3a09d3:	mov    %rax,0x530(%rsp)
+  3a09db:	lea    -0x243082(%rip),%rax        # 15d960 <<u64 as core::fmt::Display>::fmt>
+  3a09e2:	mov    %rax,0x538(%rsp)
+  3a09ea:	lea    -0x37c6cc(%rip),%rsi        # 24325 <serde_json::ser::Formatter::write_char_escape::HEX_DIGITS+0x12115>
+  3a09f1:	lea    0x180(%rsp),%rdi
+  3a09f9:	lea    0x530(%rsp),%rdx
+  3a0a01:	call   147790 <alloc::fmt::format::format_inner>
+  3a0a06:	mov    0x180(%rsp),%rax
+  3a0a0e:	mov    %rax,0x20(%rsp)
+  3a0a13:	mov    0x188(%rsp),%rax
+  3a0a1b:	mov    %rax,0x18(%rsp)
+  3a0a20:	mov    0x190(%rsp),%rax
+  3a0a28:	mov    %rax,(%rsp)
+  3a0a2c:	mov    $0x10,%bpl
+  3a0a2f:	mov    $0x40,%r12d
+  3a0a35:	mov    0x200(%rsp),%r14
+  3a0a3d:	lea    0x8(%r14),%rbx
+  3a0a41:	mov    0x379928(%rip),%r15        # 71a370 <free@GLIBC_2.2.5>
+  3a0a48:	jmp    3a0a57 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1507>
+  3a0a4a:	add    $0x18,%rbx
+  3a0a4e:	dec    %r12
+  3a0a51:	je     3a099a <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x144a>
+  3a0a57:	cmpq   $0x0,-0x8(%rbx)
+  3a0a5c:	jle    3a0a4a <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x14fa>
+  3a0a5e:	mov    (%rbx),%rdi
+  3a0a61:	call   *%r15
+  3a0a64:	jmp    3a0a4a <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x14fa>
+  3a0a66:	mov    $0x1,%r12b
+  3a0a69:	lea    0x530(%rsp),%rdi
+  3a0a71:	lea    0x1ca0(%rsp),%rsi
+  3a0a79:	mov    $0x1,%bl
+  3a0a7b:	call   4aa330 <litchi_xlsx::cell_values::snapshot::load_source_catalog>
+  3a0a80:	mov    0x530(%rsp),%rbx
+  3a0a88:	movzbl 0x538(%rsp),%ebp
+  3a0a90:	movzbl 0x539(%rsp),%eax
+  3a0a98:	mov    %al,0x10(%rsp)
+  3a0a9c:	mov    0x53a(%rsp),%eax
+  3a0aa3:	mov    %eax,0x270(%rsp)
+  3a0aaa:	movzwl 0x53e(%rsp),%eax
+  3a0ab2:	mov    %ax,0x274(%rsp)
+  3a0aba:	mov    0x540(%rsp),%rax
+  3a0ac2:	mov    %rax,0x20(%rsp)
+  3a0ac7:	mov    0x548(%rsp),%rax
+  3a0acf:	mov    %rax,0x18(%rsp)
+  3a0ad4:	mov    0x550(%rsp),%rax
+  3a0adc:	mov    %rax,(%rsp)
+  3a0ae0:	movups 0x558(%rsp),%xmm0
+  3a0ae8:	movaps %xmm0,0x70(%rsp)
+  3a0aed:	movzbl 0x568(%rsp),%eax
+  3a0af5:	mov    %al,0x8(%rsp)
+  3a0af9:	movups 0x569(%rsp),%xmm0
+  3a0b01:	movaps %xmm0,0xe80(%rsp)
+  3a0b09:	mov    0x578(%rsp),%rax
+  3a0b11:	mov    %rax,0xe8f(%rsp)
+  3a0b19:	cmp    $0x3,%rbx
+  3a0b1d:	jne    3a0d2f <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x17df>
+  3a0b23:	mov    0x270(%rsp),%eax
+  3a0b2a:	mov    %eax,0xe0(%rsp)
+  3a0b31:	movzwl 0x274(%rsp),%eax
+  3a0b39:	mov    %ax,0xe4(%rsp)
+  3a0b41:	movdqa 0xe80(%rsp),%xmm0
+  3a0b4a:	movdqa %xmm0,0x130(%rsp)
+  3a0b53:	mov    0xe8f(%rsp),%rax
+  3a0b5b:	mov    %rax,0x13f(%rsp)
+  3a0b63:	cmpq   $0x0,0x218(%rsp)
+  3a0b6c:	je     3a0b79 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1629>
+  3a0b6e:	mov    0x28(%rsp),%rdi
+  3a0b73:	call   *0x3797f7(%rip)        # 71a370 <free@GLIBC_2.2.5>
+  3a0b79:	mov    0x98(%rsp),%r14
+  3a0b81:	mov    0xa0(%rsp),%rbx
+  3a0b89:	test   %rbx,%rbx
+  3a0b8c:	je     3a0bb3 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1663>
+  3a0b8e:	lea    0x8(%r14),%r15
+  3a0b92:	mov    0x3797d7(%rip),%r12        # 71a370 <free@GLIBC_2.2.5>
+  3a0b99:	jmp    3a0ba4 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1654>
+  3a0b9b:	add    $0x18,%r15
+  3a0b9f:	dec    %rbx
+  3a0ba2:	je     3a0bb3 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1663>
+  3a0ba4:	cmpq   $0x0,-0x8(%r15)
+  3a0ba9:	jle    3a0b9b <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x164b>
+  3a0bab:	mov    (%r15),%rdi
+  3a0bae:	call   *%r12
+  3a0bb1:	jmp    3a0b9b <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x164b>
+  3a0bb3:	cmpq   $0x0,0x90(%rsp)
+  3a0bbc:	je     3a0bc7 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1677>
+  3a0bbe:	mov    %r14,%rdi
+  3a0bc1:	call   *0x3797a9(%rip)        # 71a370 <free@GLIBC_2.2.5>
+  3a0bc7:	cmp    $0x25,%bpl
+  3a0bcb:	jne    3a0ce3 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1793>
+  3a0bd1:	mov    0x448(%rsp),%r14
+  3a0bd9:	cmpq   $0x0,0x20(%rsp)
+  3a0bdf:	je     3a0d10 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x17c0>
+  3a0be5:	mov    0x18(%rsp),%rax
+  3a0bea:	mov    %rax,0x28(%rsp)
+  3a0bef:	mov    0x20(%rsp),%rax
+  3a0bf4:	mov    %rax,0x40(%rsp)
+  3a0bf9:	cmp    %r14,0x28(%rsp)
+  3a0bfe:	jne    3a0c44 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x16f4>
+  3a0c00:	mov    0x440(%rsp),%rsi
+  3a0c08:	mov    0x40(%rsp),%rax
+  3a0c0d:	lea    -0x308(%rax),%rbx
+  3a0c14:	mov    $0xffffffffffffffff,%r15
+  3a0c1b:	inc    %r15
+  3a0c1e:	cmp    %r15,%r14
+  3a0c21:	je     3a0edd <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x198d>
+  3a0c27:	add    $0x308,%rbx
+  3a0c2e:	lea    0x308(%rsi),%r12
+  3a0c35:	mov    %rbx,%rdi
+  3a0c38:	call   3f92b0 <litchi_xlsx::cell_values::snapshot::Snapshot::same_source>
+  3a0c3d:	mov    %r12,%rsi
+  3a0c40:	test   %al,%al
+  3a0c42:	jne    3a0c1b <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x16cb>
+  3a0c44:	cmpq   $0x0,0x50(%rsp)
+  3a0c4a:	je     3a0e7c <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x192c>
+  3a0c50:	mov    0x80(%rsp),%rax
+  3a0c58:	sub    $0xffffffffffffff80,%rax
+  3a0c5c:	movq   $0x0,0x530(%rsp)
+  3a0c68:	movq   $0x1,0x538(%rsp)
+  3a0c74:	movq   $0x0,0x540(%rsp)
+  3a0c80:	mov    %rax,0xe80(%rsp)
+  3a0c88:	lea    -0x21ea8f(%rip),%rax        # 182200 <<alloc::string::String as core::fmt::Display>::fmt>
+  3a0c8f:	mov    %rax,0xe88(%rsp)
+  3a0c97:	lea    0x37097a(%rip),%rsi        # 711618 <chrono::format::strftime::D_T_FMT::{{nested}}+0x3b28>
+  3a0c9e:	lea    -0x37bebf(%rip),%rdx        # 24de6 <serde_json::ser::Formatter::write_char_escape::HEX_DIGITS+0x12bd6>
+  3a0ca5:	lea    0x530(%rsp),%rdi
+  3a0cad:	lea    0xe80(%rsp),%rcx
+  3a0cb5:	call   152eb0 <core::fmt::write>
+  3a0cba:	test   %al,%al
+  3a0cbc:	jne    3a3700 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x41b0>
+  3a0cc2:	mov    0x530(%rsp),%r15
+  3a0cca:	mov    0x538(%rsp),%r12
+  3a0cd2:	mov    0x540(%rsp),%rax
+  3a0cda:	mov    %rax,(%rsp)
+  3a0cde:	jmp    3a0e8d <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x193d>
+  3a0ce3:	mov    0x48(%rsp),%r13
+  3a0ce8:	mov    0x58(%rsp),%rbx
+  3a0ced:	mov    0x18(%rsp),%r12
+  3a0cf2:	mov    0x20(%rsp),%r14
+  3a0cf7:	jmp    3a0548 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xff8>
+  3a0cfc:	mov    $0x8,%edi
+  3a0d01:	mov    $0x48,%esi
+  3a0d06:	call   1471d2 <alloc::alloc::handle_alloc_error>
+  3a0d0b:	jmp    3a3858 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x4308>
+  3a0d10:	movq   $0x0,0x178(%rsp)
+  3a0d1c:	mov    %r14,0x50(%rsp)
+  3a0d21:	movq   $0x0,0x40(%rsp)
+  3a0d2a:	jmp    3a0ef1 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x19a1>
+  3a0d2f:	lea    0x580(%rsp),%rsi
+  3a0d37:	lea    0x15e0(%rsp),%rdi
+  3a0d3f:	mov    $0x1c8,%edx
+  3a0d44:	call   *0x37960e(%rip)        # 71a358 <memcpy@GLIBC_2.14>
+  3a0d4a:	mov    %bpl,0x1598(%rsp)
+  3a0d52:	movzbl 0x10(%rsp),%eax
+  3a0d57:	mov    %al,0x1599(%rsp)
+  3a0d5e:	mov    0x270(%rsp),%eax
+  3a0d65:	mov    %eax,0x159a(%rsp)
+  3a0d6c:	movzwl 0x274(%rsp),%eax
+  3a0d74:	mov    %ax,0x159e(%rsp)
+  3a0d7c:	mov    0x20(%rsp),%rax
+  3a0d81:	mov    %rax,0x15a0(%rsp)
+  3a0d89:	mov    0x18(%rsp),%rax
+  3a0d8e:	mov    %rax,0x15a8(%rsp)
+  3a0d96:	mov    (%rsp),%rax
+  3a0d9a:	mov    %rax,0x15b0(%rsp)
+  3a0da2:	movaps 0x70(%rsp),%xmm0
+  3a0da7:	movups %xmm0,0x15b8(%rsp)
+  3a0daf:	movzbl 0x8(%rsp),%eax
+  3a0db4:	mov    %al,0x15c8(%rsp)
+  3a0dbb:	movdqa 0xe80(%rsp),%xmm0
+  3a0dc4:	movdqu %xmm0,0x15c9(%rsp)
+  3a0dcd:	mov    0xe8f(%rsp),%rax
+  3a0dd5:	mov    %rax,0x15d8(%rsp)
+  3a0ddd:	mov    %rbx,0x1590(%rsp)
+  3a0de5:	mov    0x16c0(%rsp),%rsi
+  3a0ded:	mov    0x16c8(%rsp),%rdx
+  3a0df5:	lea    0x530(%rsp),%rdi
+  3a0dfd:	lea    0x1f8(%rsp),%rcx
+  3a0e05:	call   4a9b10 <litchi_xlsx::cell_values::snapshot::resolve_selectors>
+  3a0e0a:	movzbl 0x530(%rsp),%ebp
+  3a0e12:	cmp    $0x25,%bpl
+  3a0e16:	jne    3a1eab <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x295b>
+  3a0e1c:	mov    0x538(%rsp),%rax
+  3a0e24:	mov    %rax,0x1d8(%rsp)
+  3a0e2c:	mov    0x540(%rsp),%rax
+  3a0e34:	mov    %rax,0xd0(%rsp)
+  3a0e3c:	mov    0x548(%rsp),%rax
+  3a0e44:	mov    %rax,0x120(%rsp)
+  3a0e4c:	cmpl   $0x3,0x1630(%rsp)
+  3a0e54:	jne    3a2251 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x2d01>
+  3a0e5a:	movq   $0x0,0x40(%rsp)
+  3a0e63:	jmp    3a2290 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x2d40>
+  3a0e68:	mov    $0x8,%edi
+  3a0e6d:	mov    $0x18,%esi
+  3a0e72:	call   1471d2 <alloc::alloc::handle_alloc_error>
+  3a0e77:	jmp    3a3858 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x4308>
+  3a0e7c:	mov    $0x1,%r12d
+  3a0e82:	movq   $0x0,(%rsp)
+  3a0e8a:	xor    %r15d,%r15d
+  3a0e8d:	mov    0x28(%rsp),%rax
+  3a0e92:	lea    0x1(%rax),%rbx
+  3a0e96:	mov    0x40(%rsp),%rdi
+  3a0e9b:	cmp    $0x1,%rbx
+  3a0e9f:	je     3a0eb5 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1965>
+  3a0ea1:	lea    0x308(%rdi),%r14
+  3a0ea8:	dec    %rbx
+  3a0eab:	call   343cd0 <core::ptr::drop_in_place<litchi_xlsx::cell_values::snapshot::Snapshot>>
+  3a0eb0:	mov    %r14,%rdi
+  3a0eb3:	jmp    3a0e9b <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x194b>
+  3a0eb5:	mov    $0x1f,%bpl
+  3a0eb8:	cmpq   $0x0,0x28(%rsp)
+  3a0ebe:	je     3a0ecb <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x197b>
+  3a0ec0:	mov    0x40(%rsp),%rdi
+  3a0ec5:	call   *0x3794a5(%rip)        # 71a370 <free@GLIBC_2.2.5>
+  3a0ecb:	mov    0x48(%rsp),%r13
+  3a0ed0:	mov    0x58(%rsp),%rbx
+  3a0ed5:	mov    %r15,%r14
+  3a0ed8:	jmp    3a14f5 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1fa5>
+  3a0edd:	mov    $0x1,%al
+  3a0edf:	mov    %rax,0x178(%rsp)
+  3a0ee7:	mov    %r14,0x50(%rsp)
+  3a0eec:	mov    %r14,0x18(%rsp)
+  3a0ef1:	mov    0x48(%rsp),%r13
+  3a0ef6:	mov    0x458(%rsp),%r15
+  3a0efe:	cmp    %r15,0x50(%rsp)
+  3a0f03:	je     3a046d <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xf1d>
+  3a0f09:	mov    0x450(%rsp),%rdi
+  3a0f11:	mov    $0x1,%bpl
+  3a0f14:	mov    %rdi,%rbx
+  3a0f17:	mov    %r15,%rsi
+  3a0f1a:	call   360140 <<alloc::boxed::Box<[T],A> as core::clone::Clone>::clone>
+  3a0f1f:	mov    %rax,0x28(%rsp)
+  3a0f24:	mov    %rdx,0x80(%rsp)
+  3a0f2c:	mov    $0x1,%bpl
+  3a0f2f:	mov    0x440(%rsp),%r14
+  3a0f37:	mov    %rbx,%rsi
+  3a0f3a:	cmp    %r15,0x50(%rsp)
+  3a0f3f:	mov    %ebp,0x118(%rsp)
+  3a0f46:	jne    3a0f7e <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1a2e>
+  3a0f48:	lea    -0x308(%r14),%rbx
+  3a0f4f:	mov    0x50(%rsp),%rax
+  3a0f54:	lea    0x1(%rax),%r15
+  3a0f58:	dec    %r15
+  3a0f5b:	je     3a113f <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1bef>
+  3a0f61:	add    $0x308,%rbx
+  3a0f68:	lea    0x308(%rsi),%r12
+  3a0f6f:	mov    %rbx,%rdi
+  3a0f72:	call   3f92b0 <litchi_xlsx::cell_values::snapshot::Snapshot::same_source>
+  3a0f77:	mov    %r12,%rsi
+  3a0f7a:	test   %al,%al
+  3a0f7c:	jne    3a0f58 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1a08>
+  3a0f7e:	mov    $0x1,%bl
+  3a0f80:	lea    0x530(%rsp),%rdi
+  3a0f88:	mov    0x28(%rsp),%rsi
+  3a0f8d:	mov    0x80(%rsp),%rdx
+  3a0f95:	mov    %r14,%rcx
+  3a0f98:	mov    0x50(%rsp),%r8
+  3a0f9d:	call   4a7330 <litchi_xlsx::cell_values::snapshot::MultiSnapshot::topology_plan_from>
+  3a0fa2:	movabs $0x8000000000000036,%r15
+  3a0fac:	mov    0x530(%rsp),%rax
+  3a0fb4:	lea    -0x36(%r15),%rcx
+  3a0fb8:	movzbl 0x538(%rsp),%ebp
+  3a0fc0:	movzbl 0x539(%rsp),%r8d
+  3a0fc9:	mov    0x53a(%rsp),%edx
+  3a0fd0:	mov    %edx,0x1590(%rsp)
+  3a0fd7:	movzwl 0x53e(%rsp),%edx
+  3a0fdf:	mov    %dx,0x1594(%rsp)
+  3a0fe7:	mov    0x540(%rsp),%rsi
+  3a0fef:	mov    0x548(%rsp),%r12
+  3a0ff7:	movups 0x569(%rsp),%xmm0
+  3a0fff:	movaps %xmm0,0xe80(%rsp)
+  3a1007:	mov    0x578(%rsp),%rdx
+  3a100f:	mov    %rdx,0xe8f(%rsp)
+  3a1017:	mov    0x550(%rsp),%rdx
+  3a101f:	movdqu 0x558(%rsp),%xmm1
+  3a1028:	movzbl 0x568(%rsp),%edi
+  3a1030:	cmp    %rcx,%rax
+  3a1033:	jne    3a1095 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1b45>
+  3a1035:	mov    %r8b,0x10(%rsp)
+  3a103a:	movdqa %xmm1,0x70(%rsp)
+  3a1040:	mov    %dil,0x8(%rsp)
+  3a1045:	mov    %rdx,(%rsp)
+  3a1049:	mov    %rsi,0x20(%rsp)
+  3a104e:	mov    0x1590(%rsp),%eax
+  3a1055:	mov    %eax,0x88(%rsp)
+  3a105c:	movzwl 0x1594(%rsp),%eax
+  3a1064:	mov    %ax,0x8c(%rsp)
+  3a106c:	movdqa 0xe80(%rsp),%xmm0
+  3a1075:	movdqa %xmm0,0x250(%rsp)
+  3a107e:	mov    0xe8f(%rsp),%rax
+  3a1086:	mov    %rax,0x25f(%rsp)
+  3a108e:	mov    $0x1,%bl
+  3a1090:	jmp    3a1453 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1f03>
+  3a1095:	mov    0x590(%rsp),%rcx
+  3a109d:	mov    %rcx,0x4f8(%rsp)
+  3a10a5:	movups 0x580(%rsp),%xmm0
+  3a10ad:	movups %xmm0,0x4e8(%rsp)
+  3a10b5:	mov    %rax,0x498(%rsp)
+  3a10bd:	mov    %bpl,0x4a0(%rsp)
+  3a10c5:	mov    %r8b,0x4a1(%rsp)
+  3a10cd:	mov    0x1590(%rsp),%eax
+  3a10d4:	mov    %eax,0x4a2(%rsp)
+  3a10db:	movzwl 0x1594(%rsp),%eax
+  3a10e3:	mov    %ax,0x4a6(%rsp)
+  3a10eb:	mov    %rsi,0x4a8(%rsp)
+  3a10f3:	mov    %r12,0x4b0(%rsp)
+  3a10fb:	mov    %rdx,0x4b8(%rsp)
+  3a1103:	movdqu %xmm1,0x4c0(%rsp)
+  3a110c:	mov    %dil,0x4d0(%rsp)
+  3a1114:	mov    0xe8f(%rsp),%rax
+  3a111c:	mov    %rax,0x4e0(%rsp)
+  3a1124:	movdqa 0xe80(%rsp),%xmm0
+  3a112d:	movdqu %xmm0,0x4d1(%rsp)
+  3a1136:	mov    0x118(%rsp),%ebp
+  3a113d:	jmp    3a11ad <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1c5d>
+  3a113f:	movq   $0x0,0x498(%rsp)
+  3a114b:	movq   $0x8,0x4a0(%rsp)
+  3a1157:	pxor   %xmm0,%xmm0
+  3a115b:	movdqu %xmm0,0x4a8(%rsp)
+  3a1164:	movq   $0x8,0x4b8(%rsp)
+  3a1170:	movdqu %xmm0,0x4c0(%rsp)
+  3a1179:	movq   $0x8,0x4d0(%rsp)
+  3a1185:	movdqu %xmm0,0x4d8(%rsp)
+  3a118e:	movq   $0x8,0x4e8(%rsp)
+  3a119a:	movdqu %xmm0,0x4f0(%rsp)
+  3a11a3:	movabs $0x8000000000000036,%r15
+  3a11ad:	lea    0x1590(%rsp),%rbx
+  3a11b5:	lea    0x1ca0(%rsp),%rsi
+  3a11bd:	mov    $0x708,%edx
+  3a11c2:	mov    %rbx,%rdi
+  3a11c5:	call   *0x37918d(%rip)        # 71a358 <memcpy@GLIBC_2.14>
+  3a11cb:	lea    0x530(%rsp),%rdi
+  3a11d3:	lea    0x498(%rsp),%rdx
+  3a11db:	mov    %rbx,%rsi
+  3a11de:	call   279130 <litchi_opc::source_backed::SourceBackedPackage::prepare_topology_state>
+  3a11e3:	mov    0x530(%rsp),%rbx
+  3a11eb:	lea    -0x36(%r15),%rax
+  3a11ef:	movups 0x538(%rsp),%xmm0
+  3a11f7:	movaps %xmm0,0x2d0(%rsp)
+  3a11ff:	movups 0x548(%rsp),%xmm0
+  3a1207:	movaps %xmm0,0x2e0(%rsp)
+  3a120f:	movups 0x558(%rsp),%xmm0
+  3a1217:	movaps %xmm0,0x2f0(%rsp)
+  3a121f:	movups 0x568(%rsp),%xmm0
+  3a1227:	movaps %xmm0,0x300(%rsp)
+  3a122f:	cmp    %rax,%rbx
+  3a1232:	jne    3a12d0 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1d80>
+  3a1238:	movdqa 0x2d0(%rsp),%xmm0
+  3a1241:	movdqa 0x2e0(%rsp),%xmm1
+  3a124a:	movaps 0x2f0(%rsp),%xmm2
+  3a1252:	movaps 0x300(%rsp),%xmm3
+  3a125a:	movdqa %xmm0,0x90(%rsp)
+  3a1263:	movdqa %xmm1,0xa0(%rsp)
+  3a126c:	movaps %xmm2,0xb0(%rsp)
+  3a1274:	movaps %xmm3,0xc0(%rsp)
+  3a127c:	xor    %ebx,%ebx
+  3a127e:	lea    0x1590(%rsp),%rdi
+  3a1286:	call   2239f0 <core::ptr::drop_in_place<litchi_opc::source_backed::SourceBackedPackage>>
+  3a128b:	movaps 0x90(%rsp),%xmm0
+  3a1293:	movaps 0xa0(%rsp),%xmm1
+  3a129b:	movaps 0xb0(%rsp),%xmm2
+  3a12a3:	movaps 0xc0(%rsp),%xmm3
+  3a12ab:	movaps %xmm3,0x2a0(%rsp)
+  3a12b3:	movaps %xmm2,0x290(%rsp)
+  3a12bb:	movaps %xmm1,0x280(%rsp)
+  3a12c3:	movaps %xmm0,0x270(%rsp)
+  3a12cb:	jmp    3a137d <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1e2d>
+  3a12d0:	lea    0x578(%rsp),%rsi
+  3a12d8:	lea    0xe80(%rsp),%rdi
+  3a12e0:	mov    $0x198,%edx
+  3a12e5:	call   *0x37906d(%rip)        # 71a358 <memcpy@GLIBC_2.14>
+  3a12eb:	movaps 0x2d0(%rsp),%xmm0
+  3a12f3:	movaps 0x2e0(%rsp),%xmm1
+  3a12fb:	movaps 0x2f0(%rsp),%xmm2
+  3a1303:	movaps 0x300(%rsp),%xmm3
+  3a130b:	movaps %xmm0,0x180(%rsp)
+  3a1313:	movaps %xmm1,0x190(%rsp)
+  3a131b:	movaps %xmm2,0x1a0(%rsp)
+  3a1323:	movaps %xmm3,0x1b0(%rsp)
+  3a132b:	mov    0x1590(%rsp),%r14
+  3a1333:	movups 0x1598(%rsp),%xmm0
+  3a133b:	movaps %xmm0,0x270(%rsp)
+  3a1343:	movups 0x15a8(%rsp),%xmm0
+  3a134b:	movaps %xmm0,0x280(%rsp)
+  3a1353:	movups 0x15b8(%rsp),%xmm0
+  3a135b:	movaps %xmm0,0x290(%rsp)
+  3a1363:	movups 0x15c8(%rsp),%xmm0
+  3a136b:	movaps %xmm0,0x2a0(%rsp)
+  3a1373:	cmp    $0x2,%r14
+  3a1377:	jne    3a1742 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x21f2>
+  3a137d:	movdqa 0x270(%rsp),%xmm0
+  3a1386:	movdqa 0x280(%rsp),%xmm1
+  3a138f:	movaps 0x290(%rsp),%xmm2
+  3a1397:	movaps 0x2a0(%rsp),%xmm3
+  3a139f:	movdqa %xmm0,0x130(%rsp)
+  3a13a8:	movdqa %xmm1,0x140(%rsp)
+  3a13b1:	movaps %xmm2,0x150(%rsp)
+  3a13b9:	movaps %xmm3,0x160(%rsp)
+  3a13c1:	mov    0x130(%rsp),%rax
+  3a13c9:	cmp    %r15,%rax
+  3a13cc:	jne    3a13fb <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1eab>
+  3a13ce:	test   %bpl,%bpl
+  3a13d1:	je     3a13e4 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1e94>
+  3a13d3:	xor    %ebx,%ebx
+  3a13d5:	mov    0x40(%rsp),%rdi
+  3a13da:	mov    0x18(%rsp),%rsi
+  3a13df:	call   367ca0 <core::ptr::drop_in_place<core::option::Option<litchi_xlsx::cell_values::snapshot::MultiSnapshot>>>
+  3a13e4:	mov    0x28(%rsp),%r14
+  3a13e9:	mov    0x58(%rsp),%rbx
+  3a13ee:	mov    0x80(%rsp),%rsi
+  3a13f6:	jmp    3a150e <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1fbe>
+  3a13fb:	mov    %rax,0x20(%rsp)
+  3a1400:	mov    0x138(%rsp),%r12
+  3a1408:	mov    0x140(%rsp),%rax
+  3a1410:	mov    %rax,(%rsp)
+  3a1414:	movups 0x148(%rsp),%xmm0
+  3a141c:	movaps %xmm0,0x70(%rsp)
+  3a1421:	movzbl 0x158(%rsp),%eax
+  3a1429:	mov    %al,0x8(%rsp)
+  3a142d:	movdqu 0x159(%rsp),%xmm0
+  3a1436:	movdqa %xmm0,0x250(%rsp)
+  3a143f:	mov    0x168(%rsp),%rax
+  3a1447:	mov    %rax,0x25f(%rsp)
+  3a144f:	xor    %ebp,%ebp
+  3a1451:	xor    %ebx,%ebx
+  3a1453:	mov    0x80(%rsp),%rax
+  3a145b:	lea    0x1(%rax),%r15
+  3a145f:	mov    0x28(%rsp),%rdi
+  3a1464:	cmp    $0x1,%r15
+  3a1468:	je     3a147e <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1f2e>
+  3a146a:	lea    0x308(%rdi),%r14
+  3a1471:	dec    %r15
+  3a1474:	call   343cd0 <core::ptr::drop_in_place<litchi_xlsx::cell_values::snapshot::Snapshot>>
+  3a1479:	mov    %r14,%rdi
+  3a147c:	jmp    3a1464 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1f14>
+  3a147e:	cmpq   $0x0,0x80(%rsp)
+  3a1487:	mov    0x20(%rsp),%r14
+  3a148c:	je     3a1499 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1f49>
+  3a148e:	mov    0x28(%rsp),%rdi
+  3a1493:	call   *0x378ed7(%rip)        # 71a370 <free@GLIBC_2.2.5>
+  3a1499:	mov    0x178(%rsp),%rax
+  3a14a1:	and    0x118(%rsp),%al
+  3a14a8:	cmp    $0x1,%al
+  3a14aa:	jne    3a14ec <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1f9c>
+  3a14ac:	mov    0x18(%rsp),%rax
+  3a14b1:	lea    0x1(%rax),%r15
+  3a14b5:	mov    0x40(%rsp),%rdi
+  3a14ba:	cmp    $0x1,%r15
+  3a14be:	je     3a14d4 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1f84>
+  3a14c0:	lea    0x308(%rdi),%r14
+  3a14c7:	dec    %r15
+  3a14ca:	call   343cd0 <core::ptr::drop_in_place<litchi_xlsx::cell_values::snapshot::Snapshot>>
+  3a14cf:	mov    %r14,%rdi
+  3a14d2:	jmp    3a14ba <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1f6a>
+  3a14d4:	cmpq   $0x0,0x18(%rsp)
+  3a14da:	mov    0x20(%rsp),%r14
+  3a14df:	je     3a14ec <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1f9c>
+  3a14e1:	mov    0x40(%rsp),%rdi
+  3a14e6:	call   *0x378e84(%rip)        # 71a370 <free@GLIBC_2.2.5>
+  3a14ec:	test   %bl,%bl
+  3a14ee:	mov    0x58(%rsp),%rbx
+  3a14f3:	je     3a1505 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1fb5>
+  3a14f5:	xor    %r15d,%r15d
+  3a14f8:	lea    0x1ca0(%rsp),%rdi
+  3a1500:	call   32cde0 <core::ptr::drop_in_place<litchi_opc::source_backed::SourceBackedPackage>>
+  3a1505:	cmp    $0x25,%bpl
+  3a1509:	jne    3a1559 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x2009>
+  3a150b:	mov    %r12,%rsi
+  3a150e:	xor    %r15d,%r15d
+  3a1511:	mov    %r14,%rdi
+  3a1514:	call   344e90 <core::ptr::drop_in_place<litchi_xlsx::cell_values::snapshot::MultiSnapshot>>
+  3a1519:	xor    %r15d,%r15d
+  3a151c:	lea    0x530(%rsp),%rdi
+  3a1524:	mov    %rbx,%rsi
+  3a1527:	mov    0x12c(%rsp),%edx
+  3a152e:	call   3a4d00 <litchi_perf_baseline::xlsx_managed_compression::benchmark::elapsed_ns>
+  3a1533:	mov    0x530(%rsp),%rax
+  3a153b:	test   %rax,%rax
+  3a153e:	je     3a1659 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x2109>
+  3a1544:	mov    0x538(%rsp),%rcx
+  3a154c:	mov    %rax,0x0(%r13)
+  3a1550:	mov    %rcx,0x8(%r13)
+  3a1554:	jmp    3a163a <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x20ea>
+  3a1559:	movzbl 0x10(%rsp),%eax
+  3a155e:	mov    %al,0x531(%rsp)
+  3a1565:	mov    0x88(%rsp),%eax
+  3a156c:	mov    %eax,0x532(%rsp)
+  3a1573:	movzwl 0x8c(%rsp),%eax
+  3a157b:	mov    %ax,0x536(%rsp)
+  3a1583:	mov    (%rsp),%rax
+  3a1587:	mov    %rax,0x548(%rsp)
+  3a158f:	movaps 0x70(%rsp),%xmm0
+  3a1594:	movups %xmm0,0x550(%rsp)
+  3a159c:	movzbl 0x8(%rsp),%eax
+  3a15a1:	mov    %al,0x560(%rsp)
+  3a15a8:	movdqa 0x250(%rsp),%xmm0
+  3a15b1:	movdqu %xmm0,0x561(%rsp)
+  3a15ba:	mov    0x25f(%rsp),%rax
+  3a15c2:	mov    %rax,0x570(%rsp)
+  3a15ca:	mov    %bpl,0x530(%rsp)
+  3a15d2:	mov    %r14,0x538(%rsp)
+  3a15da:	mov    %r12,0x540(%rsp)
+  3a15e2:	mov    $0x48,%edi
+  3a15e7:	call   325c00 <alloc::boxed::box_new_uninit>
+  3a15ec:	mov    0x570(%rsp),%rcx
+  3a15f4:	mov    %rcx,0x40(%rax)
+  3a15f8:	movdqu 0x530(%rsp),%xmm0
+  3a1601:	movdqu 0x540(%rsp),%xmm1
+  3a160a:	movups 0x550(%rsp),%xmm2
+  3a1612:	movups 0x560(%rsp),%xmm3
+  3a161a:	movups %xmm3,0x30(%rax)
+  3a161e:	movups %xmm2,0x20(%rax)
+  3a1622:	movdqu %xmm1,0x10(%rax)
+  3a1627:	movdqu %xmm0,(%rax)
+  3a162b:	mov    %rax,0x0(%r13)
+  3a162f:	lea    0x370122(%rip),%rax        # 711758 <chrono::format::strftime::D_T_FMT::{{nested}}+0x3c68>
+  3a1636:	mov    %rax,0x8(%r13)
+  3a163a:	movb   $0x2,0xb8(%r13)
+  3a1642:	mov    0x30(%rsp),%r12
+  3a1647:	lea    0x430(%rsp),%rdi
+  3a164f:	call   343ad0 <core::ptr::drop_in_place<litchi_xlsx::cell_values::patch::MultiCommit>>
+  3a1654:	jmp    3a0200 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xcb0>
+  3a1659:	mov    0x538(%rsp),%r14
+  3a1661:	xor    %r15d,%r15d
+  3a1664:	call   6d2350 <<std::sys::pal::unix::time::Timespec>::now>
+  3a1669:	mov    %rax,%rbx
+  3a166c:	mov    %edx,%ebp
+  3a166e:	lea    0x430(%rsp),%rdi
+  3a1676:	call   343ad0 <core::ptr::drop_in_place<litchi_xlsx::cell_values::patch::MultiCommit>>
+  3a167b:	mov    0x2b8(%rsp),%r15
+  3a1683:	lea    0x530(%rsp),%rdi
+  3a168b:	mov    %rbx,%rsi
+  3a168e:	mov    %ebp,%edx
+  3a1690:	call   3a4d00 <litchi_perf_baseline::xlsx_managed_compression::benchmark::elapsed_ns>
+  3a1695:	mov    0x530(%rsp),%rax
+  3a169d:	test   %rax,%rax
+  3a16a0:	jne    3a16d3 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x2183>
+  3a16a2:	mov    0x538(%rsp),%rbx
+  3a16aa:	lea    0x530(%rsp),%rdi
+  3a16b2:	mov    0x488(%rsp),%rsi
+  3a16ba:	mov    0x24c(%rsp),%edx
+  3a16c1:	call   3a4d00 <litchi_perf_baseline::xlsx_managed_compression::benchmark::elapsed_ns>
+  3a16c6:	mov    0x530(%rsp),%rax
+  3a16ce:	test   %rax,%rax
+  3a16d1:	je     3a16f5 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x21a5>
+  3a16d3:	mov    0x538(%rsp),%rcx
+  3a16db:	mov    %rax,0x0(%r13)
+  3a16df:	mov    %rcx,0x8(%r13)
+  3a16e3:	movb   $0x2,0xb8(%r13)
+  3a16eb:	mov    0x30(%rsp),%r12
+  3a16f0:	jmp    3a0200 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xcb0>
+  3a16f5:	mov    0x538(%rsp),%rax
+  3a16fd:	mov    %rax,0x1590(%rsp)
+  3a1705:	mov    %r15,%rcx
+  3a1708:	add    0x2c0(%rsp),%rcx
+  3a1710:	jb     3a1720 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x21d0>
+  3a1712:	add    %r14,%rcx
+  3a1715:	jb     3a1720 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x21d0>
+  3a1717:	add    %rbx,%rcx
+  3a171a:	jae    3a19f4 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x24a4>
+  3a1720:	lea    -0x3455bd(%rip),%rdi        # 5c16a <crc32fast::table::CRC32_TABLE+0x286fe>
+  3a1727:	mov    $0x2b,%esi
+  3a172c:	call   147fe0 <<alloc::boxed::Box<dyn core::error::Error> as core::convert::From<&str>>::from>
+  3a1731:	mov    %rax,0x0(%r13)
+  3a1735:	lea    0x36b854(%rip),%rax        # 70cf90 <__frame_dummy_init_array_entry+0x1e0>
+  3a173c:	mov    %rax,0x8(%r13)
+  3a1740:	jmp    3a16e3 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x2193>
+  3a1742:	lea    0x1598(%rsp),%r15
+  3a174a:	lea    0x15d8(%rsp),%rsi
+  3a1752:	lea    0x578(%rsp),%rdi
+  3a175a:	mov    0x378bf7(%rip),%r12        # 71a358 <memcpy@GLIBC_2.14>
+  3a1761:	mov    $0x6c0,%edx
+  3a1766:	call   *%r12
+  3a1769:	mov    %rbx,0xc38(%rsp)
+  3a1771:	movaps 0x180(%rsp),%xmm0
+  3a1779:	movaps 0x190(%rsp),%xmm1
+  3a1781:	movaps 0x1a0(%rsp),%xmm2
+  3a1789:	movaps 0x1b0(%rsp),%xmm3
+  3a1791:	movups %xmm0,0xc40(%rsp)
+  3a1799:	movups %xmm1,0xc50(%rsp)
+  3a17a1:	movups %xmm2,0xc60(%rsp)
+  3a17a9:	movups %xmm3,0xc70(%rsp)
+  3a17b1:	lea    0xc80(%rsp),%rdi
+  3a17b9:	lea    0xe80(%rsp),%rsi
+  3a17c1:	mov    $0x198,%edx
+  3a17c6:	call   *%r12
+  3a17c9:	mov    %r14,0x530(%rsp)
+  3a17d1:	movdqu (%r15),%xmm0
+  3a17d6:	movdqu 0x10(%r15),%xmm1
+  3a17dc:	movups 0x20(%r15),%xmm2
+  3a17e1:	movups 0x30(%r15),%xmm3
+  3a17e6:	movdqu %xmm0,0x538(%rsp)
+  3a17ef:	movdqu %xmm1,0x548(%rsp)
+  3a17f8:	movups %xmm2,0x558(%rsp)
+  3a1800:	movups %xmm3,0x568(%rsp)
+  3a1808:	movzbl 0xe10(%rsp),%eax
+  3a1810:	mov    %al,0x50(%rsp)
+  3a1814:	test   %al,%al
+  3a1816:	je     3a1873 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x2323>
+  3a1818:	lea    0xe80(%rsp),%rdi
+  3a1820:	lea    0x530(%rsp),%rsi
+  3a1828:	mov    $0x708,%edx
+  3a182d:	call   *0x378b25(%rip)        # 71a358 <memcpy@GLIBC_2.14>
+  3a1833:	mov    0x13d0(%rsp),%rbx
+  3a183b:	test   %rbx,%rbx
+  3a183e:	je     3a1a6f <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x251f>
+  3a1844:	mov    0x13d8(%rsp),%rax
+  3a184c:	movzbl 0x10(%rax),%eax
+  3a1850:	test   %al,%al
+  3a1852:	je     3a1a6f <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x251f>
+  3a1858:	movabs $0x8000000000000036,%rax
+  3a1862:	add    $0xffffffffffffffe5,%rax
+  3a1866:	mov    %rax,0x130(%rsp)
+  3a186e:	jmp    3a3640 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x40f0>
+  3a1873:	lea    0xc50(%rsp),%r8
+  3a187b:	lea    0xc68(%rsp),%r9
+  3a1883:	mov    0xc90(%rsp),%rax
+  3a188b:	mov    %rax,0x190(%rsp)
+  3a1893:	movups 0xc80(%rsp),%xmm0
+  3a189b:	movaps %xmm0,0x180(%rsp)
+  3a18a3:	mov    0xca8(%rsp),%rax
+  3a18ab:	mov    %rax,0xa0(%rsp)
+  3a18b3:	movups 0xc98(%rsp),%xmm0
+  3a18bb:	movaps %xmm0,0x90(%rsp)
+  3a18c3:	mov    0xe08(%rsp),%rax
+  3a18cb:	mov    0xcc0(%rsp),%rcx
+  3a18d3:	mov    %rcx,0x2e0(%rsp)
+  3a18db:	movups 0xcb0(%rsp),%xmm0
+  3a18e3:	movaps %xmm0,0x2d0(%rsp)
+  3a18eb:	mov    0xcd8(%rsp),%rcx
+  3a18f3:	mov    %rcx,0xe90(%rsp)
+  3a18fb:	movdqu 0xcc8(%rsp),%xmm0
+  3a1904:	movdqa %xmm0,0xe80(%rsp)
+  3a190d:	lea    0xce0(%rsp),%r14
+  3a1915:	lea    0xcf8(%rsp),%r15
+  3a191d:	lea    0xd10(%rsp),%rbp
+  3a1925:	sub    $0x8,%rsp
+  3a1929:	lea    0x138(%rsp),%rdi
+  3a1931:	lea    0x538(%rsp),%rsi
+  3a1939:	mov    0xe0(%rsp),%rdx
+  3a1941:	lea    0xc40(%rsp),%rcx
+  3a1949:	push   %rax
+  3a194a:	call   361350 <litchi_opc::source_backed::publish_prepared_topology>
+  3a194f:	add    $0x10,%rsp
+  3a1953:	mov    %rbp,%rdi
+  3a1956:	call   330d10 <core::ptr::drop_in_place<core::option::Option<litchi_opc::source_backed::EffectiveTopologyData>>>
+  3a195b:	mov    %r15,%rdi
+  3a195e:	call   330e40 <core::ptr::drop_in_place<alloc::vec::Vec<alloc::sync::Arc<litchi_core::budget::Reservation>>>>
+  3a1963:	mov    %r14,%rdi
+  3a1966:	call   330e40 <core::ptr::drop_in_place<alloc::vec::Vec<alloc::sync::Arc<litchi_core::budget::Reservation>>>>
+  3a196b:	lea    0xcc8(%rsp),%rdi
+  3a1973:	call   330e40 <core::ptr::drop_in_place<alloc::vec::Vec<alloc::sync::Arc<litchi_core::budget::Reservation>>>>
+  3a1978:	lea    0xc80(%rsp),%rbx
+  3a1980:	lea    0xcb0(%rsp),%rdi
+  3a1988:	call   330f10 <core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::source_backed::MonitoredReads>>>
+  3a198d:	mov    0x98(%rsp),%r14
+  3a1995:	mov    0xa0(%rsp),%r12
+  3a199d:	inc    %r12
+  3a19a0:	mov    %r14,%rdi
+  3a19a3:	cmp    $0x1,%r12
+  3a19a7:	je     3a19bd <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x246d>
+  3a19a9:	lea    0x1a8(%rdi),%r15
+  3a19b0:	dec    %r12
+  3a19b3:	call   3306e0 <core::ptr::drop_in_place<litchi_opc::xml_splice::SourceXmlPart>>
+  3a19b8:	mov    %r15,%rdi
+  3a19bb:	jmp    3a19a3 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x2453>
+  3a19bd:	cmpq   $0x0,0x90(%rsp)
+  3a19c6:	je     3a19d1 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x2481>
+  3a19c8:	mov    %r14,%rdi
+  3a19cb:	call   *0x37899f(%rip)        # 71a370 <free@GLIBC_2.2.5>
+  3a19d1:	mov    %rbx,%rdi
+  3a19d4:	call   3308d0 <core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::source_backed::TopologyPartAddition>>>
+  3a19d9:	mov    0x48(%rsp),%r13
+  3a19de:	mov    0x118(%rsp),%ebp
+  3a19e5:	movabs $0x8000000000000036,%r15
+  3a19ef:	jmp    3a13c1 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x1e71>
+  3a19f4:	mov    %rcx,0xe80(%rsp)
+  3a19fc:	cmp    %rax,%rcx
+  3a19ff:	jbe    3a1b6d <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x261d>
+  3a1a05:	lea    0xe80(%rsp),%rax
+  3a1a0d:	mov    %rax,0x530(%rsp)
+  3a1a15:	lea    -0x2440bc(%rip),%rax        # 15d960 <<u64 as core::fmt::Display>::fmt>
+  3a1a1c:	mov    %rax,0x538(%rsp)
+  3a1a24:	lea    0x1590(%rsp),%rcx
+  3a1a2c:	mov    %rcx,0x540(%rsp)
+  3a1a34:	mov    %rax,0x548(%rsp)
+  3a1a3c:	lea    -0x37fc10(%rip),%rsi        # 21e33 <serde_json::ser::Formatter::write_char_escape::HEX_DIGITS+0xfc23>
+  3a1a43:	lea    0xe68(%rsp),%rdi
+  3a1a4b:	lea    0x530(%rsp),%rdx
+  3a1a53:	call   147790 <alloc::fmt::format::format_inner>
+  3a1a58:	mov    0x48(%rsp),%r13
+  3a1a5d:	lea    0xe68(%rsp),%rdi
+  3a1a65:	call   147f10 <<alloc::boxed::Box<dyn core::error::Error> as core::convert::From<alloc::string::String>>::from>
+  3a1a6a:	jmp    3a1731 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x21e1>
+  3a1a6f:	mov    0x1190(%rsp),%rax
+  3a1a77:	lock incq 0x10(%rax)
+  3a1a7c:	mov    %rax,0x8(%rsp)
+  3a1a81:	lock incq (%rax)
+  3a1a85:	jle    3a3858 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x4308>
+  3a1a8b:	lea    0x1180(%rsp),%rsi
+  3a1a93:	lea    0x2d0(%rsp),%rdi
+  3a1a9b:	call   221240 <litchi_opc::source_backed::SourceSnapshot::ensure_current>
+  3a1aa0:	movabs $0x8000000000000036,%rax
+  3a1aaa:	cmp    %rax,0x2d0(%rsp)
+  3a1ab2:	jne    3a1c32 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x26e2>
+  3a1ab8:	test   %rbx,%rbx
+  3a1abb:	je     3a1c7b <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x272b>
+  3a1ac1:	lea    0x2d0(%rsp),%rdi
+  3a1ac9:	mov    $0x10000,%ecx
+  3a1ace:	lea    0x13d0(%rsp),%rsi
+  3a1ad6:	xor    %edx,%edx
+  3a1ad8:	call   170aa0 <litchi_core::execution::ExecutionContext::reserve>
+  3a1add:	movzbl 0x2f0(%rsp),%edx
+  3a1ae5:	cmp    $0xd,%dl
+  3a1ae8:	jne    3a1e41 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x28f1>
+  3a1aee:	movdqu 0x2d0(%rsp),%xmm0
+  3a1af7:	movzbl 0x2e0(%rsp),%eax
+  3a1aff:	mov    %al,(%rsp)
+  3a1b02:	mov    0x2e1(%rsp),%eax
+  3a1b09:	mov    %eax,0x110(%rsp)
+  3a1b10:	mov    0x2e4(%rsp),%eax
+  3a1b17:	mov    %eax,0x113(%rsp)
+  3a1b1e:	movdqa %xmm0,0x1c0(%rsp)
+  3a1b27:	mov    0x110(%rsp),%eax
+  3a1b2e:	mov    0x113(%rsp),%ecx
+  3a1b35:	mov    %eax,0x108(%rsp)
+  3a1b3c:	mov    %ecx,0x10b(%rsp)
+  3a1b43:	movdqa %xmm0,0x1e0(%rsp)
+  3a1b4c:	mov    0x108(%rsp),%eax
+  3a1b53:	mov    0x10b(%rsp),%ecx
+  3a1b5a:	mov    %ecx,0x103(%rsp)
+  3a1b61:	mov    %eax,0x100(%rsp)
+  3a1b68:	jmp    3a1c7f <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x272f>
+  3a1b6d:	mov    0x30(%rsp),%rsi
+  3a1b72:	mov    0x60(%rsi),%rcx
+  3a1b76:	pxor   %xmm0,%xmm0
+  3a1b7a:	mov    0x48(%rsp),%rdi
+  3a1b7f:	movdqu %xmm0,0x50(%rdi)
+  3a1b84:	mov    %rsi,(%rdi)
+  3a1b87:	movups 0x20(%rsi),%xmm0
+  3a1b8b:	mov    0x20(%rsi),%rdx
+  3a1b8f:	movups %xmm0,0x8(%rdi)
+  3a1b93:	movups 0x30(%rsi),%xmm0
+  3a1b97:	movups %xmm0,0x18(%rdi)
+  3a1b9b:	movups 0x40(%rsi),%xmm0
+  3a1b9f:	movups %xmm0,0x28(%rdi)
+  3a1ba3:	mov    0x490(%rsp),%r8
+  3a1bab:	mov    %r8,0x38(%rdi)
+  3a1baf:	mov    %r8,0x40(%rdi)
+  3a1bb3:	mov    %rdx,0x48(%rdi)
+  3a1bb7:	movdqu 0x50(%rsi),%xmm0
+  3a1bbc:	movdqu %xmm0,0x60(%rdi)
+  3a1bc1:	mov    %rcx,0x70(%rdi)
+  3a1bc5:	mov    0x2c0(%rsp),%rcx
+  3a1bcd:	mov    %rcx,0x78(%rdi)
+  3a1bd1:	mov    0x2b8(%rsp),%rcx
+  3a1bd9:	mov    %rcx,0x80(%rdi)
+  3a1be0:	mov    %r14,0x88(%rdi)
+  3a1be7:	mov    %rbx,0x90(%rdi)
+  3a1bee:	mov    %rax,0x98(%rdi)
+  3a1bf5:	mov    0x480(%rsp),%rax
+  3a1bfd:	mov    %rax,0xa0(%rdi)
+  3a1c04:	mov    0x478(%rsp),%rax
+  3a1c0c:	mov    %rax,0xa8(%rdi)
+  3a1c13:	mov    0x470(%rsp),%rax
+  3a1c1b:	mov    %rax,0xb0(%rdi)
+  3a1c22:	movzbl 0x67(%rsp),%eax
+  3a1c27:	mov    %al,0xb8(%rdi)
+  3a1c2d:	jmp    3a0214 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0xcc4>
+  3a1c32:	movdqu 0x2d0(%rsp),%xmm0
+  3a1c3b:	movdqu 0x2e0(%rsp),%xmm1
+  3a1c44:	movups 0x2f0(%rsp),%xmm2
+  3a1c4c:	movups 0x300(%rsp),%xmm3
+  3a1c54:	movaps %xmm3,0x160(%rsp)
+  3a1c5c:	movaps %xmm2,0x150(%rsp)
+  3a1c64:	movdqa %xmm1,0x140(%rsp)
+  3a1c6d:	movdqa %xmm0,0x130(%rsp)
+  3a1c76:	jmp    3a3626 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x40d6>
+  3a1c7b:	movb   $0x9,(%rsp)
+  3a1c7f:	movdqa 0x1e0(%rsp),%xmm0
+  3a1c88:	mov    0x100(%rsp),%eax
+  3a1c8f:	mov    0x103(%rsp),%ecx
+  3a1c96:	mov    %eax,0xf8(%rsp)
+  3a1c9d:	mov    %ecx,0xfb(%rsp)
+  3a1ca4:	movdqa %xmm0,0xe0(%rsp)
+  3a1cad:	mov    0xf8(%rsp),%eax
+  3a1cb4:	mov    0xfb(%rsp),%ecx
+  3a1cbb:	mov    %eax,0xf1(%rsp)
+  3a1cc2:	mov    %ecx,0xf4(%rsp)
+  3a1cc9:	movzbl (%rsp),%eax
+  3a1ccd:	mov    %al,0xf0(%rsp)
+  3a1cd4:	mov    $0x1,%edi
+  3a1cd9:	mov    $0x10000,%esi
+  3a1cde:	call   *0x378734(%rip)        # 71a418 <calloc@GLIBC_2.2.5>
+  3a1ce4:	mov    %rax,0x70(%rsp)
+  3a1ce9:	test   %rax,%rax
+  3a1cec:	je     3a1e5d <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x290d>
+  3a1cf2:	movq   $0x0,0x230(%rsp)
+  3a1cfe:	test   %rbx,%rbx
+  3a1d01:	je     3a1f4d <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x29fd>
+  3a1d07:	mov    0x1208(%rsp),%rbx
+  3a1d0f:	test   %rbx,%rbx
+  3a1d12:	je     3a215f <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x2c0f>
+  3a1d18:	movq   $0x1,0x2d0(%rsp)
+  3a1d24:	movq   $0x1,0x2d8(%rsp)
+  3a1d30:	movl   $0x0,0x2e0(%rsp)
+  3a1d3b:	movb   $0x0,0x2e4(%rsp)
+  3a1d43:	movb   $0xd,0x308(%rsp)
+  3a1d4b:	mov    $0x40,%edi
+  3a1d50:	call   *0x37860a(%rip)        # 71a360 <malloc@GLIBC_2.2.5>
+  3a1d56:	mov    %rax,0x10(%rsp)
+  3a1d5b:	test   %rax,%rax
+  3a1d5e:	je     3a3744 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x41f4>
+  3a1d64:	movups 0x2d0(%rsp),%xmm0
+  3a1d6c:	movdqu 0x2e0(%rsp),%xmm1
+  3a1d75:	movups 0x2f0(%rsp),%xmm2
+  3a1d7d:	movups 0x300(%rsp),%xmm3
+  3a1d85:	mov    0x10(%rsp),%rax
+  3a1d8a:	movups %xmm3,0x30(%rax)
+  3a1d8e:	movups %xmm2,0x20(%rax)
+  3a1d92:	movdqu %xmm1,0x10(%rax)
+  3a1d97:	movups %xmm0,(%rax)
+  3a1d9a:	movdqu 0x1180(%rsp),%xmm0
+  3a1da3:	mov    0x1180(%rsp),%rax
+  3a1dab:	lock incq (%rax)
+  3a1daf:	jle    3a3858 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x4308>
+  3a1db5:	movdqu 0x11a0(%rsp),%xmm1
+  3a1dbe:	mov    0x11b0(%rsp),%rax
+  3a1dc6:	mov    %rax,0x20(%rsp)
+  3a1dcb:	mov    0x8(%rsp),%rax
+  3a1dd0:	lock incq (%rax)
+  3a1dd4:	jle    3a3858 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x4308>
+  3a1dda:	mov    0x1198(%rsp),%rax
+  3a1de2:	lock incq (%rax)
+  3a1de6:	jle    3a3858 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x4308>
+  3a1dec:	mov    0x11b8(%rsp),%rcx
+  3a1df4:	test   %rcx,%rcx
+  3a1df7:	je     3a268e <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x313e>
+  3a1dfd:	lock incq (%rcx)
+  3a1e01:	jle    3a3858 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x4308>
+  3a1e07:	mov    0x11c0(%rsp),%rsi
+  3a1e0f:	lock incq (%rsi)
+  3a1e13:	jle    3a3858 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x4308>
+  3a1e19:	mov    0x11f0(%rsp),%rdx
+  3a1e21:	test   %rdx,%rdx
+  3a1e24:	je     3a273a <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x31ea>
+  3a1e2a:	mov    0x11f8(%rsp),%rdi
+  3a1e32:	lock incq (%rdx)
+  3a1e36:	jg     3a273a <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x31ea>
+  3a1e3c:	jmp    3a3858 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x4308>
+  3a1e41:	cmp    $0x9,%dl
+  3a1e44:	jne    3a1ff4 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x2aa4>
+  3a1e4a:	movabs $0x8000000000000036,%rax
+  3a1e54:	lea    -0x1b(%rax),%rcx
+  3a1e58:	jmp    3a2056 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x2b06>
+  3a1e5d:	movabs $0x8000000000000036,%rax
+  3a1e67:	add    $0xfffffffffffffffd,%rax
+  3a1e6b:	mov    %rax,0x130(%rsp)
+  3a1e73:	movq   $0x1,0x138(%rsp)
+  3a1e7f:	movq   $0x10000,0x140(%rsp)
+  3a1e8b:	lea    -0x347283(%rip),%rax        # 5ac0f <crc32fast::table::CRC32_TABLE+0x271a3>
+  3a1e92:	mov    %rax,0x148(%rsp)
+  3a1e9a:	movq   $0x24,0x150(%rsp)
+  3a1ea6:	jmp    3a21e4 <litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration+0x2c94>
+  3a1eab:	movzbl 0x531(%rsp),%eax
+  3a1eb3:	mov    %al,0x10(%rsp)
+  3a1eb7:	mov    0x532(%rsp),%eax
+  3a1ebe:	mov    %eax,0xe0(%rsp)
+  3a1ec5:	movzwl 0x536(%rsp),%eax
+  3a1ecd:	mov    %ax,0xe4(%rsp)
+  3a1ed5:	mov    0x538(%rsp),%rax
+  3a1edd:	mov    %rax,0x20(%rsp)
+  3a1ee2:	mov    0x540(%rsp),%rax
+  3a1eea:	mov    %rax,0x18(%rsp)
+  3a1eef:	mov    0x548(%rsp),%rax
+  3a1ef7:	mov    %rax,(%rsp)
+  3a1efb:	.byte 0xf
+  3a1efc:	.byte 0x10
+  3a1efd:	test   %ah,(%rax,%rdx,2)

@@ -1,0 +1,62 @@
+{
+  "utc": "2026-10-07T20:14:08.879072+00:00",
+  "command": [
+    "/usr/bin/taskset",
+    "--cpu-list",
+    "12-15",
+    "/usr/bin/perf",
+    "record",
+    "-e",
+    "cycles:u",
+    "-F",
+    "997",
+    "--call-graph",
+    "fp",
+    "--period",
+    "--timestamp",
+    "--sample-cpu",
+    "--buildid-all",
+    "--no-buildid-cache",
+    "--strict-freq",
+    "--user-callchains",
+    "-o",
+    "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/perf.data",
+    "--",
+    "/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+    "--shape",
+    "medium",
+    "--workload",
+    "one-edit",
+    "--workers",
+    "1",
+    "--warmup",
+    "0",
+    "--samples",
+    "200",
+    "--output",
+    "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/output"
+  ],
+  "env": {
+    "PATH": "/usr/bin:/bin",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "TZ": "UTC",
+    "RUST_BACKTRACE": "0"
+  },
+  "plan": {
+    "path": "/home/zhuhe/litchi-performance-0962/fp-plan-v1.json",
+    "bytes": 5028,
+    "sha256": "b4494abbe8da21ca7e54a4f022b92bb13b4700e09d5ff4a42b8772d213fa5bea"
+  },
+  "binary": {
+    "path": "/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+    "bytes": 104819848,
+    "sha256": "843ae35a0f5131a8cba965f917b2a4c5fccb6926ae3d66862e5f78512820fb33"
+  },
+  "helper": {
+    "path": "/home/zhuhe/litchi-performance-0962/tools/capture_fp_v1.py",
+    "bytes": 5420,
+    "sha256": "7a71f067f292c346569c3c1f2eaadd5a4847736dd6e973258dd8d673f8bdda34"
+  },
+  "cwd": "/home/zhuhe/litchi-performance-0957/source-v1"
+}

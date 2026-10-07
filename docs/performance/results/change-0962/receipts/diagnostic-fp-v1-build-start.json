@@ -1,0 +1,109 @@
+{
+  "build_dir": "/home/zhuhe/litchi-performance-0962/builds/diagnostic-fp-v1",
+  "build_helper": {
+    "bytes": 12982,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0962/build-tools/build_diagnostic_fp_v1.py",
+    "sha256": "239337bb453b50ace7b792f4f51cdffc7146fcb0ea55b574e8fb642a7be34965"
+  },
+  "cargo_identity": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\nrelease: 1.95.0\ncommit-hash: f2d3ce0bd7f24a49f8f72d9000448f8838c4e850\ncommit-date: 2026-03-21\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.2 (sys:0.20.4 vendored)\nlibcurl: 8.15.0-DEV (sys:0.4.83+curl-8.15.0 vendored ssl:OpenSSL/3.5.4)\nssl: OpenSSL 3.5.4 30 Sep 2025\nos: Ubuntu 26.4.0 (resolute) [64-bit]\n",
+  "command": [
+    "/home/zhuhe/.cargo/bin/cargo",
+    "+1.95.0",
+    "build",
+    "--release",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/Cargo.toml",
+    "--features",
+    "allocator-metrics",
+    "--example",
+    "xlsx_managed_compression_benchmark"
+  ],
+  "cwd": "/home/zhuhe/litchi-performance-0957/source-v1",
+  "deadline_seconds": 1800,
+  "effective_build_environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+    "CARGO_PROFILE_RELEASE_DEBUG": "2",
+    "CARGO_PROFILE_RELEASE_LTO": "fat",
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-performance-0962/target-diagnostic-fp-v1",
+    "CARGO_TERM_COLOR": "never",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/home/zhuhe/.cargo/bin:/usr/bin:/bin",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C debuginfo=2",
+    "RUSTUP_TOOLCHAIN": "1.95.0",
+    "RUST_BACKTRACE": "0",
+    "TMPDIR": "/home/zhuhe/litchi-performance-0962/tmp/diagnostic-fp-v1",
+    "TZ": "UTC"
+  },
+  "env_overrides": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+    "CARGO_PROFILE_RELEASE_DEBUG": "2",
+    "CARGO_PROFILE_RELEASE_LTO": "fat",
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-performance-0962/target-diagnostic-fp-v1",
+    "CARGO_TERM_COLOR": "never",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/home/zhuhe/.cargo/bin:/usr/bin:/bin",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C debuginfo=2",
+    "RUSTUP_TOOLCHAIN": "1.95.0",
+    "RUST_BACKTRACE": "0",
+    "TMPDIR": "/home/zhuhe/litchi-performance-0962/tmp/diagnostic-fp-v1",
+    "TZ": "UTC"
+  },
+  "no_rustflags": false,
+  "purpose": "Diagnostic native CPU attribution only; frame pointers and debug2 differ from performance baseline",
+  "removed_environment_flags": [
+    "RUSTFLAGS",
+    "CARGO_ENCODED_RUSTFLAGS",
+    "RUSTC_WRAPPER",
+    "RUSTC_WORKSPACE_WRAPPER",
+    "RUSTC",
+    "RUSTDOC",
+    "CARGO_BUILD_RUSTC_WRAPPER",
+    "CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER",
+    "CARGO_BUILD_RUSTFLAGS"
+  ],
+  "roles": [
+    "xlsx_managed_compression_benchmark"
+  ],
+  "rustc_identity": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "schema": "litchi.performance.0962.diagnostic-fp-v1.build-start",
+  "source_manifest": {
+    "bytes": 2267268,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0957/source-manifest-v2.json",
+    "sha256": "f5fd1ee75b734bb7efaa1882be0397defea98c76c835be0bdf1f565c573ef617"
+  },
+  "source_root": "/home/zhuhe/litchi-performance-0957/source-v1",
+  "source_verification_start": {
+    "actual_bytes": 273429543,
+    "actual_file_count": 10932,
+    "file_count": 10932,
+    "manifest": {
+      "bytes": 2267268,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0957/source-manifest-v2.json",
+      "sha256": "f5fd1ee75b734bb7efaa1882be0397defea98c76c835be0bdf1f565c573ef617"
+    },
+    "manifest_bytes": 273429543,
+    "mismatch_count": 0,
+    "mismatches": [],
+    "source_root": "/home/zhuhe/litchi-performance-0957/source-v1",
+    "tree_digest_from_manifest": "1d2cdd4fd438a01913244c6c52bb1239e26ec10a3be586c8c2b3daa03bb1d141",
+    "tree_digest_from_source": "1d2cdd4fd438a01913244c6c52bb1239e26ec10a3be586c8c2b3daa03bb1d141",
+    "verified": true
+  },
+  "started_utc": "2026-10-07T19:39:56.579620Z",
+  "target_dir": "/home/zhuhe/litchi-performance-0962/target-diagnostic-fp-v1"
+}

@@ -1,0 +1,38 @@
+{
+  "schema": "litchi.performance.0962.native-cpu-profile-schedule-timestamp-correction.v1",
+  "created_utc": "2026-10-07T19:32:35Z",
+  "status": "recorded",
+  "issue": "The three schedule JSON files contain hardcoded created_utc values that do not describe their filesystem creation times. They are retained unchanged for custody; this receipt is the authoritative timestamp correction.",
+  "observed_files": [
+    {
+      "path": "cpu-profile-native-v1/schedule.json",
+      "file_mtime_utc": "2026-10-07T19:24:13.789539539Z",
+      "bytes": 1920,
+      "embedded_created_utc": "2026-10-07T19:30:00Z"
+    },
+    {
+      "path": "cpu-profile-native-v1/phase-followup-schedule.json",
+      "file_mtime_utc": "2026-10-07T19:28:05.967461083Z",
+      "bytes": 899,
+      "embedded_created_utc": "2026-10-07T19:27:00Z"
+    },
+    {
+      "path": "cpu-profile-native-v1/high-depth-wave-schedule.json",
+      "file_mtime_utc": "2026-10-07T19:29:20.275758016Z",
+      "bytes": 1654,
+      "embedded_created_utc": "2026-10-07T19:31:00Z"
+    }
+  ],
+  "actual_order": [
+    "schedule.json was created before the 99 Hz wave",
+    "phase-followup-schedule.json was created before the 199 Hz medium follow-up",
+    "high-depth-wave-schedule.json was created before the high-depth forward medium profile"
+  ],
+  "first_high_depth_profile": {
+    "start_utc": "2026-10-07T19:29:23Z",
+    "end_utc": "2026-10-07T19:29:45Z",
+    "returncode": 0,
+    "path": "cpu-profile-native-v1/high-depth-forward-medium-one-percent"
+  },
+  "interpretation": "No schedule field is used as evidence for process launch order or duration. Future receipts use runtime date output rather than hardcoded timestamps."
+}

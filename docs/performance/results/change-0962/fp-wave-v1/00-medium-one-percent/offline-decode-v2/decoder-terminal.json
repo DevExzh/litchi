@@ -1,0 +1,25 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "/home/zhuhe/litchi-performance-0962/tools/analyze_native_cpu_v1.py",
+    "--script",
+    "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent/offline-decode-v1/perf-script-inline.txt",
+    "--physical-script",
+    "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent/offline-decode-v2/perf-script-physical.txt",
+    "--binary",
+    "/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+    "--output",
+    "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent/offline-decode-v2/analyzer.json"
+  ],
+  "cwd": "/home/zhuhe/litchi-performance-0962",
+  "deadline_seconds": 900,
+  "failure": null,
+  "finished_utc": "2026-10-07T20:24:15.398128+00:00",
+  "pid": 3197945,
+  "process_group_clear": true,
+  "returncode": 0,
+  "schema": "litchi.performance.0962.fp-wave-decoder.v2.terminal",
+  "started_utc": "2026-10-07T20:24:04.169296+00:00",
+  "terminal_before_parse": true,
+  "timeout": false
+}

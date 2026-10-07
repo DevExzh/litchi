@@ -1,0 +1,97 @@
+{
+  "utc": "2026-10-07T20:15:17.930497+00:00",
+  "status": "capture_validated",
+  "children": [
+    {
+      "index": 0,
+      "case": "medium-one-percent",
+      "command": [
+        "/usr/bin/python3",
+        "/home/zhuhe/litchi-performance-0962/tools/capture_fp_v1.py",
+        "--plan",
+        "/home/zhuhe/litchi-performance-0962/fp-plan-v1.json",
+        "--case",
+        "medium-one-percent",
+        "--output",
+        "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent"
+      ],
+      "returncode": 0
+    },
+    {
+      "index": 1,
+      "case": "dense-sparse-one-percent",
+      "command": [
+        "/usr/bin/python3",
+        "/home/zhuhe/litchi-performance-0962/tools/capture_fp_v1.py",
+        "--plan",
+        "/home/zhuhe/litchi-performance-0962/fp-plan-v1.json",
+        "--case",
+        "dense-sparse-one-percent",
+        "--output",
+        "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent"
+      ],
+      "returncode": 0
+    },
+    {
+      "index": 2,
+      "case": "medium-one-edit",
+      "command": [
+        "/usr/bin/python3",
+        "/home/zhuhe/litchi-performance-0962/tools/capture_fp_v1.py",
+        "--plan",
+        "/home/zhuhe/litchi-performance-0962/fp-plan-v1.json",
+        "--case",
+        "medium-one-edit",
+        "--output",
+        "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit"
+      ],
+      "returncode": 0
+    },
+    {
+      "index": 3,
+      "case": "medium-one-edit",
+      "command": [
+        "/usr/bin/python3",
+        "/home/zhuhe/litchi-performance-0962/tools/capture_fp_v1.py",
+        "--plan",
+        "/home/zhuhe/litchi-performance-0962/fp-plan-v1.json",
+        "--case",
+        "medium-one-edit",
+        "--output",
+        "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit"
+      ],
+      "returncode": 0
+    },
+    {
+      "index": 4,
+      "case": "dense-sparse-one-percent",
+      "command": [
+        "/usr/bin/python3",
+        "/home/zhuhe/litchi-performance-0962/tools/capture_fp_v1.py",
+        "--plan",
+        "/home/zhuhe/litchi-performance-0962/fp-plan-v1.json",
+        "--case",
+        "dense-sparse-one-percent",
+        "--output",
+        "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent"
+      ],
+      "returncode": 0
+    },
+    {
+      "index": 5,
+      "case": "medium-one-percent",
+      "command": [
+        "/usr/bin/python3",
+        "/home/zhuhe/litchi-performance-0962/tools/capture_fp_v1.py",
+        "--plan",
+        "/home/zhuhe/litchi-performance-0962/fp-plan-v1.json",
+        "--case",
+        "medium-one-percent",
+        "--output",
+        "/home/zhuhe/litchi-performance-0962/fp-wave-v1/05-medium-one-percent"
+      ],
+      "returncode": 0
+    }
+  ],
+  "attribution_status": "pending offline decode; no wave admission claim"
+}

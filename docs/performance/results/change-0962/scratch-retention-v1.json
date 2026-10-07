@@ -1,0 +1,48 @@
+{
+  "utc": "2026-10-07T20:22:31.620354+00:00",
+  "scope": "Legacy derived diagnostic scratch only; no final attribution or admission depends on these files. Preserved externally for history and removed from /tmp.",
+  "files": [
+    {
+      "old_path": "/tmp/err0962",
+      "retained_path": "/home/zhuhe/litchi-performance-0962/diagnostics/legacy-scratch/err0962",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "old_path": "/tmp/out0962",
+      "retained_path": "/home/zhuhe/litchi-performance-0962/diagnostics/legacy-scratch/out0962",
+      "bytes": 392450,
+      "sha256": "e16111fc89ebb0122d62ae5033f8a2d45690fc28aef5b5f8443be8269291f7f6"
+    },
+    {
+      "old_path": "/tmp/0962-followup-medium.perf-script",
+      "retained_path": "/home/zhuhe/litchi-performance-0962/diagnostics/legacy-scratch/0962-followup-medium.perf-script",
+      "bytes": 1074418,
+      "sha256": "6924766e1502e0ae4dea20a3e7e711e4b2c5d8a046a842a2ea6e65331c7d14e6"
+    },
+    {
+      "old_path": "/tmp/0962-medium-one-percent.perf-script",
+      "retained_path": "/home/zhuhe/litchi-performance-0962/diagnostics/legacy-scratch/0962-medium-one-percent.perf-script",
+      "bytes": 388372,
+      "sha256": "c9a8dac824dea813d8eb5c7eb87e3e161230669e48eeb4b155b67c5711dcd008"
+    },
+    {
+      "old_path": "/tmp/0962-medium-one-edit.perf-script",
+      "retained_path": "/home/zhuhe/litchi-performance-0962/diagnostics/legacy-scratch/0962-medium-one-edit.perf-script",
+      "bytes": 324787,
+      "sha256": "65a094e77da9c54e7ca778c428c2fda67b854a14c6f33b0336327dbec3fb61ef"
+    },
+    {
+      "old_path": "/tmp/0962-dense-sparse-one-percent.perf-script",
+      "retained_path": "/home/zhuhe/litchi-performance-0962/diagnostics/legacy-scratch/0962-dense-sparse-one-percent.perf-script",
+      "bytes": 546087,
+      "sha256": "30e3f97a89095d723e4ceaac0fb4e3eb2002a66d4af815357ae6d728594384c6"
+    },
+    {
+      "old_path": "/tmp/disasm-0962-timed.txt",
+      "retained_path": "/home/zhuhe/litchi-performance-0962/diagnostics/legacy-scratch/disasm-0962-timed.txt",
+      "bytes": 68315,
+      "sha256": "0153db09c8d47360e838df1bf159aa9f1fd04914f74574f1c37c8067efbf0594"
+    }
+  ]
+}

@@ -1,0 +1,108 @@
+{
+  "capture_receipts": {
+    "terminal": {
+      "path": "/home/zhuhe/litchi-performance-0962/fp-pilot-v1/terminal.json",
+      "sha256": "d124ce57cf7c6fc77ba49c4609241acd106c9e66548e6c3eaadbeae4a09075d0"
+    },
+    "validation": {
+      "path": "/home/zhuhe/litchi-performance-0962/fp-pilot-v1/validation.json",
+      "sha256": "7d16690af33ad19300757db30c8ae42c88b13fb07dbc4f15a2761dd1d551880f"
+    }
+  },
+  "capture_terminal_is_separate": true,
+  "decoder_terminal_receipt": {
+    "available": false,
+    "note": "The pilot decoder was run through the shell tool; no separate decoder terminal.json was created. The observed command return code is recorded below."
+  },
+  "export_commands": [
+    {
+      "argv": [
+        "perf",
+        "script",
+        "--show-lost-events",
+        "--demangle",
+        "--inline",
+        "-F",
+        "comm,pid,tid,time,event,period,ip,sym,symoff,dso,srcline",
+        "-i",
+        "/home/zhuhe/litchi-performance-0962/fp-pilot-v1/perf.data"
+      ],
+      "name": "inline",
+      "returncode": 0,
+      "stderr": "/home/zhuhe/litchi-performance-0962/fp-pilot-v1/perf-script-inline-v1.stderr",
+      "stdout": "/home/zhuhe/litchi-performance-0962/fp-pilot-v1/perf-script-inline-v1.txt",
+      "timestamps_available": false
+    },
+    {
+      "argv": [
+        "perf",
+        "script",
+        "--show-lost-events",
+        "--demangle",
+        "--no-inline",
+        "-F",
+        "comm,pid,tid,time,event,period,ip,sym,symoff,dso,srcline",
+        "-i",
+        "/home/zhuhe/litchi-performance-0962/fp-pilot-v1/perf.data"
+      ],
+      "name": "physical_no_inline",
+      "returncode": 0,
+      "stderr": "/home/zhuhe/litchi-performance-0962/fp-pilot-v1/perf-script-physical-v1.stderr",
+      "stdout": "/home/zhuhe/litchi-performance-0962/fp-pilot-v1/perf-script-physical-v1.txt",
+      "timestamps_available": false
+    }
+  ],
+  "helper": {
+    "bytes": 62780,
+    "frozen": true,
+    "path": "/home/zhuhe/litchi-performance-0962/tools/analyze_native_cpu_v1.py",
+    "sha256": "f5f7a387f99ba3a587eeb8f27c8f422a9fa696306c2ae47724952b861910bd3d"
+  },
+  "paired_exports": {
+    "inline": {
+      "bytes": 96343267,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-pilot-v1/perf-script-inline-v1.txt",
+      "sha256": "c03f506e569fee1d56f09b34ecc13491d1cb63d01e108c629641fa82a147a82f",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "physical": {
+      "bytes": 58246058,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-pilot-v1/perf-script-physical-v1.txt",
+      "sha256": "13596bcecdc1583a340e161d20fd67116050139ad3674b22a9a84d3b7167dfea",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "replay": {
+    "command": "python3 tools/analyze_native_cpu_v1.py --script /home/zhuhe/litchi-performance-0962/fp-pilot-v1/perf-script-inline-v1.txt --physical-script /home/zhuhe/litchi-performance-0962/fp-pilot-v1/perf-script-physical-v1.txt --binary /home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1 --output /home/zhuhe/litchi-performance-0962/fp-pilot-v1/analyzer-paired-v5.json",
+    "exact_pairing": true,
+    "gate_admitted": true,
+    "lost_records": 0,
+    "output": {
+      "bytes": 271915,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-pilot-v1/analyzer-paired-v5.json",
+      "sha256": "6eb0863fc1507ea206ba900fc8d6347112e52568e7626e1d4d5fbf01778c03aa"
+    },
+    "qualification": "qualified_ancestry_present",
+    "qualified_period": 8443033125,
+    "qualified_samples": 1921,
+    "returncode": 0,
+    "whole_process_period": 91320259987,
+    "whole_process_samples": 20998
+  },
+  "schema": "litchi.performance.0962.pilot-decoder-controls.v1",
+  "tests": {
+    "command": "python3 -m unittest -q tools/test_analyze_native_cpu_v1.py",
+    "failed": 0,
+    "passed": 11,
+    "py_compile_command": "python3 -m py_compile tools/analyze_native_cpu_v1.py tools/test_analyze_native_cpu_v1.py",
+    "py_compile_returncode": 0,
+    "returncode": 0,
+    "test_file": {
+      "bytes": 17830,
+      "path": "/home/zhuhe/litchi-performance-0962/tools/test_analyze_native_cpu_v1.py",
+      "sha256": "fccd14fb990a5a06854623d67891770c3796d8f86595c89a5202cd9f75a90ed7"
+    }
+  }
+}

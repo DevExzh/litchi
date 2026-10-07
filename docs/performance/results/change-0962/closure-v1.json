@@ -1,0 +1,42 @@
+{
+  "schema": "litchi.performance.0962.closure.v1",
+  "utc": "2026-10-07T20:33:24.356758+00:00",
+  "status": "diagnostic_attribution_qualified",
+  "production_changed": false,
+  "speedup_claim": false,
+  "goal_complete": false,
+  "capture_iterations": {
+    "pilot": 200,
+    "wave": 1200
+  },
+  "qualified_samples": 12319,
+  "qualified_period": 52852646778,
+  "wave_samples": 134969,
+  "wave_period": 583643582118,
+  "frozen_wave_inputs_restored_and_verified": true,
+  "binary_retention_verified": true,
+  "independent_admission": {
+    "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-admission-independent-v1.json",
+    "bytes": 103854,
+    "sha256": "7be4886ac97ad85c1f29a207d826530ebe11676a53e7d77ecb87d77fb29d8da1"
+  },
+  "independent_audit": {
+    "path": "/home/zhuhe/litchi-performance-0962/review/fp-wave-audit-independent-v1.json",
+    "bytes": 12471,
+    "sha256": "ac7bc7c8356f9b904cd011546ed2d17e10bedf18e43c8e42dbb565735560523f"
+  },
+  "build_cache_cleanup": {
+    "path": "/home/zhuhe/litchi-performance-0962/build-cache-cleanup-v1.json",
+    "bytes": 1013,
+    "sha256": "d97b80bc3779161e4f31f2e2a8bf54122f80aacf4635dade99a28cd08e28f01b"
+  },
+  "scratch_retention": {
+    "path": "/home/zhuhe/litchi-performance-0962/scratch-retention-v1.json",
+    "bytes": 2229,
+    "sha256": "5febef1e423809aee2afcc5b3c0869b59dd214fc6253302e3c6ba2940fe34ff8"
+  },
+  "removed_bytecode_dirs": [
+    "/home/zhuhe/litchi-performance-0962/tools/__pycache__"
+  ],
+  "scope": "Frame-pointer/debug2 attribution only; prior flags remain open. Source-file ranking withheld for relative/missing locations. Physical symbol partition qualifies. No capture retry or adopted candidate."
+}

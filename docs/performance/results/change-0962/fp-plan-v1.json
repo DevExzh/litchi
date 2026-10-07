@@ -1,0 +1,140 @@
+{
+  "schema": "litchi.performance.0962.fp-capture-plan.v1",
+  "status": "authorized",
+  "purpose": "diagnostic CPU attribution only",
+  "created_utc": "2026-10-07T19:52:12.162174+00:00",
+  "binary": {
+    "path": "/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+    "bytes": 104819848,
+    "sha256": "843ae35a0f5131a8cba965f917b2a4c5fccb6926ae3d66862e5f78512820fb33"
+  },
+  "build_id": "7eb92ba2f0f8f3b248b77d8691e27b80b114fb22",
+  "build_result": {
+    "path": "/home/zhuhe/litchi-performance-0962/receipts/diagnostic-fp-v1-build-result.json",
+    "bytes": 1333,
+    "sha256": "dbf25c2a53595a80b8c92b0262aa67c783a173eed1a22807ea1cb23d3eaa3df4"
+  },
+  "capture_helper": {
+    "path": "/home/zhuhe/litchi-performance-0962/tools/capture_fp_v1.py",
+    "bytes": 5420,
+    "sha256": "7a71f067f292c346569c3c1f2eaadd5a4847736dd6e973258dd8d673f8bdda34"
+  },
+  "cases": [
+    {
+      "case_id": "medium-one-percent",
+      "context_limits": {
+        "depth": 256,
+        "execution_in_flight_bytes": 2956761,
+        "execution_in_flight_tasks": 1,
+        "execution_min_parallel_bytes": 0,
+        "execution_min_task_bytes": 0,
+        "execution_workers": 1,
+        "input_bytes": 67108864,
+        "memory": 2956761,
+        "objects": 1000000,
+        "output_bytes": 8519112,
+        "root_cpu_tasks": 5,
+        "root_io_concurrency": 1,
+        "root_workers": 1,
+        "work": 1000000000
+      },
+      "expected_cpu_tasks": 5,
+      "expected_worker_permits": 0,
+      "output_bytes": 4226788,
+      "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+      "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+      "shape": "medium",
+      "source_bytes": 4226429,
+      "source_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+      "update_count": 93,
+      "workload": "one-percent"
+    },
+    {
+      "case_id": "dense-sparse-one-percent",
+      "context_limits": {
+        "depth": 256,
+        "execution_in_flight_bytes": 3196436,
+        "execution_in_flight_tasks": 1,
+        "execution_min_parallel_bytes": 0,
+        "execution_min_task_bytes": 0,
+        "execution_workers": 1,
+        "input_bytes": 67108864,
+        "memory": 3196436,
+        "objects": 1000000,
+        "output_bytes": 8570408,
+        "root_cpu_tasks": 5,
+        "root_io_concurrency": 1,
+        "root_workers": 1,
+        "work": 1000000000
+      },
+      "expected_cpu_tasks": 5,
+      "expected_worker_permits": 0,
+      "output_bytes": 4252436,
+      "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+      "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+      "shape": "dense-sparse",
+      "source_bytes": 4251863,
+      "source_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+      "update_count": 178,
+      "workload": "one-percent"
+    },
+    {
+      "case_id": "medium-one-edit",
+      "context_limits": {
+        "depth": 256,
+        "execution_in_flight_bytes": 2751297,
+        "execution_in_flight_tasks": 1,
+        "execution_min_parallel_bytes": 0,
+        "execution_min_task_bytes": 0,
+        "execution_workers": 1,
+        "input_bytes": 67108864,
+        "memory": 2751297,
+        "objects": 1000000,
+        "output_bytes": 8518496,
+        "root_cpu_tasks": 2,
+        "root_io_concurrency": 1,
+        "root_workers": 1,
+        "work": 1000000000
+      },
+      "expected_cpu_tasks": 2,
+      "expected_worker_permits": 0,
+      "output_bytes": 4226480,
+      "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+      "semantic_sha256": "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+      "shape": "medium",
+      "source_bytes": 4226429,
+      "source_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+      "update_count": 1,
+      "workload": "one-edit"
+    }
+  ],
+  "frequency_hz": 997,
+  "samples": 200,
+  "warmup": 0,
+  "workers": 1,
+  "cpu_mask": "12-15",
+  "cwd": "/home/zhuhe/litchi-performance-0957/source-v1",
+  "pilot": "medium-one-percent",
+  "wave_schedule": [
+    "medium-one-percent",
+    "dense-sparse-one-percent",
+    "medium-one-edit",
+    "medium-one-edit",
+    "dense-sparse-one-percent",
+    "medium-one-percent"
+  ],
+  "gates": {
+    "semantic_validation": "passed",
+    "process_group_clear": true,
+    "record_returncode": 0,
+    "lost_records": 0,
+    "minimum_qualified_samples": 100,
+    "minimum_qualified_period": 100000,
+    "physical_inline_pair_identity": true,
+    "sample_and_period_conservation": true,
+    "binary_mapping_build_id_match": true,
+    "qualified_unknown_frames": 0
+  },
+  "thread_scope": "inherit enabled; all threads retained; qualified ancestry is thread-local",
+  "release_rule": "Pilot must pass every gate before wave. Stop on any failed child; no replacements. Profile times not baseline or speedup evidence."
+}

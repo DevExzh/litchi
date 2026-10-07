@@ -1,0 +1,15 @@
+{
+  "index": 3,
+  "case": "medium-one-edit",
+  "command": [
+    "/usr/bin/python3",
+    "/home/zhuhe/litchi-performance-0962/tools/capture_fp_v1.py",
+    "--plan",
+    "/home/zhuhe/litchi-performance-0962/fp-plan-v1.json",
+    "--case",
+    "medium-one-edit",
+    "--output",
+    "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit"
+  ],
+  "returncode": 0
+}

@@ -1,0 +1,374 @@
+{
+  "created_utc": "2026-10-07T20:12:26.703715+00:00",
+  "decoder": {
+    "analyzer_binary_binding": {
+      "bytes": 104819848,
+      "elf_build_id": "7eb92ba2f0f8f3b248b77d8691e27b80b114fb22",
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+      "sha256": "843ae35a0f5131a8cba965f917b2a4c5fccb6926ae3d66862e5f78512820fb33"
+    },
+    "analyzer_output": {
+      "bytes": 271915,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-pilot-v1/analyzer-paired-v5.json",
+      "sha256": "6eb0863fc1507ea206ba900fc8d6347112e52568e7626e1d4d5fbf01778c03aa"
+    },
+    "binary_binding_exact": true,
+    "classification": {
+      "no_phase_marker": {
+        "period": 77566523839,
+        "period_share": 0.8493900898885096,
+        "samples": 17868
+      },
+      "qualified": {
+        "period": 8443033125,
+        "period_share": 0.09245520245126237,
+        "samples": 1921
+      },
+      "unknown_frames": {
+        "period": 69052577,
+        "period_share": 0.0007561583487588631,
+        "samples": 16
+      },
+      "unqualified_phase": {
+        "period": 5241650446,
+        "period_share": 0.05739854931146912,
+        "samples": 1193
+      }
+    },
+    "conservation": {
+      "header_multiset_pass": true,
+      "inline_classified_period": 91320259987,
+      "inline_classified_samples": 20998,
+      "inline_input_period": 91320259987,
+      "inline_input_samples": 20998,
+      "inline_period_sum_pass": true,
+      "inline_sample_count_pass": true,
+      "paired_stream_population_pass": true,
+      "physical_input_period": 91320259987,
+      "physical_input_samples": 20998,
+      "physical_pair_population": 20998
+    },
+    "corrected_stage_interpretation": {
+      "derivation": "any_timed minus any_stage; these rows contain timed_iteration evidence without an inline stage_timed_commit marker and are unqualified, not multiple-stage rows.",
+      "period": 5241650446,
+      "period_share": 0.05739854931146912,
+      "reason": "stage_marker_missing",
+      "samples": 1193
+    },
+    "marker_evidence": {
+      "any_stage": {
+        "period": 8443033125,
+        "period_share": 0.09245520245126237,
+        "samples": 1921
+      },
+      "any_timed": {
+        "period": 13684683571,
+        "period_share": 0.1498537517627315,
+        "samples": 3114
+      },
+      "inline_stage": {
+        "period": 8443033125,
+        "period_share": 0.09245520245126237,
+        "samples": 1921
+      },
+      "inline_timed": {
+        "period": 13684683571,
+        "period_share": 0.1498537517627315,
+        "samples": 3114
+      },
+      "ordered_stage_timed_pair": {
+        "period": 8443033125,
+        "period_share": 0.09245520245126237,
+        "samples": 1921
+      },
+      "physical_timed_source": {
+        "period": 13684683571,
+        "period_share": 0.1498537517627315,
+        "samples": 3114
+      },
+      "source_valid_pair": {
+        "period": 8443033125,
+        "period_share": 0.09245520245126237,
+        "samples": 1921
+      },
+      "strict_physical_timed_no_inline": {
+        "period": 13684683571,
+        "period_share": 0.1498537517627315,
+        "samples": 3114
+      },
+      "timed_ip_match": {
+        "period": 13684683571,
+        "period_share": 0.1498537517627315,
+        "samples": 3114
+      }
+    },
+    "owner_ranking_policy": "withheld for this pilot; analyzer heuristic owner categories and inclusive tags are not admission evidence; deepest source groups are descriptive only after separate source review.",
+    "pairing": {
+      "duplicate_inline_key_details": [],
+      "duplicate_inline_keys": 0,
+      "duplicate_inline_records": 0,
+      "duplicate_physical_key_details": [],
+      "duplicate_physical_keys": 0,
+      "duplicate_physical_records": 0,
+      "exact_pairing_pass": true,
+      "header_count_equal": true,
+      "header_key_multiplicity_equal": true,
+      "header_multiset_equal": true,
+      "header_period_equal": true,
+      "inline_header_count": 20998,
+      "inline_only_key_details": [],
+      "inline_period": 91320259987,
+      "inline_samples": 20998,
+      "paired_samples": 20998,
+      "physical_header_count": 20998,
+      "physical_only_key_details": [],
+      "physical_pair_population": 20998,
+      "physical_period": 91320259987,
+      "physical_samples": 20998,
+      "queue_duplicate_physical_records": 0,
+      "unmatched_inline_period": 0,
+      "unmatched_inline_samples": 0,
+      "unmatched_physical_period": 0,
+      "unmatched_physical_samples": 0
+    },
+    "parser": {
+      "inline": {
+        "diagnostics": {
+          "frames": 772194,
+          "headers": 20998,
+          "source_locations": 772169
+        },
+        "sample_count": 20998
+      },
+      "perf_version": null,
+      "physical": {
+        "diagnostics": {
+          "build_id_lines": 41954,
+          "frames": 315581,
+          "headers": 20998,
+          "source_locations": 273602
+        },
+        "sample_count": 20998
+      }
+    },
+    "qualification": "qualified_ancestry_present",
+    "qualification_gate": {
+      "admitted": true,
+      "admitted_without_lost_record_binding": false,
+      "lost_records": 0,
+      "lost_records_zero": true,
+      "minimum_period": 100000,
+      "minimum_samples": 100,
+      "qualified_period": 8443033125,
+      "qualified_period_min_pass": true,
+      "qualified_samples": 1921,
+      "qualified_samples_min_pass": true
+    },
+    "reasons": {
+      "no_timer_marker_in_inline_rendering": {
+        "period": 77566523839,
+        "period_share": 0.8493900898885096,
+        "samples": 17868
+      },
+      "paired_physical_timed_and_inline_stage_with_source_checks": {
+        "period": 8443033125,
+        "period_share": 0.09245520245126237,
+        "samples": 1921
+      },
+      "stage_marker_missing": {
+        "period": 5241650446,
+        "period_share": 0.05739854931146912,
+        "samples": 1193
+      },
+      "unknown_frame_in_inline_or_physical_callchain": {
+        "period": 69052577,
+        "period_share": 0.0007561583487588631,
+        "samples": 16
+      }
+    },
+    "source_leaf_review": {
+      "policy": "qualified ancestry remains in denominator; rows without deepest source_file:line are not source-owner claims",
+      "qualified_period": 8443033125,
+      "qualified_samples": 1921,
+      "status": "owner_ranking_withheld",
+      "unresolved_period": 712043633,
+      "unresolved_period_share_of_qualified": 0.08433505145107434,
+      "unresolved_samples": 162
+    },
+    "status": "pass"
+  },
+  "gates": {
+    "analyzer_binary_binding_exact": true,
+    "analyzer_status_pass": true,
+    "binary_build_id_matches_plan_and_readelf": true,
+    "build_id_list_exactly_one": true,
+    "capture_helper_plan_start_current_exact": true,
+    "decoder_lost_records_zero": true,
+    "decoder_pair_exact": true,
+    "decoder_sample_period_conservation": true,
+    "inherit_enabled_by_header": true,
+    "mapping_and_buildid_exports_returned_zero": true,
+    "mapping_build_id_exactly_one": true,
+    "mapping_path_exactly_one": true,
+    "mapping_timestamps_ordered": true,
+    "perf_data_nonempty": true,
+    "perf_header_cpu_period_and_lost_format": true,
+    "perf_header_event_cycles_u": true,
+    "perf_header_frequency_997_strict_mode": true,
+    "physical_source_and_timed_ip_gate": true,
+    "plan_authorized_diagnostic_only": true,
+    "plan_binary_descriptor_matches_actual": true,
+    "qualified_period_gate": true,
+    "qualified_sample_gate": true,
+    "qualified_unknown_frames_zero": true,
+    "record_command_required_flags": true,
+    "start_binary_descriptor_matches_actual": true,
+    "terminal_process_group_clear": true,
+    "terminal_returncode_zero": true,
+    "validation_semantic_pass": true
+  },
+  "identity": {
+    "binary_build_id_analyzer": "7eb92ba2f0f8f3b248b77d8691e27b80b114fb22",
+    "binary_build_id_plan": "7eb92ba2f0f8f3b248b77d8691e27b80b114fb22",
+    "binary_build_id_readelf": "7eb92ba2f0f8f3b248b77d8691e27b80b114fb22",
+    "binary_path": "/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+    "binary_sha256": "843ae35a0f5131a8cba965f917b2a4c5fccb6926ae3d66862e5f78512820fb33",
+    "buildid_list_exact_lines": 1,
+    "mapping_binary_path_lines": 1,
+    "mapping_build_id_lines": 1,
+    "record_pid": 3184406,
+    "thread_scope": "inherit enabled; all threads retained; qualified ancestry is thread-local",
+    "workload_pid_observed_in_mapping": []
+  },
+  "inputs": {
+    "analyzer_output": {
+      "bytes": 271915,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-pilot-v1/analyzer-paired-v5.json",
+      "sha256": "6eb0863fc1507ea206ba900fc8d6347112e52568e7626e1d4d5fbf01778c03aa"
+    },
+    "analyzer_tool_observed": {
+      "bytes": 62780,
+      "path": "/home/zhuhe/litchi-performance-0962/tools/analyze_native_cpu_v1.py",
+      "sha256": "f5f7a387f99ba3a587eeb8f27c8f422a9fa696306c2ae47724952b861910bd3d"
+    },
+    "binary": {
+      "bytes": 104819848,
+      "path": "/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+      "sha256": "843ae35a0f5131a8cba965f917b2a4c5fccb6926ae3d66862e5f78512820fb33"
+    },
+    "buildid_list": {
+      "bytes": 302,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-pilot-v1-buildid-list.txt",
+      "sha256": "7e99759e8f3a15e98ac9591d3c245672750b895d956529400409e8ddff62336b"
+    },
+    "buildid_list_stderr": {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-pilot-v1-buildid-list.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "capture_helper": {
+      "bytes": 5420,
+      "path": "/home/zhuhe/litchi-performance-0962/tools/capture_fp_v1.py",
+      "sha256": "7a71f067f292c346569c3c1f2eaadd5a4847736dd6e973258dd8d673f8bdda34"
+    },
+    "header_export": {
+      "bytes": 1819,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-pilot-v1-header.txt",
+      "sha256": "053de946fd986075f0964b5de5e67ea90aef134a6d162ee3bd084f10a15450cc"
+    },
+    "header_stderr": {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-pilot-v1-header.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "inline_script": {
+      "bytes": 96343267,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-pilot-v1/perf-script-inline-v1.txt",
+      "sha256": "c03f506e569fee1d56f09b34ecc13491d1cb63d01e108c629641fa82a147a82f"
+    },
+    "mapping_export": {
+      "bytes": 1345,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-pilot-v1-mapping-events.txt",
+      "sha256": "50af3bd1e385531011c6a7a52e1bcca0b08abe8b045b871b59576ac9587e442a"
+    },
+    "mapping_stderr": {
+      "bytes": 25,
+      "path": "/home/zhuhe/litchi-performance-0962/review/fp-pilot-v1-mapping.stderr",
+      "sha256": "d760457f9a459836db8c86aa1e430280f8b3c8762575616f72e4aee52e767536"
+    },
+    "perf_data": {
+      "bytes": 3912112,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-pilot-v1/perf.data",
+      "sha256": "7b764957a7e47b2a9e36817c10c81666e00fb88011f693c12fe56fd15e2f91f9"
+    },
+    "physical_script": {
+      "bytes": 58246058,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-pilot-v1/perf-script-physical-v1.txt",
+      "sha256": "13596bcecdc1583a340e161d20fd67116050139ad3674b22a9a84d3b7167dfea"
+    },
+    "plan": {
+      "bytes": 5028,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-plan-v1.json",
+      "sha256": "b4494abbe8da21ca7e54a4f022b92bb13b4700e09d5ff4a42b8772d213fa5bea"
+    },
+    "semantic_report": {
+      "bytes": 155270,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-pilot-v1/output/report.json",
+      "sha256": "485f1ba38094184ca178c8a2840c4210604493490a4428236d8f7596e8d91983"
+    },
+    "start": {
+      "bytes": 1587,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-pilot-v1/start.json",
+      "sha256": "27fc9d82a5654dcc2bd19074eecfe5bb2f2f1fd36f2d4060951a6834c4ad720e"
+    },
+    "terminal": {
+      "bytes": 188,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-pilot-v1/terminal.json",
+      "sha256": "d124ce57cf7c6fc77ba49c4609241acd106c9e66548e6c3eaadbeae4a09075d0"
+    },
+    "validation": {
+      "bytes": 806,
+      "path": "/home/zhuhe/litchi-performance-0962/fp-pilot-v1/validation.json",
+      "sha256": "7d16690af33ad19300757db30c8ae42c88b13fb07dbc4f15a2761dd1d551880f"
+    }
+  },
+  "interpretation_limits": [
+    "Qualified rows require paired physical timed_iteration ancestry plus one inline stage_timed_commit marker with source checks; they are a conservative stage ancestry subset, not an elapsed phase share.",
+    "The stage marker covers source xlsx_managed_compression_benchmark.rs:382-402; timed_iteration covers 404-449. Ingress, publication, commit drop, verification and teardown are not implied by the qualified period.",
+    "Whole-process cycles:u includes startup/loader, corpus and preflight/setup, the timed route, semantic/output/inverse verification and teardown; the 9.2455% qualified period is not a whole-process CPU fraction or speedup.",
+    "The 1,193 rejected rows have timed_iteration evidence without an inline stage marker; they are not multiple-stage or ambiguous rows.",
+    "Source-owner ranking is withheld. Rows lacking deepest source_file:line remain in the qualified conservation denominator but do not support a source-owner claim; generic inclusive categories/tags are not additive evidence.",
+    "The FP/debug2 executable has different generated code from the ordinary native baseline; no baseline timing or optimization comparison follows.",
+    "Sampling uses period weights from cycles:u with frame-pointer callchains; period weights are sampled event weights, not exact elapsed time or cycle totals."
+  ],
+  "review_notes": {
+    "analyzer_v5_bytes": 271915,
+    "analyzer_v5_sha256": "6eb0863fc1507ea206ba900fc8d6347112e52568e7626e1d4d5fbf01778c03aa",
+    "final_output_label": "stage_marker_missing",
+    "final_output_qualified_population_unchanged_from_v3": true,
+    "owner_ranking_released": false
+  },
+  "schema": "litchi.performance.0962.fp-pilot-admission.v2",
+  "scope": "independent read-only admission of the diagnostic FP pilot; no timing, speedup, allocation, RSS, production, optimization, or adoption claim",
+  "semantic": {
+    "report_sha256": "485f1ba38094184ca178c8a2840c4210604493490a4428236d8f7596e8d91983",
+    "samples": 200,
+    "shape": "medium",
+    "validation_status": "passed",
+    "warmup_iterations": 0,
+    "workers": 1,
+    "workload": "one-percent"
+  },
+  "status": "pass",
+  "supersedes": {
+    "path": "/home/zhuhe/litchi-performance-0962/review/fp-pilot-admission-v1.json",
+    "reason": "v1 was provisional: it lacked the analyzer binary ELF binding, used the pre-correction stage label, and did not bind the paired exported streams.",
+    "sha256": "a84a733a4d340c026c4941310ba1c06694d907eae7e1a589f23bd1d0c4eb56d3"
+  },
+  "thread_scope": {
+    "declared": "inherit enabled; all threads retained; qualified ancestry is thread-local",
+    "interpretation": "inherit is enabled; all inherited threads remain in the whole-process denominator; qualified ancestry is thread-local.",
+    "perf_header_inherit": 1
+  }
+}

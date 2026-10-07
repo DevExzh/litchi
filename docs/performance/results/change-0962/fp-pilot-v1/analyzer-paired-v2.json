@@ -1,0 +1,278 @@
+{
+  "binary_binding": {
+    "bytes": 104819848,
+    "elf_build_id": "7eb92ba2f0f8f3b248b77d8691e27b80b114fb22",
+    "mode": 509,
+    "path": "/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+    "sha256": "843ae35a0f5131a8cba965f917b2a4c5fccb6926ae3d66862e5f78512820fb33"
+  },
+  "by_comm": [
+    {
+      "key": "xlsx_managed_co",
+      "period": 91320259987,
+      "period_share": 1.0,
+      "samples": 20998
+    }
+  ],
+  "classification": {
+    "ambiguous_phase": {
+      "period": 5241650446,
+      "period_share": 0.05739854931146912,
+      "samples": 1193
+    },
+    "no_phase_marker": {
+      "period": 77566523839,
+      "period_share": 0.8493900898885096,
+      "samples": 17868
+    },
+    "unknown_frames": {
+      "period": 69052577,
+      "period_share": 0.0007561583487588631,
+      "samples": 16
+    },
+    "unqualified_phase": {
+      "period": 8443033125,
+      "period_share": 0.09245520245126237,
+      "samples": 1921
+    }
+  },
+  "commands": {
+    "analysis": "offline parser; no workload or build launched",
+    "pairing": "inline and explicit --no-inline streams are joined by event identity, never by position alone",
+    "perf_script_fields": "comm,pid,tid,time,event,period,ip,sym,symoff,dso,srcline"
+  },
+  "conservation": {
+    "header_multiset_pass": true,
+    "inline_classified_period": 91320259987,
+    "inline_classified_samples": 20998,
+    "inline_input_period": 91320259987,
+    "inline_input_samples": 20998,
+    "inline_period_sum_pass": true,
+    "inline_sample_count_pass": true,
+    "paired_stream_population_pass": true,
+    "physical_input_period": 91320259987,
+    "physical_input_samples": 20998,
+    "physical_pair_population": 20998
+  },
+  "denominators": {
+    "inline_only": {
+      "period": 0,
+      "period_share": 0.0,
+      "samples": 0
+    },
+    "qualified_ancestor": {
+      "period": 0,
+      "period_share": 0.0,
+      "samples": 0
+    }
+  },
+  "input": {
+    "inline": {
+      "input": {
+        "bytes": 96343267,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-pilot-v1/perf-script-inline-v1.txt",
+        "sha256": "c03f506e569fee1d56f09b34ecc13491d1cb63d01e108c629641fa82a147a82f"
+      },
+      "mode": "script_file"
+    },
+    "physical": {
+      "input": {
+        "bytes": 58246058,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-pilot-v1/perf-script-physical-v1.txt",
+        "sha256": "13596bcecdc1583a340e161d20fd67116050139ad3674b22a9a84d3b7167dfea"
+      },
+      "mode": "script_file"
+    }
+  },
+  "interpretation": [
+    "The qualified denominator is a conservative paired ancestry population, not a timed phase measurement.",
+    "The direct inline leaf symbol and owner category are disjoint per qualified sample; inclusive tags intentionally overlap and must not be summed.",
+    "Inline-only timer evidence is retained descriptively and is excluded until a matching strict physical timed frame is proven."
+  ],
+  "marker_evidence": {
+    "any_stage": {
+      "period": 8443033125,
+      "period_share": 0.09245520245126237,
+      "samples": 1921
+    },
+    "any_timed": {
+      "period": 13684683571,
+      "period_share": 0.1498537517627315,
+      "samples": 3114
+    },
+    "physical_stage": {
+      "period": 8443033125,
+      "period_share": 0.09245520245126237,
+      "samples": 1921
+    },
+    "physical_timed_inline_rendering": {
+      "period": 13684683571,
+      "period_share": 0.1498537517627315,
+      "samples": 3114
+    },
+    "physical_timed_source": {
+      "period": 13684683571,
+      "period_share": 0.1498537517627315,
+      "samples": 3114
+    },
+    "strict_physical_timed_no_inline": {
+      "period": 13684683571,
+      "period_share": 0.1498537517627315,
+      "samples": 3114
+    },
+    "timed_ip_match": {
+      "period": 13684683571,
+      "period_share": 0.1498537517627315,
+      "samples": 3114
+    }
+  },
+  "pairing": {
+    "duplicate_inline_key_details": [],
+    "duplicate_inline_keys": 0,
+    "duplicate_inline_records": 0,
+    "duplicate_physical_key_details": [],
+    "duplicate_physical_keys": 0,
+    "duplicate_physical_records": 0,
+    "exact_pairing_pass": true,
+    "header_count_equal": true,
+    "header_key_multiplicity_equal": true,
+    "header_multiset_equal": true,
+    "header_period_equal": true,
+    "inline_header_count": 20998,
+    "inline_only_key_details": [],
+    "inline_period": 91320259987,
+    "inline_samples": 20998,
+    "paired_samples": 20998,
+    "physical_header_count": 20998,
+    "physical_only_key_details": [],
+    "physical_pair_population": 20998,
+    "physical_period": 91320259987,
+    "physical_samples": 20998,
+    "queue_duplicate_physical_records": 0,
+    "unmatched_inline_period": 0,
+    "unmatched_inline_samples": 0,
+    "unmatched_physical_period": 0,
+    "unmatched_physical_samples": 0
+  },
+  "parser": {
+    "inline": {
+      "diagnostics": {
+        "frames": 772194,
+        "headers": 20998,
+        "source_locations": 772169
+      },
+      "sample_count": 20998
+    },
+    "perf_version": null,
+    "physical": {
+      "diagnostics": {
+        "build_id_lines": 41954,
+        "frames": 315581,
+        "headers": 20998,
+        "source_locations": 273602
+      },
+      "sample_count": 20998
+    }
+  },
+  "physical_process": {
+    "period": 91320259987,
+    "period_share": 1.0,
+    "samples": 20998
+  },
+  "qualification": "no_qualified_ancestry",
+  "qualification_gate": {
+    "admitted": false,
+    "admitted_without_lost_record_binding": false,
+    "lost_records": 0,
+    "lost_records_zero": true,
+    "minimum_period": 100000,
+    "minimum_samples": 100,
+    "qualified_period": 0,
+    "qualified_period_min_pass": false,
+    "qualified_samples": 0,
+    "qualified_samples_min_pass": false
+  },
+  "qualified_attribution": {
+    "exclusive_deepest_self_symbol": [],
+    "exclusive_owner_category": [],
+    "exclusive_physical_enclosing_leaf": [],
+    "inclusive_tags": [],
+    "inclusive_tags_are_overlapping": true,
+    "owner_candidate_sets": [],
+    "owner_category_policy": "a single candidate is exclusive; multiple candidates are classified as ambiguous and candidate sets remain visible",
+    "scope": "paired qualified ancestor rows only"
+  },
+  "reasons": {
+    "multiple_inline_stage_markers": {
+      "period": 5241650446,
+      "period_share": 0.05739854931146912,
+      "samples": 1193
+    },
+    "no_timer_marker_in_inline_rendering": {
+      "period": 77566523839,
+      "period_share": 0.8493900898885096,
+      "samples": 17868
+    },
+    "stage_marker_not_inline": {
+      "period": 8443033125,
+      "period_share": 0.09245520245126237,
+      "samples": 1921
+    },
+    "unknown_frame_in_inline_or_physical_callchain": {
+      "period": 69052577,
+      "period_share": 0.0007561583487588631,
+      "samples": 16
+    }
+  },
+  "schema": "litchi.performance.0962.native-cpu-attribution.v1",
+  "scope": "paired whole-process cycles:u samples; no-inline physical ancestry is joined to inline source/callsite evidence by exact event identity; no latency, speedup, RSS, allocation, or production claim",
+  "selection": {
+    "ambiguous_policy": "multiple exact markers or physical timed frames fail closed",
+    "duplicate_key_policy": "duplicate event keys are reported and fail closed because their callchain payloads cannot be identified",
+    "inline_rendering": "stage_timed_commit must be exactly one inline frame, ordered before exactly one inline timed_iteration, with source checks",
+    "pair_key": [
+      "comm",
+      "pid",
+      "tid",
+      "time",
+      "event",
+      "period"
+    ],
+    "physical_dso_path": "/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+    "physical_inline_policy": "any inline-marked frame in the no-inline rendering fails closed",
+    "physical_rendering": "exactly one non-inline symbol named litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration with nonempty DSO and valid source evidence is required",
+    "physical_source_policy": "physical timed frame must carry a nonempty DWARF file and positive line; its body file may differ from the inline call-site file",
+    "physical_symbol_prefix": "litchi_perf_baseline::xlsx_managed_compression::benchmark::",
+    "source_file_suffix": "xlsx_managed_compression_benchmark.rs",
+    "stage_source_line_range": {
+      "end": 402,
+      "start": 382
+    },
+    "timed_ip_join": "inline timed_iteration IP must equal the strict physical timed_iteration IP",
+    "timed_source_line_range": {
+      "end": 449,
+      "start": 404
+    },
+    "unknown_policy": "any unknown frame in either rendering excludes the pair from qualified and inline_only scopes"
+  },
+  "source_line_checks": {
+    "pass": {
+      "period": 13684683571,
+      "period_share": 0.1498537517627315,
+      "samples": 3114
+    },
+    "physical_pass": {
+      "period": 13684683571,
+      "period_share": 0.1498537517627315,
+      "samples": 3114
+    }
+  },
+  "status": "pass",
+  "whole_process": {
+    "period": 91320259987,
+    "period_share": 1.0,
+    "samples": 20998
+  }
+}

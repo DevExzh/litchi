@@ -1,0 +1,18 @@
+{
+  "utc": "2026-10-07T19:58:35.008362+00:00",
+  "command": [
+    "python3",
+    "/home/zhuhe/litchi-performance-0962/tools/test_capture_fp_v1.py"
+  ],
+  "returncode": 0,
+  "unittest_tests": 2,
+  "positive_synthetic_reports": 3,
+  "corrupted_reports_rejected": 24,
+  "optimized_python_refused": true,
+  "source": {
+    "path": "/home/zhuhe/litchi-performance-0962/tools/test_capture_fp_v1.py",
+    "bytes": 1651,
+    "sha256": "87d03a7a376767b751409f685423642b1c0b6dd60a0b5b0c35c563622ffc1283"
+  },
+  "note": "Recorded from root tool completion. Positive fixtures copy existing report and change warmup metadata only; these are parser controls, not new workload observations."
+}
