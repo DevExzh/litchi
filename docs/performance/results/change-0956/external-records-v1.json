@@ -1,0 +1,217 @@
+{
+  "authoritative_external_packet": "/home/zhuhe/litchi-performance-0956",
+  "intentionally_not_indexed_here": [
+    "formal capture child directories and raw reports (not complete at packet preparation)",
+    "reducer outputs and final performance report (reserved for root post-capture)",
+    "source census payloads and compiled binaries (bound by size/SHA only)"
+  ],
+  "packet_state": "pre_capture",
+  "prepared_utc": "2026-10-07T11:14:40.018370+00:00",
+  "records": [
+    {
+      "bytes": 66141,
+      "path": "/home/zhuhe/litchi-performance-0956/plan-final-v1.json",
+      "role": "plan",
+      "sha256": "211d4c56fa38eef0b4d3e513a4a79054bff29fe02e0100096c8ba0af8dbd9da0"
+    },
+    {
+      "bytes": 62046,
+      "path": "/home/zhuhe/litchi-performance-0956/plan-bound-v1.json",
+      "role": "bound_plan_history",
+      "sha256": "21e1ac9763b16cccd128279c008f0211f995e1a7d90a91365d50e1e28d4078f7"
+    },
+    {
+      "bytes": 2735,
+      "path": "/home/zhuhe/litchi-performance-0956/preflight-final-v1.json",
+      "role": "preflight",
+      "sha256": "90378bcff73316a1c0c72764a4870c02111fb26b26f209b34ba4392d948ce7ea"
+    },
+    {
+      "bytes": 7808,
+      "path": "/home/zhuhe/litchi-performance-0956/host.json",
+      "role": "host",
+      "sha256": "445048267294429af1f0848ddc3ea705a021205dc8ab5ce43de5608ba2dd074f"
+    },
+    {
+      "bytes": 3486,
+      "path": "/home/zhuhe/litchi-performance-0956/authorize_v1.py",
+      "role": "authorization",
+      "sha256": "a41a88861f5bae7837cbad1aa6080b9366479525246e6ee5cac260381c9125c3"
+    },
+    {
+      "bytes": 2353,
+      "path": "/home/zhuhe/litchi-performance-0956/receipts/source-integration-v3.json",
+      "role": "source_freeze",
+      "sha256": "9e58a13110d067cdacfdf61c0eceaa7266ae771095b4ac8d5ebe0aee39e8616c"
+    },
+    {
+      "bytes": 1939,
+      "path": "/home/zhuhe/litchi-performance-0956/receipts/source-integration-postcheck-v3.json",
+      "role": "source_postcheck",
+      "sha256": "b31f41bb3d07c2e6a6ad83f20bf4b87eb2200fda142d586bc20d3080027f7deb"
+    },
+    {
+      "bytes": 1564,
+      "path": "/home/zhuhe/litchi-performance-0956/receipts/source-integration-overlay-v3.json",
+      "role": "source_overlay",
+      "sha256": "d193c0479cd0be11fee31ef507b0c6e0d5fcf5bd97c15acf9c7f0318113577ec"
+    },
+    {
+      "bytes": 975,
+      "path": "/home/zhuhe/litchi-performance-0956/receipts/source-base-v1.json",
+      "role": "base_source_freeze",
+      "sha256": "fc8319320264767d1012f07612678c7a1013a78a533e7e0886dfcc67ec8a371a"
+    },
+    {
+      "bytes": 3958,
+      "path": "/home/zhuhe/litchi-performance-0956/receipts/base-lib-v1.json",
+      "role": "base_build",
+      "sha256": "3afc59fd6718939cb20264cb4bbcdc482758b6618b43418239ac0831a5582745"
+    },
+    {
+      "bytes": 5486,
+      "path": "/home/zhuhe/litchi-performance-0956/receipts/integration-native-v1.json",
+      "role": "integration_build",
+      "sha256": "51d713827aed0c2c781ada93060c3235a44cc099cc5b037d613375045ad6e53f"
+    },
+    {
+      "bytes": 1640,
+      "path": "/home/zhuhe/litchi-performance-0956/receipts/final-executable-copy-v1.json",
+      "role": "executable_copy",
+      "sha256": "14eea6b8719ec907731093138a5360e4f76d3709e695ceedb3bfafebdfc4ebf0"
+    },
+    {
+      "bytes": 4063,
+      "path": "/home/zhuhe/litchi-performance-0956/receipts/quality-clippy-v1.json",
+      "role": "quality_clippy",
+      "sha256": "f3e26a86b9e39f2df9e3a8b1575000b5e52418ef242f0ccbade4614de22fd0ae"
+    },
+    {
+      "bytes": 3879,
+      "path": "/home/zhuhe/litchi-performance-0956/receipts/quality-fmt-v1.json",
+      "role": "quality_fmt",
+      "sha256": "032c427c569da3e1e9df4c8b8c2b5dd7e9c008c367ab1f4dc628b51253df81dc"
+    },
+    {
+      "bytes": 1483,
+      "path": "/home/zhuhe/litchi-performance-0956/review/controls-v3-custody-final.json",
+      "role": "controls_v3_receipt",
+      "sha256": "2625976b038b2037523b89cdae0901b3ea8eb1163d60eefaa6edcc3188cc88fa"
+    },
+    {
+      "bytes": 5135,
+      "path": "/home/zhuhe/litchi-performance-0956/review/tooling-receipt-v5.json",
+      "role": "tooling_review",
+      "sha256": "cb133a3eac8deb8731db79bfa0ee718c700de8b84ed825823c08817aeef8fb20"
+    },
+    {
+      "bytes": 2525,
+      "path": "/home/zhuhe/litchi-performance-0956/review/runtime-v3-revalidation-root.json",
+      "role": "runtime_revalidation",
+      "sha256": "a7015f7ec9d1933a110b17f8c1f13db7fb32371176f310b68a9f92e16b9b4b81"
+    },
+    {
+      "bytes": 11482,
+      "path": "/home/zhuhe/litchi-performance-0956/runtime-qualification-v1/summary.json",
+      "role": "runtime_qualification",
+      "sha256": "5296effc123bbd4f6979c0b4574b60719b84f11907819a210f05a3edf3ac2988"
+    },
+    {
+      "bytes": 4641,
+      "path": "/home/zhuhe/litchi-performance-0956/runtime-negative-controls-v1/summary.json",
+      "role": "runtime_negative_controls",
+      "sha256": "78e0a62550dd5ab3296787eea60eff53d01ca71e6f3edfcbaa55753154e12cda"
+    },
+    {
+      "bytes": 208,
+      "path": "/home/zhuhe/litchi-performance-0956/runtime-qualification-v1/validator-binding.json",
+      "role": "validator_binding",
+      "sha256": "1ef6e9b7cb0fcec98c0d50269cd969e380bae73e08d5fd75259a1e6da538032b"
+    },
+    {
+      "bytes": 29886,
+      "committed_copy": "tools/capture_0956_v3.py",
+      "path": "/home/zhuhe/litchi-performance-0956/tools/capture_0956_v3.py",
+      "role": "capture_v3",
+      "sha256": "26501b64194cdfca85b6178d37f6a603bcc2802dcfe80501c27c174913aad5b9"
+    },
+    {
+      "bytes": 26450,
+      "committed_copy": "tools/capture_0956_v2.py",
+      "path": "/home/zhuhe/litchi-performance-0956/tools/capture_0956_v2.py",
+      "role": "capture_v2",
+      "sha256": "e9115496793032714fcfae6168002962063aabdafc3766f603becaa515326429"
+    },
+    {
+      "bytes": 9458,
+      "committed_copy": "tools/controls_0956_v3.py",
+      "path": "/home/zhuhe/litchi-performance-0956/tools/controls_0956_v3.py",
+      "role": "controls_v3",
+      "sha256": "c21fb8e5271ce7a304b7ee9fff40920c94d72fc60ec6cc5a5159f99355013fc8"
+    },
+    {
+      "bytes": 20953,
+      "committed_copy": "tools/reduce_0956_v3.py",
+      "path": "/home/zhuhe/litchi-performance-0956/tools/reduce_0956_v3.py",
+      "role": "reduce_v3",
+      "sha256": "2948909058a8d65a4ac8f691b3b2fc3063829ec18338eab9da0bddb612d6192c"
+    },
+    {
+      "bytes": 15232,
+      "committed": false,
+      "note": "external 0955 correctness oracle",
+      "path": "/home/zhuhe/litchi-performance-0955/qualification-v1/manifest.json",
+      "role": "qualification_oracle",
+      "sha256": "f4f2467e3f9fd040cc68bf20c7b78451dbb3274f3dd10cfd6468d9fb266aa70b"
+    },
+    {
+      "bytes": 2266359,
+      "committed": false,
+      "note": "full source census; external by size policy",
+      "path": "/home/zhuhe/litchi-performance-0956/source-manifest-v3.json",
+      "role": "source_manifest_v3",
+      "sha256": "fd1bc21ee257a1e9ad3b68b46be7cdbfd677877cffa17b714e3493de96b18193"
+    },
+    {
+      "bytes": 2265257,
+      "committed": false,
+      "note": "base source census; external by size policy",
+      "path": "/home/zhuhe/litchi-performance-0956/source-manifest-v1.json",
+      "role": "source_manifest_v1",
+      "sha256": "e5c8a42d59ea94d560460d4e42c54f42c73918acef701bd1f4266797c1735273"
+    },
+    {
+      "bytes": 43250464,
+      "committed": false,
+      "note": "compiled executable; never commit",
+      "path": "/home/zhuhe/litchi-performance-0956/executables/xlsx_managed_compression_benchmark",
+      "role": "benchmark_binary",
+      "sha256": "38381c594b6dd5924e07d3a27f57bf15729811b8f72d7353aac5aac810741304"
+    },
+    {
+      "bytes": 43172232,
+      "committed": false,
+      "note": "compiled executable; never commit",
+      "path": "/home/zhuhe/litchi-performance-0956/executables/xlsx_managed_compression",
+      "role": "correctness_binary",
+      "sha256": "73d0c9863cc16478e17e1b09402a42f45c3dceba9e24f4a853187d983e32e75a"
+    },
+    {
+      "bytes": 769,
+      "committed": "review/runtime-runner-status-v1.json",
+      "note": "post-workload setup failure retained; not a formal timing result",
+      "path": "/home/zhuhe/litchi-performance-0956/runtime-qualification-v1/runner-status.json",
+      "role": "runtime_runner_status",
+      "sha256": "fe353c15af9f6e94f1768540949aae00304fa90a794159fe92132b282c871f76"
+    },
+    {
+      "bytes": 4657,
+      "committed": "tools/reproduce_source_manifest_0956.py",
+      "note": "read-only source census generator; writes a new output path",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0956/tools/reproduce_source_manifest_0956.py",
+      "role": "source_manifest_reproduction_helper",
+      "sha256": "e31f26c5862a396dc4f746b71ffdf7fefed0ca935053a32bcb2a8f6210ae6cde"
+    }
+  ],
+  "schema": "litchi.performance.0956.packet.external-records.v1"
+}

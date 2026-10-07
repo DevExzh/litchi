@@ -703,3 +703,6 @@ pub(crate) fn qualify(directory: &Path) -> AnyResult<()> {
     )?;
     Ok(())
 }
+
+#[path = "xlsx_managed_compression_benchmark.rs"]
+pub(crate) mod benchmark;

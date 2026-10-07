@@ -1,0 +1,29 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "/home/zhuhe/litchi-performance-0956/tools/reduce_0956_v3.py",
+    "--plan",
+    "/home/zhuhe/litchi-performance-0956/plan-final-v1.json",
+    "--packet",
+    "/home/zhuhe/litchi-performance-0956/capture-native-v1",
+    "--output",
+    "/home/zhuhe/litchi-performance-0956/comparison-full-v1.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_utc": "2026-10-07T12:09:22.732925+00:00",
+  "deadline_seconds": 900,
+  "environment": {
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC"
+  },
+  "timeout": false,
+  "returncode": 1,
+  "seconds": 0.06389778101583943,
+  "log": {
+    "path": "/home/zhuhe/litchi-performance-0956/quality/reduction-v1.log",
+    "bytes": 90,
+    "sha256": "0c44ab544759c314d732c4c337c13ba3d39e2ef93288b8350330a16ac85136af"
+  }
+}

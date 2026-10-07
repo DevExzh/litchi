@@ -1,0 +1,58 @@
+{
+  "cpu_mask": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31
+  ],
+  "helper_dependencies": {
+    "capture_legacy_validator": {
+      "bytes": 26450,
+      "path": "/home/zhuhe/litchi-performance-0956/tools/capture_0956_v2.py",
+      "sha256": "e9115496793032714fcfae6168002962063aabdafc3766f603becaa515326429"
+    }
+  },
+  "loadavg": "0.16 0.18 0.42 1/1375 2905885\n",
+  "meminfo": "MemTotal:       129447072 kB\nMemFree:        20624032 kB\nMemAvailable:   96419416 kB\nBuffers:         5031884 kB\nCached:         86084348 kB\nSwapCached:            0 kB\nActive:         25301644 kB\nInactive:       71174160 kB\nActive(anon):   22713972 kB\nInactive(anon):  6724828 kB\nActive(file):    2587672 kB\nInactive(file): 64449332 kB\nUnevictable:       24852 kB\nMlocked:            8136 kB\nSwapTotal:             0 kB\nSwapFree:              0 kB\nZswap:                 0 kB\nZswapped:              0 kB\nDirty:               724 kB\nWriteback:             0 kB\nAnonPages:       5384912 kB\nMapped:           722260 kB\nShmem:          24058596 kB\nKReclaimable:    9952340 kB\nSlab:           11958056 kB\nSReclaimable:    9952340 kB\nSUnreclaim:      2005716 kB\nKernelStack:       22496 kB\nPageTables:        43232 kB\nSecPageTables:         0 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:    64723536 kB\nCommitted_AS:   32675104 kB\nVmallocTotal:   34359738367 kB\nVmallocUsed:       41160 kB\nVmallocChunk:          0 kB\nPercpu:            29696 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:         0 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:    831488 kB\nFilePmdMapped:         0 kB\nCmaTotal:              0 kB\nCmaFree:          875396 kB\nUnaccepted:            0 kB\nBalloon:               0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\nDirectMap4k:      188844 kB\nDirectMap2M:     6764544 kB\nDirectMap1G:    124780544 kB\n",
+  "owned_processes": [],
+  "plan": {
+    "bytes": 66141,
+    "path": "/home/zhuhe/litchi-performance-0956/plan-final-v1.json",
+    "sha256": "211d4c56fa38eef0b4d3e513a4a79054bff29fe02e0100096c8ba0af8dbd9da0"
+  },
+  "source_file_count": 10930,
+  "source_manifest": {
+    "bytes": 2266359,
+    "path": "/home/zhuhe/litchi-performance-0956/source-manifest-v3.json",
+    "sha256": "fd1bc21ee257a1e9ad3b68b46be7cdbfd677877cffa17b714e3493de96b18193"
+  },
+  "status": "passed"
+}

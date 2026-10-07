@@ -1,0 +1,133 @@
+{
+  "artifacts": {
+    "capture_v3": {
+      "bytes": 29886,
+      "path": "/home/zhuhe/litchi-performance-0956/tools/capture_0956_v3.py",
+      "sha256": "26501b64194cdfca85b6178d37f6a603bcc2802dcfe80501c27c174913aad5b9"
+    },
+    "controls_receipt_v3": {
+      "bytes": 1483,
+      "path": "/home/zhuhe/litchi-performance-0956/review/controls-v3-custody-final.json",
+      "sha256": "2625976b038b2037523b89cdae0901b3ea8eb1163d60eefaa6edcc3188cc88fa"
+    },
+    "controls_v3": {
+      "bytes": 9458,
+      "path": "/home/zhuhe/litchi-performance-0956/tools/controls_0956_v3.py",
+      "sha256": "c21fb8e5271ce7a304b7ee9fff40920c94d72fc60ec6cc5a5159f99355013fc8"
+    },
+    "negative_controls_summary": {
+      "bytes": 4641,
+      "path": "/home/zhuhe/litchi-performance-0956/runtime-negative-controls-v1/summary.json",
+      "sha256": "78e0a62550dd5ab3296787eea60eff53d01ca71e6f3edfcbaa55753154e12cda"
+    },
+    "plan_v3": {
+      "bytes": 64394,
+      "path": "/home/zhuhe/litchi-performance-0956/plan-v3-draft.json",
+      "sha256": "0bd934ff12ad92755ad4c482cefd995436d9578d7ece4cf5b08066c37d3a3d72"
+    },
+    "qualification_summary": {
+      "bytes": 11482,
+      "path": "/home/zhuhe/litchi-performance-0956/runtime-qualification-v1/summary.json",
+      "sha256": "5296effc123bbd4f6979c0b4574b60719b84f11907819a210f05a3edf3ac2988"
+    },
+    "reducer_v3": {
+      "bytes": 20953,
+      "path": "/home/zhuhe/litchi-performance-0956/tools/reduce_0956_v3.py",
+      "sha256": "2948909058a8d65a4ac8f691b3b2fc3063829ec18338eab9da0bddb612d6192c"
+    },
+    "source_plan_base": {
+      "bytes": 62046,
+      "path": "/home/zhuhe/litchi-performance-0956/plan-bound-v1.json",
+      "sha256": "21e1ac9763b16cccd128279c008f0211f995e1a7d90a91365d50e1e28d4078f7"
+    }
+  },
+  "build_started": false,
+  "checks": [
+    {
+      "command": "python3 tools/capture_0956_v3.py --plan plan-v3-draft.json --packet /tmp/no-run-0956-v3",
+      "name": "capture_v3_plan_preflight",
+      "rows": 144,
+      "status": "passed"
+    },
+    {
+      "configs": 9,
+      "detail": "all nine warmup1/sample2 reports passed exact v3 report contract; no workload rerun",
+      "name": "v3_report_validator_runtime_qualification",
+      "status": "passed"
+    },
+    {
+      "name": "v3_synthetic_custody_controls",
+      "negative_controls": [
+        "tampered_schedule_row_rejected",
+        "tampered_post_terminal_artifact_rejected",
+        "zero_counter_bootstrap"
+      ],
+      "positive_children": 144,
+      "receipt": {
+        "bytes": 1483,
+        "path": "/home/zhuhe/litchi-performance-0956/review/controls-v3-custody-final.json",
+        "sha256": "2625976b038b2037523b89cdae0901b3ea8eb1163d60eefaa6edcc3188cc88fa"
+      },
+      "status": "passed"
+    },
+    {
+      "controls": 8,
+      "name": "negative_cli_controls",
+      "receipt": {
+        "bytes": 4641,
+        "path": "/home/zhuhe/litchi-performance-0956/runtime-negative-controls-v1/summary.json",
+        "sha256": "78e0a62550dd5ab3296787eea60eff53d01ca71e6f3edfcbaa55753154e12cda"
+      },
+      "status": "passed"
+    },
+    {
+      "detail": "v3 binds outer plan/helper/source descriptors and all post-terminal artifact/validation hashes; v2 files unchanged",
+      "name": "v2_review_material_fixes",
+      "status": "applied"
+    }
+  ],
+  "created_utc": "2026-10-07T11:09:00.783931Z",
+  "history": {
+    "initial_v3_controls_output_preserved": "review/controls-v3-custody-initial.json; final controls are controls-v3-custody-final.json",
+    "reviewed_v2_capture_sha": "e9115496793032714fcfae6168002962063aabdafc3766f603becaa515326429",
+    "reviewed_v2_reducer_sha": "51d65a25652806d3365bdf040a1642772364be449b811bd2b1d2905222e08aab"
+  },
+  "pending": [
+    "final source closure/build receipt/binary binding and authorized plan before any formal native capture"
+  ],
+  "production_source_changed": false,
+  "schedule_unchanged": {
+    "blocks": 6,
+    "bootstrap": "geometric mean of six block ratios, 10000 resamples, seed 956",
+    "cases": 3,
+    "children": 144,
+    "comparisons": 2,
+    "cpu_mask": [
+      12,
+      13,
+      14,
+      15
+    ],
+    "samples": 200,
+    "warmup": 20
+  },
+  "schema": "litchi.performance.0956.native-width-tooling-review.v5",
+  "source_binding": {
+    "source_manifest": "/home/zhuhe/litchi-performance-0956/source-manifest-v3.json",
+    "source_manifest_sha256": "fd1bc21ee257a1e9ad3b68b46be7cdbfd677877cffa17b714e3493de96b18193",
+    "source_revision": "c8e80705989183d88950e282ef1852f3e3470b10"
+  },
+  "status": "prospective_v3_pending_authorization",
+  "v2_preserved": true,
+  "v3_custody_fixes": {
+    "exact_report_scopes_and_claim": true,
+    "expected_argv_cwd_environment_deadline_output_paths": true,
+    "expected_row_index": true,
+    "outer_capture_start_plan_runner_reducer_controls_source_manifest_bindings": true,
+    "post_terminal_artifacts_stdout_stderr_time_report": true,
+    "rss_field_name": "rss_review_metric; RSS remains a review metric, not a latency adoption gate",
+    "sink_capacity_and_max_write_bounds": true,
+    "validation_terminal_and_report_descriptors": true
+  },
+  "workload_started": false
+}

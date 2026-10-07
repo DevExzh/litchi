@@ -1,0 +1,119 @@
+{
+  "authorized_paths_absent_after": {
+    "target-base-lib-v1": false,
+    "tmp": false,
+    "tools/__pycache__": false
+  },
+  "cleanup_helper": {
+    "bytes": 6312,
+    "path": "/home/zhuhe/litchi-performance-0956/cleanup_0956_v1.py",
+    "sha256": "264a6c63661ff3de3e8a18fa17ffd78148d889565aee20ca363239e23fc4b309"
+  },
+  "command_executed": "python3 -B /home/zhuhe/litchi-performance-0956/cleanup_0956_v1.py --go",
+  "completed_packet_manifest": {
+    "bytes": 237533,
+    "path": "/home/zhuhe/litchi-performance-0956/completed-packet-manifest-v1.json",
+    "sha256": "f923ebe1bb5f8a3a58458f6458b0795ea26071ebd6ea4254c624d769b489ad28"
+  },
+  "correction": {
+    "normalized_inventory": {
+      "bytes": 254923,
+      "path": "/home/zhuhe/litchi-performance-0956/cleanup-inventory-v2.tsv",
+      "sha256": "38bc4e955739d30063b7f35b22594ea6c9891a6a7c16a62f7e27429b5b9ae4da"
+    },
+    "raw_inventory": {
+      "bytes": 263716,
+      "path": "/home/zhuhe/litchi-performance-0956/cleanup-inventory-v1-invalid-raw.tsv",
+      "sha256": "1def64b2e1e9cd878fb9ccb742793c895f03b1b41df4900cc3d085fd95ae7a8f"
+    },
+    "raw_receipt": {
+      "bytes": 3353,
+      "path": "/home/zhuhe/litchi-performance-0956/cleanup-receipt-v1-invalid-raw.json",
+      "sha256": "34bab5d1396ad276ca8a0c38359b8c4116601c753b3136315bdad84f9e876d96"
+    },
+    "reason": "v1 writer emitted literal backslash-n/backslash-t separators; filesystem cleanup itself completed and was not rerun"
+  },
+  "created_utc": "2026-10-07T12:11:12.308996+00:00",
+  "inventory": {
+    "bytes": 254923,
+    "file_count": 2930,
+    "logical_bytes": 2370036206,
+    "path": "/home/zhuhe/litchi-performance-0956/cleanup-inventory-v2.tsv",
+    "sha256": "38bc4e955739d30063b7f35b22594ea6c9891a6a7c16a62f7e27429b5b9ae4da"
+  },
+  "normalization_only": true,
+  "preserved_executables_after": [
+    {
+      "bytes": 43172232,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0956/executables/xlsx_managed_compression",
+      "sha256": "73d0c9863cc16478e17e1b09402a42f45c3dceba9e24f4a853187d983e32e75a"
+    },
+    {
+      "bytes": 43250464,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0956/executables/xlsx_managed_compression_benchmark",
+      "sha256": "38381c594b6dd5924e07d3a27f57bf15729811b8f72d7353aac5aac810741304"
+    }
+  ],
+  "preserved_executables_before": [
+    {
+      "bytes": 43172232,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0956/executables/xlsx_managed_compression",
+      "sha256": "73d0c9863cc16478e17e1b09402a42f45c3dceba9e24f4a853187d983e32e75a"
+    },
+    {
+      "bytes": 43250464,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0956/executables/xlsx_managed_compression_benchmark",
+      "sha256": "38381c594b6dd5924e07d3a27f57bf15729811b8f72d7353aac5aac810741304"
+    }
+  ],
+  "preserved_roots": [
+    {
+      "exists": true,
+      "path": "/home/zhuhe/litchi-performance-0956/source-v1"
+    },
+    {
+      "exists": true,
+      "path": "/home/zhuhe/litchi-performance-0956/source-base-v1"
+    },
+    {
+      "exists": true,
+      "path": "/home/zhuhe/litchi-performance-0956/executables"
+    },
+    {
+      "exists": true,
+      "path": "/home/zhuhe/litchi-performance-0956/receipts"
+    },
+    {
+      "exists": true,
+      "path": "/home/zhuhe/litchi-performance-0956/review"
+    }
+  ],
+  "removed": {
+    "target-base-lib-v1": {
+      "file_count": 2919,
+      "logical_bytes": 2369729218
+    },
+    "tmp": {
+      "file_count": 0,
+      "logical_bytes": 0
+    },
+    "tools/__pycache__": {
+      "file_count": 11,
+      "logical_bytes": 306988
+    }
+  },
+  "schema": "litchi.performance.0956.cleanup-receipt.v2",
+  "scope": "Only target-base-lib-v1, tmp, and tools/__pycache__ were removed. Source trees, raw capture/evidence/review/controls, and executables were preserved.",
+  "source_manifest_replay": {
+    "bytes": 2266359,
+    "cmp": true,
+    "frozen_path": "/home/zhuhe/litchi-performance-0956/source-manifest-v3.json",
+    "replayed_path": "/home/zhuhe/litchi-performance-0956-manifest-replay-20261007/source-manifest-v3-regenerated.json",
+    "sha256": "fd1bc21ee257a1e9ad3b68b46be7cdbfd677877cffa17b714e3493de96b18193"
+  },
+  "status": "passed"
+}

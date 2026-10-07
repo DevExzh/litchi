@@ -1,0 +1,123 @@
+{
+  "binary": {
+    "bytes": 43250464,
+    "path": "/home/zhuhe/litchi-performance-0956/target-base-lib-v1/release/examples/xlsx_managed_compression_benchmark",
+    "sha256": "38381c594b6dd5924e07d3a27f57bf15729811b8f72d7353aac5aac810741304"
+  },
+  "controls": [
+    {
+      "expected": "nonzero parser rejection and no report.json",
+      "label": "workers-zero",
+      "observed_returncode": 1,
+      "report_exists": false,
+      "schema": "litchi.performance.0956.negative-control.validation.v1",
+      "status": "passed",
+      "terminal": {
+        "bytes": 1328,
+        "path": "/home/zhuhe/litchi-performance-0956/runtime-negative-controls-v1/workers-zero/terminal.json",
+        "sha256": "a74ec8afbbda57f8b5b636914c2d1d207782594eda3227e5128bf721310da34b"
+      }
+    },
+    {
+      "expected": "nonzero parser rejection and no report.json",
+      "label": "workers-eight",
+      "observed_returncode": 1,
+      "report_exists": false,
+      "schema": "litchi.performance.0956.negative-control.validation.v1",
+      "status": "passed",
+      "terminal": {
+        "bytes": 1332,
+        "path": "/home/zhuhe/litchi-performance-0956/runtime-negative-controls-v1/workers-eight/terminal.json",
+        "sha256": "a6120a102b9505b87759bde3d88f3ffbc3f32a16d55ec872ee6100c6dcb7b545"
+      }
+    },
+    {
+      "expected": "nonzero parser rejection and no report.json",
+      "label": "samples-zero",
+      "observed_returncode": 1,
+      "report_exists": false,
+      "schema": "litchi.performance.0956.negative-control.validation.v1",
+      "status": "passed",
+      "terminal": {
+        "bytes": 1328,
+        "path": "/home/zhuhe/litchi-performance-0956/runtime-negative-controls-v1/samples-zero/terminal.json",
+        "sha256": "d3ce5ec8f92e876f28f31659efc1259884f33e8f8b44c5c66a402ad5dd7fc4bd"
+      }
+    },
+    {
+      "expected": "nonzero parser rejection and no report.json",
+      "label": "dense-one-edit",
+      "observed_returncode": 1,
+      "report_exists": false,
+      "schema": "litchi.performance.0956.negative-control.validation.v1",
+      "status": "passed",
+      "terminal": {
+        "bytes": 1339,
+        "path": "/home/zhuhe/litchi-performance-0956/runtime-negative-controls-v1/dense-one-edit/terminal.json",
+        "sha256": "7c4a09d40e66017f7aaa7a6b3583e77116d00b727e0ec2baaca12e664e91f4d0"
+      }
+    },
+    {
+      "expected": "nonzero parser rejection and no report.json",
+      "label": "duplicate-warmup",
+      "observed_returncode": 1,
+      "report_exists": false,
+      "schema": "litchi.performance.0956.negative-control.validation.v1",
+      "status": "passed",
+      "terminal": {
+        "bytes": 1369,
+        "path": "/home/zhuhe/litchi-performance-0956/runtime-negative-controls-v1/duplicate-warmup/terminal.json",
+        "sha256": "e825aa71377a77e72a9b1a95cebd0cb39ad07a2577568a301d68eea275cccffa"
+      }
+    },
+    {
+      "expected": "nonzero parser rejection and no report.json",
+      "label": "duplicate-samples",
+      "observed_returncode": 1,
+      "report_exists": false,
+      "schema": "litchi.performance.0956.negative-control.validation.v1",
+      "status": "passed",
+      "terminal": {
+        "bytes": 1374,
+        "path": "/home/zhuhe/litchi-performance-0956/runtime-negative-controls-v1/duplicate-samples/terminal.json",
+        "sha256": "8bcc0397b77af03b83a0c8b6120b5fb836328f34b146a168b8f2eb6f588f6fc7"
+      }
+    },
+    {
+      "expected": "nonzero parser rejection and no report.json",
+      "label": "missing-shape",
+      "observed_returncode": 1,
+      "report_exists": false,
+      "schema": "litchi.performance.0956.negative-control.validation.v1",
+      "status": "passed",
+      "terminal": {
+        "bytes": 1304,
+        "path": "/home/zhuhe/litchi-performance-0956/runtime-negative-controls-v1/missing-shape/terminal.json",
+        "sha256": "a4997436337fe515fcd156e29288d3a1b6869b7d95b3b914079b6b6575307c36"
+      }
+    },
+    {
+      "expected": "nonzero parser rejection and no report.json",
+      "label": "missing-workload",
+      "observed_returncode": 1,
+      "report_exists": false,
+      "schema": "litchi.performance.0956.negative-control.validation.v1",
+      "status": "passed",
+      "terminal": {
+        "bytes": 1307,
+        "path": "/home/zhuhe/litchi-performance-0956/runtime-negative-controls-v1/missing-workload/terminal.json",
+        "sha256": "071d836ff3be5ed46bd767048eb58cfdaa786cb672867379990f33847a146849"
+      }
+    }
+  ],
+  "cpu_mask_requested": [
+    12,
+    13,
+    14,
+    15
+  ],
+  "no_retries": true,
+  "schema": "litchi.performance.0956.negative-controls.v1",
+  "status": "passed",
+  "workload_started": false
+}

@@ -1,0 +1,23 @@
+{
+  "capture_start": {
+    "bytes": 1130,
+    "path": "/home/zhuhe/litchi-performance-0956/capture-native-v1/capture-start.json",
+    "sha256": "9963adadb26702fa718686b8c99049b7081405a557ffa0f62ba3e6edc4777a1d"
+  },
+  "children_expected": 144,
+  "children_started": 144,
+  "ended_utc": "2026-10-07T12:08:50.079035Z",
+  "failed_index": null,
+  "plan": {
+    "bytes": 66141,
+    "path": "/home/zhuhe/litchi-performance-0956/plan-final-v1.json",
+    "sha256": "211d4c56fa38eef0b4d3e513a4a79054bff29fe02e0100096c8ba0af8dbd9da0"
+  },
+  "runner": {
+    "bytes": 29886,
+    "path": "/home/zhuhe/litchi-performance-0956/tools/capture_0956_v3.py",
+    "sha256": "26501b64194cdfca85b6178d37f6a603bcc2802dcfe80501c27c174913aad5b9"
+  },
+  "schema": "litchi.performance.0956.native-width-capture.v3.outer-terminal",
+  "status": "completed"
+}

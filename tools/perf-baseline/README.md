@@ -18,6 +18,27 @@ OS thread counts or a speedup. Each case starts with a fresh execution context;
 there is no caller-provided warm worker facility. Existing benchmark selectors
 and timers are unchanged.
 
+## Paired cold XLSX managed compression benchmark
+
+Run one configuration per fresh process, with a CPU affinity mask that allows
+the requested worker count:
+
+```sh
+cargo run --release --manifest-path tools/perf-baseline/Cargo.toml \
+  --example xlsx_managed_compression_benchmark -- \
+  --shape medium --workload one-percent --workers 2 \
+  --warmup 20 --samples 200 --output /path/to/new-benchmark-result
+```
+
+Supported worker counts are 1, 2 and 4. Shapes are `medium` and `dense-sparse`;
+the `one-edit` control is available only for `medium`. Each iteration creates
+a fresh managed package and private compression session. Warmups warm the
+process, not the per-publication worker pool. The report retains raw ingress,
+edit/commit, publication and total durations; setup and semantic/inverse checks
+are outside those intervals. Compare widths using the same executable, sink
+and affinity mask, with balanced process ordering. The report alone makes no
+speedup or allocation claim.
+
 ## Untimed PPTX owning-input control
 
 Export the fixed 200-slide media-rich multi-slide edit through the owning

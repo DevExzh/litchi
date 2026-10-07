@@ -10319,6 +10319,14 @@ pub fn qualify_xlsx_managed_compression(directory: &std::path::Path) -> Result<(
     xlsx_managed_compression::qualify(directory)
 }
 
+/// Benchmark one explicit cold managed XLSX compression configuration.
+pub fn benchmark_xlsx_managed_compression<I>(arguments: I) -> Result<(), Box<dyn Error>>
+where
+    I: IntoIterator<Item = std::ffi::OsString>,
+{
+    xlsx_managed_compression::benchmark::benchmark(arguments)
+}
+
 /// Export the untimed owning-input PPTX preservation qualification fixtures.
 ///
 /// This is a standalone harness helper. It uses the fixed media-rich

@@ -1,0 +1,30 @@
+{
+  "checkout_origin_removed": true,
+  "comparison": "bytes match retained 0955 qualification manifest SHA f4f2467e3f9fd040cc68bf20c7b78451dbb3274f3dd10cfd6468d9fb266aa70b",
+  "exact_shell_command": "sha256sum /home/zhuhe/litchi-performance-0955/executables/xlsx_managed_compression; /home/zhuhe/litchi-performance-0955/executables/xlsx_managed_compression --help 2>&1 | head -5",
+  "interpretation": "extra unlogged correctness-only invocation; --help was consumed as the qualifier output-directory argument, so it generated manifest.json; no source/build/native formal capture was involved",
+  "observed_mtime": "2026-10-07T10:58:42.883088295Z",
+  "origin": {
+    "bytes": 15232,
+    "mode": 436,
+    "mtime_ns": 1791370722883088295,
+    "path": "/home/zhuhe/code/litchi/--help/manifest.json",
+    "sha256": "f4f2467e3f9fd040cc68bf20c7b78451dbb3274f3dd10cfd6468d9fb266aa70b"
+  },
+  "qualifier_binary": {
+    "bytes": 642418112,
+    "mode": 509,
+    "mtime_ns": 1791368661059801930,
+    "path": "/home/zhuhe/litchi-performance-0955/executables/xlsx_managed_compression",
+    "sha256": "5477e269fe2a04d790dddcb6b6568a16b6342809f1dc5b9eefac8acfcf712551"
+  },
+  "relocated": {
+    "bytes": 15232,
+    "mode": 436,
+    "mtime_ns": 1791370722883088295,
+    "path": "/home/zhuhe/litchi-performance-0956/runtime-qualification-v1/unlogged-help-argument-output/manifest.json",
+    "sha256": "f4f2467e3f9fd040cc68bf20c7b78451dbb3274f3dd10cfd6468d9fb266aa70b"
+  },
+  "schema": "litchi.performance.0956.unlogged-exploratory-output.v1",
+  "status": "relocated_outside_checkout"
+}

@@ -1,0 +1,56 @@
+{
+  "status": "passed",
+  "count": 9,
+  "reports": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0956/runtime-qualification-v1/medium-one-edit-workers1/workload-output/report.json",
+      "bytes": 4662,
+      "sha256": "ddcf55874070e1b191d861d6b3d188b6ce3753de71d2bf175f90905626d1f572"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0956/runtime-qualification-v1/medium-one-edit-workers4/workload-output/report.json",
+      "bytes": 4662,
+      "sha256": "db61b467f6cfc5582d9183e95bbfdaefc7b3331d87961aebf609b2482f17bbb7"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0956/runtime-qualification-v1/medium-one-percent-workers4/workload-output/report.json",
+      "bytes": 4676,
+      "sha256": "7a2c6816d2be7451d08e87b99779f33b4a10fae6a4a4c90bc2586e94748a2292"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0956/runtime-qualification-v1/medium-one-percent-workers2/workload-output/report.json",
+      "bytes": 4676,
+      "sha256": "1db302e25005aed85c0fcebf01a4e873ea5f31e13b8c61e0e4eabb213e44b183"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0956/runtime-qualification-v1/dense-sparse-one-percent-workers4/workload-output/report.json",
+      "bytes": 4700,
+      "sha256": "6a770ec4cf5b2123e877a9cd013ae55acf6e5d85c087ed832321beb70f37c4e9"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0956/runtime-qualification-v1/medium-one-percent-workers1/workload-output/report.json",
+      "bytes": 4676,
+      "sha256": "f6acd4ad28cf9e31547d1c47ac33efe1e1b87c9bb3c500725e9a78a924c2a7f0"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0956/runtime-qualification-v1/medium-one-edit-workers2/workload-output/report.json",
+      "bytes": 4663,
+      "sha256": "08c14c3b49b124b631ccd1aaabe87adc659183574bb4888175242eb98e6bb66f"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0956/runtime-qualification-v1/dense-sparse-one-percent-workers2/workload-output/report.json",
+      "bytes": 4700,
+      "sha256": "bc7a2ab256fe9f243c3c988783724e00d540fde8e57549f2fd3e69b810afdc99"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0956/runtime-qualification-v1/dense-sparse-one-percent-workers1/workload-output/report.json",
+      "bytes": 4701,
+      "sha256": "78a64ed42ae83d01432f4327cd56750289a692738cbca1e9449a07d4225c4add"
+    }
+  ],
+  "validator": {
+    "path": "/home/zhuhe/litchi-performance-0956/tools/capture_0956_v3.py",
+    "bytes": 29886,
+    "sha256": "26501b64194cdfca85b6178d37f6a603bcc2802dcfe80501c27c174913aad5b9"
+  }
+}

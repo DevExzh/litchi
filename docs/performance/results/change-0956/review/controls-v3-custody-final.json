@@ -1,0 +1,52 @@
+{
+  "capture": {
+    "bytes": 29886,
+    "path": "/home/zhuhe/litchi-performance-0956/tools/capture_0956_v3.py",
+    "sha256": "26501b64194cdfca85b6178d37f6a603bcc2802dcfe80501c27c174913aad5b9"
+  },
+  "checks": [
+    {
+      "name": "positive_plan_and_custody",
+      "rows": 144,
+      "status": "passed"
+    },
+    {
+      "children": 144,
+      "groups": 6,
+      "name": "positive_synthetic_144_reduction",
+      "status": "passed"
+    },
+    {
+      "error": "child schedule row mismatch: medium-one-percent__width1-vs-width2__b00__p0",
+      "name": "tampered_schedule_row_rejected",
+      "status": "rejected"
+    },
+    {
+      "error": "post-terminal artifact descriptors mismatch: medium-one-percent__width1-vs-width2__b00__p0",
+      "name": "tampered_post_terminal_artifact_rejected",
+      "status": "rejected"
+    },
+    {
+      "ci95": [
+        0.0,
+        1.0
+      ],
+      "name": "zero_counter_bootstrap",
+      "point": 0.0,
+      "status": "passed"
+    }
+  ],
+  "plan": {
+    "bytes": 64394,
+    "path": "/home/zhuhe/litchi-performance-0956/plan-v3-draft.json",
+    "sha256": "0bd934ff12ad92755ad4c482cefd995436d9578d7ece4cf5b08066c37d3a3d72"
+  },
+  "reducer": {
+    "bytes": 20953,
+    "path": "/home/zhuhe/litchi-performance-0956/tools/reduce_0956_v3.py",
+    "sha256": "2948909058a8d65a4ac8f691b3b2fc3063829ec18338eab9da0bddb612d6192c"
+  },
+  "schema": "litchi.performance.0956.native-width-controls.v3",
+  "status": "passed",
+  "workload_started": false
+}

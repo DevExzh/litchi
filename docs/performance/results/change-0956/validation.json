@@ -1,0 +1,62 @@
+{
+  "adoption": false,
+  "all_original_helper_bindings_unchanged": true,
+  "allocation_measured": false,
+  "bounded_summary": {
+    "bytes": 276768,
+    "path": "/home/zhuhe/litchi-performance-0956/comparison-summary-v4.json",
+    "sha256": "74ae2817ee86804d959b87fa88977447750c52941dbaf777de593180fa7930bb"
+  },
+  "capture_exit_code": 0,
+  "capture_tool_session": 50848,
+  "comparison_replay_equal_except_created_utc": true,
+  "full_comparison": {
+    "bytes": 3937963,
+    "path": "/home/zhuhe/litchi-performance-0956/comparison-full-v4.json",
+    "sha256": "05cd72d9920a715f74c9f7c96257e6c2777bd7ec589afa38ce510290120bf8be"
+  },
+  "measured_iterations": 28800,
+  "native_children": 144,
+  "native_replacements": 0,
+  "native_retries": 0,
+  "open_reviews": [
+    "medium commit-drop phase +73.8%/+85.1% p50",
+    "four-worker medium whole-process RSS +6.06%",
+    "individual fallback publication tails and secondary phase flags",
+    "0950 one-edit p99 +5.65% remains unresolved"
+  ],
+  "original_plan_unchanged": true,
+  "packet_manifest_before_reduction": {
+    "bytes": 237533,
+    "path": "/home/zhuhe/litchi-performance-0956/completed-packet-manifest-v1.json",
+    "sha256": "f923ebe1bb5f8a3a58458f6458b0795ea26071ebd6ea4254c624d769b489ad28"
+  },
+  "plan": {
+    "bytes": 66141,
+    "path": "/home/zhuhe/litchi-performance-0956/plan-final-v1.json",
+    "sha256": "211d4c56fa38eef0b4d3e513a4a79054bff29fe02e0100096c8ba0af8dbd9da0"
+  },
+  "protocol_review_copy_normalization": {
+    "change": "remove extra trailing blank line for git diff --check; external original unchanged",
+    "committed_copy_sha256": "a112171ea30f87532ae02e5cb657c3b88de9d04e8073ff19423b501ce879aa91",
+    "original_sha256": "4c11f2eb8f485437e4352be388a492235be5063986750a21ff94f26731af0f61"
+  },
+  "reducer_adapter": {
+    "bytes": 21168,
+    "path": "/home/zhuhe/litchi-performance-0956/tools/reduce_0956_v4.py",
+    "sha256": "a3589d6b83350284c2df3a640193f8bff940b27e1bdd909e98d7dce325d86d30"
+  },
+  "reducer_adapter_review": {
+    "bytes": 1048,
+    "path": "/home/zhuhe/litchi-performance-0956/review/reducer-v4-adapter-review.md",
+    "sha256": "b0e197e72227938707a2bc356b3d55990c9907185b3eaf45b1dc074ef479abd1"
+  },
+  "reduction_receipt": {
+    "bytes": 808,
+    "path": "/home/zhuhe/litchi-performance-0956/quality/reduction-v4-root.json",
+    "sha256": "e204ad1df93dfc53a4154f4dbd4ab182e5aa54564118c6dac97cd2707ab66c37"
+  },
+  "schema": "litchi.performance.0956.final-validation.v1",
+  "status": "passed",
+  "warmup_iterations": 2880
+}

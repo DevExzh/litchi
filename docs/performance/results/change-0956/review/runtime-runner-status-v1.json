@@ -1,0 +1,13 @@
+{
+  "children_sealed_before_error": 9,
+  "error": "FileExistsError while creating negative-existing-output child after the nine successful configurations and invalid-worker control had already sealed their terminal/validation receipts",
+  "negative_controls_sealed_before_error": 1,
+  "recovery": "existing-directory control was executed once manually in its pre-created unique child; no successful workload child was retried or replaced",
+  "runner": {
+    "bytes": 8992,
+    "path": "/home/zhuhe/litchi-performance-0956/runtime-qualification-v1.py",
+    "sha256": "ee42b20bd5c9bba2c57785fd46868c48009d1294c7924d4951a98dff2fa39731"
+  },
+  "schema": "litchi.performance.0956.runtime-qualification.runner-status.v1",
+  "status": "post_workload_setup_failure_recorded"
+}

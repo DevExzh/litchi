@@ -1,0 +1,30 @@
+{
+  "controls": {
+    "bytes": 9458,
+    "path": "/home/zhuhe/litchi-performance-0956/tools/controls_0956_v3.py",
+    "sha256": "c21fb8e5271ce7a304b7ee9fff40920c94d72fc60ec6cc5a5159f99355013fc8"
+  },
+  "plan": {
+    "bytes": 66141,
+    "path": "/home/zhuhe/litchi-performance-0956/plan-final-v1.json",
+    "sha256": "211d4c56fa38eef0b4d3e513a4a79054bff29fe02e0100096c8ba0af8dbd9da0"
+  },
+  "reducer": {
+    "bytes": 20953,
+    "path": "/home/zhuhe/litchi-performance-0956/tools/reduce_0956_v3.py",
+    "sha256": "2948909058a8d65a4ac8f691b3b2fc3063829ec18338eab9da0bddb612d6192c"
+  },
+  "row_count": 144,
+  "runner": {
+    "bytes": 29886,
+    "path": "/home/zhuhe/litchi-performance-0956/tools/capture_0956_v3.py",
+    "sha256": "26501b64194cdfca85b6178d37f6a603bcc2802dcfe80501c27c174913aad5b9"
+  },
+  "schema": "litchi.performance.0956.native-width-capture.v3.outer-start",
+  "source_manifest": {
+    "bytes": 2266359,
+    "path": "/home/zhuhe/litchi-performance-0956/source-manifest-v3.json",
+    "sha256": "fd1bc21ee257a1e9ad3b68b46be7cdbfd677877cffa17b714e3493de96b18193"
+  },
+  "started_utc": "2026-10-07T11:11:45.483088Z"
+}

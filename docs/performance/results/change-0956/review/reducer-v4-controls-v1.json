@@ -1,0 +1,69 @@
+{
+  "contract": "start deadline_seconds is required to equal plan; terminal deadline_seconds may be absent for the historical packet but a present conflicting value is rejected",
+  "fixtures_removed_after_checks": true,
+  "negative_controls": [
+    {
+      "label": "start-deadline",
+      "output_exists": false,
+      "returncode": 1,
+      "stderr": {
+        "bytes": 93,
+        "path": "/home/zhuhe/litchi-performance-0956/tmp/reducer-v4-controls/start-deadline.stderr",
+        "sha256": "742be3de9c4fea89c43f42272a759ed96bbd5e5384ae977750b669da818fb0c9"
+      },
+      "terminal": {
+        "bytes": 662,
+        "path": "/home/zhuhe/litchi-performance-0956/tmp/reducer-v4-controls/start-deadline.terminal.json",
+        "sha256": "a71054abceabe233630365370843063989db6ee99dc991afbb051dcb5395a5a4"
+      }
+    },
+    {
+      "label": "terminal-deadline",
+      "output_exists": false,
+      "returncode": 1,
+      "stderr": {
+        "bytes": 96,
+        "path": "/home/zhuhe/litchi-performance-0956/tmp/reducer-v4-controls/terminal-deadline.stderr",
+        "sha256": "f9eb8aba70a5aa5d513e9e9a1b32b09603b83d774e374b0d901077ffbfcf3b89"
+      },
+      "terminal": {
+        "bytes": 671,
+        "path": "/home/zhuhe/litchi-performance-0956/tmp/reducer-v4-controls/terminal-deadline.terminal.json",
+        "sha256": "ebf842556ce810058073d438224ef5f49f011e9e08bd7e7b7645f85172b4feec"
+      }
+    }
+  ],
+  "real_packet": {
+    "packet_manifest": {
+      "bytes": 237533,
+      "path": "/home/zhuhe/litchi-performance-0956/completed-packet-manifest-v1.json",
+      "sha256": "f923ebe1bb5f8a3a58458f6458b0795ea26071ebd6ea4254c624d769b489ad28"
+    },
+    "packet_path": "/home/zhuhe/litchi-performance-0956/capture-native-v1",
+    "plan": {
+      "bytes": 66141,
+      "path": "/home/zhuhe/litchi-performance-0956/plan-final-v1.json",
+      "sha256": "211d4c56fa38eef0b4d3e513a4a79054bff29fe02e0100096c8ba0af8dbd9da0"
+    },
+    "real_child_count": 144,
+    "real_output": {
+      "bytes": 3937963,
+      "path": "/home/zhuhe/litchi-performance-0956/analysis-v4.json",
+      "sha256": "5d36796c491b84667d9bab164f29d49cb6eba581a5c2365b2234b25dcf6a9d7f"
+    },
+    "real_output_status": "completed",
+    "reducer_v3": {
+      "bytes": 20953,
+      "path": "/home/zhuhe/litchi-performance-0956/tools/reduce_0956_v3.py",
+      "sha256": "2948909058a8d65a4ac8f691b3b2fc3063829ec18338eab9da0bddb612d6192c"
+    },
+    "reducer_v4": {
+      "bytes": 21168,
+      "path": "/home/zhuhe/litchi-performance-0956/tools/reduce_0956_v4.py",
+      "sha256": "a3589d6b83350284c2df3a640193f8bff940b27e1bdd909e98d7dce325d86d30"
+    }
+  },
+  "schema": "litchi.performance.0956.native-width-reducer-v4-controls.v1",
+  "status": "passed",
+  "workload_started": false
+}
