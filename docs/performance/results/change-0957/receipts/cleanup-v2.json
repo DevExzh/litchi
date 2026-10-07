@@ -1,0 +1,123 @@
+{
+  "created_utc": "2026-10-07T13:23:23.694428+00:00",
+  "no_checkout_mutation": true,
+  "no_workload_launched": true,
+  "post_cleanup_absent": true,
+  "post_process_probe": {
+    "clear": true,
+    "forbidden_processes": [],
+    "method": "/proc comm/cmdline, self ancestry excluded"
+  },
+  "pre_inventory": {
+    "path": "receipts/cleanup-inventory-v2.json",
+    "sha256": "17081078c9b17f0cbebf13fd209abed2cd362f0d75c779af51e8795536aed7dc"
+  },
+  "pre_process_probe": {
+    "clear": true,
+    "forbidden_processes": [],
+    "method": "/proc comm/cmdline, self ancestry excluded"
+  },
+  "preserved_roots": {
+    "build-tools": true,
+    "builds": true,
+    "executables": true,
+    "quality": true,
+    "receipts": true,
+    "review": true,
+    "revisions": true,
+    "source-base-v1": true,
+    "source-v1": true
+  },
+  "removed": [
+    {
+      "path": "target-v1",
+      "removed": true
+    },
+    {
+      "path": "tmp",
+      "removed": true
+    },
+    {
+      "path": "build-tools/__pycache__",
+      "removed": true
+    },
+    {
+      "path": "tools/__pycache__",
+      "removed": true
+    },
+    {
+      "path": "tools-v2/__pycache__",
+      "removed": true
+    }
+  ],
+  "retained_binaries": [
+    {
+      "bytes": 43676872,
+      "expected_sha256": "9ba37a6b9796ad0e316e7571ebe117ba7a5f97bcf5d29153c7cb3d74c485e9a5",
+      "match": true,
+      "path": "executables/xlsx_managed_compression_alloc.v2",
+      "role": "allocator_bin",
+      "sha256": "9ba37a6b9796ad0e316e7571ebe117ba7a5f97bcf5d29153c7cb3d74c485e9a5"
+    },
+    {
+      "bytes": 43259328,
+      "expected_sha256": "5886b0f86a697bae757994d5a757cffae4a7e8d61a2769ff1c967029cd1912c3",
+      "match": true,
+      "path": "executables/xlsx_managed_compression_benchmark.v2",
+      "role": "benchmark_example",
+      "sha256": "5886b0f86a697bae757994d5a757cffae4a7e8d61a2769ff1c967029cd1912c3"
+    }
+  ],
+  "retention_receipt": {
+    "path": "receipts/executable-retention-v2.json",
+    "sha256": "b4e0957f648cc5a436015b7963610eee5b58c0c85cf1785998939f662b96a76f"
+  },
+  "roots": [
+    {
+      "directory_count": 524,
+      "exists_before": true,
+      "file_count": 2931,
+      "logical_bytes": 2674420001,
+      "root": "target-v1",
+      "symlink_count": 0
+    },
+    {
+      "directory_count": 4,
+      "exists_before": true,
+      "file_count": 0,
+      "logical_bytes": 0,
+      "root": "tmp",
+      "symlink_count": 0
+    },
+    {
+      "directory_count": 0,
+      "exists_before": true,
+      "file_count": 3,
+      "logical_bytes": 56873,
+      "root": "build-tools/__pycache__",
+      "symlink_count": 0
+    },
+    {
+      "directory_count": 0,
+      "exists_before": true,
+      "file_count": 9,
+      "logical_bytes": 119178,
+      "root": "tools/__pycache__",
+      "symlink_count": 0
+    },
+    {
+      "directory_count": 0,
+      "exists_before": true,
+      "file_count": 6,
+      "logical_bytes": 135351,
+      "root": "tools-v2/__pycache__",
+      "symlink_count": 0
+    }
+  ],
+  "schema": "litchi.performance.0957.cleanup.v2",
+  "source_base_preserved": true,
+  "source_integration_preserved": true,
+  "status": "owned_cache_cleanup_complete",
+  "total_file_count": 2949,
+  "total_logical_bytes": 2674731403
+}

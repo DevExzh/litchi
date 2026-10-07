@@ -10327,6 +10327,15 @@ where
     xlsx_managed_compression::benchmark::benchmark(arguments)
 }
 
+/// Measure process-wide allocation intervals for explicit cold XLSX compression.
+/// Requires the isolated counting allocator and Linux worker-exit observation.
+pub fn measure_xlsx_managed_compression_allocations<I>(arguments: I) -> Result<(), Box<dyn Error>>
+where
+    I: IntoIterator<Item = std::ffi::OsString>,
+{
+    xlsx_managed_compression::benchmark::allocation::measure(arguments)
+}
+
 /// Export the untimed owning-input PPTX preservation qualification fixtures.
 ///
 /// This is a standalone harness helper. It uses the fixed media-rich

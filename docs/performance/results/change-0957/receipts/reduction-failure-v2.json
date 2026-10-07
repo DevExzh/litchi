@@ -1,0 +1,9 @@
+{
+  "returncode": 1,
+  "error": "medium-one-percent-w1-r0 validation index mismatch",
+  "output": "/home/zhuhe/litchi-performance-0957/allocation-summary-v2.json",
+  "output_created": false,
+  "reducer_sha256": "c3b3e00e29c08a810f86c96f9ce0ecb637c06c1fcaa1c55605e1df517ed595c8",
+  "reason": "capture validation embeds exact child index in child object, not a redundant top-level index",
+  "no_workload_repeated": true
+}

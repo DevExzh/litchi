@@ -39,6 +39,35 @@ are outside those intervals. Compare widths using the same executable, sink
 and affinity mask, with balanced process ordering. The report alone makes no
 speedup or allocation claim.
 
+## Cold managed XLSX allocation intervals
+
+The isolated allocator diagnostic requires Linux procfs and the explicit
+`allocator-metrics` feature:
+
+```sh
+cargo run --release --manifest-path tools/perf-baseline/Cargo.toml \
+  --features allocator-metrics --bin xlsx_managed_compression_alloc -- \
+  --shape medium --workload one-percent --workers 2 \
+  --warmup 2 --samples 10 --output /path/to/new-allocation-result
+```
+
+It reuses the native benchmark's fixed corpus, finite contexts, bounded sink
+and correctness oracles. Setup, ingress, edit/commit, publication, commit drop,
+worker drain and post-verification cleanup have separate allocation intervals.
+The process-wide counting allocator includes worker callbacks and records
+observer-ordered live-byte peaks; these are neither RSS nor per-object or
+per-thread allocation attribution. Native timing claims must use the separate
+uninstrumented executable.
+
+The pinned private Rayon pool signals shutdown when dropped; it does not join
+workers before returning. This diagnostic therefore waits for one process
+thread before each iteration and records the post-core drain as a separate
+allocation segment. Its fixed-buffer procfs probe must first pass a zero-allocation
+calibration. A drain deadline or unavailable counter is a failure, not a measured
+zero. No thread probe is inserted between the four native operation phases.
+The original native benchmark ends after commit drop and does not include this
+additional worker-drain barrier.
+
 ## Untimed PPTX owning-input control
 
 Export the fixed 200-slide media-rich multi-slide edit through the owning

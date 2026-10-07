@@ -1,0 +1,41 @@
+{
+  "build_receipt": {
+    "bytes": 5312,
+    "mode": 436,
+    "path": "receipts/allocator-integration-v2.json",
+    "sha256": "aa3e2f58287b8fffec7e73d68c447983058173f30168372a022e611c6d9c5d14"
+  },
+  "build_terminal": {
+    "bytes": 5867,
+    "mode": 436,
+    "path": "builds/allocator-integration-v2/terminal.json",
+    "sha256": "42ef21bf7014ab825ff16759641ce7ffa9454bc0cfe39bda3d430e67f5bcb4a7"
+  },
+  "created_utc": "2026-10-07T13:09:53.067710+00:00",
+  "executable_retention": {
+    "bytes": 1951,
+    "mode": 436,
+    "path": "receipts/executable-retention-v2.json",
+    "sha256": "b4e0957f648cc5a436015b7963610eee5b58c0c85cf1785998939f662b96a76f"
+  },
+  "no_workload_launched": true,
+  "process_probe": {
+    "clear": true,
+    "forbidden_processes": [],
+    "method": "/proc comm/cmdline; self ancestry excluded"
+  },
+  "quality_receipt": {
+    "bytes": 11134,
+    "mode": 436,
+    "path": "receipts/allocator-integration-quality-followup-v1.json",
+    "sha256": "dd6ad7d923649c30bb1f47cd845a45ed3b183d7b2675c694519b6fbca0badb4d"
+  },
+  "schema": "litchi.performance.0957.integration-terminal-readiness.v2",
+  "source_postquality": {
+    "bytes": 1922,
+    "mode": 436,
+    "path": "receipts/source-postquality-v2.json",
+    "sha256": "a039a9a723d8d87d919c1d13f808aa61f23b57cef59c43a3a3fa10e0dbb4e157"
+  },
+  "status": "ready_no_active_build_or_workload_processes"
+}

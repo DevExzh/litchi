@@ -1,0 +1,67 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "/home/zhuhe/.cargo/bin/cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "cleanup": {
+        "actions": [],
+        "process_group_clear": true,
+        "reaped": true
+      },
+      "index": 1,
+      "launch": {
+        "bytes": 1751,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2/01-fmt/launch.json",
+        "sha256": "8a5e2aafa0f0e659307c8986f72065491cbf418ac2138ed625493cba288f3ce5"
+      },
+      "name": "fmt",
+      "result": {
+        "bytes": 523,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2/01-fmt/result.json",
+        "sha256": "ea52e877dbfa41d79d32c39750dee3e00f3ef11af4e02e3bf141b43bc154d41c"
+      },
+      "returncode": 1,
+      "start": {
+        "bytes": 1740,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2/01-fmt/start.json",
+        "sha256": "acd13c33a356a73a01f172bc47ca855ff99726d9db1953666335655ebdfab21d"
+      },
+      "status": "failed",
+      "stderr": {
+        "bytes": 0,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2/01-fmt/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 8594,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2/01-fmt/stdout.log",
+        "sha256": "c9723b83343494a23754eea3eaff675a02b075b286f668a38ce80eb26834bfdc"
+      },
+      "terminal": {
+        "bytes": 2612,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2/01-fmt/terminal.json",
+        "sha256": "1de971e75a906e6673544b4ab365af005e289ccf77586fbdc6879dfe3bcd26b6"
+      },
+      "timed_out": false
+    }
+  ],
+  "created_utc": "2026-10-07T12:58:33.118221+00:00",
+  "no_source_format_write_requested": true,
+  "no_workload_launched": true,
+  "schema": "litchi.performance.0957.integration-quality-v2",
+  "source_manifest": "source-manifest-v2.json",
+  "source_root": "source-v1",
+  "status": "failed",
+  "stop_on_first_failure": true
+}

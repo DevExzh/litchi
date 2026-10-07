@@ -1,0 +1,155 @@
+{
+  "argv": [
+    "/home/zhuhe/.cargo/bin/cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/Cargo.toml",
+    "--features",
+    "allocator-metrics",
+    "--bin",
+    "xlsx_managed_compression_alloc",
+    "--example",
+    "xlsx_managed_compression_benchmark",
+    "-j2"
+  ],
+  "cargo": {
+    "bytes": 21113232,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/.cargo/bin/cargo",
+    "resolved_path": "/home/zhuhe/.cargo/bin/rustup",
+    "sha256": "dda7234360b7f578ca8b0ddcb80145646fa61a67c1720a5abc7051b35c9fcb71"
+  },
+  "cwd": "/home/zhuhe/litchi-performance-0957/source-v1",
+  "cwd_relative": "source-v1",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_HOME": "/home/zhuhe/.cargo",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_PROFILE_RELEASE_LTO": "fat",
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-performance-0957/target-v1",
+    "HOME": "/home/zhuhe",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/home/zhuhe/.cargo/bin:/usr/bin:/bin",
+    "RUSTUP_HOME": "/home/zhuhe/.rustup",
+    "RUSTUP_TOOLCHAIN": "1.95.0",
+    "RUST_BACKTRACE": "0",
+    "TEMP": "/home/zhuhe/litchi-performance-0957/tmp/allocator-integration-v2",
+    "TMP": "/home/zhuhe/litchi-performance-0957/tmp/allocator-integration-v2",
+    "TMPDIR": "/home/zhuhe/litchi-performance-0957/tmp/allocator-integration-v2",
+    "TZ": "UTC"
+  },
+  "no_workload_launched": true,
+  "outputs": {
+    "allocator_bin": {
+      "bytes": 43676872,
+      "executable": true,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0957/target-v1/release/xlsx_managed_compression_alloc",
+      "resolved_path": "/home/zhuhe/litchi-performance-0957/target-v1/release/xlsx_managed_compression_alloc",
+      "sha256": "9ba37a6b9796ad0e316e7571ebe117ba7a5f97bcf5d29153c7cb3d74c485e9a5"
+    },
+    "benchmark_example": {
+      "bytes": 43259328,
+      "executable": true,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0957/target-v1/release/examples/xlsx_managed_compression_benchmark",
+      "resolved_path": "/home/zhuhe/litchi-performance-0957/target-v1/release/examples/xlsx_managed_compression_benchmark",
+      "sha256": "5886b0f86a697bae757994d5a757cffae4a7e8d61a2769ff1c967029cd1912c3"
+    }
+  },
+  "process_group_clear": true,
+  "reaped": true,
+  "result": {
+    "bytes": 5131,
+    "executable": false,
+    "mode": 436,
+    "path": "builds/allocator-integration-v2/result.json",
+    "sha256": "7a2537c29121062513f1143282bec5b79cf95b9d751a12efaed8a2948cde0c1a"
+  },
+  "returncode": 0,
+  "runner": {
+    "bytes": 17002,
+    "executable": true,
+    "mode": 493,
+    "path": "build-tools/build_allocator_integration_v2.py",
+    "sha256": "d7479aae574f604bebb9425d31978b8471c9aa8cf418047d46e1e97f97e6c7e3"
+  },
+  "schema": "litchi.performance.0957.allocator-integration-build-receipt.v2",
+  "source": {
+    "bytes": 273429543,
+    "cargo_config": {
+      "bytes": 470,
+      "executable": false,
+      "mode": 436,
+      "path": "source-v1/.cargo/config.toml",
+      "sha256": "50b044c83828f2c448ee59c362afaa79de2dd47fbd390f0cd2888391f1d1119d"
+    },
+    "cargo_lock": {
+      "bytes": 56289,
+      "executable": false,
+      "mode": 436,
+      "path": "source-v1/tools/perf-baseline/Cargo.lock",
+      "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+    },
+    "cargo_manifest": {
+      "bytes": 3428,
+      "executable": false,
+      "mode": 436,
+      "path": "source-v1/tools/perf-baseline/Cargo.toml",
+      "sha256": "0a35d89d0da312e6fcd519189ca16dd1ded9792427dcd01d0cbd71e9efcd74b8"
+    },
+    "file_count": 10932,
+    "integration_freeze": {
+      "bytes": 6186,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/integration-freeze-v2.json",
+      "sha256": "e13c984db9a91cb4360bac1b06827da6c2df28840f5359ae24e4e3e5dd9cb794"
+    },
+    "manifest": {
+      "bytes": 2267268,
+      "executable": false,
+      "mode": 436,
+      "path": "source-manifest-v2.json",
+      "schema": "litchi.performance.0957.source-manifest.v2",
+      "sha256": "f5fd1ee75b734bb7efaa1882be0397defea98c76c835be0bdf1f565c573ef617"
+    },
+    "manifest_schema": "litchi.performance.0957.source-manifest.v2",
+    "source_commit": "02449f394529766d76794332204c27c4022931fc",
+    "source_receipt": {
+      "bytes": 1702,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/source-integration-v2.json",
+      "sha256": "c6f6186ed266dee6305c9760352d0a9933b196c4aa58351b0781a76ff0218312"
+    }
+  },
+  "source_commit": "02449f394529766d76794332204c27c4022931fc",
+  "source_postcheck_required": true,
+  "status": "passed",
+  "target_relative": "target-v1",
+  "terminal": {
+    "bytes": 5867,
+    "executable": false,
+    "mode": 436,
+    "path": "builds/allocator-integration-v2/terminal.json",
+    "sha256": "42ef21bf7014ab825ff16759641ce7ffa9454bc0cfe39bda3d430e67f5bcb4a7"
+  },
+  "timed_out": false,
+  "tmp_relative": "tmp/allocator-integration-v2",
+  "unset_environment": [
+    "CARGO_BUILD_RUSTC_WRAPPER",
+    "CARGO_ENCODED_RUSTFLAGS",
+    "RUSTC_WRAPPER",
+    "RUSTFLAGS"
+  ]
+}

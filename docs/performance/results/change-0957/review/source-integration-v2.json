@@ -1,0 +1,52 @@
+{
+  "base_commit": "02449f394529766d76794332204c27c4022931fc",
+  "base_snapshot": {
+    "bytes": 273393096,
+    "file_count": 10930,
+    "manifest": {
+      "bytes": 2265692,
+      "executable": false,
+      "mode": 436,
+      "path": "source-manifest-v1.json",
+      "sha256": "4876f0048bef76cd65919e239a4c1cd3eafe559b2d363518002588d453e68aec"
+    },
+    "root": "source-base-v1",
+    "source_receipt": {
+      "bytes": 7296,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/source-v1.json",
+      "sha256": "5edcf35b27d51028f041fff40f5db2d8174a740b21c247c8aff5d81a7e9591a2"
+    }
+  },
+  "created_utc": "2026-10-07T12:50:57.356032+00:00",
+  "file_count": 10932,
+  "integration_freeze": {
+    "bytes": 6186,
+    "executable": false,
+    "mode": 436,
+    "path": "receipts/integration-freeze-v2.json",
+    "sha256": "e13c984db9a91cb4360bac1b06827da6c2df28840f5359ae24e4e3e5dd9cb794"
+  },
+  "manifest": {
+    "bytes": 2267268,
+    "executable": false,
+    "mode": 436,
+    "path": "source-manifest-v2.json",
+    "schema": "litchi.performance.0957.source-manifest.v2",
+    "sha256": "f5fd1ee75b734bb7efaa1882be0397defea98c76c835be0bdf1f565c573ef617"
+  },
+  "no_workload_launched": true,
+  "overlay_paths": [
+    "tools/perf-baseline/Cargo.toml",
+    "tools/perf-baseline/README.md",
+    "tools/perf-baseline/src/lib.rs",
+    "tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+    "tools/perf-baseline/src/xlsx_managed_compression_allocation.rs",
+    "tools/perf-baseline/src/bin/xlsx_managed_compression_alloc.rs"
+  ],
+  "schema": "litchi.performance.0957.source-integration-receipt.v2",
+  "source_bytes": 273429543,
+  "source_root": "source-v1",
+  "status": "frozen"
+}

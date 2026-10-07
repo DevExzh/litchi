@@ -1,0 +1,111 @@
+{
+  "schema": "litchi.performance.0957.cli-negative-controls.v1",
+  "status": "passed",
+  "binary": {
+    "path": "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_alloc.v2",
+    "bytes": 43676872,
+    "sha256": "9ba37a6b9796ad0e316e7571ebe117ba7a5f97bcf5d29153c7cb3d74c485e9a5"
+  },
+  "runner": {
+    "path": "/home/zhuhe/litchi-performance-0957/build-tools/cli_negative_controls_v1.py",
+    "bytes": 2573,
+    "sha256": "b7a30a19bec35f0f3b67a43b4301d69b39999007fad7039be08984c4227f4d0b"
+  },
+  "checks": [
+    {
+      "name": "workers-zero",
+      "passed": true,
+      "start": {
+        "path": "/home/zhuhe/litchi-performance-0957/cli-negative-controls-v1/workers-zero/start.json",
+        "bytes": 974,
+        "sha256": "b9ffce8cd9e8069abfb7e19baa705a7056c964ab39ebcf56671e1d65d93d53ee"
+      },
+      "terminal": {
+        "path": "/home/zhuhe/litchi-performance-0957/cli-negative-controls-v1/workers-zero/terminal.json",
+        "bytes": 161,
+        "sha256": "354e3f1be3a555c91f9690c3d5f8cbd71681e9893a0054eea3f931d446f2ed0f"
+      },
+      "stderr": {
+        "path": "/home/zhuhe/litchi-performance-0957/cli-negative-controls-v1/workers-zero/stderr.log",
+        "bytes": 63,
+        "sha256": "334ed1f82ad6309596b1751a17ea67de2bf1eceb243200a7e6f2f9aefb7419ae"
+      }
+    },
+    {
+      "name": "workers-eight",
+      "passed": true,
+      "start": {
+        "path": "/home/zhuhe/litchi-performance-0957/cli-negative-controls-v1/workers-eight/start.json",
+        "bytes": 975,
+        "sha256": "256d2f06255643b5bd0eaa7646d6fb7586ec502d1d6a33c1a65655ecc3953739"
+      },
+      "terminal": {
+        "path": "/home/zhuhe/litchi-performance-0957/cli-negative-controls-v1/workers-eight/terminal.json",
+        "bytes": 161,
+        "sha256": "7a973bce8bdd48b07fb1dce1ea093c3d6cc92ac798a5f2169a6c2d2cfdfb56bf"
+      },
+      "stderr": {
+        "path": "/home/zhuhe/litchi-performance-0957/cli-negative-controls-v1/workers-eight/stderr.log",
+        "bytes": 63,
+        "sha256": "e8583c67aa57debc56e69dbfbaacd83101d092c332fb3032f682b0148385330b"
+      }
+    },
+    {
+      "name": "samples-zero",
+      "passed": true,
+      "start": {
+        "path": "/home/zhuhe/litchi-performance-0957/cli-negative-controls-v1/samples-zero/start.json",
+        "bytes": 974,
+        "sha256": "0d79550e4b513dc8c833034e70bbd8970f62f4be43eef390e2606b994d6d11ea"
+      },
+      "terminal": {
+        "path": "/home/zhuhe/litchi-performance-0957/cli-negative-controls-v1/samples-zero/terminal.json",
+        "bytes": 161,
+        "sha256": "b7f89155b625897242715ca9a177577c96307ec10889e062fd03b251c9ddd60a"
+      },
+      "stderr": {
+        "path": "/home/zhuhe/litchi-performance-0957/cli-negative-controls-v1/samples-zero/stderr.log",
+        "bytes": 34,
+        "sha256": "de3ecf027aff9e68d350669602c5d54c3ef89e6ddfc688ce0b6c1f2f1828a909"
+      }
+    },
+    {
+      "name": "missing-flags",
+      "passed": true,
+      "start": {
+        "path": "/home/zhuhe/litchi-performance-0957/cli-negative-controls-v1/missing-flags/start.json",
+        "bytes": 727,
+        "sha256": "54e831f2fc4aeed2b772562e9b4c1b965ca37af9165a4ff2a7bcd9f1ad92f2c4"
+      },
+      "terminal": {
+        "path": "/home/zhuhe/litchi-performance-0957/cli-negative-controls-v1/missing-flags/terminal.json",
+        "bytes": 161,
+        "sha256": "9b7df944af2e7148bf4d59a9fa14954b6f9703484445191b6b8f99ea73585aaa"
+      },
+      "stderr": {
+        "path": "/home/zhuhe/litchi-performance-0957/cli-negative-controls-v1/missing-flags/stderr.log",
+        "bytes": 198,
+        "sha256": "22227fabb456d3209e5a05f82be61c4ee0b9a702dcaacb8e372520dda0e9155c"
+      }
+    },
+    {
+      "name": "existing-output",
+      "passed": true,
+      "start": {
+        "path": "/home/zhuhe/litchi-performance-0957/cli-negative-controls-v1/existing-output/start.json",
+        "bytes": 963,
+        "sha256": "b31569cc810c59bc9f9108f9b880cfc7e348757c37e7cd2a4386700937b2dc5d"
+      },
+      "terminal": {
+        "path": "/home/zhuhe/litchi-performance-0957/cli-negative-controls-v1/existing-output/terminal.json",
+        "bytes": 161,
+        "sha256": "8f4e87bcbee57584a27571fcfe621813b77c5b65d53b81a56a67e7d62c61c68a"
+      },
+      "stderr": {
+        "path": "/home/zhuhe/litchi-performance-0957/cli-negative-controls-v1/existing-output/stderr.log",
+        "bytes": 133,
+        "sha256": "478c93efc5df20186aea7db6a9fd1feed997858d6062a047a3aff3b3b0d039e1"
+      }
+    }
+  ]
+}

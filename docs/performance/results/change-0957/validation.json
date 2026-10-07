@@ -1,0 +1,57 @@
+{
+  "schema": "litchi.performance.0957.final-validation.v1",
+  "status": "passed_with_inherited_workspace_fmt_failure",
+  "source_overlay_unchanged": true,
+  "normative_input_hashes_unchanged": 35,
+  "release_build": "passed",
+  "scoped_rustfmt": "passed",
+  "clippy_bin_and_example_deny_warnings": "passed",
+  "allocation_observer_tests_passed": 26,
+  "counting_allocator_bin_tests_passed": 5,
+  "workspace_fmt": "failed on inherited baseline files; retained separately, no formatting writes",
+  "cli_negative_controls_passed": 5,
+  "report_controls": "one positive plus22 rejected negatives",
+  "custody_controls": "one positive plus9 rejected negatives",
+  "wrong_executing_runner_control": "rejected",
+  "real_tiny_preflight": "passed",
+  "formal_children": 27,
+  "measured_rows": 270,
+  "warmups_per_child": 2,
+  "workload_retries": 0,
+  "capture_plan": {
+    "path": "/home/zhuhe/litchi-performance-0957/plan-final-v2.json",
+    "bytes": 18832,
+    "sha256": "3a42497534e9e678eeccdde4ba46522828d655fce825c9639e1ae2307227c9c8"
+  },
+  "packet_freeze": {
+    "path": "/home/zhuhe/litchi-performance-0957/receipts/completed-packet-freeze-v1.json",
+    "bytes": 276,
+    "sha256": "d02b32dbe42557897daf27afb68479c69a36b78711c2b14905ddbd6ad7752568"
+  },
+  "reducer_amendment": {
+    "path": "/home/zhuhe/litchi-performance-0957/receipts/reduction-amendment-v1.json",
+    "bytes": 2401,
+    "sha256": "720179edb1c27b493c843041fd6a1e23172d091792ac4166fea4ebbe53a72851"
+  },
+  "summary": {
+    "path": "/home/zhuhe/litchi-performance-0957/allocation-summary-v3.json",
+    "bytes": 391446,
+    "sha256": "bc311f3209f346baacedd591a17d6fb36937dda81a256e1ea1cb4f2aaabd4850"
+  },
+  "summary_replay": {
+    "path": "/home/zhuhe/litchi-performance-0957/allocation-summary-replay-v1.json",
+    "bytes": 391446,
+    "sha256": "bc311f3209f346baacedd591a17d6fb36937dda81a256e1ea1cb4f2aaabd4850"
+  },
+  "replay_byte_identical": true,
+  "cleanup": {
+    "path": "/home/zhuhe/litchi-performance-0957/receipts/cleanup-v2.json",
+    "bytes": 3195,
+    "sha256": "c934a8e1b649ce695e76e313a86499b75c48b3ebc4c6923cc3b41821931739ca"
+  },
+  "report_review": "independent read-only review found no concrete blocker; all phase and derived peak flags disclosed",
+  "json_and_local_report_links": "passed",
+  "repository_evidence_files_under_1_MiB": true,
+  "production_adoption": false,
+  "overall_goal_completion_proven": false
+}

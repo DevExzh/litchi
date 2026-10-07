@@ -1,0 +1,105 @@
+{
+  "created_utc": "2026-10-07T12:41:11.281866+00:00",
+  "no_workload_launched": true,
+  "post_terminal_mutations": {
+    "allocator_terminal": {
+      "launched_utc": "2026-10-07T12:26:05.152838+00:00",
+      "receipt": {
+        "bytes": 4582,
+        "mode": 436,
+        "path": "builds/allocator-lib-v1/terminal.json",
+        "sha256": "0d76eaab5d833dcf6a65aa2c6a7c94c4969dec2d912465908b8bab269764b2fb"
+      },
+      "returncode": 0,
+      "started_utc": "2026-10-07T12:26:05.149853+00:00",
+      "terminal_utc": "2026-10-07T12:32:55.280875+00:00"
+    },
+    "depfile": {
+      "bytes": 361243,
+      "mode": 436,
+      "mtime_utc": "2026-10-07T12:32:55.036366+00:00",
+      "path": "target-v1/release/liblitchi_perf_baseline.d",
+      "sha256": "bd5f6881d66f6a792a79196c42977a282b69c4597a1de2508c054717a3311585"
+    },
+    "depfile_path_references": {
+      "tools/perf-baseline/src/bin/xlsx_managed_compression_alloc.rs": false,
+      "tools/perf-baseline/src/xlsx_managed_compression.rs": true,
+      "tools/perf-baseline/src/xlsx_managed_compression_allocation.rs": false,
+      "tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs": true
+    },
+    "drafts_observed_after_terminal": [
+      {
+        "birth_utc": "2026-10-07T12:33:20.252466508+00:00",
+        "bytes": 25147,
+        "mtime_utc": "2026-10-07T12:34:03.181639+00:00",
+        "observation": "retained in source-postbuild-diff-v1 before restoration; birth time supplied by terminal-side stat observation",
+        "path": "tools/perf-baseline/src/xlsx_managed_compression_allocation.rs",
+        "sha256": "f8d20ae173f0329701e251357ec65a1078af36a411008f2e11485427b94279"
+      },
+      {
+        "birth_utc": "2026-10-07T12:34:06.870653858+00:00",
+        "bytes": 622,
+        "mtime_utc": "2026-10-07T12:34:06.870654+00:00",
+        "observation": "retained in source-postbuild-diff-v1 before restoration; birth time supplied by terminal-side stat observation",
+        "path": "tools/perf-baseline/src/bin/xlsx_managed_compression_alloc.rs",
+        "sha256": "1d36da2e9f8db3fd28cfdc843bb5e221443230e33df496836d98bc382e316207"
+      },
+      {
+        "bytes": 28537,
+        "mtime_utc": "2026-10-07T12:34:06.870654+00:00",
+        "observation": "retained in source-postbuild-diff-v1 before restoration; current source-v1 content is restored to prebuild manifest",
+        "path": "tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+        "sha256": "7d8afadf9f5414ac5215f62411c60e139a798d1c182a441902a0cc62b4445961"
+      }
+    ],
+    "interpretation": "The depfile was emitted before the allocator build terminal and has no reference to either unmanifested post-terminal draft path. This receipt records byte/path evidence only and does not claim the allocator compiler consumed those drafts.",
+    "original_diff": {
+      "bytes": 3142,
+      "mode": 436,
+      "path": "receipts/source-postbuild-diff-v1.json",
+      "sha256": "b2cd80ef674aa507b75b95f670c78d0ef65a070cd0a07abf65b691b32f2c4fc7"
+    },
+    "post_terminal_draft_status": "historical_unapproved_drift_preserved_outside_restored_source"
+  },
+  "restoration": {
+    "drafts_preserved_under_revision": true,
+    "known_benchmark_content_restored": true,
+    "receipt": {
+      "bytes": 1443,
+      "mode": 436,
+      "path": "receipts/draft-custody-restoration-v1.json",
+      "sha256": "b6c1e31e49f6a6ef01376caf7679e86dd61db01640a49c4cdf9d9b5d3dc3cdba"
+    },
+    "restored_source_has_no_draft_paths": true,
+    "source_cleanup_by_this_receipt": false,
+    "status": "draft_transferred_to_checkout_base_snapshot_restored"
+  },
+  "schema": "litchi.performance.0957.source-restoration-revalidation.v1",
+  "source": {
+    "actual_bytes": 273393096,
+    "actual_file_count": 10930,
+    "base_commit": "02449f394529766d76794332204c27c4022931fc",
+    "changed_paths": [],
+    "content_manifest_match": true,
+    "expected_bytes": 273393096,
+    "expected_file_count": 10930,
+    "manifest": {
+      "bytes": 2265692,
+      "mode": 436,
+      "path": "source-manifest-v1.json",
+      "schema": "litchi.performance.0957.source-manifest.v1",
+      "sha256": "4876f0048bef76cd65919e239a4c1cd3eafe559b2d363518002588d453e68aec"
+    },
+    "missing_paths": [],
+    "mtime_is_not_a_manifest_field": true,
+    "root": "source-v1",
+    "source_receipt": {
+      "bytes": 7296,
+      "mode": 436,
+      "path": "receipts/source-v1.json",
+      "sha256": "5edcf35b27d51028f041fff40f5db2d8174a740b21c247c8aff5d81a7e9591a2"
+    },
+    "unexpected_paths": []
+  },
+  "status": "restored_prebuild_manifest_match"
+}

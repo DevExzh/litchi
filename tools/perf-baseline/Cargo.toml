@@ -16,6 +16,11 @@ path = "src/bin/litchi-perf-baseline-alloc.rs"
 required-features = ["allocator-metrics"]
 
 [[bin]]
+name = "xlsx_managed_compression_alloc"
+path = "src/bin/xlsx_managed_compression_alloc.rs"
+required-features = ["allocator-metrics"]
+
+[[bin]]
 name = "docx_plain_paragraph_tail_append"
 path = "src/bin/docx_plain_paragraph_tail_append.rs"
 

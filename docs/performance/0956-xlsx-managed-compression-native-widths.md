@@ -42,7 +42,7 @@ is no cold-filesystem claim. Context creation, immutable source cloning, cache
 limit preparation and sink reservation are outside the timers. Ingress starts
 at the source-backed editor constructor. Edit/commit, publication, and commit
 drop are measured separately. Publication includes the consuming editor call,
-its package/private-pool teardown and returned snapshot drop; commit drop is
+its package/private-pool handle destruction and returned snapshot drop; commit drop is
 outside publication but inside total. Total therefore describes this timed
 route, not the full process or application request. These boundaries preclude
 an absolute timing comparison with 0950.
@@ -94,9 +94,14 @@ The medium commit-drop p50 ratios are **1.738** and **1.851**, with p95/p99
 ratios also above 1.70. Across the twelve processes in each role, serial p50
 commit drop spans about 167–170 microseconds, versus 291–295 at width two and
 306–320 at width four. This penalty is included in total and is not dismissed
-because total improves. Its cause has not been attributed; pool teardown must
-not be assigned to this phase because the consuming publisher already covers
-it. Edit/commit point ratios are about 1.01 for medium. Ingress and smaller
+because total improves. Its cause has not been attributed. The subsequent
+[0957 source trace](results/change-0957/review/commit-drop-source-trace-v2.md) establishes
+that pinned Rayon's pool destructor signals termination without joining worker
+threads. Publication includes that signal, but asynchronous worker cleanup can
+overlap commit drop or follow it. These timings therefore cannot attribute the
+penalty solely to commit ownership or establish completed worker teardown.
+Historical raw report scope strings are retained unchanged. Edit/commit point
+ratios are about 1.01 for medium. Ingress and smaller
 phases retain individual pair/block flags in the summary.
 
 All aggregate publication/total points remain below the 5% regression

@@ -1,0 +1,51 @@
+{
+  "plan": {
+    "path": "/home/zhuhe/litchi-performance-0957/plan-final-v2.json",
+    "bytes": 18832,
+    "sha256": "3a42497534e9e678eeccdde4ba46522828d655fce825c9639e1ae2307227c9c8"
+  },
+  "helpers": {
+    "capture_0957_v2.py": {
+      "path": "/home/zhuhe/litchi-performance-0957/tools-v2/capture_0957_v2.py",
+      "bytes": 17327,
+      "sha256": "bf8c252e422142504272d98784db5b1b5b460869ead8eb8c7241273d842766af"
+    },
+    "common_0957_v2.py": {
+      "path": "/home/zhuhe/litchi-performance-0957/tools-v2/common_0957_v2.py",
+      "bytes": 31357,
+      "sha256": "412c6466e6a7f8d21070f211d9f751cb66132c65a85eba9a9e1972213fa0d9bf"
+    },
+    "controls_0957_v2.py": {
+      "path": "/home/zhuhe/litchi-performance-0957/tools-v2/controls_0957_v2.py",
+      "bytes": 13605,
+      "sha256": "07326df1c9d36a0f9fd39deedc0b07e6c191a4f8b3bb166af077af83a27de983"
+    },
+    "custody_controls_0957_v2.py": {
+      "path": "/home/zhuhe/litchi-performance-0957/tools-v2/custody_controls_0957_v2.py",
+      "bytes": 8431,
+      "sha256": "50f6e12adae7f2ef17223a4371c65207cd0d860642e358a93fa0639da519ce3f"
+    },
+    "reduce_0957_v2.py": {
+      "path": "/home/zhuhe/litchi-performance-0957/tools-v2/reduce_0957_v2.py",
+      "bytes": 16065,
+      "sha256": "e117caa02ef2ad4db76188fe662f92a5d27f61f550a551f4656986da4e64964c"
+    },
+    "tiny_preflight_0957_v2.py": {
+      "path": "/home/zhuhe/litchi-performance-0957/tools-v2/tiny_preflight_0957_v2.py",
+      "bytes": 9580,
+      "sha256": "96183532c271f1f442f8df41c991b38f60b1ced3d15ad936dd7c903c4a138565"
+    }
+  },
+  "predecessor": {
+    "path": "/home/zhuhe/litchi-performance-0957/review/tooling-receipt-v6-v2.json",
+    "bytes": 7739,
+    "sha256": "27a07451a97996e092a284f280d139ba5ec04da74534aa47831ced7a2e63db48"
+  },
+  "changes": [
+    "Executing runner exact descriptor check",
+    "Copied/external plan bytes/SHA equality",
+    "Tiny uses full formal plan validator",
+    "Tiny rejects forced process-group cleanup"
+  ],
+  "no_workload_launched": true
+}

@@ -1,0 +1,176 @@
+{
+  "schema": "litchi.performance.0957.final-packet-provenance.v1",
+  "status": "capture_complete_bounded_packet_report_available",
+  "scope": "Bounded provenance, capture custody, controls, descriptive allocation summary, and the root-owned final allocation review. Cleanup and final validation remain root-owned.",
+  "external_packet": {
+    "root": "/home/zhuhe/litchi-performance-0957",
+    "source_manifest": {
+      "path": "/home/zhuhe/litchi-performance-0957/source-manifest-v2.json",
+      "bytes": 2267268,
+      "sha256": "f5fd1ee75b734bb7efaa1882be0397defea98c76c835be0bdf1f565c573ef617"
+    },
+    "allocator_binary": {
+      "path": "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_alloc.v2",
+      "bytes": 43676872,
+      "sha256": "9ba37a6b9796ad0e316e7571ebe117ba7a5f97bcf5d29153c7cb3d74c485e9a5"
+    },
+    "capture_packet": {
+      "root": "/home/zhuhe/litchi-performance-0957/capture-allocation-v1",
+      "manifest": {
+        "packet_path": "capture-allocation-v1/packet-manifest.json",
+        "bytes": 27843,
+        "sha256": "2f6a367ded17d7fc2301a2798d5d1ea498ee9fc7c637d6459c92556910ebb591",
+        "entry_count": 194,
+        "listed_bytes": 2129250
+      },
+      "state": {
+        "packet_path": "capture-allocation-v1/capture-state.json",
+        "bytes": 133,
+        "sha256": "2882fb32b6216206d479ce55893f63023745aebd53cc9a8ee96d5468955a9246",
+        "children_expected": 27,
+        "children_completed": 27,
+        "failed": 0,
+        "status": "completed"
+      }
+    }
+  },
+  "bounded_packet_copies": {
+    "plan": {
+      "packet_path": "plan-final-v2.json",
+      "external_path": "/home/zhuhe/litchi-performance-0957/plan-final-v2.json",
+      "bytes": 18832,
+      "sha256": "3a42497534e9e678eeccdde4ba46522828d655fce825c9639e1ae2307227c9c8",
+      "children": 27
+    },
+    "tiny_preflight": {
+      "packet_path": "tiny-preflight-v1/preflight-result.json",
+      "external_path": "/home/zhuhe/litchi-performance-0957/tiny-preflight-v1/preflight-result.json",
+      "bytes": 867,
+      "sha256": "c9f86b7589f7a0ba14b87fbdb80aec515836cd225bb4116c5bb0fc8335b2ee64",
+      "status": "passed"
+    },
+    "allocation_summary": {
+      "packet_path": "allocation-summary-v3.json",
+      "external_path": "/home/zhuhe/litchi-performance-0957/allocation-summary-v3.json",
+      "bytes": 391446,
+      "sha256": "bc311f3209f346baacedd591a17d6fb36937dda81a256e1ea1cb4f2aaabd4850",
+      "status": "completed",
+      "children": 27,
+      "claim_scope": "descriptive allocator counters and observer peaks only; no elapsed-time, bootstrap, RSS, throughput, speedup, or adoption claim"
+    },
+    "allocator_findings": {
+      "packet_path": "allocator-findings-v1.json",
+      "external_path": "/home/zhuhe/litchi-performance-0957/allocator-findings-v1.json",
+      "bytes": 21512,
+      "sha256": "adb0f7eeb2b58ab0078c27ee5150ed28555e3e5ee5eb814ddce33fd64696aa35"
+    },
+    "tools_v2": {
+      "directory": "tools-v2",
+      "external_directory": "/home/zhuhe/litchi-performance-0957/tools-v2",
+      "scripts": {
+        "capture_0957_v2.py": {
+          "bytes": 17327,
+          "sha256": "bf8c252e422142504272d98784db5b1b5b460869ead8eb8c7241273d842766af"
+        },
+        "common_0957_v2.py": {
+          "bytes": 31357,
+          "sha256": "412c6466e6a7f8d21070f211d9f751cb66132c65a85eba9a9e1972213fa0d9bf"
+        },
+        "controls_0957_v2.py": {
+          "bytes": 13605,
+          "sha256": "07326df1c9d36a0f9fd39deedc0b07e6c191a4f8b3bb166af077af83a27de983"
+        },
+        "custody_controls_0957_v2.py": {
+          "bytes": 8431,
+          "sha256": "50f6e12adae7f2ef17223a4371c65207cd0d860642e358a93fa0639da519ce3f"
+        },
+        "reduce_0957_v2.py": {
+          "bytes": 16252,
+          "sha256": "5fb5e329ae9d57c4af655c0844d5be6dd009c0612c8310ae5861b3cbe8d8f378"
+        },
+        "tiny_preflight_0957_v2.py": {
+          "bytes": 9580,
+          "sha256": "96183532c271f1f442f8df41c991b38f60b1ced3d15ad936dd7c903c4a138565"
+        }
+      },
+      "reducer_note": "The current reduce_0957_v2.py hash is the post-capture compatibility-fixed helper. final-tooling-review-v3.json records the earlier pre-capture reducer hash; reduction-amendment-v1.json is the authoritative bounded amendment receipt."
+    },
+    "control_wrappers": {
+      "root": {
+        "packet_path": "build-tools/final_offline_controls_0957_v1.py",
+        "external_path": "/home/zhuhe/litchi-performance-0957/build-tools/final_offline_controls_v1.py",
+        "bytes": 1213,
+        "sha256": "e4aad10aadba32dd36e7788bba2151f6133055ae335ccac05c3a6651e73a8096"
+      },
+      "cli": {
+        "packet_path": "build-tools/cli_negative_controls_0957_v1.py",
+        "external_path": "/home/zhuhe/litchi-performance-0957/build-tools/cli_negative_controls_v1.py",
+        "bytes": 2573,
+        "sha256": "b7a30a19bec35f0f3b67a43b4301d69b39999007fad7039be08984c4227f4d0b"
+      }
+    },
+    "summary_helper": {
+      "packet_path": "build-tools/summarize_allocator_0957_v1.py",
+      "external_path": "/home/zhuhe/litchi-performance-0957/build-tools/summarize_allocator_v1.py",
+      "bytes": 2330,
+      "sha256": "acc41d013889702d14add06b83164ca865323147ba3817956e511a35e047e007"
+    }
+  },
+  "final_report": {
+    "repo_path": "docs/performance/0957-xlsx-managed-compression-allocations.md",
+    "status": "written_by_root",
+    "decision": "no production adoption"
+  },
+  "final_receipts": {
+    "source_readiness": [
+      "receipts/source-postquality-v2.json",
+      "receipts/integration-terminal-readiness-v2.json",
+      "receipts/completed-packet-freeze-v1.json",
+      "receipts/executable-retention-v2.json"
+    ],
+    "tooling_and_controls": [
+      "review/final-plan-dry-run-v1.json",
+      "review/final-tooling-review-v3.json",
+      "review/root-tooling-freeze-v1.json",
+      "review/root-custody-controls-v1.json",
+      "review/root-report-controls-v1.json",
+      "review/root-runner-identity-control-v1.json",
+      "review/custody-controls-v2-result-v3.json",
+      "review/controls-v2-final-result-v7.json",
+      "review/tooling-receipt-v6-v2.json",
+      "review/cli-negative-controls-v1-result.json"
+    ],
+    "reduction_failures": [
+      "receipts/reduction-failure-v1.json",
+      "receipts/reduction-failure-v2.json"
+    ],
+    "reduction_amendment": {
+      "packet_path": "receipts/reduction-amendment-v1.json",
+      "external_path": "/home/zhuhe/litchi-performance-0957/receipts/reduction-amendment-v1.json",
+      "bytes": 2401,
+      "sha256": "720179edb1c27b493c843041fd6a1e23172d091792ac4166fea4ebbe53a72851"
+    },
+    "final_allocation_review": {
+      "packet_path": "review/final-allocation-review-v1.json",
+      "external_path": "/home/zhuhe/litchi-performance-0957/review/final-allocation-review-v1.json",
+      "bytes": 4948,
+      "sha256": "a2fc9e79313e126b8c00e47cc0a8a579a006016a70a7eb8478beaa6e84e6cf9a"
+    }
+  },
+  "history": {
+    "readme_snapshots": [
+      "README-v1.md",
+      "README-v2.md"
+    ],
+    "source_build_provenance": [
+      "source-build-provenance-v1.json",
+      "source-build-provenance-v2.json"
+    ],
+    "interpretation": "The v1 and v2 provenance descriptors remain historical pre-capture snapshots. This descriptor records the bounded post-capture copies without replacing the root-owned final report or reducer amendment."
+  },
+  "limitations": [
+    "Raw reports, capture logs, source manifests, binaries, targets, and final reducer outputs remain external.",
+    "The allocation summary is descriptive and does not make an adoption or performance decision.",
+    "Cleanup and final validation remain root-owned; the report and reducer amendment are now present in the repository packet."
+  ]
+}

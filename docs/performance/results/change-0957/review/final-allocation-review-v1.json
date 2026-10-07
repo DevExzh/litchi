@@ -1,0 +1,123 @@
+{
+  "authorized_plan": {
+    "bytes": 18832,
+    "path": "/home/zhuhe/litchi-performance-0957/plan-final-v2.json",
+    "sha256": "3a42497534e9e678eeccdde4ba46522828d655fce825c9639e1ae2307227c9c8"
+  },
+  "conclusion": [
+    "The sealed packet and authorized plan descriptors match the completed descriptive summary.",
+    "The two failed reducer attempts are preserved and explicitly record that no workload was repeated.",
+    "The corrected reducer binds all child identities and custody fields while accepting the actual v1 validation shape.",
+    "Six derived peak ratios exceed the 1.05 descriptive threshold, all for medium-one-percent workers=4; they must remain disclosed and do not support an adoption or performance claim."
+  ],
+  "custody_findings": {
+    "child_forced_group_cleanup_false": true,
+    "child_process_groups_reaped": true,
+    "child_terminals_returncode_zero": true,
+    "child_terminals_timed_out_false": true,
+    "child_validation_status_passed": true,
+    "children_completed": 27,
+    "children_expected": 27,
+    "full_child_identity_required": true,
+    "packet_manifest_entries": 194,
+    "validation_top_level_index": "optional, contradictory value rejected; child.index and full validation.child remain required"
+  },
+  "final_reducer": {
+    "bytes": 16252,
+    "path": "/home/zhuhe/litchi-performance-0957/tools-v2/reduce_0957_v2.py",
+    "sha256": "5fb5e329ae9d57c4af655c0844d5be6dd009c0612c8310ae5861b3cbe8d8f378"
+  },
+  "frozen_packet": {
+    "bytes": 27843,
+    "path": "/home/zhuhe/litchi-performance-0957/capture-allocation-v1/packet-manifest.json",
+    "sha256": "2f6a367ded17d7fc2301a2798d5d1ea498ee9fc7c637d6459c92556910ebb591"
+  },
+  "packet_freeze_receipt": {
+    "bytes": 276,
+    "path": "/home/zhuhe/litchi-performance-0957/receipts/completed-packet-freeze-v1.json",
+    "sha256": "d02b32dbe42557897daf27afb68479c69a36b78711c2b14905ddbd6ad7752568"
+  },
+  "preserved_reducer_failures": [
+    {
+      "no_workload_repeated": true,
+      "output_created": false,
+      "reason": "missing require_dict import",
+      "receipt": {
+        "bytes": 575,
+        "path": "/home/zhuhe/litchi-performance-0957/receipts/reduction-failure-v1.json",
+        "sha256": "d0eef950279bed427e632a59f0b5ea3d2480938a4e535d11a40cdc9c54585c26"
+      }
+    },
+    {
+      "no_workload_repeated": true,
+      "output_created": false,
+      "reason": "validation top-level index was absent in the captured v1 receipt",
+      "receipt": {
+        "bytes": 420,
+        "path": "/home/zhuhe/litchi-performance-0957/receipts/reduction-failure-v2.json",
+        "sha256": "89dd2bd497d03d3784fe1c35a9dc27da68f10dfafefe2f04eb88dcb346839dfe"
+      }
+    }
+  ],
+  "result_findings": {
+    "claim_scope": "descriptive allocator counters and observer peaks only; no elapsed-time, bootstrap, RSS, throughput, speedup, or adoption claim",
+    "configuration_count": 9,
+    "repeat_count_total": 27,
+    "reports_validated_by_reducer": "all 27 reports passed the frozen contract and counter conservation checks",
+    "summary_status": "completed",
+    "threshold_flags": [
+      {
+        "case_id": "medium-one-percent",
+        "group": "derived_peak_ratios",
+        "metric": "max_setup_core_peak_above_setup_live_before",
+        "ratio": 1.0622818218920778,
+        "workers": 4
+      },
+      {
+        "case_id": "medium-one-percent",
+        "group": "derived_peak_ratios",
+        "metric": "max_setup_drained_core_peak_above_setup_live_before",
+        "ratio": 1.0622818218920778,
+        "workers": 4
+      },
+      {
+        "case_id": "medium-one-percent",
+        "group": "derived_peak_ratios",
+        "metric": "max_setup_core_peak_above_setup_live_before",
+        "ratio": 1.0627637184601324,
+        "workers": 4
+      },
+      {
+        "case_id": "medium-one-percent",
+        "group": "derived_peak_ratios",
+        "metric": "max_setup_drained_core_peak_above_setup_live_before",
+        "ratio": 1.0627637184601324,
+        "workers": 4
+      },
+      {
+        "case_id": "medium-one-percent",
+        "group": "derived_peak_ratios",
+        "metric": "max_setup_core_peak_above_setup_live_before",
+        "ratio": 1.0700320046307625,
+        "workers": 4
+      },
+      {
+        "case_id": "medium-one-percent",
+        "group": "derived_peak_ratios",
+        "metric": "max_setup_drained_core_peak_above_setup_live_before",
+        "ratio": 1.0700320046307625,
+        "workers": 4
+      }
+    ],
+    "threshold_ratio": 1.05
+  },
+  "reviewed_at_utc": "2026-10-07T13:22:03.780545+00:00",
+  "schema": "litchi.performance.0957.final-allocation-review.v1",
+  "scope": "read-only custody/reducer/result review; no workload, rebuild, or reducer execution",
+  "status": "passed_with_threshold_disclosure",
+  "summary": {
+    "bytes": 391446,
+    "path": "/home/zhuhe/litchi-performance-0957/allocation-summary-v3.json",
+    "sha256": "bc311f3209f346baacedd591a17d6fb36937dda81a256e1ea1cb4f2aaabd4850"
+  }
+}

@@ -1,0 +1,209 @@
+{
+  "calibration_serialization_limit": {
+    "interpretation": "source calibration checks internal byte/live/peak state and no callbacks; those internal values are not serialized, so the validator does not invent absent report fields",
+    "not_serialized": [
+      "allocated_bytes",
+      "deallocated_bytes",
+      "live_bytes",
+      "peak_bytes"
+    ],
+    "serialized_and_validated": [
+      "allocation_calls",
+      "deallocation_calls",
+      "reallocation_calls",
+      "failed_allocation_calls"
+    ]
+  },
+  "checks": [
+    {
+      "argv": [
+        "python3",
+        "/home/zhuhe/litchi-performance-0957/tools-v2/controls_0957_v2.py"
+      ],
+      "result": "passed",
+      "workload_started": false
+    },
+    {
+      "argv": [
+        "python3",
+        "/home/zhuhe/litchi-performance-0957/tools-v2/custody_controls_0957_v2.py"
+      ],
+      "result": "passed",
+      "workload_started": false
+    },
+    {
+      "argv": [
+        "python3",
+        "-m",
+        "py_compile",
+        "/home/zhuhe/litchi-performance-0957/tools-v2/capture_0957_v2.py",
+        "/home/zhuhe/litchi-performance-0957/tools-v2/common_0957_v2.py",
+        "/home/zhuhe/litchi-performance-0957/tools-v2/controls_0957_v2.py",
+        "/home/zhuhe/litchi-performance-0957/tools-v2/custody_controls_0957_v2.py",
+        "/home/zhuhe/litchi-performance-0957/tools-v2/reduce_0957_v2.py",
+        "/home/zhuhe/litchi-performance-0957/tools-v2/tiny_preflight_0957_v2.py"
+      ],
+      "result": "passed",
+      "workload_started": false
+    }
+  ],
+  "control_results": {
+    "custody_contract": {
+      "bytes": 635,
+      "path": "/home/zhuhe/litchi-performance-0957/review/custody-controls-v2-result-v3.json",
+      "sha256": "113742c4bf2cc423cf195726645ebc43ca329392f86a0f97a026d0e466ac5aa0"
+    },
+    "report_contract": {
+      "bytes": 1159,
+      "path": "/home/zhuhe/litchi-performance-0957/review/controls-v2-final-result-v7.json",
+      "sha256": "4532b5bdaabdbeeca4e386ff25aa355b35a074a6aacf3311daf3a78028372a1a"
+    }
+  },
+  "custody_corrections": [
+    "expected child argv/cwd/explicit environment/output and report paths are compared to the frozen plan",
+    "start and terminal deadlines, successful leader/process-group reap, validation terminal SHA, and stdout/stderr/report descriptors are sealed and checked",
+    "copied plan, external authorized plan, runner descriptor, and outer terminal bindings are compared exactly",
+    "tiny preflight leaves report directory absent and records forced cleanup rather than hiding a live descendant",
+    "v1 helpers remain byte-preserved under review/superseded-v1"
+  ],
+  "field_contract": {
+    "context_limits": [
+      "memory",
+      "input_bytes",
+      "output_bytes",
+      "objects",
+      "depth",
+      "work",
+      "execution_workers",
+      "execution_in_flight_tasks",
+      "execution_in_flight_bytes",
+      "execution_min_parallel_bytes",
+      "execution_min_task_bytes",
+      "root_workers",
+      "root_io_concurrency",
+      "root_cpu_tasks"
+    ],
+    "derived_peaks": [
+      "max_setup_core_peak_above_setup_live_before",
+      "max_setup_drained_core_peak_above_setup_live_before"
+    ],
+    "phase_additive": [
+      "allocation_calls",
+      "deallocation_calls",
+      "reallocation_calls",
+      "failed_allocation_calls",
+      "allocated_bytes",
+      "deallocated_bytes"
+    ],
+    "resource_snapshot": [
+      "memory",
+      "workers",
+      "io_concurrency",
+      "objects"
+    ],
+    "thread_drain": [
+      "first_thread_count",
+      "final_thread_count",
+      "polls",
+      "drained",
+      "deadline_seconds",
+      "poll_limit",
+      "poll_sleep_milliseconds"
+    ]
+  },
+  "plan": {
+    "bytes": 17444,
+    "path": "/home/zhuhe/litchi-performance-0957/review/plan-schedule-v5-v2-draft.json",
+    "sha256": "99661eaafd20ca647a2f7c0156d62cf5857512625149c137a752b075e2b84ed6"
+  },
+  "plan_status": "prospective",
+  "schema": "litchi.performance.0957.tooling-receipt.v2",
+  "source_build_binary": {
+    "build_receipt": {
+      "bytes": 5312,
+      "path": "/home/zhuhe/litchi-performance-0957/receipts/allocator-integration-v2.json",
+      "sha256": "aa3e2f58287b8fffec7e73d68c447983058173f30168372a022e611c6d9c5d14"
+    },
+    "fixture_oracles": {
+      "bytes": 11346,
+      "path": "/home/zhuhe/litchi-performance-0957/review/fixture-oracles-from-0956-v1.json",
+      "sha256": "f38576c1e6af27cd909c77635bab198fc011eeab8b360d0ed47268be9d01f795"
+    },
+    "retained_binary": {
+      "bytes": 43676872,
+      "path": "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_alloc.v2",
+      "sha256": "9ba37a6b9796ad0e316e7571ebe117ba7a5f97bcf5d29153c7cb3d74c485e9a5"
+    },
+    "source_manifest": {
+      "bytes": 2267268,
+      "path": "/home/zhuhe/litchi-performance-0957/source-manifest-v2.json",
+      "sha256": "f5fd1ee75b734bb7efaa1882be0397defea98c76c835be0bdf1f565c573ef617"
+    }
+  },
+  "status": "prospective_corrected_v2_no_workload",
+  "superseded_v1": {
+    "capture_0957_v1.py": {
+      "bytes": 13888,
+      "path": "/home/zhuhe/litchi-performance-0957/review/superseded-v1/capture_0957_v1.py",
+      "sha256": "4dd06ffbb856858d619a32e56d2d04539b217ce54282b79f4db59353b45e19d2"
+    },
+    "common_0957.py": {
+      "bytes": 16462,
+      "path": "/home/zhuhe/litchi-performance-0957/review/superseded-v1/common_0957.py",
+      "sha256": "ab9736f6052fae1c9b9d2be625af90f78162441963b6b17432f9dd0335b6eec5"
+    },
+    "controls_0957_v5.py": {
+      "bytes": 6167,
+      "path": "/home/zhuhe/litchi-performance-0957/review/superseded-v1/controls_0957_v5.py",
+      "sha256": "032a9a755db53e68c40af65fc53993412cc2a280414e1347b0140010c4cabf36"
+    },
+    "reduce_0957_v1.py": {
+      "bytes": 10397,
+      "path": "/home/zhuhe/litchi-performance-0957/review/superseded-v1/reduce_0957_v1.py",
+      "sha256": "f96d60f8cdf01c2e8badf14d032f780df3989e6397a36e2391d6c39032470ea6"
+    },
+    "tiny_preflight_0957_v1.py": {
+      "bytes": 5889,
+      "path": "/home/zhuhe/litchi-performance-0957/review/superseded-v1/tiny_preflight_0957_v1.py",
+      "sha256": "eb4cb4e865b22f0fd36fdb6747fb08c0e6fb9701d906f9f30c01a580081b039f"
+    }
+  },
+  "supersedes": "review/tooling-receipt-v5-v2.json",
+  "tiny_preflight": {
+    "executed": false,
+    "reason": "plan remains prospective; no allocator workload launched",
+    "required_before_formal": true
+  },
+  "tools": {
+    "capture_0957_v2.py": {
+      "bytes": 17091,
+      "path": "/home/zhuhe/litchi-performance-0957/tools-v2/capture_0957_v2.py",
+      "sha256": "e7b5ae30982f553982616837a0f69b406dcb048bb77ededcc73672d76a612922"
+    },
+    "common_0957_v2.py": {
+      "bytes": 31357,
+      "path": "/home/zhuhe/litchi-performance-0957/tools-v2/common_0957_v2.py",
+      "sha256": "412c6466e6a7f8d21070f211d9f751cb66132c65a85eba9a9e1972213fa0d9bf"
+    },
+    "controls_0957_v2.py": {
+      "bytes": 13605,
+      "path": "/home/zhuhe/litchi-performance-0957/tools-v2/controls_0957_v2.py",
+      "sha256": "07326df1c9d36a0f9fd39deedc0b07e6c191a4f8b3bb166af077af83a27de983"
+    },
+    "custody_controls_0957_v2.py": {
+      "bytes": 8431,
+      "path": "/home/zhuhe/litchi-performance-0957/tools-v2/custody_controls_0957_v2.py",
+      "sha256": "50f6e12adae7f2ef17223a4371c65207cd0d860642e358a93fa0639da519ce3f"
+    },
+    "reduce_0957_v2.py": {
+      "bytes": 15892,
+      "path": "/home/zhuhe/litchi-performance-0957/tools-v2/reduce_0957_v2.py",
+      "sha256": "51d1233564411b46946ac9affbbbf07dd2ba599da316e92928d4c459919dd2ec"
+    },
+    "tiny_preflight_0957_v2.py": {
+      "bytes": 9586,
+      "path": "/home/zhuhe/litchi-performance-0957/tools-v2/tiny_preflight_0957_v2.py",
+      "sha256": "65fde496dd6263ca57c7eae9094fa8f3b5e63a9ff0996b7445435ac714d72e85"
+    }
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "build_receipt": {
+    "bytes": 5312,
+    "executable": false,
+    "mode": 436,
+    "path": "receipts/allocator-integration-v2.json",
+    "sha256": "aa3e2f58287b8fffec7e73d68c447983058173f30168372a022e611c6d9c5d14"
+  },
+  "created_utc": "2026-10-07T13:09:17.319889+00:00",
+  "executables": [
+    {
+      "build_output": {
+        "bytes": 43676872,
+        "executable": true,
+        "mode": 509,
+        "path": "target-v1/release/xlsx_managed_compression_alloc",
+        "sha256": "9ba37a6b9796ad0e316e7571ebe117ba7a5f97bcf5d29153c7cb3d74c485e9a5"
+      },
+      "byte_equal": true,
+      "independent_inode": true,
+      "retained_executable": {
+        "bytes": 43676872,
+        "executable": true,
+        "mode": 509,
+        "path": "executables/xlsx_managed_compression_alloc.v2",
+        "sha256": "9ba37a6b9796ad0e316e7571ebe117ba7a5f97bcf5d29153c7cb3d74c485e9a5"
+      },
+      "role": "allocator_bin"
+    },
+    {
+      "build_output": {
+        "bytes": 43259328,
+        "executable": true,
+        "mode": 509,
+        "path": "target-v1/release/examples/xlsx_managed_compression_benchmark",
+        "sha256": "5886b0f86a697bae757994d5a757cffae4a7e8d61a2769ff1c967029cd1912c3"
+      },
+      "byte_equal": true,
+      "independent_inode": true,
+      "retained_executable": {
+        "bytes": 43259328,
+        "executable": true,
+        "mode": 509,
+        "path": "executables/xlsx_managed_compression_benchmark.v2",
+        "sha256": "5886b0f86a697bae757994d5a757cffae4a7e8d61a2769ff1c967029cd1912c3"
+      },
+      "role": "benchmark_example"
+    }
+  ],
+  "no_workload_launched": true,
+  "schema": "litchi.performance.0957.executable-retention-v2",
+  "source_postquality": {
+    "bytes": 1922,
+    "executable": false,
+    "mode": 436,
+    "path": "receipts/source-postquality-v2.json",
+    "sha256": "a039a9a723d8d87d919c1d13f808aa61f23b57cef59c43a3a3fa10e0dbb4e157"
+  },
+  "status": "retained_byte_verified_executables"
+}

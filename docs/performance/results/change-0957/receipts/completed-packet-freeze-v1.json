@@ -1,0 +1,8 @@
+{
+  "path": "/home/zhuhe/litchi-performance-0957/capture-allocation-v1/packet-manifest.json",
+  "bytes": 27843,
+  "sha256": "2f6a367ded17d7fc2301a2798d5d1ea498ee9fc7c637d6459c92556910ebb591",
+  "captured_session": 19915,
+  "returncode": 0,
+  "frozen_before_reduction": true
+}

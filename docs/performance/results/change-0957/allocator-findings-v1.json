@@ -1,0 +1,860 @@
+{
+  "schema": "litchi.performance.0957.findings.v1",
+  "input": {
+    "path": "/home/zhuhe/litchi-performance-0957/allocation-summary-v3.json",
+    "bytes": 391446,
+    "sha256": "bc311f3209f346baacedd591a17d6fb36937dda81a256e1ea1cb4f2aaabd4850"
+  },
+  "generator": {
+    "path": "/home/zhuhe/litchi-performance-0957/build-tools/summarize_allocator_v1.py",
+    "bytes": 2330,
+    "sha256": "acc41d013889702d14add06b83164ca865323147ba3817956e511a35e047e007"
+  },
+  "configs": [
+    {
+      "case_id": "medium-one-percent",
+      "workers": 1,
+      "samples": 30,
+      "drained_core_allocation_calls": [
+        111025.0,
+        111025.0,
+        111025.0
+      ],
+      "drained_core_allocated_bytes": [
+        19966270.0,
+        19966270.0,
+        19966270.0
+      ],
+      "setup_drained_peak_process_means": [
+        17842418.0,
+        17842418.0,
+        17842418.0
+      ],
+      "setup_drained_peak_sample_range": [
+        17842418,
+        17842418
+      ],
+      "postcore_first_threads": {
+        "1": 30
+      },
+      "nonzero_worker_drain_samples": 0,
+      "all_pre_sample_final_threads_one": true,
+      "all_post_core_final_threads_one": true
+    },
+    {
+      "case_id": "medium-one-percent",
+      "workers": 2,
+      "samples": 30,
+      "drained_core_allocation_calls": [
+        111063.0,
+        111063.0,
+        111063.0
+      ],
+      "drained_core_allocated_bytes": [
+        19988230.0,
+        19988230.0,
+        19988230.0
+      ],
+      "setup_drained_peak_process_means": [
+        18261051.2,
+        18261526.1,
+        18261051.2
+      ],
+      "setup_drained_peak_sample_range": [
+        18257252,
+        18262001
+      ],
+      "postcore_first_threads": {
+        "1": 30
+      },
+      "nonzero_worker_drain_samples": 0,
+      "all_pre_sample_final_threads_one": true,
+      "all_post_core_final_threads_one": true
+    },
+    {
+      "case_id": "medium-one-percent",
+      "workers": 4,
+      "samples": 30,
+      "drained_core_allocation_calls": [
+        111087.0,
+        111087.0,
+        111087.0
+      ],
+      "drained_core_allocated_bytes": [
+        20006502.0,
+        20006502.0,
+        20006502.0
+      ],
+      "setup_drained_peak_process_means": [
+        18953676.3,
+        18962274.5,
+        19091958.3
+      ],
+      "setup_drained_peak_sample_range": [
+        18594611,
+        19093866
+      ],
+      "postcore_first_threads": {
+        "1": 18,
+        "2": 12
+      },
+      "nonzero_worker_drain_samples": 1,
+      "all_pre_sample_final_threads_one": true,
+      "all_post_core_final_threads_one": true
+    },
+    {
+      "case_id": "dense-sparse-one-percent",
+      "workers": 1,
+      "samples": 30,
+      "drained_core_allocation_calls": [
+        210321.0,
+        210321.0,
+        210321.0
+      ],
+      "drained_core_allocated_bytes": [
+        27673682.0,
+        27673682.0,
+        27673682.0
+      ],
+      "setup_drained_peak_process_means": [
+        22061838.0,
+        22061838.0,
+        22061838.0
+      ],
+      "setup_drained_peak_sample_range": [
+        22061838,
+        22061838
+      ],
+      "postcore_first_threads": {
+        "1": 30
+      },
+      "nonzero_worker_drain_samples": 0,
+      "all_pre_sample_final_threads_one": true,
+      "all_post_core_final_threads_one": true
+    },
+    {
+      "case_id": "dense-sparse-one-percent",
+      "workers": 2,
+      "samples": 30,
+      "drained_core_allocation_calls": [
+        210321.0,
+        210321.0,
+        210321.0
+      ],
+      "drained_core_allocated_bytes": [
+        27673682.0,
+        27673682.0,
+        27673682.0
+      ],
+      "setup_drained_peak_process_means": [
+        22061838.0,
+        22061838.0,
+        22061838.0
+      ],
+      "setup_drained_peak_sample_range": [
+        22061838,
+        22061838
+      ],
+      "postcore_first_threads": {
+        "1": 30
+      },
+      "nonzero_worker_drain_samples": 0,
+      "all_pre_sample_final_threads_one": true,
+      "all_post_core_final_threads_one": true
+    },
+    {
+      "case_id": "dense-sparse-one-percent",
+      "workers": 4,
+      "samples": 30,
+      "drained_core_allocation_calls": [
+        210321.0,
+        210321.0,
+        210321.0
+      ],
+      "drained_core_allocated_bytes": [
+        27673682.0,
+        27673682.0,
+        27673682.0
+      ],
+      "setup_drained_peak_process_means": [
+        22061838.0,
+        22061838.0,
+        22061838.0
+      ],
+      "setup_drained_peak_sample_range": [
+        22061838,
+        22061838
+      ],
+      "postcore_first_threads": {
+        "1": 30
+      },
+      "nonzero_worker_drain_samples": 0,
+      "all_pre_sample_final_threads_one": true,
+      "all_post_core_final_threads_one": true
+    },
+    {
+      "case_id": "medium-one-edit",
+      "workers": 1,
+      "samples": 30,
+      "drained_core_allocation_calls": [
+        28142.0,
+        28142.0,
+        28142.0
+      ],
+      "drained_core_allocated_bytes": [
+        5255741.0,
+        5255741.0,
+        5255741.0
+      ],
+      "setup_drained_peak_process_means": [
+        14381184.0,
+        14381184.0,
+        14381184.0
+      ],
+      "setup_drained_peak_sample_range": [
+        14381184,
+        14381184
+      ],
+      "postcore_first_threads": {
+        "1": 30
+      },
+      "nonzero_worker_drain_samples": 0,
+      "all_pre_sample_final_threads_one": true,
+      "all_post_core_final_threads_one": true
+    },
+    {
+      "case_id": "medium-one-edit",
+      "workers": 2,
+      "samples": 30,
+      "drained_core_allocation_calls": [
+        28142.0,
+        28142.0,
+        28142.0
+      ],
+      "drained_core_allocated_bytes": [
+        5255741.0,
+        5255741.0,
+        5255741.0
+      ],
+      "setup_drained_peak_process_means": [
+        14381184.0,
+        14381184.0,
+        14381184.0
+      ],
+      "setup_drained_peak_sample_range": [
+        14381184,
+        14381184
+      ],
+      "postcore_first_threads": {
+        "1": 30
+      },
+      "nonzero_worker_drain_samples": 0,
+      "all_pre_sample_final_threads_one": true,
+      "all_post_core_final_threads_one": true
+    },
+    {
+      "case_id": "medium-one-edit",
+      "workers": 4,
+      "samples": 30,
+      "drained_core_allocation_calls": [
+        28142.0,
+        28142.0,
+        28142.0
+      ],
+      "drained_core_allocated_bytes": [
+        5255741.0,
+        5255741.0,
+        5255741.0
+      ],
+      "setup_drained_peak_process_means": [
+        14381184.0,
+        14381184.0,
+        14381184.0
+      ],
+      "setup_drained_peak_sample_range": [
+        14381184,
+        14381184
+      ],
+      "postcore_first_threads": {
+        "1": 30
+      },
+      "nonzero_worker_drain_samples": 0,
+      "all_pre_sample_final_threads_one": true,
+      "all_post_core_final_threads_one": true
+    }
+  ],
+  "comparisons": [
+    {
+      "case_id": "medium-one-percent",
+      "workers": 2,
+      "repeat": 0,
+      "primary": {
+        "allocation_calls": {
+          "ratio": 1.0003422652555731,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        },
+        "allocated_bytes": {
+          "ratio": 1.0010998549052978,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        }
+      },
+      "peak": {
+        "ratio": 1.02346280644249,
+        "regression_over_5_percent": false,
+        "status": "finite"
+      },
+      "all_phase_flags": {
+        "commit_drop": {
+          "allocated_bytes": {
+            "ratio": null,
+            "regression_over_5_percent": true,
+            "status": "positive_over_zero"
+          },
+          "allocation_calls": {
+            "ratio": null,
+            "regression_over_5_percent": true,
+            "status": "positive_over_zero"
+          }
+        },
+        "publication": {
+          "allocation_calls": {
+            "ratio": 1.0918367346938775,
+            "regression_over_5_percent": true,
+            "status": "finite"
+          }
+        }
+      }
+    },
+    {
+      "case_id": "medium-one-percent",
+      "workers": 2,
+      "repeat": 1,
+      "primary": {
+        "allocation_calls": {
+          "ratio": 1.0003422652555731,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        },
+        "allocated_bytes": {
+          "ratio": 1.0010998549052978,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        }
+      },
+      "peak": {
+        "ratio": 1.0234894227901175,
+        "regression_over_5_percent": false,
+        "status": "finite"
+      },
+      "all_phase_flags": {
+        "commit_drop": {
+          "allocated_bytes": {
+            "ratio": null,
+            "regression_over_5_percent": true,
+            "status": "positive_over_zero"
+          },
+          "allocation_calls": {
+            "ratio": null,
+            "regression_over_5_percent": true,
+            "status": "positive_over_zero"
+          }
+        },
+        "publication": {
+          "allocation_calls": {
+            "ratio": 1.0918367346938775,
+            "regression_over_5_percent": true,
+            "status": "finite"
+          }
+        }
+      }
+    },
+    {
+      "case_id": "medium-one-percent",
+      "workers": 2,
+      "repeat": 2,
+      "primary": {
+        "allocation_calls": {
+          "ratio": 1.0003422652555731,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        },
+        "allocated_bytes": {
+          "ratio": 1.0010998549052978,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        }
+      },
+      "peak": {
+        "ratio": 1.02346280644249,
+        "regression_over_5_percent": false,
+        "status": "finite"
+      },
+      "all_phase_flags": {
+        "commit_drop": {
+          "allocated_bytes": {
+            "ratio": null,
+            "regression_over_5_percent": true,
+            "status": "positive_over_zero"
+          },
+          "allocation_calls": {
+            "ratio": null,
+            "regression_over_5_percent": true,
+            "status": "positive_over_zero"
+          }
+        },
+        "publication": {
+          "allocation_calls": {
+            "ratio": 1.0918367346938775,
+            "regression_over_5_percent": true,
+            "status": "finite"
+          }
+        }
+      }
+    },
+    {
+      "case_id": "medium-one-percent",
+      "workers": 4,
+      "repeat": 0,
+      "primary": {
+        "allocation_calls": {
+          "ratio": 1.0005584327854087,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        },
+        "allocated_bytes": {
+          "ratio": 1.0020149982946238,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        }
+      },
+      "peak": {
+        "ratio": 1.0622818218920778,
+        "regression_over_5_percent": true,
+        "status": "finite"
+      },
+      "all_phase_flags": {
+        "commit_drop": {
+          "allocated_bytes": {
+            "ratio": null,
+            "regression_over_5_percent": true,
+            "status": "positive_over_zero"
+          },
+          "allocation_calls": {
+            "ratio": null,
+            "regression_over_5_percent": true,
+            "status": "positive_over_zero"
+          }
+        },
+        "publication": {
+          "allocation_calls": {
+            "ratio": 1.1489795918367347,
+            "regression_over_5_percent": true,
+            "status": "finite"
+          },
+          "deallocation_calls": {
+            "ratio": 1.0559701492537314,
+            "regression_over_5_percent": true,
+            "status": "finite"
+          }
+        }
+      }
+    },
+    {
+      "case_id": "medium-one-percent",
+      "workers": 4,
+      "repeat": 1,
+      "primary": {
+        "allocation_calls": {
+          "ratio": 1.0005584327854087,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        },
+        "allocated_bytes": {
+          "ratio": 1.0020149982946238,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        }
+      },
+      "peak": {
+        "ratio": 1.0627637184601324,
+        "regression_over_5_percent": true,
+        "status": "finite"
+      },
+      "all_phase_flags": {
+        "commit_drop": {
+          "allocated_bytes": {
+            "ratio": null,
+            "regression_over_5_percent": true,
+            "status": "positive_over_zero"
+          },
+          "allocation_calls": {
+            "ratio": null,
+            "regression_over_5_percent": true,
+            "status": "positive_over_zero"
+          }
+        },
+        "publication": {
+          "allocation_calls": {
+            "ratio": 1.1482142857142859,
+            "regression_over_5_percent": true,
+            "status": "finite"
+          },
+          "deallocation_calls": {
+            "ratio": 1.0526119402985075,
+            "regression_over_5_percent": true,
+            "status": "finite"
+          }
+        }
+      }
+    },
+    {
+      "case_id": "medium-one-percent",
+      "workers": 4,
+      "repeat": 2,
+      "primary": {
+        "allocation_calls": {
+          "ratio": 1.0005584327854087,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        },
+        "allocated_bytes": {
+          "ratio": 1.0020149982946238,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        }
+      },
+      "peak": {
+        "ratio": 1.0700320046307625,
+        "regression_over_5_percent": true,
+        "status": "finite"
+      },
+      "all_phase_flags": {
+        "commit_drop": {
+          "allocated_bytes": {
+            "ratio": null,
+            "regression_over_5_percent": true,
+            "status": "positive_over_zero"
+          },
+          "allocation_calls": {
+            "ratio": null,
+            "regression_over_5_percent": true,
+            "status": "positive_over_zero"
+          }
+        },
+        "publication": {
+          "allocation_calls": {
+            "ratio": 1.1482142857142859,
+            "regression_over_5_percent": true,
+            "status": "finite"
+          },
+          "deallocation_calls": {
+            "ratio": 1.0522388059701493,
+            "regression_over_5_percent": true,
+            "status": "finite"
+          }
+        },
+        "worker_drain": {
+          "allocated_bytes": {
+            "ratio": null,
+            "regression_over_5_percent": true,
+            "status": "positive_over_zero"
+          },
+          "allocation_calls": {
+            "ratio": null,
+            "regression_over_5_percent": true,
+            "status": "positive_over_zero"
+          },
+          "deallocated_bytes": {
+            "ratio": null,
+            "regression_over_5_percent": true,
+            "status": "positive_over_zero"
+          },
+          "deallocation_calls": {
+            "ratio": null,
+            "regression_over_5_percent": true,
+            "status": "positive_over_zero"
+          }
+        }
+      }
+    },
+    {
+      "case_id": "dense-sparse-one-percent",
+      "workers": 2,
+      "repeat": 0,
+      "primary": {
+        "allocation_calls": {
+          "ratio": 1.0,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        },
+        "allocated_bytes": {
+          "ratio": 1.0,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        }
+      },
+      "peak": {
+        "ratio": 1.0,
+        "regression_over_5_percent": false,
+        "status": "finite"
+      },
+      "all_phase_flags": {}
+    },
+    {
+      "case_id": "dense-sparse-one-percent",
+      "workers": 2,
+      "repeat": 1,
+      "primary": {
+        "allocation_calls": {
+          "ratio": 1.0,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        },
+        "allocated_bytes": {
+          "ratio": 1.0,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        }
+      },
+      "peak": {
+        "ratio": 1.0,
+        "regression_over_5_percent": false,
+        "status": "finite"
+      },
+      "all_phase_flags": {}
+    },
+    {
+      "case_id": "dense-sparse-one-percent",
+      "workers": 2,
+      "repeat": 2,
+      "primary": {
+        "allocation_calls": {
+          "ratio": 1.0,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        },
+        "allocated_bytes": {
+          "ratio": 1.0,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        }
+      },
+      "peak": {
+        "ratio": 1.0,
+        "regression_over_5_percent": false,
+        "status": "finite"
+      },
+      "all_phase_flags": {}
+    },
+    {
+      "case_id": "dense-sparse-one-percent",
+      "workers": 4,
+      "repeat": 0,
+      "primary": {
+        "allocation_calls": {
+          "ratio": 1.0,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        },
+        "allocated_bytes": {
+          "ratio": 1.0,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        }
+      },
+      "peak": {
+        "ratio": 1.0,
+        "regression_over_5_percent": false,
+        "status": "finite"
+      },
+      "all_phase_flags": {}
+    },
+    {
+      "case_id": "dense-sparse-one-percent",
+      "workers": 4,
+      "repeat": 1,
+      "primary": {
+        "allocation_calls": {
+          "ratio": 1.0,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        },
+        "allocated_bytes": {
+          "ratio": 1.0,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        }
+      },
+      "peak": {
+        "ratio": 1.0,
+        "regression_over_5_percent": false,
+        "status": "finite"
+      },
+      "all_phase_flags": {}
+    },
+    {
+      "case_id": "dense-sparse-one-percent",
+      "workers": 4,
+      "repeat": 2,
+      "primary": {
+        "allocation_calls": {
+          "ratio": 1.0,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        },
+        "allocated_bytes": {
+          "ratio": 1.0,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        }
+      },
+      "peak": {
+        "ratio": 1.0,
+        "regression_over_5_percent": false,
+        "status": "finite"
+      },
+      "all_phase_flags": {}
+    },
+    {
+      "case_id": "medium-one-edit",
+      "workers": 2,
+      "repeat": 0,
+      "primary": {
+        "allocation_calls": {
+          "ratio": 1.0,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        },
+        "allocated_bytes": {
+          "ratio": 1.0,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        }
+      },
+      "peak": {
+        "ratio": 1.0,
+        "regression_over_5_percent": false,
+        "status": "finite"
+      },
+      "all_phase_flags": {}
+    },
+    {
+      "case_id": "medium-one-edit",
+      "workers": 2,
+      "repeat": 1,
+      "primary": {
+        "allocation_calls": {
+          "ratio": 1.0,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        },
+        "allocated_bytes": {
+          "ratio": 1.0,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        }
+      },
+      "peak": {
+        "ratio": 1.0,
+        "regression_over_5_percent": false,
+        "status": "finite"
+      },
+      "all_phase_flags": {}
+    },
+    {
+      "case_id": "medium-one-edit",
+      "workers": 2,
+      "repeat": 2,
+      "primary": {
+        "allocation_calls": {
+          "ratio": 1.0,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        },
+        "allocated_bytes": {
+          "ratio": 1.0,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        }
+      },
+      "peak": {
+        "ratio": 1.0,
+        "regression_over_5_percent": false,
+        "status": "finite"
+      },
+      "all_phase_flags": {}
+    },
+    {
+      "case_id": "medium-one-edit",
+      "workers": 4,
+      "repeat": 0,
+      "primary": {
+        "allocation_calls": {
+          "ratio": 1.0,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        },
+        "allocated_bytes": {
+          "ratio": 1.0,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        }
+      },
+      "peak": {
+        "ratio": 1.0,
+        "regression_over_5_percent": false,
+        "status": "finite"
+      },
+      "all_phase_flags": {}
+    },
+    {
+      "case_id": "medium-one-edit",
+      "workers": 4,
+      "repeat": 1,
+      "primary": {
+        "allocation_calls": {
+          "ratio": 1.0,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        },
+        "allocated_bytes": {
+          "ratio": 1.0,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        }
+      },
+      "peak": {
+        "ratio": 1.0,
+        "regression_over_5_percent": false,
+        "status": "finite"
+      },
+      "all_phase_flags": {}
+    },
+    {
+      "case_id": "medium-one-edit",
+      "workers": 4,
+      "repeat": 2,
+      "primary": {
+        "allocation_calls": {
+          "ratio": 1.0,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        },
+        "allocated_bytes": {
+          "ratio": 1.0,
+          "regression_over_5_percent": false,
+          "status": "finite"
+        }
+      },
+      "peak": {
+        "ratio": 1.0,
+        "regression_over_5_percent": false,
+        "status": "finite"
+      },
+      "all_phase_flags": {}
+    }
+  ],
+  "scope": "Descriptive allocator data; no timing, RSS, unique-heap, causal attribution or adoption claim."
+}

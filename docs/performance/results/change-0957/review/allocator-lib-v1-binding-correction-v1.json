@@ -1,0 +1,50 @@
+{
+  "actual_target_dir": "/home/zhuhe/litchi-performance-0957/target-v1",
+  "actual_target_dir_binding_matches_environment": true,
+  "actual_target_dir_exists": true,
+  "bindings": {
+    "bytes": 3671,
+    "mode": 436,
+    "path": "builds/allocator-lib-v1/bindings.json",
+    "sha256": "a502c849f6392343bd95cc4a8cbada5d5c24c29a9b393fb552933607f5750870"
+  },
+  "build_command_unchanged": true,
+  "corrected_target_relative": "target-v1",
+  "created_utc": "2026-10-07T12:41:11.281866+00:00",
+  "no_workload_launched": true,
+  "original_receipt": {
+    "bytes": 4039,
+    "mode": 436,
+    "path": "receipts/allocator-lib-v1.json",
+    "sha256": "d4f96c1a7432dae28b2f28a6a6c2ee64243380b505e8c821c83e0b126f5d3841"
+  },
+  "original_target_relative": "target-allocator-lib-v1",
+  "reason": "The original receipt target_relative label was target-allocator-lib-v1, while the recorded build environment and Cargo target path were target-v1. Original receipts are retained unchanged.",
+  "result": {
+    "bytes": 3869,
+    "mode": 436,
+    "path": "builds/allocator-lib-v1/result.json",
+    "sha256": "9d47e1a29f1030971d24438cf60088710011421dd3398dfc61df81acbe230e60"
+  },
+  "schema": "litchi.performance.0957.allocator-lib-build-binding-correction.v1",
+  "source_or_binary_modified_by_correction": false,
+  "start": {
+    "bytes": 4119,
+    "mode": 436,
+    "path": "builds/allocator-lib-v1/start.json",
+    "sha256": "6a85ad87b00ba03c5a4fdd6c8add601fceb5239a47348659d42499d4d08c405c"
+  },
+  "status": "metadata_correction_only",
+  "terminal": {
+    "bytes": 4582,
+    "mode": 436,
+    "path": "builds/allocator-lib-v1/terminal.json",
+    "sha256": "0d76eaab5d833dcf6a65aa2c6a7c94c4969dec2d912465908b8bab269764b2fb"
+  },
+  "wrapper": {
+    "bytes": 15597,
+    "mode": 493,
+    "path": "build-tools/build_allocator_lib_v1.py",
+    "sha256": "6f57312fc657298d41a1a45401fb989a2f75f6f8f8dfe27b6007d2a8da443302"
+  }
+}

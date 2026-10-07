@@ -1,0 +1,18 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "/home/zhuhe/litchi-performance-0957/tools-v2/reduce_0957_v2.py",
+    "--plan",
+    "/home/zhuhe/litchi-performance-0957/plan-final-v2.json",
+    "--packet",
+    "/home/zhuhe/litchi-performance-0957/capture-allocation-v1",
+    "--output",
+    "/home/zhuhe/litchi-performance-0957/allocation-summary-v1.json"
+  ],
+  "returncode": 1,
+  "error": "name 'require_dict' is not defined",
+  "reducer_sha256": "e117caa02ef2ad4db76188fe662f92a5d27f61f550a551f4656986da4e64964c",
+  "output_created": false,
+  "no_workload_repeated": true
+}

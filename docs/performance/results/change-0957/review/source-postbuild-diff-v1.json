@@ -1,0 +1,83 @@
+{
+  "actual_file_count": 10932,
+  "actual_source_bytes": 273418944,
+  "allocator_build_receipt": {
+    "bytes": 4039,
+    "path": "receipts/allocator-lib-v1.json",
+    "sha256": "d4f96c1a7432dae28b2f28a6a6c2ee64243380b505e8c821c83e0b126f5d3841"
+  },
+  "allocator_terminal": {
+    "bytes": 4582,
+    "path": "builds/allocator-lib-v1/terminal.json",
+    "sha256": "0d76eaab5d833dcf6a65aa2c6a7c94c4969dec2d912465908b8bab269764b2fb"
+  },
+  "changed_known_paths": [
+    {
+      "current": {
+        "bytes": 28537,
+        "mode": 436,
+        "mtime_ns": 1791376446870653858,
+        "mtime_utc": "2026-10-07T12:34:06.870654+00:00",
+        "path": "tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+        "sha256": "7d8afadf9f5414ac5215f62411c60e139a798d1c182a441902a0cc62b4445961"
+      },
+      "expected_bytes": 28458,
+      "expected_sha256": "bcf634006a1b8069f8c606cb2aa35e4ec560dcddd8c7ff3dfc922301ba582b13",
+      "path": "tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs"
+    }
+  ],
+  "created_utc": "2026-10-07T12:35:36Z",
+  "draft_copy": {
+    "copy": {
+      "bytes": 25147,
+      "mode": 436,
+      "mtime_ns": 1791376536241754540,
+      "mtime_utc": "2026-10-07T12:35:36.241755+00:00",
+      "path": "revisions/unapproved-draft-v1/source-v1/tools/perf-baseline/src/xlsx_managed_compression_allocation.rs",
+      "sha256": "f8d20ae173f0329701e251357ec65a1078af36a411008f8b2e11485427b94279"
+    },
+    "copy_method": "independent copy; inode differs",
+    "path": "revisions/unapproved-draft-v1/source-v1/tools/perf-baseline/src/xlsx_managed_compression_allocation.rs",
+    "source": {
+      "bytes": 25147,
+      "mode": 436,
+      "mtime_ns": 1791376443181639051,
+      "mtime_utc": "2026-10-07T12:34:03.181639+00:00",
+      "path": "source-v1/tools/perf-baseline/src/xlsx_managed_compression_allocation.rs",
+      "sha256": "f8d20ae173f0329701e251357ec65a1078af36a411008f8b2e11485427b94279"
+    }
+  },
+  "expected_file_count": 10930,
+  "expected_source_bytes": 273393096,
+  "missing_paths": [],
+  "no_workload_launched": true,
+  "postsource_clean": false,
+  "prebuild_manifest": {
+    "bytes": 2265692,
+    "path": "source-manifest-v1.json",
+    "sha256": "4876f0048bef76cd65919e239a4c1cd3eafe559b2d363518002588d453e68aec"
+  },
+  "schema": "litchi.performance.0957.source-postbuild-diff.v1",
+  "source_cleanup_performed": false,
+  "source_commit": "02449f394529766d76794332204c27c4022931fc",
+  "source_root": "source-v1",
+  "status": "drift_detected",
+  "unmanifested_paths": [
+    {
+      "bytes": 622,
+      "mode": 436,
+      "mtime_ns": 1791376446870653858,
+      "mtime_utc": "2026-10-07T12:34:06.870654+00:00",
+      "path": "tools/perf-baseline/src/bin/xlsx_managed_compression_alloc.rs",
+      "sha256": "1d36da2e9f8db3fd28cfdc843bb5e221443230e33df496836d98bc382e316207"
+    },
+    {
+      "bytes": 25147,
+      "mode": 436,
+      "mtime_ns": 1791376443181639051,
+      "mtime_utc": "2026-10-07T12:34:03.181639+00:00",
+      "path": "tools/perf-baseline/src/xlsx_managed_compression_allocation.rs",
+      "sha256": "f8d20ae173f0329701e251357ec65a1078af36a411008f8b2e11485427b94279"
+    }
+  ]
+}

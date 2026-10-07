@@ -26,6 +26,9 @@ use std::{
     time::Instant,
 };
 
+#[path = "xlsx_managed_compression_allocation.rs"]
+pub(crate) mod allocation;
+
 type AnyResult<T> = Result<T, Box<dyn Error>>;
 
 const SCHEMA: &str = "litchi.xlsx-managed-compression-benchmark.v1";

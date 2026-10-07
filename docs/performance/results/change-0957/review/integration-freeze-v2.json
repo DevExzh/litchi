@@ -1,0 +1,183 @@
+{
+  "base_commit": "02449f394529766d76794332204c27c4022931fc",
+  "base_snapshot": {
+    "bytes": 273393096,
+    "file_count": 10930,
+    "manifest": {
+      "bytes": 2265692,
+      "executable": false,
+      "mode": 436,
+      "path": "source-manifest-v1.json",
+      "sha256": "4876f0048bef76cd65919e239a4c1cd3eafe559b2d363518002588d453e68aec"
+    },
+    "root": "source-base-v1",
+    "source_receipt": {
+      "bytes": 7296,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/source-v1.json",
+      "sha256": "5edcf35b27d51028f041fff40f5db2d8174a740b21c247c8aff5d81a7e9591a2"
+    }
+  },
+  "build_started": false,
+  "cargo_config": {
+    "bytes": 470,
+    "executable": false,
+    "mode": 436,
+    "path": "source-v1/.cargo/config.toml",
+    "sha256": "50b044c83828f2c448ee59c362afaa79de2dd47fbd390f0cd2888391f1d1119d"
+  },
+  "cargo_lock": {
+    "bytes": 56289,
+    "executable": false,
+    "mode": 436,
+    "path": "source-v1/tools/perf-baseline/Cargo.lock",
+    "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+  },
+  "created_utc": "2026-10-07T12:50:31.412232+00:00",
+  "integration_census": {
+    "bytes": 273429543,
+    "file_count": 10932
+  },
+  "integration_manifest": {
+    "bytes": 2267268,
+    "executable": false,
+    "mode": 436,
+    "path": "source-manifest-v2.json",
+    "sha256": "f5fd1ee75b734bb7efaa1882be0397defea98c76c835be0bdf1f565c573ef617"
+  },
+  "no_workload_launched": true,
+  "overlay_only_delta": {
+    "added_paths": [
+      "tools/perf-baseline/src/bin/xlsx_managed_compression_alloc.rs",
+      "tools/perf-baseline/src/xlsx_managed_compression_allocation.rs"
+    ],
+    "all_authorized": true,
+    "changed_paths": [
+      "tools/perf-baseline/Cargo.toml",
+      "tools/perf-baseline/README.md",
+      "tools/perf-baseline/src/lib.rs",
+      "tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs"
+    ],
+    "deleted_paths": []
+  },
+  "overlay_paths": [
+    {
+      "checkout": {
+        "bytes": 3428,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.toml",
+        "sha256": "0a35d89d0da312e6fcd519189ca16dd1ded9792427dcd01d0cbd71e9efcd74b8"
+      },
+      "content_equal": true,
+      "independent_inode": true,
+      "integration_copy": {
+        "bytes": 3428,
+        "executable": false,
+        "mode": 436,
+        "path": "source-v1/tools/perf-baseline/Cargo.toml",
+        "sha256": "0a35d89d0da312e6fcd519189ca16dd1ded9792427dcd01d0cbd71e9efcd74b8"
+      },
+      "path": "tools/perf-baseline/Cargo.toml"
+    },
+    {
+      "checkout": {
+        "bytes": 328607,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/tools/perf-baseline/README.md",
+        "sha256": "d5bf5c00a90435e40a9e927f36f2ded12ca40ae01a16d5199b875da575437d82"
+      },
+      "content_equal": true,
+      "independent_inode": true,
+      "integration_copy": {
+        "bytes": 328607,
+        "executable": false,
+        "mode": 436,
+        "path": "source-v1/tools/perf-baseline/README.md",
+        "sha256": "d5bf5c00a90435e40a9e927f36f2ded12ca40ae01a16d5199b875da575437d82"
+      },
+      "path": "tools/perf-baseline/README.md"
+    },
+    {
+      "checkout": {
+        "bytes": 3077507,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/lib.rs",
+        "sha256": "b2ae866c0b10062c57170bd0ef35b5cfd6a46932388718740298134d8272c1be"
+      },
+      "content_equal": true,
+      "independent_inode": true,
+      "integration_copy": {
+        "bytes": 3077507,
+        "executable": false,
+        "mode": 436,
+        "path": "source-v1/tools/perf-baseline/src/lib.rs",
+        "sha256": "b2ae866c0b10062c57170bd0ef35b5cfd6a46932388718740298134d8272c1be"
+      },
+      "path": "tools/perf-baseline/src/lib.rs"
+    },
+    {
+      "checkout": {
+        "bytes": 28537,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+        "sha256": "7d8afadf9f5414ac5215f62411c60e139a798d1c182a441902a0cc62b4445961"
+      },
+      "content_equal": true,
+      "independent_inode": true,
+      "integration_copy": {
+        "bytes": 28537,
+        "executable": false,
+        "mode": 436,
+        "path": "source-v1/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+        "sha256": "7d8afadf9f5414ac5215f62411c60e139a798d1c182a441902a0cc62b4445961"
+      },
+      "path": "tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs"
+    },
+    {
+      "checkout": {
+        "bytes": 33721,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/xlsx_managed_compression_allocation.rs",
+        "sha256": "adb0ddfb59691c393ace3b423b003b650526ee6a5ff4d2eed9b59e29bf85e907"
+      },
+      "content_equal": true,
+      "independent_inode": true,
+      "integration_copy": {
+        "bytes": 33721,
+        "executable": false,
+        "mode": 436,
+        "path": "source-v1/tools/perf-baseline/src/xlsx_managed_compression_allocation.rs",
+        "sha256": "adb0ddfb59691c393ace3b423b003b650526ee6a5ff4d2eed9b59e29bf85e907"
+      },
+      "path": "tools/perf-baseline/src/xlsx_managed_compression_allocation.rs"
+    },
+    {
+      "checkout": {
+        "bytes": 622,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/bin/xlsx_managed_compression_alloc.rs",
+        "sha256": "1d36da2e9f8db3fd28cfdc843bb5e221443230e33df496836d98bc382e316207"
+      },
+      "content_equal": true,
+      "independent_inode": true,
+      "integration_copy": {
+        "bytes": 622,
+        "executable": false,
+        "mode": 436,
+        "path": "source-v1/tools/perf-baseline/src/bin/xlsx_managed_compression_alloc.rs",
+        "sha256": "1d36da2e9f8db3fd28cfdc843bb5e221443230e33df496836d98bc382e316207"
+      },
+      "path": "tools/perf-baseline/src/bin/xlsx_managed_compression_alloc.rs"
+    }
+  ],
+  "schema": "litchi.performance.0957.integration-freeze.v2",
+  "source_root": "source-v1",
+  "status": "frozen_prebuild"
+}

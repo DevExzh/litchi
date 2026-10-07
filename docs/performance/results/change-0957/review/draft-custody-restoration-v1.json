@@ -1,0 +1,28 @@
+{
+  "status": "draft_transferred_to_checkout_base_snapshot_restored",
+  "timestamp": "2026-10-07T12:37:23.023001+00:00",
+  "files": [
+    {
+      "path": "tools/perf-baseline/src/xlsx_managed_compression_allocation.rs",
+      "draft_sha256": "f8d20ae173f0329701e251357ec65a1078af36a411008f8b2e11485427b94279",
+      "draft_bytes": 25147,
+      "preserved": "/home/zhuhe/litchi-performance-0957/revisions/unapproved-draft-v1/root-preserved-xlsx_managed_compression_allocation.rs"
+    },
+    {
+      "path": "tools/perf-baseline/src/bin/xlsx_managed_compression_alloc.rs",
+      "draft_sha256": "1d36da2e9f8db3fd28cfdc843bb5e221443230e33df496836d98bc382e316207",
+      "draft_bytes": 622,
+      "preserved": "/home/zhuhe/litchi-performance-0957/revisions/unapproved-draft-v1/root-preserved-xlsx_managed_compression_alloc.rs"
+    },
+    {
+      "path": "tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+      "draft_sha256": "7d8afadf9f5414ac5215f62411c60e139a798d1c182a441902a0cc62b4445961",
+      "draft_bytes": 28537,
+      "preserved": "/home/zhuhe/litchi-performance-0957/revisions/unapproved-draft-v1/root-preserved-xlsx_managed_compression_benchmark.rs"
+    }
+  ],
+  "base_build_terminal": "2026-10-07T12:32:55.280875+00:00",
+  "first_reported_draft_birth": "2026-10-07T12:33:20Z",
+  "workload_launched": false,
+  "note": "writer stopped; unapproved post-terminal draft preserved; formal integration freeze/build pending"
+}

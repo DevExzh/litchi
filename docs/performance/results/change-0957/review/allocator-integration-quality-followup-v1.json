@@ -1,0 +1,320 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "/home/zhuhe/.cargo/bin/rustfmt",
+        "--edition",
+        "2024",
+        "--check",
+        "tools/perf-baseline/src/lib.rs",
+        "tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+        "tools/perf-baseline/src/xlsx_managed_compression_allocation.rs",
+        "tools/perf-baseline/src/bin/xlsx_managed_compression_alloc.rs"
+      ],
+      "cleanup": {
+        "actions": [],
+        "process_group_clear": true,
+        "reaped": true
+      },
+      "index": 1,
+      "launch": {
+        "bytes": 2052,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/01-scoped-rustfmt/launch.json",
+        "sha256": "0aaae4d53c8d72cafd253ca0a867a6a89c64f99ad6994c688b0468babb600d66"
+      },
+      "name": "scoped-rustfmt",
+      "result": {
+        "bytes": 797,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/01-scoped-rustfmt/result.json",
+        "sha256": "6bd2ad417238257ac110f5484f30960553d0b54628a86f09072457d0dda5ac23"
+      },
+      "returncode": 0,
+      "start": {
+        "bytes": 2061,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/01-scoped-rustfmt/start.json",
+        "sha256": "0f05c8d4cee0b1527394f80455cdc7e8bcd1594e9ffb52ca2d04f9f18c1d05d3"
+      },
+      "status": "passed",
+      "stderr": {
+        "bytes": 0,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/01-scoped-rustfmt/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/01-scoped-rustfmt/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "terminal": {
+        "bytes": 2970,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/01-scoped-rustfmt/terminal.json",
+        "sha256": "725abf59a5503974c9f9b10b91fd2a044bc90cc6a890ca7b5f8744640a233839"
+      },
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cargo/bin/cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "--offline",
+        "--manifest-path",
+        "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--bin",
+        "xlsx_managed_compression_alloc",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cleanup": {
+        "actions": [],
+        "process_group_clear": true,
+        "reaped": true
+      },
+      "index": 2,
+      "launch": {
+        "bytes": 2053,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/02-clippy-bin/launch.json",
+        "sha256": "8038829f367928ddfca844ab2b8517ce55599be1a8e11c89edde6183eba1e7ee"
+      },
+      "name": "clippy-bin",
+      "result": {
+        "bytes": 798,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/02-clippy-bin/result.json",
+        "sha256": "60ca9193ab796af6616e4d9e1bc0d48c9d8bf0e20729cd4f976f2df95c8f33bb"
+      },
+      "returncode": 0,
+      "start": {
+        "bytes": 2058,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/02-clippy-bin/start.json",
+        "sha256": "8b089bf7dac1cd1cdb54ab4db16fc6c769c824d6fb72d6b47c6b6c721f2f3cef"
+      },
+      "status": "passed",
+      "stderr": {
+        "bytes": 7940,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/02-clippy-bin/stderr.log",
+        "sha256": "14115eb7d42fee278963d00730ccc1253d4e8f605f707354fa2b3745f1f9871d"
+      },
+      "stdout": {
+        "bytes": 0,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/02-clippy-bin/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "terminal": {
+        "bytes": 2962,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/02-clippy-bin/terminal.json",
+        "sha256": "ab18b4fc042166f840892dad91435a99e914e1c190e6a13ee2637abf241c592e"
+      },
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cargo/bin/cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "--offline",
+        "--manifest-path",
+        "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--example",
+        "xlsx_managed_compression_benchmark",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cleanup": {
+        "actions": [],
+        "process_group_clear": true,
+        "reaped": true
+      },
+      "index": 3,
+      "launch": {
+        "bytes": 2069,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/03-clippy-example/launch.json",
+        "sha256": "12d5626df4861271486e76fb413086c010aaecafb941ba3a866ce7ee9f4fc2a0"
+      },
+      "name": "clippy-example",
+      "result": {
+        "bytes": 814,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/03-clippy-example/result.json",
+        "sha256": "757017e4b3582479e27e640d492dd554bc359f07e71492738a101a2388fa3771"
+      },
+      "returncode": 0,
+      "start": {
+        "bytes": 2078,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/03-clippy-example/start.json",
+        "sha256": "1a0c16489d440757d751d40dcf3674f1e52c4a2e377284c5f227c215f4a7b9fb"
+      },
+      "status": "passed",
+      "stderr": {
+        "bytes": 183,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/03-clippy-example/stderr.log",
+        "sha256": "a23946769d70c35fa69d574fdd1a00e6e6ffea5fc720f42ff9a1f1f5fe256ccf"
+      },
+      "stdout": {
+        "bytes": 0,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/03-clippy-example/stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "terminal": {
+        "bytes": 2989,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/03-clippy-example/terminal.json",
+        "sha256": "c17dca57e97a54fff107c3f00f23bff18efd577fc6d695f35e6edf90d06b630d"
+      },
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cargo/bin/cargo",
+        "test",
+        "--release",
+        "--locked",
+        "--offline",
+        "--manifest-path",
+        "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--lib",
+        "allocation_metrics::tests"
+      ],
+      "cleanup": {
+        "actions": [],
+        "process_group_clear": true,
+        "reaped": true
+      },
+      "index": 4,
+      "launch": {
+        "bytes": 2036,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/04-test-allocation-metrics/launch.json",
+        "sha256": "e36a7f6f6825693051f97c4bc5f9c851f8c8a1b2003c54973697ec38f307d6e2"
+      },
+      "name": "test-allocation-metrics",
+      "result": {
+        "bytes": 781,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/04-test-allocation-metrics/result.json",
+        "sha256": "d7be02f7daa305623d6d7b453d76501b10921812499f15ea871291f5b60bb7bc"
+      },
+      "returncode": 0,
+      "start": {
+        "bytes": 2054,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/04-test-allocation-metrics/start.json",
+        "sha256": "502135261040ad6a155d4631f6468e5bccb3b5146d3549197e4adfdb1104a581"
+      },
+      "status": "passed",
+      "stderr": {
+        "bytes": 317,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/04-test-allocation-metrics/stderr.log",
+        "sha256": "099c2fc775fdbf6a04d8e2c95153ab223c90091f3e8871e1661b28b8e517c359"
+      },
+      "stdout": {
+        "bytes": 2661,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/04-test-allocation-metrics/stdout.log",
+        "sha256": "905860b9ed6f70eaabc23f4f8d0a69c6bf0385c8b91d61829223d21cb811ab3b"
+      },
+      "terminal": {
+        "bytes": 2986,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/04-test-allocation-metrics/terminal.json",
+        "sha256": "0f4b0f9c7eb78c7b39c56918ff6f6e441cafc81a92df1ca573823e65395c4562"
+      },
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "/home/zhuhe/.cargo/bin/cargo",
+        "test",
+        "--release",
+        "--locked",
+        "--offline",
+        "--manifest-path",
+        "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--bin",
+        "xlsx_managed_compression_alloc"
+      ],
+      "cleanup": {
+        "actions": [],
+        "process_group_clear": true,
+        "reaped": true
+      },
+      "index": 5,
+      "launch": {
+        "bytes": 2049,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/05-test-counting-allocator-bin/launch.json",
+        "sha256": "50edd84f7a1c9bcd299511c5967d745837f4fdeefa31ba1799ef6f0a3663ad6a"
+      },
+      "name": "test-counting-allocator-bin",
+      "result": {
+        "bytes": 794,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/05-test-counting-allocator-bin/result.json",
+        "sha256": "9ff5212f52cbbb5175773159ce8b2c6cc94779fd240e736a0e79d17d76811ea2"
+      },
+      "returncode": 0,
+      "start": {
+        "bytes": 2071,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/05-test-counting-allocator-bin/start.json",
+        "sha256": "de2bf0b88067bc3d1f37453e6d6ccaf82a7c3d80d2a8631bd89902c3a722be25"
+      },
+      "status": "passed",
+      "stderr": {
+        "bytes": 358,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/05-test-counting-allocator-bin/stderr.log",
+        "sha256": "c7629adb2234b858de20096ab4263522a79b924cd796195b420d6bff939e5f49"
+      },
+      "stdout": {
+        "bytes": 568,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/05-test-counting-allocator-bin/stdout.log",
+        "sha256": "75b2adfffd13885bfbaea6ae4328fe2d7dceedf0b9ee36ef68a35a7de01b1c41"
+      },
+      "terminal": {
+        "bytes": 3010,
+        "mode": 436,
+        "path": "quality/allocator-integration-v2-followup/05-test-counting-allocator-bin/terminal.json",
+        "sha256": "07d18c0501ad2e301b1b42b423f2c3d842a4d9a626e330866bcdd0014fd7faf8"
+      },
+      "timed_out": false
+    }
+  ],
+  "created_utc": "2026-10-07T13:08:26.179842+00:00",
+  "no_workload_launched": true,
+  "prior_workspace_fmt_failure": "receipts/allocator-integration-quality-v2.json",
+  "schema": "litchi.performance.0957.integration-quality-followup-v1",
+  "scoped_format_only_for_approved_overlay_rust_files": true,
+  "source_manifest": "source-manifest-v2.json",
+  "source_root": "source-v1",
+  "status": "passed"
+}
