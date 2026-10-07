@@ -1,0 +1,20 @@
+{
+  "actual_files": 217469,
+  "archive": "/home/zhuhe/litchi-performance-0948-archive/archive-0948-v1.tar.zst",
+  "archive_sha256": "15a4008a6b888fed4fea50f0746d9787df32e1a2df6b164d25a7dabb19f1db95",
+  "checked_selected_files": 217469,
+  "expected_selected_files": 217466,
+  "expected_total_bytes": 7445754580,
+  "manifest_sha256": "fe29a9f975907cad76a455f60397c7c211a9dc91805b3e8d15ab0e54ec9c21af",
+  "missing": [],
+  "moved_root": "/home/zhuhe/litchi-performance-0948-replay-v1-20261007",
+  "schema": "litchi.performance.0948.replay-manifest-verification.v1",
+  "status": "pass",
+  "symlink_directories": [],
+  "target_exceptions": {
+    "allocator_v3": "target-candidate-allocator-v3/release/litchi-perf-baseline-alloc",
+    "native_v3": "target-candidate-native-v3/release/litchi-perf-baseline",
+    "v2_target_dirs_present": false
+  },
+  "unexpected_or_invalid": []
+}

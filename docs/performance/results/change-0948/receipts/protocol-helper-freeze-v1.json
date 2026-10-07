@@ -1,0 +1,63 @@
+{
+  "schema": "litchi.performance.0948.protocol-helper-freeze.v1",
+  "status": "frozen-awaiting-build-terminals-and-final-plan",
+  "created_utc": "2026-10-07T04:40:16.550545+00:00",
+  "formal_workload_launches": 0,
+  "files": [
+    {
+      "path": "tools/capture_0948_v1.py",
+      "bytes": 44255,
+      "sha256": "d5f7026128ac582384234063b147df707ea7137c67982e0698be7cd6791d48aa"
+    },
+    {
+      "path": "tools/freeze_0948_v1.py",
+      "bytes": 12524,
+      "sha256": "e6aae99debef66ac845d9afb7a6fc4437d4ef57c945b7395c17b1a9c000f192a"
+    },
+    {
+      "path": "tools/reduce_0948_v1.py",
+      "bytes": 90771,
+      "sha256": "acac2c603385bd90ff4da96da716adae57325f3a1f089d62e7d83c73ff1686f2"
+    },
+    {
+      "path": "tools/reuse_0948_v1.py",
+      "bytes": 74912,
+      "sha256": "b81e5cbdd9fe2a0ee6a391c84ce005241ed0dc9e59a5d964ea66cce570caf7be"
+    },
+    {
+      "path": "tools/semantic_0948_v1.py",
+      "bytes": 33177,
+      "sha256": "567c7ad1eecc4c93d51615076088809b38c5498a4f29ac929a1661bf9fd265dc"
+    },
+    {
+      "path": "build-tools/build_candidate_native_v3.py",
+      "bytes": 21585,
+      "sha256": "5c802bcfbcec07ea96a6d7feb67c069bef80510967cdd9c0eafc41192ff2c0a4"
+    },
+    {
+      "path": "build-tools/build_candidate_allocator_v3.py",
+      "bytes": 21661,
+      "sha256": "131c839bf3e754f3a6bedf00e902f79657a9ca9e85444a9e93b7d84dfa793326"
+    },
+    {
+      "path": "plan-v1-draft.json",
+      "bytes": 5816,
+      "sha256": "4e49d17633b2413a40ffc0b52376571921214ffb759bc7585f35e7d692648903"
+    },
+    {
+      "path": "METHOD-v1-draft.md",
+      "bytes": 5941,
+      "sha256": "19d1c5d50236667569a455e9e69221409be22fa788e466d4660cdc05400ca12c"
+    },
+    {
+      "path": "PROTOCOL-HISTORY-v1.md",
+      "bytes": 1803,
+      "sha256": "88a2c5ba41ad63dd6cec553d51fae3fd675550e8172cb169014c10a32f125d24"
+    },
+    {
+      "path": "receipts/baseline-reuse-v2.json",
+      "bytes": 4678,
+      "sha256": "a05ddc9f28879df314e0dc583d9871c60a82b2a78938c03b0a4389c252bef1bc"
+    }
+  ]
+}

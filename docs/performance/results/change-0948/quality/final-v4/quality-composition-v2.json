@@ -1,0 +1,510 @@
+{
+  "candidate_changed_code_status": "pass-with-v7-focused-bridge",
+  "checks": [
+    {
+      "check": "test-default",
+      "id": "candidate-xml_minifier-test-default",
+      "package": "xml-minifier",
+      "raw_status": "pass",
+      "receipt": {
+        "bytes": 2181,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v2/000-candidate-xml_minifier-test-default.result.json",
+        "sha256": "6842333303652d1b2738ac5ad7abab0bec4c856361462431f15e85467468cb34"
+      },
+      "receipt_role": "reused-exact-unaffected-receipt",
+      "source_binding": "candidate-source-v5 matrix receipt; XML production hashes unchanged in v7; v7 focused bridge supplements changed test lint",
+      "verdict": "pass"
+    },
+    {
+      "check": "test-all-features",
+      "id": "candidate-xml_minifier-test-all-features",
+      "package": "xml-minifier",
+      "raw_status": "pass",
+      "receipt": {
+        "bytes": 2228,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v2/001-candidate-xml_minifier-test-all-features.result.json",
+        "sha256": "b2d197bb479b9a12f07595fe5e4e713f691ffa0e077bce394579c7b281b06b03"
+      },
+      "receipt_role": "reused-exact-unaffected-receipt",
+      "source_binding": "candidate-source-v5 matrix receipt; XML production hashes unchanged in v7; v7 focused bridge supplements changed test lint",
+      "verdict": "pass"
+    },
+    {
+      "check": "doctest-default",
+      "id": "candidate-xml_minifier-doctest-default",
+      "package": "xml-minifier",
+      "raw_status": "pass",
+      "receipt": {
+        "bytes": 2184,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v2/002-candidate-xml_minifier-doctest-default.result.json",
+        "sha256": "93a2e73d8c16ad2d1b196edd23d44a0027dcb9ddee6de6be22e0c64023ecb3a6"
+      },
+      "receipt_role": "reused-exact-unaffected-receipt",
+      "source_binding": "candidate-source-v5 matrix receipt; XML production hashes unchanged in v7; v7 focused bridge supplements changed test lint",
+      "verdict": "pass"
+    },
+    {
+      "check": "doctest-all-features",
+      "id": "candidate-xml_minifier-doctest-all-features",
+      "package": "xml-minifier",
+      "raw_status": "pass",
+      "receipt": {
+        "bytes": 2231,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v2/003-candidate-xml_minifier-doctest-all-features.result.json",
+        "sha256": "6386c2f56871d2316a7c0d6bd27fca86afa2552db04b4b2f4dcdd7ee67748b35"
+      },
+      "receipt_role": "reused-exact-unaffected-receipt",
+      "source_binding": "candidate-source-v5 matrix receipt; XML production hashes unchanged in v7; v7 focused bridge supplements changed test lint",
+      "verdict": "pass"
+    },
+    {
+      "check": "clippy-default",
+      "id": "candidate-xml_minifier-clippy-default",
+      "note": "Raw all-targets Clippy fails only at unchanged examples/attribute_summary_probe.rs:266 single_char_add_str; v7 focused changed-test Clippy default/all passes.",
+      "package": "xml-minifier",
+      "raw_status": "fail",
+      "receipt": {
+        "bytes": 2227,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v2/004-candidate-xml_minifier-clippy-default.result.json",
+        "sha256": "231050ab4a53b403cb5e2fe9651ca9eb7f8e01bcca50971bcae9bc8f54fb1fd3"
+      },
+      "receipt_role": "reused-exact-unaffected-receipt",
+      "source_binding": "candidate-source-v5 matrix receipt; XML production hashes unchanged in v7; v7 focused bridge supplements changed test lint",
+      "verdict": "known-shared-baseline-failure"
+    },
+    {
+      "check": "clippy-all-features",
+      "id": "candidate-xml_minifier-clippy-all-features",
+      "note": "Raw all-targets Clippy fails only at unchanged examples/attribute_summary_probe.rs:266 single_char_add_str; v7 focused changed-test Clippy default/all passes.",
+      "package": "xml-minifier",
+      "raw_status": "fail",
+      "receipt": {
+        "bytes": 2273,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v2/005-candidate-xml_minifier-clippy-all-features.result.json",
+        "sha256": "cbc806888e9f129bef1d29765fae8ce0449a8c62e232eb28c5fdeb81ba9bd293"
+      },
+      "receipt_role": "reused-exact-unaffected-receipt",
+      "source_binding": "candidate-source-v5 matrix receipt; XML production hashes unchanged in v7; v7 focused bridge supplements changed test lint",
+      "verdict": "known-shared-baseline-failure"
+    },
+    {
+      "check": "doc-default",
+      "id": "candidate-xml_minifier-doc-default",
+      "package": "xml-minifier",
+      "raw_status": "pass",
+      "receipt": {
+        "bytes": 2201,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v2/006-candidate-xml_minifier-doc-default.result.json",
+        "sha256": "bc185c773c7f321e86b8a3a8123599975c807121d55e4cab542bbf73b23c54af"
+      },
+      "receipt_role": "reused-exact-unaffected-receipt",
+      "source_binding": "candidate-source-v5 matrix receipt; XML production hashes unchanged in v7; v7 focused bridge supplements changed test lint",
+      "verdict": "pass"
+    },
+    {
+      "check": "doc-all-features",
+      "id": "candidate-xml_minifier-doc-all-features",
+      "package": "xml-minifier",
+      "raw_status": "pass",
+      "receipt": {
+        "bytes": 2248,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v2/007-candidate-xml_minifier-doc-all-features.result.json",
+        "sha256": "310a4a09bff0a1ae8538c0b6ebc40af08ea38c392470687eb81e288244bd8d18"
+      },
+      "receipt_role": "reused-exact-unaffected-receipt",
+      "source_binding": "candidate-source-v5 matrix receipt; XML production hashes unchanged in v7; v7 focused bridge supplements changed test lint",
+      "verdict": "pass"
+    },
+    {
+      "check": "fmt",
+      "id": "candidate-xml_minifier-fmt",
+      "package": "xml-minifier",
+      "raw_status": "pass",
+      "receipt": {
+        "bytes": 2095,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v2/008-candidate-xml_minifier-fmt.result.json",
+        "sha256": "0fc75b5937c10c87708abe4484a992662dc5784e82404289da1bd82028407414"
+      },
+      "receipt_role": "reused-exact-unaffected-receipt",
+      "source_binding": "candidate-source-v5 matrix receipt; XML production hashes unchanged in v7; v7 focused bridge supplements changed test lint",
+      "verdict": "pass"
+    },
+    {
+      "check": "test-default",
+      "id": "candidate-litchi_opc-test-default",
+      "package": "litchi-opc",
+      "raw_status": "pass",
+      "receipt": {
+        "bytes": 2171,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/000-candidate-litchi_opc-test-default.result.json",
+        "sha256": "fbca0f66c508c7918f6685d66a15d3d0be217f1eac1fdf4c2f2e17b38d1f8fdd"
+      },
+      "receipt_role": "direct-v4",
+      "source_binding": "candidate-source-v5; v5 only fixes OPC lib.rs re-export ordering relative to v4; all non-fmt OPC receipts reused exactly",
+      "verdict": "pass"
+    },
+    {
+      "check": "test-all-features",
+      "id": "candidate-litchi_opc-test-all-features",
+      "package": "litchi-opc",
+      "raw_status": "pass",
+      "receipt": {
+        "bytes": 2217,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/001-candidate-litchi_opc-test-all-features.result.json",
+        "sha256": "642cac4d0e96a71c42dbabd6fa189fa08bfe4248aeaa600c5fe1afeb5bc455de"
+      },
+      "receipt_role": "direct-v4",
+      "source_binding": "candidate-source-v5; v5 only fixes OPC lib.rs re-export ordering relative to v4; all non-fmt OPC receipts reused exactly",
+      "verdict": "pass"
+    },
+    {
+      "check": "clippy-default",
+      "id": "candidate-litchi_opc-clippy-default",
+      "package": "litchi-opc",
+      "raw_status": "pass",
+      "receipt": {
+        "bytes": 2214,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/002-candidate-litchi_opc-clippy-default.result.json",
+        "sha256": "e829023fe944531f0bc5e3fe1b10755db0e584b964e79ebf53d68fb5080506ec"
+      },
+      "receipt_role": "direct-v4",
+      "source_binding": "candidate-source-v5; v5 only fixes OPC lib.rs re-export ordering relative to v4; all non-fmt OPC receipts reused exactly",
+      "verdict": "pass"
+    },
+    {
+      "check": "clippy-all-features",
+      "id": "candidate-litchi_opc-clippy-all-features",
+      "package": "litchi-opc",
+      "raw_status": "pass",
+      "receipt": {
+        "bytes": 2260,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/003-candidate-litchi_opc-clippy-all-features.result.json",
+        "sha256": "b8a37fa447dfbb3e0c023f20adb48c44383443f21712f002e28b15bbbd8c8e59"
+      },
+      "receipt_role": "direct-v4",
+      "source_binding": "candidate-source-v5; v5 only fixes OPC lib.rs re-export ordering relative to v4; all non-fmt OPC receipts reused exactly",
+      "verdict": "pass"
+    },
+    {
+      "check": "doctest-default",
+      "id": "candidate-litchi_opc-doctest-default",
+      "package": "litchi-opc",
+      "raw_status": "pass",
+      "receipt": {
+        "bytes": 2173,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v2/011-candidate-litchi_opc-doctest-default.result.json",
+        "sha256": "7a72b4524a861a1cd1306c4132e057d8b671854be39b37c48f3ff8a7a05b0e4d"
+      },
+      "receipt_role": "reused-exact-unaffected-receipt",
+      "source_binding": "candidate-source-v5; v5 only fixes OPC lib.rs re-export ordering relative to v4; all non-fmt OPC receipts reused exactly",
+      "verdict": "pass"
+    },
+    {
+      "check": "doctest-all-features",
+      "id": "candidate-litchi_opc-doctest-all-features",
+      "package": "litchi-opc",
+      "raw_status": "pass",
+      "receipt": {
+        "bytes": 2220,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v2/012-candidate-litchi_opc-doctest-all-features.result.json",
+        "sha256": "8e330a4518b6fa9e51b9fb43b48276bd836e6925dfd0d345139318fefa8a5758"
+      },
+      "receipt_role": "reused-exact-unaffected-receipt",
+      "source_binding": "candidate-source-v5; v5 only fixes OPC lib.rs re-export ordering relative to v4; all non-fmt OPC receipts reused exactly",
+      "verdict": "pass"
+    },
+    {
+      "check": "doc-default",
+      "id": "candidate-litchi_opc-doc-default",
+      "package": "litchi-opc",
+      "raw_status": "pass",
+      "receipt": {
+        "bytes": 2190,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v2/015-candidate-litchi_opc-doc-default.result.json",
+        "sha256": "5cc7673eedc49de2bb0b3bfe91038ba263f618ed803d5e5af443a5c8e3e1e9a7"
+      },
+      "receipt_role": "reused-exact-unaffected-receipt",
+      "source_binding": "candidate-source-v5; v5 only fixes OPC lib.rs re-export ordering relative to v4; all non-fmt OPC receipts reused exactly",
+      "verdict": "pass"
+    },
+    {
+      "check": "doc-all-features",
+      "id": "candidate-litchi_opc-doc-all-features",
+      "package": "litchi-opc",
+      "raw_status": "pass",
+      "receipt": {
+        "bytes": 2238,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v2/016-candidate-litchi_opc-doc-all-features.result.json",
+        "sha256": "8bff8df56e0afb585cc9c6522377cb16bf3762c1e5eeb2ad4b8864f75dcc2f7f"
+      },
+      "receipt_role": "reused-exact-unaffected-receipt",
+      "source_binding": "candidate-source-v5; v5 only fixes OPC lib.rs re-export ordering relative to v4; all non-fmt OPC receipts reused exactly",
+      "verdict": "pass"
+    },
+    {
+      "check": "fmt",
+      "id": "candidate-litchi_opc-fmt",
+      "note": "v5 lib.rs re-export ordering no longer appears in fmt output; remaining diff is unchanged source_fingerprint_quality.rs lines 22/34/195.",
+      "package": "litchi-opc",
+      "raw_status": "fail",
+      "receipt": {
+        "bytes": 2424,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/opc-fmt-addendum-v5.result.json",
+        "sha256": "0e80d3d1f1b1eea7b3e74fbc3256d38e4a37aa89cceb5edf37b1061960d07e41"
+      },
+      "receipt_role": "v5-format-addendum",
+      "source_binding": "candidate-source-v5; v5 re-export format delta fixed; package command still sees retained baseline test drift",
+      "verdict": "known-baseline-format-drift-after-candidate-delta-fixed"
+    },
+    {
+      "check": "test-default",
+      "id": "candidate-litchi_xlsx-test-default",
+      "note": "Focused integration test passed; source tree digest remained dc3dbd95c9e29997024bf7a17e63e8d35376194617719617338fd2c967da88bf.",
+      "package": "litchi-xlsx",
+      "raw_status": "pass",
+      "receipt": {
+        "bytes": 1088,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v3/focused-xlsx-integration-v1.default.terminal.json",
+        "sha256": "318aeabfe8719a19219b518f4e15d71436c8fd2e07d04ba259e6a9bf8409c664"
+      },
+      "receipt_role": "focused-terminal",
+      "source_binding": "integration-source-xlsx-v1 plus v4 selected receipts; XLSX source unchanged through v5/v7; exact fixture export bound",
+      "verdict": "pass"
+    },
+    {
+      "check": "test-all-features",
+      "id": "candidate-litchi_xlsx-test-all-features",
+      "note": "Focused integration test passed; source tree digest remained dc3dbd95c9e29997024bf7a17e63e8d35376194617719617338fd2c967da88bf.",
+      "package": "litchi-xlsx",
+      "raw_status": "pass",
+      "receipt": {
+        "bytes": 1114,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v3/focused-xlsx-integration-v1.all-features.terminal.json",
+        "sha256": "12d3329ce3cb208437e8c6d9d61368e043fc7d1224a5c451cd6533b52276d8e1"
+      },
+      "receipt_role": "focused-terminal",
+      "source_binding": "integration-source-xlsx-v1 plus v4 selected receipts; XLSX source unchanged through v5/v7; exact fixture export bound",
+      "verdict": "pass"
+    },
+    {
+      "check": "doctest-default",
+      "id": "candidate-litchi_xlsx-doctest-default",
+      "package": "litchi-xlsx",
+      "raw_status": "pass",
+      "receipt": {
+        "bytes": 2181,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/004-candidate-litchi_xlsx-doctest-default.result.json",
+        "sha256": "84602dae2f7981ffd64426d6eb01b57f00a85d84e39c98fc3768bf41336ae085"
+      },
+      "receipt_role": "direct-v4",
+      "source_binding": "integration-source-xlsx-v1 plus v4 selected receipts; XLSX source unchanged through v5/v7; exact fixture export bound",
+      "verdict": "pass"
+    },
+    {
+      "check": "doctest-all-features",
+      "id": "candidate-litchi_xlsx-doctest-all-features",
+      "package": "litchi-xlsx",
+      "raw_status": "pass",
+      "receipt": {
+        "bytes": 2228,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/005-candidate-litchi_xlsx-doctest-all-features.result.json",
+        "sha256": "b6271be86d612256651ef80caac4f3925667134e1320de571f777dbb637b6095"
+      },
+      "receipt_role": "direct-v4",
+      "source_binding": "integration-source-xlsx-v1 plus v4 selected receipts; XLSX source unchanged through v5/v7; exact fixture export bound",
+      "verdict": "pass"
+    },
+    {
+      "check": "clippy-default",
+      "id": "candidate-litchi_xlsx-clippy-default",
+      "package": "litchi-xlsx",
+      "raw_status": "pass",
+      "receipt": {
+        "bytes": 2220,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/006-candidate-litchi_xlsx-clippy-default.result.json",
+        "sha256": "160aab4a47df60a7f2013f90b589d78f5fdc513a0c77c00fe38bd71b78b1dd4d"
+      },
+      "receipt_role": "direct-v4",
+      "source_binding": "integration-source-xlsx-v1 plus v4 selected receipts; XLSX source unchanged through v5/v7; exact fixture export bound",
+      "verdict": "pass"
+    },
+    {
+      "check": "clippy-all-features",
+      "id": "candidate-litchi_xlsx-clippy-all-features",
+      "package": "litchi-xlsx",
+      "raw_status": "pass",
+      "receipt": {
+        "bytes": 2267,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/007-candidate-litchi_xlsx-clippy-all-features.result.json",
+        "sha256": "236eb5b5d0eb1a5cf5cdaa59f430c0cfe80f1f362b568f2e91302172c5dedaf2"
+      },
+      "receipt_role": "direct-v4",
+      "source_binding": "integration-source-xlsx-v1 plus v4 selected receipts; XLSX source unchanged through v5/v7; exact fixture export bound",
+      "verdict": "pass"
+    },
+    {
+      "check": "doc-default",
+      "id": "candidate-litchi_xlsx-doc-default",
+      "package": "litchi-xlsx",
+      "raw_status": "pass",
+      "receipt": {
+        "bytes": 2197,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/008-candidate-litchi_xlsx-doc-default.result.json",
+        "sha256": "8658ddb9b29cbdd026ecbc7f82da24f4adf01d64e7993d8ddebaff0287fe7841"
+      },
+      "receipt_role": "direct-v4",
+      "source_binding": "integration-source-xlsx-v1 plus v4 selected receipts; XLSX source unchanged through v5/v7; exact fixture export bound",
+      "verdict": "pass"
+    },
+    {
+      "check": "doc-all-features",
+      "id": "candidate-litchi_xlsx-doc-all-features",
+      "package": "litchi-xlsx",
+      "raw_status": "pass",
+      "receipt": {
+        "bytes": 2244,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/009-candidate-litchi_xlsx-doc-all-features.result.json",
+        "sha256": "87f6ce89400025edae0eef156fd53ace8d2f74d0b2b755eabdb969bcbff376bc"
+      },
+      "receipt_role": "direct-v4",
+      "source_binding": "integration-source-xlsx-v1 plus v4 selected receipts; XLSX source unchanged through v5/v7; exact fixture export bound",
+      "verdict": "pass"
+    },
+    {
+      "check": "fmt",
+      "id": "candidate-litchi_xlsx-fmt",
+      "package": "litchi-xlsx",
+      "raw_status": "pass",
+      "receipt": {
+        "bytes": 2090,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/010-candidate-litchi_xlsx-fmt.result.json",
+        "sha256": "a63f3d2fdd151e6779bbc9fa3ab6e606e5f90e3658ed6991e768d97636f0afc9"
+      },
+      "receipt_role": "direct-v4",
+      "source_binding": "integration-source-xlsx-v1 plus v4 selected receipts; XLSX source unchanged through v5/v7; exact fixture export bound",
+      "verdict": "pass"
+    },
+    {
+      "check": "boundary",
+      "id": "candidate-crate-boundary-check",
+      "note": "Initial boundary receipt failed only because ADR inputs were absent; immutable rerun passed after quality-only ADR export.",
+      "package": "quality-boundary",
+      "raw_status": "pass",
+      "receipt": {
+        "bytes": 1983,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/boundary-rerun-v1.result.json",
+        "sha256": "78a21eb6923f130339415201efa48fb5ccfca20d44e3070da32b5f38226fba70"
+      },
+      "receipt_role": "boundary-rerun-replacement",
+      "source_binding": "final-v4 quality candidate with ADR/fixture/tool overlays",
+      "verdict": "pass"
+    },
+    {
+      "check": "baseline-quicktest",
+      "id": "baseline-xml-source-replacement-quicktest",
+      "package": "xml-minifier-baseline",
+      "raw_status": "pass",
+      "receipt": {
+        "bytes": 2272,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/012-baseline-baseline-xml-source-replacement-quicktest.result.json",
+        "sha256": "4920852a151a75640363600f806095cd48687afb84b7da7c87d8a92bbdb0c2c6"
+      },
+      "receipt_role": "direct-v4",
+      "source_binding": "baseline-source with root lock d80aa...",
+      "verdict": "pass"
+    },
+    {
+      "check": "baseline-fmt",
+      "id": "baseline-opc-fmt-preexisting-drift-comparison",
+      "note": "Baseline already fails source_fingerprint_quality.rs formatting lines 22/34/195; v5 candidate addendum confirms no introduced lib.rs format diff.",
+      "package": "litchi-opc-baseline",
+      "raw_status": "fail",
+      "receipt": {
+        "bytes": 2235,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/013-baseline-baseline-opc-fmt-preexisting-drift-comparison.result.json",
+        "sha256": "13ce643c2a61266c29dc1880b7d9862b1e2c76a96955ee4858a16a09f3c6fa62"
+      },
+      "receipt_role": "direct-v4",
+      "source_binding": "baseline-source",
+      "verdict": "known-baseline-format-drift"
+    }
+  ],
+  "created_utc": "2026-10-07T04:58:38.097450Z",
+  "focused_xml_bridge": {
+    "checks": [
+      "test-default",
+      "test-all-features",
+      "clippy-default",
+      "clippy-all-features"
+    ],
+    "final_v7_summary": {
+      "bytes": 2023,
+      "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/xml-v7-focused-v1.summary.json",
+      "sha256": "21e17a7a3e3c76fe05ffe33b80e60ea441d90ba08be83a72ddbccdf261a409dd"
+    },
+    "prior_failed_intermediate_receipts": [
+      {
+        "reason": "v5 focused candidate Clippy exposed deliberate 10..9 literals as reversed_empty_ranges.",
+        "summary": {
+          "bytes": 2375,
+          "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/xml-clippy-supp-v1.summary.json",
+          "sha256": "607e3d9f1e9b2fe238f394062da18493fcdae6d735f91741372ddf638ce2df1d"
+        }
+      },
+      {
+        "reason": "v6 explicit Range constructors left existing std::ops::Range signatures as unnecessary qualifications.",
+        "summary": {
+          "bytes": 2042,
+          "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/xml-v6-focused-v1.summary.json",
+          "sha256": "8aba853d9eddc2de5442aa481a06cfebad1113eb6ffaf4671b8b83fe0e89bc1f"
+        }
+      }
+    ],
+    "production_xml_source_v5_hashes": {
+      "audit.rs": "29efd9aa99c9491a1e86cfc25f1bbb31b3da7b6cbfc4438a1638c15b18b95cee",
+      "audit/namespaces.rs": "2b24bf90377ba75db3a15eeaa53d010bf817b17b2741b8b20e6e377fd34bbdfe"
+    },
+    "source_tree_digest": "9e94e7c908c88ddf3a69427c5d077814bbb3b735afbb7e9f6b65c1348c2471a9",
+    "status": "pass",
+    "test_sha256": "a8fe4435f002c59390d686008b879f1fe0362c839ae9769d29f8c37ac9cd3fff"
+  },
+  "full_plan_check_count": 30,
+  "known_failures": [
+    {
+      "check_ids": [
+        "candidate-xml_minifier-clippy-default",
+        "candidate-xml_minifier-clippy-all-features"
+      ],
+      "reason": "unchanged example lint at crates/xml-minifier/examples/attribute_summary_probe.rs:266 single_char_add_str; v7 focused test/Clippy default/all passes."
+    },
+    {
+      "check_ids": [
+        "candidate-litchi_opc-fmt",
+        "baseline-opc-fmt-preexisting-drift-comparison"
+      ],
+      "reason": "unchanged crates/litchi-opc/tests/source_fingerprint_quality.rs formatting drift at lines 22, 34, and 195; v5 candidate lib.rs re-export format delta is fixed."
+    }
+  ],
+  "matrix_reuse_policy": "Only exact unaffected receipts are reused; XML v7 focused bridge covers the changed test lint delta; XLSX integration and v4 checks bind the fixture export and unchanged source tree; no broad rerun is claimed.",
+  "no_production_edits_by_quality": true,
+  "overall_status": "review-failures-documented-baseline-drift",
+  "plan": {
+    "bytes": 18738,
+    "path": "/home/zhuhe/litchi-performance-0948/quality/final/plan-v2.json",
+    "sha256": "6bd8bbf7e461e1f79587983a4efd30454e211bf1760b27e022047e35448cdcbf"
+  },
+  "raw_status_counts": {
+    "fail": 4,
+    "pass": 26
+  },
+  "schema": "litchi.performance.0948-quality-composition.v2",
+  "source_binding": {
+    "bytes": 5147,
+    "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/final-source-binding-v2.json",
+    "sha256": "55fac50726a61b802f0f4ef8fd1489cb823c41feb4fa301e2d62dd799b2acf80"
+  },
+  "verdict_counts": {
+    "known_or_bridged_failure": 4,
+    "pass": 26
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "schema": "litchi.performance.0948.baseline-reuse.v1",
+  "status": "pass",
+  "baseline_head": "b6c5c80ffbcb60736d6c4c2f3b590838640008a9",
+  "all_selected_tracked_build_inputs_equal": true,
+  "checked_files": 10788,
+  "extra_root_lockfile": "0948 ignored root Cargo.lock copied for quality checks only; standalone perf builds consume their own tracked tools/perf-baseline/Cargo.lock, which matches.",
+  "prior_candidate_source_manifest": {
+    "path": "/home/zhuhe/litchi-performance-0945/candidate-source-manifest-v2.json",
+    "sha256": "da7128f699b4bf7a9a4745e99b99606830df1aa192ce389a0b7fe3cceb8a0994"
+  },
+  "binaries": [
+    {
+      "kind": "native",
+      "path": "binaries/baseline-native",
+      "bytes": 265669200,
+      "sha256": "087aec962f5251d1255e7a54dc188e53f9b8a722c5da95eaa1c69439caa138c8",
+      "original_path": "/home/zhuhe/litchi-performance-0945/target-candidate-native-v2/release/litchi-perf-baseline",
+      "build_receipt": {
+        "path": "references/0945-candidate-native/terminal.json",
+        "sha256": "c321315a84c69b8202499b969a2b1bf67aad9bf10e122da04f68d55eb24c1266"
+      },
+      "prior_build_command_source": "references/0945-candidate-native/build_candidate_native_v2.py"
+    },
+    {
+      "kind": "allocator",
+      "path": "binaries/baseline-allocator",
+      "bytes": 269016128,
+      "sha256": "c19971a7e923accd822e9744382aa757d0a67d9d7ba4e47e27354e05767de713",
+      "original_path": "/home/zhuhe/litchi-performance-0945/target-candidate-allocator-v2/release/litchi-perf-baseline-alloc",
+      "build_receipt": {
+        "path": "references/0945-candidate-allocator/terminal.json",
+        "sha256": "a3cb0e4a7cf6fa395618fe4ce1d3b888f04c7c559d0171743d7429e679f6a03a"
+      },
+      "prior_build_command_source": "references/0945-candidate-allocator/build_candidate_allocator_v2.py"
+    }
+  ]
+}

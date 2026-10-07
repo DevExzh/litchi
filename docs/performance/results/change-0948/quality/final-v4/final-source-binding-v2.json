@@ -1,0 +1,97 @@
+{
+  "created_utc": "2026-10-07T04:55:33.949670Z",
+  "equivalence_statement": "The measured production source is candidate-source-v5. Final tests adopt candidate-source-v7 through the explicit one-file XML test-only bridge; no v7 test-only bytes were included in performance binaries. XLSX focused tests bind integration-source-xlsx-v1 plus its three fixture copies. Matrix receipts remain bound to their exact frozen source trees and are reused only where source semantics are unchanged.",
+  "final_quality_overlay": {
+    "file_count": 10796,
+    "quality_only_inputs": [
+      {
+        "bytes": 4694,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/fixture-export-v2.json",
+        "sha256": "f866f1268ee48fac087d53ad272531b69145d249173c522eaedd938b019c12c8"
+      },
+      {
+        "bytes": 2632,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/boundary-adr-export-v1.json",
+        "sha256": "34a1d2ad3b7632f0f0267b600e3516f9d3776c74b026ff3671781da92e620088"
+      },
+      {
+        "bytes": 3173576,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/candidate-source/tools/check_crate_boundaries.py",
+        "sha256": "e74594d8ab28732fe84308d18876cc5f01e533dd6bfa9a2ff7eedc8ba39c05d9"
+      },
+      {
+        "bytes": 13436,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/candidate-source/tools/crate_boundaries.json",
+        "sha256": "715e27ba51b9d60163bf2f51f0d21893ad223df3e61f8ebc768a46c4f7deea36"
+      }
+    ],
+    "role": "v4 matrix source with quality-only fixture/ADR/boundary overlays; not claimed as raw v7 tree",
+    "root": "/home/zhuhe/litchi-performance-0948/quality/final-v4/candidate-source",
+    "total_bytes": 265205980,
+    "tree_digest_with_fixtures_adrs_boundary_tools": "d0cdf9ee83fd3a9fb50cf1e79b0f2180479cd57fd39df3a8046db5c4cf38655c"
+  },
+  "final_test_source": {
+    "file_count": 10789,
+    "role": "quality/test source adopted for final verdict; one test-only lint correction over measured v5",
+    "root": "/home/zhuhe/litchi-performance-0948/candidate-source-v7",
+    "test_only_delta": {
+      "final_v7": {
+        "bytes": 47352,
+        "sha256": "a8fe4435f002c59390d686008b879f1fe0362c839ae9769d29f8c37ac9cd3fff"
+      },
+      "measured_v5": {
+        "bytes": 47326,
+        "sha256": "600712ff53ad145fa82659989104a9b496e2b03afd1295f20605f29ca7a5615e"
+      },
+      "path": "crates/xml-minifier/tests/source_replacement.rs",
+      "semantic_note": "Use imported Range in existing helper signatures and explicit Range { start: 10, end: 9 } for the two intentional inverted ranges; production XML and assertions are unchanged."
+    },
+    "total_bytes": 260076563,
+    "tree_digest": "9e94e7c908c88ddf3a69427c5d077814bbb3b735afbb7e9f6b65c1348c2471a9"
+  },
+  "measured_source": {
+    "file_count": 10789,
+    "opc_lib_sha256": "af4d0633fcaecb6f0634c314a9aa8aed16237ed88030a0f98dcf66b55c8805cc",
+    "role": "production/performance source; candidate v5 OPC re-export formatting correction",
+    "root": "/home/zhuhe/litchi-performance-0948/candidate-source-v5",
+    "total_bytes": 260076537,
+    "tree_digest": "228e74ebb6fee5bbd64d1ee81a4ec8334a4d1277cbf89d9b365c3bbe7cae8a28",
+    "xml_production_sha256": {
+      "crates/xml-minifier/src/audit.rs": "29efd9aa99c9491a1e86cfc25f1bbb31b3da7b6cbfc4438a1638c15b18b95cee",
+      "crates/xml-minifier/src/audit/namespaces.rs": "2b24bf90377ba75db3a15eeaa53d010bf817b17b2741b8b20e6e377fd34bbdfe"
+    },
+    "xml_test_sha256": "600712ff53ad145fa82659989104a9b496e2b03afd1295f20605f29ca7a5615e"
+  },
+  "opc_v4_to_v5_delta": {
+    "path": "crates/litchi-opc/src/lib.rs",
+    "role": "format-only re-export ordering correction; v5 addendum confirms no candidate lib.rs fmt diff",
+    "v4_sha256": "1a9c1cc6810b343aa5647aab9aa60e09adf14fc63b6cc0459196316ffac442a2",
+    "v5_sha256": "af4d0633fcaecb6f0634c314a9aa8aed16237ed88030a0f98dcf66b55c8805cc"
+  },
+  "root_cargo_lock_sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061",
+  "schema": "litchi.performance.0948-final-source-binding.v2",
+  "source_freeze_receipts": {
+    "v4": {
+      "bytes": 2031,
+      "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/final-source-binding-v1.json",
+      "sha256": "4e2dc731884c0f2a22ec912780e2b8cfa67cf21163dd028a17d172252cb6b502"
+    },
+    "v4_freeze": {
+      "bytes": 4850414,
+      "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/source-freeze-v1.json",
+      "sha256": "6aae7203c521bd3aae654c38ac2e6cea21e9ff934fe0d6b74b77661222a419fa"
+    }
+  },
+  "xlsx_integration_binding": {
+    "file_count": 10792,
+    "fixture_export_receipt": {
+      "bytes": 3367,
+      "path": "/home/zhuhe/litchi-performance-0948/quality/integration-xlsx-v1.json",
+      "sha256": "46a79dd3134c97f1fb4135603496efda393bdaa91bfa34b885b7ab042b2ee816"
+    },
+    "role": "focused default/all-target test source; unchanged through v5/v7",
+    "root": "/home/zhuhe/litchi-performance-0948/integration-source-xlsx-v1",
+    "total_bytes": 260101822,
+    "tree_digest_with_fixtures": "dc3dbd95c9e29997024bf7a17e63e8d35376194617719617338fd2c967da88bf"
+  }
+}

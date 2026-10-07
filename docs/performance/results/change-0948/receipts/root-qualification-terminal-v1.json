@@ -1,0 +1,9 @@
+{
+  "schema": "litchi.performance.0948.root-qualification-terminal.v1",
+  "session_id": 36825,
+  "exit_code": 0,
+  "stdout": "qualification: 16 children / 32 samples passed\n",
+  "completed_utc": "2026-10-07T04:58:13.189268+00:00",
+  "capture_receipt": "qualification/capture.json",
+  "prelaunch": "receipts/root-qualification-go-v1.json"
+}

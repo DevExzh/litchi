@@ -1,0 +1,75 @@
+{
+  "after": {
+    "/home/zhuhe/litchi-performance-0948-leaf-negative-20261007": {
+      "bytes": 0,
+      "directories": 0,
+      "exists": false,
+      "files": 0,
+      "is_directory": false,
+      "symlinks": 0
+    },
+    "/home/zhuhe/litchi-performance-0948-replay-check-20261007": {
+      "bytes": 0,
+      "directories": 0,
+      "exists": false,
+      "files": 0,
+      "is_directory": false,
+      "symlinks": 0
+    },
+    "/home/zhuhe/litchi-performance-0948-replay-v1-20261007": {
+      "bytes": 0,
+      "directories": 0,
+      "exists": false,
+      "files": 0,
+      "is_directory": false,
+      "symlinks": 0
+    }
+  },
+  "archive_v1_immutable": true,
+  "before": {
+    "/home/zhuhe/litchi-performance-0948-leaf-negative-20261007": {
+      "bytes": 7517213435,
+      "directories": 35902,
+      "exists": true,
+      "files": 217473,
+      "is_directory": true,
+      "symlinks": 0
+    },
+    "/home/zhuhe/litchi-performance-0948-replay-check-20261007": {
+      "bytes": 59388826293,
+      "directories": 41757,
+      "exists": true,
+      "files": 246393,
+      "is_directory": true,
+      "symlinks": 0
+    },
+    "/home/zhuhe/litchi-performance-0948-replay-v1-20261007": {
+      "bytes": 7602359340,
+      "directories": 35902,
+      "exists": true,
+      "files": 217479,
+      "is_directory": true,
+      "symlinks": 0
+    }
+  },
+  "completed_at_utc": "2026-10-07T05:34:33.795961+00:00",
+  "evidence_preserved_before_delete": [
+    "/home/zhuhe/litchi-performance-0948-archive/archive-v1-replay-final-receipt.json",
+    "/home/zhuhe/litchi-performance-0948-archive/replay-v1-comparison-corrected-v1.json",
+    "/home/zhuhe/litchi-performance-0948-archive/postseal-review/postseal-review-copy-manifest-v2.json"
+  ],
+  "helper": "/home/zhuhe/litchi-performance-0948-archive/cleanup-replay-scratch-0948-v1.py",
+  "helper_sha256": "7845a7e7290e865da947468a42a0799eb14960af7bfd41b1fd2c07b7bdc8e21e",
+  "postseal_review_copy_manifest_v2_retained": true,
+  "removed_bytes": 74508399068,
+  "removed_directories": 113561,
+  "removed_files": 681345,
+  "roots": [
+    "/home/zhuhe/litchi-performance-0948-replay-v1-20261007",
+    "/home/zhuhe/litchi-performance-0948-leaf-negative-20261007",
+    "/home/zhuhe/litchi-performance-0948-replay-check-20261007"
+  ],
+  "schema": "litchi.performance.0948.replay_scratch_cleanup.v1",
+  "started_at_utc": "2026-10-07T05:34:26.703242+00:00",
+  "status": "pass"
+}

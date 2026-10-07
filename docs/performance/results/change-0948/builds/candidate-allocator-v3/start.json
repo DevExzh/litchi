@@ -1,0 +1,206 @@
+{
+  "argv": [
+    "/home/zhuhe/.cargo/bin/cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "/home/zhuhe/litchi-performance-0948/candidate-build-v3/tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "litchi-perf-baseline-alloc",
+    "--features",
+    "allocator-metrics",
+    "-j2"
+  ],
+  "binary_receipt": "builds/candidate-allocator-v3/binary.json",
+  "binary_relative": "target-candidate-allocator-v3/release/litchi-perf-baseline-alloc",
+  "bindings": {
+    "bytes": 7714,
+    "executable": false,
+    "mode": 436,
+    "path": "builds/candidate-allocator-v3/bindings.json",
+    "sha256": "5a1f46faf0e5c647e3f5a7df5338833533ff57b88d26aefced1701d7d744e802"
+  },
+  "cargo": {
+    "bytes": 21113232,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/.cargo/bin/cargo",
+    "resolved_path": "/home/zhuhe/.cargo/bin/rustup",
+    "sha256": "dda7234360b7f578ca8b0ddcb80145646fa61a67c1720a5abc7051b35c9fcb71"
+  },
+  "cwd": "/home/zhuhe/litchi-performance-0948/candidate-build-v3",
+  "cwd_relative": "candidate-build-v3",
+  "deadline_seconds": 1800,
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_HOME": "/home/zhuhe/.cargo",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_PROFILE_RELEASE_LTO": "fat",
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-performance-0948/target-candidate-allocator-v3",
+    "HOME": "/home/zhuhe",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/home/zhuhe/.cargo/bin:/usr/bin:/bin",
+    "RUSTUP_HOME": "/home/zhuhe/.rustup",
+    "RUSTUP_TOOLCHAIN": "1.95.0",
+    "RUST_BACKTRACE": "0",
+    "TEMP": "/home/zhuhe/litchi-performance-0948/tmp/candidate-allocator-v3",
+    "TMP": "/home/zhuhe/litchi-performance-0948/tmp/candidate-allocator-v3",
+    "TMPDIR": "/home/zhuhe/litchi-performance-0948/tmp/candidate-allocator-v3",
+    "TZ": "UTC"
+  },
+  "launch_receipt": "builds/candidate-allocator-v3/launch.json",
+  "process_group": true,
+  "receipt_kind": "start",
+  "result_receipt": "builds/candidate-allocator-v3/result.json",
+  "runner": {
+    "bytes": 21661,
+    "executable": false,
+    "mode": 436,
+    "path": "build-tools/build_candidate_allocator_v3.py",
+    "sha256": "131c839bf3e754f3a6bedf00e902f79657a9ca9e85444a9e93b7d84dfa793326"
+  },
+  "schema": "litchi.performance.0948.candidate-allocator-build-v3",
+  "source": {
+    "bytes": 260076537,
+    "cargo_config": {
+      "bytes": 470,
+      "executable": false,
+      "mode": 420,
+      "path": "candidate-build-v3/.cargo/config.toml",
+      "sha256": "50b044c83828f2c448ee59c362afaa79de2dd47fbd390f0cd2888391f1d1119d"
+    },
+    "cargo_lock": {
+      "bytes": 56289,
+      "executable": false,
+      "mode": 420,
+      "path": "candidate-build-v3/tools/perf-baseline/Cargo.lock",
+      "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+    },
+    "cargo_manifest": {
+      "bytes": 3286,
+      "executable": false,
+      "mode": 420,
+      "path": "candidate-build-v3/tools/perf-baseline/Cargo.toml",
+      "sha256": "53fd47997ae969e709e2ee45575a6050f75de10df339f48dd427f35538768202"
+    },
+    "changes": [
+      {
+        "baseline_bytes": 4490,
+        "baseline_sha256": "6405b4319858d18f75d65ef967b62991eb6e62f62e78eb150ecaf520bd95abb6",
+        "candidate_bytes": 4507,
+        "candidate_sha256": "af4d0633fcaecb6f0634c314a9aa8aed16237ed88030a0f98dcf66b55c8805cc",
+        "path": "crates/litchi-opc/src/lib.rs"
+      },
+      {
+        "baseline_bytes": 942148,
+        "baseline_sha256": "5e0cf3451e70784ff76896b0b2dc93b4409b15db9ef7c88535cc6a20885f8c43",
+        "candidate_bytes": 950512,
+        "candidate_sha256": "571ec3e2e08d11626b5ce489c5d7de498445c1dd72441692306772c1893c3498",
+        "path": "crates/litchi-opc/src/source_backed.rs"
+      },
+      {
+        "baseline_bytes": 21140,
+        "baseline_sha256": "2c64b8c6e33dbb9a8ee983d3a1d3eb1bb0af5134d1877a5c6f145c7b8b26d3bf",
+        "candidate_bytes": 22581,
+        "candidate_sha256": "026f466c5eae0c641276c00dcf32bd1e89875c9ee650977ce20fcbd452d41825",
+        "path": "crates/litchi-xlsx/src/cell_values/facts_oracle_tests.rs"
+      },
+      {
+        "baseline_bytes": 134510,
+        "baseline_sha256": "fff0da0fd3fe86824ba6a84531ad81d8499ebff0e73c824e4c16bf53d77129a5",
+        "candidate_bytes": 142741,
+        "candidate_sha256": "50a4ef8fd9f2e810d2b1315d8a389086134a28901a2b86a98cc8abeb84308726",
+        "path": "crates/litchi-xlsx/src/cell_values/snapshot.rs"
+      },
+      {
+        "baseline_bytes": 33049,
+        "baseline_sha256": "b462dc62df4cd24f6964464a4166eab3c1a78715e9a2d0004ef21b182a807da4",
+        "candidate_bytes": 34873,
+        "candidate_sha256": "8b2079cd3c5437d7e7113e5d4486bed9ed8eb677e87ace82c63b8ce1559f5084",
+        "path": "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs"
+      },
+      {
+        "baseline_bytes": 1014,
+        "baseline_sha256": "b11d1525db0ac6c3dd17c7b35ed5eddb8ad699f3c0c46ebc37af4a87a9082529",
+        "candidate_bytes": 1037,
+        "candidate_sha256": "2cc0c3797f9ba16d1e4c23782cded2789948362947339384de3396284dc17559",
+        "path": "crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs"
+      },
+      {
+        "baseline_bytes": 27039,
+        "baseline_sha256": "c6d5c29fecac0b67415014cad92e7c4fa08bfe88eeee8145d9ab59777543a202",
+        "candidate_bytes": 29085,
+        "candidate_sha256": "16983ebda28ace9081be68e6d6a84698f91e95b152e25481c348e6a14d288303",
+        "path": "crates/litchi-xlsx/src/raw/worksheet/edit/package.rs"
+      },
+      {
+        "baseline_bytes": 53527,
+        "baseline_sha256": "475619b8f989bd62297c6e3ef8c100bb162bafc0bd95ba664936bf0171f78d9c",
+        "candidate_bytes": 56639,
+        "candidate_sha256": "82a921f56b589e555f64c12d74595011bb6562e2ad9503bb95d99d38ab664cc1",
+        "path": "crates/litchi-xlsx/src/raw/worksheet/edit/tests.rs"
+      },
+      {
+        "baseline_bytes": 126817,
+        "baseline_sha256": "eddc437156c976c55ce36b0bf8f0ef47cc4943d296735a1ac8d6ef120b8754e7",
+        "candidate_bytes": 139194,
+        "candidate_sha256": "29efd9aa99c9491a1e86cfc25f1bbb31b3da7b6cbfc4438a1638c15b18b95cee",
+        "path": "crates/xml-minifier/src/audit.rs"
+      },
+      {
+        "baseline_bytes": 31260,
+        "baseline_sha256": "688027bc2d9652395c7385087995cc52084d6d7ff8a57c6a16bee0f582b83296",
+        "candidate_bytes": 32468,
+        "candidate_sha256": "2b24bf90377ba75db3a15eeaa53d010bf817b17b2741b8b20e6e377fd34bbdfe",
+        "path": "crates/xml-minifier/src/audit/namespaces.rs"
+      },
+      {
+        "baseline_bytes": 34098,
+        "baseline_sha256": "e22e4f6b690e34b6f073fb69278d9eec536b646409da3259c11df57f4a8319a0",
+        "candidate_bytes": 47326,
+        "candidate_sha256": "600712ff53ad145fa82659989104a9b496e2b03afd1295f20605f29ca7a5615e",
+        "path": "crates/xml-minifier/tests/source_replacement.rs"
+      }
+    ],
+    "file_count": 10789,
+    "freeze_receipt": {
+      "bytes": 4900,
+      "bytes_verified": 4900,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/candidate-freeze-v3.json",
+      "sha256": "8f68153a809c729cbdb082b336e0b841f242892904929643917d5fee41d514a6"
+    },
+    "manifest": {
+      "bytes": 2296969,
+      "executable": false,
+      "mode": 436,
+      "path": "candidate-build-manifest-v3.json",
+      "sha256": "f565a52b36e8657453448d1f097179002b8fd7c95b4417996f62e1cbf6a4b992"
+    },
+    "manifest_schema": "litchi.performance.0948.candidate-build-source-manifest.v3",
+    "manifest_size": 2296969,
+    "source_commit": "b6c5c80ffbcb60736d6c4c2f3b590838640008a9",
+    "source_root": "candidate-build-v3"
+  },
+  "start_new_session": true,
+  "started_utc": "2026-10-07T04:35:58.335860+00:00",
+  "stderr_path": "builds/candidate-allocator-v3/build.stderr.log",
+  "stdout_path": "builds/candidate-allocator-v3/build.stdout.log",
+  "target_relative": "target-candidate-allocator-v3",
+  "terminal_before_binary_parse": true,
+  "terminal_receipt": "builds/candidate-allocator-v3/terminal.json",
+  "unset_environment": [
+    "CARGO_BUILD_RUSTC_WRAPPER",
+    "CARGO_ENCODED_RUSTFLAGS",
+    "RUSTC_WRAPPER",
+    "RUSTFLAGS"
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "authorization": "root coordinator authorized a versioned reducer-only representation correction",
+  "capture": {
+    "bytes": 44255,
+    "executable": false,
+    "mode": 436,
+    "path": "tools/capture_0948_v3.py",
+    "sha256": "23619b6071c10cf373f2d748a46a0162b65b4839a356027c43feec4925699c8b"
+  },
+  "capture_sha256": "23619b6071c10cf373f2d748a46a0162b65b4839a356027c43feec4925699c8b",
+  "corrected_reducer": {
+    "bytes": 96736,
+    "executable": false,
+    "mode": 436,
+    "path": "tools/reduce_0948_v4.py",
+    "sha256": "f960a94cad1544ac7f64c8a5006eb172bf5db849735b576fba58a6338a5b1d17"
+  },
+  "formal_workload_launches_by_correction": 0,
+  "gate_sha256": "31d4d21fe24587c2a9606fba8a5a9d948ef98beecea2ca484bdbb3eab937c082",
+  "no_capture_change": true,
+  "no_child_retry": true,
+  "no_gate_change": true,
+  "original_declared_reducer": {
+    "bytes": 90771,
+    "executable": false,
+    "mode": 436,
+    "path": "tools/reduce_0948_v3.py",
+    "sha256": "4cb89ac77cce55f2b72a748fc0c8b745d1749a197bd64f134115de733cb92ec1"
+  },
+  "plan": {
+    "bytes": 10861,
+    "executable": false,
+    "mode": 436,
+    "path": "plan-v3.json",
+    "sha256": "e4bb028993ec25b0b538616153a09b17fdfb26b91c8255336eab9393d87de73f"
+  },
+  "schema": "litchi.performance.0948.reducer-v4-source-census-correction.v1",
+  "scope": "strict full source census verification plus capture-compatible full/focused summary normalization",
+  "source_contract": {
+    "adapter": "capture_source_summaries derives both exact capture schemas from the verified reducer full result; leaf_review checks both forms",
+    "capture_focused": "child command/receipt source_end retains checked_files baseline=candidate=11, full=false for candidate delta",
+    "capture_full": "capture source_start/source_end and child start/terminal/command source use checked_files baseline=candidate=10789, full=true",
+    "full": "reducer source_check verifies both complete role manifests, exact symlink-free tree closure, every bound digest, exact candidate delta, and source commit"
+  },
+  "status": "authorized"
+}

@@ -1,0 +1,56 @@
+{
+  "completed_utc": "2026-10-07T04:51:58.784324Z",
+  "no_retry": true,
+  "prelaunch": {
+    "bytes": 4461,
+    "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/xml-v7-focused-v1.prelaunch.json",
+    "sha256": "a1f2f0b6be132072549144063c51a2ac62bf86d022236b0b21556ac7f66d0a09"
+  },
+  "results": [
+    {
+      "check": "test-default",
+      "result": {
+        "bytes": 2254,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/xml-v7-focused-v1.test-default.result.json",
+        "sha256": "14fe67f651fee5577f35ca12ca6ca217a59bd67bc3fefb002783c4fc0dd93559"
+      },
+      "returncode": 0,
+      "status": "pass"
+    },
+    {
+      "check": "test-all-features",
+      "result": {
+        "bytes": 2297,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/xml-v7-focused-v1.test-all-features.result.json",
+        "sha256": "f72393f5248e41963f48c362eff4d0dc46a454db16956bacc5dd7ff047072204"
+      },
+      "returncode": 0,
+      "status": "pass"
+    },
+    {
+      "check": "clippy-default",
+      "result": {
+        "bytes": 2311,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/xml-v7-focused-v1.clippy-default.result.json",
+        "sha256": "32d1ccbe541a2bd3f787d28ee013eef73f568456f48736d31e0dda33355a2819"
+      },
+      "returncode": 0,
+      "status": "pass"
+    },
+    {
+      "check": "clippy-all-features",
+      "result": {
+        "bytes": 2352,
+        "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/xml-v7-focused-v1.clippy-all-features.result.json",
+        "sha256": "45c16536f783a39cd52a683758a29db332e85399685c265b94ffb18849330c80"
+      },
+      "returncode": 0,
+      "status": "pass"
+    }
+  ],
+  "schema": "litchi.performance.0948-xml-v7-focused-summary.v1",
+  "source_tree_digest_after": "9e94e7c908c88ddf3a69427c5d077814bbb3b735afbb7e9f6b65c1348c2471a9",
+  "source_tree_digest_before": "9e94e7c908c88ddf3a69427c5d077814bbb3b735afbb7e9f6b65c1348c2471a9",
+  "source_unchanged_after_run": true,
+  "status": "pass"
+}

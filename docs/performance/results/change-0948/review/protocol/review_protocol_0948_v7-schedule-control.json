@@ -1,0 +1,49 @@
+{
+  "capture": {
+    "bytes": 44255,
+    "path": "/home/zhuhe/litchi-performance-0948/tools/capture_0948_v3.py",
+    "sha256": "23619b6071c10cf373f2d748a46a0162b65b4839a356027c43feec4925699c8b"
+  },
+  "checks": [
+    {
+      "children": 16,
+      "id": "qualification_expected_jobs_and_stage_counts",
+      "samples": 2,
+      "status": "pass",
+      "warmup": 0
+    },
+    {
+      "children": 48,
+      "id": "native_expected_jobs_and_stage_counts",
+      "samples": 100,
+      "status": "pass",
+      "warmup": 10
+    },
+    {
+      "children": 24,
+      "id": "allocator_expected_jobs_and_stage_counts",
+      "samples": 5,
+      "status": "pass",
+      "warmup": 2
+    },
+    {
+      "id": "workload_cwd_is_real_directory",
+      "path": "/home/zhuhe/litchi-performance-0948",
+      "status": "pass"
+    },
+    {
+      "error": "CaptureError: allocator counts changed",
+      "id": "wrong_allocator_repeat_count_rejected",
+      "status": "pass"
+    }
+  ],
+  "plan": {
+    "bytes": 10861,
+    "path": "/home/zhuhe/litchi-performance-0948/plan-v3.json",
+    "sha256": "e4bb028993ec25b0b538616153a09b17fdfb26b91c8255336eab9393d87de73f",
+    "status": "frozen"
+  },
+  "schema": "litchi.performance.0948.schedule-control.v1",
+  "scope": "actual helper expected_jobs/stage_counts only; no child/build/workload execution",
+  "status": "pass"
+}

@@ -1,0 +1,36 @@
+{
+  "adapter_exit_code": 0,
+  "archive_manifest_selected_file_count": 217466,
+  "archive_manifest_selected_source_bytes": 7445754580,
+  "byte_identical": true,
+  "count_note": "actual_files includes 217466 selected source files plus 3 ARCHIVE_METADATA files; selected and metadata checks are separate.",
+  "metadata_verification": {
+    "bytes": 1114,
+    "path": "/home/zhuhe/litchi-performance-0948-archive/replay-v1-metadata-verification.json",
+    "sha256": "f418327c6f877c513be95dfc9d7d7afafd0ad44049beaf9b3c554603bb7e14d4"
+  },
+  "moved_metadata_files_checked": 3,
+  "moved_reduction": {
+    "bytes": 5815204,
+    "path": "/home/zhuhe/litchi-performance-0948-archive/replay-v1-adapter-v2-reduction.json",
+    "sha256": "ff73db31d7374f921bc812b35b39f96ec772a9abd939fe132e3591f196334ac9"
+  },
+  "moved_selected_files_checked": 217466,
+  "moved_total_regular_files": 217469,
+  "original_analysis": {
+    "bytes": 5815204,
+    "path": "/home/zhuhe/litchi-performance-0948/analysis.json",
+    "sha256": "ff73db31d7374f921bc812b35b39f96ec772a9abd939fe132e3591f196334ac9"
+  },
+  "schema": "litchi.performance.0948.replay-corrected-comparison.v1",
+  "semantic_json_equal": true,
+  "source_manifest_verification": {
+    "bytes": 873,
+    "path": "/home/zhuhe/litchi-performance-0948-archive/replay-v1-manifest-verification.json",
+    "sha256": "c73e01fd8e874001e2e6c77a0b96715ba094c20214a0fb8373db24b1059745d5"
+  },
+  "status": "pass",
+  "symlink_directories": [],
+  "unmodified_reducer_exit_code": 1,
+  "workload_launched": false
+}

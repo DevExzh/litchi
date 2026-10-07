@@ -1,0 +1,82 @@
+{
+  "blockers": [
+    {
+      "detail": "0948 baseline-reuse.v1 branch checks only status, head, file count, and binary bytes/SHA; it bypasses the strict nested source/build/terminal validator.",
+      "id": "baseline-reuse-bypass",
+      "location": "tools/capture_0948_v1.py:458-472; tools/reduce_0948_v1.py:405-419",
+      "severity": "high"
+    },
+    {
+      "detail": "workload cwd and stage/child directory paths use is_dir without rejecting symlink ancestors; source trees themselves are symlink-checked.",
+      "id": "symlinked-runtime-paths",
+      "location": "tools/capture_0948_v1.py:576-581; tools/reduce_0948_v1.py:1131-1133,1224-1227",
+      "severity": "medium"
+    },
+    {
+      "detail": "reviewed.folder is stored as folder.resolve(), so reduced output is location-bound on packet relocation.",
+      "id": "absolute-reviewed-folder",
+      "location": "tools/reduce_0948_v1.py:1193",
+      "severity": "medium"
+    },
+    {
+      "detail": "status remains draft and candidate source/role/build bindings are not yet populated.",
+      "id": "plan-not-frozen",
+      "location": "plan-v1-draft.json",
+      "severity": "blocker"
+    }
+  ],
+  "builds_started_by_review": false,
+  "closed_findings": [
+    {
+      "evidence": "capture source_tree_names rejects symlinks/special files and stage_capture compares full source_start/source_end",
+      "id": "source-census-pre-post",
+      "status": "closed"
+    },
+    {
+      "evidence": "reuse validator checks source manifests, argv, -j2, environment/unsets, runner/Cargo/log descriptors, start/launch/bindings/terminal/binary/result chain",
+      "id": "0948-build-adapter",
+      "status": "closed_for-0948-terminal-schema"
+    },
+    {
+      "evidence": "reducer loads semantic validator through packet-relative descriptor resolution",
+      "id": "portable-validator-import",
+      "status": "closed"
+    }
+  ],
+  "plan": {
+    "bytes": 5524,
+    "path": "/home/zhuhe/litchi-performance-0948/plan-v1-draft.json",
+    "sha256": "181d93df1344b0c69f2a1f5150230042890582936c4116b8053903ea8fde0fa7"
+  },
+  "prior_control_receipt": {
+    "note": "Referenced only; no controls were rerun for this v3 static review.",
+    "path": "/home/zhuhe/litchi-performance-0948/review/protocol/review_protocol_0948_v2-draft-refresh.json",
+    "sha256": "f7fc63b4d48cc8f7b35a558fdfca71c1fe639eff7ac60b8f95bc489d78c75167"
+  },
+  "review_mode": "static inspection only; synthetic controls were not rerun",
+  "schema": "litchi.performance.0948.independent-protocol-custody-review.v3",
+  "status": "blocked_before_capture",
+  "tools": [
+    {
+      "bytes": 43852,
+      "path": "/home/zhuhe/litchi-performance-0948/tools/capture_0948_v1.py",
+      "sha256": "6d12520a3265cb28dde7cbe276d40cca3219fb3bd2563b0682a43ad57c0d8e8f"
+    },
+    {
+      "bytes": 90613,
+      "path": "/home/zhuhe/litchi-performance-0948/tools/reduce_0948_v1.py",
+      "sha256": "bab4a310dc7289385d56541fb1b2824ddde8d4c0e7bd66cf8cecb311fcbea629"
+    },
+    {
+      "bytes": 45052,
+      "path": "/home/zhuhe/litchi-performance-0948/tools/reuse_0948_v1.py",
+      "sha256": "7c3857a57ddc737ae8a22c1d479f0515a94c2e57433357af9dc955375930477a"
+    },
+    {
+      "bytes": 12243,
+      "path": "/home/zhuhe/litchi-performance-0948/tools/freeze_0948_v1.py",
+      "sha256": "a9a4db7de695cc977b288ccf436322511f02f656d907a9f0f78b8c58a87fe6b1"
+    }
+  ],
+  "workloads_started": false
+}

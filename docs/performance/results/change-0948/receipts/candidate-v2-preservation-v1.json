@@ -1,0 +1,30 @@
+{
+  "binaries": [
+    {
+      "bytes": 265824576,
+      "destination": "binaries/candidate-v2-preserved/litchi-perf-baseline",
+      "destination_verified": true,
+      "kind": "native",
+      "sha256": "17344fad7c4c74f1c2d270a4d99caafceb4c805e1753e45432e0ebc35e9c690c",
+      "source": "target-candidate-native-v2/release/litchi-perf-baseline",
+      "source_binary_receipt": "builds/candidate-native-v2/binary.json",
+      "source_result_receipt": "builds/candidate-native-v2/result.json",
+      "source_terminal_receipt": "builds/candidate-native-v2/terminal.json"
+    },
+    {
+      "bytes": 269159824,
+      "destination": "binaries/candidate-v2-preserved/litchi-perf-baseline-alloc",
+      "destination_verified": true,
+      "kind": "allocator",
+      "sha256": "55adf8dc7cb71af07dcf11c8eef94c5c124ab8cd53aaee7f2315b4095e950eea",
+      "source": "target-candidate-allocator-v2/release/litchi-perf-baseline-alloc",
+      "source_binary_receipt": "builds/candidate-allocator-v2/binary.json",
+      "source_result_receipt": "builds/candidate-allocator-v2/result.json",
+      "source_terminal_receipt": "builds/candidate-allocator-v2/terminal.json"
+    }
+  ],
+  "created_utc": "2026-10-07T04:34:53.689857+00:00",
+  "schema": "litchi.performance.0948.candidate-v2-binary-preservation.v1",
+  "source_builds_are_immutable_history": true,
+  "status": "preserved-before-v3-build"
+}

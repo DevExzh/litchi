@@ -1,0 +1,31 @@
+{
+  "checks": [
+    {
+      "match": true,
+      "moved_bytes": 54217762,
+      "moved_sha256": "fe29a9f975907cad76a455f60397c7c211a9dc91805b3e8d15ab0e54ec9c21af",
+      "name": "manifest-v1.json",
+      "source_bytes": 54217762,
+      "source_sha256": "fe29a9f975907cad76a455f60397c7c211a9dc91805b3e8d15ab0e54ec9c21af"
+    },
+    {
+      "match": true,
+      "moved_bytes": 9433,
+      "moved_sha256": "fe8ae21029dfb6894f61a7163a33756f4d9b718c46c0154df27e7f18fc5df83c",
+      "name": "archive-0948-v1.py",
+      "source_bytes": 9433,
+      "source_sha256": "fe8ae21029dfb6894f61a7163a33756f4d9b718c46c0154df27e7f18fc5df83c"
+    },
+    {
+      "match": true,
+      "moved_bytes": 17221443,
+      "moved_sha256": "d80b9585c30b76497e9f8c2f12e61917a1a0a2efcd8b281a2b88153006cc7b5a",
+      "name": "selection-v1.list",
+      "source_bytes": 17221443,
+      "source_sha256": "d80b9585c30b76497e9f8c2f12e61917a1a0a2efcd8b281a2b88153006cc7b5a"
+    }
+  ],
+  "moved_root": "/home/zhuhe/litchi-performance-0948-replay-v1-20261007",
+  "schema": "litchi.performance.0948.replay-metadata-verification.v1",
+  "status": "pass"
+}

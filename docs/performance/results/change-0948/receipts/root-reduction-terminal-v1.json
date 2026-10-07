@@ -1,0 +1,15 @@
+{
+  "schema": "litchi.performance.0948.root-reduction-terminal.v1",
+  "created_utc": "2026-10-07T05:15:50.669521+00:00",
+  "session_id": 68941,
+  "exit_code": 0,
+  "analysis_status": "fail",
+  "decision": "reject-candidate",
+  "reason": "Both primary cases exceed frozen allocated_bytes and allocation_calls safety gates in every allocator repeat.",
+  "retries": 0,
+  "analysis": {
+    "path": "analysis.json",
+    "bytes": 5815204,
+    "sha256": "ff73db31d7374f921bc812b35b39f96ec772a9abd939fe132e3591f196334ac9"
+  }
+}

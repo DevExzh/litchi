@@ -1,0 +1,43 @@
+{
+  "adapter": {
+    "path": "tools/replay_0948_v2.py",
+    "sha256": "ea110ddd381373b40e19ed8619873490a293e03c74996a9cd079c549b7dbb573"
+  },
+  "child": "qualification/q00-baseline-native-primary-percent-medium",
+  "controls": {
+    "missing_physical_report_actual_leaf_review": {
+      "error": "/home/zhuhe/litchi-performance-0948-leaf-negative-20261007/qualification/q00-baseline-native-primary-percent-medium retained output missing or symlinked",
+      "removed_shadow_entry": "qualification/q00-baseline-native-primary-percent-medium/report.json",
+      "status": "rejected"
+    },
+    "positive_actual_leaf_review": {
+      "reviewed_label": "qualification/q00-baseline-native-primary-percent-medium",
+      "status": "accepted"
+    },
+    "tampered_historical_argv_actual_leaf_review": {
+      "error": "/home/zhuhe/litchi-performance-0948-leaf-negative-20261007/qualification/q00-baseline-native-primary-percent-medium start invocation custody",
+      "status": "rejected"
+    },
+    "tampered_historical_cwd_actual_leaf_review": {
+      "error": "/home/zhuhe/litchi-performance-0948-leaf-negative-20261007/qualification/q00-baseline-native-primary-percent-medium start invocation custody",
+      "status": "rejected"
+    }
+  },
+  "frozen_reducer": {
+    "path": "tools/reduce_0948_v4.py",
+    "sha256": "f960a94cad1544ac7f64c8a5006eb172bf5db849735b576fba58a6338a5b1d17"
+  },
+  "historical_authorization": {
+    "cwd": "/home/zhuhe/litchi-performance-0948",
+    "path": "receipts/root-qualification-go-v1.json",
+    "sha256": "59e12d460778f5552604c08b612e353172792317d8f75ea026dc6bf653d03613"
+  },
+  "plan": {
+    "path": "plan-v3.json",
+    "sha256": "e4bb028993ec25b0b538616153a09b17fdfb26b91c8255336eab9393d87de73f"
+  },
+  "relocated_packet_root": "/home/zhuhe/litchi-performance-0948-leaf-negative-20261007",
+  "schema": "litchi.performance.0948.portable-replay-leaf-controls.v1",
+  "scope": "offline leaf_review only; no workload launch; mutation controls used in-memory JSON and shadow-directory unlink",
+  "status": "pass"
+}\n

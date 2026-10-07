@@ -1,5 +1,20 @@
 # Performance hotspot inventory
 
+## 0948 — multi-window audit saves latency but fails allocation safety
+
+[0948](0948-xlsx-multi-window-audit-rejected.md) prospectively evaluates the
+bounded changed-cell window candidate suggested by 0947. Publication p50 falls
+14.25% / 14.63% and workflow p50 falls 6.16% / 6.89% for medium / dense-sparse
+one-percent edits; all native gates pass. Publication allocation calls rise
+67.73% / 129.31%, and requested bytes rise 7.30% / 14.70% in every allocator
+repeat. Both exceed the frozen 5% safety limits, so the candidate is rejected
+and production remains at the 0945 implementation. Complete source, tests,
+patch, and measurement evidence are retained externally with a reduced packet.
+Next attribute per-window state/parser allocation costs before designing a
+new candidate; these results do not establish which allocation site dominates.
+Keep complete original auditing, exact gap verification, bounded metadata,
+canonical error fallback, and fresh prospective gates.
+
 ## 0947 — changed-cell spans make multiple replacement windows worth qualifying
 
 [0947](0947-xlsx-replacement-window-coverage.md) binds retained XML to the

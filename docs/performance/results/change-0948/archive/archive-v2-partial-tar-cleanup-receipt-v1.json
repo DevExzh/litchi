@@ -1,0 +1,14 @@
+{
+  "archive_v1_preserved": true,
+  "bytes": 7713433600,
+  "completed_at_utc": "2026-10-07T05:35:05.660421+00:00",
+  "exists_after": false,
+  "mode": 436,
+  "original_interruption_receipt": "/home/zhuhe/litchi-performance-0948-archive/archive-v2-interrupted-receipt-v1.json",
+  "path": "/home/zhuhe/litchi-performance-0948-archive/archive-0948-v2.tar",
+  "reason": "remove the unsealed redundant v2 partial tar after authoritative v1 archive and replay verification; preserve v2 metadata/helper and interruption receipt",
+  "schema": "litchi.performance.0948.interrupted_partial_tar_cleanup.v1",
+  "sha256": "not_computed_by_policy",
+  "started_at_utc": "2026-10-07T05:35:05.660287+00:00",
+  "status": "pass"
+}

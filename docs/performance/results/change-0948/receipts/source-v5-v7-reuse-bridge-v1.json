@@ -1,0 +1,4462 @@
+{
+  "binaries": [
+    {
+      "binary": {
+        "bytes": 265836208,
+        "executable": true,
+        "mode": 509,
+        "path": "target-candidate-native-v3/release/litchi-perf-baseline",
+        "sha256": "c9e3b3122b1ac5f64fdf0fc8b4aabea9c53d80598b80e702f39eb8424b1063e2"
+      },
+      "binary_receipt": {
+        "bytes": 785,
+        "executable": false,
+        "mode": 436,
+        "path": "builds/candidate-native-v3/binary.json",
+        "sha256": "4f972c296d5980221ea25d39179962f4bba96ecc58eed99ba75f92923d3ff117"
+      },
+      "kind": "native",
+      "process_group_clear": true,
+      "reaped": true,
+      "result": {
+        "bytes": 1021,
+        "executable": false,
+        "mode": 436,
+        "path": "builds/candidate-native-v3/result.json",
+        "sha256": "1f1a054dce53ce626c11ce9478480e18983e587a9ce6cf6b646d340d8de72b1b"
+      },
+      "status": "passed",
+      "terminal": {
+        "bytes": 8566,
+        "executable": false,
+        "mode": 436,
+        "path": "builds/candidate-native-v3/terminal.json",
+        "sha256": "eaea1250b7776116a3dc1f860a09480ffe8ef174f4688dec92a929331b184ed6"
+      },
+      "terminal_returncode": 0
+    },
+    {
+      "binary": {
+        "bytes": 269145952,
+        "executable": true,
+        "mode": 509,
+        "path": "target-candidate-allocator-v3/release/litchi-perf-baseline-alloc",
+        "sha256": "7f7c1a0c0148dd283db27ec7b0cb2870572d94cc4d8de1920c4f7de302f3590e"
+      },
+      "binary_receipt": {
+        "bytes": 803,
+        "executable": false,
+        "mode": 436,
+        "path": "builds/candidate-allocator-v3/binary.json",
+        "sha256": "ce07fe98ddc07e3e0d899f17814a79d94805047c1448a8a5f567774ee1563fe5"
+      },
+      "kind": "allocator",
+      "process_group_clear": true,
+      "reaped": true,
+      "result": {
+        "bytes": 1042,
+        "executable": false,
+        "mode": 436,
+        "path": "builds/candidate-allocator-v3/result.json",
+        "sha256": "460c7b3310e7032d251cae6340491e8cb0e6b7b2cc4baf71f6e4254480f77d46"
+      },
+      "status": "passed",
+      "terminal": {
+        "bytes": 8666,
+        "executable": false,
+        "mode": 436,
+        "path": "builds/candidate-allocator-v3/terminal.json",
+        "sha256": "5a467ced86b26a7fd091261de8b2a65089eeb72e55a2651db5186c2103dc0b00"
+      },
+      "terminal_returncode": 0
+    }
+  ],
+  "changed_test_file": "crates/xml-minifier/tests/source_replacement.rs",
+  "compiled_source": {
+    "bytes": 260076537,
+    "file_count": 10789,
+    "root": "candidate-build-v3",
+    "tree_digest": "228e74ebb6fee5bbd64d1ee81a4ec8334a4d1277cbf89d9b365c3bbe7cae8a28"
+  },
+  "compiled_source_binding": {
+    "build_revision": "candidate-build-v3",
+    "source_freeze": {
+      "bytes": 4900,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/candidate-freeze-v3.json",
+      "sha256": "8f68153a809c729cbdb082b336e0b841f242892904929643917d5fee41d514a6"
+    },
+    "source_manifest": {
+      "bytes": 2296969,
+      "executable": false,
+      "mode": 436,
+      "path": "candidate-build-manifest-v3.json",
+      "sha256": "f565a52b36e8657453448d1f097179002b8fd7c95b4417996f62e1cbf6a4b992"
+    },
+    "source_v7_is_not_compiled": true
+  },
+  "compiled_source_matches_source_v5": {
+    "mismatches": [],
+    "same_file_metadata": true,
+    "same_file_set": true
+  },
+  "created_utc": "2026-10-07T04:52:48.164360+00:00",
+  "dep_info_archive": {
+    "all_archived_dep_info_verified": true,
+    "lanes": [
+      {
+        "all_copies_match_live_targets": true,
+        "archive_root": "archives/dep-info-v3/allocator/release",
+        "build_script_dep_info_count": 23,
+        "crate_dependency_dep_info_count": 212,
+        "dep_info_count": 236,
+        "lane": "allocator",
+        "metadata": {
+          "bytes": 108492,
+          "executable": false,
+          "mode": 436,
+          "path": "archives/dep-info-v3/allocator-dep-info.json",
+          "sha256": "28d62f8b198b4473796ddc130551fb701b05f880ee23d4992bfb1f4a4e3d72d5"
+        }
+      },
+      {
+        "all_copies_match_live_targets": true,
+        "archive_root": "archives/dep-info-v3/native/release",
+        "build_script_dep_info_count": 23,
+        "crate_dependency_dep_info_count": 212,
+        "dep_info_count": 236,
+        "lane": "native",
+        "metadata": {
+          "bytes": 107028,
+          "executable": false,
+          "mode": 436,
+          "path": "archives/dep-info-v3/native-dep-info.json",
+          "sha256": "2537b0cbfc8ac3b48381b211b0a67efca1d40a243653ee1968406d9c078da4f4"
+        }
+      }
+    ],
+    "receipt": {
+      "bytes": 232819,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/dep-info-v3-archive-v1.json",
+      "sha256": "e1ddcc6710478a84eb13fa050e8e1b9deaa886b5bb5b215ab4fae342f70b45b1"
+    }
+  },
+  "release_dep_info": [
+    {
+      "all_release_dep_info_excludes_changed_test": true,
+      "build_script_dep_info_count": 23,
+      "changed_test_basename_hits": [],
+      "changed_test_path_hits": [],
+      "crate_dependency_dep_info_count": 212,
+      "dep_info_count": 236,
+      "files": [
+        {
+          "bytes": 557,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/build/crc32fast-9c5be2ccfba2e957/build_script_build-9c5be2ccfba2e957.d",
+          "sha256": "7a6bd63edd11355d9b6aab6057d2c08980609e75ae3ce53b4d2465c5ce72fb55"
+        },
+        {
+          "bytes": 587,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/build/crossbeam-deque-e0e8ef747a72ee23/build_script_build-e0e8ef747a72ee23.d",
+          "sha256": "e449f636a727ece01e27f213fbf7dfb12d91fc243f63435455d05aea072e6d6f"
+        },
+        {
+          "bytes": 590,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/build/crossbeam-epoch-f00c9da68f6941bc/build_script_build-f00c9da68f6941bc.d",
+          "sha256": "03feb81edc75d416e72e7f04c33a84b965341c0a673ba2ff6a3e76bbb8dde8bb"
+        },
+        {
+          "bytes": 1249,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/build/crossbeam-utils-d94b50820fc09316/build_script_build-d94b50820fc09316.d",
+          "sha256": "b36ac0dd4c0335b9b70f8159f9242b37ffc1f6eddf93b24ea3f675e5f53a7a9d"
+        },
+        {
+          "bytes": 580,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/build/generic-array-d33cef7df2a5441c/build_script_build-d33cef7df2a5441c.d",
+          "sha256": "632b1e6fa84c402f51e99882860f415d36caf5947375a9dfcde4b2ef7374bbf6"
+        },
+        {
+          "bytes": 557,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/build/getrandom-1a2e4b93dd957df7/build_script_build-1a2e4b93dd957df7.d",
+          "sha256": "d9190bf48afcfdd19c7cbb46743baa69f9b6be1fe18424b65346346cae8af4c2"
+        },
+        {
+          "bytes": 607,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/build/icu_normalizer_data-5c52f21f7db0cab3/build_script_build-5c52f21f7db0cab3.d",
+          "sha256": "924a8f8d1d70a2482c83cdcc3de7ae627093f45e72b2624e08be11f0cc3b8db6"
+        },
+        {
+          "bytes": 607,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/build/icu_properties_data-d0f6bc2d784dbe56/build_script_build-d0f6bc2d784dbe56.d",
+          "sha256": "9e58df0f829c4e9cb256fceb0b9d3075273fb857388c9a53cf205de29d0537e6"
+        },
+        {
+          "bytes": 538,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/build/libc-845f4563fba2f06f/build_script_build-845f4563fba2f06f.d",
+          "sha256": "84be8f782b80a441a3762fc69c6451244725660bdf7ce49c2f0a1efe250740b8"
+        },
+        {
+          "bytes": 806,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/build/libm-b2adb721adff90c8/build_script_build-b2adb721adff90c8.d",
+          "sha256": "a72c4dd2bfaeddbdbc91705611047e769cb3ff3eec3ee332c37dfcf3cf300fe7"
+        },
+        {
+          "bytes": 582,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/build/num-bigint-dig-9452fc56a63c0eb1/build_script_build-9452fc56a63c0eb1.d",
+          "sha256": "fe8a8166d8e96d2645be3a5ecad5b80898ec769f18ca0d585a76ee09d6583be8"
+        },
+        {
+          "bytes": 565,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/build/num-traits-da92aa144aabc9ee/build_script_build-da92aa144aabc9ee.d",
+          "sha256": "7214e96aafc46695a1ed10685c97d06a4df684881ee0235933015c4abfc939af"
+        },
+        {
+          "bytes": 573,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/build/proc-macro2-07113d198abad617/build_script_build-07113d198abad617.d",
+          "sha256": "389361f7e1736dd802f8fce46124fe1e4c308a98eed2c47cc132fba7062191de"
+        },
+        {
+          "bytes": 540,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/build/quote-b9c1a5ae93fd7326/build_script_build-b9c1a5ae93fd7326.d",
+          "sha256": "98f37d40b4c6e07edd8c3785035fb9d406198eb579fb43de73080f03c3c11917"
+        },
+        {
+          "bytes": 565,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/build/rayon-core-561badc1d4d9a2b7/build_script_build-561badc1d4d9a2b7.d",
+          "sha256": "cef41a24ba65048aaa50ae2e417a704024b41004b90ddcdf710d9e4b7b07d8c5"
+        },
+        {
+          "bytes": 542,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/build/rustix-4da3256ba2ad6d56/build_script_build-4da3256ba2ad6d56.d",
+          "sha256": "676a855e87afaa10205784ba4366d231111b8565657386837be81c3b42f2e8d8"
+        },
+        {
+          "bytes": 886,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/build/rustversion-d109a93ed5539d05/build_script_build-d109a93ed5539d05.d",
+          "sha256": "ecc280cd2acdc36769f9e452c6f526ab6bf0341d3375f127738cf6caa8b16905"
+        },
+        {
+          "bytes": 543,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/build/serde-672c71063fd1a24c/build_script_build-672c71063fd1a24c.d",
+          "sha256": "5dcbc7e9ebdd610db1611a805d658db037718e3b3c06376d38a8d0e512218b4e"
+        },
+        {
+          "bytes": 568,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/build/serde_core-dfb8c30c17dbf58e/build_script_build-dfb8c30c17dbf58e.d",
+          "sha256": "3c4704115a5e27aac1ac52d5023fb374942010c4fb9bb7dbcf95aec740885db8"
+        },
+        {
+          "bytes": 568,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/build/serde_json-913bd34cb919b41e/build_script_build-913bd34cb919b41e.d",
+          "sha256": "043b1d5a152656c417c18847e00c49a95c5cdcd4fa4a1ff2dbde7e02d0ef7845"
+        },
+        {
+          "bytes": 560,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/build/thiserror-94a4f5faf412058f/build_script_build-94a4f5faf412058f.d",
+          "sha256": "8cd15d8cc41980f725ba9d9eb3e128dd593a7ffde6384ed59da20253507d16ed"
+        },
+        {
+          "bytes": 555,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/build/zerocopy-d4297b42cfaf70a5/build_script_build-d4297b42cfaf70a5.d",
+          "sha256": "eac65283dbaf34eb0fa9e89c12635eeca19dee6f9ec054237e95a6b5d92f46ff"
+        },
+        {
+          "bytes": 535,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/build/zmij-eccc74d68366fef0/build_script_build-eccc74d68366fef0.d",
+          "sha256": "4d9152aa38a155259f7e1bebb9cc3a2dbf0f1792eee2a75f2813f1a8345c9d2f"
+        },
+        {
+          "bytes": 1041,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/aead-86b5437673130b36.d",
+          "sha256": "f502fd99efa1368078676306712409d209f55b9b9567efebc043f7d398c99439"
+        },
+        {
+          "bytes": 6078,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/aes-1814ec0405d5b47d.d",
+          "sha256": "67059d34c661f497c139a0925cb2ab1a771b63b71b0cc70efbcacc3a6866ad9e"
+        },
+        {
+          "bytes": 1082,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/aes_gcm-de838d3e571b5a79.d",
+          "sha256": "3bb66ca8977a40cfddc663727845cc942a34a6ed14f732b959eac36a75342ccd"
+        },
+        {
+          "bytes": 3309,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/argon2-354e47fbf75e1e1e.d",
+          "sha256": "7780febbed4836dcdcb0de26c464002487677ab0acb56d69598b580cd10e9562"
+        },
+        {
+          "bytes": 3081,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/atoi_simd-78416a8f7c477837.d",
+          "sha256": "d9a3d063753f59887faa482b5d23edc04e10f3a50cafce92f35b36d7bd3f63c7"
+        },
+        {
+          "bytes": 1804,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/autocfg-dfc78334b5c01b99.d",
+          "sha256": "5a9fe30a1cca620307a1d56a147e2a677a9524e92e1cf14575f9d8c4fa529de4"
+        },
+        {
+          "bytes": 2569,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/base16ct-97dcefc69a20ba8a.d",
+          "sha256": "082f9de34e5e26d700127b4b5f26625c3190505b46c756869ee392171bc34665"
+        },
+        {
+          "bytes": 6797,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/base64-15544df1f10b52d0.d",
+          "sha256": "c2222843f7b1fbd0655102a9413ce52d9e2b547ef969e05aa94f3b5164c9c2e3"
+        },
+        {
+          "bytes": 5869,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/base64ct-9e195e048dcf7fe5.d",
+          "sha256": "a5bb043db2101771257d540b58d184880e7799954b4f3dbb38e826e60049e73e"
+        },
+        {
+          "bytes": 2814,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/bergshamra_c14n-2865a529439aebd3.d",
+          "sha256": "99cd4d28381adc7047373e9177c76bb7f73ce08d78ecff29ae578be734ff0f4e"
+        },
+        {
+          "bytes": 1952,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/bergshamra_core-48c64146b4fb29f4.d",
+          "sha256": "d1c35a471628e1a06d148b2eafcfa9ae5d18c92609d1076b91eda67d87161aa6"
+        },
+        {
+          "bytes": 2350,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/bergshamra_xml-ab9cd44af229d293.d",
+          "sha256": "0e7c47f7b42843ca6af1aec9f2016974c68bc25a025cbaa8e0bdd9c8e057371d"
+        },
+        {
+          "bytes": 3407,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/bitflags-99a6eea1164cc34e.d",
+          "sha256": "0be45505d9a8179fed7420a92a1a028bddd08780681e22c6fcd5ab00ba359c6c"
+        },
+        {
+          "bytes": 3762,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/blake2-6a4970eddf0191fe.d",
+          "sha256": "909f5505c4c2fa3117813fad5c548dba63b70c506c29effa7583e24b01c839e1"
+        },
+        {
+          "bytes": 1125,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/block_buffer-9a284b730545032c.d",
+          "sha256": "624fa2eedd8ef371b75c97d9789e041a21e5daecc699e2816f211b350da6c98a"
+        },
+        {
+          "bytes": 1514,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/block_buffer-a944155d87d2daf8.d",
+          "sha256": "bf32c676dfd6b7080cb50567807456b8bdc6503440e89f47b67282459f6e8752"
+        },
+        {
+          "bytes": 1140,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/block_padding-c53c7b4716c9e935.d",
+          "sha256": "42771998fd28b964bab6aecf48c5c96c14e74cf6849e0d284cae6f4e5faf2f7c"
+        },
+        {
+          "bytes": 1073,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/blowfish-9a8ac740f8afddc9.d",
+          "sha256": "ff26f128aa298ead8b8731946f07638079d0f8fab2ff6dd34cee61800c5f02f8"
+        },
+        {
+          "bytes": 4442,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/bumpalo-898423ca37fc8d5d.d",
+          "sha256": "a84de5cc1277ffb86a6302bf6a52179c66767724cacb3b0450bf0b1d9923c938"
+        },
+        {
+          "bytes": 703,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/byteorder-24f2c8b01b017816.d",
+          "sha256": "e3353b1220f29422ec392299babf2d8bee0767c3bd6b4483b6008dc1d90caf30"
+        },
+        {
+          "bytes": 1117,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/caseless-b59541c51f43582b.d",
+          "sha256": "e63a2b49537d010caeaf032ba240ffb1c30cc6908f523d4175348a935b627760"
+        },
+        {
+          "bytes": 1383,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/cbc-e49bd9577def367d.d",
+          "sha256": "ee11701049e91753d990a7de06f8305ebc989f3c72a558cb83ba175b811cb3f5"
+        },
+        {
+          "bytes": 682,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/cfg_if-83fc8b03136a8ff7.d",
+          "sha256": "b56bf8c38857ff9449de7d0c7241a6170b939e419a54fe344f466d66be07e09d"
+        },
+        {
+          "bytes": 3467,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/chacha20-17dbcce9974f8844.d",
+          "sha256": "6b2bae7f0261a353ace8a0e440bf527369d49b8ea98a7f0e090ce8a603a66f94"
+        },
+        {
+          "bytes": 14023,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/chrono-47cdc36da82cc282.d",
+          "sha256": "9af1f12966a0a27cad649269dbf590ca48d5d3b13e8b14fc6e0dde1e239c404f"
+        },
+        {
+          "bytes": 4913,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/cipher-04fa95d546523125.d",
+          "sha256": "31543ae462a26cb3d1a6719778305ba1db23c0e4efd6bb201e747ad1fc2f1a12"
+        },
+        {
+          "bytes": 2575,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/cipher-4017546eb37c3bf1.d",
+          "sha256": "3c078411425eef9ba7356bb24a4b950d2580a40dae26643d7884824d9f9faf66"
+        },
+        {
+          "bytes": 2870,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/cmov-1c31d51e741353ff.d",
+          "sha256": "40b1df6be1a85502a2283ea58f504e2910341b86c84ac00acacf9d57fb9de616"
+        },
+        {
+          "bytes": 3795,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/const_oid-844e481e9e15d7d9.d",
+          "sha256": "02e64ec5cd9c06d5122b42578d3972d395496f5faa12d61d5829eaa5c3160787"
+        },
+        {
+          "bytes": 3743,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/const_oid-859eb1e75716c4d1.d",
+          "sha256": "f143b087eecff880b4ad176cd4030480184e26252f6746c8d96587be963d809a"
+        },
+        {
+          "bytes": 1074,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/cpubits-89e8c089df4b1f84.d",
+          "sha256": "5b1b7ef95dfa76db052faac17522d99048f034dd4b55db574a0ab7528713d64d"
+        },
+        {
+          "bytes": 1495,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/cpufeatures-284915969223d67c.d",
+          "sha256": "29563f9d4f9405c42b01c067ffe9582ed8bc7dae6402b977ef33f3a42034ce4c"
+        },
+        {
+          "bytes": 1102,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/cpufeatures-f96c188307301194.d",
+          "sha256": "4d0124a9518c102200b9d03cdf4079e250ccff66f4300673045ce9739f0f9236"
+        },
+        {
+          "bytes": 2712,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/crc32fast-443de9c034c8075b.d",
+          "sha256": "f5c42b4113405fcc3539e47de47fc08eba459fa3bc8ab1109bee2a0120d1d1f4"
+        },
+        {
+          "bytes": 20617,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/crc_fast-0d5d633d3d6cdd8e.d",
+          "sha256": "41a24959593e4c9136d8d6b401eae08abeaddd073317facccabdc1fdfe6b32be"
+        },
+        {
+          "bytes": 1146,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/crossbeam_deque-a2b6fd89a642b44d.d",
+          "sha256": "7d325c4cb0a173802f370a0a8be2b96ae51df14312b0d103055fc14df5cb9e81"
+        },
+        {
+          "bytes": 5340,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/crossbeam_epoch-9d1c5edf26d78806.d",
+          "sha256": "e0c0d8187bd129b2d5bf66de4102e9ae52775f1d8edcb8633492950db5d213b9"
+        },
+        {
+          "bytes": 5957,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/crossbeam_utils-0f1494b6fbcf32b2.d",
+          "sha256": "20bc33015d87d4bd9b4e7649634556ee124dfa7ddd0c36c790c886162f96cbac"
+        },
+        {
+          "bytes": 33627,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/crypto_bigint-fca6f6227b8648e5.d",
+          "sha256": "04b6b7d74fbbb6ef3724e38117573cf8f17e3779de17ed04ddfc0c5b9fc71a48"
+        },
+        {
+          "bytes": 731,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/crypto_common-2c5e06a5437476c3.d",
+          "sha256": "441454135a737afcf9090c469db14bb3cc6e4ec9aacee4a7cfa65a0e3f0bc713"
+        },
+        {
+          "bytes": 1942,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/crypto_common-b638a4274bde6c19.d",
+          "sha256": "72470d56086bcb3ab286c6d23584d83ba7492ffdec32c5031b982c8910418daf"
+        },
+        {
+          "bytes": 2570,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/ctr-2476f27263efa7e7.d",
+          "sha256": "451741acdd0aa3fa93c6c6f1428e58fc957106e4bc1f72465922b5fb9a91b8ae"
+        },
+        {
+          "bytes": 5441,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/ctutils-d03ec3d4af4f576f.d",
+          "sha256": "1f973442e278b0708cfd03aaf19c276f4e228fe3ae069dbbf9bcbf2e8db65188"
+        },
+        {
+          "bytes": 1506,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/debug_unsafe-8ae9c54f20f24170.d",
+          "sha256": "13d001561be4cb1bc29e5fd4fa7103b8d9e726219cc208f6f4379ea6e19ffc97"
+        },
+        {
+          "bytes": 20521,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/der-14c96ad56c84d099.d",
+          "sha256": "39c58251c200cb344a153498665d5b025b24b17ccea95c0550be59ff0e50e58d"
+        },
+        {
+          "bytes": 3486,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/der_derive-6cc6b3a0fdfc36c0.d",
+          "sha256": "82977dc212025115c548b38d3154e017feb027b3e34b3a5574301828d44eae52"
+        },
+        {
+          "bytes": 4688,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/digest-0484b02829f3f972.d",
+          "sha256": "0ddc5df6e9615df53aaaeb1cd8989cd4e123a21cfdbead4c2129ec2e407eae60"
+        },
+        {
+          "bytes": 3497,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/digest-ce514365ffc97f84.d",
+          "sha256": "c94065bdb402920a9a0de7af973b796a8c7c3e37dcad3569f3e56cb70a588759"
+        },
+        {
+          "bytes": 1352,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/displaydoc-730c38ff85538aa9.d",
+          "sha256": "4fcd5910a40726de017cbdd3c4a7fa7c942aca1bdc72d2ed74a398ca139f2962"
+        },
+        {
+          "bytes": 3302,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/ecdsa-634ad260b35bad91.d",
+          "sha256": "187165a112882d8002f28b06021a3fa0e02758c3ab61b893ed5126b36a248295"
+        },
+        {
+          "bytes": 1460,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/either-f286f2eb974ecac6.d",
+          "sha256": "048265dd8b78dc383fdbed17a8362da9887cd99eeed68aa051ad06888240204e"
+        },
+        {
+          "bytes": 7462,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/elliptic_curve-7e3d742a0e942220.d",
+          "sha256": "e16183a7e4f77b08f2e51e2534252d100ac1b9e8956272bc7006eaae5630f869"
+        },
+        {
+          "bytes": 7899,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/encoding_rs-6f74d7419ae1e4e5.d",
+          "sha256": "d63332bf6f06a176a2da1682afdb3c5b25b59ad0eb482a542ca2b95bc1961bc9"
+        },
+        {
+          "bytes": 3821,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/fast_float2-df62ff4f8df22011.d",
+          "sha256": "f0c565ba2ac831ab7a36c8552e87ca805fecf44da368f94afc3bcf40404bce49"
+        },
+        {
+          "bytes": 696,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/fastrand-4cce81cce366d228.d",
+          "sha256": "8c4f4ae221a6abda6ad003a885790749890c63fb1dce14ccffad724d78b10805"
+        },
+        {
+          "bytes": 1089,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/fastrand-bf68bda815caec6f.d",
+          "sha256": "be4f30af916814237ed90898cd6aac0cdd8561e5ea9f0329fe3768ce326858bb"
+        },
+        {
+          "bytes": 1372,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/ff-eadd6ba263e9e6d6.d",
+          "sha256": "59cc76450382cbc7265bf42ed22eb57ed8194f906b14501737d52b85e3de00a6"
+        },
+        {
+          "bytes": 1908,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/fixedbitset-052b296e7b48804a.d",
+          "sha256": "44614c0aff1d196aff84c80aec0ee24347d31f1b61b6303a8b052ef111009bde"
+        },
+        {
+          "bytes": 689,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/flagset-30a5c99390976c27.d",
+          "sha256": "20d16a1360158faf576df91744a364c6fe39d6a31c8cfc26fb01f40bc824ec2d"
+        },
+        {
+          "bytes": 7981,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/flate2-ae20f9d90aac10b3.d",
+          "sha256": "bf50fcf01a02c4960d9feb2bf145fc25415dc1d5730abc5e5345bd2858e104d1"
+        },
+        {
+          "bytes": 745,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/form_urlencoded-08cb55553fc75045.d",
+          "sha256": "f27c58ba75fbc20a86d51e142706f5f695fef21f9b4e846d0c6c7633b094acb5"
+        },
+        {
+          "bytes": 3554,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/generic_array-ae7df951bb8cb7b6.d",
+          "sha256": "6250e8fea3b9368d2522cbd43ad3ee664181afca4f9fd75fc3dfb4c1fce14639"
+        },
+        {
+          "bytes": 5839,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/getrandom-03e629af4d0ba0a4.d",
+          "sha256": "fb23126b9cd796b002e52364e7570bfd6255cfbeaebbf8dbc6ed96a0f163bb2c"
+        },
+        {
+          "bytes": 3506,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/getrandom-90d8098f4bfb0c5d.d",
+          "sha256": "9942b1576c0c64c63d173f76f4c58fd8efedf995a040d845c8b831290e31b0d5"
+        },
+        {
+          "bytes": 1052,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/ghash-da388972c513e9ba.d",
+          "sha256": "b9300ee24829115e356d9752b546d7eebdc1cd12a4fc5f6d771c8fccb735af07"
+        },
+        {
+          "bytes": 1782,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/group-247ff8cc22b0ca6f.d",
+          "sha256": "bafb21200afe0dfaeec940ccb44e9cb5c6fb2f0cf4eaaed3ead6b0566ef0336e"
+        },
+        {
+          "bytes": 1398,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/hmac-1bdacf3c2659c96f.d",
+          "sha256": "37bf9c5bc49348292c52f38c4f024f0f1b98a4706814a2de38f23360af2c5f9d"
+        },
+        {
+          "bytes": 2541,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/hmac-71c755177c4aff5d.d",
+          "sha256": "9655c47be0db2e8e3fde5bc807b69ae4cc48c6f3d79447edd48b28b906fee5da"
+        },
+        {
+          "bytes": 3118,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/hybrid_array-a18d6d82e0418768.d",
+          "sha256": "0c7eac88525ad2150999f3af14bcd96356df513ce809e0ff1f1e79341b368116"
+        },
+        {
+          "bytes": 1572,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/iana_time_zone-613bae1fc9ec8037.d",
+          "sha256": "74b4f30cef2e4eea6f7f9554e9ff9508f47b5b1f2eab89ad02f25f44bd13ecba"
+        },
+        {
+          "bytes": 6281,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/icu_collections-31fd55f746429a7a.d",
+          "sha256": "42b490c24310fb743a31790726f0bab3b11706c0d6e12b9212f67f2a6e35c75e"
+        },
+        {
+          "bytes": 30324,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/icu_locale_core-8514b56dcd5115f3.d",
+          "sha256": "fe22c7bc144ec3df0dc58628a0e0176c8878cc07fdb5b0589ee0ca841231658c"
+        },
+        {
+          "bytes": 1961,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/icu_normalizer-6c74eb1f3da663c9.d",
+          "sha256": "7a4fa6ccb52574e4d25c47f743a32bbe8c507f9a2c5a707a0b402920a37c4b20"
+        },
+        {
+          "bytes": 5009,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/icu_normalizer_data-20239c50ece754cf.d",
+          "sha256": "6549e11510586483973ae21e478ed69d94f4d54fdafd9a8aa19072649866050b"
+        },
+        {
+          "bytes": 5249,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/icu_properties-daf3b239fc208829.d",
+          "sha256": "0a5a5da84f6bc768d990fb9a7301237aeea5dba9b061c2db6340ce2fc51ebe1f"
+        },
+        {
+          "bytes": 81919,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/icu_properties_data-b4693ea74689c590.d",
+          "sha256": "ffaacc3b4b76c31f63c9c8eda801163876a4ec481713d214b958ad7f738e4e24"
+        },
+        {
+          "bytes": 5556,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/icu_provider-00fd10786c907d0e.d",
+          "sha256": "cff422db79a0931d6450fa42cd7b63f8504e502d2c1b751b51fc47d998298bbd"
+        },
+        {
+          "bytes": 1771,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/idna-767380eb72b0c1f0.d",
+          "sha256": "86d980e0f93e324a4809d218c63a9a03e6a36731932be4c58ca999b3ae9bc779"
+        },
+        {
+          "bytes": 724,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/idna_adapter-28ca9864e30c7533.d",
+          "sha256": "075980668a3ca35a107b948200c440a75a1dc7ba239375ebd4903ac6adf38c2f"
+        },
+        {
+          "bytes": 2151,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/inout-1b4fdf771c653e6e.d",
+          "sha256": "83c75a452ee27991585a1ac086ebf3f7d8b90e7657cdaa9315554fb18c06c00b"
+        },
+        {
+          "bytes": 2151,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/inout-adaeb27f800aa2d6.d",
+          "sha256": "4617eb7b1ed44c2ab6a7b1b64d07747afe7868822219ff223a7372f50235733e"
+        },
+        {
+          "bytes": 1045,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/itoa-5b9423a7444c41ab.d",
+          "sha256": "a3a12cb63b6bef8c7632d1d4c7c15e23a75cbc9f5bfb44ad9d481f395c58ab5d"
+        },
+        {
+          "bytes": 1118,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/lazy_static-d691560bee55f22c.d",
+          "sha256": "3339a536a4d9e0f62ea42c595706e5844b71ca8e46513da478077076c06f2cd5"
+        },
+        {
+          "bytes": 22228,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/libc-670c7e786b2bc9b6.d",
+          "sha256": "bf887d4334e41df9b55b06a25282acfdeaa94921229ff6b5287bf889fb4d309a"
+        },
+        {
+          "bytes": 55897,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/libm-3681a3c9c81d0e14.d",
+          "sha256": "d82e9d78fa863443aa3e15444ecf33244f804c9037312a705e6b71985d2643a8"
+        },
+        {
+          "bytes": 2836,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/linux_raw_sys-eff8d907f71d5492.d",
+          "sha256": "8cda5c03cf5a1351559ae97f9642b4e14d92b2dfd7ac4833a4a5d83d66a3f257"
+        },
+        {
+          "bytes": 14342,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi-f04cf97525baa992.d",
+          "sha256": "5cb06c58e7bc429914dd823e5eb96cb7e945a45314d0bf9194f684b991f100eb"
+        },
+        {
+          "bytes": 2085,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_biff-0dc088e406834852.d",
+          "sha256": "c42f20ca67983e2e8715081d07a514adcc327a85745d97c8b2ba0c1d87f53e43"
+        },
+        {
+          "bytes": 8026,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_cfb-bf96412950922411.d",
+          "sha256": "25c5bde29c9eae1025b5c72205a53b96bfcfc499d35723c86a07b770ee9f1c25"
+        },
+        {
+          "bytes": 709,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_codepage-15466b4014b54388.d",
+          "sha256": "2e70539459104e56b00b9f18f173ca3288284e3ce850de90e05aee6f1f3e55cc"
+        },
+        {
+          "bytes": 16444,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_core-09fb65f4178f144d.d",
+          "sha256": "977e6893860e63460fc51a262e6a05d06bdd63810d2eafb543b550df20795a26"
+        },
+        {
+          "bytes": 4433,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_crypto-8483647c12fa3895.d",
+          "sha256": "52bf52a923a43711ec8aed87871e876b9e37aa0532f057cda27f5f4b632e59f2"
+        },
+        {
+          "bytes": 148579,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_doc-e5c4727476112f29.d",
+          "sha256": "4b2785d2bcd4997c65c84367232e3ef2b12ebc204a51cb146c13577bd718afc0"
+        },
+        {
+          "bytes": 119460,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_docx-776df42632d7afe4.d",
+          "sha256": "28ac17711e81962fd114e21ea524f52c80504a2d8418f1843c4a3e4b24f928e9"
+        },
+        {
+          "bytes": 43987,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_drawingml-abadf0c6d81455ec.d",
+          "sha256": "0eedfe5428da64ead6906748c734963f170e9426fe1b9d3e4cf19c78a2f97bc4"
+        },
+        {
+          "bytes": 41806,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_odf_common-bd6efd17263e58bc.d",
+          "sha256": "4ef0a167aa502fa35bbae42cf717b5f317b969bb3c81be7cf2312d499b49ac47"
+        },
+        {
+          "bytes": 24386,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_odp-f02fe751e719d5c1.d",
+          "sha256": "c749b243de08e960dedea7ec7670f7b854fd2d7993da43137d04da47d5df8cca"
+        },
+        {
+          "bytes": 15847,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_odraw-79ea0ab693b95bba.d",
+          "sha256": "7a52daa88fa650927c52d5cb0a2b2b5a278464a7d14569fe2386e46928f50982"
+        },
+        {
+          "bytes": 85810,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_ods-988506fe507d6620.d",
+          "sha256": "cd9d98e5b0fdffeb3ae0730adfc29b3da488ddcceaa5dd95943cc00dba189197"
+        },
+        {
+          "bytes": 110474,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_odt-c730f4c07372c2d7.d",
+          "sha256": "911e47d2ded5098845fdb665af3f4b108a957427370e6eb5440af6f3810bc6db"
+        },
+        {
+          "bytes": 24952,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_ograph-1bc1ea0e1815052f.d",
+          "sha256": "18b3a4ccdfd2423ca5f3feed4b3d81e02b8f7d07d4cd585c77e1390fa1c6bdff"
+        },
+        {
+          "bytes": 46146,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_ole_common-808a3f902845481b.d",
+          "sha256": "dde8ed266f54677947a9ed21dfc45121f44bc8494c75858255ca74fb5e3356bb"
+        },
+        {
+          "bytes": 40017,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_ooxml_common-90e7395b76022a2a.d",
+          "sha256": "bbd1bdf58c53a939ca6b07bce791d5adaabaccdfc4d5eca10310d7cbf927196f"
+        },
+        {
+          "bytes": 14386,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_opc-f425e7ebc51994fa.d",
+          "sha256": "13c08bdde7319e40c7467abc5ebe62022a4ee24750926dceafd11765fb18009f"
+        },
+        {
+          "bytes": 7298,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_perf_baseline-24ec8ec199aeb481.d",
+          "sha256": "ae766e4e53feeb1559fb0203479da439e555df8fd358b8fb0daa7c5e7a17fe56"
+        },
+        {
+          "bytes": 271,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_perf_baseline-a01706706077c70c.d",
+          "sha256": "395d44ffb0ea6fb922ca91db63c712306653fe1110d34a3214516213275cc76c"
+        },
+        {
+          "bytes": 142667,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_ppt-147dc2487b957768.d",
+          "sha256": "3527534e3988e3e9c330598fcbad60932250b9fe5e773f380cad95d388c16a35"
+        },
+        {
+          "bytes": 168276,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_pptx-a1b5c3c3fbe802b0.d",
+          "sha256": "b71f6ff7026b76c8f6d023539b903cad6edeecc5830f0c042e59d01e373f6a4f"
+        },
+        {
+          "bytes": 68930,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_rtf-3cbaedb82b02c050.d",
+          "sha256": "2b5a2549740eb45ea859635bf56c57bfad29a4c8a7df7d1874c1ddb8bd23ef6a"
+        },
+        {
+          "bytes": 1795,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_sheet-64fa5d31a93318f2.d",
+          "sha256": "6e183d873d88607c608925e9571120eff9e0d96b82a889965e4a2614bd92d886"
+        },
+        {
+          "bytes": 1748,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_sign-96955914bef1758b.d",
+          "sha256": "289b6c180ebbd4f9b76588f5756166675b91c0e67c5c0cda5a09b6edbe06c105"
+        },
+        {
+          "bytes": 5156,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_spreadsheet_drawing-0620204f3aa75580.d",
+          "sha256": "30c2e4325f87de9b8b0e8874796d5f93885036edd468205c8d63571ff67f8992"
+        },
+        {
+          "bytes": 2054,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_vba-002244280ffb764b.d",
+          "sha256": "2f8fd1c0d9c41e443ff3aff277b1f9591dcb98e9ac26bdc4f967f76489605944"
+        },
+        {
+          "bytes": 8085,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_xldm-1d9761acf9d85194.d",
+          "sha256": "cdf0f42da4790f494135da4d9369fd3a6cb45890f9afa9ebc25fce83298d6149"
+        },
+        {
+          "bytes": 137221,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_xls-e10c47bbbda4a69d.d",
+          "sha256": "24d7741368e87209f7d84cbf23478eb0c18eb168851e78a7fa1aaf5c6b3bf726"
+        },
+        {
+          "bytes": 110384,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_xlsb-bcd699e1912ce121.d",
+          "sha256": "27d2229e8ec6f7ef969c1b39de2d5656d8c2ae809659c3ad4e6aef702696e6be"
+        },
+        {
+          "bytes": 171758,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litchi_xlsx-95615af84fca6ea8.d",
+          "sha256": "ea1a865a0e3fcf4c18b56b978010934d39534dcc5da12634ce36fb5e99183dc1"
+        },
+        {
+          "bytes": 1848,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/litemap-2bb56d63c3d31d04.d",
+          "sha256": "017821ef0a8d1e4419c6735f968f9ad2a91a9a5d836f9a7196a4901234742596"
+        },
+        {
+          "bytes": 2554,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/md5-cfd9968435eff712.d",
+          "sha256": "de62ad6afe8488148c0bb53a926ccf198ce093b16bd96b98525bbf0225a30cd6"
+        },
+        {
+          "bytes": 11328,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/memchr-1068499beab65841.d",
+          "sha256": "a9b91eeca2c15841f6706f921c024714770a9dba14f240f9e8e4be13a2d1812f"
+        },
+        {
+          "bytes": 11328,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/memchr-2a9fb0f0d0a89a7f.d",
+          "sha256": "6ced3b8ad0538165ddd8a2a24aea4b1fde035e041b1be5371c5836af9af0c0e0"
+        },
+        {
+          "bytes": 9222,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/num_bigint_dig-23fa17b0fd489885.d",
+          "sha256": "a1d7bfd141f6c84a270cb62ff10a09299ee5c7cc2902da745ef7f61e6ed58d58"
+        },
+        {
+          "bytes": 1507,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/num_integer-486c0d3ac84d4646.d",
+          "sha256": "69e35d79a411f84af23dc554f71f509b00752a41413a758db41a90d60d7c8a82"
+        },
+        {
+          "bytes": 700,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/num_iter-a95a22ca2f2633e1.d",
+          "sha256": "a127cfc5d2450b81ed7e9fd505fcd6806ce8573c68658b36c1a95abe605fc097"
+        },
+        {
+          "bytes": 7848,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/num_traits-8f08085f96b12db9.d",
+          "sha256": "ca78b521997985ff1781157164e4cbf43a4cce6696350b35cc2c6d0a0e971ed8"
+        },
+        {
+          "bytes": 1473,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/once_cell-aaa3c86345d2d5a3.d",
+          "sha256": "8ab8368fab708f5dffd1b024170f09339f07ff302de60e0eb297d777d0be4f18"
+        },
+        {
+          "bytes": 3888,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/p256-e80bf999bce193df.d",
+          "sha256": "e5c18c592b00e916121094d7ebbc28d9f6d494603afc3beb57d0b5030a8895e6"
+        },
+        {
+          "bytes": 4308,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/password_hash-5d629497819aee08.d",
+          "sha256": "3572f0759ce89886405d10be895f1015100bd6f10832387e8276251bc314cbcc"
+        },
+        {
+          "bytes": 1071,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/pbkdf2-286ca4af7ceb4788.d",
+          "sha256": "2245d6933dd3d4d6968e85c8ed08e17d77885b6c6b58b4af03303ff95cb84c22"
+        },
+        {
+          "bytes": 2682,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/pem_rfc7468-fe0e30d91398ffee.d",
+          "sha256": "6cdd5f5c83f8886836c7dbbd7761c24d281a7999fe41eeadc4caf56d270e214c"
+        },
+        {
+          "bytes": 1173,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/percent_encoding-2fc7d37c55619996.d",
+          "sha256": "c251d2b9ed736017a98059a04a2bf6a4ea41c8e13c976f225e1f9503bcefd019"
+        },
+        {
+          "bytes": 2125,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/phf-df3160bf924a3b57.d",
+          "sha256": "5b862222ce3d18f90c29feaecb5974c1a83f47516e08a8ae6b1dac506a341e0d"
+        },
+        {
+          "bytes": 735,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/phf_generator-e0eea06f5e17373f.d",
+          "sha256": "212c6fe2504f2c202bf80e83394dc2cad2bc5797722b75d180fbde099477decc"
+        },
+        {
+          "bytes": 792,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/phf_macros-4652c90a6b067cc2.d",
+          "sha256": "72a0fe923598019e29cb0a30570d04350308e2438030755cf786cecd677d7f11"
+        },
+        {
+          "bytes": 1103,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/phf_shared-58be08666627dddb.d",
+          "sha256": "e18bcd7650bd210700e21eb9b4ae8e94576057ac979da51463421f0df506ec17"
+        },
+        {
+          "bytes": 1103,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/phf_shared-d366c4283402b7a8.d",
+          "sha256": "8749c46c4be301c4db3ae71d1354c81de6715097a823b4ddb9ba9ed54d4b1cf8"
+        },
+        {
+          "bytes": 3731,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/pkcs1-c5188129308623ad.d",
+          "sha256": "941352193202f85ba1b5aac455a08795ad64dc42f6ea283a93d93a4e303d6a98"
+        },
+        {
+          "bytes": 2576,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/pkcs8-5676f1008a856f95.d",
+          "sha256": "7ddaa59b0cb5da1e1d6efa60d75143f7400029b0da6d4115dc991f12e127fc32"
+        },
+        {
+          "bytes": 3929,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/polyval-d0298b9c398ff949.d",
+          "sha256": "4e20436e87278724e6134170b43a5d4a62cef908758123e6604971eb5d141bf5"
+        },
+        {
+          "bytes": 1513,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/potential_utf-f9f427646f61c70f.d",
+          "sha256": "80e62c3dc1fa15cd07576dc096e1cf7b740be732c64d34ad15f1694075081168"
+        },
+        {
+          "bytes": 2294,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/ppv_lite86-2804fd859ac98dac.d",
+          "sha256": "4e2562432155c840e0792e40baf9f95b6ac65764997b23dbe6f25e07178fb9a9"
+        },
+        {
+          "bytes": 2723,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/primeorder-eba073036165d2f4.d",
+          "sha256": "4b1e5472a65df8f5d8e12da2cd014400565d72fc732f1ea3b89b1c27534e3a3a"
+        },
+        {
+          "bytes": 4879,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/proc_macro2-5ec71ccf6c285ef8.d",
+          "sha256": "996b47d82341d36ef6601a40b07d75fc15851906a8c029a64e09bf52130cec92"
+        },
+        {
+          "bytes": 7997,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/quick_xml-02d7ed9d49649c87.d",
+          "sha256": "fbc18b78f82a479584a3a8f334ccfdbc6e8968bc3c9ebd0ec420cc6b10bde3cc"
+        },
+        {
+          "bytes": 7997,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/quick_xml-5ad0c7f283dd96aa.d",
+          "sha256": "b7ff73b21c505c63f43495758d279d188152250e25cd0dd2a48f0c20be4c7a85"
+        },
+        {
+          "bytes": 2933,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/quote-1530d8040ef6da98.d",
+          "sha256": "64b043a6171bf1c2e75b50918a2aa24b21438bb145e36cd7c46d75dee3844443"
+        },
+        {
+          "bytes": 6627,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/rand-3b24d02ae5ca917a.d",
+          "sha256": "e7421247c19995ac6a9c2dd66f00f7bb2a88dc97224f84aaa65baa0005375aea"
+        },
+        {
+          "bytes": 11748,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/rand-dd6eb635d266c601.d",
+          "sha256": "92bab7768baf859ebcec26c3b228291e6b4a445c97795c802cdc5d9843541639"
+        },
+        {
+          "bytes": 1487,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/rand_chacha-fea1dcb694833b82.d",
+          "sha256": "fe1c8eacf8d66a38644d5ea8842f031ac600a676cff4383f3b0c3fcda5641fad"
+        },
+        {
+          "bytes": 2564,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/rand_core-1a079b87f1fcb29c.d",
+          "sha256": "52819d72a4721f8d9b3e766d9215fbd47a5e4b92d05aede9778977ee3ca8b3d1"
+        },
+        {
+          "bytes": 3053,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/rand_core-25a0970634ff6911.d",
+          "sha256": "2242ec8f3578626b8384a0f1becb1144dc761ba800150237271d89b4372b90b3"
+        },
+        {
+          "bytes": 39536,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/rayon-12f6355f29559d52.d",
+          "sha256": "45a67bc6a3ce4e73b3160b7d91ee4e911200d5fadcef674f6e70662f439ae19a"
+        },
+        {
+          "bytes": 9984,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/rayon_core-8f08f2a3be0d5498.d",
+          "sha256": "f5aa5ed307e65f95879a910d06ee60b428aebe7e22852a8be57a5b5f2f6d2384"
+        },
+        {
+          "bytes": 1030,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/rc4-bf378ec3df307c13.d",
+          "sha256": "61244201c48ad39b28556b342eaefae0b9867a9e3350c86a06b86db20ee709ad"
+        },
+        {
+          "bytes": 1447,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/rfc6979-af312d202a0d81d4.d",
+          "sha256": "fd800e795eb092aa4e9e7aafdf944b72bd71abc44cc64e1a87ccb98815a03160"
+        },
+        {
+          "bytes": 12828,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/rsa-e9a36fb656be1451.d",
+          "sha256": "46dcca40e926f42f6610e2e4aaf4bf719f566e0cca7652d2fbf3fe2a95ed6bdd"
+        },
+        {
+          "bytes": 26751,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/rustix-503831ea7c70e403.d",
+          "sha256": "b5236c6c08482803ba452457365b1865a77b327992b9bda44355ef6cc0661d50"
+        },
+        {
+          "bytes": 4517,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/rustversion-ebe4308792f39e8a.d",
+          "sha256": "4491ab34f43a9531c500830d516b953d616d91a11a591dc66aea674d36d0fb55"
+        },
+        {
+          "bytes": 4832,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/ryu-309aa8b0df9a1913.d",
+          "sha256": "2296cfa6df59ac7ee764b04516adb5a51f56f48bb7857c3ae7346f6ff43a1ac7"
+        },
+        {
+          "bytes": 1076,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/same_file-bd033678c3d60606.d",
+          "sha256": "ee5c01485c383067c530b11a002dd386c6e91120ecce4b41ca047d0cd79cdf43"
+        },
+        {
+          "bytes": 2874,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/sec1-1e70afac92ed5138.d",
+          "sha256": "d29d3245ab0bb33b9f290172dea1745f70868288a541ab15723df6fef4ea812c"
+        },
+        {
+          "bytes": 2831,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/serde-e125749e405a9705.d",
+          "sha256": "4d694327d6ed62388dd4ac0a202e96f25356bcc6cdf165de0723f6be5c23abcc"
+        },
+        {
+          "bytes": 8300,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/serde_core-07af2f346d9513f1.d",
+          "sha256": "35959228987dc70c48bd570737ab3e1f289bfbd681c5c705f409162bff24c70f"
+        },
+        {
+          "bytes": 9117,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/serde_derive-463ed392ef1b1b45.d",
+          "sha256": "c3f793b77d87e81b9b43d2127cba078f72289afd2823b00420fe4d182c72201b"
+        },
+        {
+          "bytes": 6661,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/serde_json-9c477e356e728ee9.d",
+          "sha256": "fa327e8d8e66d381824fbcdf115eb9928f79551d8a5e533661c57917ee05caec"
+        },
+        {
+          "bytes": 1827,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/sha1-d8b2922b69cb63a8.d",
+          "sha256": "23710738a2d5890abfe5829c75f0d61469a6a33a5f58a6f78d66574b0830b4d1"
+        },
+        {
+          "bytes": 2962,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/sha1-f5e60b2b182bcd45.d",
+          "sha256": "9ea2bafb9428b80279939ea9c58bb6e2a78e0cffa5c3791be259820b542d926f"
+        },
+        {
+          "bytes": 4915,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/sha2-15d9c5b59d4aa182.d",
+          "sha256": "7f63445780db279347aff569ef019ab22bfc96389b6321c40d23a624e0b746b4"
+        },
+        {
+          "bytes": 3672,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/sha2-fb837764a1381d5e.d",
+          "sha256": "1c31a3c35a06f56ce8956051a35aa8d9efeb86859a76ac2f94cdb0776e290729"
+        },
+        {
+          "bytes": 3823,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/signature-5adcaf42b19b4a26.d",
+          "sha256": "cd062d644d5b5bb6054c000850c10bbe1be8dfb7b4ab73a7b41e539a6829204d"
+        },
+        {
+          "bytes": 2227,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/siphasher-5205dc01c129eb7a.d",
+          "sha256": "862b0e74069bac54af52ba8adb82ff2b098049c83252bc9236c223c85abbc6b8"
+        },
+        {
+          "bytes": 2227,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/siphasher-7a8f0f3cf510da06.d",
+          "sha256": "02e0bb6018b47bab0734dc96a5d0fbd92cea6fd1ed20316cb0ee408883e3771b"
+        },
+        {
+          "bytes": 700,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/smallvec-5b7d1e601f8e79b2.d",
+          "sha256": "ffe20c27985fbf084d0a8c93e07b9e4b02a0d5f3dfbeb2a122461f249b807c06"
+        },
+        {
+          "bytes": 7357,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/soapberry_zip-24f058c9311d17a3.d",
+          "sha256": "56e6e57705f9f0b8aac82f58c58336fce5c207adedf7e5078b5437d1d4247c1b"
+        },
+        {
+          "bytes": 2497,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/spin-92c28ccf73d30100.d",
+          "sha256": "eb13a251c09ee2daa558d3de165dba00b515112e8ba8574ced116e3944a1247d"
+        },
+        {
+          "bytes": 1378,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/spin-efd16c2273a1959e.d",
+          "sha256": "5652d16277a70950190df9f3b7dc4859ff48314faf38b8cdb6f0398e72ae64f5"
+        },
+        {
+          "bytes": 2485,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/spki-7582937fe3d6a022.d",
+          "sha256": "22ab117ccbf87da57a520db952dfcbe08929147b36c641b952ab5a0bb4702aa8"
+        },
+        {
+          "bytes": 766,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/stable_deref_trait-b67bb5704c076269.d",
+          "sha256": "0ae44752a46999710c45934a13bc8e95246099c10f6a1aee5963c1ea54a738b2"
+        },
+        {
+          "bytes": 682,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/subtle-f6c641dfaf36f539.d",
+          "sha256": "cc480c71d6d34d2821d96cc897577e22dcb7d04a540b7ebbe4ef80c1b37f73d7"
+        },
+        {
+          "bytes": 15795,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/syn-270204bcf3d00b4f.d",
+          "sha256": "d8592ec54092e178bcc24326063b8beb726bb5aaf4e59f117f1e42a0e14831d7"
+        },
+        {
+          "bytes": 19781,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/syn-361ed5c9af453307.d",
+          "sha256": "0adc03c55a325af6f03e535280fe2093e57019cdfa8f86705784a8717e59130a"
+        },
+        {
+          "bytes": 1125,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/synstructure-b245021c9b8e0f31.d",
+          "sha256": "82f9fa81da096787d55c3c01e99ed4735566fe506c514a945c3b4fd8273f56c5"
+        },
+        {
+          "bytes": 4598,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/tempfile-caf8f48620736654.d",
+          "sha256": "85650a292cfca57c74b5dbaa201200dede962ae39644ebaf286581e87e9d47a4"
+        },
+        {
+          "bytes": 2851,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/thiserror-83bcbc6bef472ea1.d",
+          "sha256": "26d49321b1ebac22bd064d9384c3f6e89f037525c2284d9fadf0a3708fd4bb4c"
+        },
+        {
+          "bytes": 3586,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/thiserror_impl-d142897c12d79a85.d",
+          "sha256": "3c8adcd93a9dcbae122dc4c87ae065e148952e28370d55fdb5ec02a504bf0098"
+        },
+        {
+          "bytes": 3316,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/tinystr-b413c413d391280d.d",
+          "sha256": "dbec737c3c1c8519652a2f3c54df3c1b341da40defee91ab478027aa1fb6df3c"
+        },
+        {
+          "bytes": 3075,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/tinyvec-f76085abb1d274b7.d",
+          "sha256": "97118000e68511eb07cf57de080f260756eee12e0e4d3c6f4f2adfee164c9a42"
+        },
+        {
+          "bytes": 738,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/tinyvec_macros-38b01ec0e9f7b516.d",
+          "sha256": "754427dfeb48e00398ad6283f57453e4a834af82e2a64296894bdd6caa0bc5a3"
+        },
+        {
+          "bytes": 5742,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/typenum-fbfb0e86096906de.d",
+          "sha256": "8a3f842ea173690b06db87b90feaddf492937dd84297064c94ce7e0922f798d1"
+        },
+        {
+          "bytes": 1136,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/unicode_ident-25ff576d09e9d543.d",
+          "sha256": "c4e7ccadaa00393b02cd06f45151b062b70d4e5737d64df8009ed1673d90520e"
+        },
+        {
+          "bytes": 5245,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/unicode_normalization-c386b5f7d1164f40.d",
+          "sha256": "810cbf0f6820364418e7e8f65ebe3dc64f50ec728e2868ab671be93c0ebe1592"
+        },
+        {
+          "bytes": 1151,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/universal_hash-04c78ef0bb91e4d6.d",
+          "sha256": "d5eeaaf0a9c041ebf483468801c8bc61d3eda0e54727958e1472fa876661651b"
+        },
+        {
+          "bytes": 9536,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/uppsala-354f4457bc3fc25a.d",
+          "sha256": "7662a436f631bce233e667005a3aac7ad05b12b03502c5c5b08ca9d6fd1e5607"
+        },
+        {
+          "bytes": 2827,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/url-c225b84b8d0ef4b1.d",
+          "sha256": "a45df53f7ed0183f7ba74f40261aa7172e99d99a77119d55cb6a61649e492c9a"
+        },
+        {
+          "bytes": 1469,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/utf8_iter-37927657ce13db01.d",
+          "sha256": "2b9a9dd8c87db95906823915b5cc0a4d4faeee1deb04e1678945959dc72e928d"
+        },
+        {
+          "bytes": 1922,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/version_check-6ea113176d4ad250.d",
+          "sha256": "bef759daae643a852320ee17c9e2059f01c834d7cefddeaffb7a32fc14e25b46"
+        },
+        {
+          "bytes": 3041,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/writeable-bc8182a0d577b050.d",
+          "sha256": "72b0ffbbd483b64ee8b58dba777fd699ef9b9dd9d8055e8c495840fb1e4129b6"
+        },
+        {
+          "bytes": 12660,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/x509_cert-bb7a78f11e92f8f3.d",
+          "sha256": "f84d22fd8ba53d2705cb5dc07ed6d8ea9c516354d2ce11f0d5973e4717b2cd99"
+        },
+        {
+          "bytes": 2224,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/xml_minifier-33f6a5ad8632728d.d",
+          "sha256": "7ff389ee30b8265c4287fa4686fb0b16c969da57285cf3c0affaf96a3954f24e"
+        },
+        {
+          "bytes": 518,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/xml_minifier_macros-e0d6805f24726f99.d",
+          "sha256": "d893a5f8e531865069006b1355fc57adbfa269543749f4a3c1121e070fb0fafc"
+        },
+        {
+          "bytes": 3664,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/yoke-a3c963a3c9d3b033.d",
+          "sha256": "841fabc99d1d055036d2f1c09e5cf490ff23472bdd5f2b0071a42ec347584743"
+        },
+        {
+          "bytes": 1101,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/yoke_derive-4116816d009ebf46.d",
+          "sha256": "e50f3fd0c42cc6c3adc5d2d723f852afcfd453bffcfacb4e2510e189f9a1caa7"
+        },
+        {
+          "bytes": 7854,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/zerocopy-9a5b7846992beacb.d",
+          "sha256": "688fafdfdacea6aa1f86f3ab1c2057aa92cc9ee67377a62e860854bb7537844f"
+        },
+        {
+          "bytes": 3164,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/zerocopy_derive-6d8bb49650fc738c.d",
+          "sha256": "91ddc174bbc0d44c69becc73e791055394bbc78f6a754412fe6e04fdc0524105"
+        },
+        {
+          "bytes": 1482,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/zerofrom-47f3feb6e18ca5f1.d",
+          "sha256": "ec00504c0c100009f4ac3e7e969c914a171a96bcf23f67a55625f79bf6e18ad4"
+        },
+        {
+          "bytes": 832,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/zerofrom_derive-4cb4042f7fe0a121.d",
+          "sha256": "6e6e8054ce005db841ff146f171f07fcd6d3eba6aae55e4f52a6dc46be87f18e"
+        },
+        {
+          "bytes": 2181,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/zeroize-4397cec355abb179.d",
+          "sha256": "0617116d178e5437956d8636aa7cec1cffb151d62738848cb810dadd7f8c2b9d"
+        },
+        {
+          "bytes": 6298,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/zerotrie-1aa10ca4f7890f2a.d",
+          "sha256": "7cd17ec64c04eb01afac58cb790e606ca397f18125ad6abc54eb1c4bc3d7d9b3"
+        },
+        {
+          "bytes": 9888,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/zerovec-2fb63492312bb41c.d",
+          "sha256": "31be179c9e9e373eb2138c5345ce3ce871fc3ecc134bbf49f21a82cb2973ffbb"
+        },
+        {
+          "bytes": 2052,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/zerovec_derive-48e1431249b63702.d",
+          "sha256": "893522a1f173917a974aafa9f68f680480dd13931fee40bec0c34fbd880c1f3c"
+        },
+        {
+          "bytes": 15810,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/zlib_rs-8f3129fae3d82df4.d",
+          "sha256": "d480ff5059ef8ae2fd954adba093e1602772d0ae46cb6965e62a74aa1692ccce"
+        },
+        {
+          "bytes": 1422,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/deps/zmij-9dc7192ec31eff66.d",
+          "sha256": "b280accdfc0046c07f0a48351f9cf41e84fb04340a183f1b5ec0bbdac4682c2e"
+        },
+        {
+          "bytes": 395783,
+          "category": "other",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-native-v3/release/litchi-perf-baseline.d",
+          "sha256": "5ac17ab9f8d4f55d488e4ab908d2231b19e3fee785e4a79e74f7908b5f6657b8"
+        }
+      ],
+      "release_root": "target-candidate-native-v3/release",
+      "target_root": "target-candidate-native-v3"
+    },
+    {
+      "all_release_dep_info_excludes_changed_test": true,
+      "build_script_dep_info_count": 23,
+      "changed_test_basename_hits": [],
+      "changed_test_path_hits": [],
+      "crate_dependency_dep_info_count": 212,
+      "dep_info_count": 236,
+      "files": [
+        {
+          "bytes": 563,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/build/crc32fast-9c5be2ccfba2e957/build_script_build-9c5be2ccfba2e957.d",
+          "sha256": "e4be7932e1e4b3ec640d1245a49f2309d00fb688649741e6392eb6d9e6ac06e6"
+        },
+        {
+          "bytes": 593,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/build/crossbeam-deque-e0e8ef747a72ee23/build_script_build-e0e8ef747a72ee23.d",
+          "sha256": "da98336c42a1054982d66b9c8eadd77eb813a69aa95b6b898c4c55428f22a7e7"
+        },
+        {
+          "bytes": 596,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/build/crossbeam-epoch-f00c9da68f6941bc/build_script_build-f00c9da68f6941bc.d",
+          "sha256": "1f4b91e0f6f96c02c6c11b0181d650c1d8cbbc9bbf6aa8eaa47f475d880e729c"
+        },
+        {
+          "bytes": 1255,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/build/crossbeam-utils-d94b50820fc09316/build_script_build-d94b50820fc09316.d",
+          "sha256": "251d257bfc69d4bb178aa69d0213397f9e423c34f82faf87692953df8705f55d"
+        },
+        {
+          "bytes": 586,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/build/generic-array-d33cef7df2a5441c/build_script_build-d33cef7df2a5441c.d",
+          "sha256": "c3d043f9287e8e50e7dc4ba19a75b1ee55d4a4044375c093ca535b38205ead50"
+        },
+        {
+          "bytes": 563,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/build/getrandom-1a2e4b93dd957df7/build_script_build-1a2e4b93dd957df7.d",
+          "sha256": "2629acecc141275da021c3b066a0470eb02453d583e983086c7b7dcaa564199f"
+        },
+        {
+          "bytes": 613,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/build/icu_normalizer_data-5c52f21f7db0cab3/build_script_build-5c52f21f7db0cab3.d",
+          "sha256": "1b41d4845d351d4ce784845cc9235e18ffe7c6b7cf88acae3e48e33dacdc30ba"
+        },
+        {
+          "bytes": 613,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/build/icu_properties_data-d0f6bc2d784dbe56/build_script_build-d0f6bc2d784dbe56.d",
+          "sha256": "655ae1095f6867ab6280e182b49b701315a9c726b906cd52e7c99a7c88371cab"
+        },
+        {
+          "bytes": 544,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/build/libc-845f4563fba2f06f/build_script_build-845f4563fba2f06f.d",
+          "sha256": "bfbccf6448b9f16e6046120eb4a4ae17cd1709ed32790f23c102d261121edabf"
+        },
+        {
+          "bytes": 812,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/build/libm-b2adb721adff90c8/build_script_build-b2adb721adff90c8.d",
+          "sha256": "883d7f0b48746c378ae2a019a831a458d58c2568e575f94e614c7e9462b3f372"
+        },
+        {
+          "bytes": 588,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/build/num-bigint-dig-9452fc56a63c0eb1/build_script_build-9452fc56a63c0eb1.d",
+          "sha256": "64c355e6397855008e137797c8dace33698e6173cdd18845f9b8bd37520678bf"
+        },
+        {
+          "bytes": 571,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/build/num-traits-da92aa144aabc9ee/build_script_build-da92aa144aabc9ee.d",
+          "sha256": "5387e7903bea624d0b3bd040b0311b64034ef45dbb9040d8061e70fac8651e04"
+        },
+        {
+          "bytes": 579,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/build/proc-macro2-07113d198abad617/build_script_build-07113d198abad617.d",
+          "sha256": "5990ab2ad7fc5b6995256f8f149b38d78470429258df40981676481b9627eb5d"
+        },
+        {
+          "bytes": 546,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/build/quote-b9c1a5ae93fd7326/build_script_build-b9c1a5ae93fd7326.d",
+          "sha256": "42a8951967ddbfe4bd2ee148dcbd4effa362fef398e49a4c43009b1caf448606"
+        },
+        {
+          "bytes": 571,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/build/rayon-core-561badc1d4d9a2b7/build_script_build-561badc1d4d9a2b7.d",
+          "sha256": "0981673468d91c4ffd7a49794a35ef25c77b7c4be485923fa90f7403b45591d5"
+        },
+        {
+          "bytes": 548,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/build/rustix-4da3256ba2ad6d56/build_script_build-4da3256ba2ad6d56.d",
+          "sha256": "4e9c80525548e5f4bc8247f1ee3b2652bdfbe6f3f0b69dbf36d1174f6c4c93f7"
+        },
+        {
+          "bytes": 892,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/build/rustversion-d109a93ed5539d05/build_script_build-d109a93ed5539d05.d",
+          "sha256": "32df02283fc02ce0725ade7a5a8292567d3aa1f2da52ecb8343de92889876e64"
+        },
+        {
+          "bytes": 549,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/build/serde-672c71063fd1a24c/build_script_build-672c71063fd1a24c.d",
+          "sha256": "bfca36d837cc52f2fc7105459fd986195d92dbd3daa9d337e2c86a54bf8a42f3"
+        },
+        {
+          "bytes": 574,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/build/serde_core-dfb8c30c17dbf58e/build_script_build-dfb8c30c17dbf58e.d",
+          "sha256": "085b14e5af49366db87e274997d72fc35814c221b69ef24a8bb2dc32622317e5"
+        },
+        {
+          "bytes": 574,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/build/serde_json-913bd34cb919b41e/build_script_build-913bd34cb919b41e.d",
+          "sha256": "8d83f502b3493caa649ab2a92f4e1fa8c4228e99be2dfb9812da8e1f4031d97c"
+        },
+        {
+          "bytes": 566,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/build/thiserror-94a4f5faf412058f/build_script_build-94a4f5faf412058f.d",
+          "sha256": "ce1d045d68e3c7b48e7bfb73d5ee1a11b16d2e96f04acc4cae9fe1b4819a644a"
+        },
+        {
+          "bytes": 561,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/build/zerocopy-d4297b42cfaf70a5/build_script_build-d4297b42cfaf70a5.d",
+          "sha256": "2241f8c393a561f1bc09ed5ad93792f619c0dcaa552cbfcaaf7d44a9a5a52ada"
+        },
+        {
+          "bytes": 541,
+          "category": "build-script",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/build/zmij-eccc74d68366fef0/build_script_build-eccc74d68366fef0.d",
+          "sha256": "fb5199ba62bacdb79504f744a6c102c3a44e9d0792e9999caf80ecc9deb6964f"
+        },
+        {
+          "bytes": 1050,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/aead-86b5437673130b36.d",
+          "sha256": "a6de9cac611487174baae42070f61387b5e80333649827ebf22b435276073770"
+        },
+        {
+          "bytes": 6087,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/aes-1814ec0405d5b47d.d",
+          "sha256": "86168a825846428022b6145c3bd3f01827067eb87056492a0e289f177f68a6a1"
+        },
+        {
+          "bytes": 1091,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/aes_gcm-de838d3e571b5a79.d",
+          "sha256": "7bf06389c58133f30ffd3135f6020fb16ed6f4b1e357a120b6e07010c29dc4b1"
+        },
+        {
+          "bytes": 3318,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/argon2-354e47fbf75e1e1e.d",
+          "sha256": "40c37039ffcd922d7b677ea8efa567c96e357c0350393ce436e976df610168ec"
+        },
+        {
+          "bytes": 3090,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/atoi_simd-78416a8f7c477837.d",
+          "sha256": "ed4454ca623935cf60f3873eb8d85ff5151ab7c68f28970b5e6a2164248cf13f"
+        },
+        {
+          "bytes": 1813,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/autocfg-dfc78334b5c01b99.d",
+          "sha256": "a90f0b5bb5f0e2ce3270da7db5131427b18d17eba5b76782e4b0a79ec8a5dbd3"
+        },
+        {
+          "bytes": 2578,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/base16ct-97dcefc69a20ba8a.d",
+          "sha256": "610eb5c3380d7a9b42bad8c0fe4e7b1444af68f36969e7981b33ccf150aeb310"
+        },
+        {
+          "bytes": 6806,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/base64-15544df1f10b52d0.d",
+          "sha256": "cf774803019cd4b2199fa61eb5e0466e859053d738cecd553120dd83d76858cd"
+        },
+        {
+          "bytes": 5878,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/base64ct-9e195e048dcf7fe5.d",
+          "sha256": "3547935ac4064f23b942dacf05426eebdae0ee5ed0af1eb894f9f2dbabd61896"
+        },
+        {
+          "bytes": 2823,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/bergshamra_c14n-2865a529439aebd3.d",
+          "sha256": "ed6241423bb7db59f9ac5e67ac0fec66066e4d37062745b258cc091d20814942"
+        },
+        {
+          "bytes": 1961,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/bergshamra_core-48c64146b4fb29f4.d",
+          "sha256": "6e483fe173fb8e2b8f002dea7466f0212a201e288dc5f11ec5b12a693148b7c2"
+        },
+        {
+          "bytes": 2359,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/bergshamra_xml-ab9cd44af229d293.d",
+          "sha256": "5637522153b31fc09343faac0b5cbad6b452615e8a53d57506da0bff06361b96"
+        },
+        {
+          "bytes": 3416,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/bitflags-99a6eea1164cc34e.d",
+          "sha256": "7245de3079d5131e4d918f004761cd9721481cd65d810e9970a243accfc48927"
+        },
+        {
+          "bytes": 3771,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/blake2-6a4970eddf0191fe.d",
+          "sha256": "a11a3b2a5597825a483cd5760713d90fdd355fc260e72cf0740c9a4ababbec40"
+        },
+        {
+          "bytes": 1134,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/block_buffer-9a284b730545032c.d",
+          "sha256": "bb63aabf66faff9645196819941b33d0fc839938baadce8313189e37fb3765b5"
+        },
+        {
+          "bytes": 1523,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/block_buffer-a944155d87d2daf8.d",
+          "sha256": "2592b562a8d9a83246ba29517ad0087ef2798ee355dab6357e7fc77ebdee7209"
+        },
+        {
+          "bytes": 1149,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/block_padding-c53c7b4716c9e935.d",
+          "sha256": "7e2b407dcc31bb7d75b25cf543b702d99fe150eba5f452ec00cd2284b070e0f2"
+        },
+        {
+          "bytes": 1082,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/blowfish-9a8ac740f8afddc9.d",
+          "sha256": "8213c28913a167a84b596ccd1f548c5194b48a112f9de4633e8bbb2fc92e7c88"
+        },
+        {
+          "bytes": 4451,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/bumpalo-898423ca37fc8d5d.d",
+          "sha256": "e41532aa0ce849ea43502c08304c470920d416348368386354358f179e84793d"
+        },
+        {
+          "bytes": 712,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/byteorder-24f2c8b01b017816.d",
+          "sha256": "e267199cfcd49caa96eb5018e37196a60d2e6ec4dbbacb6d2a7780bb0b07c336"
+        },
+        {
+          "bytes": 1126,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/caseless-b59541c51f43582b.d",
+          "sha256": "12581238d4c1a88387410dddcea4c6c0e8e2c3a77f3d4631ba0384763ae7e81d"
+        },
+        {
+          "bytes": 1392,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/cbc-e49bd9577def367d.d",
+          "sha256": "e36315fc64c16ef3a0572696cc68c6c6bf5bcdf1556c71ff455b4a7b5e23fd79"
+        },
+        {
+          "bytes": 691,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/cfg_if-83fc8b03136a8ff7.d",
+          "sha256": "d92b3ea8b900d7f1c3fc3613f3c364b1506a534ec758905fe07e1e4ae225997d"
+        },
+        {
+          "bytes": 3476,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/chacha20-17dbcce9974f8844.d",
+          "sha256": "0f9b8a7c9c0c241f0d3146c0321452822226d2fe035054ba3581f45106aacba4"
+        },
+        {
+          "bytes": 14032,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/chrono-47cdc36da82cc282.d",
+          "sha256": "432c395ad5bcb26769f8f4c3e01ffec6ed7560b9e61920d0152a4fb21f211250"
+        },
+        {
+          "bytes": 4922,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/cipher-04fa95d546523125.d",
+          "sha256": "ae37fda9d2b176b0f10451cc15bcbc151e5db7da251f795a7f127a097f8e2544"
+        },
+        {
+          "bytes": 2584,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/cipher-4017546eb37c3bf1.d",
+          "sha256": "869ed1024f88c3ef1d0a0b55c4004b03e581074f9f62b5fa89aa48ed305f72f9"
+        },
+        {
+          "bytes": 2879,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/cmov-1c31d51e741353ff.d",
+          "sha256": "3e3c733e68836c44495944aabb7f00db87b55815e1887c572127285111f2ac1b"
+        },
+        {
+          "bytes": 3804,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/const_oid-844e481e9e15d7d9.d",
+          "sha256": "85521a766ab9eff6e88da69d18ae5e2c63bbcd57cb64b8c716be4e76c0ed2462"
+        },
+        {
+          "bytes": 3752,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/const_oid-859eb1e75716c4d1.d",
+          "sha256": "053f05b19fd3ed45b73608b594da55017f4fd40a3c1bf6454ffb23661de68d92"
+        },
+        {
+          "bytes": 1083,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/cpubits-89e8c089df4b1f84.d",
+          "sha256": "bd16df6231bab2ae7f2093abc002b7cb3e2a8d61002532d01b4b949ac975075a"
+        },
+        {
+          "bytes": 1504,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/cpufeatures-284915969223d67c.d",
+          "sha256": "c97621b7a84ac26c244ab43dd8d74d44ffbe95dc82054b79e728dc946102f49e"
+        },
+        {
+          "bytes": 1111,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/cpufeatures-f96c188307301194.d",
+          "sha256": "2b5dcc6138683984c69d96878d1ee373acf250ed9ecaf80eb3caaf2c07aabcc0"
+        },
+        {
+          "bytes": 2721,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/crc32fast-443de9c034c8075b.d",
+          "sha256": "1def54c8d7f1bae920bded9d1150f174837b23da94aabad7335da23d8d613741"
+        },
+        {
+          "bytes": 20629,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/crc_fast-0d5d633d3d6cdd8e.d",
+          "sha256": "105441745563ad6eaba75dff2029636099cc13c97b04891f8bb8317dbc5e9ff2"
+        },
+        {
+          "bytes": 1155,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/crossbeam_deque-a2b6fd89a642b44d.d",
+          "sha256": "cf1b4f2e36f6ec461f97872ade1e19fd68cffd337a2a55b4b31fe4cea9d674a9"
+        },
+        {
+          "bytes": 5349,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/crossbeam_epoch-9d1c5edf26d78806.d",
+          "sha256": "8d91d545c53cecb170a04ada87aaeac5b7a0bd96e8ec249fddf4b4da7f14ea08"
+        },
+        {
+          "bytes": 5966,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/crossbeam_utils-0f1494b6fbcf32b2.d",
+          "sha256": "b339670cd9fb2bd4ad201d509e2993b0d34d67079a6a02980069fc88a70ad70a"
+        },
+        {
+          "bytes": 33636,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/crypto_bigint-fca6f6227b8648e5.d",
+          "sha256": "d99aa08f508959508ecfb88dbe22084aff490e2b92a253e8a2f34699a454eeb0"
+        },
+        {
+          "bytes": 740,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/crypto_common-2c5e06a5437476c3.d",
+          "sha256": "1909f0863b252488e2db7ea070b7e8d4ef9a8abf62fd73c88477cea9518d5bcd"
+        },
+        {
+          "bytes": 1951,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/crypto_common-b638a4274bde6c19.d",
+          "sha256": "805c4c7e498ac58769f654e13f42279835ff605338a30fcdb248b1c7c6477f76"
+        },
+        {
+          "bytes": 2579,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/ctr-2476f27263efa7e7.d",
+          "sha256": "721b34c805a6178ee0b3c61abde296bf7058dab7c15c11c649684e286a35d131"
+        },
+        {
+          "bytes": 5450,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/ctutils-d03ec3d4af4f576f.d",
+          "sha256": "205212cd28a15ccf583c8426b784c5a3cca178b4b20070b6a351983070f98c42"
+        },
+        {
+          "bytes": 1515,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/debug_unsafe-8ae9c54f20f24170.d",
+          "sha256": "7841abe23b8323185ad3931946303ea96e47d154b66530440f62e23eae5a562b"
+        },
+        {
+          "bytes": 20530,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/der-14c96ad56c84d099.d",
+          "sha256": "d07a5851f9434d418c9cc499dfbe60c4489032e8732bbf98df1273176338b432"
+        },
+        {
+          "bytes": 3492,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/der_derive-6cc6b3a0fdfc36c0.d",
+          "sha256": "5a4fec925ec77c9c9494c58a2d116e7a18f3345285b483a01e21268e28c1011d"
+        },
+        {
+          "bytes": 4697,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/digest-0484b02829f3f972.d",
+          "sha256": "4a62653fc507d92910bae1f18ad36d5cc89a57ac6e83b1a334b3233376415a52"
+        },
+        {
+          "bytes": 3506,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/digest-ce514365ffc97f84.d",
+          "sha256": "ca8bc746989c1208e39845f30cd385c9e85fa02dbdba17fc833b07befdd71df2"
+        },
+        {
+          "bytes": 1358,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/displaydoc-730c38ff85538aa9.d",
+          "sha256": "c4db8a82b48b0e407de3bba36228147775d2e891f84a8586463ff52ad72b6bf9"
+        },
+        {
+          "bytes": 3311,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/ecdsa-634ad260b35bad91.d",
+          "sha256": "ba24121a1d3fcbc2d1e30fb86d4f0c4656c2712273ce1b241782c9f6b7c073db"
+        },
+        {
+          "bytes": 1469,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/either-f286f2eb974ecac6.d",
+          "sha256": "0d3711aa9949dbe56d72bb43f9ef87c298a693d1edc1b0b55292634aca1c1a59"
+        },
+        {
+          "bytes": 7471,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/elliptic_curve-7e3d742a0e942220.d",
+          "sha256": "14fb766f99aaae7bc1a354839de43bf0b387e5080a674c42c66c0469b5404805"
+        },
+        {
+          "bytes": 7908,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/encoding_rs-6f74d7419ae1e4e5.d",
+          "sha256": "b1ded4d504d649806c70d735e076102e6930c48420f492a3b7c893624dde8758"
+        },
+        {
+          "bytes": 3830,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/fast_float2-df62ff4f8df22011.d",
+          "sha256": "2bd72c720acd475fd543410f89aff9466e806ff4ebac35d3f595f94f901027e4"
+        },
+        {
+          "bytes": 705,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/fastrand-4cce81cce366d228.d",
+          "sha256": "bdda672c6ba46da129a3b95470e3d1aa00f49f7cf4dd1eb62f4ff68d10f290b6"
+        },
+        {
+          "bytes": 1098,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/fastrand-bf68bda815caec6f.d",
+          "sha256": "06fc2331828da7821ade710d218dcc5a6ecf1b3e410effcf91a76d5f2f1033b1"
+        },
+        {
+          "bytes": 1381,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/ff-eadd6ba263e9e6d6.d",
+          "sha256": "2409fcbe7e3a765b079f4e1bc266664efc9a525e9ae2f9bff2452e8712edfc22"
+        },
+        {
+          "bytes": 1917,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/fixedbitset-052b296e7b48804a.d",
+          "sha256": "4f4f4225514ecdeb2ff1c1a7abbb37a7c1f2fbc31d0558aea66480f93be47c0b"
+        },
+        {
+          "bytes": 698,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/flagset-30a5c99390976c27.d",
+          "sha256": "d9659b497c75f06ca453d2d7fa9b5e4ebe4024004c92ed67f8b8d127a20c2dfd"
+        },
+        {
+          "bytes": 7990,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/flate2-ae20f9d90aac10b3.d",
+          "sha256": "f031a5e6f5e5711493ee3b09c5559fd8915f8261747debfd3f1a0c5622b0f35b"
+        },
+        {
+          "bytes": 754,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/form_urlencoded-08cb55553fc75045.d",
+          "sha256": "9d20b08c00b69592dfc7f6c9f6a8abd137aef374e7904507038ea720e3c40b9c"
+        },
+        {
+          "bytes": 3563,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/generic_array-ae7df951bb8cb7b6.d",
+          "sha256": "8f56d81a1e167ec73b97ef828eba7e77ca880b25dfe2876822570ad3037e3e3f"
+        },
+        {
+          "bytes": 5848,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/getrandom-03e629af4d0ba0a4.d",
+          "sha256": "5afde9516c2cd6cf4610561f14db37fe23e915f428761686f545194ffdda89d7"
+        },
+        {
+          "bytes": 3515,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/getrandom-90d8098f4bfb0c5d.d",
+          "sha256": "9a0d38ad4de72c10f295f3daa354344cfad18514e7f93087896cce2258b726c4"
+        },
+        {
+          "bytes": 1061,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/ghash-da388972c513e9ba.d",
+          "sha256": "4e648ea8670c1ba41c2f4947d541ac75468306ac5e24b86ba417f9fe081a609c"
+        },
+        {
+          "bytes": 1791,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/group-247ff8cc22b0ca6f.d",
+          "sha256": "7e78798199a33b95aa9b663d2b66819b7dba0361195f8ebcbb5d9402b34a3e2b"
+        },
+        {
+          "bytes": 1407,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/hmac-1bdacf3c2659c96f.d",
+          "sha256": "abcb8d14fa5a47b3c42855ef0c305772dc17e87b4c011d6b27e6c11d32dbb2cb"
+        },
+        {
+          "bytes": 2550,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/hmac-71c755177c4aff5d.d",
+          "sha256": "76b61b8a3ef21707c1bf40ceb125f1d55ca3726dfa712d1138d9b8c194f58592"
+        },
+        {
+          "bytes": 3127,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/hybrid_array-a18d6d82e0418768.d",
+          "sha256": "11b44e84c4c0da8ff20951a8f73b5279fe39bbc747a49e43071bc5c99872dcbd"
+        },
+        {
+          "bytes": 1581,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/iana_time_zone-613bae1fc9ec8037.d",
+          "sha256": "868a096f6dbbffb2dcefb09203ac0a274595e154b80a9bfdfff09805c77a0870"
+        },
+        {
+          "bytes": 6290,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/icu_collections-31fd55f746429a7a.d",
+          "sha256": "a7ae4d06f7aa9aeda21333a55fee8f04f9ff13a9a141bdb6a607b7158191448e"
+        },
+        {
+          "bytes": 30333,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/icu_locale_core-8514b56dcd5115f3.d",
+          "sha256": "b263c3735bb059b89ad42d805069dbfb95633a60d066179c17ef8fc4dcc9aa56"
+        },
+        {
+          "bytes": 1970,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/icu_normalizer-6c74eb1f3da663c9.d",
+          "sha256": "296820b4bf6a8b64a341bd041275618c5851c00c5e4d9b09825f4c0397b77aef"
+        },
+        {
+          "bytes": 5018,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/icu_normalizer_data-20239c50ece754cf.d",
+          "sha256": "1572c5d0865f25952ea7d1f6ac1cff649f4efd62e6b16281f96c9ae2a2e0681d"
+        },
+        {
+          "bytes": 5258,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/icu_properties-daf3b239fc208829.d",
+          "sha256": "a59c62b6c08048080c40ad84ef0e949f53ebd0f04eed1f7c3ca6c48db829ebae"
+        },
+        {
+          "bytes": 81928,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/icu_properties_data-b4693ea74689c590.d",
+          "sha256": "d0bbf250206b721ebade1dba96e4ebf65a43a4299c1ad5a9b92c8096280981a1"
+        },
+        {
+          "bytes": 5565,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/icu_provider-00fd10786c907d0e.d",
+          "sha256": "00e2a836b0aa9a6d9ef221fad110c79e7df81715c75333131f894a6fde76fed1"
+        },
+        {
+          "bytes": 1780,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/idna-767380eb72b0c1f0.d",
+          "sha256": "2ca570211ca5d44177dd6a4ac2f8f7a7b8cbc730aea79a5ff4a3da9f9772f7b0"
+        },
+        {
+          "bytes": 733,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/idna_adapter-28ca9864e30c7533.d",
+          "sha256": "93313ce9de3267f69440ebf731106f64e9497fcfa80ac892114761d8c72b36f8"
+        },
+        {
+          "bytes": 2160,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/inout-1b4fdf771c653e6e.d",
+          "sha256": "275b9cb522ce02732cad717dc4c33e27ba860c92986e7c42691fc5325a3cc164"
+        },
+        {
+          "bytes": 2160,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/inout-adaeb27f800aa2d6.d",
+          "sha256": "85be0339b1bebb571f2b803f3773898342c77249da7d05318733de03ff46f8e2"
+        },
+        {
+          "bytes": 1054,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/itoa-5b9423a7444c41ab.d",
+          "sha256": "4097a69325aca38fb3088113fe0833fcc642be56aabfe5592d8e1a68b1706113"
+        },
+        {
+          "bytes": 1127,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/lazy_static-d691560bee55f22c.d",
+          "sha256": "ff84ee3fccfdbaf606556ab03d37e613326e8a86c9004f5df3f2d990165c8b60"
+        },
+        {
+          "bytes": 22237,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/libc-670c7e786b2bc9b6.d",
+          "sha256": "4ea964aafb60d84ffdb7d57193f11a6cae7af71ac456065bd05ee63f316743ce"
+        },
+        {
+          "bytes": 55906,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/libm-3681a3c9c81d0e14.d",
+          "sha256": "fa143057fc4c01ef40ceb3b548f259e3cf818125ceb64e2a599ce31b8d102fde"
+        },
+        {
+          "bytes": 2845,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/linux_raw_sys-eff8d907f71d5492.d",
+          "sha256": "b91551cbfd217f28a29b2216b7975c741ef8cc26135c76a1b1c2816cb5444a95"
+        },
+        {
+          "bytes": 14351,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi-f04cf97525baa992.d",
+          "sha256": "010ebbd63964bd33a90bf41d79e3ef4aec9e31c4c0de6b60765b08bf1ef06c84"
+        },
+        {
+          "bytes": 2094,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_biff-0dc088e406834852.d",
+          "sha256": "de0274a8e9e0b6cb42144fda587602fe7af49be956377c9ec8d462c12a361d3b"
+        },
+        {
+          "bytes": 8035,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_cfb-bf96412950922411.d",
+          "sha256": "bfe6fd4333111e67fd4e1729fc2e57be2eebc354f49b523ade9331af369efbe4"
+        },
+        {
+          "bytes": 718,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_codepage-15466b4014b54388.d",
+          "sha256": "915be1884177ecfa9a3914da245b6c20a69e0c0e0e74aa17d40e50dc575abc6a"
+        },
+        {
+          "bytes": 16453,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_core-09fb65f4178f144d.d",
+          "sha256": "50b241756af46f5270cd156684657eb6b3ee73cbc48036b0326c5c480295d8ab"
+        },
+        {
+          "bytes": 4442,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_crypto-8483647c12fa3895.d",
+          "sha256": "dc33a18de7eeeeea06c08295c95bb7a977fef370b30b7f5ec290a1b1ae61de4c"
+        },
+        {
+          "bytes": 148588,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_doc-e5c4727476112f29.d",
+          "sha256": "ffa316b3040876cd5197ff4bff50b7793dd55b34046de46616fc234ffe1ec0ba"
+        },
+        {
+          "bytes": 119469,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_docx-776df42632d7afe4.d",
+          "sha256": "299b829976002ff310ce8deca8b19e1c8105061d1e031c7d062267f6ac4bc885"
+        },
+        {
+          "bytes": 43996,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_drawingml-abadf0c6d81455ec.d",
+          "sha256": "baee134909069545a7b3ff4740278a6ebd67385894ee1f33ff860951f78c9e6e"
+        },
+        {
+          "bytes": 41815,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_odf_common-bd6efd17263e58bc.d",
+          "sha256": "9ef7e5d675618924423f3c23bd6d7ff18b36a02e5ca21898c33cad2cf0a37754"
+        },
+        {
+          "bytes": 24395,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_odp-f02fe751e719d5c1.d",
+          "sha256": "fbe35ea9d91f41c374d7ed1ba5b53d4554d55f3246d7936ccdf02aa8fce6d70f"
+        },
+        {
+          "bytes": 15856,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_odraw-79ea0ab693b95bba.d",
+          "sha256": "0ec3f2b948423a823fc8184d017b3a53c4e39a41ca964f4aa760a9b15dc569fe"
+        },
+        {
+          "bytes": 85819,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_ods-988506fe507d6620.d",
+          "sha256": "c9ed7da180b9a3a0debd537af7bc4b39585f499d14fded27298808536e977612"
+        },
+        {
+          "bytes": 110483,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_odt-c730f4c07372c2d7.d",
+          "sha256": "4bfcd2be3fc91a8ef5c8de5a0bca7c5f65ef446a18766288eecfb886fb6d9fb2"
+        },
+        {
+          "bytes": 24961,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_ograph-1bc1ea0e1815052f.d",
+          "sha256": "1e624caf8c0ccdf4f3d06c2aec2c43144cedcc06d722b9cf794711478dabe53e"
+        },
+        {
+          "bytes": 46155,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_ole_common-808a3f902845481b.d",
+          "sha256": "5143c2aeeaa3c7258bfff7aa029923899c1b85737ace9938d77bdac5b20b0a7c"
+        },
+        {
+          "bytes": 40026,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_ooxml_common-90e7395b76022a2a.d",
+          "sha256": "17c8959cc02a64cfe741090568626be37408244c89e5db7dee3f799f2536cb92"
+        },
+        {
+          "bytes": 14395,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_opc-f425e7ebc51994fa.d",
+          "sha256": "d6a5d12c5c91c57459bfb9012c3ce3c1deb0c15627c473050590544e29ce1e2f"
+        },
+        {
+          "bytes": 7307,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_perf_baseline-95f2486a090501ac.d",
+          "sha256": "cb3a41e99b2fe10b612e44f80442cad8de6b68f4dc3e0815f27fd5972a96816d"
+        },
+        {
+          "bytes": 482,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_perf_baseline_alloc-b896fd89b66e25a2.d",
+          "sha256": "0e907df4a5206cf62b7c971404e4972d1edb4fc54f0ebb15d114d3a800a41f74"
+        },
+        {
+          "bytes": 142676,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_ppt-147dc2487b957768.d",
+          "sha256": "4d2373d991d4541dee01908abd387008542c921a8ae4ff0be0b7e7505f95a22d"
+        },
+        {
+          "bytes": 168285,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_pptx-a1b5c3c3fbe802b0.d",
+          "sha256": "7c340ee999d90554113cef562ef8558ea2d70c19ceab202b1c475643bbfb985b"
+        },
+        {
+          "bytes": 68939,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_rtf-3cbaedb82b02c050.d",
+          "sha256": "b94044d0aa07f6c8d6d6b2239bb8163ef7586afa242cd96d8d3dddbe2710563a"
+        },
+        {
+          "bytes": 1804,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_sheet-64fa5d31a93318f2.d",
+          "sha256": "931d9c8d346e76eb32444737521c2618649db1c9f63f548e5445549651843115"
+        },
+        {
+          "bytes": 1757,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_sign-96955914bef1758b.d",
+          "sha256": "a7b8965e6a84f50437acf84538805dcf5f096651132134f4de2cabc712f9e1bd"
+        },
+        {
+          "bytes": 5165,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_spreadsheet_drawing-0620204f3aa75580.d",
+          "sha256": "3ec23f247ac06e40d27891e589121318356a5d1a82fa812b4834a45705ed1016"
+        },
+        {
+          "bytes": 2063,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_vba-002244280ffb764b.d",
+          "sha256": "55f10115cbb0da553895a84e34c5a8b8d793d97b214b7f7f133a46c5c8bbc36e"
+        },
+        {
+          "bytes": 8094,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_xldm-1d9761acf9d85194.d",
+          "sha256": "75d65250b5173f97f5fca72d6b6a8ce4cfaff3afa49057518a392e7fd763214f"
+        },
+        {
+          "bytes": 137230,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_xls-e10c47bbbda4a69d.d",
+          "sha256": "59a0b54e4e8f8b221b6c61e9049998c058c66f4e5736352d6ca82f09400bf6af"
+        },
+        {
+          "bytes": 110393,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_xlsb-bcd699e1912ce121.d",
+          "sha256": "97a6e205112802a420e0a9a7e827ad42cb5341e38ecd7d637b8e3bc55b87ad75"
+        },
+        {
+          "bytes": 171767,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litchi_xlsx-95615af84fca6ea8.d",
+          "sha256": "cedc1047b15301205e4dab28940ae8be42dfbbd24b97db98bb6a362ec8e466b5"
+        },
+        {
+          "bytes": 1857,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/litemap-2bb56d63c3d31d04.d",
+          "sha256": "fa54503192422e2613f3ddea908052be7488f667114e8711eb82750b037c61af"
+        },
+        {
+          "bytes": 2563,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/md5-cfd9968435eff712.d",
+          "sha256": "6ba67af208574592aa4fb445ff24fcaf0aae8dea48eaba22004265be6357f44a"
+        },
+        {
+          "bytes": 11337,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/memchr-1068499beab65841.d",
+          "sha256": "6dac0401e8389aea33d2fb523530207aa27ce68af6df6f161658db0316239c91"
+        },
+        {
+          "bytes": 11337,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/memchr-2a9fb0f0d0a89a7f.d",
+          "sha256": "eb2eb5ffa7102827590e512439c53ea72504e74b8d069973b14ada5b303d72f4"
+        },
+        {
+          "bytes": 9231,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/num_bigint_dig-23fa17b0fd489885.d",
+          "sha256": "2b14695d889daddf65f1d2ff49329de65c53933e0e48705e14a1909e22510847"
+        },
+        {
+          "bytes": 1516,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/num_integer-486c0d3ac84d4646.d",
+          "sha256": "157a1bf0b6426d49aaef07d1ef4051b3c0bdd0b3e0d7ac85d33b1e446d27abfc"
+        },
+        {
+          "bytes": 709,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/num_iter-a95a22ca2f2633e1.d",
+          "sha256": "a702d5bd23d7287d8e23477deee759b6687cd501300d3d87a5e4bcffebad4c61"
+        },
+        {
+          "bytes": 7857,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/num_traits-8f08085f96b12db9.d",
+          "sha256": "e80f747bfe941351298343e3a554d56db032582f1fa163c89b913c2fa88d5f81"
+        },
+        {
+          "bytes": 1482,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/once_cell-aaa3c86345d2d5a3.d",
+          "sha256": "cfbed847be6472a46869ceafc68a3b1172e410d75c924e9818ed039e99667b8d"
+        },
+        {
+          "bytes": 3897,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/p256-e80bf999bce193df.d",
+          "sha256": "6714d7991ef6863f496a1c07e7350b9aba44828f6ed83f228d816775d8fee19b"
+        },
+        {
+          "bytes": 4317,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/password_hash-5d629497819aee08.d",
+          "sha256": "d3e30462b804abf2240071aa3c2e81b134309a8b0f20139ffe18b9665f296b06"
+        },
+        {
+          "bytes": 1080,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/pbkdf2-286ca4af7ceb4788.d",
+          "sha256": "2237059a2cee9342cdc5c8d2c656a879e9506fe4431ec29d16461ca7387af33f"
+        },
+        {
+          "bytes": 2691,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/pem_rfc7468-fe0e30d91398ffee.d",
+          "sha256": "d3a4d059dcfe51a721a15540e73483381f3961a0b43efa10789ff4e1df2d1aee"
+        },
+        {
+          "bytes": 1182,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/percent_encoding-2fc7d37c55619996.d",
+          "sha256": "025bbbbe0e0866da6a64f9ea450bf59120889d0f77532ea7efd6507cd477199c"
+        },
+        {
+          "bytes": 2134,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/phf-df3160bf924a3b57.d",
+          "sha256": "f1f2ade58f3614c4a440b404dcfe68c544be43ed5713380995a7fc6d0ac6ac06"
+        },
+        {
+          "bytes": 744,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/phf_generator-e0eea06f5e17373f.d",
+          "sha256": "70c25f955e5b45757dd761d262d929dbecead142c590be405903e031853b890b"
+        },
+        {
+          "bytes": 798,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/phf_macros-4652c90a6b067cc2.d",
+          "sha256": "49672b143ab4692ca5e6dd4e1070d7f097de830482c041836b23f7aad5773ae9"
+        },
+        {
+          "bytes": 1112,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/phf_shared-58be08666627dddb.d",
+          "sha256": "255f79c8bd133aa1e628d59ce06b9e5cd434653dce735a24710acbc4b04af124"
+        },
+        {
+          "bytes": 1112,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/phf_shared-d366c4283402b7a8.d",
+          "sha256": "f6eaca7b58e02e1d53713225221fdacafe89a8c23c53aee8628784a68d5cbd6d"
+        },
+        {
+          "bytes": 3740,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/pkcs1-c5188129308623ad.d",
+          "sha256": "c57cc4d562801888315c4ab0fc5fbdae896b8cc5224ccbe479727c2c0146e02a"
+        },
+        {
+          "bytes": 2585,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/pkcs8-5676f1008a856f95.d",
+          "sha256": "81d8785333f0a3437db012aa65dbd91417d3536c2f92a767b59d8dd5908bfa22"
+        },
+        {
+          "bytes": 3938,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/polyval-d0298b9c398ff949.d",
+          "sha256": "cebc263348b9dfad6db4396087563d0b0e5b3ab433af807bd0167895d61ab603"
+        },
+        {
+          "bytes": 1522,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/potential_utf-f9f427646f61c70f.d",
+          "sha256": "292e3232679f5aaaefb37e0742f6224a7490bdb10290b5844779b302710dd183"
+        },
+        {
+          "bytes": 2303,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/ppv_lite86-2804fd859ac98dac.d",
+          "sha256": "124b9c45e144c209d0001e89249d2891610695cc7dc517d21c09d74db904f6df"
+        },
+        {
+          "bytes": 2732,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/primeorder-eba073036165d2f4.d",
+          "sha256": "7f34b07988c40f3e2022cbb5047d75ff04e8a638c75d01fed4aae86836284054"
+        },
+        {
+          "bytes": 4888,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/proc_macro2-5ec71ccf6c285ef8.d",
+          "sha256": "2f6ac040695e85d0bd47345a48a2e4df8945e9547f791cecdd1a3612d2133f2c"
+        },
+        {
+          "bytes": 8006,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/quick_xml-02d7ed9d49649c87.d",
+          "sha256": "3feea3d7b5259443a44c2128b5a169f15439160ec617cae077d21515cb786eef"
+        },
+        {
+          "bytes": 8006,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/quick_xml-5ad0c7f283dd96aa.d",
+          "sha256": "45592464a8cfc51a3a6e39b507a61c6233e025cc53c73c57db04a48a80a6e013"
+        },
+        {
+          "bytes": 2942,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/quote-1530d8040ef6da98.d",
+          "sha256": "0b4f34c1fadf4af847399827c623e834f8b65d4b0e9626b49b60c4df44f7697b"
+        },
+        {
+          "bytes": 6636,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/rand-3b24d02ae5ca917a.d",
+          "sha256": "f99bf6b0b1547f690417e5cdc2b5f6a2f32916ec9f9885d84f4a94546252038f"
+        },
+        {
+          "bytes": 11757,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/rand-dd6eb635d266c601.d",
+          "sha256": "69570eb9b9bea36a8258f7fb91c21b645ec9281e4d1bb2cda72e96b3dad63709"
+        },
+        {
+          "bytes": 1496,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/rand_chacha-fea1dcb694833b82.d",
+          "sha256": "1959183097668c15235a598945be94d94d1aa5128d60db1190c5b806bb129d46"
+        },
+        {
+          "bytes": 2573,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/rand_core-1a079b87f1fcb29c.d",
+          "sha256": "d5029069bd53ee7222848abda9f93c133294e159062033d8e0c853217cf5f0d2"
+        },
+        {
+          "bytes": 3062,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/rand_core-25a0970634ff6911.d",
+          "sha256": "a5e3d6bf7a3ad97a69c57da951fb53deebd3419591f4bfe9a8233aa549e48dd0"
+        },
+        {
+          "bytes": 39545,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/rayon-12f6355f29559d52.d",
+          "sha256": "4b73803fc93078d8001c327b7c57b596ac1fb4fc97c8e5f61644a7d607e912ce"
+        },
+        {
+          "bytes": 9993,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/rayon_core-8f08f2a3be0d5498.d",
+          "sha256": "7f39f592628c098025cdb496c60033a96d9eef65cf7e2995a268811e94efeecb"
+        },
+        {
+          "bytes": 1039,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/rc4-bf378ec3df307c13.d",
+          "sha256": "2bb7eb5d46b9b070cebcb2409a50cd7aa26dae0d8b3bc589ac167840432d6d83"
+        },
+        {
+          "bytes": 1456,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/rfc6979-af312d202a0d81d4.d",
+          "sha256": "87440b033459e39814bed42020575578b11555cd1c7332ebcfd62a0aa006d1be"
+        },
+        {
+          "bytes": 12837,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/rsa-e9a36fb656be1451.d",
+          "sha256": "078762e81eda7965509d8cde6ea35c5d1318f6c261c693d94592f6424268b19b"
+        },
+        {
+          "bytes": 26760,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/rustix-503831ea7c70e403.d",
+          "sha256": "83ea644f590a42f2c709fb71797e3e6af2801654cbce66a675e85a3e1ee4ca63"
+        },
+        {
+          "bytes": 4535,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/rustversion-ebe4308792f39e8a.d",
+          "sha256": "6e00473e3aa137cd26f7b9f0b5854ec4965adabd0ef018c01a83ea4694ef094c"
+        },
+        {
+          "bytes": 4841,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/ryu-309aa8b0df9a1913.d",
+          "sha256": "4bcbe14d0e1eaa08d5487105d9d854969a7646925d76e4bbb784474f0d7f795e"
+        },
+        {
+          "bytes": 1085,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/same_file-bd033678c3d60606.d",
+          "sha256": "0c7d6d234df4cb688d9ce2152d8b5112e44afbcc3770641e7960371772269269"
+        },
+        {
+          "bytes": 2883,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/sec1-1e70afac92ed5138.d",
+          "sha256": "2cb689078063ea4412ca36e1899d91d9b93489367cc020edece4f2ba789ca8fd"
+        },
+        {
+          "bytes": 2855,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/serde-e125749e405a9705.d",
+          "sha256": "94b12537a66ec5c587acc2fea84ddbca5581e0a91c8c416d85254b05f1c9b253"
+        },
+        {
+          "bytes": 8324,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/serde_core-07af2f346d9513f1.d",
+          "sha256": "53baf95bb4b1aee31126af511123ddbcf97b7697125963fa2af0e1bd4a8a8282"
+        },
+        {
+          "bytes": 9123,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/serde_derive-463ed392ef1b1b45.d",
+          "sha256": "d0149de68e97918b617f79667d0c16adb69852cd7a8425b54096c11166871480"
+        },
+        {
+          "bytes": 6670,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/serde_json-9c477e356e728ee9.d",
+          "sha256": "9a81ba474bd5d32b1808eacfb7c3a59c52679ba40c40b76bfa5f62b3117a7c06"
+        },
+        {
+          "bytes": 1836,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/sha1-d8b2922b69cb63a8.d",
+          "sha256": "5c9d331b2f67572e0b3d77c46e621446492964a7998240a8e364643321ff43bb"
+        },
+        {
+          "bytes": 2971,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/sha1-f5e60b2b182bcd45.d",
+          "sha256": "3a63d84da3c46d9d545a61b69c9b76e6b318ad1f005c59d6b44772f925099ceb"
+        },
+        {
+          "bytes": 4924,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/sha2-15d9c5b59d4aa182.d",
+          "sha256": "7a96a76376eefadd2aaac9832578ba704cf0bdfb6377dcff8664c5065459ce07"
+        },
+        {
+          "bytes": 3681,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/sha2-fb837764a1381d5e.d",
+          "sha256": "97ebf82be58ee26eb2b65427b97dcee962138661eb54089e58c2c209f1298324"
+        },
+        {
+          "bytes": 3832,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/signature-5adcaf42b19b4a26.d",
+          "sha256": "17a72dd167c135682ef1f1dee06e72aa307b4f8a9ccec802382991cca29130bd"
+        },
+        {
+          "bytes": 2236,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/siphasher-5205dc01c129eb7a.d",
+          "sha256": "879ca81d6f9dc0a41c39326cfd20da3d691265fd353cd8794fad386df01c7115"
+        },
+        {
+          "bytes": 2236,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/siphasher-7a8f0f3cf510da06.d",
+          "sha256": "77425c824ea3606f862b1ae5b8cf86a1b758d501a64a144a34fdf4e9cd366ad0"
+        },
+        {
+          "bytes": 709,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/smallvec-5b7d1e601f8e79b2.d",
+          "sha256": "b5648072a5e4ccbeecdfaadf1684ea0857ddeb7246a9d7cbb755176fdd812537"
+        },
+        {
+          "bytes": 7366,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/soapberry_zip-24f058c9311d17a3.d",
+          "sha256": "36b2913ff80d5bd47dbc52c46277bd75e5bbdd0203ae32a9b1bbedfe93718de5"
+        },
+        {
+          "bytes": 2506,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/spin-92c28ccf73d30100.d",
+          "sha256": "44a16c66e4b6f00b68f1682b57fc1e0eaba516d56e9ec42ceac97e7299dddf03"
+        },
+        {
+          "bytes": 1387,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/spin-efd16c2273a1959e.d",
+          "sha256": "8045c7310ad6ec2b6eb849a67ebc1096b90eae66bdb976419156d1a02289e1bb"
+        },
+        {
+          "bytes": 2494,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/spki-7582937fe3d6a022.d",
+          "sha256": "bacefbe9fac9caab92c3aa81361167d8fd10e14e1c71272d53c928be3c18a813"
+        },
+        {
+          "bytes": 775,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/stable_deref_trait-b67bb5704c076269.d",
+          "sha256": "4a861b60ccf4986ad930e2f4acfaa048b11e915e09104b34771c801f5f675405"
+        },
+        {
+          "bytes": 691,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/subtle-f6c641dfaf36f539.d",
+          "sha256": "8081f2af90ad28d55c62d53ac74600f7f2b5f9bf8facb39cb383c36c7813f7cd"
+        },
+        {
+          "bytes": 15804,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/syn-270204bcf3d00b4f.d",
+          "sha256": "f9f276a131a7d408d0c994e372a51651088fe7c49c93a20e6eeb807a89b0838b"
+        },
+        {
+          "bytes": 19790,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/syn-361ed5c9af453307.d",
+          "sha256": "1501b3559fcc212a3d4520789e0e65a9aae3e1535f3ecbf76f7d5ac87b97124c"
+        },
+        {
+          "bytes": 1134,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/synstructure-b245021c9b8e0f31.d",
+          "sha256": "138a19ca71cc4e15a0732cc09e09fc20e0ffdc0d6bf4ab8ffa485a38cc169e11"
+        },
+        {
+          "bytes": 4607,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/tempfile-caf8f48620736654.d",
+          "sha256": "a15cfe2f13e0d0354989070c89738647160477eb07be946f4ad2447b43a5b709"
+        },
+        {
+          "bytes": 2875,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/thiserror-83bcbc6bef472ea1.d",
+          "sha256": "0fa6283750a31f9a694397c41e79d275243d915c671b5c5fe2dbd91939ab1f13"
+        },
+        {
+          "bytes": 3592,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/thiserror_impl-d142897c12d79a85.d",
+          "sha256": "e28cb05826cd5cea36affe39662a1f70f04b3f4d585af2e474e2a150e352d68c"
+        },
+        {
+          "bytes": 3325,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/tinystr-b413c413d391280d.d",
+          "sha256": "b4a8ecc9a20139b804ec2d3b5d53be76ebe3d4dcb21faf6931c49ca15f475980"
+        },
+        {
+          "bytes": 3084,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/tinyvec-f76085abb1d274b7.d",
+          "sha256": "ded9a157268521f9381524d81d397405a096daef2d89613e526a4499a66c4dc1"
+        },
+        {
+          "bytes": 747,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/tinyvec_macros-38b01ec0e9f7b516.d",
+          "sha256": "9c26c6c7a4481c6a06d04c14114e764323f542231f6e7f772b036cae7fb24659"
+        },
+        {
+          "bytes": 5751,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/typenum-fbfb0e86096906de.d",
+          "sha256": "4e31ecdfd04837ab713a6b4e502fa8b13497cd2358622c30bff43110b1bef78d"
+        },
+        {
+          "bytes": 1145,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/unicode_ident-25ff576d09e9d543.d",
+          "sha256": "1d66cb823bb1f14a3070f797a2784886284747a1747c22442c72828ffc3d3765"
+        },
+        {
+          "bytes": 5254,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/unicode_normalization-c386b5f7d1164f40.d",
+          "sha256": "8604b62b583418a5331ad0bf7f7d0d9c81dc1bb16904f4e668572d29e2716e97"
+        },
+        {
+          "bytes": 1160,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/universal_hash-04c78ef0bb91e4d6.d",
+          "sha256": "dc2f7eeab2e9ee4714274e5e03a192099f28901c11d6c0574cc8a6e8ccddd682"
+        },
+        {
+          "bytes": 9545,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/uppsala-354f4457bc3fc25a.d",
+          "sha256": "98a819d412f9806b9450b2b6473bc78ac8194f0f6a2a6dc004f3e805ffbcdf0f"
+        },
+        {
+          "bytes": 2836,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/url-c225b84b8d0ef4b1.d",
+          "sha256": "7deb8fe87b09bc616fecf7ea391cbb60d0930a11320734f80675a284de4a8394"
+        },
+        {
+          "bytes": 1478,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/utf8_iter-37927657ce13db01.d",
+          "sha256": "f03594f9a2402637cdd866996988432760eccca7b46e8a74996e8e93d36ca1c9"
+        },
+        {
+          "bytes": 1931,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/version_check-6ea113176d4ad250.d",
+          "sha256": "e413586716cca8e0944f76baceb62400f2b4f776668cdf9df8d6280ef09cbdf1"
+        },
+        {
+          "bytes": 3050,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/writeable-bc8182a0d577b050.d",
+          "sha256": "ffc7b79b96eaa0ff72dd2a71a831ccea612ec22fcf5d976148597499a415227a"
+        },
+        {
+          "bytes": 12669,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/x509_cert-bb7a78f11e92f8f3.d",
+          "sha256": "4e11bc05752f7ee9d05bf57cc73b48eccfce636a039c4ed67fe62aa50fc027a9"
+        },
+        {
+          "bytes": 2233,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/xml_minifier-33f6a5ad8632728d.d",
+          "sha256": "0131fb11b46302790e27e30f89e692da042e40e787bbc584e0c8e241c5c62a5b"
+        },
+        {
+          "bytes": 524,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/xml_minifier_macros-e0d6805f24726f99.d",
+          "sha256": "03cfdd487a5c847ead4f0c7bd902216b6b3f2f938733579791c517903d6af384"
+        },
+        {
+          "bytes": 3673,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/yoke-a3c963a3c9d3b033.d",
+          "sha256": "98b7305ceb5b545baec8a5858a028e813d545e2835693ec390349d1a6baa5d8f"
+        },
+        {
+          "bytes": 1107,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/yoke_derive-4116816d009ebf46.d",
+          "sha256": "e4d788822c9b9ee82b834dc10053cd0d425a1f2b66101def72e9cf6eb57e74cc"
+        },
+        {
+          "bytes": 7863,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/zerocopy-9a5b7846992beacb.d",
+          "sha256": "09f9c0a9147b7037f6c0ba8becba2ce9628af2d441cf992d679a2d81e1b8f7a7"
+        },
+        {
+          "bytes": 3170,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/zerocopy_derive-6d8bb49650fc738c.d",
+          "sha256": "3a8e1a4a95bfa870fc1e8573e9736a71a7f287c42457e7d37b4797c179c0fcab"
+        },
+        {
+          "bytes": 1491,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/zerofrom-47f3feb6e18ca5f1.d",
+          "sha256": "2a6b8d00cfcc80ce2e0b67df3e368f8155f6ab2be1d62152c3e31c0b790199e2"
+        },
+        {
+          "bytes": 838,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/zerofrom_derive-4cb4042f7fe0a121.d",
+          "sha256": "d67b63d71541e8b75895eca8c6f2708b3de2278e93a0d5e200c00af6d6af7af3"
+        },
+        {
+          "bytes": 2190,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/zeroize-4397cec355abb179.d",
+          "sha256": "6c9a7d026f2f5a40c6e68e885f1f479d60a096e21db1e55fa55ab9619cc691fb"
+        },
+        {
+          "bytes": 6307,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/zerotrie-1aa10ca4f7890f2a.d",
+          "sha256": "d6d59dd0c7a4bc0be75c2f1bb84f18dfca4175966f81b374c57222323b8e8a44"
+        },
+        {
+          "bytes": 9897,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/zerovec-2fb63492312bb41c.d",
+          "sha256": "6c984ce11e5196c5c0e8d7886b1f64235e72c127ca9fae1db0de114b42dbcbba"
+        },
+        {
+          "bytes": 2058,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/zerovec_derive-48e1431249b63702.d",
+          "sha256": "2af36de5853c89992dc4c4193c60c1bf7b44b3de79a64cbbc292cded88026dd0"
+        },
+        {
+          "bytes": 15819,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/zlib_rs-8f3129fae3d82df4.d",
+          "sha256": "c97b8969c73762d98c2965cf76d51bf424b31e7d0970f947ae6bf01a259d6d92"
+        },
+        {
+          "bytes": 1431,
+          "category": "crate-dependency",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/deps/zmij-9dc7192ec31eff66.d",
+          "sha256": "15357159e50c82f1786b517c300b200b0cb3b970b601caf487fb9beebf7a68d1"
+        },
+        {
+          "bytes": 395931,
+          "category": "other",
+          "mentions_changed_test_basename": false,
+          "mentions_changed_test_path": false,
+          "mode": 436,
+          "path": "target-candidate-allocator-v3/release/litchi-perf-baseline-alloc.d",
+          "sha256": "9908d56d8cbcb4b96ab2e2dd7f500a0186df56d442a6fa640f2adb7c41607bf1"
+        }
+      ],
+      "release_root": "target-candidate-allocator-v3/release",
+      "target_root": "target-candidate-allocator-v3"
+    }
+  ],
+  "reuse_decision": {
+    "measurement_source_binding_remains": "candidate-build-v3",
+    "new_build_required_for_v7_test_only_change": false,
+    "reason": "candidate-source-v7 changes only an XML-minifier test lint expression; v3 release dep-info and build-script input records exclude that test file",
+    "reuse_candidate_build_v3": true
+  },
+  "schema": "litchi.performance.0948.source-v5-v7-reuse-bridge.v1",
+  "source_v5": {
+    "bytes": 260076537,
+    "file_count": 10789,
+    "root": "candidate-source-v5",
+    "tree_digest": "228e74ebb6fee5bbd64d1ee81a4ec8334a4d1277cbf89d9b365c3bbe7cae8a28"
+  },
+  "source_v5_to_v7": {
+    "changed_file_count": 1,
+    "changed_files": [
+      {
+        "path": "crates/xml-minifier/tests/source_replacement.rs",
+        "v5_bytes": 47326,
+        "v5_sha256": "600712ff53ad145fa82659989104a9b496e2b03afd1295f20605f29ca7a5615e",
+        "v7_bytes": 47352,
+        "v7_sha256": "a8fe4435f002c59390d686008b879f1fe0362c839ae9769d29f8c37ac9cd3fff"
+      }
+    ],
+    "mode_changes": [],
+    "same_file_set": true
+  },
+  "source_v7": {
+    "bytes": 260076563,
+    "file_count": 10789,
+    "root": "candidate-source-v7",
+    "tree_digest": "9e94e7c908c88ddf3a69427c5d077814bbb3b735afbb7e9f6b65c1348c2471a9"
+  },
+  "status": "passed",
+  "v3_binary_preservation": {
+    "bytes": 3065,
+    "executable": false,
+    "mode": 436,
+    "path": "receipts/candidate-v3-preservation-v1.json",
+    "sha256": "5815e0f1a84c792986ec824e23e553da1e2f1e6f0820bfe7ab64599bb1dc6e58"
+  }
+}

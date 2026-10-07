@@ -1,0 +1,31 @@
+{
+  "schema": "litchi.performance.0948.source-export.v1",
+  "source_commit": "b6c5c80ffbcb60736d6c4c2f3b590838640008a9",
+  "argv": [
+    "git",
+    "archive",
+    "b6c5c80ffbcb60736d6c4c2f3b590838640008a9",
+    ".cargo",
+    "crates",
+    "test-data",
+    "tools/perf-baseline",
+    "Cargo.toml",
+    "README.md",
+    "clippy.toml",
+    "deny.toml",
+    "rust-toolchain.toml",
+    "rustfmt.toml"
+  ],
+  "root_lockfile_untracked_copy": {
+    "bytes": 138443,
+    "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+  },
+  "baseline_candidate_initial_bytes_equal": true,
+  "file_count": 10789,
+  "source_bytes": 260024666,
+  "manifest": {
+    "path": "baseline-source-manifest-v1.json",
+    "bytes": 2033638,
+    "sha256": "dd66b044540d185c448cae78b16e9aa61556a10f01252e27f2075f48aa5121c2"
+  }
+}

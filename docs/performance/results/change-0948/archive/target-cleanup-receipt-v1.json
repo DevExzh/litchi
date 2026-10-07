@@ -1,0 +1,63 @@
+{
+  "checks": {
+    "all_selected_absent": true,
+    "preserved_after": {
+      "target-candidate-allocator-v3/release/litchi-perf-baseline-alloc": {
+        "bytes": 269145952,
+        "mode_bits": 509,
+        "path": "target-candidate-allocator-v3/release/litchi-perf-baseline-alloc",
+        "sha256": "7f7c1a0c0148dd283db27ec7b0cb2870572d94cc4d8de1920c4f7de302f3590e"
+      },
+      "target-candidate-native-v3/release/litchi-perf-baseline": {
+        "bytes": 265836208,
+        "mode_bits": 509,
+        "path": "target-candidate-native-v3/release/litchi-perf-baseline",
+        "sha256": "c9e3b3122b1ac5f64fdf0fc8b4aabea9c53d80598b80e702f39eb8424b1063e2"
+      }
+    },
+    "preserved_unchanged": true,
+    "remaining_selected": []
+  },
+  "preserved_paths": [
+    "target-candidate-allocator-v3/release/litchi-perf-baseline-alloc",
+    "target-candidate-native-v3/release/litchi-perf-baseline"
+  ],
+  "removed_bytes": 51850203420,
+  "removed_file_count": 28826,
+  "removed_roots": [
+    "target-candidate-native-v2",
+    "target-candidate-allocator-v2",
+    "target-candidate-native-v3/.rustc_info.json",
+    "target-candidate-allocator-v3/.rustc_info.json",
+    "quality/final-v3-target",
+    "target-candidate-native-v3/release/.cargo-lock",
+    "target-candidate-native-v3/release/.fingerprint",
+    "target-candidate-native-v3/release/build",
+    "target-candidate-native-v3/release/deps",
+    "target-candidate-native-v3/release/examples",
+    "target-candidate-native-v3/release/incremental",
+    "target-candidate-native-v3/release/litchi-perf-baseline.d",
+    "target-candidate-allocator-v3/release/.cargo-lock",
+    "target-candidate-allocator-v3/release/.fingerprint",
+    "target-candidate-allocator-v3/release/build",
+    "target-candidate-allocator-v3/release/deps",
+    "target-candidate-allocator-v3/release/examples",
+    "target-candidate-allocator-v3/release/incremental",
+    "target-candidate-allocator-v3/release/litchi-perf-baseline-alloc.d",
+    "quality/final/target-candidate",
+    "quality/final-v2/target-candidate",
+    "quality/final-v3/target-candidate-focused-xlsx-integration-v1",
+    "quality/final-v4/target-baseline",
+    "quality/final-v4/target-candidate",
+    "quality/final-v4/target-xml-clippy-baseline-v1",
+    "quality/final-v4/target-xml-clippy-candidate-v5",
+    "quality/final-v4/target-xml-v6-focused-v1",
+    "quality/final-v4/target-xml-v7-focused-v1"
+  ],
+  "root": "/home/zhuhe/litchi-performance-0948",
+  "schema": "litchi.performance.0948.target-cleanup-receipt.v1",
+  "selection": "/home/zhuhe/litchi-performance-0948-archive/target-cleanup-selection-v3.json",
+  "selection_roots": 28,
+  "selection_sha256": "c0843779aa22ac4418427ae1fb30e41a49a7b5bc5fd8011f30a501df67143f37",
+  "status": "pass"
+}

@@ -1,0 +1,27 @@
+{
+  "archive": {
+    "bytes": 1348106492,
+    "format": "tar.zst",
+    "path": "/home/zhuhe/litchi-performance-0948-archive/archive-0948-v1.tar.zst",
+    "sha256": "15a4008a6b888fed4fea50f0746d9787df32e1a2df6b164d25a7dabb19f1db95"
+  },
+  "cleanup": {
+    "policy": "only disposable target intermediates after moved replay; retain source trees, historical binaries, role copies, and dep-info",
+    "status": "not_started"
+  },
+  "compression": "*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***",
+  "helper": {
+    "path": "/home/zhuhe/litchi-performance-0948-archive/archive-0948-v1.py",
+    "sha256": "fe8ae21029dfb6894f61a7163a33756f4d9b718c46c0154df27e7f18fc5df83c"
+  },
+  "manifest": {
+    "file_count": 217466,
+    "path": "/home/zhuhe/litchi-performance-0948-archive/manifest-v1.json",
+    "sha256": "fe29a9f975907cad76a455f60397c7c211a9dc91805b3e8d15ab0e54ec9c21af",
+    "source_bytes": 7445754580
+  },
+  "schema": "litchi.performance.0948.external-archive-receipt.v1",
+  "tar": {
+    "version": "tar (GNU tar) 1.35"
+  }
+}

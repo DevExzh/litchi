@@ -1,0 +1,181 @@
+{
+  "checks": [
+    {
+      "id": "hash_freeze",
+      "status": "pass"
+    },
+    {
+      "id": "hash_reuse",
+      "status": "pass"
+    },
+    {
+      "id": "hash_capture",
+      "status": "pass"
+    },
+    {
+      "id": "hash_reduce",
+      "status": "pass"
+    },
+    {
+      "id": "hash_prior_gate",
+      "status": "pass"
+    },
+    {
+      "candidate_files": [
+        "crates/litchi-opc/src/lib.rs",
+        "crates/litchi-opc/src/source_backed.rs",
+        "crates/litchi-xlsx/src/cell_values/facts_oracle_tests.rs",
+        "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/edit/package.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/edit/tests.rs",
+        "crates/xml-minifier/src/audit.rs",
+        "crates/xml-minifier/src/audit/namespaces.rs",
+        "crates/xml-minifier/tests/source_replacement.rs"
+      ],
+      "file_count": 10789,
+      "id": "in_memory_freeze_source_binding",
+      "status": "pass"
+    },
+    {
+      "id": "role_bindings_use_retained_binary_copies",
+      "paths": {
+        "baseline": {
+          "allocator": "binaries/baseline-allocator",
+          "native": "binaries/baseline-native"
+        },
+        "candidate": {
+          "allocator": "binaries/candidate-v3-preserved/litchi-perf-baseline-alloc",
+          "native": "binaries/candidate-v3-preserved/litchi-perf-baseline"
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "binary_sha256": "c9e3b3122b1ac5f64fdf0fc8b4aabea9c53d80598b80e702f39eb8424b1063e2",
+      "id": "candidate_native_terminal_v2_validator",
+      "returncode": 0,
+      "status": "pass",
+      "terminal_sha256": "eaea1250b7776116a3dc1f860a09480ffe8ef174f4688dec92a929331b184ed6"
+    },
+    {
+      "binary_sha256": "7f7c1a0c0148dd283db27ec7b0cb2870572d94cc4d8de1920c4f7de302f3590e",
+      "id": "candidate_allocator_terminal_v2_validator",
+      "returncode": 0,
+      "status": "pass",
+      "terminal_sha256": "5a467ced86b26a7fd091261de8b2a65089eeb72e55a2651db5186c2103dc0b00"
+    },
+    {
+      "binary_sha256": "087aec962f5251d1255e7a54dc188e53f9b8a722c5da95eaa1c69439caa138c8",
+      "id": "baseline_native_reuse_v2_validator",
+      "status": "pass"
+    },
+    {
+      "binary_sha256": "c19971a7e923accd822e9744382aa757d0a67d9d7ba4e47e27354e05767de713",
+      "id": "baseline_allocator_reuse_v2_validator",
+      "status": "pass"
+    },
+    {
+      "id": "capture_imports_reuse_v2",
+      "resolved": "/home/zhuhe/litchi-performance-0948/tools/reuse_0948_v2.py",
+      "status": "pass"
+    },
+    {
+      "id": "reduce_imports_reuse_v2",
+      "resolved": "/home/zhuhe/litchi-performance-0948/tools/reuse_0948_v2.py",
+      "status": "pass"
+    }
+  ],
+  "helper_bindings": {
+    "capture": {
+      "bytes": 44255,
+      "expected_sha256": "307d49f623368860f87809ec28862448cc69be5565dcd2cb0f3a2da4eefcdeb1",
+      "path": "/home/zhuhe/litchi-performance-0948/tools/capture_0948_v2.py",
+      "sha256": "307d49f623368860f87809ec28862448cc69be5565dcd2cb0f3a2da4eefcdeb1"
+    },
+    "freeze": {
+      "bytes": 12700,
+      "expected_sha256": "84db5881fbfc4aeda4b3f86b850a6f29b0ace3832f9abbc6dfb12f141bd4041d",
+      "path": "/home/zhuhe/litchi-performance-0948/tools/freeze_0948_v4.py",
+      "sha256": "84db5881fbfc4aeda4b3f86b850a6f29b0ace3832f9abbc6dfb12f141bd4041d"
+    },
+    "prior_gate": {
+      "bytes": 4725,
+      "expected_sha256": "ecbbf311342afe1affe6d577fffb23caa7be74ddf9b00690306c09e2adf8a7ca",
+      "path": "/home/zhuhe/litchi-performance-0948/review/protocol/review_protocol_0948_v4-final.json",
+      "sha256": "ecbbf311342afe1affe6d577fffb23caa7be74ddf9b00690306c09e2adf8a7ca"
+    },
+    "reduce": {
+      "bytes": 90771,
+      "expected_sha256": "7f5f3abdbbddd78138359fa824f25611ecc113d4e89bb3477b6cd874d025a630",
+      "path": "/home/zhuhe/litchi-performance-0948/tools/reduce_0948_v2.py",
+      "sha256": "7f5f3abdbbddd78138359fa824f25611ecc113d4e89bb3477b6cd874d025a630"
+    },
+    "reuse": {
+      "bytes": 75142,
+      "expected_sha256": "c83c1270e42a82d73bc9f08f77f7cb2ac9087ff969b1e3082f8b6f84699c726a",
+      "path": "/home/zhuhe/litchi-performance-0948/tools/reuse_0948_v2.py",
+      "sha256": "c83c1270e42a82d73bc9f08f77f7cb2ac9087ff969b1e3082f8b6f84699c726a"
+    }
+  },
+  "plan": {
+    "future_final_binding_required": true,
+    "source": "in-memory freeze_0948_v4 construction",
+    "status": "not written"
+  },
+  "prior_gate_controls": {
+    "path": "/home/zhuhe/litchi-performance-0948/review/protocol/review_protocol_0948_v4-final.json",
+    "sha256": "ecbbf311342afe1affe6d577fffb23caa7be74ddf9b00690306c09e2adf8a7ca",
+    "status": "reused; not rerun"
+  },
+  "schema": "litchi.performance.0948.build-v2-terminal-preflight.v1",
+  "scope": "actual v3 candidate terminals and retained baseline reuse; no plan write, build, or workload",
+  "status": "pass",
+  "validated_baseline": {
+    "allocator": "pass",
+    "native": "pass"
+  },
+  "validated_candidate": {
+    "allocator": {
+      "binary": {
+        "build_binding_id": "candidate2",
+        "build_receipt": {
+          "bytes": 8666,
+          "executable": false,
+          "mode": 436,
+          "path": "builds/candidate-allocator-v3/terminal.json",
+          "sha256": "5a467ced86b26a7fd091261de8b2a65089eeb72e55a2651db5186c2103dc0b00"
+        },
+        "build_revision": "v3",
+        "bytes": 269145952,
+        "executable": true,
+        "mode": 509,
+        "path": "binaries/candidate-v3-preserved/litchi-perf-baseline-alloc",
+        "sha256": "7f7c1a0c0148dd283db27ec7b0cb2870572d94cc4d8de1920c4f7de302f3590e"
+      },
+      "terminal": "/home/zhuhe/litchi-performance-0948/builds/candidate-allocator-v3/terminal.json",
+      "terminal_sha256": "5a467ced86b26a7fd091261de8b2a65089eeb72e55a2651db5186c2103dc0b00"
+    },
+    "native": {
+      "binary": {
+        "build_binding_id": "candidate2",
+        "build_receipt": {
+          "bytes": 8566,
+          "executable": false,
+          "mode": 436,
+          "path": "builds/candidate-native-v3/terminal.json",
+          "sha256": "eaea1250b7776116a3dc1f860a09480ffe8ef174f4688dec92a929331b184ed6"
+        },
+        "build_revision": "v3",
+        "bytes": 265836208,
+        "executable": true,
+        "mode": 509,
+        "path": "binaries/candidate-v3-preserved/litchi-perf-baseline",
+        "sha256": "c9e3b3122b1ac5f64fdf0fc8b4aabea9c53d80598b80e702f39eb8424b1063e2"
+      },
+      "terminal": "/home/zhuhe/litchi-performance-0948/builds/candidate-native-v3/terminal.json",
+      "terminal_sha256": "eaea1250b7776116a3dc1f860a09480ffe8ef174f4688dec92a929331b184ed6"
+    }
+  }
+}

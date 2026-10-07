@@ -1,0 +1,84 @@
+{
+  "binaries": [
+    {
+      "bytes": 265836208,
+      "destination": "binaries/candidate-v3-preserved/litchi-perf-baseline",
+      "destination_verified": true,
+      "kind": "native",
+      "sha256": "c9e3b3122b1ac5f64fdf0fc8b4aabea9c53d80598b80e702f39eb8424b1063e2",
+      "source": "target-candidate-native-v3/release/litchi-perf-baseline",
+      "source_binary_receipt": {
+        "bytes": 785,
+        "executable": false,
+        "mode": 436,
+        "path": "builds/candidate-native-v3/binary.json",
+        "sha256": "4f972c296d5980221ea25d39179962f4bba96ecc58eed99ba75f92923d3ff117"
+      },
+      "source_result_receipt": {
+        "bytes": 1021,
+        "executable": false,
+        "mode": 436,
+        "path": "builds/candidate-native-v3/result.json",
+        "sha256": "1f1a054dce53ce626c11ce9478480e18983e587a9ce6cf6b646d340d8de72b1b"
+      },
+      "source_status": "passed",
+      "source_terminal_receipt": {
+        "bytes": 8566,
+        "executable": false,
+        "mode": 436,
+        "path": "builds/candidate-native-v3/terminal.json",
+        "sha256": "eaea1250b7776116a3dc1f860a09480ffe8ef174f4688dec92a929331b184ed6"
+      },
+      "terminal_returncode": 0
+    },
+    {
+      "bytes": 269145952,
+      "destination": "binaries/candidate-v3-preserved/litchi-perf-baseline-alloc",
+      "destination_verified": true,
+      "kind": "allocator",
+      "sha256": "7f7c1a0c0148dd283db27ec7b0cb2870572d94cc4d8de1920c4f7de302f3590e",
+      "source": "target-candidate-allocator-v3/release/litchi-perf-baseline-alloc",
+      "source_binary_receipt": {
+        "bytes": 803,
+        "executable": false,
+        "mode": 436,
+        "path": "builds/candidate-allocator-v3/binary.json",
+        "sha256": "ce07fe98ddc07e3e0d899f17814a79d94805047c1448a8a5f567774ee1563fe5"
+      },
+      "source_result_receipt": {
+        "bytes": 1042,
+        "executable": false,
+        "mode": 436,
+        "path": "builds/candidate-allocator-v3/result.json",
+        "sha256": "460c7b3310e7032d251cae6340491e8cb0e6b7b2cc4baf71f6e4254480f77d46"
+      },
+      "source_status": "passed",
+      "source_terminal_receipt": {
+        "bytes": 8666,
+        "executable": false,
+        "mode": 436,
+        "path": "builds/candidate-allocator-v3/terminal.json",
+        "sha256": "5a467ced86b26a7fd091261de8b2a65089eeb72e55a2651db5186c2103dc0b00"
+      },
+      "terminal_returncode": 0
+    }
+  ],
+  "created_utc": "2026-10-07T04:49:12.092791+00:00",
+  "schema": "litchi.performance.0948.candidate-v3-binary-preservation.v1",
+  "source_build_revision": "candidate-build-v3",
+  "source_freeze": {
+    "bytes": 4900,
+    "executable": false,
+    "mode": 436,
+    "path": "receipts/candidate-freeze-v3.json",
+    "sha256": "8f68153a809c729cbdb082b336e0b841f242892904929643917d5fee41d514a6"
+  },
+  "source_manifest": {
+    "bytes": 2296969,
+    "executable": false,
+    "mode": 436,
+    "path": "candidate-build-manifest-v3.json",
+    "sha256": "f565a52b36e8657453448d1f097179002b8fd7c95b4417996f62e1cbf6a4b992"
+  },
+  "status": "preserved-before-v6-reuse-bridge"
+}

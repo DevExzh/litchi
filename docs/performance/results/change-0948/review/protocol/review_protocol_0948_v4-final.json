@@ -1,0 +1,135 @@
+{
+  "builds_started_by_this_run": false,
+  "capture_authorization": false,
+  "checks": [
+    {
+      "id": "frozen_helper_hash_capture",
+      "sha256": "d5f7026128ac582384234063b147df707ea7137c67982e0698be7cd6791d48aa",
+      "status": "pass"
+    },
+    {
+      "id": "frozen_helper_hash_reduce",
+      "sha256": "acac2c603385bd90ff4da96da716adae57325f3a1f089d62e7d83c73ff1686f2",
+      "status": "pass"
+    },
+    {
+      "id": "frozen_helper_hash_reuse",
+      "sha256": "b81e5cbdd9fe2a0ee6a391c84ce005241ed0dc9e59a5d964ea66cce570caf7be",
+      "status": "pass"
+    },
+    {
+      "id": "frozen_helper_hash_freeze",
+      "sha256": "e6aae99debef66ac845d9afb7a6fc4437d4ef57c945b7395c17b1a9c000f192a",
+      "status": "pass"
+    },
+    {
+      "id": "frozen_helper_hash_baseline_reuse_receipt",
+      "sha256": "a05ddc9f28879df314e0dc583d9871c60a82b2a78938c03b0a4389c252bef1bc",
+      "status": "pass"
+    },
+    {
+      "id": "retained_baseline_reuse_v2_custody",
+      "kinds": [
+        {
+          "kind": "native",
+          "status": "pass"
+        },
+        {
+          "kind": "allocator",
+          "status": "pass"
+        }
+      ],
+      "status": "pass"
+    },
+    {
+      "expected_protocol": "pass",
+      "id": "primary_block_safety_threshold_is_not_aggregate_threshold",
+      "reducer_result": true,
+      "review_flags": [],
+      "status": "pass"
+    },
+    {
+      "all_pair_gate_pass": true,
+      "all_row_safety_gate_pass": true,
+      "id": "allocator_five_metric_pair_and_aggregate_safety",
+      "status": "pass"
+    },
+    {
+      "error": "ReviewError: primary-percent-medium/allocation_calls/0 has a nonzero candidate over a zero baseline (non-comparable)",
+      "id": "nonzero_over_zero_baseline_rejected",
+      "status": "pass"
+    },
+    {
+      "error": "ReviewError: allocator child count is not 24",
+      "id": "missing_allocator_child_rejected",
+      "status": "pass"
+    },
+    {
+      "error": "ReviewError: 0/baseline/primary-percent-medium allocator allocated_bytes is invalid",
+      "id": "missing_allocator_metric_rejected",
+      "status": "pass"
+    },
+    {
+      "id": "equal_zero_is_explicit_degenerate",
+      "status": "pass"
+    },
+    {
+      "id": "tool_copy_hash_stable",
+      "status": "pass"
+    }
+  ],
+  "findings": [
+    {
+      "detail": "The inspected plan is draft; this receipt covers only offline synthetic gates and helper custody, not capture authorization.",
+      "id": "plan-pending-final-binding",
+      "severity": "info"
+    }
+  ],
+  "frozen_helper_bindings": {
+    "baseline_reuse_receipt": {
+      "bytes": 4678,
+      "expected_sha256": "a05ddc9f28879df314e0dc583d9871c60a82b2a78938c03b0a4389c252bef1bc",
+      "path": "/home/zhuhe/litchi-performance-0948/receipts/baseline-reuse-v2.json",
+      "sha256": "a05ddc9f28879df314e0dc583d9871c60a82b2a78938c03b0a4389c252bef1bc"
+    },
+    "capture": {
+      "bytes": 44255,
+      "expected_sha256": "d5f7026128ac582384234063b147df707ea7137c67982e0698be7cd6791d48aa",
+      "path": "/home/zhuhe/litchi-performance-0948/tools/capture_0948_v1.py",
+      "sha256": "d5f7026128ac582384234063b147df707ea7137c67982e0698be7cd6791d48aa"
+    },
+    "freeze": {
+      "bytes": 12524,
+      "expected_sha256": "e6aae99debef66ac845d9afb7a6fc4437d4ef57c945b7395c17b1a9c000f192a",
+      "path": "/home/zhuhe/litchi-performance-0948/tools/freeze_0948_v1.py",
+      "sha256": "e6aae99debef66ac845d9afb7a6fc4437d4ef57c945b7395c17b1a9c000f192a"
+    },
+    "reduce": {
+      "bytes": 90771,
+      "expected_sha256": "acac2c603385bd90ff4da96da716adae57325f3a1f089d62e7d83c73ff1686f2",
+      "path": "/home/zhuhe/litchi-performance-0948/tools/reduce_0948_v1.py",
+      "sha256": "acac2c603385bd90ff4da96da716adae57325f3a1f089d62e7d83c73ff1686f2"
+    },
+    "reuse": {
+      "bytes": 74912,
+      "expected_sha256": "b81e5cbdd9fe2a0ee6a391c84ce005241ed0dc9e59a5d964ea66cce570caf7be",
+      "path": "/home/zhuhe/litchi-performance-0948/tools/reuse_0948_v1.py",
+      "sha256": "b81e5cbdd9fe2a0ee6a391c84ce005241ed0dc9e59a5d964ea66cce570caf7be"
+    }
+  },
+  "plan": {
+    "bytes": 5816,
+    "path": "/home/zhuhe/litchi-performance-0948/plan-v1-draft.json",
+    "sha256": "4e49d17633b2413a40ffc0b52376571921214ffb759bc7585f35e7d692648903",
+    "status": "draft"
+  },
+  "reducer": {
+    "bytes": 90771,
+    "path": "/home/zhuhe/litchi-performance-0948/tools/reduce_0948_v1.py",
+    "sha256": "acac2c603385bd90ff4da96da716adae57325f3a1f089d62e7d83c73ff1686f2"
+  },
+  "schema": "litchi.performance.0948.independent-protocol-review.v4",
+  "scope": "one offline synthetic gate/custody run; no workload, build, or packet mutation",
+  "status": "passed_synthetic_preflight_plan_pending",
+  "workloads_started_by_this_run": false
+}

@@ -1,0 +1,2142 @@
+--- a/crates/litchi-opc/src/lib.rs
++++ b/crates/litchi-opc/src/lib.rs
+@@ -88,7 +88,7 @@
+ pub use source_backed::{
+     AuthorizedPrecompressedPart, EffectiveContentType, EffectivePart, EffectivePartData,
+     EffectiveTopology, PartBatch, PartData, PartReadSession, PartView, PreparedTopology,
+-    RetainedPrecompressedPart, SourceArtifact, SourceArtifactFingerprint,
++    ReplacementSpan, RetainedPrecompressedPart, SourceArtifact, SourceArtifactFingerprint,
+     SourceArtifactRestoreProof, SourceBackedPackage, SourceCacheCounterDelta,
+     SourceCacheDiagnostics, SourceCacheDiagnosticsError, SourceCacheLimitError, SourceCacheLimits,
+     SourceLineage, SourcePartSpliceFragment, SourcePartSpliceLimits, SourcePartSplicePlan,
+--- a/crates/litchi-opc/src/source_backed.rs
++++ b/crates/litchi-opc/src/source_backed.rs
+@@ -58,6 +58,7 @@
+     SourcePartSplicePublication, SourcePartSpliceReplay, SourcePartSpliceReplayError,
+     SourcePartSpliceReplayHandle, SourcePartSpliceReplayProof,
+ };
++pub use xml_minifier::audit::ReplacementSpan;
+ mod batch;
+ pub use batch::PartBatch;
+ pub(crate) mod content_types_plan;
+@@ -83,6 +84,7 @@
+ const MAX_SOURCE_TOPOLOGY_RELATIONSHIPS: usize = 4096;
+ const MAX_SOURCE_RELATIONSHIP_FIELD_BYTES: usize = 64 * 1024;
+ const MAX_SOURCE_TOPOLOGY_RELATIONSHIP_BYTES: usize = 8 * 1024 * 1024;
++const MAX_SOURCE_REPLACEMENT_SPANS: usize = 4096;
+ const MAX_SOURCE_RELATIONSHIP_ATTRIBUTES_PER_ELEMENT: usize = 4096;
+ const MAX_SOURCE_RELATIONSHIP_NAMESPACE_DECLARATIONS_PER_ELEMENT: usize = 256;
+ const QUICK_XML_MAX_SAFE_DEPTH: usize = (u16::MAX as usize) - 1;
+@@ -161,6 +163,7 @@
+     target: usize,
+     replacement: Arc<Vec<u8>>,
+     source_xml: Option<SourceXmlPart>,
++    replacement_spans: Option<Arc<[ReplacementSpan]>>,
+ }
+ 
+ /// A bounded source-backed OPC publication plan.
+@@ -183,6 +186,7 @@
+     partname: PackURI,
+     replacement: Arc<Vec<u8>>,
+     source_xml: Option<SourceXmlPart>,
++    replacement_spans: Option<Arc<[ReplacementSpan]>>,
+ }
+ 
+ #[derive(Debug)]
+@@ -1915,6 +1919,29 @@
+         self.try_replace_part_with_payload(partname, || replacement)
+     }
+ 
++    /// Replace the payload of one existing Part while retaining caller-owned
++    /// replacement bytes and bounded, untrusted source-window hints.
++    ///
++    /// The hints are only used by the source XML audit during topology
++    /// publication. They never authorize a replacement and are discarded when
++    /// their count is outside the bounded multi-window range. A zero or one
++    /// hint therefore follows the historical complete replacement audit.
++    ///
++    /// # Errors
++    ///
++    /// Returns the same typed URI, operation-count, duplicate-name, and
++    /// allocation errors as [`Self::try_replace_part_shared`].
++    pub fn try_replace_part_shared_with_spans(
++        &mut self,
++        partname: PackURI,
++        replacement: Arc<Vec<u8>>,
++        spans: Arc<[ReplacementSpan]>,
++    ) -> Result<()> {
++        let spans =
++            (spans.len() > 1 && spans.len() <= MAX_SOURCE_REPLACEMENT_SPANS).then_some(spans);
++        self.try_replace_part_with_payload_and_spans(partname, || replacement, spans)
++    }
++
+     /// Replace one existing XML Part with a source-authorized payload.
+     ///
+     /// The source payload may be an exact copy or a checked splice assembled
+@@ -1949,11 +1976,24 @@
+             partname,
+             replacement,
+             source_xml: Some(source_xml),
++            replacement_spans: None,
+         });
+         Ok(())
+     }
+ 
+     fn try_replace_part_with_payload<F>(&mut self, partname: PackURI, replacement: F) -> Result<()>
++    where
++        F: FnOnce() -> Arc<Vec<u8>>,
++    {
++        self.try_replace_part_with_payload_and_spans(partname, replacement, None)
++    }
++
++    fn try_replace_part_with_payload_and_spans<F>(
++        &mut self,
++        partname: PackURI,
++        replacement: F,
++        replacement_spans: Option<Arc<[ReplacementSpan]>>,
++    ) -> Result<()>
+     where
+         F: FnOnce() -> Arc<Vec<u8>>,
+     {
+@@ -1968,6 +2008,7 @@
+             partname,
+             replacement: replacement(),
+             source_xml: None,
++            replacement_spans,
+         });
+         Ok(())
+     }
+@@ -8308,6 +8349,7 @@
+                 target,
+                 replacement: Arc::clone(&replacement.replacement),
+                 source_xml: replacement.source_xml.clone(),
++                replacement_spans: replacement.replacement_spans.clone(),
+             });
+         }
+         let mut pending_replacement_indices = HashMap::new();
+@@ -9628,10 +9670,11 @@
+                     part.partname.as_str(),
+                     part.content_type.as_str(),
+                 ) {
+-                    validate_source_part_replacement_xml(
++                    audit_source_part_replacement_xml(
+                         part.partname.as_str(),
+                         original.as_bytes(),
+                         &replacement.replacement,
++                        replacement.replacement_spans.as_deref(),
+                     )?;
+                 }
+                 changed.push(ChangedOverlay {
+@@ -10420,6 +10463,7 @@
+                     target,
+                     replacement: Arc::new(replacement),
+                     source_xml: None,
++                    replacement_spans: None,
+                 });
+                 continue;
+             }
+@@ -10453,6 +10497,7 @@
+                 target,
+                 replacement: Arc::new(replacement),
+                 source_xml: None,
++                replacement_spans: None,
+             });
+             relationship_overlays.push((
+                 target,
+@@ -10731,6 +10776,7 @@
+                 target,
+                 replacement: into_shared(replacement),
+                 source_xml: None,
++                replacement_spans: None,
+             });
+         }
+         let mut omitted_members = Vec::new();
+@@ -12938,32 +12984,55 @@
+ /// after the XML declaration, attribute separators of any length and
+ /// whitespace before a tag close are accepted as the producer spelled them.
+ ///
+-/// Change 0747 audits the pair with one
+-/// [`xml_minifier::audit::verify_source_replacement`] call. Its verdict is
+-/// exactly that of auditing the original and then the replacement with
++/// Change 0747 audits the pair with one source-replacement audit call. The
++/// established paths use
++/// [`xml_minifier::audit::verify_source_replacement`], while the topology
++/// path may use its bounded
++/// [`xml_minifier::audit::verify_source_replacement_with_spans`] variant when
++/// it receives more than one untrusted window hint. Both verdicts are exactly
++/// those of auditing the original and then the replacement with
+ /// `verify_source`, including which side fails first and the error it
+-/// reports; it only avoids scanning again the replacement bytes that repeat
+-/// the original's outside the one element an edit replaced, which the
+-/// original's audit checked in the same parser state moments earlier.
++/// reports; the window path only avoids scanning again replacement bytes that
++/// repeat the original outside the hinted elements, which the original's
++/// audit checked in the same parser state moments earlier. Invalid or
++/// incomplete hints fall back to the complete replacement audit.
+ ///
+ /// [`validate_overlay_xml`] keeps the authored contract where this library
+ /// composes a whole stream with no source to inherit from: its canonical
+ /// relationship XML and a Part a plan *adds*.
++fn audit_source_part_replacement_xml(
++    part: &str,
++    original: &[u8],
++    replacement: &[u8],
++    spans: Option<&[ReplacementSpan]>,
++) -> Result<xml_minifier::audit::ReplacementProof> {
++    let audit = match spans {
++        Some(spans) if spans.len() > 1 && spans.len() <= MAX_SOURCE_REPLACEMENT_SPANS => {
++            xml_minifier::audit::verify_source_replacement_with_spans(
++                original,
++                replacement,
++                xml_minifier::audit::Limits::default(),
++                spans,
++            )
++        },
++        _ => xml_minifier::audit::verify_source_replacement(
++            original,
++            replacement,
++            xml_minifier::audit::Limits::default(),
++        ),
++    };
++    audit.map_err(|error| OpcError::XmlPublication {
++        part: part.to_string(),
++        source: error.into_error(),
++    })
++}
++
+ fn validate_source_part_replacement_xml(
+     part: &str,
+     original: &[u8],
+     replacement: &[u8],
+ ) -> Result<()> {
+-    xml_minifier::audit::verify_source_replacement(
+-        original,
+-        replacement,
+-        xml_minifier::audit::Limits::default(),
+-    )
+-    .map(|_proof| ())
+-    .map_err(|error| OpcError::XmlPublication {
+-        part: part.to_string(),
+-        source: error.into_error(),
+-    })
++    audit_source_part_replacement_xml(part, original, replacement, None).map(|_| ())
+ }
+ 
+ fn checked_overlay_total(
+@@ -14991,6 +15060,151 @@
+     }
+ 
+     #[test]
++    fn topology_replace_part_shared_with_spans_publishes_multiwindow_xml() {
++        let original = "<r><a>0</a><b>0</b><c>unchanged</c></r>";
++        let replacement = "<r><a>1</a><b>12345</b><c>unchanged</c></r>";
++        let original_a = original.find("<a>0</a>").unwrap();
++        let replacement_a = replacement.find("<a>1</a>").unwrap();
++        let original_b = original.find("<b>0</b>").unwrap();
++        let replacement_b = replacement.find("<b>12345</b>").unwrap();
++        let spans: Arc<[ReplacementSpan]> = Arc::from(vec![
++            ReplacementSpan {
++                original: original_a..original_a + "<a>0</a>".len(),
++                replacement: replacement_a..replacement_a + "<a>1</a>".len(),
++            },
++            ReplacementSpan {
++                original: original_b..original_b + "<b>0</b>".len(),
++                replacement: replacement_b..replacement_b + "<b>12345</b>".len(),
++            },
++        ]);
++        let proof = audit_source_part_replacement_xml(
++            "/word/document.xml",
++            original.as_bytes(),
++            replacement.as_bytes(),
++            Some(spans.as_ref()),
++        );
++        assert!(matches!(
++            proof,
++            Ok(xml_minifier::audit::ReplacementProof::Windows { count: 2, .. })
++        ));
++
++        let partname = PackURI::new("/word/document.xml").unwrap();
++        let mut plan = SourceTopologyPlan::new();
++        plan.try_replace_part_shared_with_spans(
++            partname.clone(),
++            Arc::new(replacement.as_bytes().to_vec()),
++            Arc::clone(&spans),
++        )
++        .unwrap();
++        assert_eq!(
++            plan.replacements[0].replacement_spans.as_deref(),
++            Some(spans.as_ref())
++        );
++
++        let mut output = Vec::new();
++        SourceBackedPackage::from_vec(archive_bytes(
++            root_relationships(),
++            original.as_bytes(),
++            false,
++        ))
++        .unwrap()
++        .write_topology_to_stream(&mut output, plan)
++        .unwrap();
++        assert_eq!(
++            soapberry_zip::office::ArchiveReader::new(&output)
++                .unwrap()
++                .read(partname.membername())
++                .unwrap(),
++            replacement.as_bytes()
++        );
++    }
++
++    #[test]
++    fn topology_replace_part_shared_with_spans_cannot_bypass_malformed_replacement() {
++        let original = "<r><a>0</a><b>0</b><c>0</c></r>";
++        let replacement = "<r><a>1</broken><b>2</b><c>0</c></r>";
++        let original_a = original.find("<a>0</a>").unwrap();
++        let replacement_a = replacement.find("<a>1</broken>").unwrap();
++        let original_b = original.find("<b>0</b>").unwrap();
++        let spans: Arc<[ReplacementSpan]> = Arc::from(vec![
++            ReplacementSpan {
++                original: original_a..original_a + "<a>0</a>".len(),
++                replacement: replacement_a..replacement_a + "<a>1</broken>".len(),
++            },
++            // This out-of-bounds hint forces the auditor's complete fallback;
++            // it cannot turn the malformed first window into a proof.
++            ReplacementSpan {
++                original: original_b..original_b + "<b>0</b>".len(),
++                replacement: replacement.len()..replacement.len() + 1,
++            },
++        ]);
++        assert!(matches!(
++            audit_source_part_replacement_xml(
++                "/word/document.xml",
++                original.as_bytes(),
++                replacement.as_bytes(),
++                Some(spans.as_ref()),
++            ),
++            Err(OpcError::XmlPublication { .. })
++        ));
++
++        let partname = PackURI::new("/word/document.xml").unwrap();
++        let mut plan = SourceTopologyPlan::new();
++        plan.try_replace_part_shared_with_spans(
++            partname,
++            Arc::new(replacement.as_bytes().to_vec()),
++            spans,
++        )
++        .unwrap();
++        let mut output = Vec::new();
++        assert!(matches!(
++            SourceBackedPackage::from_vec(archive_bytes(
++                root_relationships(),
++                original.as_bytes(),
++                false,
++            ))
++            .unwrap()
++            .write_topology_to_stream(&mut output, plan),
++            Err(OpcError::XmlPublication { .. })
++        ));
++        assert!(output.is_empty());
++    }
++
++    #[test]
++    fn topology_replace_part_shared_with_spans_drops_overbound_hints() {
++        let mut plan = SourceTopologyPlan::new();
++        let spans: Arc<[ReplacementSpan]> = Arc::from(
++            (0..=MAX_SOURCE_REPLACEMENT_SPANS)
++                .map(|index| ReplacementSpan {
++                    original: index..index + 1,
++                    replacement: index..index + 1,
++                })
++                .collect::<Vec<_>>(),
++        );
++        let partname = PackURI::new("/word/document.xml").unwrap();
++        plan.try_replace_part_shared_with_spans(
++            partname.clone(),
++            Arc::new(b"<replacement/>".to_vec()),
++            spans,
++        )
++        .unwrap();
++        assert!(plan.replacements[0].replacement_spans.is_none());
++
++        let mut output = Vec::new();
++        SourceBackedPackage::from_vec(archive_bytes(root_relationships(), b"<before/>", false))
++            .unwrap()
++            .write_topology_to_stream(&mut output, plan)
++            .unwrap();
++        assert_eq!(
++            soapberry_zip::office::ArchiveReader::new(&output)
++                .unwrap()
++                .read(partname.membername())
++                .unwrap(),
++            b"<replacement/>"
++        );
++    }
++
++    #[test]
+     fn topology_replace_part_shared_preserves_refusal_order_and_plan_on_failure() {
+         let root = PackURI::new("/").unwrap();
+         let mut root_plan = SourceTopologyPlan::new();
+--- a/crates/litchi-xlsx/src/cell_values/facts_oracle_tests.rs
++++ b/crates/litchi-xlsx/src/cell_values/facts_oracle_tests.rs
+@@ -226,6 +226,47 @@
+     format!(r#"<worksheet xmlns="{SML}">{body}</worksheet>"#)
+ }
+ 
++#[test]
++fn facts_and_layout_routes_retain_identical_changed_cell_spans() {
++    let source = scalar_sheet(
++        r#"<dimension ref="A1:C2"/><sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1"><v>2</v></c><c r="C1"><v>3</v></c></row><row r="2"><c r="A2"><v>4</v></c><c r="C2"><v>6</v></c></row></sheetData>"#,
++    );
++    let source = source.as_bytes();
++    let facts = plan(source).expect("admitted source facts");
++    let actions = BTreeMap::from([
++        (
++            Address::from_a1("A1").expect("A1"),
++            Action::set("a longer replacement".into()),
++        ),
++        (
++            Address::from_a1("C2").expect("C2"),
++            Action::set("short".into()),
++        ),
++    ]);
++    let from_facts = rewrite_value_only_with_provenance(
++        source,
++        "Sheet1",
++        BTreeMap::from([
++            (
++                Address::from_a1("A1").expect("A1"),
++                Action::set("a longer replacement".into()),
++            ),
++            (
++                Address::from_a1("C2").expect("C2"),
++                Action::set("short".into()),
++            ),
++        ]),
++        Some(&facts),
++    )
++    .expect("fact route rewrite");
++    let from_layout = rewrite_value_only_with_provenance(source, "Sheet1", actions, None)
++        .expect("layout route rewrite");
++
++    assert_eq!(from_facts.bytes, from_layout.bytes);
++    assert_eq!(from_facts.spans, from_layout.spans);
++    assert_eq!(from_facts.spans.len(), 2);
++}
++
+ /// Shapes the fact route is expected to accept.
+ fn admitted_shapes() -> Vec<(&'static str, String)> {
+     vec![
+--- a/crates/litchi-xlsx/src/cell_values/snapshot.rs
++++ b/crates/litchi-xlsx/src/cell_values/snapshot.rs
+@@ -6,7 +6,7 @@
+ use litchi_core::{ExecutionContext, ExecutionError, Selector as CoreSelector, SourceVersion};
+ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+ use litchi_opc::{
+-    BlobPart, OpcError, OpcPackage, PackURI, Part, Relationship, Relationships,
++    BlobPart, OpcError, OpcPackage, PackURI, Part, Relationship, Relationships, ReplacementSpan,
+     SourceBackedPackage, SourceLineage, SourceRelationshipTarget, SourceTopologyPlan, TargetMode,
+ };
+ use litchi_sheet::{Cell as Address, Rect};
+@@ -459,6 +459,7 @@
+                 context: None,
+                 source_lineage: None,
+                 source_version: None,
++                worksheet_replacement_hint: None,
+             },
+         })
+     }
+@@ -528,6 +529,7 @@
+                 context: package.execution_context(),
+                 source_lineage: Some(capture.source_lineage.clone()),
+                 source_version: Some(capture.source_version),
++                worksheet_replacement_hint: None,
+             },
+         })
+     }
+@@ -762,6 +764,7 @@
+                 context,
+                 source_lineage,
+                 source_version,
++                worksheet_replacement_hint: None,
+             },
+         })
+     }
+@@ -777,6 +780,7 @@
+         result.cells = Arc::new(cells);
+         result.facts = None;
+         result.source.worksheet.bytes = SourcePayload::Owned(Arc::new(bytes));
++        result.source.worksheet_replacement_hint = None;
+         result.source.check_execution()?;
+         Ok(result)
+     }
+@@ -792,25 +796,35 @@
+         source: &Self,
+         rewrite: raw::worksheet::edit::ValueOnlyRewrite<'_>,
+     ) -> Result<Self> {
+-        if rewrite.omitted.is_empty() || !std::ptr::eq(rewrite.source, source.source_xml()) {
++        if !std::ptr::eq(rewrite.source, source.source_xml()) {
+             return Self::from_rewritten_source(source, rewrite.bytes);
+         }
+         source.source.check_execution()?;
+         validation::worksheet_xml(&rewrite.bytes)?;
+         // Speculative buffers are dropped before the complete parser fallback.
+-        let cells = match Self::try_rewritten_value_cells(source, &rewrite) {
+-            Some(cells) => cells,
+-            None => {
+-                let shared_strings = source.source.shared_strings.as_ref();
+-                raw::worksheet::parse_refusing_repairs(&rewrite.bytes, || {
+-                    shared_strings.map(SharedStringsState::strings).transpose()
+-                })?
+-            },
++        let cells = if rewrite.omitted.is_empty() {
++            let shared_strings = source.source.shared_strings.as_ref();
++            raw::worksheet::parse_refusing_repairs(&rewrite.bytes, || {
++                shared_strings.map(SharedStringsState::strings).transpose()
++            })?
++        } else {
++            match Self::try_rewritten_value_cells(source, &rewrite) {
++                Some(cells) => cells,
++                None => {
++                    let shared_strings = source.source.shared_strings.as_ref();
++                    raw::worksheet::parse_refusing_repairs(&rewrite.bytes, || {
++                        shared_strings.map(SharedStringsState::strings).transpose()
++                    })?
++                },
++            }
+         };
++        let bytes = Arc::new(rewrite.bytes);
++        let replacement_hint = WorksheetReplacementHint::new(rewrite.source, &bytes, rewrite.spans);
+         let mut result = source.clone();
+         result.cells = Arc::new(cells);
+         result.facts = None;
+-        result.source.worksheet.bytes = SourcePayload::Owned(Arc::new(rewrite.bytes));
++        result.source.worksheet.bytes = SourcePayload::Owned(bytes);
++        result.source.worksheet_replacement_hint = replacement_hint;
+         result.source.check_execution()?;
+         Ok(result)
+     }
+@@ -887,6 +901,7 @@
+         let mut result = source.clone();
+         result.facts = None;
+         result.source.worksheet.bytes = SourcePayload::Owned(Arc::new(bytes));
++        result.source.worksheet_replacement_hint = None;
+         result.source.check_execution()?;
+         Ok(result)
+     }
+@@ -1463,6 +1478,7 @@
+     context: Option<ExecutionContext>,
+     source_lineage: Option<SourceLineage>,
+     source_version: Option<SourceVersion>,
++    worksheet_replacement_hint: Option<WorksheetReplacementHint>,
+ }
+ 
+ impl SourceState {
+@@ -1492,6 +1508,62 @@
+     }
+ }
+ 
++/// Bounded, detached metadata describing the worksheet replacement produced by
++/// one value-only rewrite. The source and replacement payloads themselves are
++/// deliberately not retained: publication checks these identities against the
++/// before and after snapshots and the OPC auditor treats every span as
++/// untrusted input.
++#[derive(Clone, Debug)]
++struct WorksheetReplacementHint {
++    source_ptr: usize,
++    source_len: usize,
++    replacement_ptr: usize,
++    replacement_len: usize,
++    spans: Arc<[ReplacementSpan]>,
++}
++
++impl WorksheetReplacementHint {
++    fn new(
++        source: &[u8],
++        replacement: &Arc<Vec<u8>>,
++        spans: Box<[ReplacementSpan]>,
++    ) -> Option<Self> {
++        if spans.len() < 2 || spans.len() > raw::worksheet::edit::MAX_REPLACEMENT_SPANS {
++            return None;
++        }
++        let mut source_end = 0;
++        let mut replacement_end = 0;
++        for span in &spans {
++            if span.original.start >= span.original.end
++                || span.replacement.start >= span.replacement.end
++                || span.original.start < source_end
++                || span.replacement.start < replacement_end
++                || span.original.end > source.len()
++                || span.replacement.end > replacement.len()
++            {
++                return None;
++            }
++            source_end = span.original.end;
++            replacement_end = span.replacement.end;
++        }
++        let spans: Arc<[ReplacementSpan]> = Arc::from(spans);
++        Some(Self {
++            source_ptr: source.as_ptr() as usize,
++            source_len: source.len(),
++            replacement_ptr: replacement.as_ptr() as usize,
++            replacement_len: replacement.len(),
++            spans,
++        })
++    }
++
++    fn matches(&self, source: &[u8], replacement: &[u8]) -> bool {
++        self.source_ptr == source.as_ptr() as usize
++            && self.source_len == source.len()
++            && self.replacement_ptr == replacement.as_ptr() as usize
++            && self.replacement_len == replacement.len()
++    }
++}
++
+ #[derive(Clone, Debug)]
+ struct PartState {
+     uri: PackURI,
+@@ -1632,14 +1704,25 @@
+     partname: PackURI,
+     payload: &SourcePayload,
+     resource: &'static str,
++    replacement_spans: Option<&Arc<[ReplacementSpan]>>,
+ ) -> Result<()> {
+     // Only already-detached bytes may cross the OPC publication boundary by
+     // Arc. Keep managed and budgeted payloads on the old fallible Vec copy so
+     // their reservation and allocation behavior stays unchanged.
+     match payload {
+-        SourcePayload::Owned(bytes) => plan
+-            .try_replace_part_shared(partname, Arc::clone(bytes))
+-            .map_err(Error::Package)?,
++        SourcePayload::Owned(bytes) => {
++            if let Some(spans) = replacement_spans {
++                plan.try_replace_part_shared_with_spans(
++                    partname,
++                    Arc::clone(bytes),
++                    Arc::clone(spans),
++                )
++                .map_err(Error::Package)?;
++            } else {
++                plan.try_replace_part_shared(partname, Arc::clone(bytes))
++                    .map_err(Error::Package)?;
++            }
++        },
+         SourcePayload::Managed(_) | SourcePayload::OwnedBudgeted { .. } => {
+             plan.try_replace_part(partname, copy_payload(payload.as_bytes(), resource)?)
+                 .map_err(Error::Package)?;
+@@ -1665,11 +1748,22 @@
+         // bytes only for the `<dimension>` tag and the edited `<c>` records.
+         // The replacement therefore carries the producer's own formatting,
+         // which publication audits with source rules since change 0657.
++        let replacement_spans = after
++            .worksheet_replacement_hint
++            .as_ref()
++            .filter(|hint| {
++                hint.matches(
++                    before.worksheet.bytes.as_bytes(),
++                    after.worksheet.bytes.as_bytes(),
++                )
++            })
++            .map(|hint| &hint.spans);
+         try_replace_source_payload(
+             plan,
+             after.worksheet.uri.clone(),
+             &after.worksheet.bytes,
+             "source-backed worksheet topology replacement",
++            replacement_spans,
+         )?;
+     }
+     Ok(())
+@@ -1696,6 +1790,7 @@
+             after.workbook.uri.clone(),
+             &after.workbook.bytes,
+             "source-backed workbook topology replacement",
++            None,
+         )?;
+     }
+     match (&before.calculation_chain, &after.calculation_chain) {
+@@ -2594,6 +2689,7 @@
+             PackURI::new("/xl/workbook.xml").unwrap(),
+             &owned,
+             "owned replacement test",
++            None,
+         )
+         .unwrap();
+         assert_eq!(Arc::strong_count(&owned_bytes), 3);
+@@ -2618,6 +2714,7 @@
+             PackURI::new("/xl/worksheets/sheet1.xml").unwrap(),
+             &budgeted,
+             "budgeted replacement test",
++            None,
+         )
+         .unwrap();
+         assert_eq!(
+@@ -2680,6 +2777,7 @@
+             PackURI::new("/xl/ctrlProps/ctrlProp1.xml").unwrap(),
+             &payload,
+             "managed replacement test",
++            None,
+         )
+         .unwrap();
+         assert!(matches!(
+@@ -2707,7 +2805,7 @@
+     use litchi_opc::{
+         BlobPart, OpcPackage, PackURI, PackageWriter, SourceBackedPackage, TargetMode,
+     };
+-    use litchi_sheet::{Cell as Address, Rect};
++    use litchi_sheet::{Cell as Address, Rect, Row};
+ 
+     use super::Snapshot;
+     use crate::cell::{Cell, Store, Value};
+@@ -2717,6 +2815,7 @@
+     use crate::raw::worksheet::edit::{
+         Action, ValueOnlyRewrite, rewrite, rewrite_value_only_with_provenance,
+     };
++    use crate::row_visibility::SourceBackedEditor as RowVisibilitySourceBackedEditor;
+     use crate::{ErrorValue, Number};
+ 
+     const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+@@ -2946,6 +3045,108 @@
+             .collect()
+     }
+ 
++    #[test]
++    fn replacement_hints_refresh_and_clear_across_rebinds() {
++        let worksheet = format!(
++            r#"<worksheet xmlns="{SML}"><dimension ref="A1:B1"/><sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1"><v>2</v></c></row></sheetData></worksheet>"#
++        );
++        let source = Snapshot::load(&fixture_package(&worksheet), "Sheet1").unwrap();
++        let first_proof = proof_for_sets(&source, &[("A1", 11), ("B1", 12)]);
++        assert_eq!(first_proof.spans.len(), 2);
++        let first = Snapshot::from_rewritten_value_source(&source, first_proof).unwrap();
++        let first_hint = first
++            .source
++            .worksheet_replacement_hint
++            .as_ref()
++            .expect("multi-cell rewrite retains a hint");
++        assert_eq!(
++            first_hint.source_ptr,
++            source.source_xml().as_ptr() as usize,
++            "the hint is tied to the exact source allocation"
++        );
++        assert_eq!(
++            first_hint.replacement_ptr,
++            first.source_xml().as_ptr() as usize,
++            "the hint is tied to the exact detached output allocation"
++        );
++
++        let second_proof = proof_for_sets(&first, &[("A1", 21), ("B1", 22)]);
++        assert_eq!(second_proof.spans.len(), 2);
++        let second = Snapshot::from_rewritten_value_source(&first, second_proof).unwrap();
++        let second_hint = second
++            .source
++            .worksheet_replacement_hint
++            .as_ref()
++            .expect("repeated rewrite retains a refreshed hint");
++        assert_eq!(
++            second_hint.source_ptr,
++            first.source_xml().as_ptr() as usize,
++            "the second hint points at the immediately preceding payload"
++        );
++        assert_eq!(
++            second_hint.replacement_ptr,
++            second.source_xml().as_ptr() as usize,
++            "the second hint points at its own output payload"
++        );
++        assert_ne!(
++            first_hint.source_ptr, second_hint.source_ptr,
++            "repeated rewrites must not retain the original source identity"
++        );
++
++        let rebased = Snapshot::from_rewritten_source(&first, first.source_xml().to_vec())
++            .expect("ordinary worksheet rebind");
++        assert!(
++            rebased.source.worksheet_replacement_hint.is_none(),
++            "ordinary worksheet rebind clears stale span metadata"
++        );
++        let invalidated = first
++            .clone()
++            .with_invalidated_calculation()
++            .expect("workbook-only invalidation");
++        assert!(
++            invalidated.source.worksheet_replacement_hint.is_some(),
++            "workbook-only invalidation preserves the worksheet hint"
++        );
++
++        let visibility_package = SourceBackedPackage::from_vec(
++            PackageWriter::to_bytes(&fixture_package(
++                std::str::from_utf8(first.source_xml()).expect("worksheet XML is UTF-8"),
++            ))
++            .expect("visibility package archive"),
++        )
++        .expect("visibility source package");
++        let visibility_editor =
++            RowVisibilitySourceBackedEditor::from_source_backed_package(visibility_package)
++                .expect("visibility editor");
++        let mut visibility_edit = visibility_editor.edit("Sheet1").expect("visibility edit");
++        visibility_edit
++            .hide(Row::new(0).unwrap())
++            .expect("visibility stage");
++        let (visibility_snapshot, _) = visibility_edit
++            .commit()
++            .expect("visibility commit")
++            .into_parts();
++        let visibility_rebound =
++            Snapshot::from_rewritten_source(&first, visibility_snapshot.source_xml().to_vec())
++                .expect("visibility rebind");
++        assert!(
++            visibility_rebound
++                .source
++                .worksheet_replacement_hint
++                .is_none(),
++            "worksheet visibility rebind clears cell span metadata"
++        );
++
++        let other = Snapshot::load(&fixture_package(&worksheet), "Sheet1").unwrap();
++        let stale_proof = proof_for_sets(&first, &[("A1", 31), ("B1", 32)]);
++        let stale = Snapshot::from_rewritten_value_source(&other, stale_proof)
++            .expect("stale proof falls back to complete parse");
++        assert!(
++            stale.source.worksheet_replacement_hint.is_none(),
++            "a proof from another allocation cannot publish span metadata"
++        );
++    }
++
+     fn bytes_between<'a>(bytes: &'a [u8], start: &[u8], end: &[u8]) -> &'a [u8] {
+         let start_at = bytes
+             .windows(start.len())
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs
+@@ -3,6 +3,7 @@
+ use std::collections::BTreeMap;
+ 
+ use litchi_core::xml::escape_xml;
++use litchi_opc::ReplacementSpan;
+ use litchi_sheet::{Cell as Address, Row};
+ 
+ use super::super::super::wire::{
+@@ -13,10 +14,10 @@
+ use crate::error::{Result, invalid};
+ use crate::outline::Outline;
+ use crate::raw::strings::encode_spreadsheet_text;
+-use crate::raw::worksheet::edit::OmittedCells;
+ use crate::raw::worksheet::edit::model::{
+     Action, DescentEffect, HeightEffect, Payload, RowAction, StyleEffect,
+ };
++use crate::raw::worksheet::edit::{MAX_REPLACEMENT_SPANS, OmittedCells};
+ 
+ pub(crate) fn write_sheet_data(
+     output: &mut Vec<u8>,
+@@ -92,6 +93,8 @@
+     cells: BTreeMap<Address, Action>,
+     rows: BTreeMap<Row, RowAction>,
+     descent_name: &str,
++    spans: &mut Vec<ReplacementSpan>,
++    recording_spans: &mut bool,
+ ) -> Result<Box<[OmittedCells]>> {
+     let mut by_row = BTreeMap::<u32, RowEdits>::new();
+     for (address, action) in cells {
+@@ -162,7 +165,16 @@
+             if membership_changed || edits.row.is_some() || row.empty {
+                 write_row(output, source, row, &edits, descent_name)?;
+             } else {
+-                write_replacement_row(output, source, row, &edits, &mut omitted, &mut recording)?;
++                write_replacement_row(
++                    output,
++                    source,
++                    row,
++                    &edits,
++                    &mut omitted,
++                    &mut recording,
++                    spans,
++                    recording_spans,
++                )?;
+             }
+         } else {
+             output.extend_from_slice(&source[row.span.start..row.tag_end]);
+@@ -201,6 +213,8 @@
+     facts: &SourceFacts,
+     cells: BTreeMap<Address, Action>,
+     slots: &BTreeMap<Address, CellSlot>,
++    spans: &mut Vec<ReplacementSpan>,
++    recording_spans: &mut bool,
+ ) -> Result<Box<[OmittedCells]>> {
+     let mut by_row = BTreeMap::<u32, BTreeMap<Address, Action>>::new();
+     for (address, action) in cells {
+@@ -240,6 +254,8 @@
+                     slots,
+                     &mut omitted,
+                     &mut recording,
++                    spans,
++                    recording_spans,
+                 )?;
+             },
+             None => {
+@@ -281,6 +297,8 @@
+     slots: &BTreeMap<Address, CellSlot>,
+     omitted: &mut Vec<OmittedCells>,
+     recording: &mut bool,
++    spans: &mut Vec<ReplacementSpan>,
++    recording_spans: &mut bool,
+ ) -> Result<()> {
+     let start = usize::try_from(row.start)
+         .map_err(|_source| invalid("worksheet row fact does not fit usize"))?;
+@@ -310,12 +328,23 @@
+             let slot = slots
+                 .get(&cell.address)
+                 .ok_or_else(|| invalid("worksheet changed cell lost its materialized slot"))?;
++            let replacement_start = output.len();
+             match action {
+                 Action::Update { .. } => write_cell(output, source, slot, action)?,
+                 Action::Remove => {
+                     return Err(invalid("fact rewrite unexpectedly removes a cell"));
+                 },
+             }
++            record_replacement_span(
++                spans,
++                recording_spans,
++                Span {
++                    start: cell_span_start,
++                    end: cell_span_end,
++                },
++                replacement_start,
++                output.len(),
++            );
+         } else {
+             let start = run.map(|(start, _, _)| start).unwrap_or(cell_start);
+             let first = run.map(|(_, first, _)| first).unwrap_or(cell.address);
+@@ -359,6 +388,8 @@
+     edits: &RowEdits,
+     omitted: &mut Vec<OmittedCells>,
+     recording: &mut bool,
++    spans: &mut Vec<ReplacementSpan>,
++    recording_spans: &mut bool,
+ ) -> Result<()> {
+     output.extend_from_slice(&source[row.span.start..row.tag_end]);
+     let mut cursor = row.tag_end;
+@@ -392,12 +423,20 @@
+             if let Some((start, first, last)) = run.take() {
+                 record_omitted(omitted, recording, first, last, start, cell_start)?;
+             }
++            let replacement_start = output.len();
+             match action {
+                 Action::Update { .. } => write_cell(output, source, cell, action)?,
+                 Action::Remove => {
+                     return Err(invalid("replacement row unexpectedly removes a cell"));
+                 },
+             }
++            record_replacement_span(
++                spans,
++                recording_spans,
++                cell.span,
++                replacement_start,
++                output.len(),
++            );
+         } else {
+             let start = run.map(|(start, _, _)| start).unwrap_or(cell_start);
+             let first = run.map(|(_, first, _)| first).unwrap_or(cell.address);
+@@ -514,6 +553,31 @@
+         end,
+     });
+     Ok(())
++}
++
++fn record_replacement_span(
++    spans: &mut Vec<ReplacementSpan>,
++    recording: &mut bool,
++    original: Span,
++    replacement_start: usize,
++    replacement_end: usize,
++) {
++    if !*recording {
++        return;
++    }
++    if original.start >= original.end
++        || replacement_start >= replacement_end
++        || spans.len() >= MAX_REPLACEMENT_SPANS
++        || spans.try_reserve(1).is_err()
++    {
++        *recording = false;
++        spans.clear();
++        return;
++    }
++    spans.push(ReplacementSpan {
++        original: original.start..original.end,
++        replacement: replacement_start..replacement_end,
++    });
+ }
+ 
+ #[derive(Debug, Default)]
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs
+@@ -27,6 +27,6 @@
+ #[cfg(test)]
+ pub(crate) use package::route;
+ pub(crate) use package::{
+-    OmittedCells, ValueOnlyRewrite, reduced_readback, rewrite, rewrite_merges,
+-    rewrite_value_only_with_provenance,
++    MAX_REPLACEMENT_SPANS, OmittedCells, ValueOnlyRewrite, reduced_readback, rewrite,
++    rewrite_merges, rewrite_value_only_with_provenance,
+ };
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/package.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/package.rs
+@@ -2,6 +2,7 @@
+ 
+ use std::collections::BTreeMap;
+ 
++use litchi_opc::ReplacementSpan;
+ use litchi_sheet::{Cell as Address, Rect};
+ 
+ use super::codec::{
+@@ -10,7 +11,7 @@
+     write_columns, write_defaults, write_new_columns, write_new_defaults, write_root,
+     write_sheet_data, write_sheet_data_from_facts, write_sheet_data_with_provenance, write_tag,
+ };
+-use super::model::{MergePlan, Payload, Plan};
++use super::model::{Action, MergePlan, Payload, Plan};
+ use super::validation::{
+     expanded_dimension, plan_sets_descent, validate_actions, validate_column_actions,
+     validate_defaults_action, validate_row_actions,
+@@ -30,6 +31,9 @@
+     pub(crate) end: usize,
+ }
+ 
++/// Upper bound for optional multi-window replacement metadata.
++pub(crate) const MAX_REPLACEMENT_SPANS: usize = 4_096;
++
+ impl OmittedCells {
+     /// The single-row cell range this omission covers.
+     pub(crate) fn range(&self) -> Option<Rect> {
+@@ -53,6 +57,7 @@
+     pub(crate) source: &'a [u8],
+     pub(crate) bytes: Vec<u8>,
+     pub(crate) omitted: Box<[OmittedCells]>,
++    pub(crate) spans: Box<[ReplacementSpan]>,
+ }
+ pub(crate) fn rewrite(content: &[u8], sheet: &str, plan: impl Into<Plan>) -> Result<Vec<u8>> {
+     let plan = plan.into();
+@@ -177,7 +182,7 @@
+ pub(crate) fn rewrite_value_only_with_provenance<'a>(
+     content: &'a [u8],
+     sheet: &str,
+-    cells: BTreeMap<Address, super::model::Action>,
++    cells: BTreeMap<Address, Action>,
+     facts: Option<&SourceFacts>,
+ ) -> Result<ValueOnlyRewrite<'a>> {
+     let plan = Plan::cells(cells);
+@@ -186,6 +191,7 @@
+             source: content,
+             bytes: content.to_vec(),
+             omitted: Box::new([]),
++            spans: Box::new([]),
+         });
+     }
+ 
+@@ -222,10 +228,12 @@
+             source: content,
+             bytes: rewrite_with_layout(content, sheet, layout, plan)?,
+             omitted: Box::new([]),
++            spans: Box::new([]),
+         });
+     }
+ 
+     let dimension = expanded_dimension(&layout, &plan.cells);
++    let retain_spans = dimension.is_none() && admits_replacement_spans(&layout, &plan.cells);
+     let extension_names = ExtensionNames::plan(&layout, plan_sets_descent(&plan))?;
+     let effects = plan
+         .cells
+@@ -258,26 +266,63 @@
+         cursor = tag.span.end;
+     }
+     output.extend_from_slice(&content[cursor..layout.sheet_data.span.start]);
+-    let omitted = if cells.is_empty() {
++    let (omitted, spans) = if cells.is_empty() {
+         output
+             .extend_from_slice(&content[layout.sheet_data.span.start..layout.sheet_data.span.end]);
+-        Box::new([])
++        (
++            Vec::<OmittedCells>::new().into_boxed_slice(),
++            Vec::<ReplacementSpan>::new().into_boxed_slice(),
++        )
+     } else {
+-        write_sheet_data_with_provenance(
++        let mut spans = Vec::new();
++        let mut recording_spans = retain_spans
++            && spans
++                .try_reserve(cells.len().min(MAX_REPLACEMENT_SPANS))
++                .is_ok();
++        let omitted = write_sheet_data_with_provenance(
+             &mut output,
+             content,
+             &layout.sheet_data,
+             cells,
+             BTreeMap::new(),
+             &extension_names.descent,
+-        )?
++            &mut spans,
++            &mut recording_spans,
++        )?;
++        let spans = if recording_spans {
++            spans.into_boxed_slice()
++        } else {
++            Box::new([])
++        };
++        (omitted, spans)
+     };
+     output.extend_from_slice(&content[layout.sheet_data.span.end..]);
+     Ok(ValueOnlyRewrite {
+         source: content,
+         bytes: output,
+         omitted,
++        spans,
+     })
++}
++
++fn admits_replacement_spans(layout: &Layout, cells: &BTreeMap<Address, Action>) -> bool {
++    cells.len() >= 2
++        && cells.iter().all(|(address, action)| {
++            let Some(number) = address.row().get().checked_add(1) else {
++                return false;
++            };
++            matches!(action, Action::Update { .. })
++                && layout
++                    .sheet_data
++                    .rows
++                    .iter()
++                    .find(|row| row.number == number)
++                    .is_some_and(|row| {
++                        row.cells
++                            .binary_search_by_key(address, |cell| cell.address)
++                            .is_ok()
++                    })
++        })
+ }
+ 
+ /// Test-only accounting of which commit route ran.
+@@ -382,6 +427,7 @@
+     output
+         .try_reserve(extra)
+         .map_err(|source| allocation("worksheet edit output", source))?;
++    let retain_spans = dimension.is_none() && plan.cells.len() >= 2;
+     let Plan { cells, .. } = plan;
+     let mut cursor = 0usize;
+     if let Some((fact, tag, range)) = dimension.as_ref() {
+@@ -396,14 +442,33 @@
+         cursor = fact.span.end;
+     }
+     output.extend_from_slice(&content[cursor..facts.sheet_data.start]);
+-    let omitted = write_sheet_data_from_facts(&mut output, content, facts, cells, &slots)?;
++    let mut spans = Vec::new();
++    let mut recording_spans = retain_spans
++        && spans
++            .try_reserve(cells.len().min(MAX_REPLACEMENT_SPANS))
++            .is_ok();
++    let omitted = write_sheet_data_from_facts(
++        &mut output,
++        content,
++        facts,
++        cells,
++        &slots,
++        &mut spans,
++        &mut recording_spans,
++    )?;
+     output.extend_from_slice(&content[facts.sheet_data.end..]);
+     #[cfg(test)]
+     route::note_accepted();
++    let spans = if recording_spans {
++        spans.into_boxed_slice()
++    } else {
++        Box::new([])
++    };
+     Ok(FactRewrite::Written(ValueOnlyRewrite {
+         source: content,
+         bytes: output,
+         omitted,
++        spans,
+     }))
+ }
+ 
+@@ -423,7 +488,7 @@
+         return false;
+     }
+     plan.cells.iter().all(|(address, action)| {
+-        if matches!(action, super::model::Action::Remove)
++        if matches!(action, Action::Remove)
+             || matches!(action.payload(), Some(Payload::SharedFormula { .. }))
+         {
+             return false;
+@@ -486,15 +551,12 @@
+ /// the retained cell addresses instead of a rebuilt layout.
+ fn expanded_dimension_from_facts(
+     facts: &SourceFacts,
+-    actions: &BTreeMap<Address, super::model::Action>,
++    actions: &BTreeMap<Address, Action>,
+ ) -> Option<(DimensionFact, Rect)> {
+     let dimension = facts.dimension?;
+     let mut bounds = None::<Rect>;
+     for cell in &*facts.cells {
+-        if matches!(
+-            actions.get(&cell.address),
+-            Some(super::model::Action::Remove)
+-        ) {
++        if matches!(actions.get(&cell.address), Some(Action::Remove)) {
+             continue;
+         }
+         let single = Rect::single(cell.address);
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/tests.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/tests.rs
+@@ -239,6 +239,105 @@
+     assert!(!output.contains("<x:v>old-number</x:v>"));
+     assert!(!output.contains("<x:f>SUM(B1)</x:f>"));
+     assert!(!output.contains("<x:t>old-text</x:t>"));
++}
++
++#[test]
++fn provenance_records_changed_cell_windows_and_preserves_length_changed_gaps() {
++    let source = format!(
++        r#"<worksheet xmlns="{S}"><sheetData><row r="1"><c r="A1"><v>1</v></c>  <c r="B1"><v>2</v></c></row></sheetData></worksheet>"#
++    )
++    .into_bytes();
++    let edited = rewrite_value_only_with_provenance(
++        &source,
++        "Data",
++        BTreeMap::from([
++            (
++                Address::from_a1("A1").expect("A1"),
++                Action::set("a longer replacement value".into()),
++            ),
++            (
++                Address::from_a1("B1").expect("B1"),
++                Action::set("short".into()),
++            ),
++        ]),
++        None,
++    )
++    .expect("multi-cell rewrite");
++
++    assert_eq!(edited.spans.len(), 2, "both existing cells get windows");
++    let mut source_cursor = 0;
++    let mut replacement_cursor = 0;
++    for span in &edited.spans {
++        assert_eq!(
++            &source[source_cursor..span.original.start],
++            &edited.bytes[replacement_cursor..span.replacement.start],
++            "unchanged gaps stay byte-identical",
++        );
++        assert!(
++            source[span.original.clone()].starts_with(b"<c "),
++            "source windows cover complete cell elements",
++        );
++        assert!(
++            edited.bytes[span.replacement.clone()].starts_with(b"<c "),
++            "replacement windows cover complete cell elements",
++        );
++        source_cursor = span.original.end;
++        replacement_cursor = span.replacement.end;
++    }
++    assert_eq!(
++        &source[source_cursor..],
++        &edited.bytes[replacement_cursor..],
++        "the trailing gap stays byte-identical",
++    );
++    assert_ne!(source, edited.bytes);
++}
++
++#[test]
++fn provenance_drops_windows_for_single_new_or_removed_cell_changes() {
++    let source = format!(
++        r#"<worksheet xmlns="{S}"><dimension ref="A1:B1"/><sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1"><v>2</v></c></row></sheetData></worksheet>"#
++    )
++    .into_bytes();
++    let rewrite = |actions| {
++        rewrite_value_only_with_provenance(&source, "Data", actions, None)
++            .expect("value-only fallback rewrite")
++    };
++
++    let single = rewrite(BTreeMap::from([(
++        Address::from_a1("A1").expect("A1"),
++        Action::set(3_i32.into()),
++    )]));
++    assert!(
++        single.spans.is_empty(),
++        "one window delegates the old route"
++    );
++
++    let with_new = rewrite(BTreeMap::from([
++        (
++            Address::from_a1("A1").expect("A1"),
++            Action::set(3_i32.into()),
++        ),
++        (
++            Address::from_a1("C1").expect("C1"),
++            Action::set(4_i32.into()),
++        ),
++    ]));
++    assert!(
++        with_new.spans.is_empty(),
++        "new cell changes use the full route"
++    );
++
++    let with_remove = rewrite(BTreeMap::from([
++        (Address::from_a1("A1").expect("A1"), Action::Remove),
++        (
++            Address::from_a1("B1").expect("B1"),
++            Action::set(4_i32.into()),
++        ),
++    ]));
++    assert!(
++        with_remove.spans.is_empty(),
++        "removed cell changes use the full route"
++    );
+ }
+ 
+ #[test]
+--- a/crates/xml-minifier/src/audit.rs
++++ b/crates/xml-minifier/src/audit.rs
+@@ -935,6 +935,22 @@
+     verify_with_policy(input, limits, Policy::SOURCE)
+ }
+ 
++/// One untrusted source/replacement byte-span hint for
++/// [`verify_source_replacement_with_spans`].
++///
++/// A caller may use this low-level type to describe an element-sized change it
++/// already located while producing a replacement. The auditor treats every
++/// field as a hint: it checks the ranges against both payloads, checks that
++/// the corresponding gaps are byte-identical, and falls back to a complete
++/// replacement audit when the hints do not describe a safe set of windows.
++#[derive(Clone, Debug, Eq, PartialEq)]
++pub struct ReplacementSpan {
++    /// The source bytes replaced by this edit.
++    pub original: Range<usize>,
++    /// The replacement bytes that take the source span's place.
++    pub replacement: Range<usize>,
++}
++
+ /// How [`verify_source_replacement`] established the replacement's verdict.
+ ///
+ /// Every variant means the same thing about the replacement: it passed every
+@@ -957,6 +973,17 @@
+         /// The replacement bytes that took its place.
+         replacement: Range<usize>,
+     },
++    /// The replacement was proved by auditing several disjoint element
++    /// windows while the identical gaps retained the original audit's
++    /// verdict.
++    Windows {
++        /// Number of replacement windows that were audited.
++        count: usize,
++        /// Total source bytes occupied by the audited windows.
++        original_bytes: usize,
++        /// Total replacement bytes occupied by the audited windows.
++        replacement_bytes: usize,
++    },
+     /// The replacement was scanned completely, as [`verify_source`] scans it.
+     Complete,
+ }
+@@ -1074,6 +1101,122 @@
+     verify_source(replacement, limits)
+         .map(|_report| ReplacementProof::Complete)
+         .map_err(ReplacementError::Replacement)
++}
++
++/// The maximum number of caller-supplied windows the multi-window candidate
++/// will retain while observing the original. A larger hint set is treated as
++/// untrusted metadata and uses the canonical complete replacement audit.
++const MAX_REPLACEMENT_SPANS: usize = 4_096;
++/// Aggregate bound for retained namespace snapshots in one candidate proof.
++/// A source with larger inherited namespace state falls back to the complete
++/// replacement audit instead of multiplying that state across windows.
++const MAX_REPLACEMENT_NAMESPACE_CLONE_BYTES: usize = 8 * 1024 * 1024;
++
++/// Verifies a source/replacement pair using several caller-supplied element
++/// spans when they can be proved safe.
++///
++/// The hints are deliberately low-level and untrusted. The original is
++/// always audited completely first. For two or more spans, the auditor uses
++/// the original scan to establish that each source range is exactly one
++/// balanced, non-root element and to capture the inherited namespace state at
++/// its boundary. It then audits the corresponding replacement ranges, while
++/// requiring every gap between the ranges to be byte-identical on both sides.
++/// Aggregate event, attribute, text, and byte limits are checked after all
++/// windows are re-totalled.
++///
++/// Any unsupported or ambiguous shape, including an out-of-order, overlapping,
++/// out-of-bounds, non-element, or allocation-failed hint, falls back to the
++/// complete replacement audit. That fallback supplies the canonical
++/// replacement error and offset. A single span deliberately uses
++/// [`verify_source_replacement`] so the established one-window behavior and
++/// proof variant remain unchanged.
++///
++/// # Errors
++///
++/// Returns [`ReplacementError::Original`] when the complete source audit
++/// fails, or [`ReplacementError::Replacement`] with the canonical complete
++/// replacement error when the replacement fails.
++pub fn verify_source_replacement_with_spans(
++    original: &[u8],
++    replacement: &[u8],
++    limits: Limits,
++    spans: &[ReplacementSpan],
++) -> Result<ReplacementProof, ReplacementError> {
++    if spans.len() <= 1 {
++        return verify_source_replacement(original, replacement, limits);
++    }
++
++    // Preserve the exact no-op proof after auditing the original, regardless
++    // of whether a caller supplied stale or otherwise unnecessary hints.
++    if original == replacement {
++        return verify_source(original, limits)
++            .map(|_report| ReplacementProof::Identical)
++            .map_err(ReplacementError::Original);
++    }
++
++    if spans.len() > MAX_REPLACEMENT_SPANS {
++        let _report = verify_source(original, limits).map_err(ReplacementError::Original)?;
++        return verify_source(replacement, limits)
++            .map(|_report| ReplacementProof::Complete)
++            .map_err(ReplacementError::Replacement);
++    }
++
++    let mut search = MultiWindowSearch::new(spans);
++    let report = verify_observed(original, limits, Policy::SOURCE, &mut search)
++        .map_err(ReplacementError::Original)?;
++    if !spans_cover_differences(original, replacement, spans) || !search.complete() {
++        return verify_source(replacement, limits)
++            .map(|_report| ReplacementProof::Complete)
++            .map_err(ReplacementError::Replacement);
++    }
++
++    let Some(proof) = prove_windows(search.windows, report, replacement, limits) else {
++        return verify_source(replacement, limits)
++            .map(|_report| ReplacementProof::Complete)
++            .map_err(ReplacementError::Replacement);
++    };
++    #[cfg(debug_assertions)]
++    debug_check_window_proof(replacement, limits, &proof);
++    Ok(proof)
++}
++
++/// Check the untrusted span layout without parsing either payload.
++///
++/// Every byte outside a supplied replacement range must occur at the same
++/// relative gap on both sides. This proves that the hints cover every changed
++/// byte while keeping the original audit responsible for all XML structure.
++fn spans_cover_differences(original: &[u8], replacement: &[u8], spans: &[ReplacementSpan]) -> bool {
++    let mut original_cursor = 0;
++    let mut replacement_cursor = 0;
++    for span in spans {
++        let original_range = &span.original;
++        let replacement_range = &span.replacement;
++        if original_range.start >= original_range.end
++            || replacement_range.start >= replacement_range.end
++            || original_range.start < original_cursor
++            || replacement_range.start < replacement_cursor
++        {
++            return false;
++        }
++        let Some(original_gap) = original.get(original_cursor..original_range.start) else {
++            return false;
++        };
++        let Some(replacement_gap) = replacement.get(replacement_cursor..replacement_range.start)
++        else {
++            return false;
++        };
++        if original_gap != replacement_gap {
++            return false;
++        }
++        if original.get(original_range.clone()).is_none()
++            || replacement.get(replacement_range.clone()).is_none()
++        {
++            return false;
++        }
++        original_cursor = original_range.end;
++        replacement_cursor = replacement_range.end;
++    }
++    original.get(original_cursor..) == replacement.get(replacement_cursor..)
+ }
+ 
+ /// A shared allocation whose exact bytes passed [`verify_source`] under
+@@ -2298,6 +2441,132 @@
+     }
+ }
+ 
++/// Watches a complete original audit for the exact element ranges named by a
++/// bounded set of replacement hints.
++///
++/// The observer never decides an XML verdict. It only records enough state to
++/// replay each matched element in the replacement. Any allocation failure or
++/// unmatched range makes the caller use the complete replacement audit.
++struct MultiWindowSearch<'s> {
++    spans: &'s [ReplacementSpan],
++    next: usize,
++    open: Vec<(usize, Counters)>,
++    windows: Vec<Window>,
++    namespace_clone_bytes: usize,
++    failed: bool,
++}
++
++impl<'s> MultiWindowSearch<'s> {
++    fn new(spans: &'s [ReplacementSpan]) -> Self {
++        Self {
++            spans,
++            next: 0,
++            open: Vec::new(),
++            windows: Vec::new(),
++            namespace_clone_bytes: 0,
++            failed: false,
++        }
++    }
++
++    fn complete(&self) -> bool {
++        !self.failed && self.next == self.spans.len()
++    }
++
++    fn consider(&mut self, start: usize, end: usize, before: Counters, state: &State) {
++        let Some(span) = self.spans.get(self.next) else {
++            return;
++        };
++        if state.depth == 0 || span.original.start != start || span.original.end != end {
++            return;
++        }
++        let Some(removed) = Counters::of(state).since(before) else {
++            self.failed = true;
++            return;
++        };
++        let Some(namespace_bytes) = state.namespaces.as_ref().map_or_else(
++            || Some(size_of::<Namespaces>()),
++            Namespaces::clone_memory_charge,
++        ) else {
++            self.failed = true;
++            return;
++        };
++        let Some(window_metadata) = size_of::<Window>().checked_sub(size_of::<Namespaces>()) else {
++            self.failed = true;
++            return;
++        };
++        let Some(charge) = namespace_bytes.checked_add(window_metadata) else {
++            self.failed = true;
++            return;
++        };
++        let Some(total) = self.namespace_clone_bytes.checked_add(charge) else {
++            self.failed = true;
++            return;
++        };
++        if total > MAX_REPLACEMENT_NAMESPACE_CLONE_BYTES {
++            self.failed = true;
++            return;
++        }
++        if self.windows.try_reserve(1).is_err() {
++            self.failed = true;
++            return;
++        }
++        let Some(namespaces) = state
++            .namespaces
++            .as_ref()
++            .map_or_else(|| Some(Namespaces::new()), Namespaces::try_clone)
++        else {
++            self.failed = true;
++            return;
++        };
++        let replacement = span.replacement.clone();
++        self.windows.push(Window {
++            original: span.original.clone(),
++            replacement,
++            depth: state.depth,
++            removed,
++            namespaces,
++        });
++        self.namespace_clone_bytes = total;
++        self.next += 1;
++    }
++}
++
++impl Observer for MultiWindowSearch<'_> {
++    #[inline]
++    fn listening(&self) -> bool {
++        !self.failed && self.next < self.spans.len()
++    }
++
++    #[inline]
++    fn accepted(
++        &mut self,
++        token: Token,
++        start: usize,
++        end: usize,
++        before: Counters,
++        state: &State,
++    ) {
++        if self.failed {
++            return;
++        }
++        match token {
++            Token::Start => {
++                if self.open.try_reserve(1).is_err() {
++                    self.failed = true;
++                    return;
++                }
++                self.open.push((start, before));
++            },
++            Token::End => match self.open.pop() {
++                Some((opened, counters)) => self.consider(opened, end, counters, state),
++                None => self.failed = true,
++            },
++            Token::Empty => self.consider(start, end, before, state),
++            Token::Markup | Token::Character => {},
++        }
++    }
++}
++
+ /// One element of an original payload and the replacement bytes that took
+ /// its place.
+ #[derive(Debug)]
+@@ -2347,6 +2616,65 @@
+             replacement: self.replacement,
+         })
+     }
++}
++
++/// Prove several disjoint replacement windows from one complete original
++/// report, or return `None` so the caller performs the canonical complete
++/// replacement audit.
++fn prove_windows(
++    windows: Vec<Window>,
++    original: Report,
++    replacement: &[u8],
++    limits: Limits,
++) -> Option<ReplacementProof> {
++    if replacement.len() > limits.bytes || windows.is_empty() {
++        return None;
++    }
++
++    let count = windows.len();
++    let mut removed = Counters::default();
++    let mut added = Counters::default();
++    let original_bytes = windows.iter().try_fold(0usize, |total, window| {
++        total.checked_add(window.original.len())
++    })?;
++    let replacement_bytes = windows.iter().try_fold(0usize, |total, window| {
++        total.checked_add(window.replacement.len())
++    })?;
++    // A failed multi-window proof must not scan more replacement bytes than
++    // the complete fallback it is intended to avoid. The strict half-payload
++    // boundary mirrors the existing single-window guard.
++    if replacement_bytes > replacement.len() / 2 {
++        return None;
++    }
++    for window in windows {
++        let bytes = replacement.get(window.replacement.clone())?;
++        let counters = audit_window(bytes, limits, window.depth, window.namespaces)?;
++        removed = Counters {
++            attributes: removed.attributes.checked_add(window.removed.attributes)?,
++            events: removed.events.checked_add(window.removed.events)?,
++            text_bytes: removed.text_bytes.checked_add(window.removed.text_bytes)?,
++        };
++        added = Counters {
++            attributes: added.attributes.checked_add(counters.attributes)?,
++            events: added.events.checked_add(counters.events)?,
++            text_bytes: added.text_bytes.checked_add(counters.text_bytes)?,
++        };
++    }
++
++    let totals = Counters {
++        attributes: original.attributes,
++        events: original.events,
++        text_bytes: original.text_bytes,
++    }
++    .replaced(removed, added)?;
++    if !totals.within(limits) {
++        return None;
++    }
++    Some(ReplacementProof::Windows {
++        count,
++        original_bytes,
++        replacement_bytes,
++    })
+ }
+ 
+ /// Audit `bytes` under the source policy as the content that replaced one
+--- a/crates/xml-minifier/src/audit/namespaces.rs
++++ b/crates/xml-minifier/src/audit/namespaces.rs
+@@ -29,7 +29,10 @@
+ //! The keys of every hash are random per audit, so an input cannot choose the
+ //! collisions that would lengthen a comparison chain.
+ 
+-use core::hash::{BuildHasher, BuildHasherDefault, Hasher};
++use core::{
++    hash::{BuildHasher, BuildHasherDefault, Hasher},
++    mem::size_of,
++};
+ use std::collections::{HashMap, HashSet};
+ use std::hash::RandomState;
+ 
+@@ -145,6 +148,25 @@
+             recent: [EMPTY; RECENT],
+             tags: self.tags,
+         })
++    }
++
++    /// A checked logical admission charge for one independent namespace
++    /// snapshot. The hash-map factor deliberately charges more than the
++    /// key/value pair alone, covering bucket control bytes, alignment and
++    /// allocator slack. It is a conservative resource-accounting value, not a
++    /// physical RSS or allocator measurement. Callers charge it before
++    /// cloning, so an overflow or an exhausted aggregate budget falls back to
++    /// the complete audit.
++    pub(super) fn clone_memory_charge(&self) -> Option<usize> {
++        const HASH_ENTRY_FACTOR: usize = 8;
++        let hash_entry_bytes = size_of::<(u64, usize)>().checked_mul(HASH_ENTRY_FACTOR)?;
++        let mut bytes = size_of::<Self>();
++        bytes = bytes.checked_add(self.text.capacity())?;
++        bytes = bytes.checked_add(self.bindings.capacity().checked_mul(size_of::<Binding>())?)?;
++        bytes = bytes.checked_add(self.prefixes.capacity().checked_mul(hash_entry_bytes)?)?;
++        bytes = bytes.checked_add(self.names.capacity().checked_mul(size_of::<Name>())?)?;
++        bytes = bytes.checked_add(self.name_index.capacity().checked_mul(hash_entry_bytes)?)?;
++        Some(bytes)
+     }
+ 
+     fn prefix(&self, binding: usize) -> &[u8] {
+--- a/crates/xml-minifier/tests/source_replacement.rs
++++ b/crates/xml-minifier/tests/source_replacement.rs
+@@ -7,9 +7,11 @@
+     reason = "each test states one fixed expected verdict"
+ )]
+ 
++use core::ops::Range;
++
+ use xml_minifier::audit::{
+-    Error, Limits, ReplacementError, ReplacementProof, Resource, verify_source,
+-    verify_source_replacement,
++    Error, Limits, ReplacementError, ReplacementProof, ReplacementSpan, Resource, verify_source,
++    verify_source_replacement, verify_source_replacement_with_spans,
+ };
+ 
+ /// The two audits the pair API replaces, in their order.
+@@ -39,19 +41,28 @@
+     actual
+ }
+ 
+-fn window(
+-    original: std::ops::Range<usize>,
+-    replacement: std::ops::Range<usize>,
+-) -> ReplacementProof {
++fn window(original: Range<usize>, replacement: Range<usize>) -> ReplacementProof {
+     ReplacementProof::Window {
+         original,
+         replacement,
+     }
+ }
+ 
+-fn span(document: &str, needle: &str) -> std::ops::Range<usize> {
++fn span(document: &str, needle: &str) -> Range<usize> {
+     let start = document.find(needle).expect("fixture needle");
+     start..start + needle.len()
++}
++
++fn replacement_span(
++    original: &str,
++    replacement: &str,
++    original_needle: &str,
++    replacement_needle: &str,
++) -> ReplacementSpan {
++    ReplacementSpan {
++        original: span(original, original_needle),
++        replacement: span(replacement, replacement_needle),
++    }
+ }
+ 
+ const WORKSHEET_HEAD: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n<worksheet xmlns=\"urn:sml\"><dimension ref=\"A1:C3\"/>\n  <sheetData>\n";
+@@ -100,6 +111,395 @@
+     let cell = span(&original, "<c r=\"A1\" s=\"1\"><v>7</v></c>");
+     let edited = span(&replacement, "<c r=\"A1\"><v>123456</v></c>");
+     assert_eq!(proof, window(cell, edited));
++}
++
++#[test]
++fn several_sibling_elements_are_proved_by_independent_windows() {
++    let original = "<r><a>0</a><b>0</b><c>unchanged</c></r>";
++    let replacement = "<r><a>1</a><b>12345</b><c>unchanged</c></r>";
++    let spans = [
++        replacement_span(original, replacement, "<a>0</a>", "<a>1</a>"),
++        replacement_span(original, replacement, "<b>0</b>", "<b>12345</b>"),
++    ];
++    let actual = verify_source_replacement_with_spans(
++        original.as_bytes(),
++        replacement.as_bytes(),
++        Limits::default(),
++        &spans,
++    );
++    assert_eq!(
++        actual,
++        Ok(ReplacementProof::Windows {
++            count: 2,
++            original_bytes: "<a>0</a>".len() + "<b>0</b>".len(),
++            replacement_bytes: "<a>1</a>".len() + "<b>12345</b>".len(),
++        })
++    );
++}
++
++#[test]
++fn multiwindow_replays_inherited_namespace_bindings() {
++    let original =
++        r#"<r xmlns:x="urn"><a x:k="0"/><b x:k="0"/><pad>paddingpaddingpadding</pad></r>"#;
++    let replacement =
++        r#"<r xmlns:x="urn"><a x:k="1"/><b x:k="123"/><pad>paddingpaddingpadding</pad></r>"#;
++    let spans = [
++        replacement_span(original, replacement, r#"<a x:k="0"/>"#, r#"<a x:k="1"/>"#),
++        replacement_span(
++            original,
++            replacement,
++            r#"<b x:k="0"/>"#,
++            r#"<b x:k="123"/>"#,
++        ),
++    ];
++    let proof = verify_source_replacement_with_spans(
++        original.as_bytes(),
++        replacement.as_bytes(),
++        Limits::default(),
++        &spans,
++    )
++    .expect("inherited namespaces are part of the source proof");
++    assert!(matches!(proof, ReplacementProof::Windows { count: 2, .. }));
++}
++
++#[test]
++fn multiwindow_retotals_length_changes_and_shifted_coordinates() {
++    let replacement = "<r><a>123456</a><b>0</b><c>789</c><pad>paddingpaddingpadding</pad></r>";
++    let original = "<r><a>0</a><b>0</b><c>0</c><pad>paddingpaddingpadding</pad></r>";
++    let spans = [
++        replacement_span(original, replacement, "<a>0</a>", "<a>123456</a>"),
++        replacement_span(original, replacement, "<c>0</c>", "<c>789</c>"),
++    ];
++    let expected = oracle(
++        original.as_bytes(),
++        replacement.as_bytes(),
++        Limits::default(),
++    );
++    let actual = verify_source_replacement_with_spans(
++        original.as_bytes(),
++        replacement.as_bytes(),
++        Limits::default(),
++        &spans,
++    );
++    assert!(expected.is_ok(), "{expected:?}");
++    assert!(matches!(
++        actual,
++        Ok(ReplacementProof::Windows { count: 2, .. })
++    ));
++}
++
++#[test]
++fn gaps_outside_hints_force_the_canonical_complete_audit() {
++    let original = "<r><a>0</a><b>0</b><c>0</c></r>";
++    let replacement = "<r><a>1</a><b>0</b><c>2</c></r>";
++    let spans = [
++        replacement_span(original, replacement, "<a>0</a>", "<a>1</a>"),
++        replacement_span(original, replacement, "<b>0</b>", "<b>0</b>"),
++    ];
++    let expected = oracle(
++        original.as_bytes(),
++        replacement.as_bytes(),
++        Limits::default(),
++    );
++    let actual = verify_source_replacement_with_spans(
++        original.as_bytes(),
++        replacement.as_bytes(),
++        Limits::default(),
++        &spans,
++    );
++    assert!(expected.is_ok(), "{expected:?}");
++    assert_eq!(actual, Ok(ReplacementProof::Complete));
++}
++
++#[test]
++fn malformed_window_reports_the_complete_replacement_error() {
++    let original = "<r><a>0</a><b>0</b><c>0</c></r>";
++    let replacement = "<r><a>1</broken><b>2</b><c>0</c></r>";
++    let spans = [
++        replacement_span(original, replacement, "<a>0</a>", "<a>1</broken>"),
++        replacement_span(original, replacement, "<b>0</b>", "<b>2</b>"),
++    ];
++    let expected = oracle(
++        original.as_bytes(),
++        replacement.as_bytes(),
++        Limits::default(),
++    )
++    .expect_err("the replacement is malformed");
++    let actual = verify_source_replacement_with_spans(
++        original.as_bytes(),
++        replacement.as_bytes(),
++        Limits::default(),
++        &spans,
++    );
++    assert_eq!(actual, Err(expected));
++}
++
++#[test]
++fn root_or_non_element_hints_fall_back_without_changing_the_verdict() {
++    let original = "<r><a>0</a><b>0</b></r>";
++    let replacement = "<r><a>1</a><b>0</b></r>";
++    let spans = [
++        ReplacementSpan {
++            original: 0..original.len(),
++            replacement: 0..replacement.len(),
++        },
++        replacement_span(original, replacement, "<a>0</a>", "<a>1</a>"),
++    ];
++    assert_eq!(
++        verify_source_replacement_with_spans(
++            original.as_bytes(),
++            replacement.as_bytes(),
++            Limits::default(),
++            &spans,
++        ),
++        Ok(ReplacementProof::Complete)
++    );
++}
++
++#[test]
++fn aggregate_limits_are_rechecked_after_all_windows() {
++    let original = "<r><a/><b/><pad>paddingpaddingpaddingpadding</pad></r>";
++    let replacement =
++        "<r><a x=\"1\">123</a><b y=\"2\">456</b><pad>paddingpaddingpaddingpadding</pad></r>";
++    let spans = [
++        replacement_span(original, replacement, "<a/>", "<a x=\"1\">123</a>"),
++        replacement_span(original, replacement, "<b/>", "<b y=\"2\">456</b>"),
++    ];
++    for limits in [
++        Limits::builder().events(11).expect("event limit").build(),
++        Limits::builder()
++            .attributes(1)
++            .expect("attribute limit")
++            .build(),
++        Limits::builder()
++            .text_bytes(29)
++            .expect("text limit")
++            .build(),
++    ] {
++        let expected = oracle(original.as_bytes(), replacement.as_bytes(), limits)
++            .expect_err("the replacement exceeds one aggregate limit");
++        let actual = verify_source_replacement_with_spans(
++            original.as_bytes(),
++            replacement.as_bytes(),
++            limits,
++            &spans,
++        );
++        assert_eq!(actual, Err(expected));
++    }
++}
++
++#[test]
++fn more_than_the_bounded_span_cap_uses_the_complete_path() {
++    let count = 4_097;
++    let mut original = String::from("<r>");
++    let mut replacement = String::from("<r>");
++    let mut spans = Vec::with_capacity(count);
++    for index in 0..count {
++        let start = original.len();
++        original.push_str("<a/>");
++        replacement.push_str(if index == 0 { "<b/>" } else { "<a/>" });
++        spans.push(ReplacementSpan {
++            original: start..start + 4,
++            replacement: start..start + 4,
++        });
++    }
++    original.push_str("</r>");
++    replacement.push_str("</r>");
++    assert_eq!(
++        verify_source_replacement_with_spans(
++            original.as_bytes(),
++            replacement.as_bytes(),
++            Limits::default(),
++            &spans,
++        ),
++        Ok(ReplacementProof::Complete)
++    );
++}
++
++#[test]
++fn deep_empty_elements_keep_balanced_non_root_boundaries() {
++    let original = "<r><a><b><c/><e/></b></a><pad>paddingpaddingpadding</pad></r>";
++    let replacement = "<r><a><b><d/><f/></b></a><pad>paddingpaddingpadding</pad></r>";
++    let spans = [
++        replacement_span(original, replacement, "<c/>", "<d/>"),
++        replacement_span(original, replacement, "<e/>", "<f/>"),
++    ];
++    assert!(matches!(
++        verify_source_replacement_with_spans(
++            original.as_bytes(),
++            replacement.as_bytes(),
++            Limits::default(),
++            &spans,
++        ),
++        Ok(ReplacementProof::Windows { count: 2, .. })
++    ));
++}
++
++#[test]
++fn invalid_original_precedes_invalid_span_hints() {
++    let original = b"<r><a></r>";
++    let replacement = b"<r><a>1</a></r>";
++    let spans = [
++        ReplacementSpan {
++            original: usize::MAX - 1..usize::MAX,
++            replacement: usize::MAX - 1..usize::MAX,
++        },
++        ReplacementSpan {
++            original: 0..0,
++            replacement: 0..0,
++        },
++    ];
++    let actual =
++        verify_source_replacement_with_spans(original, replacement, Limits::default(), &spans);
++    assert!(matches!(&actual, Err(ReplacementError::Original(_))));
++    assert_eq!(
++        actual.map(|_| ()),
++        oracle(original, replacement, Limits::default())
++    );
++}
++
++#[test]
++fn reversed_spans_fall_back_with_the_oracle_verdict() {
++    let original = "<r><a>0</a><b>0</b><c>0</c><pad>paddingpaddingpadding</pad></r>";
++    let replacement = "<r><a>1</a><b>2</b><c>0</c><pad>paddingpaddingpadding</pad></r>";
++    let spans = [
++        replacement_span(original, replacement, "<b>0</b>", "<b>2</b>"),
++        replacement_span(original, replacement, "<a>0</a>", "<a>1</a>"),
++    ];
++    assert_eq!(
++        verify_source_replacement_with_spans(
++            original.as_bytes(),
++            replacement.as_bytes(),
++            Limits::default(),
++            &spans,
++        ),
++        Ok(ReplacementProof::Complete)
++    );
++}
++
++#[test]
++fn overlapping_and_nested_spans_fall_back_without_a_partial_proof() {
++    let original = "<r><a><b>0</b></a><pad>paddingpaddingpadding</pad></r>";
++    let replacement = "<r><a><b>1</b></a><pad>paddingpaddingpadding</pad></r>";
++    let spans = [
++        replacement_span(original, replacement, "<a><b>0</b></a>", "<a><b>1</b></a>"),
++        replacement_span(original, replacement, "<b>0</b>", "<b>1</b>"),
++    ];
++    assert_eq!(
++        verify_source_replacement_with_spans(
++            original.as_bytes(),
++            replacement.as_bytes(),
++            Limits::default(),
++            &spans,
++        ),
++        Ok(ReplacementProof::Complete)
++    );
++}
++
++#[test]
++fn malformed_ranges_on_valid_inputs_use_the_complete_path() {
++    let original = "<r><a>0</a><b>0</b><pad>paddingpaddingpadding</pad></r>";
++    let replacement = "<r><a>1</a><b>2</b><pad>paddingpaddingpadding</pad></r>";
++    let valid = replacement_span(original, replacement, "<b>0</b>", "<b>2</b>");
++    let cases = [
++        ReplacementSpan {
++            original: 0..0,
++            replacement: 0..0,
++        },
++        ReplacementSpan {
++            original: Range { start: 10, end: 9 },
++            replacement: Range { start: 10, end: 9 },
++        },
++        ReplacementSpan {
++            original: 0..original.len() + 1,
++            replacement: 0..replacement.len() + 1,
++        },
++        ReplacementSpan {
++            original: original.len() + 1..original.len() + 2,
++            replacement: replacement.len() + 1..replacement.len() + 2,
++        },
++    ];
++    for malformed in cases {
++        assert_eq!(
++            verify_source_replacement_with_spans(
++                original.as_bytes(),
++                replacement.as_bytes(),
++                Limits::default(),
++                &[malformed, valid.clone()],
++            ),
++            Ok(ReplacementProof::Complete)
++        );
++    }
++}
++
++#[test]
++fn valid_but_wrong_element_hints_cannot_hide_a_distant_edit() {
++    let original = "<r><a>0</a><b>0</b><c>0</c><pad>paddingpaddingpadding</pad></r>";
++    let replacement = "<r><a>1</a><b>0</b><c>0</c><pad>paddingpaddingpadding</pad></r>";
++    let spans = [
++        replacement_span(original, replacement, "<b>0</b>", "<b>0</b>"),
++        replacement_span(original, replacement, "<c>0</c>", "<c>0</c>"),
++    ];
++    assert_eq!(
++        verify_source_replacement_with_spans(
++            original.as_bytes(),
++            replacement.as_bytes(),
++            Limits::default(),
++            &spans,
++        ),
++        Ok(ReplacementProof::Complete)
++    );
++}
++
++#[test]
++fn replacement_byte_limit_is_checked_before_multiwindow_success() {
++    let original = "<r><a/><b/><pad>paddingpaddingpadding</pad></r>";
++    let replacement = "<r><a>1</a><b>2</b><pad>paddingpaddingpadding</pad></r>";
++    let spans = [
++        replacement_span(original, replacement, "<a/>", "<a>1</a>"),
++        replacement_span(original, replacement, "<b/>", "<b>2</b>"),
++    ];
++    let limits = Limits::builder()
++        .bytes(replacement.len() - 1)
++        .expect("replacement byte limit")
++        .build();
++    let expected = oracle(original.as_bytes(), replacement.as_bytes(), limits)
++        .expect_err("the replacement exceeds the byte limit");
++    assert_eq!(
++        verify_source_replacement_with_spans(
++            original.as_bytes(),
++            replacement.as_bytes(),
++            limits,
++            &spans,
++        ),
++        Err(expected)
++    );
++}
++
++#[test]
++fn namespace_snapshot_budget_falls_back_before_multiplication() {
++    let namespace = "u".repeat(5_000_000);
++    let original =
++        format!(r#"<r xmlns:x="{namespace}"><a/><b/><pad>paddingpaddingpadding</pad></r>"#);
++    let replacement =
++        format!(r#"<r xmlns:x="{namespace}"><c/><d/><pad>paddingpaddingpadding</pad></r>"#);
++    let spans = [
++        replacement_span(&original, &replacement, "<a/>", "<c/>"),
++        replacement_span(&original, &replacement, "<b/>", "<d/>"),
++    ];
++    let limits = Limits::builder()
++        .token_bytes(8 * 1024 * 1024)
++        .expect("large namespace token limit")
++        .build();
++    assert_eq!(
++        verify_source_replacement_with_spans(
++            original.as_bytes(),
++            replacement.as_bytes(),
++            limits,
++            &spans,
++        ),
++        Ok(ReplacementProof::Complete)
++    );
+ }
+ 
+ #[test]

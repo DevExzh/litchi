@@ -1,0 +1,151 @@
+{
+  "builds_started_by_this_run": false,
+  "checks": [
+    {
+      "id": "hash_freeze_v1",
+      "status": "pass"
+    },
+    {
+      "id": "hash_freeze_v2",
+      "status": "pass"
+    },
+    {
+      "id": "hash_history_v2",
+      "status": "pass"
+    },
+    {
+      "id": "hash_freeze_receipt_v2",
+      "status": "pass"
+    },
+    {
+      "id": "hash_prior_controls",
+      "status": "pass"
+    },
+    {
+      "changed_line_count": 9,
+      "diff_sha256": "159492296ad92c20d0231381ae2d4802de363ee8fa3495670c4189f0a80a87ab",
+      "hunks": [
+        "@@ -136,10 +136,13 @@\n"
+      ],
+      "id": "v2_delta_is_source_binding_only",
+      "status": "pass"
+    },
+    {
+      "error": "FreezeError: source manifest identity changed",
+      "id": "v1_rejects_missing_top_level_baseline_census",
+      "status": "pass"
+    },
+    {
+      "candidate_files": [
+        "crates/litchi-opc/src/lib.rs",
+        "crates/litchi-opc/src/source_backed.rs",
+        "crates/litchi-xlsx/src/cell_values/facts_oracle_tests.rs",
+        "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/edit/package.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/edit/tests.rs",
+        "crates/xml-minifier/src/audit.rs",
+        "crates/xml-minifier/src/audit/namespaces.rs",
+        "crates/xml-minifier/tests/source_replacement.rs"
+      ],
+      "file_count": 10789,
+      "id": "v2_actual_source_binding_passes",
+      "source_commit": "b6c5c80ffbcb60736d6c4c2f3b590838640008a9",
+      "status": "pass"
+    },
+    {
+      "id": "source_binding_inputs_unchanged",
+      "status": "pass"
+    },
+    {
+      "baseline_file_count": 10789,
+      "candidate_file_count": 10789,
+      "id": "historical_file_list_count_is_bound_by_source_export",
+      "source_export_file_count": 10789,
+      "status": "pass"
+    },
+    {
+      "id": "observed_baseline_manifest_commit_matches_export",
+      "status": "pass"
+    },
+    {
+      "id": "negative_candidate_count_mismatch_rejected",
+      "status": "pass"
+    },
+    {
+      "id": "negative_export_count_mismatch_rejected",
+      "status": "pass"
+    },
+    {
+      "id": "negative_candidate_base_commit_mismatch_rejected",
+      "status": "pass"
+    }
+  ],
+  "files": {
+    "freeze_receipt_v2": {
+      "bytes": 2651,
+      "expected_sha256": "f9a0e98692ec428d0f0f55411dea0fa7ea25026473595a9381d493c391f5ac22",
+      "path": "/home/zhuhe/litchi-performance-0948/receipts/protocol-helper-freeze-v2.json",
+      "sha256": "f9a0e98692ec428d0f0f55411dea0fa7ea25026473595a9381d493c391f5ac22"
+    },
+    "freeze_v1": {
+      "bytes": 12524,
+      "expected_sha256": "e6aae99debef66ac845d9afb7a6fc4437d4ef57c945b7395c17b1a9c000f192a",
+      "path": "/home/zhuhe/litchi-performance-0948/tools/freeze_0948_v1.py",
+      "sha256": "e6aae99debef66ac845d9afb7a6fc4437d4ef57c945b7395c17b1a9c000f192a"
+    },
+    "freeze_v2": {
+      "bytes": 12700,
+      "expected_sha256": "b6847e3b5f6bf35df9b971716c36830a2ba153faa93561ab3a5d67ef189e03e0",
+      "path": "/home/zhuhe/litchi-performance-0948/tools/freeze_0948_v2.py",
+      "sha256": "b6847e3b5f6bf35df9b971716c36830a2ba153faa93561ab3a5d67ef189e03e0"
+    },
+    "history_v2": {
+      "bytes": 2466,
+      "expected_sha256": "bbf260e11b9ffb8388d8fedf63fbcf8238679d936bac6d3a5b1627befe4efd67",
+      "path": "/home/zhuhe/litchi-performance-0948/PROTOCOL-HISTORY-v2.md",
+      "sha256": "bbf260e11b9ffb8388d8fedf63fbcf8238679d936bac6d3a5b1627befe4efd67"
+    },
+    "prior_controls": {
+      "bytes": 4725,
+      "expected_sha256": "ecbbf311342afe1affe6d577fffb23caa7be74ddf9b00690306c09e2adf8a7ca",
+      "path": "/home/zhuhe/litchi-performance-0948/review/protocol/review_protocol_0948_v4-final.json",
+      "sha256": "ecbbf311342afe1affe6d577fffb23caa7be74ddf9b00690306c09e2adf8a7ca"
+    }
+  },
+  "notes": [
+    "v2 removes only invalid top-level file_count/source_root assumptions from the historical baseline file-list manifest.",
+    "The actual baseline manifest source_commit also matches source-export-v1.json; final plan/build preflight remains separate."
+  ],
+  "prior_full_controls": {
+    "path": "/home/zhuhe/litchi-performance-0948/review/protocol/review_protocol_0948_v4-final.json",
+    "sha256": "ecbbf311342afe1affe6d577fffb23caa7be74ddf9b00690306c09e2adf8a7ca",
+    "status": "reused; not rerun"
+  },
+  "schema": "litchi.performance.0948.freeze-v2-source-binding-review.v2",
+  "scope": "freeze_0948_v2 source-binding delta only; prior v4 synthetic controls reused",
+  "source_binding": {
+    "baseline_manifest": {
+      "path": "/home/zhuhe/litchi-performance-0948/baseline-source-manifest-v1.json",
+      "sha256": "dd66b044540d185c448cae78b16e9aa61556a10f01252e27f2075f48aa5121c2"
+    },
+    "candidate_manifest": {
+      "path": "/home/zhuhe/litchi-performance-0948/candidate-build-manifest-v3.json",
+      "sha256": "f565a52b36e8657453448d1f097179002b8fd7c95b4417996f62e1cbf6a4b992"
+    },
+    "helper": {
+      "path": "/home/zhuhe/litchi-performance-0948/tools/freeze_0948_v2.py",
+      "sha256": "b6847e3b5f6bf35df9b971716c36830a2ba153faa93561ab3a5d67ef189e03e0"
+    },
+    "observed_candidate_file_count": 10789,
+    "observed_changed_file_count": 11,
+    "observed_source_commit": "b6c5c80ffbcb60736d6c4c2f3b590838640008a9",
+    "source_export": {
+      "path": "/home/zhuhe/litchi-performance-0948/source-export-v1.json",
+      "sha256": "b59d75474d301c1a4cb357ecbe899043e2aba7dd4b8db6509b5adb38eaededf5"
+    }
+  },
+  "status": "pass",
+  "workloads_started_by_this_run": false
+}

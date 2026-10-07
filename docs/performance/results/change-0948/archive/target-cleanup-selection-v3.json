@@ -1,0 +1,212 @@
+{
+  "disposable_bytes": 51850203420,
+  "disposable_file_count": 28826,
+  "disposable_roots": [
+    {
+      "bytes": 2343689006,
+      "dirs": 333,
+      "files": 1781,
+      "path": "target-candidate-native-v2",
+      "symlinks": []
+    },
+    {
+      "bytes": 2350363564,
+      "dirs": 333,
+      "files": 1781,
+      "path": "target-candidate-allocator-v2",
+      "symlinks": []
+    },
+    {
+      "bytes": 1040,
+      "dirs": 0,
+      "files": 1,
+      "path": "target-candidate-native-v3/.rustc_info.json",
+      "symlinks": []
+    },
+    {
+      "bytes": 1040,
+      "dirs": 0,
+      "files": 1,
+      "path": "target-candidate-allocator-v3/.rustc_info.json",
+      "symlinks": []
+    },
+    {
+      "bytes": 1962041855,
+      "dirs": 326,
+      "files": 1106,
+      "path": "quality/final-v3-target",
+      "symlinks": []
+    },
+    {
+      "bytes": 0,
+      "dirs": 0,
+      "files": 1,
+      "path": "target-candidate-native-v3/release/.cargo-lock",
+      "symlinks": []
+    },
+    {
+      "bytes": 306606,
+      "dirs": 258,
+      "files": 986,
+      "path": "target-candidate-native-v3/release/.fingerprint",
+      "symlinks": []
+    },
+    {
+      "bytes": 203834017,
+      "dirs": 69,
+      "files": 166,
+      "path": "target-candidate-native-v3/release/build",
+      "symlinks": []
+    },
+    {
+      "bytes": 1873335219,
+      "dirs": 0,
+      "files": 625,
+      "path": "target-candidate-native-v3/release/deps",
+      "symlinks": []
+    },
+    {
+      "bytes": 0,
+      "dirs": 0,
+      "files": 0,
+      "path": "target-candidate-native-v3/release/examples",
+      "symlinks": []
+    },
+    {
+      "bytes": 0,
+      "dirs": 0,
+      "files": 0,
+      "path": "target-candidate-native-v3/release/incremental",
+      "symlinks": []
+    },
+    {
+      "bytes": 395783,
+      "dirs": 0,
+      "files": 1,
+      "path": "target-candidate-native-v3/release/litchi-perf-baseline.d",
+      "symlinks": []
+    },
+    {
+      "bytes": 0,
+      "dirs": 0,
+      "files": 1,
+      "path": "target-candidate-allocator-v3/release/.cargo-lock",
+      "symlinks": []
+    },
+    {
+      "bytes": 306724,
+      "dirs": 258,
+      "files": 986,
+      "path": "target-candidate-allocator-v3/release/.fingerprint",
+      "symlinks": []
+    },
+    {
+      "bytes": 203834224,
+      "dirs": 69,
+      "files": 166,
+      "path": "target-candidate-allocator-v3/release/build",
+      "symlinks": []
+    },
+    {
+      "bytes": 1876648540,
+      "dirs": 0,
+      "files": 625,
+      "path": "target-candidate-allocator-v3/release/deps",
+      "symlinks": []
+    },
+    {
+      "bytes": 0,
+      "dirs": 0,
+      "files": 0,
+      "path": "target-candidate-allocator-v3/release/examples",
+      "symlinks": []
+    },
+    {
+      "bytes": 0,
+      "dirs": 0,
+      "files": 0,
+      "path": "target-candidate-allocator-v3/release/incremental",
+      "symlinks": []
+    },
+    {
+      "bytes": 395931,
+      "dirs": 0,
+      "files": 1,
+      "path": "target-candidate-allocator-v3/release/litchi-perf-baseline-alloc.d",
+      "symlinks": []
+    },
+    {
+      "bytes": 1096575090,
+      "dirs": 653,
+      "files": 2451,
+      "path": "quality/final/target-candidate",
+      "symlinks": []
+    },
+    {
+      "bytes": 3255986769,
+      "dirs": 1332,
+      "files": 4801,
+      "path": "quality/final-v2/target-candidate",
+      "symlinks": []
+    },
+    {
+      "bytes": 29129534974,
+      "dirs": 480,
+      "files": 2606,
+      "path": "quality/final-v3/target-candidate-focused-xlsx-integration-v1",
+      "symlinks": []
+    },
+    {
+      "bytes": 60725559,
+      "dirs": 26,
+      "files": 90,
+      "path": "quality/final-v4/target-baseline",
+      "symlinks": []
+    },
+    {
+      "bytes": 7262483088,
+      "dirs": 1518,
+      "files": 10120,
+      "path": "quality/final-v4/target-candidate",
+      "symlinks": []
+    },
+    {
+      "bytes": 43840811,
+      "dirs": 40,
+      "files": 170,
+      "path": "quality/final-v4/target-xml-clippy-baseline-v1",
+      "symlinks": []
+    },
+    {
+      "bytes": 43821818,
+      "dirs": 28,
+      "files": 98,
+      "path": "quality/final-v4/target-xml-clippy-candidate-v5",
+      "symlinks": []
+    },
+    {
+      "bytes": 65649883,
+      "dirs": 33,
+      "files": 128,
+      "path": "quality/final-v4/target-xml-v6-focused-v1",
+      "symlinks": []
+    },
+    {
+      "bytes": 76431879,
+      "dirs": 33,
+      "files": 134,
+      "path": "quality/final-v4/target-xml-v7-focused-v1",
+      "symlinks": []
+    }
+  ],
+  "disposable_symlinks": 0,
+  "policy": "remove only listed target build intermediates; preserve exact v3 executable paths and all binaries/role copies",
+  "preserved_binary_bytes": 534982160,
+  "preserved_files": [
+    "target-candidate-allocator-v3/release/litchi-perf-baseline-alloc",
+    "target-candidate-native-v3/release/litchi-perf-baseline"
+  ],
+  "root": "/home/zhuhe/litchi-performance-0948",
+  "schema": "litchi.performance.0948.target-cleanup-selection.v3",
+  "status": "inventory_only_not_deleted"
+}

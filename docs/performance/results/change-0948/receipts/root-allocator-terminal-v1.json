@@ -1,0 +1,12 @@
+{
+  "schema": "litchi.performance.0948.root-allocator-terminal.v1",
+  "created_utc": "2026-10-07T05:14:31.721805+00:00",
+  "session_id": 70488,
+  "exit_code": 0,
+  "retries": 0,
+  "capture": {
+    "path": "allocator/capture.json",
+    "bytes": 182648,
+    "sha256": "9e335997539b9ced76e8d0998b0798dd44b5d575be534a5cbd4dbd962c896ff1"
+  }
+}

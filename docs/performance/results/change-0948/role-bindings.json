@@ -1,0 +1,30 @@
+{
+  "baseline": {
+    "allocator": {
+      "build_binding_id": "baseline1",
+      "build_receipt": "receipts/baseline-reuse-v2.json",
+      "build_revision": "v1",
+      "path": "binaries/baseline-allocator"
+    },
+    "native": {
+      "build_binding_id": "baseline1",
+      "build_receipt": "receipts/baseline-reuse-v2.json",
+      "build_revision": "v1",
+      "path": "binaries/baseline-native"
+    }
+  },
+  "candidate": {
+    "allocator": {
+      "build_binding_id": "candidate2",
+      "build_receipt": "builds/candidate-allocator-v3/terminal.json",
+      "build_revision": "v3",
+      "path": "binaries/candidate-v3-preserved/litchi-perf-baseline-alloc"
+    },
+    "native": {
+      "build_binding_id": "candidate2",
+      "build_receipt": "builds/candidate-native-v3/terminal.json",
+      "build_revision": "v3",
+      "path": "binaries/candidate-v3-preserved/litchi-perf-baseline"
+    }
+  }
+}

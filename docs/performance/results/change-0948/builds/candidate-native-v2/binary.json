@@ -1,0 +1,21 @@
+{
+  "binary": {
+    "bytes": 265824576,
+    "executable": true,
+    "mode": 509,
+    "path": "target-candidate-native-v2/release/litchi-perf-baseline",
+    "sha256": "17344fad7c4c74f1c2d270a4d99caafceb4c805e1753e45432e0ebc35e9c690c",
+    "status": "present",
+    "terminal_receipt": "builds/candidate-native-v2/terminal.json",
+    "terminal_sha256": "983efd0f0767fbc4bb235cfba418f8f982da1b39c53081f1cc52c0a1f2b027b5"
+  },
+  "build_terminal": {
+    "bytes": 8566,
+    "executable": false,
+    "mode": 436,
+    "path": "builds/candidate-native-v2/terminal.json",
+    "sha256": "983efd0f0767fbc4bb235cfba418f8f982da1b39c53081f1cc52c0a1f2b027b5"
+  },
+  "schema": "litchi.performance.0948.candidate-native-binary-receipt-v2",
+  "source_commit": "b6c5c80ffbcb60736d6c4c2f3b590838640008a9"
+}

@@ -1,0 +1,46 @@
+{
+  "schema": "litchi.performance.0948.root-qualification-go.v1",
+  "created_utc": "2026-10-07T04:56:56.214233+00:00",
+  "status": "authorized",
+  "argv": [
+    "python3",
+    "-B",
+    "tools/capture_0948_v3.py",
+    "qualification"
+  ],
+  "cwd": "/home/zhuhe/litchi-performance-0948",
+  "environment_override": {
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "known_baseline_quality_failures": [
+    "XML all-target Clippy: attribute_summary_probe single_char_add_str",
+    "OPC package fmt: source_fingerprint_quality.rs"
+  ],
+  "refs": [
+    {
+      "path": "plan-v3.json",
+      "bytes": 10861,
+      "sha256": "e4bb028993ec25b0b538616153a09b17fdfb26b91c8255336eab9393d87de73f"
+    },
+    {
+      "path": "tools/capture_0948_v3.py",
+      "bytes": 44255,
+      "sha256": "23619b6071c10cf373f2d748a46a0162b65b4839a356027c43feec4925699c8b"
+    },
+    {
+      "path": "review/protocol/review_protocol_0948_v7-schedule-control.json",
+      "bytes": 1342,
+      "sha256": "268e661880d516c2141ddfaa1b2c27afe634fba9a56b4bc8e7a5a385ac4824a4"
+    },
+    {
+      "path": "receipts/source-v5-v7-reuse-bridge-v1.json",
+      "bytes": 191739,
+      "sha256": "502e13536d365cb3f2e4af12652c3108cae483a00ae8c4d17a3dc07280e86f7f"
+    },
+    {
+      "path": "quality/final-v4/xml-v7-focused-v1.summary.json",
+      "bytes": 2023,
+      "sha256": "21e17a7a3e3c76fe05ffe33b80e60ea441d90ba08be83a72ddbccdf261a409dd"
+    }
+  ]
+}

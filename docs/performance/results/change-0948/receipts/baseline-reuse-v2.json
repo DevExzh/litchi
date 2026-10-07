@@ -1,0 +1,124 @@
+{
+  "all_selected_tracked_build_inputs_equal": true,
+  "baseline_head": "b6c5c80ffbcb60736d6c4c2f3b590838640008a9",
+  "binaries": [
+    {
+      "build_receipt": {
+        "bytes": 5268,
+        "executable": false,
+        "mode": 436,
+        "path": "references/0945-candidate-native/terminal.json",
+        "sha256": "c321315a84c69b8202499b969a2b1bf67aad9bf10e122da04f68d55eb24c1266"
+      },
+      "bytes": 265669200,
+      "executable": true,
+      "kind": "native",
+      "mode": 509,
+      "original_path": "/home/zhuhe/litchi-performance-0945/target-candidate-native-v2/release/litchi-perf-baseline",
+      "path": "binaries/baseline-native",
+      "prior_build_command_source": "references/0945-candidate-native/build_candidate_native_v2.py",
+      "sha256": "087aec962f5251d1255e7a54dc188e53f9b8a722c5da95eaa1c69439caa138c8"
+    },
+    {
+      "build_receipt": {
+        "bytes": 5368,
+        "executable": false,
+        "mode": 436,
+        "path": "references/0945-candidate-allocator/terminal.json",
+        "sha256": "a3cb0e4a7cf6fa395618fe4ce1d3b888f04c7c559d0171743d7429e679f6a03a"
+      },
+      "bytes": 269016128,
+      "executable": true,
+      "kind": "allocator",
+      "mode": 509,
+      "original_path": "/home/zhuhe/litchi-performance-0945/target-candidate-allocator-v2/release/litchi-perf-baseline-alloc",
+      "path": "binaries/baseline-allocator",
+      "prior_build_command_source": "references/0945-candidate-allocator/build_candidate_allocator_v2.py",
+      "sha256": "c19971a7e923accd822e9744382aa757d0a67d9d7ba4e47e27354e05767de713"
+    }
+  ],
+  "checked_files": 10788,
+  "extra_root_lockfile": "0948 ignored root Cargo.lock copied for quality checks only; standalone perf builds consume their own tracked tools/perf-baseline/Cargo.lock, which matches.",
+  "historical_source_closure": {
+    "closure_selection": {
+      "bytes": 754,
+      "executable": false,
+      "mode": 436,
+      "path": "references/0945-source-equivalence/source-closure-selection.json",
+      "sha256": "ffec8134b4d49b26bb68f57213b97b3c3a44439c735df1ec14ba4fbec42f4f21"
+    },
+    "export": {
+      "bytes": 734,
+      "executable": false,
+      "mode": 436,
+      "path": "references/0945-source-equivalence/export-receipt.json",
+      "sha256": "1bc0724ffb9b00910bcbf3453bd9bfd6e22133a4e1e534c1b49349ba3c1fda4b"
+    },
+    "manifest": {
+      "bytes": 3674260,
+      "executable": false,
+      "mode": 436,
+      "path": "references/0945-source-equivalence/source-build-manifest.json",
+      "sha256": "b63113ce5251218be817ba29c466b0ace535c546a416b97413ae8a73f0caea64"
+    },
+    "origin_commit": "933ee45cbb5d2ef9dc29583f7ec890ad234e04fb"
+  },
+  "prior_candidate_source_manifest": {
+    "bytes": 3048241,
+    "executable": false,
+    "mode": 436,
+    "path": "references/0945-source-equivalence/candidate-source-manifest-v2.json",
+    "sha256": "da7128f699b4bf7a9a4745e99b99606830df1aa192ce389a0b7fe3cceb8a0994"
+  },
+  "schema": "litchi.performance.0948.baseline-reuse.v2",
+  "source_equivalence": {
+    "closure_selection": {
+      "bytes": 754,
+      "executable": false,
+      "mode": 436,
+      "path": "references/0945-source-equivalence/source-closure-selection.json",
+      "sha256": "ffec8134b4d49b26bb68f57213b97b3c3a44439c735df1ec14ba4fbec42f4f21"
+    },
+    "compared_fields": [
+      "path",
+      "bytes",
+      "sha256",
+      "git_oid",
+      "git_mode"
+    ],
+    "comparison": "per-path path, bytes, SHA-256, Git blob, and Git mode equality after excluding the untracked root Cargo.lock",
+    "current_commit": "b6c5c80ffbcb60736d6c4c2f3b590838640008a9",
+    "current_manifest": {
+      "bytes": 2993814,
+      "executable": false,
+      "mode": 436,
+      "path": "references/0945-source-equivalence/current-selected-manifest-v2.json",
+      "sha256": "8e2e9e923b75f741266e1332dced8121642f60b3a9be0dad4b27f6479a534dea"
+    },
+    "file_count": 10788,
+    "matched_path_count": 10788,
+    "mismatches": {
+      "bytes": 0,
+      "git_mode": 0,
+      "git_oid": 0,
+      "path": 0,
+      "sha256": 0
+    },
+    "original_commit": "e037befa6ce52b3988c8ae2032ae652196f2a09d",
+    "original_export": {
+      "bytes": 963,
+      "executable": false,
+      "mode": 436,
+      "path": "references/0945-source-equivalence/source-equivalence-export-v2.json",
+      "sha256": "9f01d8674df9842f542e8b1f92be4dd060d93ab7e5d77cff93ef64675f68754a"
+    },
+    "original_manifest": {
+      "bytes": 2993791,
+      "executable": false,
+      "mode": 436,
+      "path": "references/0945-source-equivalence/prior-candidate-selected-manifest-v2.json",
+      "sha256": "433cb410879bc2e269a55584af18ef33d2604121b21220b10f2d07ebc7f27454"
+    }
+  },
+  "status": "pass"
+}

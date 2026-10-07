@@ -1,0 +1,100 @@
+{
+  "base_commit": "b6c5c80ffbcb60736d6c4c2f3b590838640008a9",
+  "candidate_input_root": "candidate-source-v2",
+  "changes": [
+    {
+      "baseline_bytes": 4490,
+      "baseline_sha256": "6405b4319858d18f75d65ef967b62991eb6e62f62e78eb150ecaf520bd95abb6",
+      "candidate_bytes": 4507,
+      "candidate_sha256": "1a9c1cc6810b343aa5647aab9aa60e09adf14fc63b6cc0459196316ffac442a2",
+      "path": "crates/litchi-opc/src/lib.rs"
+    },
+    {
+      "baseline_bytes": 942148,
+      "baseline_sha256": "5e0cf3451e70784ff76896b0b2dc93b4409b15db9ef7c88535cc6a20885f8c43",
+      "candidate_bytes": 950512,
+      "candidate_sha256": "571ec3e2e08d11626b5ce489c5d7de498445c1dd72441692306772c1893c3498",
+      "path": "crates/litchi-opc/src/source_backed.rs"
+    },
+    {
+      "baseline_bytes": 21140,
+      "baseline_sha256": "2c64b8c6e33dbb9a8ee983d3a1d3eb1bb0af5134d1877a5c6f145c7b8b26d3bf",
+      "candidate_bytes": 22277,
+      "candidate_sha256": "d944229e02497fffb2d1307141a7b77646e8b61fb3e6a11a9864a59be9b57792",
+      "path": "crates/litchi-xlsx/src/cell_values/facts_oracle_tests.rs"
+    },
+    {
+      "baseline_bytes": 134510,
+      "baseline_sha256": "fff0da0fd3fe86824ba6a84531ad81d8499ebff0e73c824e4c16bf53d77129a5",
+      "candidate_bytes": 142066,
+      "candidate_sha256": "d1afeb511def3ab46d55b77ee067d5937d90ead82b38b8d58b414ddf3f1238e4",
+      "path": "crates/litchi-xlsx/src/cell_values/snapshot.rs"
+    },
+    {
+      "baseline_bytes": 33049,
+      "baseline_sha256": "b462dc62df4cd24f6964464a4166eab3c1a78715e9a2d0004ef21b182a807da4",
+      "candidate_bytes": 34873,
+      "candidate_sha256": "8b2079cd3c5437d7e7113e5d4486bed9ed8eb677e87ace82c63b8ce1559f5084",
+      "path": "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs"
+    },
+    {
+      "baseline_bytes": 27039,
+      "baseline_sha256": "c6d5c29fecac0b67415014cad92e7c4fa08bfe88eeee8145d9ab59777543a202",
+      "candidate_bytes": 29071,
+      "candidate_sha256": "6903258ce4162c5208995d0436bd3f6b0c163ca6ab206bafad6b3f7bb87247ee",
+      "path": "crates/litchi-xlsx/src/raw/worksheet/edit/package.rs"
+    },
+    {
+      "baseline_bytes": 53527,
+      "baseline_sha256": "475619b8f989bd62297c6e3ef8c100bb162bafc0bd95ba664936bf0171f78d9c",
+      "candidate_bytes": 56639,
+      "candidate_sha256": "82a921f56b589e555f64c12d74595011bb6562e2ad9503bb95d99d38ab664cc1",
+      "path": "crates/litchi-xlsx/src/raw/worksheet/edit/tests.rs"
+    },
+    {
+      "baseline_bytes": 126817,
+      "baseline_sha256": "eddc437156c976c55ce36b0bf8f0ef47cc4943d296735a1ac8d6ef120b8754e7",
+      "candidate_bytes": 139194,
+      "candidate_sha256": "29efd9aa99c9491a1e86cfc25f1bbb31b3da7b6cbfc4438a1638c15b18b95cee",
+      "path": "crates/xml-minifier/src/audit.rs"
+    },
+    {
+      "baseline_bytes": 31260,
+      "baseline_sha256": "688027bc2d9652395c7385087995cc52084d6d7ff8a57c6a16bee0f582b83296",
+      "candidate_bytes": 32468,
+      "candidate_sha256": "2b24bf90377ba75db3a15eeaa53d010bf817b17b2741b8b20e6e377fd34bbdfe",
+      "path": "crates/xml-minifier/src/audit/namespaces.rs"
+    },
+    {
+      "baseline_bytes": 34098,
+      "baseline_sha256": "e22e4f6b690e34b6f073fb69278d9eec536b646409da3259c11df57f4a8319a0",
+      "candidate_bytes": 47326,
+      "candidate_sha256": "600712ff53ad145fa82659989104a9b496e2b03afd1295f20605f29ca7a5615e",
+      "path": "crates/xml-minifier/tests/source_replacement.rs"
+    }
+  ],
+  "created_utc": "2026-10-07T04:10:16.938246+00:00",
+  "file_count": 10789,
+  "quality_predecessor": {
+    "bytes": 4850090,
+    "path": "quality/final/source-freeze-v1.json",
+    "scope": "provenance only; does not qualify candidate-source-v2",
+    "sha256": "4040f1367dbc75fff3cc383bc187cf9d5550ff4936d0a9863d963fcebc28e7a3"
+  },
+  "quality_v2_required_before_build": true,
+  "schema": "litchi.performance.0948.candidate-freeze.v1",
+  "source_bytes": 260075521,
+  "source_commit": "b6c5c80ffbcb60736d6c4c2f3b590838640008a9",
+  "source_copy": {
+    "changed_file_count": 10,
+    "full_census_verified": true,
+    "input": "candidate-source-v2"
+  },
+  "source_manifest": {
+    "bytes": 2296391,
+    "path": "candidate-build-manifest-v1.json",
+    "sha256": "a3a4f9714e3e71bf90adf9f5e194d732eaf579f6fb7c83a0b3254c20d2a8dab5"
+  },
+  "source_root": "candidate-build-v1",
+  "status": "frozen-source-pending-quality-v2"
+}

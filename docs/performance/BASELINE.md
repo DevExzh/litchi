@@ -1,5 +1,17 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0948 — rejected XLSX multi-window candidate
+
+[0948](0948-xlsx-multi-window-audit-rejected.md) retains 16 qualification,
+48 native, and 24 allocator children with no retries. The candidate passes
+all native gates but fails both primary allocation-call and allocated-byte
+limits in every repeat. Publication p50 paired ratios are 0.85747 / 0.85366;
+allocation-call ratios are 1.67734 / 2.29310. Production is unchanged, so these
+are rejected-candidate measurements, not a new adopted baseline. The ordinary
+and managed one-edit controls satisfy all frozen gates. Evidence is scoped to
+named synthetic XLSX warm serial workloads on CPU 12; no general Office,
+cold-cache, concurrency, or physical-copy improvement is claimed.
+
 ## 0937 — combined validation candidate fails paired latency safety
 
 [0937](0937-docx-combined-fragment-validation.md) combines private inventory

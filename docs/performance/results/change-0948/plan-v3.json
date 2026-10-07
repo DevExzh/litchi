@@ -1,0 +1,360 @@
+{
+  "allocator": {
+    "children": 24,
+    "repeats": 3,
+    "samples": 5,
+    "schedule": "three alternating repeats; even baseline then candidate and forward case order; odd candidate then baseline and reverse case order",
+    "warmup": 2
+  },
+  "build_binding_ids": {
+    "baseline": "baseline1",
+    "candidate": "candidate2"
+  },
+  "build_revisions": {
+    "baseline": "v1",
+    "candidate": "v3"
+  },
+  "cases": [
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "id": "primary-percent-medium",
+      "kind": "primary",
+      "xlsx_cell_crud_shape": "medium"
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "id": "primary-percent-dense-sparse",
+      "kind": "primary",
+      "xlsx_cell_crud_shape": "dense-sparse"
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_edit_save",
+      "id": "control-xlsx-one-edit-medium",
+      "kind": "control",
+      "xlsx_cell_crud_shape": "medium"
+    },
+    {
+      "case": "xlsx_source_backed_managed_cell_values_one_edit_save",
+      "id": "control-xlsx-managed-one-edit-medium",
+      "kind": "managed-control",
+      "xlsx_cell_crud_shape": "medium"
+    }
+  ],
+  "cpu": 12,
+  "draft_constraints": {
+    "candidate_bindings_required": true,
+    "candidate_semantic_review_required": true,
+    "full_original_first_audit_required": true,
+    "no_build_or_capture_until_root_go": true,
+    "optional_multi_window_activation_is_diagnostic_only": true
+  },
+  "environment": {
+    "fixed": {
+      "LANG": "C",
+      "LC_ALL": "C",
+      "PATH": "/usr/bin:/bin",
+      "RUST_BACKTRACE": "0",
+      "TZ": "UTC"
+    }
+  },
+  "expected_artifacts": {
+    "child": [
+      "start.json",
+      "terminal.json",
+      "stdout.txt",
+      "stderr.txt",
+      "report.json",
+      "resource.json",
+      "command.json",
+      "receipt.json"
+    ],
+    "no_retry": true,
+    "terminal_before_parse": true,
+    "unexpected_artifact_is_failure": true
+  },
+  "gate": {
+    "allocation": {
+      "case_ids": [
+        "primary-percent-medium",
+        "primary-percent-dense-sparse",
+        "control-xlsx-one-edit-medium",
+        "control-xlsx-managed-one-edit-medium"
+      ],
+      "metrics": [
+        "allocated_bytes",
+        "allocation_calls",
+        "region_peak_live_bytes",
+        "live_bytes_after",
+        "max_rss_kib"
+      ],
+      "missing_metric": "fail-closed",
+      "paired_median_ratio_max": 1.05,
+      "per_pair": true,
+      "per_pair_ratio_max": 1.05,
+      "repeats": 3,
+      "zero_denominator": "equal-zero-only"
+    },
+    "bootstrap": {
+      "confidence_level": 0.95,
+      "lower_percentile": 2.5,
+      "replicates": 10000,
+      "seed": 948009,
+      "statistic": "paired_median_ratio",
+      "upper_percentile": 97.5
+    },
+    "latency": {
+      "case_ids": [
+        "primary-percent-medium",
+        "primary-percent-dense-sparse",
+        "control-xlsx-one-edit-medium",
+        "control-xlsx-managed-one-edit-medium"
+      ],
+      "metrics": [
+        "whole_workflow_p50",
+        "whole_workflow_p95",
+        "publication_p50",
+        "publication_p95"
+      ],
+      "per_block": true,
+      "per_block_ratio_max": 1.05,
+      "primary_case_ids": [
+        "primary-percent-medium",
+        "primary-percent-dense-sparse"
+      ],
+      "primary_publication_bootstrap_upper_95_lt": 1.0,
+      "primary_publication_p50_ratio_max": 0.95
+    },
+    "review": {
+      "allocation_bootstrap": false,
+      "p50_spread_gt": 1.2,
+      "regression_ratio_gt": 1.05,
+      "tail_metrics": [
+        "p50",
+        "p95",
+        "p99"
+      ]
+    }
+  },
+  "helpers": {
+    "capture": {
+      "bytes": 44255,
+      "executable": false,
+      "mode": 436,
+      "path": "tools/capture_0948_v3.py",
+      "sha256": "23619b6071c10cf373f2d748a46a0162b65b4839a356027c43feec4925699c8b"
+    },
+    "freeze": {
+      "bytes": 12700,
+      "executable": false,
+      "mode": 436,
+      "path": "tools/freeze_0948_v5.py",
+      "sha256": "2dfabd46ad092fcbd375130dafce4d713a51926b0964cac4289910a39bc92e5d"
+    },
+    "method": {
+      "bytes": 6748,
+      "executable": false,
+      "mode": 436,
+      "path": "METHOD-v2-draft.md",
+      "sha256": "ba96f045b104125d921dd076b25ca0c51ca0eb09f5f3c4086fc288da04912180"
+    },
+    "reducer": {
+      "bytes": 90771,
+      "executable": false,
+      "mode": 436,
+      "path": "tools/reduce_0948_v3.py",
+      "sha256": "4cb89ac77cce55f2b72a748fc0c8b745d1749a197bd64f134115de733cb92ec1"
+    },
+    "reuse_validator": {
+      "bytes": 75142,
+      "executable": false,
+      "mode": 436,
+      "path": "tools/reuse_0948_v2.py",
+      "sha256": "c83c1270e42a82d73bc9f08f77f7cb2ac9087ff969b1e3082f8b6f84699c726a"
+    },
+    "semantic": {
+      "bytes": 33177,
+      "executable": false,
+      "mode": 436,
+      "path": "tools/semantic_0948_v1.py",
+      "sha256": "567c7ad1eecc4c93d51615076088809b38c5498a4f29ac929a1661bf9fd265dc"
+    }
+  },
+  "native": {
+    "blocks": 6,
+    "children": 48,
+    "samples": 100,
+    "schedule": "six alternating blocks; even baseline then candidate and forward case order; odd candidate then baseline and reverse case order",
+    "warmup": 10
+  },
+  "plan_id": "0948",
+  "protocol_revision": 1,
+  "qualification": {
+    "children": 16,
+    "kinds": [
+      "native",
+      "allocator"
+    ],
+    "roles": [
+      "baseline",
+      "candidate"
+    ],
+    "samples": 2,
+    "warmup": 0
+  },
+  "resource": {
+    "deadline_seconds": 900,
+    "enabled": true,
+    "format": "{\"max_rss_kib\":%M,\"elapsed_seconds\":%e,\"user_seconds\":%U,\"system_seconds\":%S}",
+    "process_group": true,
+    "time_path": "/usr/bin/time"
+  },
+  "roles": {
+    "baseline": {
+      "allocator": {
+        "build_binding_id": "baseline1",
+        "build_receipt": {
+          "bytes": 4678,
+          "executable": false,
+          "mode": 436,
+          "path": "receipts/baseline-reuse-v2.json",
+          "sha256": "a05ddc9f28879df314e0dc583d9871c60a82b2a78938c03b0a4389c252bef1bc"
+        },
+        "build_revision": "v1",
+        "bytes": 269016128,
+        "executable": true,
+        "mode": 509,
+        "path": "binaries/baseline-allocator",
+        "sha256": "c19971a7e923accd822e9744382aa757d0a67d9d7ba4e47e27354e05767de713"
+      },
+      "native": {
+        "build_binding_id": "baseline1",
+        "build_receipt": {
+          "bytes": 4678,
+          "executable": false,
+          "mode": 436,
+          "path": "receipts/baseline-reuse-v2.json",
+          "sha256": "a05ddc9f28879df314e0dc583d9871c60a82b2a78938c03b0a4389c252bef1bc"
+        },
+        "build_revision": "v1",
+        "bytes": 265669200,
+        "executable": true,
+        "mode": 509,
+        "path": "binaries/baseline-native",
+        "sha256": "087aec962f5251d1255e7a54dc188e53f9b8a722c5da95eaa1c69439caa138c8"
+      }
+    },
+    "candidate": {
+      "allocator": {
+        "build_binding_id": "candidate2",
+        "build_receipt": {
+          "bytes": 8666,
+          "executable": false,
+          "mode": 436,
+          "path": "builds/candidate-allocator-v3/terminal.json",
+          "sha256": "5a467ced86b26a7fd091261de8b2a65089eeb72e55a2651db5186c2103dc0b00"
+        },
+        "build_revision": "v3",
+        "bytes": 269145952,
+        "executable": true,
+        "mode": 509,
+        "path": "binaries/candidate-v3-preserved/litchi-perf-baseline-alloc",
+        "sha256": "7f7c1a0c0148dd283db27ec7b0cb2870572d94cc4d8de1920c4f7de302f3590e"
+      },
+      "native": {
+        "build_binding_id": "candidate2",
+        "build_receipt": {
+          "bytes": 8566,
+          "executable": false,
+          "mode": 436,
+          "path": "builds/candidate-native-v3/terminal.json",
+          "sha256": "eaea1250b7776116a3dc1f860a09480ffe8ef174f4688dec92a929331b184ed6"
+        },
+        "build_revision": "v3",
+        "bytes": 265836208,
+        "executable": true,
+        "mode": 509,
+        "path": "binaries/candidate-v3-preserved/litchi-perf-baseline",
+        "sha256": "c9e3b3122b1ac5f64fdf0fc8b4aabea9c53d80598b80e702f39eb8424b1063e2"
+      }
+    }
+  },
+  "schema": "litchi.paired-audit-capture-0948.v1",
+  "seed": 948009,
+  "semantic_gates": {
+    "allocator_counter_conservation": true,
+    "full_xml_audit": true,
+    "managed_budget_release": true,
+    "output_sha256": true,
+    "relationship_and_member_identity": true,
+    "reopen_semantic_hash": true,
+    "sink_largest_write_max": 65536,
+    "source_backed": true,
+    "typed_refusal_and_zero_output": true,
+    "unmanaged_budget_zero": true,
+    "untouched_member_preservation": true
+  },
+  "semantic_validator": {
+    "bytes": 33177,
+    "executable": false,
+    "mode": 436,
+    "path": "tools/semantic_0948_v1.py",
+    "sha256": "567c7ad1eecc4c93d51615076088809b38c5498a4f29ac929a1661bf9fd265dc"
+  },
+  "source": {
+    "baseline_manifest": {
+      "bytes": 2033638,
+      "executable": false,
+      "mode": 436,
+      "path": "baseline-source-manifest-v1.json",
+      "sha256": "dd66b044540d185c448cae78b16e9aa61556a10f01252e27f2075f48aa5121c2"
+    },
+    "baseline_reuse_receipt": {
+      "bytes": 4678,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/baseline-reuse-v2.json",
+      "sha256": "a05ddc9f28879df314e0dc583d9871c60a82b2a78938c03b0a4389c252bef1bc"
+    },
+    "baseline_root": "baseline-source",
+    "candidate_files": [
+      "crates/litchi-opc/src/lib.rs",
+      "crates/litchi-opc/src/source_backed.rs",
+      "crates/litchi-xlsx/src/cell_values/facts_oracle_tests.rs",
+      "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+      "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs",
+      "crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs",
+      "crates/litchi-xlsx/src/raw/worksheet/edit/package.rs",
+      "crates/litchi-xlsx/src/raw/worksheet/edit/tests.rs",
+      "crates/xml-minifier/src/audit.rs",
+      "crates/xml-minifier/src/audit/namespaces.rs",
+      "crates/xml-minifier/tests/source_replacement.rs"
+    ],
+    "candidate_freeze_receipt": {
+      "bytes": 4900,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/candidate-freeze-v3.json",
+      "sha256": "8f68153a809c729cbdb082b336e0b841f242892904929643917d5fee41d514a6"
+    },
+    "candidate_manifest": {
+      "bytes": 2296969,
+      "executable": false,
+      "mode": 436,
+      "path": "candidate-build-manifest-v3.json",
+      "sha256": "f565a52b36e8657453448d1f097179002b8fd7c95b4417996f62e1cbf6a4b992"
+    },
+    "candidate_root": "candidate-build-v3",
+    "file_count": 10789,
+    "root_worktree": ".",
+    "source_commit": "b6c5c80ffbcb60736d6c4c2f3b590838640008a9",
+    "source_export": {
+      "bytes": 819,
+      "executable": false,
+      "mode": 436,
+      "path": "source-export-v1.json",
+      "sha256": "b59d75474d301c1a4cb357ecbe899043e2aba7dd4b8db6509b5adb38eaededf5"
+    }
+  },
+  "status": "frozen",
+  "workload_cwd": "."
+}

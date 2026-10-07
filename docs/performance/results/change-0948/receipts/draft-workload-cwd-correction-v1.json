@@ -1,0 +1,16 @@
+{
+  "current_bytes": 5839,
+  "current_sha256": "819f457d4a80f9151f670e5dfa73f663850ec50abbd7e4e7c903595ad454bc48",
+  "method": "replayed exact recorded pre-freeze JSON patch sequence and descriptor-mode correction; verified prior SHA256",
+  "note": "Historical helper-freeze receipts refer to the original draft path and SHA. Exact prior bytes are retained here; final plan-v3 binds the corrected draft. No workload preceded this correction.",
+  "only_json_change": {
+    "field": "workload_cwd",
+    "value": "."
+  },
+  "original_path": "plan-v1-draft.json",
+  "prior_bytes": 5816,
+  "prior_sha256": "4e49d17633b2413a40ffc0b52376571921214ffb759bc7585f35e7d692648903",
+  "retained_prior_path": "references/protocol-drafts/plan-v1-before-workload-cwd.json",
+  "schema": "litchi.performance.0948.draft-location-history.v1",
+  "status": "pass"
+}

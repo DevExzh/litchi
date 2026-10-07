@@ -1,0 +1,12 @@
+{
+  "schema": "litchi.performance.0948.root-native-terminal.v1",
+  "created_utc": "2026-10-07T05:13:36.405459+00:00",
+  "session_id": 3359,
+  "exit_code": 0,
+  "retries": 0,
+  "capture": {
+    "path": "native/capture.json",
+    "bytes": 357273,
+    "sha256": "92d634d2c8fc2278e5e08ae7d6f108ff200efc99e5e27a6a9c30a4cc76c3deab"
+  }
+}

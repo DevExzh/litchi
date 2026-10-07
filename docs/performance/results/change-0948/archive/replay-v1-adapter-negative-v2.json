@@ -1,0 +1,44 @@
+{
+  "adapter": {
+    "path": "ARCHIVE_METADATA/replay_0948_v2.py",
+    "sha256": "ea110ddd381373b40e19ed8619873490a293e03c74996a9cd079c549b7dbb573"
+  },
+  "controls": {
+    "missing_relocated_artifact": "rejected",
+    "tampered_historical_argv": "rejected",
+    "tampered_historical_cwd": "rejected"
+  },
+  "frozen_reducer": {
+    "path": "tools/reduce_0948_v4.py",
+    "sha256": "f960a94cad1544ac7f64c8a5006eb172bf5db849735b576fba58a6338a5b1d17"
+  },
+  "historical_authorization": {
+    "argv": [
+      "python3",
+      "-B",
+      "tools/capture_0948_v3.py",
+      "qualification"
+    ],
+    "cwd": "/home/zhuhe/litchi-performance-0948",
+    "path": "receipts/root-qualification-go-v1.json",
+    "schema": "litchi.performance.0948.root-qualification-go.v1",
+    "sha256": "59e12d460778f5552604c08b612e353172792317d8f75ea026dc6bf653d03613"
+  },
+  "historical_root": "/home/zhuhe/litchi-performance-0948",
+  "plan": {
+    "path": "plan-v3.json",
+    "sha256": "e4bb028993ec25b0b538616153a09b17fdfb26b91c8255336eab9393d87de73f"
+  },
+  "relocated_packet_root": "/home/zhuhe/litchi-performance-0948-replay-v1-20261007",
+  "schema": "litchi.performance.0948.portable-replay-negative-controls.v1",
+  "status": "pass",
+  "unmodified_v4_relocation": {
+    "observed_argv_mismatch": true,
+    "observed_cwd": {
+      "captured": "/home/zhuhe/litchi-performance-0948",
+      "unmodified_v4": "/home/zhuhe/litchi-performance-0948-replay-v1-20261007"
+    },
+    "reason": "v4 renders absolute command and cwd expectations from its current PACKET",
+    "status": "expected-failure"
+  }
+}

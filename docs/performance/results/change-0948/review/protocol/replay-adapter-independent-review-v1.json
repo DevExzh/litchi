@@ -1,0 +1,114 @@
+{
+  "actual_leaf_controls": {
+    "controls": {
+      "missing_physical_report_actual_leaf_review": {
+        "error": "/home/zhuhe/litchi-performance-0948-leaf-negative-20261007/qualification/q00-baseline-native-primary-percent-medium retained output missing or symlinked",
+        "removed_shadow_entry": "qualification/q00-baseline-native-primary-percent-medium/report.json",
+        "status": "rejected"
+      },
+      "positive_actual_leaf_review": {
+        "reviewed_label": "qualification/q00-baseline-native-primary-percent-medium",
+        "status": "accepted"
+      },
+      "tampered_historical_argv_actual_leaf_review": {
+        "error": "/home/zhuhe/litchi-performance-0948-leaf-negative-20261007/qualification/q00-baseline-native-primary-percent-medium start invocation custody",
+        "status": "rejected"
+      },
+      "tampered_historical_cwd_actual_leaf_review": {
+        "error": "/home/zhuhe/litchi-performance-0948-leaf-negative-20261007/qualification/q00-baseline-native-primary-percent-medium start invocation custody",
+        "status": "rejected"
+      }
+    },
+    "receipt": {
+      "bytes": 2291,
+      "path": "/home/zhuhe/litchi-performance-0948-leaf-negative-20261007/review/protocol/independent-leaf-controls-v2.json",
+      "sha256": "a26d3983f7b31155f84c33ac37d83a55d26e117bb054b7112c20466964597020"
+    },
+    "shadow_root": "/home/zhuhe/litchi-performance-0948-leaf-negative-20261007",
+    "status": "pass"
+  },
+  "adapter": {
+    "bytes": 14192,
+    "path": "tools/replay_0948_v2.py",
+    "sha256": "ea110ddd381373b40e19ed8619873490a293e03c74996a9cd079c549b7dbb573"
+  },
+  "adapter_negative_controls": {
+    "controls": {
+      "missing_relocated_artifact": "rejected",
+      "tampered_historical_argv": "rejected",
+      "tampered_historical_cwd": "rejected"
+    },
+    "historical_root": "/home/zhuhe/litchi-performance-0948",
+    "receipt": {
+      "bytes": 1566,
+      "path": "/home/zhuhe/litchi-performance-0948-replay-v1-20261007/review/protocol/replay-adapter-negative-controls-v2.json",
+      "sha256": "6f69b15c55891395dbef0167570b458f9318c7081993b24d9bf34f73dc8f7890"
+    },
+    "status": "pass",
+    "unmodified_v4_relocation": {
+      "observed_argv_mismatch": true,
+      "observed_cwd": {
+        "captured": "/home/zhuhe/litchi-performance-0948",
+        "unmodified_v4": "/home/zhuhe/litchi-performance-0948-replay-v1-20261007"
+      },
+      "reason": "v4 renders absolute command and cwd expectations from its current PACKET",
+      "status": "expected-failure"
+    }
+  },
+  "frozen_plan": {
+    "bytes": 10861,
+    "path": "plan-v3.json",
+    "sha256": "e4bb028993ec25b0b538616153a09b17fdfb26b91c8255336eab9393d87de73f"
+  },
+  "frozen_reducer_v4": {
+    "bytes": 96736,
+    "path": "tools/reduce_0948_v4.py",
+    "sha256": "f960a94cad1544ac7f64c8a5006eb172bf5db849735b576fba58a6338a5b1d17"
+  },
+  "historical_authorization": {
+    "bytes": 1408,
+    "path": "receipts/root-qualification-go-v1.json",
+    "sha256": "59e12d460778f5552604c08b612e353172792317d8f75ea026dc6bf653d03613"
+  },
+  "moved_replay": {
+    "all": {
+      "output": {
+        "bytes": 5815204,
+        "path": "/home/zhuhe/litchi-performance-0948-replay-v1-20261007/review/protocol/independent-v2-all.json",
+        "sha256": "ff73db31d7374f921bc812b35b39f96ec772a9abd939fe132e3591f196334ac9"
+      },
+      "stage": "all",
+      "status": "fail"
+    },
+    "all_output_sha256_equals_original_analysis": true,
+    "original_analysis": {
+      "bytes": 5815204,
+      "path": "analysis.json",
+      "sha256": "ff73db31d7374f921bc812b35b39f96ec772a9abd939fe132e3591f196334ac9"
+    },
+    "qualification": {
+      "output": {
+        "bytes": 333796,
+        "path": "/home/zhuhe/litchi-performance-0948-replay-v1-20261007/review/protocol/independent-v2-qualification.json",
+        "sha256": "d588d6e7b28156d2676065544e71490ab9af81f0055935a367d4faf56ee815d4"
+      },
+      "stage": "qualification",
+      "status": "pass"
+    }
+  },
+  "original_open_guard": {
+    "historical_root_boundary_match_count": 0,
+    "method": "strace -f -qq -e trace=%file over moved qualification replay; boundary regex excludes relocated-root prefix",
+    "result": "no physical open/stat/readlink path under historical packet root",
+    "trace": {
+      "bytes": 78976976,
+      "path": "/home/zhuhe/litchi-performance-0948-replay-v1-20261007/review/protocol/independent-v2-qualification-open.trace",
+      "sha256": "b2cbcb272e1886301c9c04bf24870a27d60f66fdb36c3b16b81a53f6f6e37e56"
+    }
+  },
+  "relocated_packet_root": "/home/zhuhe/litchi-performance-0948-replay-v1-20261007",
+  "replay_adapter_source_note": "actual leaf mutations were executed from an inline PYTHONDONTWRITEBYTECODE=1 python3 -B control script; the bound adapter and receipts are retained, with no separate standalone mutation script claimed",
+  "schema": "litchi.performance.0948.portable-replay-independent-review.v1",
+  "scope": "offline moved-packet replay and custody only; no workload launch, build, capture, or retry",
+  "status": "pass"
+}

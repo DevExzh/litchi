@@ -1,0 +1,136 @@
+{
+  "files": [
+    {
+      "archive_path": "hardlink-replay-check/receipts/replay-adapter-negative-controls-v2.json",
+      "bytes": 1367,
+      "copy_match": true,
+      "sha256": "8cc28887e8be3ef26b9fb8b972dcfac16e9f86b9cb490a5c1f4f8d2a401fb329",
+      "source_path": "/home/zhuhe/litchi-performance-0948-replay-check-20261007/receipts/replay-adapter-negative-controls-v2.json",
+      "source_sha256": "8cc28887e8be3ef26b9fb8b972dcfac16e9f86b9cb490a5c1f4f8d2a401fb329"
+    },
+    {
+      "archive_path": "hardlink-replay-check/review/protocol/independent-portable-qualification-v2.json",
+      "bytes": 333796,
+      "copy_match": true,
+      "sha256": "d588d6e7b28156d2676065544e71490ab9af81f0055935a367d4faf56ee815d4",
+      "source_path": "/home/zhuhe/litchi-performance-0948-replay-check-20261007/review/protocol/independent-portable-qualification-v2.json",
+      "source_sha256": "d588d6e7b28156d2676065544e71490ab9af81f0055935a367d4faf56ee815d4"
+    },
+    {
+      "archive_path": "hardlink-replay-check/review/protocol/independent-portable-qualification-v2.strace",
+      "bytes": 80027507,
+      "copy_match": true,
+      "sha256": "ef701c6dcfc83ef406a150192a3973832b41b3c2b954731d94ff441808a56bb9",
+      "source_path": "/home/zhuhe/litchi-performance-0948-replay-check-20261007/review/protocol/independent-portable-qualification-v2.strace",
+      "source_sha256": "ef701c6dcfc83ef406a150192a3973832b41b3c2b954731d94ff441808a56bb9"
+    },
+    {
+      "archive_path": "leaf-negative/review/protocol/independent-leaf-controls-v1.json",
+      "bytes": 2042,
+      "copy_match": true,
+      "sha256": "42706028dbfdb9d6fcd5f382585b7939bbcb43faac42b4ecfaec05e52928d6fa",
+      "source_path": "/home/zhuhe/litchi-performance-0948-leaf-negative-20261007/review/protocol/independent-leaf-controls-v1.json",
+      "source_sha256": "42706028dbfdb9d6fcd5f382585b7939bbcb43faac42b4ecfaec05e52928d6fa"
+    },
+    {
+      "archive_path": "leaf-negative/review/protocol/independent-leaf-controls-v2.json",
+      "bytes": 2291,
+      "copy_match": true,
+      "sha256": "a26d3983f7b31155f84c33ac37d83a55d26e117bb054b7112c20466964597020",
+      "source_path": "/home/zhuhe/litchi-performance-0948-leaf-negative-20261007/review/protocol/independent-leaf-controls-v2.json",
+      "source_sha256": "a26d3983f7b31155f84c33ac37d83a55d26e117bb054b7112c20466964597020"
+    },
+    {
+      "archive_path": "leaf-negative/review/protocol/replay-adapter-negative-controls-v2.json",
+      "bytes": 1566,
+      "copy_match": true,
+      "sha256": "6f69b15c55891395dbef0167570b458f9318c7081993b24d9bf34f73dc8f7890",
+      "source_path": "/home/zhuhe/litchi-performance-0948-leaf-negative-20261007/review/protocol/replay-adapter-negative-controls-v2.json",
+      "source_sha256": "6f69b15c55891395dbef0167570b458f9318c7081993b24d9bf34f73dc8f7890"
+    },
+    {
+      "archive_path": "moved-replay-v1/review/protocol/independent-v2-all.json",
+      "bytes": 5815204,
+      "copy_match": true,
+      "sha256": "ff73db31d7374f921bc812b35b39f96ec772a9abd939fe132e3591f196334ac9",
+      "source_path": "/home/zhuhe/litchi-performance-0948-replay-v1-20261007/review/protocol/independent-v2-all.json",
+      "source_sha256": "ff73db31d7374f921bc812b35b39f96ec772a9abd939fe132e3591f196334ac9"
+    },
+    {
+      "archive_path": "moved-replay-v1/review/protocol/independent-v2-all.stderr",
+      "bytes": 0,
+      "copy_match": true,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_path": "/home/zhuhe/litchi-performance-0948-replay-v1-20261007/review/protocol/independent-v2-all.stderr",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "archive_path": "moved-replay-v1/review/protocol/independent-v2-all.stdout",
+      "bytes": 93,
+      "copy_match": true,
+      "sha256": "eb9d8d4e30119497818f41a367eba1bfbac98fbc0785d5ed839ed13bb6942b6d",
+      "source_path": "/home/zhuhe/litchi-performance-0948-replay-v1-20261007/review/protocol/independent-v2-all.stdout",
+      "source_sha256": "eb9d8d4e30119497818f41a367eba1bfbac98fbc0785d5ed839ed13bb6942b6d"
+    },
+    {
+      "archive_path": "moved-replay-v1/review/protocol/independent-v2-qualification-open.trace",
+      "bytes": 78976976,
+      "copy_match": true,
+      "sha256": "b2cbcb272e1886301c9c04bf24870a27d60f66fdb36c3b16b81a53f6f6e37e56",
+      "source_path": "/home/zhuhe/litchi-performance-0948-replay-v1-20261007/review/protocol/independent-v2-qualification-open.trace",
+      "source_sha256": "b2cbcb272e1886301c9c04bf24870a27d60f66fdb36c3b16b81a53f6f6e37e56"
+    },
+    {
+      "archive_path": "moved-replay-v1/review/protocol/independent-v2-qualification.json",
+      "bytes": 333796,
+      "copy_match": true,
+      "sha256": "d588d6e7b28156d2676065544e71490ab9af81f0055935a367d4faf56ee815d4",
+      "source_path": "/home/zhuhe/litchi-performance-0948-replay-v1-20261007/review/protocol/independent-v2-qualification.json",
+      "source_sha256": "d588d6e7b28156d2676065544e71490ab9af81f0055935a367d4faf56ee815d4"
+    },
+    {
+      "archive_path": "moved-replay-v1/review/protocol/independent-v2-qualification.stderr",
+      "bytes": 0,
+      "copy_match": true,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_path": "/home/zhuhe/litchi-performance-0948-replay-v1-20261007/review/protocol/independent-v2-qualification.stderr",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "archive_path": "moved-replay-v1/review/protocol/independent-v2-qualification.stdout",
+      "bytes": 103,
+      "copy_match": true,
+      "sha256": "9de7b94cd203a3116092e0d0359c58df0c86c9f46d8ee72bf771ae54e9d7afcb",
+      "source_path": "/home/zhuhe/litchi-performance-0948-replay-v1-20261007/review/protocol/independent-v2-qualification.stdout",
+      "source_sha256": "9de7b94cd203a3116092e0d0359c58df0c86c9f46d8ee72bf771ae54e9d7afcb"
+    },
+    {
+      "archive_path": "moved-replay-v1/review/protocol/replay-adapter-negative-controls-v2.json",
+      "bytes": 1566,
+      "copy_match": true,
+      "sha256": "6f69b15c55891395dbef0167570b458f9318c7081993b24d9bf34f73dc8f7890",
+      "source_path": "/home/zhuhe/litchi-performance-0948-replay-v1-20261007/review/protocol/replay-adapter-negative-controls-v2.json",
+      "source_sha256": "6f69b15c55891395dbef0167570b458f9318c7081993b24d9bf34f73dc8f7890"
+    },
+    {
+      "archive_path": "original-packet-review-protocol-replay-adapter-independent-review-v2.json",
+      "bytes": 7239,
+      "copy_match": true,
+      "sha256": "4a7ac412fdc97eece190cdb69a928fa78639f97abec3b0292f72889d3e39dfea",
+      "source_path": "/home/zhuhe/litchi-performance-0948/review/protocol/replay-adapter-independent-review-v2.json",
+      "source_sha256": "4a7ac412fdc97eece190cdb69a928fa78639f97abec3b0292f72889d3e39dfea"
+    },
+    {
+      "archive_path": "original-packet-review-protocol-independent-leaf-controls-inline-v1.py",
+      "bytes": 4170,
+      "copy_match": true,
+      "sha256": "6989bcf16efa9bd36da3cfb027193eaf92aaa631d6683fd1c3e7febb9f1c027d",
+      "source_path": "/home/zhuhe/litchi-performance-0948/review/protocol/independent-leaf-controls-inline-v1.py",
+      "source_sha256": "6989bcf16efa9bd36da3cfb027193eaf92aaa631d6683fd1c3e7febb9f1c027d"
+    }
+  ],
+  "large_trace_scope": "qualification-only open tracing; full all replay remained untraced and byte-identical",
+  "prior_manifest": "postseal-review-copy-manifest-v1.json",
+  "schema": "litchi.performance.0948.postseal-review-copy.v2",
+  "status": "pass"
+}

@@ -1,0 +1,76 @@
+{
+  "correction_receipt": {
+    "bytes": 2071,
+    "executable": false,
+    "mode": 436,
+    "path": "receipts/reducer-v4-source-census-correction-v1.json",
+    "sha256": "bb0eea587b9b33f50f0b3f8bbe3730c524b801647cd5c61396263a747b162f25"
+  },
+  "negative_controls": [
+    {
+      "error_type": "ReviewError",
+      "label": "full_flag_false",
+      "passed": true
+    },
+    {
+      "error_type": "ReviewError",
+      "label": "baseline_count_minus_one",
+      "passed": true
+    },
+    {
+      "error_type": "ReviewError",
+      "label": "candidate_count_missing",
+      "passed": true
+    },
+    {
+      "error_type": "ReviewError",
+      "label": "source_commit_mismatch",
+      "passed": true
+    },
+    {
+      "error_type": "ReviewError",
+      "label": "focused_marked_full",
+      "passed": true
+    }
+  ],
+  "plan": {
+    "bytes": 10861,
+    "path": "plan-v3.json",
+    "sha256": "e4bb028993ec25b0b538616153a09b17fdfb26b91c8255336eab9393d87de73f"
+  },
+  "prior_failure": {
+    "bytes": 1096,
+    "exit_code": 1,
+    "formal_native_or_allocator_children": 0,
+    "path": "receipts/qualification-reduction-failed-v1.json",
+    "preserved": true,
+    "qualification_child_retries": 0,
+    "sha256": "af3c37e511b7ef89f45e11ec9517b3f34c1680652a81b69a1c34f1ad120167b4"
+  },
+  "qualification_children": {
+    "focused_end": 16,
+    "full_start": 16
+  },
+  "reducer": {
+    "bytes": 96736,
+    "path": "tools/reduce_0948_v4.py",
+    "sha256": "f960a94cad1544ac7f64c8a5006eb172bf5db849735b576fba58a6338a5b1d17"
+  },
+  "schema": "litchi.performance.0948.review.source-census-v8",
+  "scope": "offline retained qualification source custody only; no workload launch",
+  "source_census": {
+    "analysis_source_equivalent": true,
+    "capture_focused_shape_checked_files": {
+      "baseline": 11,
+      "candidate": 11
+    },
+    "capture_full_shape_checked_files": {
+      "baseline": 10789,
+      "candidate": 10789
+    },
+    "capture_start_end_equal": true,
+    "file_count_each_role": 10789,
+    "hashed_entries_both_roles": 21578
+  },
+  "status": "pass"
+}

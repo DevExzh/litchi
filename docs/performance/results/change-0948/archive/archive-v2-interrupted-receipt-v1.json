@@ -1,0 +1,46 @@
+{
+  "archive_version": "v2",
+  "cleanup_started": false,
+  "partial_artifacts": [
+    {
+      "bytes": 7713433600,
+      "exists": true,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0948-archive/archive-0948-v2.tar"
+    },
+    {
+      "exists": false,
+      "path": "/home/zhuhe/litchi-performance-0948-archive/archive-0948-v2.tar.zst"
+    },
+    {
+      "bytes": 54219706,
+      "exists": true,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0948-archive/manifest-v2.json"
+    },
+    {
+      "bytes": 17221849,
+      "exists": true,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0948-archive/selection-v2.list"
+    },
+    {
+      "bytes": 9555,
+      "exists": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0948-archive/archive-0948-v2.py"
+    }
+  ],
+  "partial_tar_sha256": "not_computed_by_policy",
+  "pids": [
+    2653933,
+    2654102
+  ],
+  "process_check": "no archive-v2 tar/zstd/python process remained after interruption",
+  "reason": "coordinator stopped redundant v2 rebuild; v1 archive remains authoritative",
+  "schema": "litchi.performance.0948.external-archive-interrupted.v1",
+  "session_id": 44199,
+  "source_packet_untouched": true,
+  "status": "interrupted_before_compressed_archive_seal",
+  "v1_untouched": true
+}

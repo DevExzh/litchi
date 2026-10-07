@@ -1,0 +1,27 @@
+{
+  "archive": {
+    "bytes": 15417955,
+    "path": "/home/zhuhe/litchi-performance-0948-archive/postseal-supplement-v1.tar.gz",
+    "sha256": "0f493c88235c0aab8cd4edbc454d53e95541710c63e679e5ee36006e45693b3a"
+  },
+  "command": [
+    "python3",
+    "-B",
+    "/home/zhuhe/litchi-performance-0948-archive/archive-postseal-v1.py",
+    "--packet",
+    "/home/zhuhe/litchi-performance-0948",
+    "--archive-root",
+    "/home/zhuhe/litchi-performance-0948-archive",
+    "--output",
+    "/home/zhuhe/litchi-performance-0948-archive/postseal-supplement-v1.tar.gz"
+  ],
+  "file_count": 59,
+  "helper": {
+    "path": "/home/zhuhe/litchi-performance-0948-archive/archive-postseal-v1.py",
+    "sha256": "0fa91970c536e60dc860f924ee1e7d53ab7fb17dbc3504a27f2ee4fba08d2c0c"
+  },
+  "manifest_sha256": "6fd349e310902a50397cd36cf6bf8274ae6b46ef86c73ff2a25204d42693da6c",
+  "schema": "litchi.performance.0948.postseal-archive-receipt.v1",
+  "source_bytes": 225758648,
+  "status": "verified"
+}

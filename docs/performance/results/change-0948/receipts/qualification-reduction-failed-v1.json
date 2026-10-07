@@ -1,0 +1,33 @@
+{
+  "schema": "litchi.performance.0948.qualification-reduction-failure.v1",
+  "recorded_utc": "2026-10-07T05:01:14.809606+00:00",
+  "argv": [
+    "python3",
+    "-B",
+    "tools/reduce_0948_v3.py",
+    "qualification"
+  ],
+  "session_id": 71185,
+  "exit_code": 1,
+  "stderr": "0948 reduction failed: qualification capture custody\n",
+  "diagnosis": "Full source verification succeeds but capture and reducer return different summary shapes: checked_files/full vs file_count/hashed_entries. Other custody fields compared equal.",
+  "qualification_child_retries": 0,
+  "formal_native_or_allocator_children": 0,
+  "refs": [
+    {
+      "path": "plan-v3.json",
+      "bytes": 10861,
+      "sha256": "e4bb028993ec25b0b538616153a09b17fdfb26b91c8255336eab9393d87de73f"
+    },
+    {
+      "path": "tools/reduce_0948_v3.py",
+      "bytes": 90771,
+      "sha256": "4cb89ac77cce55f2b72a748fc0c8b745d1749a197bd64f134115de733cb92ec1"
+    },
+    {
+      "path": "qualification/capture.json",
+      "bytes": 125523,
+      "sha256": "d03f1d6e985bf51a3e2bdcebad090fc52a2d0fbb8e03f266dd48b0058ebbaae0"
+    }
+  ]
+}
