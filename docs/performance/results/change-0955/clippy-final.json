@@ -1,0 +1,38 @@
+{
+  "command": [
+    "cargo",
+    "+1.95.0",
+    "clippy",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--example",
+    "xlsx_managed_compression",
+    "-j2",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "cwd": "/home/zhuhe/litchi-performance-0955/source-v1",
+  "started_utc": "2026-10-07T10:25:10.449983+00:00",
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-performance-0955/target",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "RUSTFLAGS": null,
+    "RUSTDOCFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LC_ALL": "C",
+    "TZ": "UTC"
+  },
+  "deadline_seconds": 900,
+  "timeout": false,
+  "returncode": 0,
+  "seconds": 13.131804364005802,
+  "log": {
+    "path": "/home/zhuhe/litchi-performance-0955/clippy-final.log",
+    "bytes": 182,
+    "sha256": "9e651afc788f18b5a7975698d0eb39a934625f7d3d6c319576cd469663d64b4d"
+  }
+}

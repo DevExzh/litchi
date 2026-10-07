@@ -1,0 +1,67 @@
+[
+  {
+    "path": "/home/zhuhe/litchi-performance-0955/probe-build-v4.log",
+    "bytes": 182,
+    "sha256": "74ec38ab7da0622d11f41aa209f42543f384ad4621ec0c21fa95729c2b09e2cb"
+  },
+  {
+    "path": "/home/zhuhe/litchi-performance-0955/clippy-final.log",
+    "bytes": 182,
+    "sha256": "9e651afc788f18b5a7975698d0eb39a934625f7d3d6c319576cd469663d64b4d"
+  },
+  {
+    "path": "/home/zhuhe/litchi-performance-0955/format-final.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "/home/zhuhe/litchi-performance-0955/boundary.log",
+    "bytes": 565,
+    "sha256": "9e0e2ab2ac2ef6b534622708ed674217fb34b69d81a73eb96caa3d7dfd0bedc1"
+  },
+  {
+    "path": "/home/zhuhe/litchi-performance-0955/qualification-final.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "/home/zhuhe/litchi-performance-0955/qualification-final-replay.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "/home/zhuhe/litchi-performance-0955/existing-output-refusal-final.log",
+    "bytes": 116,
+    "sha256": "c121611670f774cc8658c8becaf210767598dd6bfed2b42a7a63b524eaf0b68d"
+  },
+  {
+    "path": "/home/zhuhe/litchi-performance-0955/source-census-replay.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "/home/zhuhe/litchi-performance-0955/build-input-v1.json",
+    "bytes": 762,
+    "sha256": "210a02ad5b0d8191e73cd3edacaf70bcbc0578197d86528217e273d16ecd3aa2"
+  },
+  {
+    "path": "/home/zhuhe/litchi-performance-0955/build-input-v2.json",
+    "bytes": 223,
+    "sha256": "18a34f4797bb7f857f51e21923edca547f5ce09f3ef8a31d4e587a4069385b69"
+  },
+  {
+    "path": "/home/zhuhe/litchi-performance-0955/review/source-review.md",
+    "bytes": 4906,
+    "sha256": "64b5c607043ab219463ae7eeda58c0a7f4a29414e4e9e6f89b4ec4bf26f65c44"
+  },
+  {
+    "path": "/home/zhuhe/litchi-performance-0955/review/final-note.md",
+    "bytes": 2385,
+    "sha256": "72c89843c603d707bf34e3e51ce65be0bc8a30013e3915709ef24cd907a57e10"
+  },
+  {
+    "path": "/home/zhuhe/litchi-performance-0955/review/final-note-v2.md",
+    "bytes": 1438,
+    "sha256": "1e08b9450da290f8324267462e14a19048e04080b5ea073a67c9cee5db5de18c"
+  }
+]

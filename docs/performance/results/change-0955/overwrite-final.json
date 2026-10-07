@@ -1,0 +1,6 @@
+{
+  "expected_returncode": 1,
+  "actual_returncode": 1,
+  "sha256_before": "f4f2467e3f9fd040cc68bf20c7b78451dbb3274f3dd10cfd6468d9fb266aa70b",
+  "sha256_after": "f4f2467e3f9fd040cc68bf20c7b78451dbb3274f3dd10cfd6468d9fb266aa70b"
+}

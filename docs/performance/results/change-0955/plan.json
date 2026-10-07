@@ -1,0 +1,99 @@
+{
+  "schema": "litchi.performance.0955.plan.v1",
+  "purpose": "Untimed explicit cold managed compression qualification on existing exact XLSX corpora",
+  "native_performance_claim": false,
+  "production_changes": false,
+  "cases": [
+    {
+      "id": "medium-one-percent",
+      "workers": 1,
+      "expected_worker_permits": 0,
+      "expected_cpu_tasks": 5,
+      "source_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+      "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c"
+    },
+    {
+      "id": "medium-one-percent",
+      "workers": 2,
+      "expected_worker_permits": 2,
+      "expected_cpu_tasks": 5,
+      "source_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+      "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c"
+    },
+    {
+      "id": "medium-one-percent",
+      "workers": 4,
+      "expected_worker_permits": 4,
+      "expected_cpu_tasks": 5,
+      "source_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+      "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c"
+    },
+    {
+      "id": "medium-one-edit",
+      "workers": 1,
+      "expected_worker_permits": 0,
+      "expected_cpu_tasks": 2,
+      "source_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+      "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1"
+    },
+    {
+      "id": "medium-one-edit",
+      "workers": 2,
+      "expected_worker_permits": 0,
+      "expected_cpu_tasks": 2,
+      "source_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+      "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1"
+    },
+    {
+      "id": "medium-one-edit",
+      "workers": 4,
+      "expected_worker_permits": 0,
+      "expected_cpu_tasks": 2,
+      "source_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+      "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1"
+    },
+    {
+      "id": "dense-sparse-one-percent",
+      "workers": 1,
+      "expected_worker_permits": 0,
+      "expected_cpu_tasks": 5,
+      "source_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+      "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d"
+    },
+    {
+      "id": "dense-sparse-one-percent",
+      "workers": 2,
+      "expected_worker_permits": 0,
+      "expected_cpu_tasks": 5,
+      "source_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+      "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d"
+    },
+    {
+      "id": "dense-sparse-one-percent",
+      "workers": 4,
+      "expected_worker_permits": 0,
+      "expected_cpu_tasks": 5,
+      "source_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+      "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d"
+    }
+  ],
+  "required_gates": [
+    "exact output SHA and semantic reopen",
+    "expected sink-observed worker permits",
+    "exact Deflate CpuTasks",
+    "post-drop memory/workers/objects/io permits zero",
+    "managed exact no-op and inverse restoration",
+    "pre-cancelled zero-output refusal",
+    "bounded output zero-output refusal"
+  ],
+  "execution": "serial diagnostic process, widths 1/2/4 each on fresh context and source package; no ambient pool or caller warm facility",
+  "quality": [
+    "scoped rustfmt",
+    "warning-denied Clippy for example",
+    "diagnostic qualification",
+    "byte-identical second diagnostic replay",
+    "existing-output refusal without mutation"
+  ],
+  "reproduction": "cargo +1.95.0 build --locked --offline --manifest-path tools/perf-baseline/Cargo.toml --example xlsx_managed_compression -j2; run example with new output directory",
+  "interpretation": "Counter observations prove admitted compression width, not OS thread counts or parallel speedup."
+}

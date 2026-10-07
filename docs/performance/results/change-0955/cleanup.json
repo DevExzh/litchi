@@ -1,0 +1,27 @@
+{
+  "target_removed": true,
+  "target_path": "/home/zhuhe/litchi-performance-0955/target",
+  "target_files": 3075,
+  "target_logical_bytes": 5263605700,
+  "duplicate_reports_removed": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0955/qualification-replay",
+      "bytes": 15232
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0955/qualification-final-replay",
+      "bytes": 15232
+    }
+  ],
+  "retained_final_binary": {
+    "path": "/home/zhuhe/litchi-performance-0955/executables/xlsx_managed_compression",
+    "bytes": 642418112,
+    "sha256": "5477e269fe2a04d790dddcb6b6568a16b6342809f1dc5b9eefac8acfcf712551"
+  },
+  "retained": "Canonical source snapshot, source census, original/final qualification reports, versioned revisions, intermediate qualified binary, logs and review.",
+  "duplicate_source_census_removed": {
+    "path": "/home/zhuhe/litchi-performance-0955/source-manifest-replay.json",
+    "bytes": 112643948,
+    "sha256": "2e2f21be709431c7f652ba00f7f51481b7df46d01e47e0534ee8ae94044d6634"
+  }
+}

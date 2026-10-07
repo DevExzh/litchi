@@ -1,0 +1,35 @@
+{
+  "command": [
+    "cargo",
+    "+1.95.0",
+    "build",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--example",
+    "xlsx_managed_compression",
+    "-j2"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_utc": "2026-10-07T10:15:27.286976+00:00",
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-performance-0955/target",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "RUSTFLAGS": null,
+    "RUSTDOCFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LC_ALL": "C",
+    "TZ": "UTC"
+  },
+  "deadline_seconds": 900,
+  "timeout": false,
+  "returncode": -15,
+  "seconds": 20.946295544010354,
+  "log": {
+    "path": "/home/zhuhe/litchi-performance-0955/probe-build-v1.log",
+    "bytes": 1808,
+    "sha256": "ca9fbb3822de22a9d77700b0c7e9452f6bd1161b7f3736637c8aab0fb623acc7"
+  }
+}

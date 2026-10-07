@@ -1,0 +1,10 @@
+{
+  "reason": "Root launched first probe build from working checkout instead of isolated source snapshot; deliberately stopped before any workload. Rebuild uses explicit snapshot cwd.",
+  "processes": [
+    {
+      "pid": 2868274,
+      "pgid": 2868274,
+      "cwd": "/home/zhuhe/code/litchi"
+    }
+  ]
+}

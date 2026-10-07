@@ -55,6 +55,7 @@ mod xls_numeric;
 mod xlsx_attribute_fixtures;
 #[cfg(test)]
 mod xlsx_commit_metrics_tests;
+mod xlsx_managed_compression;
 pub mod xlsx_planning_guard;
 pub mod xml_stream_audit;
 pub mod zip_directory_spool;
@@ -10310,6 +10311,12 @@ pub fn write_xlsx_attribute_fixtures(
     include_one_edit: bool,
 ) -> Result<(), Box<dyn Error>> {
     xlsx_attribute_fixtures::export(directory, include_one_edit)
+}
+
+/// Qualify explicit bounded cold compression contexts on the fixed XLSX corpora.
+/// This untimed diagnostic refuses an existing output directory.
+pub fn qualify_xlsx_managed_compression(directory: &std::path::Path) -> Result<(), Box<dyn Error>> {
+    xlsx_managed_compression::qualify(directory)
 }
 
 /// Export the untimed owning-input PPTX preservation qualification fixtures.

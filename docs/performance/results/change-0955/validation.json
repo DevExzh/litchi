@@ -1,0 +1,19 @@
+{
+  "schema": "litchi.performance.0955.validation.v1",
+  "case_count": 9,
+  "frozen_case_matrix_matches": true,
+  "all_gates_pass": true,
+  "byte_identical_replay": true,
+  "manifest_sha256": "f4f2467e3f9fd040cc68bf20c7b78451dbb3274f3dd10cfd6468d9fb266aa70b",
+  "existing_output_refusal_returncode": 1,
+  "existing_output_unchanged": true,
+  "final_module_sha256": "ef77f362959c3b38efcc56db4c8b6ae6f60a5ba040a1bde0286c8761043a1d20",
+  "final_binary_sha256": "5477e269fe2a04d790dddcb6b6568a16b6342809f1dc5b9eefac8acfcf712551",
+  "qualification": "qualification-final.json",
+  "replay": "qualification-final-replay.json",
+  "refusal": "existing-output-refusal-final.json",
+  "prior_and_final_manifests_equal": true,
+  "source_census_byte_identical_replay": true,
+  "source_manifest_sha256": "2e2f21be709431c7f652ba00f7f51481b7df46d01e47e0534ee8ae94044d6634",
+  "source_census_replay": "source-census-replay.json"
+}

@@ -1,0 +1,50 @@
+{
+  "base_head": "d52f0b37e162fea0a46378ae007916f693bf3e68",
+  "overlay": [
+    {
+      "path": "tools/perf-baseline/README.md",
+      "bytes": 326132,
+      "sha256": "ee189278af4b52445b03bdaa4a1485189baa324f5512f3876f0df5b0261a42d9"
+    },
+    {
+      "path": "tools/perf-baseline/examples/xlsx_managed_compression.rs",
+      "bytes": 458,
+      "sha256": "eb9a5812bdb0ccf6b5c4d3bce4acfdf44b0929900171e56becee72c530d239e9"
+    },
+    {
+      "path": "tools/perf-baseline/src/lib.rs",
+      "bytes": 3076833,
+      "sha256": "79bc5419926a2816213c621a36fc9ebdcf19a487ba38d2c722560833b17dbdaa"
+    },
+    {
+      "path": "tools/perf-baseline/src/xlsx_managed_compression.rs",
+      "bytes": 25934,
+      "sha256": "ef77f362959c3b38efcc56db4c8b6ae6f60a5ba040a1bde0286c8761043a1d20"
+    }
+  ],
+  "source_files": 453962,
+  "source_bytes": 6153654145,
+  "all_non_overlay_files_match_git_base": true,
+  "manifest": {
+    "path": "/home/zhuhe/litchi-performance-0955/source-manifest-final.json",
+    "bytes": 112643948,
+    "sha256": "2e2f21be709431c7f652ba00f7f51481b7df46d01e47e0534ee8ae94044d6634"
+  },
+  "binary": {
+    "path": "/home/zhuhe/litchi-performance-0955/target/debug/examples/xlsx_managed_compression",
+    "bytes": 642418112,
+    "sha256": "5477e269fe2a04d790dddcb6b6568a16b6342809f1dc5b9eefac8acfcf712551"
+  },
+  "toolchain": {
+    "path": "/home/zhuhe/litchi-performance-0955/toolchain.txt",
+    "bytes": 196,
+    "sha256": "4fdff2578428e9c5c08ddd7a0d3079c1a106b1cdaa46e73e46f7cd32b0fb9cad"
+  },
+  "runner": {
+    "path": "/home/zhuhe/litchi-performance-0955/run.py",
+    "bytes": 1564,
+    "sha256": "2fdf5e0e8b3b4471b0879cf5c950b95c6778a0d83a89e8dd69f1635a70cfab6a"
+  },
+  "build": "probe-build-v4.json",
+  "integration_history": "source-v1 is the integration directory; earlier module bytes are retained under revisions/v1 and revisions/v2. Final byte census is frozen here."
+}

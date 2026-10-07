@@ -1,0 +1,9 @@
+{
+  "reason": "Explicitly approved post-qualification correction: sample publication CpuTasks before inverse handoff; prior source revision/binary/receipts retained. All affected checks rerun.",
+  "source_sha256": "ef77f362959c3b38efcc56db4c8b6ae6f60a5ba040a1bde0286c8761043a1d20",
+  "prior_binary": {
+    "path": "/home/zhuhe/litchi-performance-0955/qualified-intermediate-v3/xlsx_managed_compression",
+    "bytes": 642418112,
+    "sha256": "f3a0471d77976546b66305fbabf24edb90540aa8ddade17692798fecb54f6382"
+  }
+}

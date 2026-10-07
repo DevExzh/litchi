@@ -1,0 +1,27 @@
+{
+  "command": [
+    "/home/zhuhe/litchi-performance-0955/target/debug/examples/xlsx_managed_compression",
+    "/home/zhuhe/litchi-performance-0955/qualification-final"
+  ],
+  "cwd": "/home/zhuhe/litchi-performance-0955/source-v1",
+  "started_utc": "2026-10-07T10:28:06.715960+00:00",
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-performance-0955/target",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "RUSTFLAGS": null,
+    "RUSTDOCFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LC_ALL": "C",
+    "TZ": "UTC"
+  },
+  "deadline_seconds": 900,
+  "timeout": false,
+  "returncode": 1,
+  "seconds": 0.0015201369824353606,
+  "log": {
+    "path": "/home/zhuhe/litchi-performance-0955/existing-output-refusal-final.log",
+    "bytes": 116,
+    "sha256": "c121611670f774cc8658c8becaf210767598dd6bfed2b42a7a63b524eaf0b68d"
+  }
+}

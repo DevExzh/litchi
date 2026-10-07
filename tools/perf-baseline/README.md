@@ -1,5 +1,23 @@
 # OPC, CFB, OLE2 Office, OOXML, RTF, and ODF performance baseline
 
+## Untimed XLSX managed compression qualification
+
+Exercise explicit cold managed contexts at worker limits 1, 2 and 4 on the
+medium/dense-sparse one-percent edits and medium one-cell control:
+
+```sh
+cargo run --manifest-path tools/perf-baseline/Cargo.toml \
+  --example xlsx_managed_compression -- /path/to/new-compression-qualification
+```
+
+The output directory must be new. This diagnostic checks deterministic output,
+semantic readback, managed lifecycle boundaries and resource release. Its sink
+observes worker permits during publication, before the consuming editor API
+releases its private session. This establishes admitted compression width, not
+OS thread counts or a speedup. Each case starts with a fresh execution context;
+there is no caller-provided warm worker facility. Existing benchmark selectors
+and timers are unchanged.
+
 ## Untimed PPTX owning-input control
 
 Export the fixed 200-slide media-rich multi-slide edit through the owning
