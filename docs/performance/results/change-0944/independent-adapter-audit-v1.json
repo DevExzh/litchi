@@ -1,0 +1,81 @@
+{
+  "adapters": {
+    "adapter": {
+      "bytes": 34984,
+      "path": "/home/zhuhe/litchi-performance-0944/docs/performance/results/change-0944/analyze_v2_adapter.py",
+      "sha256": "e04ff0ef1a00556ae34b0d1c2b55ae13945773eaff016970815b499ec52a5f04"
+    },
+    "raw_analyzer_v2": {
+      "bytes": 5053,
+      "path": "/home/zhuhe/litchi-performance-0944/tools/raw_analyzer_v2.py",
+      "sha256": "348917787ff3d75ebdb76a7d126662e34feac86b8c794dd1470e00520ab23e8f"
+    },
+    "reader": {
+      "bytes": 63017,
+      "path": "/home/zhuhe/litchi-performance-0944/docs/performance/results/change-0944/change-0845/reader_v2.py",
+      "sha256": "8a2f2fd71d7f0e67643793d9673805aacd0142be666928f4abb5e12cf57a2203"
+    },
+    "semantic_v2": {
+      "bytes": 6372,
+      "path": "/home/zhuhe/litchi-performance-0944/tools/semantic_v2.py",
+      "sha256": "ce7779125acefcab91ad1f8b900a5257bc7b9db365ca91bdf72e7a05e43ca8e7"
+    }
+  },
+  "corruption_controls": {
+    "extra-suffix": {
+      "exit": 0,
+      "expected_reject": false,
+      "stderr_prefix": "",
+      "stdout_prefix": "{\n  \"classification\": {\n    \"lifecycle_count\": 5,\n    \"lifecycle_prediction\": 5,\n    \"measured_count\": 1,\n    \"measured_file\": \"control-extra-suffix/callgrind.o"
+    },
+    "missing-number": {
+      "exit": 1,
+      "expected_reject": true,
+      "stderr_prefix": "raw_analyzer_v2: non-contiguous dump sequence [1, 3, 4, 5, 6]\n",
+      "stdout_prefix": ""
+    },
+    "terminal-gap": {
+      "exit": 0,
+      "expected_reject": false,
+      "stderr_prefix": "",
+      "stdout_prefix": "{\n  \"classification\": {\n    \"lifecycle_count\": 5,\n    \"lifecycle_prediction\": 5,\n    \"measured_count\": 1,\n    \"measured_file\": \"control-terminal-gap/callgrind.o"
+    },
+    "terminal-nonzero": {
+      "exit": 1,
+      "expected_reject": true,
+      "stderr_prefix": "raw_analyzer_v2: /tmp/litchi-0944-adapter-audit-v1/control-terminal-nonzero/callgrind.out: no compressed function names\n",
+      "stdout_prefix": ""
+    }
+  },
+  "created_utc": "2026-10-07T00:33:44.572352+00:00",
+  "finding": "Current draft raw analyzer must reject malformed callgrind.out.* entries and require terminal part exactly max(numbered)+1; observed controls currently pass these malformed cases. Missing numeric part and nonzero terminal summary reject.",
+  "fixture": {
+    "capture": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/capture/00-medium",
+    "scratch_packet": "/tmp/litchi-0944-adapter-audit-v1",
+    "source_plan": "/home/zhuhe/code/litchi/docs/performance/results/change-0901/plan.json"
+  },
+  "positive": {
+    "collected_values": [
+      169387210,
+      169387210
+    ],
+    "lifecycle_count": 5,
+    "measured_count": 1,
+    "numbered_parts": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "numbered_summary_ir": 169387210,
+    "raw_status": "pass",
+    "result": "pass",
+    "semantic_shape": "medium",
+    "semantic_status": "pass",
+    "terminal_part": 7
+  },
+  "schema": "litchi.xlsx-publication-profile-0944-independent-adapter-audit-v1",
+  "scope": "offline retained 0901 semantic/raw fixture replay only; no workload, build, or 0944 child executed"
+}

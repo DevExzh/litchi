@@ -1,0 +1,87 @@
+{
+  "control_count": 14,
+  "controls": [
+    {
+      "error": "EvidenceError: duplicate JSON key: x",
+      "expected": "reject",
+      "name": "duplicate-json-key",
+      "status": "pass"
+    },
+    {
+      "error": "EvidenceError: absolute-path escapes packet: /tmp/x",
+      "expected": "reject",
+      "name": "absolute-path",
+      "status": "pass"
+    },
+    {
+      "error": "EvidenceError: parent-path escapes packet: ../x",
+      "expected": "reject",
+      "name": "parent-path",
+      "status": "pass"
+    },
+    {
+      "error": "EvidenceError: nul-path is not a relative path",
+      "expected": "reject",
+      "name": "nul-path",
+      "status": "pass"
+    },
+    {
+      "expected": "accept",
+      "name": "current-source-plan-positive",
+      "status": "pass"
+    },
+    {
+      "expected": "accept",
+      "name": "retained-semantic-positive-medium",
+      "status": "pass"
+    },
+    {
+      "expected": "accept",
+      "name": "retained-semantic-positive-dense-sparse",
+      "status": "pass"
+    },
+    {
+      "error": "EvidenceError: binary SHA does not bind plan",
+      "expected": "reject",
+      "name": "semantic-binary-digest",
+      "status": "pass"
+    },
+    {
+      "error": "AssertionError: medium phase reopen_ns is not a non-negative integer vector",
+      "expected": "reject",
+      "name": "semantic-bool-reopen",
+      "status": "pass"
+    },
+    {
+      "error": "AssertionError: medium source output digest disagrees with result output digest",
+      "expected": "reject",
+      "name": "semantic-output-identity",
+      "status": "pass"
+    },
+    {
+      "error": "EvidenceError: operation metrics missing",
+      "expected": "reject",
+      "name": "semantic-missing-operation-metrics",
+      "status": "pass"
+    },
+    {
+      "expected": "accept",
+      "name": "retained-raw-positive",
+      "status": "pass"
+    },
+    {
+      "error": "ValueError: malformed numbered Callgrind suffixes: ['callgrind.out.1.extra']",
+      "expected": "reject",
+      "name": "raw-extra-suffix",
+      "status": "pass"
+    },
+    {
+      "error": "ValueError: terminal part has a gap",
+      "expected": "reject",
+      "name": "raw-terminal-gap",
+      "status": "pass"
+    }
+  ],
+  "schema": "litchi-xlsx-profile-audit-controls-v2",
+  "status": "pass"
+}

@@ -1,0 +1,26 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "/home/zhuhe/litchi-performance-0944-archive/moved-replay/tools/root_replay.py",
+    "--output",
+    "/home/zhuhe/litchi-performance-0944-archive/moved-replay/root-moved-reduction.json"
+  ],
+  "byte_identical": true,
+  "copied_bytes": 729248479,
+  "copied_files": 11003,
+  "elapsed_seconds": 2.875640869140625,
+  "excluded_root_directories": [
+    "source",
+    "target-native",
+    "tmp"
+  ],
+  "original_hidden": true,
+  "original_restored": true,
+  "reduction_bytes": 52227,
+  "reduction_sha256": "7156b72d6b36e310d13f0365a154de9a1fa16bd413f4db27f32fd523f2f3ddea",
+  "returncode": 0,
+  "schema": "litchi.xlsx-publication-0944-moved-replay-v1",
+  "status": "pass",
+  "stderr": "",
+  "stdout": "{\"status\": \"pass\", \"captures\": 4, \"output\": \"/home/zhuhe/litchi-performance-0944-archive/moved-replay/root-moved-reduction.json\"}\n"
+}

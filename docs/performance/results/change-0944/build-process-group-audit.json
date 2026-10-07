@@ -1,0 +1,15 @@
+{
+  "checked_utc": "2026-10-07T00:35:26.511225+00:00",
+  "observation": "process group absent",
+  "pid": 2318247,
+  "pid_proc_entry_exists": false,
+  "process_group_clear": true,
+  "process_group_id": 2318247,
+  "required_for_capture": true,
+  "schema": "litchi-xlsx-profile-build-process-group-audit-v1",
+  "terminal": {
+    "bytes": 820,
+    "path": "build/native-build-terminal.json",
+    "sha256": "5b0c8cde3292d6577e0b3a544a877954907052c379852040005e9f05d4e0df3a"
+  }
+}

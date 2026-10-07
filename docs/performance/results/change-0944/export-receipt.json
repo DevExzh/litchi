@@ -1,0 +1,26 @@
+{
+  "schema": "litchi-xlsx-profile-source-export-v1",
+  "started_utc": "2026-10-07T00:21:25.610901+00:00",
+  "terminal_utc": "2026-10-07T00:21:49.906413+00:00",
+  "cwd": "/home/zhuhe/code/litchi",
+  "argv": [
+    "git",
+    "archive",
+    "--format=tar",
+    "933ee45cbb5d2ef9dc29583f7ec890ad234e04fb"
+  ],
+  "extract_argv": [
+    "tar",
+    "-xf",
+    "-",
+    "-C",
+    "source"
+  ],
+  "commit": "933ee45cbb5d2ef9dc29583f7ec890ad234e04fb",
+  "tree": "8b571b08a83c530c50fdbcb16345a9aa75883794",
+  "source_root": "source",
+  "manifest": "source-manifest.json",
+  "manifest_sha256": "5227e2831e0136e315bfe0f80e1128a5673bbf8cfd08f627ed82bce0cd9eb395",
+  "file_count": 453481,
+  "tracked_lock": "source/tools/perf-baseline/Cargo.lock"
+}

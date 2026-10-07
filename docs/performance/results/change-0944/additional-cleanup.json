@@ -1,0 +1,43 @@
+{
+  "capture_or_source_artifacts_removed": false,
+  "removed": [
+    {
+      "bytes": 4424199,
+      "files": 84,
+      "path": "/tmp/litchi-0944-adapter-audit-v1",
+      "purpose": "owned offline audit scratch or tool bytecode; retained inputs and result receipts remain in the external packet/archive"
+    },
+    {
+      "bytes": 1423901,
+      "files": 22,
+      "path": "/tmp/litchi-0944-controls-retest-v1",
+      "purpose": "owned offline audit scratch or tool bytecode; retained inputs and result receipts remain in the external packet/archive"
+    },
+    {
+      "bytes": 56629243,
+      "files": 1,
+      "path": "/tmp/litchi-0944-export-paths.txt",
+      "purpose": "owned offline audit scratch or tool bytecode; retained inputs and result receipts remain in the external packet/archive"
+    },
+    {
+      "bytes": 56629243,
+      "files": 1,
+      "path": "/tmp/litchi-0944-head-paths.txt",
+      "purpose": "owned offline audit scratch or tool bytecode; retained inputs and result receipts remain in the external packet/archive"
+    },
+    {
+      "bytes": 67987,
+      "files": 1,
+      "path": "/home/zhuhe/litchi-performance-0944-archive/__pycache__",
+      "purpose": "owned offline audit scratch or tool bytecode; retained inputs and result receipts remain in the external packet/archive"
+    },
+    {
+      "bytes": 0,
+      "files": 0,
+      "path": "/home/zhuhe/litchi-performance-0944/tmp",
+      "purpose": "empty build temporary directory"
+    }
+  ],
+  "schema": "litchi.performance.0944.additional-cleanup-v1",
+  "status": "completed"
+}

@@ -1,0 +1,42 @@
+{
+  "schema": "litchi-xlsx-profile-retained-helper-custody-v1",
+  "source_head": "933ee45cbb5d2ef9dc29583f7ec890ad234e04fb",
+  "files": [
+    {
+      "source_repo_path": "docs/performance/results/change-0901/capture.py",
+      "path": "docs/performance/results/change-0944/helpers/retained-0901-capture.py",
+      "bytes": 4589,
+      "sha256": "7906878cbe6bd24a72c7af05121606e5cdf6a03d85c92ec48a8d81fc2306d029"
+    },
+    {
+      "source_repo_path": "docs/performance/results/change-0901/admit_first.py",
+      "path": "docs/performance/results/change-0944/helpers/retained-0901-admit_first.py",
+      "bytes": 2687,
+      "sha256": "cb0dde786dc56a8d10603fe6b4a1f23a20d474f0d22d93abb0c6d652b68a473d"
+    },
+    {
+      "source_repo_path": "docs/performance/results/change-0901/analyze_v2.py",
+      "path": "docs/performance/results/change-0944/helpers/retained-0901-analyze_v2.py",
+      "bytes": 34984,
+      "sha256": "e04ff0ef1a00556ae34b0d1c2b55ae13945773eaff016970815b499ec52a5f04"
+    },
+    {
+      "source_repo_path": "docs/performance/results/change-0845/reader_v2.py",
+      "path": "docs/performance/results/change-0944/helpers/retained-0845-reader_v2.py",
+      "bytes": 63017,
+      "sha256": "8a2f2fd71d7f0e67643793d9673805aacd0142be666928f4abb5e12cf57a2203"
+    },
+    {
+      "source_repo_path": "docs/performance/results/change-0705/analyze.py",
+      "path": "docs/performance/results/change-0944/helpers/retained-0705-semantic-analyze.py",
+      "bytes": 33177,
+      "sha256": "567c7ad1eecc4c93d51615076088809b38c5498a4f29ac929a1661bf9fd265dc"
+    },
+    {
+      "source_repo_path": "docs/performance/results/change-0900/run_v2.py",
+      "path": "docs/performance/results/change-0944/helpers/retained-0900-source-checker.py",
+      "bytes": 7998,
+      "sha256": "4d79556f7296e59fdba374045bef1085e60cb206cb5be44b766de81760c7479d"
+    }
+  ]
+}

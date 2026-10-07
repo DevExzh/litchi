@@ -1,0 +1,29 @@
+{
+  "schema": "litchi-xlsx-profile-source-closure-selection-v1",
+  "origin_commit": "933ee45cbb5d2ef9dc29583f7ec890ad234e04fb",
+  "full_export_root": "source",
+  "selected_root": "source-build",
+  "include": [
+    ".cargo/",
+    "crates/",
+    "test-data/",
+    "tools/perf-baseline/",
+    "Cargo.toml",
+    "README.md",
+    "clippy.toml",
+    "deny.toml",
+    "rust-toolchain.toml",
+    "rustfmt.toml"
+  ],
+  "exclude": [
+    "docs/performance/",
+    "docs/report/",
+    ".github/",
+    ".gitignore",
+    "AGENTS.md",
+    "LICENSE",
+    "SECURITY.md"
+  ],
+  "tracked_3rdparty_count": 0,
+  "note": "The authoritative checkout has no tracked 3rdparty entries; untracked/nested OfficeCLI/specs content is intentionally outside the Cargo source closure."
+}

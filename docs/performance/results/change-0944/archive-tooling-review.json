@@ -1,0 +1,79 @@
+{
+  "archive_started": false,
+  "archive_workspace": "/home/zhuhe/litchi-performance-0944-archive",
+  "binary_descriptor": {
+    "bytes": 494,
+    "path": "/home/zhuhe/litchi-performance-0944-archive/binary-descriptor.json",
+    "sha256": "36ccc245478ea7a3e9e4e111f82d9f308197960a7d36f959266283e02a762708"
+  },
+  "binary_descriptor_schema": "litchi.performance.0944.binary-descriptor-v1",
+  "bound_binary": {
+    "bytes": 265794648,
+    "path": "target-native/release/litchi-perf-baseline",
+    "sha256": "63cbffd8c17299a4e2d1096e4ffa2a2d34a549cc452dfdf8ba5691b8ab7e75a3"
+  },
+  "build_terminal": {
+    "bytes": 820,
+    "path": "/home/zhuhe/litchi-performance-0944/build/native-build-terminal.json",
+    "sha256": "5b0c8cde3292d6577e0b3a544a877954907052c379852040005e9f05d4e0df3a"
+  },
+  "cleanup_started": false,
+  "closure": {
+    "full_export_files": 453481,
+    "full_export_manifest_sha256": "5227e2831e0136e315bfe0f80e1128a5673bbf8cfd08f627ed82bce0cd9eb395",
+    "selected_manifest_sha256": "b63113ce5251218be817ba29c466b0ace535c546a416b97413ae8a73f0caea64",
+    "selected_source_build_bytes": 259872266,
+    "selected_source_build_files": 10788
+  },
+  "go_gate": {
+    "archive_verify_cleanup_not_authorized_in_this_receipt": true,
+    "environment": "LITCHI_PERF_0944_ARCHIVE_GO=1",
+    "flag": "--go"
+  },
+  "live_mutation": false,
+  "plan_command": "/usr/bin/python3 -B /home/zhuhe/litchi-performance-0944-archive/archive-0944-v1.py --plan",
+  "plan_exit": 0,
+  "plan_output": {
+    "bytes": 4343,
+    "path": "/home/zhuhe/litchi-performance-0944-archive/plan-v2.stdout.json",
+    "sha256": "80ee1a6419389a073b37813782371a0394ae393d754b8192b784e2663a5dba38"
+  },
+  "schema": "litchi.performance.0944.archive-tooling-review-v2",
+  "scope_test_command": "/usr/bin/python3 -B /home/zhuhe/litchi-performance-0944-archive/archive-0944-v1-scope-tests.py",
+  "scope_test_exit": 0,
+  "scope_test_stderr": {
+    "bytes": 0,
+    "path": "/home/zhuhe/litchi-performance-0944-archive/scope-tests-v1.stderr.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "scope_test_stdout": {
+    "bytes": 63,
+    "path": "/home/zhuhe/litchi-performance-0944-archive/scope-tests-v1.stdout.log",
+    "sha256": "a7517e9f719dc194ebb259748ac2f0b2ae55f4b5c57e68d0250af412dc60a467"
+  },
+  "scope_tests": {
+    "bytes": 9681,
+    "path": "/home/zhuhe/litchi-performance-0944-archive/archive-0944-v1-scope-tests.py",
+    "sha256": "db39b29e22441914ab469ead854cc27bbfff6ef9756ae82e37c3d0f5ab21259d"
+  },
+  "script": {
+    "bytes": 38818,
+    "path": "/home/zhuhe/litchi-performance-0944-archive/archive-0944-v1.py",
+    "sha256": "1b5547e6b9c5b8e0257989cec10058b7eb345447a2bdbb497af1970ca5c2658a"
+  },
+  "selection_policy": {
+    "exclude_after_validation": [
+      "top-level source",
+      "__pycache__",
+      "target-native files outside descriptor-bound binaries"
+    ],
+    "preserve": [
+      "source-build all files",
+      "nested target-* directories/files outside top-level target-native",
+      "all receipts/raw/tooling/build artifacts"
+    ]
+  },
+  "source_root": "/home/zhuhe/litchi-performance-0944",
+  "status": "prepared_not_started",
+  "verify_started": false
+}

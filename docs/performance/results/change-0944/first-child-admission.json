@@ -1,0 +1,60 @@
+{
+  "binary": {
+    "bytes": 265794648,
+    "executable": true,
+    "mode_bits": 509,
+    "path": "docs/performance/results/change-0944/binaries/profile-native",
+    "sha256": "63cbffd8c17299a4e2d1096e4ffa2a2d34a549cc452dfdf8ba5691b8ab7e75a3"
+  },
+  "index": 0,
+  "plan": {
+    "bytes": 20217,
+    "path": "docs/performance/results/change-0944/plan.json",
+    "sha256": "bccc817e1ac7c8c2d3b6c0e1eb061b3deae380d67c68c95c5e266e6646e0f9da"
+  },
+  "raw": {
+    "bytes": 80558,
+    "path": "docs/performance/results/change-0944/capture/00-medium/raw.json",
+    "sha256": "6de412ea46924d337311677e8167da256b7b1a8fc1978235b5749392b9ef3583"
+  },
+  "report": {
+    "bytes": 21560,
+    "path": "docs/performance/results/change-0944/capture/00-medium/report.json",
+    "sha256": "b1bc4048142f39b9b89854738f4bf35b0ab1de803bf6ddf3dfcfb6361ee4f42b"
+  },
+  "row": {
+    "index": 0,
+    "repeat": 0,
+    "shape": "medium"
+  },
+  "runner": {
+    "bytes": 9058,
+    "path": "tools/capture_v2.py",
+    "sha256": "c707aa7fa51c980a6ab4317a5f6147c5d79ae30158fe31ca642a5186e6600db6"
+  },
+  "schema": "litchi.xlsx-publication-profile-first-child-admission-v2",
+  "semantics": {
+    "bytes": 5025,
+    "path": "docs/performance/results/change-0944/capture/00-medium/semantics.json",
+    "sha256": "5276c7e136687a2bc56bc6e3c69a911e86aa89a120c42f6ca442afb93b573509"
+  },
+  "source_manifest": {
+    "bytes": 3674260,
+    "path": "source-build-manifest.json",
+    "sha256": "b63113ce5251218be817ba29c466b0ace535c546a416b97413ae8a73f0caea64"
+  },
+  "status": "pass",
+  "terminal": {
+    "bytes": 4449,
+    "path": "docs/performance/results/change-0944/capture/00-medium/terminal.json",
+    "sha256": "b33394cf0468fe9d099bb1bb334f58230f26c1818b72d48fb201cc2727e1dd9c"
+  },
+  "validation": {
+    "lifecycle_calls_retained": true,
+    "no_retry_or_replacement": true,
+    "one_measured_owner_call": true,
+    "raw_callgrind_gate": true,
+    "semantic_gate": true,
+    "terminal_before_parse": true
+  }
+}

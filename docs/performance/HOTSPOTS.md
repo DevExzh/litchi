@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## 0944 — current XLSX publication remains XML- and writer-heavy
+
+[0944](0944-xlsx-post-attribute-publication-profile.md) refreshes the stale
+0901 attribution after accepted 0905. Four current-source captures pass
+semantic, preservation, raw accounting, independent audit, and relocation
+replay. Nested XML auditing receives 53.48% / 56.88% of medium / dense-sparse
+publication Ir; preservation writing receives 45.89–45.90% / 42.64%.
+These are instruction shares, with nested costs kept separate, not native-time
+shares or a speedup comparison. Existing rejection and preservation constraints
+remain in force. Sharing generated replacement payloads is a distinct
+allocation hypothesis requiring its own qualification; topology-plan creation
+is only about 0.30% of publication Ir here. No production change is adopted.
+
 ## 0943 — unchanged DOC Data sharing misses allocation and latency gates
 
 [0943](0943-doc-data-sharing-rejection.md) qualifies private `Arc<Vec<u8>>`

@@ -1,0 +1,71 @@
+{
+  "adapters": {
+    "controls_script": {
+      "bytes": 4905,
+      "path": "tools/audit_controls_v2.py",
+      "sha256": "bc661f3fe6ff9b3ab3f3ed45116bca60de9ea219b65c15a27337ef0e9e7e2bd2"
+    },
+    "raw_analyzer": {
+      "bytes": 6004,
+      "path": "tools/raw_analyzer_v2.py",
+      "sha256": "e313a0c743cb8e8f7e5f07662b10033b805bd830217f9509d1494fe1ccd0778c"
+    },
+    "semantic_validator": {
+      "bytes": 6372,
+      "path": "tools/semantic_v2.py",
+      "sha256": "ce7779125acefcab91ad1f8b900a5257bc7b9db365ca91bdf72e7a05e43ca8e7"
+    },
+    "source_checker": {
+      "bytes": 11660,
+      "path": "tools/source_check_v2.py",
+      "sha256": "467a162b09342a4e5728c05b51ebdb9f18d8f50ee76e305634c4e8f068b187ae"
+    }
+  },
+  "control_receipt_note": "The packet controls/audit-controls-v2.json terminal-gap run rejected earlier on a report-path mismatch before reaching the terminal assertion; this supplemental corrected retest isolates the terminal-part check.",
+  "created_utc": "2026-10-07T00:38:23.048168+00:00",
+  "negative_controls": {
+    "absolute_parent_nul_paths": "reject",
+    "duplicate_json_key": "reject",
+    "raw_extra_suffix": {
+      "error": "malformed numbered Callgrind suffixes",
+      "status": "reject"
+    },
+    "raw_terminal_gap": {
+      "error": "terminal part has a gap",
+      "fixture": "path-corrected independent copy",
+      "status": "reject"
+    },
+    "semantic_binary_digest": "reject",
+    "semantic_bool_reopen": "reject",
+    "semantic_missing_operation_metrics": "reject",
+    "semantic_output_identity": "reject"
+  },
+  "plan": {
+    "bytes": 20009,
+    "path": "docs/performance/results/change-0944/plan.json",
+    "sha256": "5e7562e113b842b20dffbb909fef7c71e1a4e572866f9e5e35eaa2161b1b42e9"
+  },
+  "positive": {
+    "lifecycle_count": 5,
+    "measured_owner_count": 1,
+    "numbered_parts": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "raw_medium": "pass",
+    "semantic_dense_sparse": "pass",
+    "semantic_medium": "pass",
+    "terminal_part": 7
+  },
+  "schema": "litchi.xlsx-publication-profile-0944-independent-controls-retest-v1",
+  "scope": "offline retained 0901 fixture; no 0944 workload/build/capture",
+  "source_check": {
+    "binary_sha256": "63cbffd8c17299a4e2d1096e4ffa2a2d34a549cc452dfdf8ba5691b8ab7e75a3",
+    "source_file_count": 10788,
+    "status": "pass"
+  }
+}

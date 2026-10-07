@@ -1,0 +1,948 @@
+{
+  "binary": {
+    "actual": {
+      "bytes": 265794648,
+      "executable": true,
+      "mode_bits": 509,
+      "path": "docs/performance/results/change-0944/binaries/profile-native",
+      "sha256": "63cbffd8c17299a4e2d1096e4ffa2a2d34a549cc452dfdf8ba5691b8ab7e75a3"
+    },
+    "comparison": {
+      "bytes_match": true,
+      "executable_match": true,
+      "match": true,
+      "mode_bits_match": true,
+      "path_match": true,
+      "sha256_match": true
+    },
+    "declared": {
+      "bytes": 265794648,
+      "executable": true,
+      "mode_bits": 509,
+      "path": "docs/performance/results/change-0944/binaries/profile-native",
+      "sha256": "63cbffd8c17299a4e2d1096e4ffa2a2d34a549cc452dfdf8ba5691b8ab7e75a3"
+    }
+  },
+  "bindings": {
+    "audit_control_results": {
+      "actual": {
+        "bytes": 2289,
+        "path": "controls/audit-controls-v2.json",
+        "sha256": "d0391e0fd5f8c977dc188be34218a614e14e0ea5959568ea3151b858bf2cc118"
+      },
+      "declared": {
+        "bytes": 2289,
+        "path": "controls/audit-controls-v2.json",
+        "sha256": "d0391e0fd5f8c977dc188be34218a614e14e0ea5959568ea3151b858bf2cc118"
+      },
+      "match": true
+    },
+    "audit_controls": {
+      "actual": {
+        "bytes": 5112,
+        "path": "tools/audit_controls_v2.py",
+        "sha256": "98f184f841ae1d0aa9605bf293234c483a08bb6d6e08a098c8399a572d125e59"
+      },
+      "declared": {
+        "bytes": 5112,
+        "path": "tools/audit_controls_v2.py",
+        "sha256": "98f184f841ae1d0aa9605bf293234c483a08bb6d6e08a098c8399a572d125e59"
+      },
+      "match": true
+    },
+    "binary": {
+      "actual": {
+        "bytes": 265794648,
+        "executable": true,
+        "mode_bits": 509,
+        "path": "docs/performance/results/change-0944/binaries/profile-native",
+        "sha256": "63cbffd8c17299a4e2d1096e4ffa2a2d34a549cc452dfdf8ba5691b8ab7e75a3"
+      },
+      "comparison": {
+        "bytes_match": true,
+        "executable_match": true,
+        "match": true,
+        "mode_bits_match": true,
+        "path_match": true,
+        "sha256_match": true
+      },
+      "declared": {
+        "bytes": 265794648,
+        "executable": true,
+        "mode_bits": 509,
+        "path": "docs/performance/results/change-0944/binaries/profile-native",
+        "sha256": "63cbffd8c17299a4e2d1096e4ffa2a2d34a549cc452dfdf8ba5691b8ab7e75a3"
+      },
+      "match": true
+    },
+    "build": {
+      "actual": {
+        "bytes": 820,
+        "path": "build/native-build-terminal.json",
+        "sha256": "5b0c8cde3292d6577e0b3a544a877954907052c379852040005e9f05d4e0df3a"
+      },
+      "declared": {
+        "bytes": 820,
+        "path": "build/native-build-terminal.json",
+        "sha256": "5b0c8cde3292d6577e0b3a544a877954907052c379852040005e9f05d4e0df3a"
+      },
+      "match": true
+    },
+    "build_process_group_audit": {
+      "actual": {
+        "bytes": 475,
+        "path": "build/build-process-group-audit.json",
+        "sha256": "55652ae8edf4d82d3d0282aeb0883577b7c10d296964e950438b29bca1a83a00"
+      },
+      "declared": {
+        "bytes": 475,
+        "path": "build/build-process-group-audit.json",
+        "sha256": "55652ae8edf4d82d3d0282aeb0883577b7c10d296964e950438b29bca1a83a00"
+      },
+      "match": true
+    },
+    "build_runner": {
+      "actual": {
+        "bytes": 5419,
+        "path": "tools/build_native.py",
+        "sha256": "b133f0d3884b61e0a8d85f7630cb9b5ebe8a1407522df899d5dde9cfc9c58b36"
+      },
+      "declared": {
+        "bytes": 5419,
+        "path": "tools/build_native.py",
+        "sha256": "b133f0d3884b61e0a8d85f7630cb9b5ebe8a1407522df899d5dde9cfc9c58b36"
+      },
+      "match": true
+    },
+    "build_start": {
+      "actual": {
+        "bytes": 2492,
+        "path": "build/native-build-start.json",
+        "sha256": "58a5a58383d76f24908d0dda39a6a9600e120d5b760903cc277f7a1301b9eae3"
+      },
+      "declared": {
+        "bytes": 2492,
+        "path": "build/native-build-start.json",
+        "sha256": "58a5a58383d76f24908d0dda39a6a9600e120d5b760903cc277f7a1301b9eae3"
+      },
+      "match": true
+    },
+    "capture_runner": {
+      "actual": {
+        "bytes": 9058,
+        "path": "tools/capture_v2.py",
+        "sha256": "c707aa7fa51c980a6ab4317a5f6147c5d79ae30158fe31ca642a5186e6600db6"
+      },
+      "declared": {
+        "bytes": 9058,
+        "path": "tools/capture_v2.py",
+        "sha256": "c707aa7fa51c980a6ab4317a5f6147c5d79ae30158fe31ca642a5186e6600db6"
+      },
+      "match": true
+    },
+    "native_context": {
+      "actual": {
+        "bytes": 92879,
+        "path": "references/native-context-0900.json",
+        "sha256": "d07726feea9d991d87d1c1b7a4bc74e5da61f0328ad054ed02bfd5bb2c52f12a"
+      },
+      "declared": {
+        "bytes": 92879,
+        "path": "references/native-context-0900.json",
+        "sha256": "d07726feea9d991d87d1c1b7a4bc74e5da61f0328ad054ed02bfd5bb2c52f12a"
+      },
+      "match": true
+    },
+    "plan_generator": {
+      "actual": {
+        "bytes": 6522,
+        "path": "tools/prepare_plan.py",
+        "sha256": "386e9340f73e05211f3a4ee9b45e2d18a91a14d84a7d559803af86c7119faadd"
+      },
+      "declared": {
+        "bytes": 6522,
+        "path": "tools/prepare_plan.py",
+        "sha256": "386e9340f73e05211f3a4ee9b45e2d18a91a14d84a7d559803af86c7119faadd"
+      },
+      "match": true
+    },
+    "prior_semantic_validator": {
+      "actual": {
+        "bytes": 33177,
+        "path": "docs/performance/results/change-0944/helpers/retained-0705-semantic-analyze.py",
+        "sha256": "567c7ad1eecc4c93d51615076088809b38c5498a4f29ac929a1661bf9fd265dc"
+      },
+      "declared": {
+        "bytes": 33177,
+        "path": "docs/performance/results/change-0944/helpers/retained-0705-semantic-analyze.py",
+        "sha256": "567c7ad1eecc4c93d51615076088809b38c5498a4f29ac929a1661bf9fd265dc"
+      },
+      "match": true
+    },
+    "raw_adapter": {
+      "actual": {
+        "bytes": 34984,
+        "path": "docs/performance/results/change-0944/analyze_v2_adapter.py",
+        "sha256": "e04ff0ef1a00556ae34b0d1c2b55ae13945773eaff016970815b499ec52a5f04"
+      },
+      "declared": {
+        "bytes": 34984,
+        "path": "docs/performance/results/change-0944/analyze_v2_adapter.py",
+        "sha256": "e04ff0ef1a00556ae34b0d1c2b55ae13945773eaff016970815b499ec52a5f04"
+      },
+      "match": true
+    },
+    "raw_analyzer": {
+      "actual": {
+        "bytes": 6654,
+        "path": "tools/raw_analyzer_v2.py",
+        "sha256": "3990fa66aa5f3d3985ee48785cbe23ad5f2be31c351f28dbb3b19c3ea599991f"
+      },
+      "declared": {
+        "bytes": 6654,
+        "path": "tools/raw_analyzer_v2.py",
+        "sha256": "3990fa66aa5f3d3985ee48785cbe23ad5f2be31c351f28dbb3b19c3ea599991f"
+      },
+      "match": true
+    },
+    "reader": {
+      "actual": {
+        "bytes": 63017,
+        "path": "docs/performance/results/change-0845/reader_v2.py",
+        "sha256": "8a2f2fd71d7f0e67643793d9673805aacd0142be666928f4abb5e12cf57a2203"
+      },
+      "declared": {
+        "bytes": 63017,
+        "path": "docs/performance/results/change-0845/reader_v2.py",
+        "sha256": "8a2f2fd71d7f0e67643793d9673805aacd0142be666928f4abb5e12cf57a2203"
+      },
+      "match": true
+    },
+    "retained_helpers": {
+      "actual": {
+        "bytes": 1865,
+        "path": "docs/performance/results/change-0944/retained-helper-custody.json",
+        "sha256": "1cb02d45683c0d083707f000d69e97ed610324b3c7d5c5e7ca5ace8f82a90fb5"
+      },
+      "declared": {
+        "bytes": 1865,
+        "path": "docs/performance/results/change-0944/retained-helper-custody.json",
+        "sha256": "1cb02d45683c0d083707f000d69e97ed610324b3c7d5c5e7ca5ace8f82a90fb5"
+      },
+      "match": true
+    },
+    "semantic_validator": {
+      "actual": {
+        "bytes": 6372,
+        "path": "tools/semantic_v2.py",
+        "sha256": "ce7779125acefcab91ad1f8b900a5257bc7b9db365ca91bdf72e7a05e43ca8e7"
+      },
+      "declared": {
+        "bytes": 6372,
+        "path": "tools/semantic_v2.py",
+        "sha256": "ce7779125acefcab91ad1f8b900a5257bc7b9db365ca91bdf72e7a05e43ca8e7"
+      },
+      "match": true
+    },
+    "source_checker": {
+      "actual": {
+        "bytes": 11672,
+        "path": "tools/source_check_v2.py",
+        "sha256": "3610a0b837c1496052cd0b108a8856322e0b164bb11541740088e194c6cc5d8d"
+      },
+      "declared": {
+        "bytes": 11672,
+        "path": "tools/source_check_v2.py",
+        "sha256": "3610a0b837c1496052cd0b108a8856322e0b164bb11541740088e194c6cc5d8d"
+      },
+      "match": true
+    },
+    "source_manifest": {
+      "actual": {
+        "bytes": 3674260,
+        "path": "source-build-manifest.json",
+        "sha256": "b63113ce5251218be817ba29c466b0ace535c546a416b97413ae8a73f0caea64"
+      },
+      "declared": {
+        "bytes": 3674260,
+        "path": "source-build-manifest.json",
+        "sha256": "b63113ce5251218be817ba29c466b0ace535c546a416b97413ae8a73f0caea64"
+      },
+      "match": true
+    }
+  },
+  "controls": {
+    "control_count": 14,
+    "current_terminal_gap_retest": {
+      "error": "raw_analyzer_v2: terminal part has a gap",
+      "fixture": "audit-adapter-v1/reanalysis-current/retest-terminal-gap-current-v4",
+      "status": "reject",
+      "stderr_sha256": "8593740b09c1fee6171d9e054220ed299febcdc4baef3384f1e1033720681fb6"
+    },
+    "descriptor": {
+      "bytes": 2289,
+      "path": "controls/audit-controls-v2.json",
+      "sha256": "d0391e0fd5f8c977dc188be34218a614e14e0ea5959568ea3151b858bf2cc118"
+    },
+    "note": "Current packet controls were generated by audit_controls_v2.py after the path-binding fix and report the intended terminal-part-gap rejection. The earlier independent-controls-retest-v1 receipt is retained as historical evidence of the pre-fix path-mismatch attempt; it is not used for this final control claim.",
+    "packet_terminal_gap_control": {
+      "control_result_descriptor": {
+        "bytes": 2289,
+        "path": "controls/audit-controls-v2.json",
+        "sha256": "d0391e0fd5f8c977dc188be34218a614e14e0ea5959568ea3151b858bf2cc118"
+      },
+      "error": "ValueError: terminal part has a gap",
+      "status": "reject"
+    },
+    "status": "pass"
+  },
+  "correction_provenance": {
+    "corrections": [
+      {
+        "field": "binary.match",
+        "issue": "v1 top-level binary.match used whole-dictionary equality while actual omitted executable/mode fields present in the declaration",
+        "v2_fix": "compare path, bytes, SHA-256, mode bits, and executable flag as separate booleans; all pass"
+      },
+      {
+        "field": "rows[*].raw.measured_exclusive_self_ir",
+        "issue": "v1 label represented adapter top-self rows but was described as all exclusive self-Ir",
+        "v2_fix": "replace with measured_exclusive_self.top_self_ir and measured_exclusive_self.all_self_ir, retaining other_self_ir, row count, limit, and conservation validation"
+      }
+    ],
+    "created_utc": "2026-10-07T00:49:44.632017+00:00",
+    "no_new_workloads_or_builds": true,
+    "schema": "litchi.xlsx-publication-profile-0944-audit-correction-v2",
+    "source_evidence_unchanged": true,
+    "supersedes": {
+      "bytes": 29384,
+      "path": "/home/zhuhe/litchi-performance-0944/audit-adapter-v1/independent-four-row-audit-v1.json",
+      "sha256": "f328e4d5d0716f24039a7a39fa401dbc15302cb4a790438ca45a6693b407a3ca"
+    }
+  },
+  "created_utc": "2026-10-07T00:44:25.267148+00:00",
+  "descriptive_reduction": {
+    "by_shape": {
+      "dense-sparse": {
+        "max": 167533924,
+        "mean": 167533436,
+        "measured_owner_ir_by_repeat": [
+          167532948,
+          167533924
+        ],
+        "min": 167532948,
+        "repeat1_minus_repeat0": 976,
+        "repeat1_over_repeat0": 1.0000058257197264
+      },
+      "medium": {
+        "max": 92990939,
+        "mean": 92990438,
+        "measured_owner_ir_by_repeat": [
+          92990939,
+          92989937
+        ],
+        "min": 92989937,
+        "repeat1_minus_repeat0": -1002,
+        "repeat1_over_repeat0": 0.9999892247566184
+      }
+    },
+    "metric": "Callgrind Ir in measured owner only; descriptive and shape-local, not native latency/allocation/RSS/speedup/adoption evidence.",
+    "nested_partition_policy": "Immediate topology children have conservation checks; nested XML-audit/writer/compression rows remain diagnostics and are not summed."
+  },
+  "head": "933ee45cbb5d2ef9dc29583f7ec890ad234e04fb",
+  "limitations": [
+    "Callgrind Ir is not wall-clock latency and does not establish speedup or production adoption.",
+    "Returned snapshot destruction/reopen are outside the owner Callgrind scope; semantics records reopen/preservation gates separately.",
+    "The run has one sample per child and two repeats per shape, so these are diagnostic measurements, not uncertainty-qualified performance claims."
+  ],
+  "plan": {
+    "bytes": 20217,
+    "path": "docs/performance/results/change-0944/plan.json",
+    "sha256": "bccc817e1ac7c8c2d3b6c0e1eb061b3deae380d67c68c95c5e266e6646e0f9da"
+  },
+  "raw_reanalysis": {
+    "adapter": {
+      "actual": {
+        "bytes": 6654,
+        "path": "tools/raw_analyzer_v2.py",
+        "sha256": "3990fa66aa5f3d3985ee48785cbe23ad5f2be31c351f28dbb3b19c3ea599991f"
+      },
+      "declared": {
+        "bytes": 6654,
+        "path": "tools/raw_analyzer_v2.py",
+        "sha256": "3990fa66aa5f3d3985ee48785cbe23ad5f2be31c351f28dbb3b19c3ea599991f"
+      },
+      "match": true
+    },
+    "all_four_byte_equal": true,
+    "results": [
+      {
+        "byte_equal": true,
+        "capture_raw": {
+          "bytes": 80558,
+          "path": "docs/performance/results/change-0944/capture/00-medium/raw.json",
+          "sha256": "6de412ea46924d337311677e8167da256b7b1a8fc1978235b5749392b9ef3583"
+        },
+        "index": 0,
+        "output": {
+          "bytes": 80558,
+          "path": "audit-adapter-v1/reanalysis-current/raw-0.json",
+          "sha256": "6de412ea46924d337311677e8167da256b7b1a8fc1978235b5749392b9ef3583"
+        }
+      },
+      {
+        "byte_equal": true,
+        "capture_raw": {
+          "bytes": 81502,
+          "path": "docs/performance/results/change-0944/capture/01-dense-sparse/raw.json",
+          "sha256": "ed81fdf806589e9c8b31c1d3286fa8eb6d3bdbfd213ba1771de37d345ee1ac4b"
+        },
+        "index": 1,
+        "output": {
+          "bytes": 81502,
+          "path": "audit-adapter-v1/reanalysis-current/raw-1.json",
+          "sha256": "ed81fdf806589e9c8b31c1d3286fa8eb6d3bdbfd213ba1771de37d345ee1ac4b"
+        }
+      },
+      {
+        "byte_equal": true,
+        "capture_raw": {
+          "bytes": 81512,
+          "path": "docs/performance/results/change-0944/capture/02-dense-sparse/raw.json",
+          "sha256": "4094bbdcbc82746a6ccf23cb306ae44a5e4fb24b3139a39016bf595b65b9ca5f"
+        },
+        "index": 2,
+        "output": {
+          "bytes": 81512,
+          "path": "audit-adapter-v1/reanalysis-current/raw-2.json",
+          "sha256": "4094bbdcbc82746a6ccf23cb306ae44a5e4fb24b3139a39016bf595b65b9ca5f"
+        }
+      },
+      {
+        "byte_equal": true,
+        "capture_raw": {
+          "bytes": 80568,
+          "path": "docs/performance/results/change-0944/capture/03-medium/raw.json",
+          "sha256": "35f39851996542fbc5aabc140cc09d56d8c8ffa4823796bf16e20217a2aba944"
+        },
+        "index": 3,
+        "output": {
+          "bytes": 80568,
+          "path": "audit-adapter-v1/reanalysis-current/raw-3.json",
+          "sha256": "35f39851996542fbc5aabc140cc09d56d8c8ffa4823796bf16e20217a2aba944"
+        }
+      }
+    ]
+  },
+  "rows": [
+    {
+      "index": 0,
+      "issues": [],
+      "raw": {
+        "direct_topology_ir": 92705594,
+        "lifecycle_owner_ir": [
+          10399001,
+          25948,
+          25769483,
+          26030,
+          25889625
+        ],
+        "lifecycle_parts": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "measured_exclusive_self": {
+          "all_self_ir": 92990939,
+          "other_self_ir": 3408835,
+          "retained_top_row_count": 20,
+          "top_row_limit": 20,
+          "top_self_ir": 89582104,
+          "validation": {
+            "all_self_rows_conserve_summary": true,
+            "top_plus_other_conserves_all_self": true
+          }
+        },
+        "measured_owner_ir": 92990939,
+        "measured_part": 6,
+        "nested_diagnostics_rows": 7,
+        "numbered_parts": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "stderr_collected_values": [
+          155101026,
+          155101026
+        ],
+        "stderr_numbered_sum": 155101026,
+        "terminal_part": 7
+      },
+      "reanalysis_raw_sha256": "6de412ea46924d337311677e8167da256b7b1a8fc1978235b5749392b9ef3583",
+      "receipt_descriptors": {
+        "command": {
+          "bytes": 5461,
+          "path": "docs/performance/results/change-0944/capture/00-medium/command.json",
+          "sha256": "2c41bb8ff5dd57dfb745d954c9cd21e442f36951a75e71fcb01f46821bfe13b9"
+        },
+        "raw": {
+          "bytes": 80558,
+          "path": "docs/performance/results/change-0944/capture/00-medium/raw.json",
+          "sha256": "6de412ea46924d337311677e8167da256b7b1a8fc1978235b5749392b9ef3583"
+        },
+        "report": {
+          "bytes": 21560,
+          "path": "docs/performance/results/change-0944/capture/00-medium/report.json",
+          "sha256": "b1bc4048142f39b9b89854738f4bf35b0ab1de803bf6ddf3dfcfb6361ee4f42b"
+        },
+        "semantics": {
+          "bytes": 5025,
+          "path": "docs/performance/results/change-0944/capture/00-medium/semantics.json",
+          "sha256": "5276c7e136687a2bc56bc6e3c69a911e86aa89a120c42f6ca442afb93b573509"
+        },
+        "start": {
+          "bytes": 2977,
+          "path": "docs/performance/results/change-0944/capture/00-medium/start.json",
+          "sha256": "0670298e7c4caa282d5beeac59fd7268054cf94de885f0f2a4703af4d09c8e9d"
+        },
+        "terminal": {
+          "bytes": 4449,
+          "path": "docs/performance/results/change-0944/capture/00-medium/terminal.json",
+          "sha256": "b33394cf0468fe9d099bb1bb334f58230f26c1818b72d48fb201cc2727e1dd9c"
+        }
+      },
+      "repeat": 0,
+      "semantic": {
+        "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+        "reopen_ns": 2198899375,
+        "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+        "status": "pass",
+        "untouched_member_count": 12,
+        "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19"
+      },
+      "shape": "medium",
+      "status": "pass",
+      "terminal": {
+        "pid": 2332060,
+        "process_group_clear": true,
+        "process_group_id": 2332060,
+        "returncode": 0,
+        "started_utc": "2026-10-07T00:39:46.646893+00:00",
+        "terminal_before_parse": true,
+        "terminal_utc": "2026-10-07T00:40:15.263353+00:00",
+        "timed_out": false
+      }
+    },
+    {
+      "index": 1,
+      "issues": [],
+      "raw": {
+        "direct_topology_ir": 167021124,
+        "lifecycle_owner_ir": [
+          10576823,
+          25820,
+          113340577,
+          26004,
+          113672577
+        ],
+        "lifecycle_parts": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "measured_exclusive_self": {
+          "all_self_ir": 167532948,
+          "other_self_ir": 5882743,
+          "retained_top_row_count": 20,
+          "top_row_limit": 20,
+          "top_self_ir": 161650205,
+          "validation": {
+            "all_self_rows_conserve_summary": true,
+            "top_plus_other_conserves_all_self": true
+          }
+        },
+        "measured_owner_ir": 167532948,
+        "measured_part": 6,
+        "nested_diagnostics_rows": 7,
+        "numbered_parts": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "stderr_collected_values": [
+          405174749,
+          405174749
+        ],
+        "stderr_numbered_sum": 405174749,
+        "terminal_part": 7
+      },
+      "reanalysis_raw_sha256": "ed81fdf806589e9c8b31c1d3286fa8eb6d3bdbfd213ba1771de37d345ee1ac4b",
+      "receipt_descriptors": {
+        "command": {
+          "bytes": 5581,
+          "path": "docs/performance/results/change-0944/capture/01-dense-sparse/command.json",
+          "sha256": "f3bcca624800f8cd84894d79366f8c2e6746b8f7fcb93ef32a63f7f076bc491a"
+        },
+        "raw": {
+          "bytes": 81502,
+          "path": "docs/performance/results/change-0944/capture/01-dense-sparse/raw.json",
+          "sha256": "ed81fdf806589e9c8b31c1d3286fa8eb6d3bdbfd213ba1771de37d345ee1ac4b"
+        },
+        "report": {
+          "bytes": 21592,
+          "path": "docs/performance/results/change-0944/capture/01-dense-sparse/report.json",
+          "sha256": "f8918d0e60e7a13d8b9b331903065eb82c5416c4343c3f7e6255f558361e0f8b"
+        },
+        "semantics": {
+          "bytes": 5048,
+          "path": "docs/performance/results/change-0944/capture/01-dense-sparse/semantics.json",
+          "sha256": "c9e1270140028a0835154a35052536c79e758de0550da0cd2cc65ceb71fb6863"
+        },
+        "start": {
+          "bytes": 3025,
+          "path": "docs/performance/results/change-0944/capture/01-dense-sparse/start.json",
+          "sha256": "b97ed74691b5b913c93bd2dafe879c4d75c9f6194f9fc330deddcec8483a8b03"
+        },
+        "terminal": {
+          "bytes": 4539,
+          "path": "docs/performance/results/change-0944/capture/01-dense-sparse/terminal.json",
+          "sha256": "f2aa3e0aebe1b10d3a43321e3800898ed50b43593f7484ba5cc94236507df3ea"
+        }
+      },
+      "repeat": 0,
+      "semantic": {
+        "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+        "reopen_ns": 2607954719,
+        "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+        "status": "pass",
+        "untouched_member_count": 12,
+        "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19"
+      },
+      "shape": "dense-sparse",
+      "status": "pass",
+      "terminal": {
+        "pid": 2332487,
+        "process_group_clear": true,
+        "process_group_id": 2332487,
+        "returncode": 0,
+        "started_utc": "2026-10-07T00:40:25.433032+00:00",
+        "terminal_before_parse": true,
+        "terminal_utc": "2026-10-07T00:41:04.051563+00:00",
+        "timed_out": false
+      }
+    },
+    {
+      "index": 2,
+      "issues": [],
+      "raw": {
+        "direct_topology_ir": 167022424,
+        "lifecycle_owner_ir": [
+          10577790,
+          25951,
+          113342179,
+          26046,
+          113671453
+        ],
+        "lifecycle_parts": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "measured_exclusive_self": {
+          "all_self_ir": 167533924,
+          "other_self_ir": 5883654,
+          "retained_top_row_count": 20,
+          "top_row_limit": 20,
+          "top_self_ir": 161650270,
+          "validation": {
+            "all_self_rows_conserve_summary": true,
+            "top_plus_other_conserves_all_self": true
+          }
+        },
+        "measured_owner_ir": 167533924,
+        "measured_part": 6,
+        "nested_diagnostics_rows": 7,
+        "numbered_parts": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "stderr_collected_values": [
+          405177343,
+          405177343
+        ],
+        "stderr_numbered_sum": 405177343,
+        "terminal_part": 7
+      },
+      "reanalysis_raw_sha256": "4094bbdcbc82746a6ccf23cb306ae44a5e4fb24b3139a39016bf595b65b9ca5f",
+      "receipt_descriptors": {
+        "command": {
+          "bytes": 5581,
+          "path": "docs/performance/results/change-0944/capture/02-dense-sparse/command.json",
+          "sha256": "5635df5ac62de8428e1f8d7d7d22cf8bcfb0a11ac2c4b3430352a0be0a3edac0"
+        },
+        "raw": {
+          "bytes": 81512,
+          "path": "docs/performance/results/change-0944/capture/02-dense-sparse/raw.json",
+          "sha256": "4094bbdcbc82746a6ccf23cb306ae44a5e4fb24b3139a39016bf595b65b9ca5f"
+        },
+        "report": {
+          "bytes": 21592,
+          "path": "docs/performance/results/change-0944/capture/02-dense-sparse/report.json",
+          "sha256": "35f0b8ae13d3302ab8859e95efca343d1a8ca3bc134c3f4be68aec21126f8166"
+        },
+        "semantics": {
+          "bytes": 5048,
+          "path": "docs/performance/results/change-0944/capture/02-dense-sparse/semantics.json",
+          "sha256": "b46d660f0758ac464189ac7eaadbdeeecd40c306b05578a6418949b087639b25"
+        },
+        "start": {
+          "bytes": 3025,
+          "path": "docs/performance/results/change-0944/capture/02-dense-sparse/start.json",
+          "sha256": "051088fbc490547ed61fa45133059eaf4c4fef1f0db4280b842dde2d8b25844a"
+        },
+        "terminal": {
+          "bytes": 4539,
+          "path": "docs/performance/results/change-0944/capture/02-dense-sparse/terminal.json",
+          "sha256": "eb16443bdc0f76c25394d87264444b127322304684ffb45ca28c3341ecc75023"
+        }
+      },
+      "repeat": 1,
+      "semantic": {
+        "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+        "reopen_ns": 2628001376,
+        "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+        "status": "pass",
+        "untouched_member_count": 12,
+        "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19"
+      },
+      "shape": "dense-sparse",
+      "status": "pass",
+      "terminal": {
+        "pid": 2333060,
+        "process_group_clear": true,
+        "process_group_id": 2333060,
+        "returncode": 0,
+        "started_utc": "2026-10-07T00:41:19.662792+00:00",
+        "terminal_before_parse": true,
+        "terminal_utc": "2026-10-07T00:41:58.282124+00:00",
+        "timed_out": false
+      }
+    },
+    {
+      "index": 3,
+      "issues": [],
+      "raw": {
+        "direct_topology_ir": 92704822,
+        "lifecycle_owner_ir": [
+          10399307,
+          25810,
+          25766930,
+          25925,
+          25890037
+        ],
+        "lifecycle_parts": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "measured_exclusive_self": {
+          "all_self_ir": 92989937,
+          "other_self_ir": 3407884,
+          "retained_top_row_count": 20,
+          "top_row_limit": 20,
+          "top_self_ir": 89582053,
+          "validation": {
+            "all_self_rows_conserve_summary": true,
+            "top_plus_other_conserves_all_self": true
+          }
+        },
+        "measured_owner_ir": 92989937,
+        "measured_part": 6,
+        "nested_diagnostics_rows": 7,
+        "numbered_parts": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "stderr_collected_values": [
+          155097946,
+          155097946
+        ],
+        "stderr_numbered_sum": 155097946,
+        "terminal_part": 7
+      },
+      "reanalysis_raw_sha256": "35f39851996542fbc5aabc140cc09d56d8c8ffa4823796bf16e20217a2aba944",
+      "receipt_descriptors": {
+        "command": {
+          "bytes": 5461,
+          "path": "docs/performance/results/change-0944/capture/03-medium/command.json",
+          "sha256": "ac82635ec5369d6412309e3d54d0f5733f4b31a4cf04e96abd55cc92d965efdd"
+        },
+        "raw": {
+          "bytes": 80568,
+          "path": "docs/performance/results/change-0944/capture/03-medium/raw.json",
+          "sha256": "35f39851996542fbc5aabc140cc09d56d8c8ffa4823796bf16e20217a2aba944"
+        },
+        "report": {
+          "bytes": 21560,
+          "path": "docs/performance/results/change-0944/capture/03-medium/report.json",
+          "sha256": "daf2fa0eed26cb84e734ced5ff972a38719af80fa5a62bbf829fb10eb560ca3c"
+        },
+        "semantics": {
+          "bytes": 5025,
+          "path": "docs/performance/results/change-0944/capture/03-medium/semantics.json",
+          "sha256": "9133da5b8b6c04cb45130f4c0debd955a27f0cb87dd134e034caed52078c5499"
+        },
+        "start": {
+          "bytes": 2977,
+          "path": "docs/performance/results/change-0944/capture/03-medium/start.json",
+          "sha256": "b65e4e3a9b0a2b820432c7b9a9ed93136e33c201dc0da02b90393b53c241b6be"
+        },
+        "terminal": {
+          "bytes": 4449,
+          "path": "docs/performance/results/change-0944/capture/03-medium/terminal.json",
+          "sha256": "5229ad31a8e938326693e9aa983d089d800de097d0f009ad8f2b1031b46ef9e7"
+        }
+      },
+      "repeat": 1,
+      "semantic": {
+        "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+        "reopen_ns": 2162307437,
+        "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+        "status": "pass",
+        "untouched_member_count": 12,
+        "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19"
+      },
+      "shape": "medium",
+      "status": "pass",
+      "terminal": {
+        "pid": 2333519,
+        "process_group_clear": true,
+        "process_group_id": 2333519,
+        "returncode": 0,
+        "started_utc": "2026-10-07T00:42:03.154033+00:00",
+        "terminal_before_parse": true,
+        "terminal_utc": "2026-10-07T00:42:31.769489+00:00",
+        "timed_out": false
+      }
+    }
+  ],
+  "schedule": {
+    "capture_directories": [
+      "00-medium",
+      "01-dense-sparse",
+      "02-dense-sparse",
+      "03-medium"
+    ],
+    "first_child_admission": {
+      "descriptor": {
+        "bytes": 1971,
+        "path": "docs/performance/results/change-0944/first-child-admission.json",
+        "sha256": "f6f881e2f7e14601918d258a8a5e69fa8c0818718096521e668b3c1337d6b15a"
+      },
+      "index": 0,
+      "no_retry_replacement_evidence": "Exactly four capture directories equal the frozen M,D,D,M schedule; no extra row directories.",
+      "plan": {
+        "bytes": 20217,
+        "path": "docs/performance/results/change-0944/plan.json",
+        "sha256": "bccc817e1ac7c8c2d3b6c0e1eb061b3deae380d67c68c95c5e266e6646e0f9da"
+      },
+      "raw": {
+        "bytes": 80558,
+        "path": "docs/performance/results/change-0944/capture/00-medium/raw.json",
+        "sha256": "6de412ea46924d337311677e8167da256b7b1a8fc1978235b5749392b9ef3583"
+      },
+      "semantics": {
+        "bytes": 5025,
+        "path": "docs/performance/results/change-0944/capture/00-medium/semantics.json",
+        "sha256": "5276c7e136687a2bc56bc6e3c69a911e86aa89a120c42f6ca442afb93b573509"
+      },
+      "status": "pass",
+      "terminal": {
+        "bytes": 4449,
+        "path": "docs/performance/results/change-0944/capture/00-medium/terminal.json",
+        "sha256": "b33394cf0468fe9d099bb1bb334f58230f26c1818b72d48fb201cc2727e1dd9c"
+      }
+    },
+    "frozen": [
+      {
+        "index": 0,
+        "repeat": 0,
+        "shape": "medium"
+      },
+      {
+        "index": 1,
+        "repeat": 0,
+        "shape": "dense-sparse"
+      },
+      {
+        "index": 2,
+        "repeat": 1,
+        "shape": "dense-sparse"
+      },
+      {
+        "index": 3,
+        "repeat": 1,
+        "shape": "medium"
+      }
+    ],
+    "matches": true
+  },
+  "schema": "litchi.xlsx-publication-profile-0944-independent-four-row-audit-v2",
+  "scope": "Read-only independent audit of the completed 0944 four-child Callgrind packet; no benchmark, build, replay workload, or production/source edit performed by this auditor.",
+  "source_build": {
+    "accepted_0905": {
+      "commit": "8267929233736e3f4f4612eee94e47016a74685e",
+      "path": "source-build/crates/xml-minifier/src/audit.rs",
+      "sha256": "eddc437156c976c55ce36b0bf8f0ef47cc4943d296735a1ac8d6ef120b8754e7"
+    },
+    "source_check_status": "pass",
+    "source_file_count": 10788,
+    "source_manifest": {
+      "actual": {
+        "bytes": 3674260,
+        "path": "source-build-manifest.json",
+        "sha256": "b63113ce5251218be817ba29c466b0ace535c546a416b97413ae8a73f0caea64"
+      },
+      "declared": {
+        "bytes": 3674260,
+        "path": "source-build-manifest.json",
+        "sha256": "b63113ce5251218be817ba29c466b0ace535c546a416b97413ae8a73f0caea64"
+      },
+      "match": true
+    }
+  },
+  "status": "pass",
+  "status_checks": {
+    "all_four_raw_replays_byte_equal": true,
+    "all_four_rows_pass": true,
+    "all_full_self_rows_conserve_summary": true,
+    "all_plan_helper_binary_bindings_match": true,
+    "controls_pass_and_count_ge_14": true,
+    "corrected_binary_comparison_pass": true,
+    "current_terminal_gap_retest_rejects": true,
+    "first_child_admission_pass": true,
+    "frozen_schedule_matches_capture_directories": true,
+    "source_check_pass": true
+  }
+}

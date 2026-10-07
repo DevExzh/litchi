@@ -1,0 +1,1262 @@
+{
+  "binary": {
+    "bytes": 265794648,
+    "executable": true,
+    "mode_bits": 509,
+    "path": "docs/performance/results/change-0944/binaries/profile-native",
+    "sha256": "63cbffd8c17299a4e2d1096e4ffa2a2d34a549cc452dfdf8ba5691b8ab7e75a3"
+  },
+  "captures": [
+    {
+      "classification": {
+        "lifecycle_count": 5,
+        "lifecycle_prediction": 5,
+        "measured_count": 1,
+        "measured_file": "docs/performance/results/change-0944/capture/00-medium/callgrind.out.6",
+        "measured_part": 6
+      },
+      "exclusive_self": {
+        "all_self_ir": 92990939,
+        "limit": 20,
+        "other_self_ir": 3408835,
+        "rows": [
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/longest_match.rs",
+            "id": 6472,
+            "name": "zlib_rs::deflate::longest_match::longest_match",
+            "self_ir": 18584283
+          },
+          {
+            "file": "./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S",
+            "id": 722,
+            "name": "__memcpy_avx_unaligned_erms",
+            "self_ir": 9637833
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs",
+            "id": 1940,
+            "name": "quick_xml::reader::Reader<R>::read_event_impl",
+            "self_ir": 9473741
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/algorithm/medium.rs",
+            "id": 6448,
+            "name": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+            "self_ir": 9402960
+          },
+          {
+            "file": "/home/zhuhe/litchi-performance-0944/source-build/crates/xml-minifier/src/audit.rs",
+            "id": 12018,
+            "name": "xml_minifier::audit::verify_source_replacement",
+            "self_ir": 6371741
+          },
+          {
+            "file": "/home/zhuhe/litchi-performance-0944/source-build/crates/xml-minifier/src/audit.rs",
+            "id": 5906,
+            "name": "xml_minifier::audit::check_start",
+            "self_ir": 5608051
+          },
+          {
+            "file": "/home/zhuhe/litchi-performance-0944/source-build/crates/xml-minifier/src/audit.rs",
+            "id": 5828,
+            "name": "xml_minifier::audit::verify_with_policy",
+            "self_ir": 4939236
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs",
+            "id": 1998,
+            "name": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+            "self_ir": 3368490
+          },
+          {
+            "file": "./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S",
+            "id": 794,
+            "name": "__memset_avx2_unaligned_erms",
+            "self_ir": 3043823
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/state.rs",
+            "id": 2328,
+            "name": "quick_xml::reader::state::ReaderState::emit_end",
+            "self_ir": 3018708
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/state.rs",
+            "id": 2014,
+            "name": "quick_xml::reader::state::ReaderState::emit_start",
+            "self_ir": 2877580
+          },
+          {
+            "file": "/home/zhuhe/litchi-performance-0944/source-build/crates/xml-minifier/src/audit/wellformed.rs",
+            "id": 5870,
+            "name": "xml_minifier::audit::wellformed::scan_qname",
+            "self_ir": 2469853
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "id": 2002,
+            "name": "memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2",
+            "self_ir": 2133256
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs",
+            "id": 1952,
+            "name": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+            "self_ir": 1789752
+          },
+          {
+            "file": "/home/zhuhe/litchi-performance-0944/source-build/crates/xml-minifier/src/audit.rs",
+            "id": 5952,
+            "name": "xml_minifier::audit::inspect_attributes",
+            "self_ir": 1253997
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "id": 2000,
+            "name": "memchr::arch::x86_64::avx2::memchr::Three::find_raw",
+            "self_ir": 1236673
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate.rs",
+            "id": 6544,
+            "name": "zlib_rs::deflate::flush_block_only",
+            "self_ir": 1198142
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "id": 1956,
+            "name": "memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2",
+            "self_ir": 1192576
+          },
+          {
+            "file": "/home/zhuhe/litchi-performance-0944/source-build/crates/xml-minifier/src/audit.rs",
+            "id": 5974,
+            "name": "xml_minifier::audit::check_end",
+            "self_ir": 1160828
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "id": 1954,
+            "name": "memchr::arch::x86_64::avx2::memchr::Two::find_raw",
+            "self_ir": 820581
+          }
+        ],
+        "summary_ir": 92990939,
+        "top_self_ir": 89582104,
+        "validation": {
+          "all_self_rows_conserve_summary": true,
+          "top_plus_other_conserves_all_self": true
+        }
+      },
+      "index": 0,
+      "nested_xml_ir": 49735942,
+      "other_publication_ir": 288508,
+      "preparation_ir": 50025084,
+      "publication_ir": 92990939,
+      "raw": {
+        "bytes": 80558,
+        "path": "docs/performance/results/change-0944/capture/00-medium/raw.json",
+        "sha256": "6de412ea46924d337311677e8167da256b7b1a8fc1978235b5749392b9ef3583"
+      },
+      "repeat": 0,
+      "report": {
+        "bytes": 21560,
+        "path": "docs/performance/results/change-0944/capture/00-medium/report.json",
+        "sha256": "b1bc4048142f39b9b89854738f4bf35b0ab1de803bf6ddf3dfcfb6361ee4f42b"
+      },
+      "semantic": {
+        "constants": {
+          "budget_objects_used_after_handles_drop": 0,
+          "budget_used_after_handles_drop": 0,
+          "budget_used_after_package_drop": 0,
+          "cache_allocation_bypasses": 0,
+          "cache_budget_managed": false,
+          "cache_budget_memory_limit": null,
+          "cache_budget_memory_used": 0,
+          "cache_budget_reservation_failures": 0,
+          "cache_budget_reserved_bytes": 0,
+          "cache_bypasses": 0,
+          "cache_cold_loads": 6,
+          "cache_evictions": 0,
+          "cache_failed_loads": 0,
+          "cache_hits": 0,
+          "cache_in_flight_loads": 0,
+          "cache_mode": "unmanaged-control",
+          "cache_oversized_bypasses": 0,
+          "cache_retained_bytes": 269785,
+          "cache_retained_entries": 6,
+          "cache_successful_loads": 6,
+          "cache_waiter_joins": 0,
+          "implementation": "source-backed",
+          "output_budget_refusal": {
+            "accepted_output_bytes": 0,
+            "first_output_request_bytes": 0,
+            "one_under_output_limit": 0,
+            "output_bytes_used": 0,
+            "source_identity_preserved": false,
+            "source_read_bytes": 0,
+            "source_read_calls": 0,
+            "successful_output_ceiling": 0,
+            "typed_output_resource_refusal": false,
+            "zero_output_verified": false
+          },
+          "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+          "payload_materializations": 6,
+          "payload_memory_limit": null,
+          "post_publication_budget": {
+            "cache_reserved_objects": null,
+            "catalog_reserved_objects": null,
+            "input_bytes_limit": null,
+            "input_bytes_used": 0,
+            "objects_limit": null,
+            "objects_used": 0,
+            "output_bytes_limit": null,
+            "output_bytes_used": 0,
+            "work_limit": null,
+            "work_used": 0
+          },
+          "pre_publication_budget": {
+            "cache_reserved_objects": 0,
+            "catalog_reserved_objects": 0,
+            "input_bytes_limit": null,
+            "input_bytes_used": 0,
+            "objects_limit": null,
+            "objects_used": 0,
+            "output_bytes_limit": null,
+            "output_bytes_used": 0,
+            "work_limit": null,
+            "work_used": 0
+          },
+          "publication_planning_memory_headroom": null,
+          "selected_worksheet_count": 4,
+          "selected_worksheet_read_bytes": 27146,
+          "selected_worksheet_read_calls": 4,
+          "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+          "source_read_bytes": 4233170,
+          "source_read_calls": 183,
+          "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+          "unselected_worksheet_read_bytes": 0,
+          "unselected_worksheet_read_calls": 0,
+          "untouched_member_count": 12,
+          "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+          "update_count": 93,
+          "workbook_read_bytes": 226,
+          "workbook_read_calls": 1
+        },
+        "corpus": {
+          "archive_bytes": 4226429,
+          "archive_member_count": 17,
+          "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+          "compression": "deflate",
+          "entry_bytes": 4,
+          "entry_count": 9216,
+          "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+          "name": "xlsx-cell-values-medium",
+          "package_format": "XLSX/OPC/ZIP",
+          "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+          "shape": "medium",
+          "target_entry": "Sheet1!A1",
+          "target_payload_bytes": 1,
+          "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+          "uncompressed_payload_bytes": 4231168,
+          "xlsx": {
+            "columns_per_sheet": 48,
+            "one_percent_update_count": 93,
+            "rows_per_sheet": 48,
+            "sheet_count": 4,
+            "source_members": {
+              "shared_strings": null,
+              "styles": "xl/styles.xml",
+              "workbook": "xl/workbook.xml",
+              "worksheets": [
+                "xl/worksheets/sheet1.xml",
+                "xl/worksheets/sheet2.xml",
+                "xl/worksheets/sheet3.xml",
+                "xl/worksheets/sheet4.xml"
+              ]
+            }
+          }
+        },
+        "native_reference": {
+          "bytes": 92879,
+          "path": "references/native-context-0900.json",
+          "sha256": "d07726feea9d991d87d1c1b7a4bc74e5da61f0328ad054ed02bfd5bb2c52f12a"
+        },
+        "preservation": {
+          "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+          "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+          "untouched_member_count": 12,
+          "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19"
+        },
+        "reopen_ns": 2198899375,
+        "shape": "medium",
+        "sink": {
+          "accepted_bytes": 4226788,
+          "largest_write": 65536,
+          "write_calls": 143,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_16385_to_65536": 64,
+            "bytes_1_to_512": 75,
+            "bytes_4097_to_16384": 4,
+            "bytes_513_to_4096": 0,
+            "bytes_over_65536": 0
+          }
+        },
+        "status": "pass",
+        "timing_policy": "Instrumented elapsed durations retained but excluded from Callgrind/native conclusions. Reopen and preservation gates run inside the harness outside the timed phases."
+      },
+      "shape": "medium",
+      "terminal": {
+        "bytes": 4449,
+        "path": "docs/performance/results/change-0944/capture/00-medium/terminal.json",
+        "sha256": "b33394cf0468fe9d099bb1bb334f58230f26c1818b72d48fb201cc2727e1dd9c"
+      },
+      "writer_ir": 42677347,
+      "writer_share": 0.45894091896415845,
+      "xml_share": 0.5348471854876097
+    },
+    {
+      "classification": {
+        "lifecycle_count": 5,
+        "lifecycle_prediction": 5,
+        "measured_count": 1,
+        "measured_file": "docs/performance/results/change-0944/capture/01-dense-sparse/callgrind.out.6",
+        "measured_part": 6
+      },
+      "exclusive_self": {
+        "all_self_ir": 167532948,
+        "limit": 20,
+        "other_self_ir": 5882743,
+        "rows": [
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/longest_match.rs",
+            "id": 6458,
+            "name": "zlib_rs::deflate::longest_match::longest_match",
+            "self_ir": 35695609
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs",
+            "id": 1934,
+            "name": "quick_xml::reader::Reader<R>::read_event_impl",
+            "self_ir": 18146510
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/algorithm/medium.rs",
+            "id": 6434,
+            "name": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+            "self_ir": 17963652
+          },
+          {
+            "file": "/home/zhuhe/litchi-performance-0944/source-build/crates/xml-minifier/src/audit.rs",
+            "id": 12012,
+            "name": "xml_minifier::audit::verify_source_replacement",
+            "self_ir": 12289280
+          },
+          {
+            "file": "./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S",
+            "id": 722,
+            "name": "__memcpy_avx_unaligned_erms",
+            "self_ir": 11107928
+          },
+          {
+            "file": "/home/zhuhe/litchi-performance-0944/source-build/crates/xml-minifier/src/audit.rs",
+            "id": 5892,
+            "name": "xml_minifier::audit::check_start",
+            "self_ir": 10885237
+          },
+          {
+            "file": "/home/zhuhe/litchi-performance-0944/source-build/crates/xml-minifier/src/audit.rs",
+            "id": 5814,
+            "name": "xml_minifier::audit::verify_with_policy",
+            "self_ir": 9420890
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs",
+            "id": 1992,
+            "name": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+            "self_ir": 6444120
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/state.rs",
+            "id": 2322,
+            "name": "quick_xml::reader::state::ReaderState::emit_end",
+            "self_ir": 5784291
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/state.rs",
+            "id": 2008,
+            "name": "quick_xml::reader::state::ReaderState::emit_start",
+            "self_ir": 5507726
+          },
+          {
+            "file": "/home/zhuhe/litchi-performance-0944/source-build/crates/xml-minifier/src/audit/wellformed.rs",
+            "id": 5856,
+            "name": "xml_minifier::audit::wellformed::scan_qname",
+            "self_ir": 4710273
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "id": 1996,
+            "name": "memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2",
+            "self_ir": 4081135
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs",
+            "id": 1946,
+            "name": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+            "self_ir": 3428568
+          },
+          {
+            "file": "./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S",
+            "id": 794,
+            "name": "__memset_avx2_unaligned_erms",
+            "self_ir": 3159469
+          },
+          {
+            "file": "/home/zhuhe/litchi-performance-0944/source-build/crates/xml-minifier/src/audit.rs",
+            "id": 5938,
+            "name": "xml_minifier::audit::inspect_attributes",
+            "self_ir": 2398365
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "id": 1994,
+            "name": "memchr::arch::x86_64::avx2::memchr::Three::find_raw",
+            "self_ir": 2364318
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "id": 1950,
+            "name": "memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2",
+            "self_ir": 2285136
+          },
+          {
+            "file": "/home/zhuhe/litchi-performance-0944/source-build/crates/xml-minifier/src/audit.rs",
+            "id": 5960,
+            "name": "xml_minifier::audit::check_end",
+            "self_ir": 2220317
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate.rs",
+            "id": 6530,
+            "name": "zlib_rs::deflate::flush_block_only",
+            "self_ir": 2185639
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "id": 1948,
+            "name": "memchr::arch::x86_64::avx2::memchr::Two::find_raw",
+            "self_ir": 1571742
+          }
+        ],
+        "summary_ir": 167532948,
+        "top_self_ir": 161650205,
+        "validation": {
+          "all_self_rows_conserve_summary": true,
+          "top_plus_other_conserves_all_self": true
+        }
+      },
+      "index": 1,
+      "nested_xml_ir": 95298865,
+      "other_publication_ir": 514988,
+      "preparation_ir": 95587073,
+      "publication_ir": 167532948,
+      "raw": {
+        "bytes": 81502,
+        "path": "docs/performance/results/change-0944/capture/01-dense-sparse/raw.json",
+        "sha256": "ed81fdf806589e9c8b31c1d3286fa8eb6d3bdbfd213ba1771de37d345ee1ac4b"
+      },
+      "repeat": 0,
+      "report": {
+        "bytes": 21592,
+        "path": "docs/performance/results/change-0944/capture/01-dense-sparse/report.json",
+        "sha256": "f8918d0e60e7a13d8b9b331903065eb82c5416c4343c3f7e6255f558361e0f8b"
+      },
+      "semantic": {
+        "constants": {
+          "budget_objects_used_after_handles_drop": 0,
+          "budget_used_after_handles_drop": 0,
+          "budget_used_after_package_drop": 0,
+          "cache_allocation_bypasses": 0,
+          "cache_budget_managed": false,
+          "cache_budget_memory_limit": null,
+          "cache_budget_memory_used": 0,
+          "cache_budget_reservation_failures": 0,
+          "cache_budget_reserved_bytes": 0,
+          "cache_bypasses": 0,
+          "cache_cold_loads": 6,
+          "cache_evictions": 0,
+          "cache_failed_loads": 0,
+          "cache_hits": 0,
+          "cache_in_flight_loads": 0,
+          "cache_mode": "unmanaged-control",
+          "cache_oversized_bypasses": 0,
+          "cache_retained_bytes": 509460,
+          "cache_retained_entries": 6,
+          "cache_successful_loads": 6,
+          "cache_waiter_joins": 0,
+          "implementation": "source-backed",
+          "output_budget_refusal": {
+            "accepted_output_bytes": 0,
+            "first_output_request_bytes": 0,
+            "one_under_output_limit": 0,
+            "output_bytes_used": 0,
+            "source_identity_preserved": false,
+            "source_read_bytes": 0,
+            "source_read_calls": 0,
+            "successful_output_ceiling": 0,
+            "typed_output_resource_refusal": false,
+            "zero_output_verified": false
+          },
+          "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+          "payload_materializations": 6,
+          "payload_memory_limit": null,
+          "post_publication_budget": {
+            "cache_reserved_objects": null,
+            "catalog_reserved_objects": null,
+            "input_bytes_limit": null,
+            "input_bytes_used": 0,
+            "objects_limit": null,
+            "objects_used": 0,
+            "output_bytes_limit": null,
+            "output_bytes_used": 0,
+            "work_limit": null,
+            "work_used": 0
+          },
+          "pre_publication_budget": {
+            "cache_reserved_objects": 0,
+            "catalog_reserved_objects": 0,
+            "input_bytes_limit": null,
+            "input_bytes_used": 0,
+            "objects_limit": null,
+            "objects_used": 0,
+            "output_bytes_limit": null,
+            "output_bytes_used": 0,
+            "work_limit": null,
+            "work_used": 0
+          },
+          "publication_planning_memory_headroom": null,
+          "selected_worksheet_count": 4,
+          "selected_worksheet_read_bytes": 52580,
+          "selected_worksheet_read_calls": 4,
+          "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+          "source_read_bytes": 4258604,
+          "source_read_calls": 183,
+          "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+          "unselected_worksheet_read_bytes": 0,
+          "unselected_worksheet_read_calls": 0,
+          "untouched_member_count": 12,
+          "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+          "update_count": 178,
+          "workbook_read_bytes": 226,
+          "workbook_read_calls": 1
+        },
+        "corpus": {
+          "archive_bytes": 4251863,
+          "archive_member_count": 17,
+          "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+          "compression": "deflate",
+          "entry_bytes": 4,
+          "entry_count": 17792,
+          "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+          "name": "xlsx-cell-values-dense-sparse",
+          "package_format": "XLSX/OPC/ZIP",
+          "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+          "shape": "dense-sparse",
+          "target_entry": "Sheet1!A1",
+          "target_payload_bytes": 1,
+          "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+          "uncompressed_payload_bytes": 4265472,
+          "xlsx": {
+            "columns_per_sheet": 128,
+            "one_percent_update_count": 178,
+            "rows_per_sheet": 128,
+            "sheet_count": 4,
+            "source_members": {
+              "shared_strings": null,
+              "styles": "xl/styles.xml",
+              "workbook": "xl/workbook.xml",
+              "worksheets": [
+                "xl/worksheets/sheet1.xml",
+                "xl/worksheets/sheet2.xml",
+                "xl/worksheets/sheet3.xml",
+                "xl/worksheets/sheet4.xml"
+              ]
+            }
+          }
+        },
+        "native_reference": {
+          "bytes": 92879,
+          "path": "references/native-context-0900.json",
+          "sha256": "d07726feea9d991d87d1c1b7a4bc74e5da61f0328ad054ed02bfd5bb2c52f12a"
+        },
+        "preservation": {
+          "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+          "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+          "untouched_member_count": 12,
+          "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19"
+        },
+        "reopen_ns": 2607954719,
+        "shape": "dense-sparse",
+        "sink": {
+          "accepted_bytes": 4252436,
+          "largest_write": 65536,
+          "write_calls": 143,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_16385_to_65536": 65,
+            "bytes_1_to_512": 75,
+            "bytes_4097_to_16384": 0,
+            "bytes_513_to_4096": 3,
+            "bytes_over_65536": 0
+          }
+        },
+        "status": "pass",
+        "timing_policy": "Instrumented elapsed durations retained but excluded from Callgrind/native conclusions. Reopen and preservation gates run inside the harness outside the timed phases."
+      },
+      "shape": "dense-sparse",
+      "terminal": {
+        "bytes": 4539,
+        "path": "docs/performance/results/change-0944/capture/01-dense-sparse/terminal.json",
+        "sha256": "f2aa3e0aebe1b10d3a43321e3800898ed50b43593f7484ba5cc94236507df3ea"
+      },
+      "writer_ir": 71430887,
+      "writer_share": 0.4263691879880249,
+      "xml_share": 0.5688365550637836
+    },
+    {
+      "classification": {
+        "lifecycle_count": 5,
+        "lifecycle_prediction": 5,
+        "measured_count": 1,
+        "measured_file": "docs/performance/results/change-0944/capture/02-dense-sparse/callgrind.out.6",
+        "measured_part": 6
+      },
+      "exclusive_self": {
+        "all_self_ir": 167533924,
+        "limit": 20,
+        "other_self_ir": 5883654,
+        "rows": [
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/longest_match.rs",
+            "id": 6458,
+            "name": "zlib_rs::deflate::longest_match::longest_match",
+            "self_ir": 35695609
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs",
+            "id": 1934,
+            "name": "quick_xml::reader::Reader<R>::read_event_impl",
+            "self_ir": 18146510
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/algorithm/medium.rs",
+            "id": 6434,
+            "name": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+            "self_ir": 17963652
+          },
+          {
+            "file": "/home/zhuhe/litchi-performance-0944/source-build/crates/xml-minifier/src/audit.rs",
+            "id": 12020,
+            "name": "xml_minifier::audit::verify_source_replacement",
+            "self_ir": 12289280
+          },
+          {
+            "file": "./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S",
+            "id": 722,
+            "name": "__memcpy_avx_unaligned_erms",
+            "self_ir": 11107993
+          },
+          {
+            "file": "/home/zhuhe/litchi-performance-0944/source-build/crates/xml-minifier/src/audit.rs",
+            "id": 5892,
+            "name": "xml_minifier::audit::check_start",
+            "self_ir": 10885237
+          },
+          {
+            "file": "/home/zhuhe/litchi-performance-0944/source-build/crates/xml-minifier/src/audit.rs",
+            "id": 5814,
+            "name": "xml_minifier::audit::verify_with_policy",
+            "self_ir": 9420890
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs",
+            "id": 1992,
+            "name": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+            "self_ir": 6444120
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/state.rs",
+            "id": 2322,
+            "name": "quick_xml::reader::state::ReaderState::emit_end",
+            "self_ir": 5784291
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/state.rs",
+            "id": 2008,
+            "name": "quick_xml::reader::state::ReaderState::emit_start",
+            "self_ir": 5507726
+          },
+          {
+            "file": "/home/zhuhe/litchi-performance-0944/source-build/crates/xml-minifier/src/audit/wellformed.rs",
+            "id": 5856,
+            "name": "xml_minifier::audit::wellformed::scan_qname",
+            "self_ir": 4710273
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "id": 1996,
+            "name": "memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2",
+            "self_ir": 4081135
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs",
+            "id": 1946,
+            "name": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+            "self_ir": 3428568
+          },
+          {
+            "file": "./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S",
+            "id": 794,
+            "name": "__memset_avx2_unaligned_erms",
+            "self_ir": 3159469
+          },
+          {
+            "file": "/home/zhuhe/litchi-performance-0944/source-build/crates/xml-minifier/src/audit.rs",
+            "id": 5938,
+            "name": "xml_minifier::audit::inspect_attributes",
+            "self_ir": 2398365
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "id": 1994,
+            "name": "memchr::arch::x86_64::avx2::memchr::Three::find_raw",
+            "self_ir": 2364318
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "id": 1950,
+            "name": "memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2",
+            "self_ir": 2285136
+          },
+          {
+            "file": "/home/zhuhe/litchi-performance-0944/source-build/crates/xml-minifier/src/audit.rs",
+            "id": 5960,
+            "name": "xml_minifier::audit::check_end",
+            "self_ir": 2220317
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate.rs",
+            "id": 6530,
+            "name": "zlib_rs::deflate::flush_block_only",
+            "self_ir": 2185639
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "id": 1948,
+            "name": "memchr::arch::x86_64::avx2::memchr::Two::find_raw",
+            "self_ir": 1571742
+          }
+        ],
+        "summary_ir": 167533924,
+        "top_self_ir": 161650270,
+        "validation": {
+          "all_self_rows_conserve_summary": true,
+          "top_plus_other_conserves_all_self": true
+        }
+      },
+      "index": 2,
+      "nested_xml_ir": 95298831,
+      "other_publication_ir": 514655,
+      "preparation_ir": 95587667,
+      "publication_ir": 167533924,
+      "raw": {
+        "bytes": 81512,
+        "path": "docs/performance/results/change-0944/capture/02-dense-sparse/raw.json",
+        "sha256": "4094bbdcbc82746a6ccf23cb306ae44a5e4fb24b3139a39016bf595b65b9ca5f"
+      },
+      "repeat": 1,
+      "report": {
+        "bytes": 21592,
+        "path": "docs/performance/results/change-0944/capture/02-dense-sparse/report.json",
+        "sha256": "35f0b8ae13d3302ab8859e95efca343d1a8ca3bc134c3f4be68aec21126f8166"
+      },
+      "semantic": {
+        "constants": {
+          "budget_objects_used_after_handles_drop": 0,
+          "budget_used_after_handles_drop": 0,
+          "budget_used_after_package_drop": 0,
+          "cache_allocation_bypasses": 0,
+          "cache_budget_managed": false,
+          "cache_budget_memory_limit": null,
+          "cache_budget_memory_used": 0,
+          "cache_budget_reservation_failures": 0,
+          "cache_budget_reserved_bytes": 0,
+          "cache_bypasses": 0,
+          "cache_cold_loads": 6,
+          "cache_evictions": 0,
+          "cache_failed_loads": 0,
+          "cache_hits": 0,
+          "cache_in_flight_loads": 0,
+          "cache_mode": "unmanaged-control",
+          "cache_oversized_bypasses": 0,
+          "cache_retained_bytes": 509460,
+          "cache_retained_entries": 6,
+          "cache_successful_loads": 6,
+          "cache_waiter_joins": 0,
+          "implementation": "source-backed",
+          "output_budget_refusal": {
+            "accepted_output_bytes": 0,
+            "first_output_request_bytes": 0,
+            "one_under_output_limit": 0,
+            "output_bytes_used": 0,
+            "source_identity_preserved": false,
+            "source_read_bytes": 0,
+            "source_read_calls": 0,
+            "successful_output_ceiling": 0,
+            "typed_output_resource_refusal": false,
+            "zero_output_verified": false
+          },
+          "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+          "payload_materializations": 6,
+          "payload_memory_limit": null,
+          "post_publication_budget": {
+            "cache_reserved_objects": null,
+            "catalog_reserved_objects": null,
+            "input_bytes_limit": null,
+            "input_bytes_used": 0,
+            "objects_limit": null,
+            "objects_used": 0,
+            "output_bytes_limit": null,
+            "output_bytes_used": 0,
+            "work_limit": null,
+            "work_used": 0
+          },
+          "pre_publication_budget": {
+            "cache_reserved_objects": 0,
+            "catalog_reserved_objects": 0,
+            "input_bytes_limit": null,
+            "input_bytes_used": 0,
+            "objects_limit": null,
+            "objects_used": 0,
+            "output_bytes_limit": null,
+            "output_bytes_used": 0,
+            "work_limit": null,
+            "work_used": 0
+          },
+          "publication_planning_memory_headroom": null,
+          "selected_worksheet_count": 4,
+          "selected_worksheet_read_bytes": 52580,
+          "selected_worksheet_read_calls": 4,
+          "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+          "source_read_bytes": 4258604,
+          "source_read_calls": 183,
+          "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+          "unselected_worksheet_read_bytes": 0,
+          "unselected_worksheet_read_calls": 0,
+          "untouched_member_count": 12,
+          "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+          "update_count": 178,
+          "workbook_read_bytes": 226,
+          "workbook_read_calls": 1
+        },
+        "corpus": {
+          "archive_bytes": 4251863,
+          "archive_member_count": 17,
+          "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+          "compression": "deflate",
+          "entry_bytes": 4,
+          "entry_count": 17792,
+          "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+          "name": "xlsx-cell-values-dense-sparse",
+          "package_format": "XLSX/OPC/ZIP",
+          "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+          "shape": "dense-sparse",
+          "target_entry": "Sheet1!A1",
+          "target_payload_bytes": 1,
+          "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+          "uncompressed_payload_bytes": 4265472,
+          "xlsx": {
+            "columns_per_sheet": 128,
+            "one_percent_update_count": 178,
+            "rows_per_sheet": 128,
+            "sheet_count": 4,
+            "source_members": {
+              "shared_strings": null,
+              "styles": "xl/styles.xml",
+              "workbook": "xl/workbook.xml",
+              "worksheets": [
+                "xl/worksheets/sheet1.xml",
+                "xl/worksheets/sheet2.xml",
+                "xl/worksheets/sheet3.xml",
+                "xl/worksheets/sheet4.xml"
+              ]
+            }
+          }
+        },
+        "native_reference": {
+          "bytes": 92879,
+          "path": "references/native-context-0900.json",
+          "sha256": "d07726feea9d991d87d1c1b7a4bc74e5da61f0328ad054ed02bfd5bb2c52f12a"
+        },
+        "preservation": {
+          "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+          "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+          "untouched_member_count": 12,
+          "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19"
+        },
+        "reopen_ns": 2628001376,
+        "shape": "dense-sparse",
+        "sink": {
+          "accepted_bytes": 4252436,
+          "largest_write": 65536,
+          "write_calls": 143,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_16385_to_65536": 65,
+            "bytes_1_to_512": 75,
+            "bytes_4097_to_16384": 0,
+            "bytes_513_to_4096": 3,
+            "bytes_over_65536": 0
+          }
+        },
+        "status": "pass",
+        "timing_policy": "Instrumented elapsed durations retained but excluded from Callgrind/native conclusions. Reopen and preservation gates run inside the harness outside the timed phases."
+      },
+      "shape": "dense-sparse",
+      "terminal": {
+        "bytes": 4539,
+        "path": "docs/performance/results/change-0944/capture/02-dense-sparse/terminal.json",
+        "sha256": "eb16443bdc0f76c25394d87264444b127322304684ffb45ca28c3341ecc75023"
+      },
+      "writer_ir": 71431602,
+      "writer_share": 0.4263709718874608,
+      "xml_share": 0.5688330382567772
+    },
+    {
+      "classification": {
+        "lifecycle_count": 5,
+        "lifecycle_prediction": 5,
+        "measured_count": 1,
+        "measured_file": "docs/performance/results/change-0944/capture/03-medium/callgrind.out.6",
+        "measured_part": 6
+      },
+      "exclusive_self": {
+        "all_self_ir": 92989937,
+        "limit": 20,
+        "other_self_ir": 3407884,
+        "rows": [
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/longest_match.rs",
+            "id": 6472,
+            "name": "zlib_rs::deflate::longest_match::longest_match",
+            "self_ir": 18584283
+          },
+          {
+            "file": "./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S",
+            "id": 722,
+            "name": "__memcpy_avx_unaligned_erms",
+            "self_ir": 9637782
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs",
+            "id": 1940,
+            "name": "quick_xml::reader::Reader<R>::read_event_impl",
+            "self_ir": 9473741
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/algorithm/medium.rs",
+            "id": 6448,
+            "name": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+            "self_ir": 9402960
+          },
+          {
+            "file": "/home/zhuhe/litchi-performance-0944/source-build/crates/xml-minifier/src/audit.rs",
+            "id": 12048,
+            "name": "xml_minifier::audit::verify_source_replacement",
+            "self_ir": 6371741
+          },
+          {
+            "file": "/home/zhuhe/litchi-performance-0944/source-build/crates/xml-minifier/src/audit.rs",
+            "id": 5906,
+            "name": "xml_minifier::audit::check_start",
+            "self_ir": 5608051
+          },
+          {
+            "file": "/home/zhuhe/litchi-performance-0944/source-build/crates/xml-minifier/src/audit.rs",
+            "id": 5828,
+            "name": "xml_minifier::audit::verify_with_policy",
+            "self_ir": 4939236
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs",
+            "id": 1998,
+            "name": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+            "self_ir": 3368490
+          },
+          {
+            "file": "./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S",
+            "id": 794,
+            "name": "__memset_avx2_unaligned_erms",
+            "self_ir": 3043823
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/state.rs",
+            "id": 2328,
+            "name": "quick_xml::reader::state::ReaderState::emit_end",
+            "self_ir": 3018708
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/state.rs",
+            "id": 2014,
+            "name": "quick_xml::reader::state::ReaderState::emit_start",
+            "self_ir": 2877580
+          },
+          {
+            "file": "/home/zhuhe/litchi-performance-0944/source-build/crates/xml-minifier/src/audit/wellformed.rs",
+            "id": 5870,
+            "name": "xml_minifier::audit::wellformed::scan_qname",
+            "self_ir": 2469853
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "id": 2002,
+            "name": "memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2",
+            "self_ir": 2133256
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs",
+            "id": 1952,
+            "name": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+            "self_ir": 1789752
+          },
+          {
+            "file": "/home/zhuhe/litchi-performance-0944/source-build/crates/xml-minifier/src/audit.rs",
+            "id": 5952,
+            "name": "xml_minifier::audit::inspect_attributes",
+            "self_ir": 1253997
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "id": 2000,
+            "name": "memchr::arch::x86_64::avx2::memchr::Three::find_raw",
+            "self_ir": 1236673
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate.rs",
+            "id": 6544,
+            "name": "zlib_rs::deflate::flush_block_only",
+            "self_ir": 1198142
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "id": 1956,
+            "name": "memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2",
+            "self_ir": 1192576
+          },
+          {
+            "file": "/home/zhuhe/litchi-performance-0944/source-build/crates/xml-minifier/src/audit.rs",
+            "id": 5974,
+            "name": "xml_minifier::audit::check_end",
+            "self_ir": 1160828
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "id": 1954,
+            "name": "memchr::arch::x86_64::avx2::memchr::Two::find_raw",
+            "self_ir": 820581
+          }
+        ],
+        "summary_ir": 92989937,
+        "top_self_ir": 89582053,
+        "validation": {
+          "all_self_rows_conserve_summary": true,
+          "top_plus_other_conserves_all_self": true
+        }
+      },
+      "index": 3,
+      "nested_xml_ir": 49735426,
+      "other_publication_ir": 288278,
+      "preparation_ir": 50023578,
+      "publication_ir": 92989937,
+      "raw": {
+        "bytes": 80568,
+        "path": "docs/performance/results/change-0944/capture/03-medium/raw.json",
+        "sha256": "35f39851996542fbc5aabc140cc09d56d8c8ffa4823796bf16e20217a2aba944"
+      },
+      "repeat": 1,
+      "report": {
+        "bytes": 21560,
+        "path": "docs/performance/results/change-0944/capture/03-medium/report.json",
+        "sha256": "daf2fa0eed26cb84e734ced5ff972a38719af80fa5a62bbf829fb10eb560ca3c"
+      },
+      "semantic": {
+        "constants": {
+          "budget_objects_used_after_handles_drop": 0,
+          "budget_used_after_handles_drop": 0,
+          "budget_used_after_package_drop": 0,
+          "cache_allocation_bypasses": 0,
+          "cache_budget_managed": false,
+          "cache_budget_memory_limit": null,
+          "cache_budget_memory_used": 0,
+          "cache_budget_reservation_failures": 0,
+          "cache_budget_reserved_bytes": 0,
+          "cache_bypasses": 0,
+          "cache_cold_loads": 6,
+          "cache_evictions": 0,
+          "cache_failed_loads": 0,
+          "cache_hits": 0,
+          "cache_in_flight_loads": 0,
+          "cache_mode": "unmanaged-control",
+          "cache_oversized_bypasses": 0,
+          "cache_retained_bytes": 269785,
+          "cache_retained_entries": 6,
+          "cache_successful_loads": 6,
+          "cache_waiter_joins": 0,
+          "implementation": "source-backed",
+          "output_budget_refusal": {
+            "accepted_output_bytes": 0,
+            "first_output_request_bytes": 0,
+            "one_under_output_limit": 0,
+            "output_bytes_used": 0,
+            "source_identity_preserved": false,
+            "source_read_bytes": 0,
+            "source_read_calls": 0,
+            "successful_output_ceiling": 0,
+            "typed_output_resource_refusal": false,
+            "zero_output_verified": false
+          },
+          "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+          "payload_materializations": 6,
+          "payload_memory_limit": null,
+          "post_publication_budget": {
+            "cache_reserved_objects": null,
+            "catalog_reserved_objects": null,
+            "input_bytes_limit": null,
+            "input_bytes_used": 0,
+            "objects_limit": null,
+            "objects_used": 0,
+            "output_bytes_limit": null,
+            "output_bytes_used": 0,
+            "work_limit": null,
+            "work_used": 0
+          },
+          "pre_publication_budget": {
+            "cache_reserved_objects": 0,
+            "catalog_reserved_objects": 0,
+            "input_bytes_limit": null,
+            "input_bytes_used": 0,
+            "objects_limit": null,
+            "objects_used": 0,
+            "output_bytes_limit": null,
+            "output_bytes_used": 0,
+            "work_limit": null,
+            "work_used": 0
+          },
+          "publication_planning_memory_headroom": null,
+          "selected_worksheet_count": 4,
+          "selected_worksheet_read_bytes": 27146,
+          "selected_worksheet_read_calls": 4,
+          "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+          "source_read_bytes": 4233170,
+          "source_read_calls": 183,
+          "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+          "unselected_worksheet_read_bytes": 0,
+          "unselected_worksheet_read_calls": 0,
+          "untouched_member_count": 12,
+          "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+          "update_count": 93,
+          "workbook_read_bytes": 226,
+          "workbook_read_calls": 1
+        },
+        "corpus": {
+          "archive_bytes": 4226429,
+          "archive_member_count": 17,
+          "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+          "compression": "deflate",
+          "entry_bytes": 4,
+          "entry_count": 9216,
+          "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+          "name": "xlsx-cell-values-medium",
+          "package_format": "XLSX/OPC/ZIP",
+          "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+          "shape": "medium",
+          "target_entry": "Sheet1!A1",
+          "target_payload_bytes": 1,
+          "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+          "uncompressed_payload_bytes": 4231168,
+          "xlsx": {
+            "columns_per_sheet": 48,
+            "one_percent_update_count": 93,
+            "rows_per_sheet": 48,
+            "sheet_count": 4,
+            "source_members": {
+              "shared_strings": null,
+              "styles": "xl/styles.xml",
+              "workbook": "xl/workbook.xml",
+              "worksheets": [
+                "xl/worksheets/sheet1.xml",
+                "xl/worksheets/sheet2.xml",
+                "xl/worksheets/sheet3.xml",
+                "xl/worksheets/sheet4.xml"
+              ]
+            }
+          }
+        },
+        "native_reference": {
+          "bytes": 92879,
+          "path": "references/native-context-0900.json",
+          "sha256": "d07726feea9d991d87d1c1b7a4bc74e5da61f0328ad054ed02bfd5bb2c52f12a"
+        },
+        "preservation": {
+          "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+          "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+          "untouched_member_count": 12,
+          "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19"
+        },
+        "reopen_ns": 2162307437,
+        "shape": "medium",
+        "sink": {
+          "accepted_bytes": 4226788,
+          "largest_write": 65536,
+          "write_calls": 143,
+          "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_16385_to_65536": 64,
+            "bytes_1_to_512": 75,
+            "bytes_4097_to_16384": 4,
+            "bytes_513_to_4096": 0,
+            "bytes_over_65536": 0
+          }
+        },
+        "status": "pass",
+        "timing_policy": "Instrumented elapsed durations retained but excluded from Callgrind/native conclusions. Reopen and preservation gates run inside the harness outside the timed phases."
+      },
+      "shape": "medium",
+      "terminal": {
+        "bytes": 4449,
+        "path": "docs/performance/results/change-0944/capture/03-medium/terminal.json",
+        "sha256": "5229ad31a8e938326693e9aa983d089d800de097d0f009ad8f2b1031b46ef9e7"
+      },
+      "writer_ir": 42678081,
+      "writer_share": 0.45895375754475454,
+      "xml_share": 0.5348473996707838
+    }
+  ],
+  "plan": {
+    "bytes": 20217,
+    "path": "docs/performance/results/change-0944/plan.json",
+    "sha256": "bccc817e1ac7c8c2d3b6c0e1eb061b3deae380d67c68c95c5e266e6646e0f9da"
+  },
+  "schema": "litchi.xlsx-publication-0944-root-replay-v1",
+  "scope": "Callgrind owner Ir only; nested rows overlap; no native performance or adoption claim.",
+  "source_check": {
+    "binary_sha256": "63cbffd8c17299a4e2d1096e4ffa2a2d34a549cc452dfdf8ba5691b8ab7e75a3",
+    "schema": "litchi.xlsx-publication-profile-0944.v2",
+    "source_file_count": 10788,
+    "source_manifest_sha256": "b63113ce5251218be817ba29c466b0ace535c546a416b97413ae8a73f0caea64",
+    "status": "pass"
+  },
+  "status": "pass"
+}

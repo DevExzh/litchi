@@ -1,0 +1,26 @@
+{
+  "binary": {
+    "bytes": 265794648,
+    "path": "target-native/release/litchi-perf-baseline",
+    "sha256": "63cbffd8c17299a4e2d1096e4ffa2a2d34a549cc452dfdf8ba5691b8ab7e75a3"
+  },
+  "deadline_seconds": 900,
+  "pid": 2318247,
+  "process_group_id": 2318247,
+  "returncode": 0,
+  "schema": "litchi-xlsx-profile-build-terminal-v1",
+  "started_utc": "2026-10-07T00:23:42.906695+00:00",
+  "stderr": {
+    "bytes": 8771,
+    "path": "build/native-build.stderr.log",
+    "sha256": "55a352a5466635d53ae36bad8aa4379b5b2e76a9d164f80c265571bbfb3b2cd2"
+  },
+  "stdout": {
+    "bytes": 0,
+    "path": "build/native-build.stdout.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "terminal_before_parse": true,
+  "terminal_utc": "2026-10-07T00:35:10.140363+00:00",
+  "timed_out": false
+}
