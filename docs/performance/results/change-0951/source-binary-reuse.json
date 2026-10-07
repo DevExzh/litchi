@@ -1,0 +1,158 @@
+{
+  "archive_binding": {
+    "archive": {
+      "bytes": 464187123,
+      "expected_sha256": "cee0b5d2c9e878ca577994d4a4f8e56032c1d119fe6e27ac3b3d8a8e51daa363",
+      "mode": 436,
+      "path": "archive-0950-v1.tar.zst",
+      "sha256": "cee0b5d2c9e878ca577994d4a4f8e56032c1d119fe6e27ac3b3d8a8e51daa363"
+    },
+    "candidate_manifest_archive_entry": {
+      "bytes": 2037928,
+      "executable": false,
+      "mode": 436,
+      "path": "candidate-source-manifest-v1.json",
+      "sha256": "5b16ef65a17f868a2d941355baed30dbbf9e338b817365c02bfb7133fedc80d4"
+    },
+    "historical_0948_dependency": {
+      "archive": "/home/zhuhe/litchi-performance-0948-archive/archive-0948-v1.tar.zst",
+      "archive_sha256": "15a4008a6b888fed4fea50f0746d9787df32e1a2df6b164d25a7dabb19f1db95",
+      "manifest": "/home/zhuhe/litchi-performance-0948-archive/manifest-v1.json",
+      "manifest_sha256": "fe29a9f975907cad76a455f60397c7c211a9dc91805b3e8d15ab0e54ec9c21af"
+    },
+    "manifest": {
+      "bytes": 8774266,
+      "expected_sha256": "6efa98e164432849a31dd11485160afc4f5f94976a531542d3a03776ff3fd1ab",
+      "mode": 436,
+      "path": "manifest-v1.json",
+      "sha256": "6efa98e164432849a31dd11485160afc4f5f94976a531542d3a03776ff3fd1ab"
+    }
+  },
+  "build_reuse": {
+    "allocator": {
+      "argv_uses_locked": true,
+      "artifact": {
+        "bytes": 269378864,
+        "mode": 509,
+        "path": "target-candidate-allocator-v1/release/litchi-perf-baseline-alloc",
+        "sha256": "88a954f86edf857f7fa78fccb72eb736fc17533682bf8dd672bfc39712344091"
+      },
+      "bindings_sha256": "d5bb7bef8ecb95e9ae39127648553df5dd1f00360f5e1e5ab5bb97bccf25bddc",
+      "process_group_clear": true,
+      "result_status": "passed",
+      "source_commit": "b6c5c80ffbcb60736d6c4c2f3b590838640008a9",
+      "standalone_workspace_lock": {
+        "bytes": 56289,
+        "path": "tools/perf-baseline/Cargo.lock",
+        "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+      },
+      "standalone_workspace_manifest": {
+        "bytes": 3286,
+        "path": "tools/perf-baseline/Cargo.toml",
+        "sha256": "53fd47997ae969e709e2ee45575a6050f75de10df339f48dd427f35538768202"
+      },
+      "terminal_returncode": 0,
+      "terminal_sha256": "d8c82ee76bd78c448d9d19a596d9225709c2b1d5911066ce2d447ad18064850f",
+      "terminal_status": "terminal",
+      "timed_out": false,
+      "tracked_workspace_lock_in_current_HEAD": true
+    },
+    "native": {
+      "argv_uses_locked": true,
+      "artifact": {
+        "bytes": 266090728,
+        "mode": 509,
+        "path": "target-candidate-native-v1/release/litchi-perf-baseline",
+        "sha256": "198c2e87471a088cf054a23785e4068eaf7f205ffb1fb25cad5ba0b7a6db5bec"
+      },
+      "bindings_sha256": "112abde1c054f78e34457cd2a5d63fa48b987fa18daa5e655e61db52b6517793",
+      "process_group_clear": true,
+      "result_status": "passed",
+      "source_commit": "b6c5c80ffbcb60736d6c4c2f3b590838640008a9",
+      "standalone_workspace_lock": {
+        "bytes": 56289,
+        "path": "tools/perf-baseline/Cargo.lock",
+        "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+      },
+      "standalone_workspace_manifest": {
+        "bytes": 3286,
+        "path": "tools/perf-baseline/Cargo.toml",
+        "sha256": "53fd47997ae969e709e2ee45575a6050f75de10df339f48dd427f35538768202"
+      },
+      "terminal_returncode": 0,
+      "terminal_sha256": "1fbd465453f3e2b9658dbc1c48c1450e4557529593d24279dc7fab5943380387",
+      "terminal_status": "terminal",
+      "timed_out": false,
+      "tracked_workspace_lock_in_current_HEAD": true
+    }
+  },
+  "claim_scope": {
+    "binary": "The retained binaries were built from the frozen 0950 candidate snapshot: base commit b6c5c80ffbcb60736d6c4c2f3b590838640008a9 plus its declared 12-file candidate delta. The standalone tools/perf-baseline workspace uses its tracked Cargo.lock (SHA db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5) and --locked build receipts. The selected closure is byte-equivalent to current HEAD, but this does not claim the binaries were compiled at current HEAD ce6f1fbea9902d533b97f6830994d4bc3fd497a1.",
+    "reuse": "Reuse is byte-equivalence custody only; no rebuild or workload was performed.",
+    "source": "10,790 frozen candidate files are byte/hash-equivalent to current HEAD plus one explicitly declared ignored Cargo.lock; 10,789 are proven from committed Git objects.",
+    "standalone_build_lock": "The ignored root Cargo.lock exception is separate from the tracked tools/perf-baseline/Cargo.lock used by both retained binary builds.",
+    "strict_blocker": "If the gate requires every 10,790 source files to be committed Git objects, Cargo.lock is a concrete unresolved exception because the repository ignores *.lock."
+  },
+  "current_head": "ce6f1fbea9902d533b97f6830994d4bc3fd497a1",
+  "git_object_comparison": {
+    "blob_command": "git cat-file --batch",
+    "committed_git_object_matches": 10789,
+    "declared_ignored_missing": [
+      "Cargo.lock"
+    ],
+    "full_head_tree_entry_count": 453892,
+    "head_tree_listing_sha256": "ee23d6be651bf20f8fd7da498f66b40a1d1a7490c940be23ae6232f392ae7f36",
+    "manifest_paths": 10790,
+    "matched_committed_bytes": 259963894,
+    "matched_committed_rows_digest": "3ad95a16870c2b70be2ce10e0c15dafd19772138bfff1683b7b91dfb056e144a",
+    "strict_all_files_committed_match": false,
+    "tree_command": "git ls-tree -r -z --format='%(objectname)\\t%(objecttype)\\t%(path)' HEAD",
+    "unexpected_missing_committed_paths": []
+  },
+  "ignored_lock_binding": {
+    "bytes": 138443,
+    "candidate_manifest_sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061",
+    "candidate_source_copy_sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061",
+    "current_checkout_is_committed_git_object": false,
+    "current_checkout_sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061",
+    "gitignore_rule": ".gitignore:85:*.lock",
+    "path": "Cargo.lock"
+  },
+  "schema": "litchi.performance.0951.source-binary-reuse.v1",
+  "scope": "read-only Git-object/source/archive/build custody; no rebuild, workload, or large-artifact copy",
+  "source_manifest": {
+    "base_commit": "b6c5c80ffbcb60736d6c4c2f3b590838640008a9",
+    "bytes": 260102337,
+    "candidate_delta": {
+      "base_commit": "b6c5c80ffbcb60736d6c4c2f3b590838640008a9",
+      "count": 12,
+      "paths": [
+        "crates/litchi-opc/src/lib.rs",
+        "crates/litchi-opc/src/source_backed.rs",
+        "crates/litchi-xlsx/src/cell_values/facts_oracle_tests.rs",
+        "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/edit/package.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/edit/tests.rs",
+        "crates/xml-minifier/src/audit/namespaces.rs",
+        "crates/xml-minifier/src/audit.rs",
+        "crates/xml-minifier/tests/multi_window_reuse.rs",
+        "crates/xml-minifier/tests/source_replacement.rs"
+      ]
+    },
+    "file_count": 10790,
+    "manifest_rows_digest": "7dd5b6dc09e5e863279593ff70cc5c0075b779c1264b9c9189bee910970a6900",
+    "measurement_source_commit": "df6ee5583b409f2547e2f824896d87feb8d50630",
+    "path": "/home/zhuhe/litchi-performance-0950/candidate-source-manifest-v1.json",
+    "schema": "litchi.performance.0950.candidate-source-manifest.v1",
+    "sha256": "5b16ef65a17f868a2d941355baed30dbbf9e338b817365c02bfb7133fedc80d4"
+  },
+  "status": "pass_with_declared_ignored_lock_exception",
+  "verified_utc": "2026-10-07T07:45:00.880747+00:00",
+  "working_tree_changes_excluded_from_check": [
+    " M tools/check_iwork_leaf_public_api.py",
+    "?? crates/litchi/examples/bench_word_parse.rs",
+    "?? docs/UNIFIED_OPS_API_DESIGN.md"
+  ]
+}

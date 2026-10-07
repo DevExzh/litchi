@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0951 — current XLSX publication instruction profile
+
+[0951](0951-xlsx-post-multi-window-publication-profile.md) reuses the verified
+0950 native binary for four fresh serial Callgrind captures. All semantic,
+custody, raw conservation, and independent reconciliation checks pass.
+Preservation writing accounts for 57.70–60.95% of publication instructions;
+the nested combined source/replacement XML audit accounts for 38.61–42.05%.
+These are instruction shares, with profiler warnings retained, not native-time
+shares or a new performance baseline. Production remains at 0950.
+
 ## 0950 — adopted transient XLSX multi-window audit
 
 [0950](0950-xlsx-transient-multi-window-audit.md) adopts transient replacement

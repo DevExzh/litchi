@@ -1,0 +1,70 @@
+{
+  "controls": {
+    "extra_artifact": {
+      "exception": "ReplayError",
+      "message": "manifest regular-file set differs",
+      "status": "rejected",
+      "validator": "verify_manifest"
+    },
+    "manifest_positive": {
+      "logical_bytes": 4923164,
+      "regular_files": 126,
+      "status": "pass",
+      "symlinks": [],
+      "validator": "verify_manifest"
+    },
+    "missing_artifact": {
+      "exception": "ReplayError",
+      "message": "manifest regular-file set differs",
+      "status": "rejected",
+      "validator": "verify_manifest"
+    },
+    "path_escape": {
+      "exception": "ReplayError",
+      "message": "unsafe manifest path: ../outside-control-artifact",
+      "status": "rejected",
+      "validator": "verify_manifest"
+    },
+    "symlink_artifact": {
+      "exception": "ReplayError",
+      "message": "manifest tree contains symlink(s): ['analysis/current-audit-00-incoming-v1.json']",
+      "status": "rejected",
+      "validator": "verify_manifest"
+    },
+    "tampered_argv": {
+      "exception": "ReplayError",
+      "message": "00-medium: captured argv differs",
+      "status": "rejected",
+      "validator": "reducer.verify_historical_argv"
+    },
+    "tampered_artifact_argv": {
+      "exception": "ReplayError",
+      "message": "00-medium: artifact argv differs",
+      "status": "rejected",
+      "validator": "reducer.verify_historical_argv"
+    },
+    "tampered_cwd": {
+      "exception": "ReplayError",
+      "message": "00-medium: cwd differs",
+      "status": "rejected",
+      "validator": "reducer.verify_historical_argv"
+    }
+  },
+  "historical_root": "/home/zhuhe/litchi-performance-0951",
+  "manifest": {
+    "bytes": 28615,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0951-archive/manifest-v1.json",
+    "sha256": "aacca68cc6d39fe0df017c3e00c50e4eb12f5220e01a34a2d05c6267a9cdc6f8"
+  },
+  "moved_packet": "/home/zhuhe/litchi-performance-0951-replay-v2",
+  "schema": "litchi.performance.0951.portable-replay-adapter.v5.negative-controls",
+  "status": "pass",
+  "supersedes": {
+    "flaw": "v4 checked mutated values/under() but did not invoke a historical argv or manifest admission validator.",
+    "path": "/home/zhuhe/litchi-performance-0951-archive/replay-results/replay-negative-controls-v4.json",
+    "sha256": "9c8444d4bfcacf0063eb3a36eab8e3b85bddce063269e79889c37635515d0a1c"
+  },
+  "validator_contract": "Every rejected case invoked the named validator and required ReplayError; mutation-only assertions are absent."
+}

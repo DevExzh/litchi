@@ -1,0 +1,2895 @@
+{
+  "children": [
+    {
+      "custody": {
+        "command": {
+          "bytes": 6584,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0951/capture/00-medium/command.json",
+          "sha256": "06eaf030a3448652704bc01e90f572491eb7ee68e0fba0bd05c02bc91dc82cf6"
+        },
+        "command_artifacts": [
+          {
+            "bytes": 554,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/00-medium/callgrind.out",
+            "sha256": "8f240d08e38364f5dbd2e78fc1ea07807d17ffe48d2c2c904209d2792a0f4597"
+          },
+          {
+            "bytes": 38219,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/00-medium/callgrind.out.1",
+            "sha256": "62b2fc2b40ea17ff217a3717ccb7c3249f8fe86ee6af763ce7f7fdb00d684ae1"
+          },
+          {
+            "bytes": 16677,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/00-medium/callgrind.out.2",
+            "sha256": "8d8c5ab2d26d9f8a69d24a8e8ef1295c009620c9fc55162895542794f0d6bd85"
+          },
+          {
+            "bytes": 222512,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/00-medium/callgrind.out.3",
+            "sha256": "6130ad06b09aa8df467d0c14354ccef8ad7a4b016a6c69232ffc7ab09e2e2cec"
+          },
+          {
+            "bytes": 16642,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/00-medium/callgrind.out.4",
+            "sha256": "556aade2c1aa9798777268ea4c8813f4c27af590f396176b91482eb3ca61e15d"
+          },
+          {
+            "bytes": 223201,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/00-medium/callgrind.out.5",
+            "sha256": "f441e27951ee168c81d84b71baa0e5b6b628e714c2e5cfe16754d96c2cfd4b3d"
+          },
+          {
+            "bytes": 235739,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/00-medium/callgrind.out.6",
+            "sha256": "450c573241957412e0c0a422893e8a5f4bf0070df76fd2731b1b5648eef544ad"
+          },
+          {
+            "bytes": 78267,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/00-medium/raw.json",
+            "sha256": "87247bdbb30374967563685fc08ba906cbb5c377872bd4f398ccaafaab4b3e75"
+          },
+          {
+            "bytes": 21555,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/00-medium/report.json",
+            "sha256": "5d3fbb67009b73297b28c272020dad111bb9f3d40dc1b7c0f87b59d917127ae5"
+          },
+          {
+            "bytes": 5028,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/00-medium/semantics.json",
+            "sha256": "a74a5f5af5e5b9757af6ad3b8c80845bd6a30e61249bdcf35630d4588f1cd1f4"
+          },
+          {
+            "bytes": 3300,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/00-medium/start.json",
+            "sha256": "8411a549faa589ba063eb92988e052e819ae8fff669821ab953a9ed5437a7f33"
+          },
+          {
+            "bytes": 1045,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/00-medium/stderr.txt",
+            "sha256": "8c6273866f1cb2b5d7ba1e6e3ba8eef59350719ad6c13d76b1271bc077d5e2f9"
+          },
+          {
+            "bytes": 0,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/00-medium/stdout.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "raw": {
+          "bytes": 78267,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0951/capture/00-medium/raw.json",
+          "sha256": "87247bdbb30374967563685fc08ba906cbb5c377872bd4f398ccaafaab4b3e75"
+        },
+        "report": {
+          "bytes": 21555,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0951/capture/00-medium/report.json",
+          "sha256": "5d3fbb67009b73297b28c272020dad111bb9f3d40dc1b7c0f87b59d917127ae5"
+        },
+        "semantics": {
+          "bytes": 5028,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0951/capture/00-medium/semantics.json",
+          "sha256": "a74a5f5af5e5b9757af6ad3b8c80845bd6a30e61249bdcf35630d4588f1cd1f4"
+        },
+        "start": {
+          "bytes": 3300,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0951/capture/00-medium/start.json",
+          "sha256": "8411a549faa589ba063eb92988e052e819ae8fff669821ab953a9ed5437a7f33"
+        },
+        "terminal": {
+          "bytes": 5122,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0951/capture/00-medium/terminal.json",
+          "sha256": "2c4afaa49aaa3f9fcecb1faabf77df7a4d5df75fa08d12b02ad05447951fedd6"
+        },
+        "terminal_artifacts": [
+          {
+            "bytes": 554,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/00-medium/callgrind.out",
+            "sha256": "8f240d08e38364f5dbd2e78fc1ea07807d17ffe48d2c2c904209d2792a0f4597"
+          },
+          {
+            "bytes": 38219,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/00-medium/callgrind.out.1",
+            "sha256": "62b2fc2b40ea17ff217a3717ccb7c3249f8fe86ee6af763ce7f7fdb00d684ae1"
+          },
+          {
+            "bytes": 16677,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/00-medium/callgrind.out.2",
+            "sha256": "8d8c5ab2d26d9f8a69d24a8e8ef1295c009620c9fc55162895542794f0d6bd85"
+          },
+          {
+            "bytes": 222512,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/00-medium/callgrind.out.3",
+            "sha256": "6130ad06b09aa8df467d0c14354ccef8ad7a4b016a6c69232ffc7ab09e2e2cec"
+          },
+          {
+            "bytes": 16642,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/00-medium/callgrind.out.4",
+            "sha256": "556aade2c1aa9798777268ea4c8813f4c27af590f396176b91482eb3ca61e15d"
+          },
+          {
+            "bytes": 223201,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/00-medium/callgrind.out.5",
+            "sha256": "f441e27951ee168c81d84b71baa0e5b6b628e714c2e5cfe16754d96c2cfd4b3d"
+          },
+          {
+            "bytes": 235739,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/00-medium/callgrind.out.6",
+            "sha256": "450c573241957412e0c0a422893e8a5f4bf0070df76fd2731b1b5648eef544ad"
+          },
+          {
+            "bytes": 21555,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/00-medium/report.json",
+            "sha256": "5d3fbb67009b73297b28c272020dad111bb9f3d40dc1b7c0f87b59d917127ae5"
+          },
+          {
+            "bytes": 3300,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/00-medium/start.json",
+            "sha256": "8411a549faa589ba063eb92988e052e819ae8fff669821ab953a9ed5437a7f33"
+          },
+          {
+            "bytes": 1045,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/00-medium/stderr.txt",
+            "sha256": "8c6273866f1cb2b5d7ba1e6e3ba8eef59350719ad6c13d76b1271bc077d5e2f9"
+          },
+          {
+            "bytes": 0,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/00-medium/stdout.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ]
+      },
+      "exclusive_top20": {
+        "all_exclusive_self_ir": 70017755,
+        "other_exclusive_self_ir": 2485939,
+        "rows": [
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/longest_match.rs",
+            "name": "zlib_rs::deflate::longest_match::longest_match",
+            "rank": 1,
+            "self_ir": 18584283
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/algorithm/medium.rs",
+            "name": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+            "rank": 2,
+            "self_ir": 9402960
+          },
+          {
+            "file": "./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S",
+            "name": "__memcpy_avx_unaligned_erms",
+            "rank": 3,
+            "self_ir": 9092645
+          },
+          {
+            "file": "$P0950/candidate-source-v1/crates/litchi-opc/src/source_backed.rs",
+            "name": "litchi_opc::source_backed::audit_source_part_replacement_xml",
+            "rank": 4,
+            "self_ir": 7320372
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs",
+            "name": "quick_xml::reader::Reader<R>::read_event_impl",
+            "rank": 5,
+            "self_ir": 4786041
+          },
+          {
+            "file": "./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S",
+            "name": "__memset_avx2_unaligned_erms",
+            "rank": 6,
+            "self_ir": 3043823
+          },
+          {
+            "file": "$P0950/candidate-source-v1/crates/xml-minifier/src/audit.rs",
+            "name": "xml_minifier::audit::check_start",
+            "rank": 7,
+            "self_ir": 2836208
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs",
+            "name": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+            "rank": 8,
+            "self_ir": 1702230
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/state.rs",
+            "name": "quick_xml::reader::state::ReaderState::emit_end",
+            "rank": 9,
+            "self_ir": 1524582
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/state.rs",
+            "name": "quick_xml::reader::state::ReaderState::emit_start",
+            "rank": 10,
+            "self_ir": 1453722
+          },
+          {
+            "file": "$P0950/candidate-source-v1/crates/xml-minifier/src/audit/wellformed.rs",
+            "name": "xml_minifier::audit::wellformed::scan_qname",
+            "rank": 11,
+            "self_ir": 1249476
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate.rs",
+            "name": "zlib_rs::deflate::flush_block_only",
+            "rank": 12,
+            "self_ir": 1198142
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "name": "memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2",
+            "rank": 13,
+            "self_ir": 1067428
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs",
+            "name": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+            "rank": 14,
+            "self_ir": 904056
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "name": "memchr::arch::x86_64::avx2::memchr::Three::find_raw",
+            "rank": 15,
+            "self_ir": 639275
+          },
+          {
+            "file": "$P0950/candidate-source-v1/crates/xml-minifier/src/audit.rs",
+            "name": "xml_minifier::audit::inspect_attributes",
+            "rank": 16,
+            "self_ir": 634648
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "name": "memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2",
+            "rank": 17,
+            "self_ir": 596416
+          },
+          {
+            "file": "$P0950/candidate-source-v1/crates/xml-minifier/src/audit.rs",
+            "name": "xml_minifier::audit::check_end",
+            "rank": 18,
+            "self_ir": 586314
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/compare256.rs",
+            "name": "zlib_rs::deflate::compare256::compare256_slice",
+            "rank": 19,
+            "self_ir": 485673
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "name": "memchr::arch::x86_64::avx2::memchr::Two::find_raw",
+            "rank": 20,
+            "self_ir": 423522
+          }
+        ],
+        "summary_ir": 70017755,
+        "top20_exclusive_self_ir": 67531816
+      },
+      "historical_metadata": {
+        "argv": [
+          "/usr/bin/taskset",
+          "-c",
+          "12",
+          "/usr/bin/valgrind",
+          "--tool=callgrind",
+          "--collect-atstart=no",
+          "--toggle-collect=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+          "--zero-before=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+          "--dump-after=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+          "--callgrind-out-file=/home/zhuhe/litchi-performance-0951/capture/00-medium/callgrind.out",
+          "$P0950/target-candidate-native-v1/release/litchi-perf-baseline",
+          "--warmup",
+          "0",
+          "--samples",
+          "1",
+          "--case",
+          "xlsx_source_backed_cell_values_one_percent_edit_save",
+          "--xlsx-cell-crud-shape",
+          "medium",
+          "--json",
+          "$P0951/capture/00-medium/report.json"
+        ],
+        "cwd": "$P0950/candidate-source-v1",
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin",
+          "RUST_BACKTRACE": "0",
+          "TZ": "UTC"
+        },
+        "pid": 2775993,
+        "process_group_id": 2775993,
+        "started_utc": "2026-10-07T07:51:21.105866+00:00",
+        "terminal_utc": "2026-10-07T07:51:49.720714+00:00"
+      },
+      "index": 0,
+      "nested_overlap": {
+        "current_audit": [
+          {
+            "direct_children_ir": 19714823,
+            "inclusive_ir": 27035195,
+            "incoming_edges": [
+              {
+                "callee": "litchi_opc::source_backed::audit_source_part_replacement_xml",
+                "callee_id": 12016,
+                "caller": "litchi_opc::source_backed::SourceBackedPackage::prepare_topology_state",
+                "caller_id": 11090,
+                "calls": 1,
+                "file": "$P0950/candidate-source-v1/crates/litchi-opc/src/source_backed.rs",
+                "inclusive_ir": 65464,
+                "line": 2904,
+                "position": "*"
+              },
+              {
+                "callee": "litchi_opc::source_backed::audit_source_part_replacement_xml",
+                "callee_id": 12016,
+                "caller": "litchi_opc::source_backed::SourceBackedPackage::prepare_topology_state",
+                "caller_id": 11090,
+                "calls": 4,
+                "file": "$P0950/candidate-source-v1/crates/litchi-opc/src/source_backed.rs",
+                "inclusive_ir": 26969731,
+                "line": 2911,
+                "position": "*"
+              }
+            ],
+            "name": "litchi_opc::source_backed::audit_source_part_replacement_xml",
+            "overlap": true,
+            "self_ir": 7320372,
+            "sum_allowed": false
+          }
+        ],
+        "current_audit_to_multi_paths": [
+          {
+            "edges": [
+              {
+                "callee": "xml_minifier::audit::MultiWindowSearch::prove",
+                "calls": 4,
+                "inclusive_ir": 728
+              }
+            ],
+            "functions": [
+              "litchi_opc::source_backed::audit_source_part_replacement_xml",
+              "xml_minifier::audit::MultiWindowSearch::prove"
+            ]
+          },
+          {
+            "edges": [
+              {
+                "callee": "xml_minifier::audit::MultiWindowSearch::finish",
+                "calls": 93,
+                "inclusive_ir": 427329
+              }
+            ],
+            "functions": [
+              "litchi_opc::source_backed::audit_source_part_replacement_xml",
+              "xml_minifier::audit::MultiWindowSearch::finish"
+            ]
+          },
+          {
+            "edges": [
+              {
+                "callee": "xml_minifier::audit::MultiWindowSearch::finish",
+                "calls": 93,
+                "inclusive_ir": 427329
+              },
+              {
+                "callee": "xml_minifier::audit::MultiWindowSearch::audit_replacement",
+                "calls": 93,
+                "inclusive_ir": 384828
+              }
+            ],
+            "functions": [
+              "litchi_opc::source_backed::audit_source_part_replacement_xml",
+              "xml_minifier::audit::MultiWindowSearch::finish",
+              "xml_minifier::audit::MultiWindowSearch::audit_replacement"
+            ]
+          }
+        ],
+        "multi_window": [
+          {
+            "direct_children_ir": 415053,
+            "inclusive_ir": 427329,
+            "name": "xml_minifier::audit::MultiWindowSearch::finish",
+            "overlap": true,
+            "self_ir": 12276,
+            "sum_allowed": false
+          },
+          {
+            "direct_children_ir": 373055,
+            "inclusive_ir": 384828,
+            "name": "xml_minifier::audit::MultiWindowSearch::audit_replacement",
+            "overlap": true,
+            "self_ir": 11773,
+            "sum_allowed": false
+          },
+          {
+            "direct_children_ir": 564,
+            "inclusive_ir": 728,
+            "name": "xml_minifier::audit::MultiWindowSearch::prove",
+            "overlap": true,
+            "self_ir": 164,
+            "sum_allowed": false
+          }
+        ],
+        "retained_0944_rows": [
+          {
+            "direct_children_ir": 31383210,
+            "implementation_note": "retained 0944 nested name; not the current direct audit symbol",
+            "incoming_calls": 416,
+            "incoming_ir": 31384955,
+            "name": "zlib_rs::deflate::deflate",
+            "overlap": true,
+            "self_ir": 1745,
+            "sum_allowed": false
+          },
+          {
+            "direct_children_ir": 27318683,
+            "implementation_note": "retained 0944 nested name; not the current direct audit symbol",
+            "incoming_calls": 1,
+            "incoming_ir": 27323146,
+            "name": "litchi_opc::source_backed::SourceBackedPackage::prepare_topology_state",
+            "overlap": true,
+            "self_ir": 4463,
+            "sum_allowed": false
+          },
+          {
+            "direct_children_ir": 63053,
+            "implementation_note": "retained 0944 nested name; not the current direct audit symbol",
+            "incoming_calls": 1,
+            "incoming_ir": 65406,
+            "name": "xml_minifier::audit::verify_source_replacement",
+            "overlap": true,
+            "self_ir": 2353,
+            "sum_allowed": false
+          },
+          {
+            "direct_children_ir": 42676296,
+            "implementation_note": "retained 0944 nested name; not the current direct audit symbol",
+            "incoming_calls": 1,
+            "incoming_ir": 42678061,
+            "name": "litchi_opc::source_backed::SourceBackedPackage::write_changed_overlays_with_appended_inner",
+            "overlap": true,
+            "self_ir": 1765,
+            "sum_allowed": false
+          },
+          {
+            "direct_children_ir": 33927966,
+            "implementation_note": "retained 0944 nested name; not the current direct audit symbol",
+            "incoming_calls": 1,
+            "incoming_ir": 33930745,
+            "name": "soapberry_zip::preserve::PreservationIndex<R>::prepare_with",
+            "overlap": true,
+            "self_ir": 2779,
+            "sum_allowed": false
+          },
+          {
+            "direct_children_ir": 42485004,
+            "implementation_note": "retained 0944 nested name; not the current direct audit symbol",
+            "incoming_calls": 1,
+            "incoming_ir": 42486671,
+            "name": "soapberry_zip::preserve::PreservationIndex<R>::write_prepared",
+            "overlap": true,
+            "self_ir": 1667,
+            "sum_allowed": false
+          }
+        ],
+        "rules": {
+          "all_nested_rows_overlap": true,
+          "current_audit_incoming_edges_conserved": true,
+          "nested_sum_allowed": false,
+          "replicates_must_remain_separate": true
+        }
+      },
+      "publication_table": {
+        "current_audit_call_count": 5,
+        "current_audit_ir": 27035195,
+        "preparation_boundary_residual_ir": 287951,
+        "preparation_call_count": 1,
+        "preparation_ir": 27323146,
+        "publication_boundary_residual_ir": 14610,
+        "publication_owner_call_count": 1,
+        "publication_owner_ir": 70017755,
+        "relations": {
+          "current_audit_is_nested_in_preparation": true,
+          "current_audit_not_added_to_writer_or_residual": true,
+          "current_audit_overlaps_preparation_and_publication": true,
+          "publication_residual_disjoint_from_topology": true,
+          "writer_and_preparation_are_sibling_boundary_rows": true
+        },
+        "topology_call_count": 1,
+        "topology_ir": 70003145,
+        "topology_other_children_and_self_ir": 1938,
+        "writer_call_count": 1,
+        "writer_ir": 42678061
+      },
+      "repeat": 0,
+      "revalidation": {
+        "current_audit_incoming_edges": true,
+        "no_retry_or_replacement": true,
+        "raw_callgrind": true,
+        "semantic": true,
+        "terminal": true
+      },
+      "semantic": {
+        "preservation": {
+          "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+          "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+          "untouched_member_count": 12,
+          "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19"
+        },
+        "reopen_ns": 2203603579,
+        "shape": "medium",
+        "status": "pass",
+        "timing_policy": "Instrumented elapsed durations retained but excluded from Callgrind/native conclusions. Reopen and preservation gates run inside the harness outside the timed phases."
+      },
+      "shape": "medium"
+    },
+    {
+      "custody": {
+        "command": {
+          "bytes": 6710,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0951/capture/01-dense-sparse/command.json",
+          "sha256": "98566acb95b12a73c01277b066807ac4881b22aab11e804eda10f96d5409e8ed"
+        },
+        "command_artifacts": [
+          {
+            "bytes": 566,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/01-dense-sparse/callgrind.out",
+            "sha256": "426d4eb7391e767cce3165c4d3031a42bdd13259ef196dafbb98fc101f51c5ee"
+          },
+          {
+            "bytes": 38069,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/01-dense-sparse/callgrind.out.1",
+            "sha256": "4f1ba12f71d242d383f8320c6dcbb5f7f19d925411c1fe36fb2dd29602c34414"
+          },
+          {
+            "bytes": 16716,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/01-dense-sparse/callgrind.out.2",
+            "sha256": "7fef24932f534f106e8db268280c46ca7f6490d2dd0966b2bbde4fd732b0410e"
+          },
+          {
+            "bytes": 226035,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/01-dense-sparse/callgrind.out.3",
+            "sha256": "4bed89c48897c666ec0226dbe6c91f2e5f7809ab2ad4d9d0a009e01c9cfa5db0"
+          },
+          {
+            "bytes": 16672,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/01-dense-sparse/callgrind.out.4",
+            "sha256": "03c69f38ece2f5f3431d1c06b5dfae01a8fecd6455dfad06d9b946a449b8c22d"
+          },
+          {
+            "bytes": 227396,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/01-dense-sparse/callgrind.out.5",
+            "sha256": "86fc89404dbe2dfe83f9c3e5ed740b445318a2c56ad527da91429cfef3544794"
+          },
+          {
+            "bytes": 240421,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/01-dense-sparse/callgrind.out.6",
+            "sha256": "f5d0768c012ee868e4806315a0bbc92cc00f7e87a308f2429dfbe07dd85bbac2"
+          },
+          {
+            "bytes": 79220,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/01-dense-sparse/raw.json",
+            "sha256": "630d952d4f3c93523afb9784038b1a7efcec49881b23b2ccf9f6144d5841b286"
+          },
+          {
+            "bytes": 21587,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/01-dense-sparse/report.json",
+            "sha256": "7eb724e500f62e2169e16bea19218021322ff180f1ffc342ea5a0c4c6de1b87f"
+          },
+          {
+            "bytes": 5051,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/01-dense-sparse/semantics.json",
+            "sha256": "e9e5d9992fa10ce48ea8e8271915f4396120d96cf82183d814aa660df579b7f2"
+          },
+          {
+            "bytes": 3354,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/01-dense-sparse/start.json",
+            "sha256": "238774c90879ddb139c91f95566511a85302871f3d191dfccf6a99fed89ec922"
+          },
+          {
+            "bytes": 1057,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/01-dense-sparse/stderr.txt",
+            "sha256": "1183415393d332997b48db6ec8d38ffff0cce2ddd8473ebf196a270efa55f947"
+          },
+          {
+            "bytes": 0,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/01-dense-sparse/stdout.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "raw": {
+          "bytes": 79220,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0951/capture/01-dense-sparse/raw.json",
+          "sha256": "630d952d4f3c93523afb9784038b1a7efcec49881b23b2ccf9f6144d5841b286"
+        },
+        "report": {
+          "bytes": 21587,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0951/capture/01-dense-sparse/report.json",
+          "sha256": "7eb724e500f62e2169e16bea19218021322ff180f1ffc342ea5a0c4c6de1b87f"
+        },
+        "semantics": {
+          "bytes": 5051,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0951/capture/01-dense-sparse/semantics.json",
+          "sha256": "e9e5d9992fa10ce48ea8e8271915f4396120d96cf82183d814aa660df579b7f2"
+        },
+        "start": {
+          "bytes": 3354,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0951/capture/01-dense-sparse/start.json",
+          "sha256": "238774c90879ddb139c91f95566511a85302871f3d191dfccf6a99fed89ec922"
+        },
+        "terminal": {
+          "bytes": 5218,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0951/capture/01-dense-sparse/terminal.json",
+          "sha256": "47673d7f86030b6ab721adf7b28f075b6cf132f83a97ac03d932e87341c54425"
+        },
+        "terminal_artifacts": [
+          {
+            "bytes": 566,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/01-dense-sparse/callgrind.out",
+            "sha256": "426d4eb7391e767cce3165c4d3031a42bdd13259ef196dafbb98fc101f51c5ee"
+          },
+          {
+            "bytes": 38069,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/01-dense-sparse/callgrind.out.1",
+            "sha256": "4f1ba12f71d242d383f8320c6dcbb5f7f19d925411c1fe36fb2dd29602c34414"
+          },
+          {
+            "bytes": 16716,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/01-dense-sparse/callgrind.out.2",
+            "sha256": "7fef24932f534f106e8db268280c46ca7f6490d2dd0966b2bbde4fd732b0410e"
+          },
+          {
+            "bytes": 226035,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/01-dense-sparse/callgrind.out.3",
+            "sha256": "4bed89c48897c666ec0226dbe6c91f2e5f7809ab2ad4d9d0a009e01c9cfa5db0"
+          },
+          {
+            "bytes": 16672,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/01-dense-sparse/callgrind.out.4",
+            "sha256": "03c69f38ece2f5f3431d1c06b5dfae01a8fecd6455dfad06d9b946a449b8c22d"
+          },
+          {
+            "bytes": 227396,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/01-dense-sparse/callgrind.out.5",
+            "sha256": "86fc89404dbe2dfe83f9c3e5ed740b445318a2c56ad527da91429cfef3544794"
+          },
+          {
+            "bytes": 240421,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/01-dense-sparse/callgrind.out.6",
+            "sha256": "f5d0768c012ee868e4806315a0bbc92cc00f7e87a308f2429dfbe07dd85bbac2"
+          },
+          {
+            "bytes": 21587,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/01-dense-sparse/report.json",
+            "sha256": "7eb724e500f62e2169e16bea19218021322ff180f1ffc342ea5a0c4c6de1b87f"
+          },
+          {
+            "bytes": 3354,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/01-dense-sparse/start.json",
+            "sha256": "238774c90879ddb139c91f95566511a85302871f3d191dfccf6a99fed89ec922"
+          },
+          {
+            "bytes": 1057,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/01-dense-sparse/stderr.txt",
+            "sha256": "1183415393d332997b48db6ec8d38ffff0cce2ddd8473ebf196a270efa55f947"
+          },
+          {
+            "bytes": 0,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/01-dense-sparse/stdout.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ]
+      },
+      "exclusive_top20": {
+        "all_exclusive_self_ir": 123788788,
+        "other_exclusive_self_ir": 4261370,
+        "rows": [
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/longest_match.rs",
+            "name": "zlib_rs::deflate::longest_match::longest_match",
+            "rank": 1,
+            "self_ir": 35695609
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/algorithm/medium.rs",
+            "name": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+            "rank": 2,
+            "self_ir": 17963652
+          },
+          {
+            "file": "$P0950/candidate-source-v1/crates/litchi-opc/src/source_backed.rs",
+            "name": "litchi_opc::source_backed::audit_source_part_replacement_xml",
+            "rank": 3,
+            "self_ir": 13991486
+          },
+          {
+            "file": "./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S",
+            "name": "__memcpy_avx_unaligned_erms",
+            "rank": 4,
+            "self_ir": 10085372
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs",
+            "name": "quick_xml::reader::Reader<R>::read_event_impl",
+            "rank": 5,
+            "self_ir": 9214850
+          },
+          {
+            "file": "$P0950/candidate-source-v1/crates/xml-minifier/src/audit.rs",
+            "name": "xml_minifier::audit::check_start",
+            "rank": 6,
+            "self_ir": 5534521
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs",
+            "name": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+            "rank": 7,
+            "self_ir": 3274530
+          },
+          {
+            "file": "./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S",
+            "name": "__memset_avx2_unaligned_erms",
+            "rank": 8,
+            "self_ir": 3159469
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/state.rs",
+            "name": "quick_xml::reader::state::ReaderState::emit_end",
+            "rank": 9,
+            "self_ir": 2936655
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/state.rs",
+            "name": "quick_xml::reader::state::ReaderState::emit_start",
+            "rank": 10,
+            "self_ir": 2797629
+          },
+          {
+            "file": "$P0950/candidate-source-v1/crates/xml-minifier/src/audit/wellformed.rs",
+            "name": "xml_minifier::audit::wellformed::scan_qname",
+            "rank": 11,
+            "self_ir": 2396848
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate.rs",
+            "name": "zlib_rs::deflate::flush_block_only",
+            "rank": 12,
+            "self_ir": 2185639
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "name": "memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2",
+            "rank": 13,
+            "self_ir": 2053604
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs",
+            "name": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+            "rank": 14,
+            "self_ir": 1740864
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "name": "memchr::arch::x86_64::avx2::memchr::Three::find_raw",
+            "rank": 15,
+            "self_ir": 1228711
+          },
+          {
+            "file": "$P0950/candidate-source-v1/crates/xml-minifier/src/audit.rs",
+            "name": "xml_minifier::audit::inspect_attributes",
+            "rank": 16,
+            "self_ir": 1219375
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "name": "memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2",
+            "rank": 17,
+            "self_ir": 1148864
+          },
+          {
+            "file": "$P0950/candidate-source-v1/crates/xml-minifier/src/audit.rs",
+            "name": "xml_minifier::audit::check_end",
+            "rank": 18,
+            "self_ir": 1128081
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/compare256.rs",
+            "name": "zlib_rs::deflate::compare256::compare256_slice",
+            "rank": 19,
+            "self_ir": 958035
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "name": "memchr::arch::x86_64::avx2::memchr::Two::find_raw",
+            "rank": 20,
+            "self_ir": 813624
+          }
+        ],
+        "summary_ir": 123788788,
+        "top20_exclusive_self_ir": 119527418
+      },
+      "historical_metadata": {
+        "argv": [
+          "/usr/bin/taskset",
+          "-c",
+          "12",
+          "/usr/bin/valgrind",
+          "--tool=callgrind",
+          "--collect-atstart=no",
+          "--toggle-collect=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+          "--zero-before=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+          "--dump-after=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+          "--callgrind-out-file=/home/zhuhe/litchi-performance-0951/capture/01-dense-sparse/callgrind.out",
+          "$P0950/target-candidate-native-v1/release/litchi-perf-baseline",
+          "--warmup",
+          "0",
+          "--samples",
+          "1",
+          "--case",
+          "xlsx_source_backed_cell_values_one_percent_edit_save",
+          "--xlsx-cell-crud-shape",
+          "dense-sparse",
+          "--json",
+          "$P0951/capture/01-dense-sparse/report.json"
+        ],
+        "cwd": "$P0950/candidate-source-v1",
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin",
+          "RUST_BACKTRACE": "0",
+          "TZ": "UTC"
+        },
+        "pid": 2776496,
+        "process_group_id": 2776496,
+        "started_utc": "2026-10-07T07:52:42.543427+00:00",
+        "terminal_utc": "2026-10-07T07:53:20.761582+00:00"
+      },
+      "index": 1,
+      "nested_overlap": {
+        "current_audit": [
+          {
+            "direct_children_ir": 38060926,
+            "inclusive_ir": 52052412,
+            "incoming_edges": [
+              {
+                "callee": "litchi_opc::source_backed::audit_source_part_replacement_xml",
+                "callee_id": 12008,
+                "caller": "litchi_opc::source_backed::SourceBackedPackage::prepare_topology_state",
+                "caller_id": 11084,
+                "calls": 2,
+                "file": "$P0950/candidate-source-v1/crates/litchi-opc/src/source_backed.rs",
+                "inclusive_ir": 631699,
+                "line": 12370,
+                "position": "*"
+              },
+              {
+                "callee": "litchi_opc::source_backed::audit_source_part_replacement_xml",
+                "callee_id": 12008,
+                "caller": "litchi_opc::source_backed::SourceBackedPackage::prepare_topology_state",
+                "caller_id": 11084,
+                "calls": 3,
+                "file": "$P0950/candidate-source-v1/crates/litchi-opc/src/source_backed.rs",
+                "inclusive_ir": 51420713,
+                "line": 12377,
+                "position": "*"
+              }
+            ],
+            "name": "litchi_opc::source_backed::audit_source_part_replacement_xml",
+            "overlap": true,
+            "self_ir": 13991486,
+            "sum_allowed": false
+          }
+        ],
+        "current_audit_to_multi_paths": [
+          {
+            "edges": [
+              {
+                "callee": "xml_minifier::audit::MultiWindowSearch::prove",
+                "calls": 3,
+                "inclusive_ir": 546
+              }
+            ],
+            "functions": [
+              "litchi_opc::source_backed::audit_source_part_replacement_xml",
+              "xml_minifier::audit::MultiWindowSearch::prove"
+            ]
+          },
+          {
+            "edges": [
+              {
+                "callee": "xml_minifier::audit::MultiWindowSearch::finish",
+                "calls": 177,
+                "inclusive_ir": 808645
+              }
+            ],
+            "functions": [
+              "litchi_opc::source_backed::audit_source_part_replacement_xml",
+              "xml_minifier::audit::MultiWindowSearch::finish"
+            ]
+          },
+          {
+            "edges": [
+              {
+                "callee": "xml_minifier::audit::MultiWindowSearch::finish",
+                "calls": 177,
+                "inclusive_ir": 808645
+              },
+              {
+                "callee": "xml_minifier::audit::MultiWindowSearch::audit_replacement",
+                "calls": 177,
+                "inclusive_ir": 727756
+              }
+            ],
+            "functions": [
+              "litchi_opc::source_backed::audit_source_part_replacement_xml",
+              "xml_minifier::audit::MultiWindowSearch::finish",
+              "xml_minifier::audit::MultiWindowSearch::audit_replacement"
+            ]
+          }
+        ],
+        "multi_window": [
+          {
+            "direct_children_ir": 785281,
+            "inclusive_ir": 808645,
+            "name": "xml_minifier::audit::MultiWindowSearch::finish",
+            "overlap": true,
+            "self_ir": 23364,
+            "sum_allowed": false
+          },
+          {
+            "direct_children_ir": 705520,
+            "inclusive_ir": 727756,
+            "name": "xml_minifier::audit::MultiWindowSearch::audit_replacement",
+            "overlap": true,
+            "self_ir": 22236,
+            "sum_allowed": false
+          },
+          {
+            "direct_children_ir": 423,
+            "inclusive_ir": 546,
+            "name": "xml_minifier::audit::MultiWindowSearch::prove",
+            "overlap": true,
+            "self_ir": 123,
+            "sum_allowed": false
+          }
+        ],
+        "retained_0944_rows": [
+          {
+            "direct_children_ir": 59934163,
+            "implementation_note": "retained 0944 nested name; not the current direct audit symbol",
+            "incoming_calls": 420,
+            "incoming_ir": 59935993,
+            "name": "zlib_rs::deflate::deflate",
+            "overlap": true,
+            "self_ir": 1830,
+            "sum_allowed": false
+          },
+          {
+            "direct_children_ir": 52336462,
+            "implementation_note": "retained 0944 nested name; not the current direct audit symbol",
+            "incoming_calls": 1,
+            "incoming_ir": 52340914,
+            "name": "litchi_opc::source_backed::SourceBackedPackage::prepare_topology_state",
+            "overlap": true,
+            "self_ir": 4452,
+            "sum_allowed": false
+          },
+          {
+            "direct_children_ir": 501990,
+            "implementation_note": "retained 0944 nested name; not the current direct audit symbol",
+            "incoming_calls": 2,
+            "incoming_ir": 631583,
+            "name": "xml_minifier::audit::verify_source_replacement",
+            "overlap": true,
+            "self_ir": 129593,
+            "sum_allowed": false
+          },
+          {
+            "direct_children_ir": 71429489,
+            "implementation_note": "retained 0944 nested name; not the current direct audit symbol",
+            "incoming_calls": 1,
+            "incoming_ir": 71431254,
+            "name": "litchi_opc::source_backed::SourceBackedPackage::write_changed_overlays_with_appended_inner",
+            "overlap": true,
+            "self_ir": 1765,
+            "sum_allowed": false
+          },
+          {
+            "direct_children_ir": 62633277,
+            "implementation_note": "retained 0944 nested name; not the current direct audit symbol",
+            "incoming_calls": 1,
+            "incoming_ir": 62636056,
+            "name": "soapberry_zip::preserve::PreservationIndex<R>::prepare_with",
+            "overlap": true,
+            "self_ir": 2779,
+            "sum_allowed": false
+          },
+          {
+            "direct_children_ir": 71238472,
+            "implementation_note": "retained 0944 nested name; not the current direct audit symbol",
+            "incoming_calls": 1,
+            "incoming_ir": 71240139,
+            "name": "soapberry_zip::preserve::PreservationIndex<R>::write_prepared",
+            "overlap": true,
+            "self_ir": 1667,
+            "sum_allowed": false
+          }
+        ],
+        "rules": {
+          "all_nested_rows_overlap": true,
+          "current_audit_incoming_edges_conserved": true,
+          "nested_sum_allowed": false,
+          "replicates_must_remain_separate": true
+        }
+      },
+      "publication_table": {
+        "current_audit_call_count": 5,
+        "current_audit_ir": 52052412,
+        "preparation_boundary_residual_ir": 288502,
+        "preparation_call_count": 1,
+        "preparation_ir": 52340914,
+        "publication_boundary_residual_ir": 14667,
+        "publication_owner_call_count": 1,
+        "publication_owner_ir": 123788788,
+        "relations": {
+          "current_audit_is_nested_in_preparation": true,
+          "current_audit_not_added_to_writer_or_residual": true,
+          "current_audit_overlaps_preparation_and_publication": true,
+          "publication_residual_disjoint_from_topology": true,
+          "writer_and_preparation_are_sibling_boundary_rows": true
+        },
+        "topology_call_count": 1,
+        "topology_ir": 123774121,
+        "topology_other_children_and_self_ir": 1953,
+        "writer_call_count": 1,
+        "writer_ir": 71431254
+      },
+      "repeat": 0,
+      "revalidation": {
+        "current_audit_incoming_edges": true,
+        "no_retry_or_replacement": true,
+        "raw_callgrind": true,
+        "semantic": true,
+        "terminal": true
+      },
+      "semantic": {
+        "preservation": {
+          "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+          "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+          "untouched_member_count": 12,
+          "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19"
+        },
+        "reopen_ns": 2630934294,
+        "shape": "dense-sparse",
+        "status": "pass",
+        "timing_policy": "Instrumented elapsed durations retained but excluded from Callgrind/native conclusions. Reopen and preservation gates run inside the harness outside the timed phases."
+      },
+      "shape": "dense-sparse"
+    },
+    {
+      "custody": {
+        "command": {
+          "bytes": 6710,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0951/capture/02-dense-sparse/command.json",
+          "sha256": "bd101561d2222955aa319efdcb56249a708b981d5d68671e5bed75889a585a8c"
+        },
+        "command_artifacts": [
+          {
+            "bytes": 566,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/02-dense-sparse/callgrind.out",
+            "sha256": "75d4434b48b6fec4328b342ee2cb21ea4b6d5dd265f6e4ff76348329a0be0f5e"
+          },
+          {
+            "bytes": 38152,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/02-dense-sparse/callgrind.out.1",
+            "sha256": "26f6b82168ead1b37fe04d1fdd2e863dee14a354a3f35e8080921b3501ac1dc9"
+          },
+          {
+            "bytes": 16691,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/02-dense-sparse/callgrind.out.2",
+            "sha256": "4d87abb790315cd9294d616e1b1e3b32c7b311498886a20ac0a7d3bf74a5c713"
+          },
+          {
+            "bytes": 225782,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/02-dense-sparse/callgrind.out.3",
+            "sha256": "6b381c0ff49fe13e9427834d709a678b94e516e9da54f5be1dfb2dea7db18a49"
+          },
+          {
+            "bytes": 16722,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/02-dense-sparse/callgrind.out.4",
+            "sha256": "9f208a8cbfe613c0d17a82568878bc3fb75919854ba43ee69fe63ed612829f4a"
+          },
+          {
+            "bytes": 227178,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/02-dense-sparse/callgrind.out.5",
+            "sha256": "585a5b5893f72d8a3a86690b7cfe1ea272258f562293fe779f9d44bd18cf0276"
+          },
+          {
+            "bytes": 240303,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/02-dense-sparse/callgrind.out.6",
+            "sha256": "05044cb24af1fb25864089f2adc579f8f020160bc4851a81b0e21be2a1767555"
+          },
+          {
+            "bytes": 79224,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/02-dense-sparse/raw.json",
+            "sha256": "03a6686f1b2ce2497a84ccd5af58eb59a985b0967b970957673b7cd46e6c410b"
+          },
+          {
+            "bytes": 21587,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/02-dense-sparse/report.json",
+            "sha256": "1ddfb9eefdda4ccea7729504d43e6c47b1dceb52d6f5ce04e8c0e4b9fce8279e"
+          },
+          {
+            "bytes": 5051,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/02-dense-sparse/semantics.json",
+            "sha256": "d37ae5acbf2ba96d4acb05225e15b90b47fc652e005d3d40a036fad47eb3207c"
+          },
+          {
+            "bytes": 3354,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/02-dense-sparse/start.json",
+            "sha256": "2846ae24981be3435b56164966467782675916efffe784070e45c3183faf8f91"
+          },
+          {
+            "bytes": 1057,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/02-dense-sparse/stderr.txt",
+            "sha256": "9757f2e374bec527fdb6887009260fb479f47bbfe480819bbaef8492e0f89d49"
+          },
+          {
+            "bytes": 0,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/02-dense-sparse/stdout.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "raw": {
+          "bytes": 79224,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0951/capture/02-dense-sparse/raw.json",
+          "sha256": "03a6686f1b2ce2497a84ccd5af58eb59a985b0967b970957673b7cd46e6c410b"
+        },
+        "report": {
+          "bytes": 21587,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0951/capture/02-dense-sparse/report.json",
+          "sha256": "1ddfb9eefdda4ccea7729504d43e6c47b1dceb52d6f5ce04e8c0e4b9fce8279e"
+        },
+        "semantics": {
+          "bytes": 5051,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0951/capture/02-dense-sparse/semantics.json",
+          "sha256": "d37ae5acbf2ba96d4acb05225e15b90b47fc652e005d3d40a036fad47eb3207c"
+        },
+        "start": {
+          "bytes": 3354,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0951/capture/02-dense-sparse/start.json",
+          "sha256": "2846ae24981be3435b56164966467782675916efffe784070e45c3183faf8f91"
+        },
+        "terminal": {
+          "bytes": 5218,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0951/capture/02-dense-sparse/terminal.json",
+          "sha256": "8f1476bbee48105c2032fe46d53494100e356cbf68d01721988512894a631b15"
+        },
+        "terminal_artifacts": [
+          {
+            "bytes": 566,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/02-dense-sparse/callgrind.out",
+            "sha256": "75d4434b48b6fec4328b342ee2cb21ea4b6d5dd265f6e4ff76348329a0be0f5e"
+          },
+          {
+            "bytes": 38152,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/02-dense-sparse/callgrind.out.1",
+            "sha256": "26f6b82168ead1b37fe04d1fdd2e863dee14a354a3f35e8080921b3501ac1dc9"
+          },
+          {
+            "bytes": 16691,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/02-dense-sparse/callgrind.out.2",
+            "sha256": "4d87abb790315cd9294d616e1b1e3b32c7b311498886a20ac0a7d3bf74a5c713"
+          },
+          {
+            "bytes": 225782,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/02-dense-sparse/callgrind.out.3",
+            "sha256": "6b381c0ff49fe13e9427834d709a678b94e516e9da54f5be1dfb2dea7db18a49"
+          },
+          {
+            "bytes": 16722,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/02-dense-sparse/callgrind.out.4",
+            "sha256": "9f208a8cbfe613c0d17a82568878bc3fb75919854ba43ee69fe63ed612829f4a"
+          },
+          {
+            "bytes": 227178,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/02-dense-sparse/callgrind.out.5",
+            "sha256": "585a5b5893f72d8a3a86690b7cfe1ea272258f562293fe779f9d44bd18cf0276"
+          },
+          {
+            "bytes": 240303,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/02-dense-sparse/callgrind.out.6",
+            "sha256": "05044cb24af1fb25864089f2adc579f8f020160bc4851a81b0e21be2a1767555"
+          },
+          {
+            "bytes": 21587,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/02-dense-sparse/report.json",
+            "sha256": "1ddfb9eefdda4ccea7729504d43e6c47b1dceb52d6f5ce04e8c0e4b9fce8279e"
+          },
+          {
+            "bytes": 3354,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/02-dense-sparse/start.json",
+            "sha256": "2846ae24981be3435b56164966467782675916efffe784070e45c3183faf8f91"
+          },
+          {
+            "bytes": 1057,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/02-dense-sparse/stderr.txt",
+            "sha256": "9757f2e374bec527fdb6887009260fb479f47bbfe480819bbaef8492e0f89d49"
+          },
+          {
+            "bytes": 0,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/02-dense-sparse/stdout.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ]
+      },
+      "exclusive_top20": {
+        "all_exclusive_self_ir": 123788193,
+        "other_exclusive_self_ir": 4260602,
+        "rows": [
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/longest_match.rs",
+            "name": "zlib_rs::deflate::longest_match::longest_match",
+            "rank": 1,
+            "self_ir": 35695609
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/algorithm/medium.rs",
+            "name": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+            "rank": 2,
+            "self_ir": 17963652
+          },
+          {
+            "file": "$P0950/candidate-source-v1/crates/litchi-opc/src/source_backed.rs",
+            "name": "litchi_opc::source_backed::audit_source_part_replacement_xml",
+            "rank": 3,
+            "self_ir": 13991486
+          },
+          {
+            "file": "./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S",
+            "name": "__memcpy_avx_unaligned_erms",
+            "rank": 4,
+            "self_ir": 10085545
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs",
+            "name": "quick_xml::reader::Reader<R>::read_event_impl",
+            "rank": 5,
+            "self_ir": 9214850
+          },
+          {
+            "file": "$P0950/candidate-source-v1/crates/xml-minifier/src/audit.rs",
+            "name": "xml_minifier::audit::check_start",
+            "rank": 6,
+            "self_ir": 5534521
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs",
+            "name": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+            "rank": 7,
+            "self_ir": 3274530
+          },
+          {
+            "file": "./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S",
+            "name": "__memset_avx2_unaligned_erms",
+            "rank": 8,
+            "self_ir": 3159469
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/state.rs",
+            "name": "quick_xml::reader::state::ReaderState::emit_end",
+            "rank": 9,
+            "self_ir": 2936655
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/state.rs",
+            "name": "quick_xml::reader::state::ReaderState::emit_start",
+            "rank": 10,
+            "self_ir": 2797629
+          },
+          {
+            "file": "$P0950/candidate-source-v1/crates/xml-minifier/src/audit/wellformed.rs",
+            "name": "xml_minifier::audit::wellformed::scan_qname",
+            "rank": 11,
+            "self_ir": 2396848
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate.rs",
+            "name": "zlib_rs::deflate::flush_block_only",
+            "rank": 12,
+            "self_ir": 2185639
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "name": "memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2",
+            "rank": 13,
+            "self_ir": 2053604
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs",
+            "name": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+            "rank": 14,
+            "self_ir": 1740864
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "name": "memchr::arch::x86_64::avx2::memchr::Three::find_raw",
+            "rank": 15,
+            "self_ir": 1228711
+          },
+          {
+            "file": "$P0950/candidate-source-v1/crates/xml-minifier/src/audit.rs",
+            "name": "xml_minifier::audit::inspect_attributes",
+            "rank": 16,
+            "self_ir": 1219375
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "name": "memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2",
+            "rank": 17,
+            "self_ir": 1148864
+          },
+          {
+            "file": "$P0950/candidate-source-v1/crates/xml-minifier/src/audit.rs",
+            "name": "xml_minifier::audit::check_end",
+            "rank": 18,
+            "self_ir": 1128081
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/compare256.rs",
+            "name": "zlib_rs::deflate::compare256::compare256_slice",
+            "rank": 19,
+            "self_ir": 958035
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "name": "memchr::arch::x86_64::avx2::memchr::Two::find_raw",
+            "rank": 20,
+            "self_ir": 813624
+          }
+        ],
+        "summary_ir": 123788193,
+        "top20_exclusive_self_ir": 119527591
+      },
+      "historical_metadata": {
+        "argv": [
+          "/usr/bin/taskset",
+          "-c",
+          "12",
+          "/usr/bin/valgrind",
+          "--tool=callgrind",
+          "--collect-atstart=no",
+          "--toggle-collect=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+          "--zero-before=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+          "--dump-after=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+          "--callgrind-out-file=/home/zhuhe/litchi-performance-0951/capture/02-dense-sparse/callgrind.out",
+          "$P0950/target-candidate-native-v1/release/litchi-perf-baseline",
+          "--warmup",
+          "0",
+          "--samples",
+          "1",
+          "--case",
+          "xlsx_source_backed_cell_values_one_percent_edit_save",
+          "--xlsx-cell-crud-shape",
+          "dense-sparse",
+          "--json",
+          "$P0951/capture/02-dense-sparse/report.json"
+        ],
+        "cwd": "$P0950/candidate-source-v1",
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin",
+          "RUST_BACKTRACE": "0",
+          "TZ": "UTC"
+        },
+        "pid": 2776781,
+        "process_group_id": 2776781,
+        "started_utc": "2026-10-07T07:53:21.867902+00:00",
+        "terminal_utc": "2026-10-07T07:54:00.537378+00:00"
+      },
+      "index": 2,
+      "nested_overlap": {
+        "current_audit": [
+          {
+            "direct_children_ir": 38061304,
+            "inclusive_ir": 52052790,
+            "incoming_edges": [
+              {
+                "callee": "litchi_opc::source_backed::audit_source_part_replacement_xml",
+                "callee_id": 11998,
+                "caller": "litchi_opc::source_backed::SourceBackedPackage::prepare_topology_state",
+                "caller_id": 11070,
+                "calls": 2,
+                "file": "$P0950/candidate-source-v1/crates/litchi-opc/src/source_backed.rs",
+                "inclusive_ir": 632414,
+                "line": 15257,
+                "position": "*"
+              },
+              {
+                "callee": "litchi_opc::source_backed::audit_source_part_replacement_xml",
+                "callee_id": 11998,
+                "caller": "litchi_opc::source_backed::SourceBackedPackage::prepare_topology_state",
+                "caller_id": 11070,
+                "calls": 3,
+                "file": "$P0950/candidate-source-v1/crates/litchi-opc/src/source_backed.rs",
+                "inclusive_ir": 51420376,
+                "line": 15264,
+                "position": "*"
+              }
+            ],
+            "name": "litchi_opc::source_backed::audit_source_part_replacement_xml",
+            "overlap": true,
+            "self_ir": 13991486,
+            "sum_allowed": false
+          }
+        ],
+        "current_audit_to_multi_paths": [
+          {
+            "edges": [
+              {
+                "callee": "xml_minifier::audit::MultiWindowSearch::prove",
+                "calls": 3,
+                "inclusive_ir": 546
+              }
+            ],
+            "functions": [
+              "litchi_opc::source_backed::audit_source_part_replacement_xml",
+              "xml_minifier::audit::MultiWindowSearch::prove"
+            ]
+          },
+          {
+            "edges": [
+              {
+                "callee": "xml_minifier::audit::MultiWindowSearch::finish",
+                "calls": 177,
+                "inclusive_ir": 808755
+              }
+            ],
+            "functions": [
+              "litchi_opc::source_backed::audit_source_part_replacement_xml",
+              "xml_minifier::audit::MultiWindowSearch::finish"
+            ]
+          },
+          {
+            "edges": [
+              {
+                "callee": "xml_minifier::audit::MultiWindowSearch::finish",
+                "calls": 177,
+                "inclusive_ir": 808755
+              },
+              {
+                "callee": "xml_minifier::audit::MultiWindowSearch::audit_replacement",
+                "calls": 177,
+                "inclusive_ir": 727866
+              }
+            ],
+            "functions": [
+              "litchi_opc::source_backed::audit_source_part_replacement_xml",
+              "xml_minifier::audit::MultiWindowSearch::finish",
+              "xml_minifier::audit::MultiWindowSearch::audit_replacement"
+            ]
+          }
+        ],
+        "multi_window": [
+          {
+            "direct_children_ir": 785391,
+            "inclusive_ir": 808755,
+            "name": "xml_minifier::audit::MultiWindowSearch::finish",
+            "overlap": true,
+            "self_ir": 23364,
+            "sum_allowed": false
+          },
+          {
+            "direct_children_ir": 705630,
+            "inclusive_ir": 727866,
+            "name": "xml_minifier::audit::MultiWindowSearch::audit_replacement",
+            "overlap": true,
+            "self_ir": 22236,
+            "sum_allowed": false
+          },
+          {
+            "direct_children_ir": 423,
+            "inclusive_ir": 546,
+            "name": "xml_minifier::audit::MultiWindowSearch::prove",
+            "overlap": true,
+            "self_ir": 123,
+            "sum_allowed": false
+          }
+        ],
+        "retained_0944_rows": [
+          {
+            "direct_children_ir": 59934341,
+            "implementation_note": "retained 0944 nested name; not the current direct audit symbol",
+            "incoming_calls": 420,
+            "incoming_ir": 59936171,
+            "name": "zlib_rs::deflate::deflate",
+            "overlap": true,
+            "self_ir": 1830,
+            "sum_allowed": false
+          },
+          {
+            "direct_children_ir": 52336559,
+            "implementation_note": "retained 0944 nested name; not the current direct audit symbol",
+            "incoming_calls": 1,
+            "incoming_ir": 52341011,
+            "name": "litchi_opc::source_backed::SourceBackedPackage::prepare_topology_state",
+            "overlap": true,
+            "self_ir": 4452,
+            "sum_allowed": false
+          },
+          {
+            "direct_children_ir": 502705,
+            "implementation_note": "retained 0944 nested name; not the current direct audit symbol",
+            "incoming_calls": 2,
+            "incoming_ir": 632298,
+            "name": "xml_minifier::audit::verify_source_replacement",
+            "overlap": true,
+            "self_ir": 129593,
+            "sum_allowed": false
+          },
+          {
+            "direct_children_ir": 71429347,
+            "implementation_note": "retained 0944 nested name; not the current direct audit symbol",
+            "incoming_calls": 1,
+            "incoming_ir": 71431112,
+            "name": "litchi_opc::source_backed::SourceBackedPackage::write_changed_overlays_with_appended_inner",
+            "overlap": true,
+            "self_ir": 1765,
+            "sum_allowed": false
+          },
+          {
+            "direct_children_ir": 62633127,
+            "implementation_note": "retained 0944 nested name; not the current direct audit symbol",
+            "incoming_calls": 1,
+            "incoming_ir": 62635906,
+            "name": "soapberry_zip::preserve::PreservationIndex<R>::prepare_with",
+            "overlap": true,
+            "self_ir": 2779,
+            "sum_allowed": false
+          },
+          {
+            "direct_children_ir": 71238331,
+            "implementation_note": "retained 0944 nested name; not the current direct audit symbol",
+            "incoming_calls": 1,
+            "incoming_ir": 71239998,
+            "name": "soapberry_zip::preserve::PreservationIndex<R>::write_prepared",
+            "overlap": true,
+            "self_ir": 1667,
+            "sum_allowed": false
+          }
+        ],
+        "rules": {
+          "all_nested_rows_overlap": true,
+          "current_audit_incoming_edges_conserved": true,
+          "nested_sum_allowed": false,
+          "replicates_must_remain_separate": true
+        }
+      },
+      "publication_table": {
+        "current_audit_call_count": 5,
+        "current_audit_ir": 52052790,
+        "preparation_boundary_residual_ir": 288221,
+        "preparation_call_count": 1,
+        "preparation_ir": 52341011,
+        "publication_boundary_residual_ir": 14120,
+        "publication_owner_call_count": 1,
+        "publication_owner_ir": 123788193,
+        "relations": {
+          "current_audit_is_nested_in_preparation": true,
+          "current_audit_not_added_to_writer_or_residual": true,
+          "current_audit_overlaps_preparation_and_publication": true,
+          "publication_residual_disjoint_from_topology": true,
+          "writer_and_preparation_are_sibling_boundary_rows": true
+        },
+        "topology_call_count": 1,
+        "topology_ir": 123774073,
+        "topology_other_children_and_self_ir": 1950,
+        "writer_call_count": 1,
+        "writer_ir": 71431112
+      },
+      "repeat": 1,
+      "revalidation": {
+        "current_audit_incoming_edges": true,
+        "no_retry_or_replacement": true,
+        "raw_callgrind": true,
+        "semantic": true,
+        "terminal": true
+      },
+      "semantic": {
+        "preservation": {
+          "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+          "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+          "untouched_member_count": 12,
+          "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19"
+        },
+        "reopen_ns": 2654433732,
+        "shape": "dense-sparse",
+        "status": "pass",
+        "timing_policy": "Instrumented elapsed durations retained but excluded from Callgrind/native conclusions. Reopen and preservation gates run inside the harness outside the timed phases."
+      },
+      "shape": "dense-sparse"
+    },
+    {
+      "custody": {
+        "command": {
+          "bytes": 6584,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0951/capture/03-medium/command.json",
+          "sha256": "2bd2142ab5156393ce00dfd12bd11e1b0b25ea3d83c010f7893eb9daca2d75ca"
+        },
+        "command_artifacts": [
+          {
+            "bytes": 554,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/03-medium/callgrind.out",
+            "sha256": "b703a36096160db0361ecf5712835c1a1571700ec5c15fa9c7371abc62cd2f16"
+          },
+          {
+            "bytes": 38063,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/03-medium/callgrind.out.1",
+            "sha256": "a2ae29df7a183ed03ff128e371dec315698aa195eee2f7bcc51e44dafb83ab67"
+          },
+          {
+            "bytes": 16763,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/03-medium/callgrind.out.2",
+            "sha256": "45e40adc799e8920c12fea3bada1bbc8fe427e52903beea00485ba63ad103bea"
+          },
+          {
+            "bytes": 222646,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/03-medium/callgrind.out.3",
+            "sha256": "a5c4fdbfec3ab67f045025e33f963352527213ad01d27099ee4ef8f2dbf04b05"
+          },
+          {
+            "bytes": 16679,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/03-medium/callgrind.out.4",
+            "sha256": "baa28f7a6d4db540b671774e2893635bbf70d00448be74035b6978ef54f997bc"
+          },
+          {
+            "bytes": 222568,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/03-medium/callgrind.out.5",
+            "sha256": "a978c99e2e1a7a7b6ecd4c54d965e9d4e74701a7345072b954f4cc02294780ee"
+          },
+          {
+            "bytes": 235716,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/03-medium/callgrind.out.6",
+            "sha256": "2b072abce8ae3b42e36744c6c77c192e9dc6ba956e8d7d2f9e5c72273d66746c"
+          },
+          {
+            "bytes": 78266,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/03-medium/raw.json",
+            "sha256": "af603ed38dbf4b59b7ffb59abe20280178e173eedafb341204ae96a0bad687fc"
+          },
+          {
+            "bytes": 21555,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/03-medium/report.json",
+            "sha256": "6ce28e5a69463f65116bcf3b14bad86e5de40b9899dec74fe6ea123e9ae22b3a"
+          },
+          {
+            "bytes": 5028,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/03-medium/semantics.json",
+            "sha256": "177fdacb73aabe327068190f424fb1ab376147bc62ff78a887be13d54ef636b4"
+          },
+          {
+            "bytes": 3300,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/03-medium/start.json",
+            "sha256": "aec465d72e476b4c7a573215f4c203a3a6d91212a072919d55cd0df39c61a209"
+          },
+          {
+            "bytes": 1045,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/03-medium/stderr.txt",
+            "sha256": "8e42bedb71b6b82d84e67057c3c880649a372b5f5399e53f8a1f17fb70f900db"
+          },
+          {
+            "bytes": 0,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/03-medium/stdout.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "raw": {
+          "bytes": 78266,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0951/capture/03-medium/raw.json",
+          "sha256": "af603ed38dbf4b59b7ffb59abe20280178e173eedafb341204ae96a0bad687fc"
+        },
+        "report": {
+          "bytes": 21555,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0951/capture/03-medium/report.json",
+          "sha256": "6ce28e5a69463f65116bcf3b14bad86e5de40b9899dec74fe6ea123e9ae22b3a"
+        },
+        "semantics": {
+          "bytes": 5028,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0951/capture/03-medium/semantics.json",
+          "sha256": "177fdacb73aabe327068190f424fb1ab376147bc62ff78a887be13d54ef636b4"
+        },
+        "start": {
+          "bytes": 3300,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0951/capture/03-medium/start.json",
+          "sha256": "aec465d72e476b4c7a573215f4c203a3a6d91212a072919d55cd0df39c61a209"
+        },
+        "terminal": {
+          "bytes": 5122,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0951/capture/03-medium/terminal.json",
+          "sha256": "9f5f13b487c8b6dd5c55a09db70533401f9ca2ed24f6c3fbbb225f642bd37890"
+        },
+        "terminal_artifacts": [
+          {
+            "bytes": 554,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/03-medium/callgrind.out",
+            "sha256": "b703a36096160db0361ecf5712835c1a1571700ec5c15fa9c7371abc62cd2f16"
+          },
+          {
+            "bytes": 38063,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/03-medium/callgrind.out.1",
+            "sha256": "a2ae29df7a183ed03ff128e371dec315698aa195eee2f7bcc51e44dafb83ab67"
+          },
+          {
+            "bytes": 16763,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/03-medium/callgrind.out.2",
+            "sha256": "45e40adc799e8920c12fea3bada1bbc8fe427e52903beea00485ba63ad103bea"
+          },
+          {
+            "bytes": 222646,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/03-medium/callgrind.out.3",
+            "sha256": "a5c4fdbfec3ab67f045025e33f963352527213ad01d27099ee4ef8f2dbf04b05"
+          },
+          {
+            "bytes": 16679,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/03-medium/callgrind.out.4",
+            "sha256": "baa28f7a6d4db540b671774e2893635bbf70d00448be74035b6978ef54f997bc"
+          },
+          {
+            "bytes": 222568,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/03-medium/callgrind.out.5",
+            "sha256": "a978c99e2e1a7a7b6ecd4c54d965e9d4e74701a7345072b954f4cc02294780ee"
+          },
+          {
+            "bytes": 235716,
+            "executable": false,
+            "mode": 384,
+            "path": "$P0951/capture/03-medium/callgrind.out.6",
+            "sha256": "2b072abce8ae3b42e36744c6c77c192e9dc6ba956e8d7d2f9e5c72273d66746c"
+          },
+          {
+            "bytes": 21555,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/03-medium/report.json",
+            "sha256": "6ce28e5a69463f65116bcf3b14bad86e5de40b9899dec74fe6ea123e9ae22b3a"
+          },
+          {
+            "bytes": 3300,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/03-medium/start.json",
+            "sha256": "aec465d72e476b4c7a573215f4c203a3a6d91212a072919d55cd0df39c61a209"
+          },
+          {
+            "bytes": 1045,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/03-medium/stderr.txt",
+            "sha256": "8e42bedb71b6b82d84e67057c3c880649a372b5f5399e53f8a1f17fb70f900db"
+          },
+          {
+            "bytes": 0,
+            "executable": false,
+            "mode": 436,
+            "path": "$P0951/capture/03-medium/stdout.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ]
+      },
+      "exclusive_top20": {
+        "all_exclusive_self_ir": 70018237,
+        "other_exclusive_self_ir": 2486443,
+        "rows": [
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/longest_match.rs",
+            "name": "zlib_rs::deflate::longest_match::longest_match",
+            "rank": 1,
+            "self_ir": 18584283
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/algorithm/medium.rs",
+            "name": "zlib_rs::deflate::algorithm::medium::deflate_medium",
+            "rank": 2,
+            "self_ir": 9402960
+          },
+          {
+            "file": "./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S",
+            "name": "__memcpy_avx_unaligned_erms",
+            "rank": 3,
+            "self_ir": 9092623
+          },
+          {
+            "file": "$P0950/candidate-source-v1/crates/litchi-opc/src/source_backed.rs",
+            "name": "litchi_opc::source_backed::audit_source_part_replacement_xml",
+            "rank": 4,
+            "self_ir": 7320372
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs",
+            "name": "quick_xml::reader::Reader<R>::read_event_impl",
+            "rank": 5,
+            "self_ir": 4786041
+          },
+          {
+            "file": "./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S",
+            "name": "__memset_avx2_unaligned_erms",
+            "rank": 6,
+            "self_ir": 3043823
+          },
+          {
+            "file": "$P0950/candidate-source-v1/crates/xml-minifier/src/audit.rs",
+            "name": "xml_minifier::audit::check_start",
+            "rank": 7,
+            "self_ir": 2836208
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs",
+            "name": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+            "rank": 8,
+            "self_ir": 1702230
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/state.rs",
+            "name": "quick_xml::reader::state::ReaderState::emit_end",
+            "rank": 9,
+            "self_ir": 1524582
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/state.rs",
+            "name": "quick_xml::reader::state::ReaderState::emit_start",
+            "rank": 10,
+            "self_ir": 1453722
+          },
+          {
+            "file": "$P0950/candidate-source-v1/crates/xml-minifier/src/audit/wellformed.rs",
+            "name": "xml_minifier::audit::wellformed::scan_qname",
+            "rank": 11,
+            "self_ir": 1249476
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate.rs",
+            "name": "zlib_rs::deflate::flush_block_only",
+            "rank": 12,
+            "self_ir": 1198142
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "name": "memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2",
+            "rank": 13,
+            "self_ir": 1067428
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs",
+            "name": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+            "rank": 14,
+            "self_ir": 904056
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "name": "memchr::arch::x86_64::avx2::memchr::Three::find_raw",
+            "rank": 15,
+            "self_ir": 639275
+          },
+          {
+            "file": "$P0950/candidate-source-v1/crates/xml-minifier/src/audit.rs",
+            "name": "xml_minifier::audit::inspect_attributes",
+            "rank": 16,
+            "self_ir": 634648
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "name": "memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2",
+            "rank": 17,
+            "self_ir": 596416
+          },
+          {
+            "file": "$P0950/candidate-source-v1/crates/xml-minifier/src/audit.rs",
+            "name": "xml_minifier::audit::check_end",
+            "rank": 18,
+            "self_ir": 586314
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/compare256.rs",
+            "name": "zlib_rs::deflate::compare256::compare256_slice",
+            "rank": 19,
+            "self_ir": 485673
+          },
+          {
+            "file": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs",
+            "name": "memchr::arch::x86_64::avx2::memchr::Two::find_raw",
+            "rank": 20,
+            "self_ir": 423522
+          }
+        ],
+        "summary_ir": 70018237,
+        "top20_exclusive_self_ir": 67531794
+      },
+      "historical_metadata": {
+        "argv": [
+          "/usr/bin/taskset",
+          "-c",
+          "12",
+          "/usr/bin/valgrind",
+          "--tool=callgrind",
+          "--collect-atstart=no",
+          "--toggle-collect=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+          "--zero-before=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+          "--dump-after=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+          "--callgrind-out-file=/home/zhuhe/litchi-performance-0951/capture/03-medium/callgrind.out",
+          "$P0950/target-candidate-native-v1/release/litchi-perf-baseline",
+          "--warmup",
+          "0",
+          "--samples",
+          "1",
+          "--case",
+          "xlsx_source_backed_cell_values_one_percent_edit_save",
+          "--xlsx-cell-crud-shape",
+          "medium",
+          "--json",
+          "$P0951/capture/03-medium/report.json"
+        ],
+        "cwd": "$P0950/candidate-source-v1",
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin",
+          "RUST_BACKTRACE": "0",
+          "TZ": "UTC"
+        },
+        "pid": 2777022,
+        "process_group_id": 2777022,
+        "started_utc": "2026-10-07T07:54:01.646794+00:00",
+        "terminal_utc": "2026-10-07T07:54:30.061634+00:00"
+      },
+      "index": 3,
+      "nested_overlap": {
+        "current_audit": [
+          {
+            "direct_children_ir": 19715393,
+            "inclusive_ir": 27035765,
+            "incoming_edges": [
+              {
+                "callee": "litchi_opc::source_backed::audit_source_part_replacement_xml",
+                "callee_id": 12038,
+                "caller": "litchi_opc::source_backed::SourceBackedPackage::prepare_topology_state",
+                "caller_id": 11108,
+                "calls": 1,
+                "file": "$P0950/candidate-source-v1/crates/litchi-opc/src/source_backed.rs",
+                "inclusive_ir": 66147,
+                "line": 17768,
+                "position": "*"
+              },
+              {
+                "callee": "litchi_opc::source_backed::audit_source_part_replacement_xml",
+                "callee_id": 12038,
+                "caller": "litchi_opc::source_backed::SourceBackedPackage::prepare_topology_state",
+                "caller_id": 11108,
+                "calls": 4,
+                "file": "$P0950/candidate-source-v1/crates/litchi-opc/src/source_backed.rs",
+                "inclusive_ir": 26969618,
+                "line": 17775,
+                "position": "*"
+              }
+            ],
+            "name": "litchi_opc::source_backed::audit_source_part_replacement_xml",
+            "overlap": true,
+            "self_ir": 7320372,
+            "sum_allowed": false
+          }
+        ],
+        "current_audit_to_multi_paths": [
+          {
+            "edges": [
+              {
+                "callee": "xml_minifier::audit::MultiWindowSearch::prove",
+                "calls": 4,
+                "inclusive_ir": 728
+              }
+            ],
+            "functions": [
+              "litchi_opc::source_backed::audit_source_part_replacement_xml",
+              "xml_minifier::audit::MultiWindowSearch::prove"
+            ]
+          },
+          {
+            "edges": [
+              {
+                "callee": "xml_minifier::audit::MultiWindowSearch::finish",
+                "calls": 93,
+                "inclusive_ir": 427329
+              }
+            ],
+            "functions": [
+              "litchi_opc::source_backed::audit_source_part_replacement_xml",
+              "xml_minifier::audit::MultiWindowSearch::finish"
+            ]
+          },
+          {
+            "edges": [
+              {
+                "callee": "xml_minifier::audit::MultiWindowSearch::finish",
+                "calls": 93,
+                "inclusive_ir": 427329
+              },
+              {
+                "callee": "xml_minifier::audit::MultiWindowSearch::audit_replacement",
+                "calls": 93,
+                "inclusive_ir": 384828
+              }
+            ],
+            "functions": [
+              "litchi_opc::source_backed::audit_source_part_replacement_xml",
+              "xml_minifier::audit::MultiWindowSearch::finish",
+              "xml_minifier::audit::MultiWindowSearch::audit_replacement"
+            ]
+          }
+        ],
+        "multi_window": [
+          {
+            "direct_children_ir": 415053,
+            "inclusive_ir": 427329,
+            "name": "xml_minifier::audit::MultiWindowSearch::finish",
+            "overlap": true,
+            "self_ir": 12276,
+            "sum_allowed": false
+          },
+          {
+            "direct_children_ir": 373055,
+            "inclusive_ir": 384828,
+            "name": "xml_minifier::audit::MultiWindowSearch::audit_replacement",
+            "overlap": true,
+            "self_ir": 11773,
+            "sum_allowed": false
+          },
+          {
+            "direct_children_ir": 564,
+            "inclusive_ir": 728,
+            "name": "xml_minifier::audit::MultiWindowSearch::prove",
+            "overlap": true,
+            "self_ir": 164,
+            "sum_allowed": false
+          }
+        ],
+        "retained_0944_rows": [
+          {
+            "direct_children_ir": 31383210,
+            "implementation_note": "retained 0944 nested name; not the current direct audit symbol",
+            "incoming_calls": 416,
+            "incoming_ir": 31384955,
+            "name": "zlib_rs::deflate::deflate",
+            "overlap": true,
+            "self_ir": 1745,
+            "sum_allowed": false
+          },
+          {
+            "direct_children_ir": 27319384,
+            "implementation_note": "retained 0944 nested name; not the current direct audit symbol",
+            "incoming_calls": 1,
+            "incoming_ir": 27323847,
+            "name": "litchi_opc::source_backed::SourceBackedPackage::prepare_topology_state",
+            "overlap": true,
+            "self_ir": 4463,
+            "sum_allowed": false
+          },
+          {
+            "direct_children_ir": 63736,
+            "implementation_note": "retained 0944 nested name; not the current direct audit symbol",
+            "incoming_calls": 1,
+            "incoming_ir": 66089,
+            "name": "xml_minifier::audit::verify_source_replacement",
+            "overlap": true,
+            "self_ir": 2353,
+            "sum_allowed": false
+          },
+          {
+            "direct_children_ir": 42675881,
+            "implementation_note": "retained 0944 nested name; not the current direct audit symbol",
+            "incoming_calls": 1,
+            "incoming_ir": 42677646,
+            "name": "litchi_opc::source_backed::SourceBackedPackage::write_changed_overlays_with_appended_inner",
+            "overlap": true,
+            "self_ir": 1765,
+            "sum_allowed": false
+          },
+          {
+            "direct_children_ir": 33927927,
+            "implementation_note": "retained 0944 nested name; not the current direct audit symbol",
+            "incoming_calls": 1,
+            "incoming_ir": 33930706,
+            "name": "soapberry_zip::preserve::PreservationIndex<R>::prepare_with",
+            "overlap": true,
+            "self_ir": 2779,
+            "sum_allowed": false
+          },
+          {
+            "direct_children_ir": 42484965,
+            "implementation_note": "retained 0944 nested name; not the current direct audit symbol",
+            "incoming_calls": 1,
+            "incoming_ir": 42486632,
+            "name": "soapberry_zip::preserve::PreservationIndex<R>::write_prepared",
+            "overlap": true,
+            "self_ir": 1667,
+            "sum_allowed": false
+          }
+        ],
+        "rules": {
+          "all_nested_rows_overlap": true,
+          "current_audit_incoming_edges_conserved": true,
+          "nested_sum_allowed": false,
+          "replicates_must_remain_separate": true
+        }
+      },
+      "publication_table": {
+        "current_audit_call_count": 5,
+        "current_audit_ir": 27035765,
+        "preparation_boundary_residual_ir": 288082,
+        "preparation_call_count": 1,
+        "preparation_ir": 27323847,
+        "publication_boundary_residual_ir": 14806,
+        "publication_owner_call_count": 1,
+        "publication_owner_ir": 70018237,
+        "relations": {
+          "current_audit_is_nested_in_preparation": true,
+          "current_audit_not_added_to_writer_or_residual": true,
+          "current_audit_overlaps_preparation_and_publication": true,
+          "publication_residual_disjoint_from_topology": true,
+          "writer_and_preparation_are_sibling_boundary_rows": true
+        },
+        "topology_call_count": 1,
+        "topology_ir": 70003431,
+        "topology_other_children_and_self_ir": 1938,
+        "writer_call_count": 1,
+        "writer_ir": 42677646
+      },
+      "repeat": 1,
+      "revalidation": {
+        "current_audit_incoming_edges": true,
+        "no_retry_or_replacement": true,
+        "raw_callgrind": true,
+        "semantic": true,
+        "terminal": true
+      },
+      "semantic": {
+        "preservation": {
+          "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+          "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+          "untouched_member_count": 12,
+          "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19"
+        },
+        "reopen_ns": 2156168559,
+        "shape": "medium",
+        "status": "pass",
+        "timing_policy": "Instrumented elapsed durations retained but excluded from Callgrind/native conclusions. Reopen and preservation gates run inside the harness outside the timed phases."
+      },
+      "shape": "medium"
+    }
+  ],
+  "determinism": {
+    "all_current_audit_incoming_replays_equal": true,
+    "all_raw_and_semantic_replays_equal": true,
+    "large_raw_artifacts_external": true,
+    "retries": 0,
+    "schedule": [
+      {
+        "index": 0,
+        "repeat": 0,
+        "shape": "medium"
+      },
+      {
+        "index": 1,
+        "repeat": 0,
+        "shape": "dense-sparse"
+      },
+      {
+        "index": 2,
+        "repeat": 1,
+        "shape": "dense-sparse"
+      },
+      {
+        "index": 3,
+        "repeat": 1,
+        "shape": "medium"
+      }
+    ],
+    "serial": true
+  },
+  "first_child_admission": {
+    "index": 0,
+    "raw": {
+      "bytes": 78267,
+      "executable": false,
+      "mode": 436,
+      "path": "$P0951/capture/00-medium/raw.json",
+      "sha256": "87247bdbb30374967563685fc08ba906cbb5c377872bd4f398ccaafaab4b3e75"
+    },
+    "report": {
+      "bytes": 21555,
+      "executable": false,
+      "mode": 436,
+      "path": "$P0951/capture/00-medium/report.json",
+      "sha256": "5d3fbb67009b73297b28c272020dad111bb9f3d40dc1b7c0f87b59d917127ae5"
+    },
+    "row": {
+      "id": "primary-percent-medium-r0",
+      "index": 0,
+      "repeat": 0,
+      "shape": "medium"
+    },
+    "semantics": {
+      "bytes": 5028,
+      "executable": false,
+      "mode": 436,
+      "path": "$P0951/capture/00-medium/semantics.json",
+      "sha256": "a74a5f5af5e5b9757af6ad3b8c80845bd6a30e61249bdcf35630d4588f1cd1f4"
+    },
+    "status": "pass",
+    "terminal": {
+      "bytes": 5122,
+      "executable": false,
+      "mode": 436,
+      "path": "$P0951/capture/00-medium/terminal.json",
+      "sha256": "2c4afaa49aaa3f9fcecb1faabf77df7a4d5df75fa08d12b02ad05447951fedd6"
+    },
+    "validation": {
+      "no_retry_or_replacement": true,
+      "raw_callgrind_owner_lifecycle": true,
+      "semantic_reopen_preservation": true,
+      "terminal_before_parse": true
+    }
+  },
+  "frozen_bindings": {
+    "binary": {
+      "bytes": 266090728,
+      "executable": true,
+      "mode": 509,
+      "path": "$P0950/target-candidate-native-v1/release/litchi-perf-baseline",
+      "sha256": "198c2e87471a088cf054a23785e4068eaf7f205ffb1fb25cad5ba0b7a6db5bec"
+    },
+    "current_audit_helper": {
+      "bytes": 10079,
+      "executable": true,
+      "mode": 493,
+      "path": "$P0951/tools/attribute_current_audit_0951_v1.py",
+      "sha256": "c885ba8bc434a611693b192866b487dec2b54667b4cc73a82a2dd05f3d3fffb0"
+    },
+    "incoming_aggregator": {
+      "bytes": 9648,
+      "executable": true,
+      "mode": 493,
+      "path": "$P0951/tools/aggregate_current_audit_0951_v2.py",
+      "sha256": "bd73d26b95e6aafa9f2273b7873c10972dd8ed82ff49306b24f8ea5e86ef413e"
+    },
+    "native_context": {
+      "bytes": 13613,
+      "path": "references/native-context-0950-v1.json",
+      "sha256": "266cbbcf9441ae1e3b054409ec43dd5f1d05f9819f4aaeb01a7cfc2b0c14ca65"
+    },
+    "plan": {
+      "bytes": 14581,
+      "executable": false,
+      "mode": 436,
+      "path": "$P0951/plan-0951-v1.json",
+      "sha256": "227322ea28ccadb206f00fee3efdc162db83e33431fbaa430d164b4e269b8bad"
+    },
+    "runner": {
+      "bytes": 25770,
+      "executable": true,
+      "mode": 493,
+      "path": "$P0951/tools/capture_0951_v1.py",
+      "sha256": "9c4ab50803150ecb8c05251ad6a484671878bbd60cbdd98148e166ee146a58da"
+    },
+    "source_manifest": {
+      "bytes": 2037928,
+      "executable": false,
+      "mode": 436,
+      "path": "$P0950/candidate-source-manifest-v1.json",
+      "sha256": "5b16ef65a17f868a2d941355baed30dbbf9e338b817365c02bfb7133fedc80d4"
+    }
+  },
+  "limitations": [
+    "Exclusive top-20 rows are disjoint self-Ir rows within each selected measured dump.",
+    "Publication/preparation/writer boundary rows are reported with their explicit nesting relations; current audit and MultiWindowSearch rows overlap and are never summed.",
+    "The current direct audit implementation is derived from the post-raw audit_source_part_replacement_xml graph; the retained 0944 validate_source_part_replacement_xml row is labeled historical and is not used as the current claim.",
+    "The 0950 source/binary custody receipt records one ignored root Cargo.lock exception: 10,789 committed Git objects plus the declared ignored lock make the 10,790-file closure."
+  ],
+  "normalization": {
+    "captured_absolute_argv_and_cwd": "historical metadata only; never used as filesystem locators",
+    "declared_roots": {
+      "0944": "$P0944",
+      "0950": "$P0950",
+      "0951": "$P0951"
+    },
+    "unrecognized_absolute_paths": "retained verbatim; no broad path rewriting"
+  },
+  "preflight": {
+    "current_0950_binary": {
+      "build_terminal_sha256": "1fbd465453f3e2b9658dbc1c48c1450e4557529593d24279dc7fab5943380387",
+      "descriptor": {
+        "bytes": 266090728,
+        "executable": true,
+        "mode": 509,
+        "path": "$P0950/target-candidate-native-v1/release/litchi-perf-baseline",
+        "sha256": "198c2e87471a088cf054a23785e4068eaf7f205ffb1fb25cad5ba0b7a6db5bec"
+      },
+      "reuse_artifact": {
+        "bytes": 266090728,
+        "mode": 509,
+        "path": "target-candidate-native-v1/release/litchi-perf-baseline",
+        "sha256": "198c2e87471a088cf054a23785e4068eaf7f205ffb1fb25cad5ba0b7a6db5bec"
+      },
+      "source_commit": "b6c5c80ffbcb60736d6c4c2f3b590838640008a9",
+      "source_manifest": {
+        "base_commit": "b6c5c80ffbcb60736d6c4c2f3b590838640008a9",
+        "bytes": 260102337,
+        "candidate_delta": {
+          "base_commit": "b6c5c80ffbcb60736d6c4c2f3b590838640008a9",
+          "count": 12,
+          "paths": [
+            "crates/litchi-opc/src/lib.rs",
+            "crates/litchi-opc/src/source_backed.rs",
+            "crates/litchi-xlsx/src/cell_values/facts_oracle_tests.rs",
+            "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+            "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs",
+            "crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs",
+            "crates/litchi-xlsx/src/raw/worksheet/edit/package.rs",
+            "crates/litchi-xlsx/src/raw/worksheet/edit/tests.rs",
+            "crates/xml-minifier/src/audit/namespaces.rs",
+            "crates/xml-minifier/src/audit.rs",
+            "crates/xml-minifier/tests/multi_window_reuse.rs",
+            "crates/xml-minifier/tests/source_replacement.rs"
+          ]
+        },
+        "file_count": 10790,
+        "manifest_rows_digest": "7dd5b6dc09e5e863279593ff70cc5c0075b779c1264b9c9189bee910970a6900",
+        "measurement_source_commit": "df6ee5583b409f2547e2f824896d87feb8d50630",
+        "path": "$P0950/candidate-source-manifest-v1.json",
+        "schema": "litchi.performance.0950.candidate-source-manifest.v1",
+        "sha256": "5b16ef65a17f868a2d941355baed30dbbf9e338b817365c02bfb7133fedc80d4"
+      }
+    },
+    "receipts": {
+      "comparison_review": {
+        "bytes": 12229,
+        "executable": false,
+        "mode": 436,
+        "path": "$P0951/receipts/comparison-tooling-review-v1.json",
+        "sha256": "8beb0b190356867b121a9dac5885da99693821cba144bc827c0409751fb623a1"
+      },
+      "first_child_go": {
+        "bytes": 1339,
+        "executable": false,
+        "mode": 436,
+        "path": "$P0951/receipts/root-first-child-go-v1.json",
+        "sha256": "d1d830e5cbea63f02c71af08c14fa8f31acacf8e5f39df2201bd978cf4be0a77"
+      },
+      "remaining_go": {
+        "bytes": 639,
+        "executable": false,
+        "mode": 436,
+        "path": "$P0951/receipts/root-remaining-capture-go-v1.json",
+        "sha256": "176b9f84226f73a807ec9abfe4bdeaa936cc51167efdd64636d3a77b11e616b1"
+      },
+      "root_start": {
+        "bytes": 6873,
+        "executable": false,
+        "mode": 436,
+        "path": "$P0951/receipts/root-start-v1.json",
+        "sha256": "6d80294429e16252488b5cec4bdf37765cb9ae59e3426cd9b01694766de60b53"
+      },
+      "source_binary_reuse": {
+        "bytes": 7914,
+        "executable": false,
+        "mode": 436,
+        "path": "$P0951/receipts/source-binary-reuse-v1.json",
+        "sha256": "cfbdab576801388fb19c208e90d3a1f272cae5b1dd9df902c6c9dcbb1e16cf91"
+      },
+      "validate_only": {
+        "bytes": 1383,
+        "executable": false,
+        "mode": 436,
+        "path": "$P0951/receipts/validate-only-v1.json",
+        "sha256": "56fba8d9b7d42d8be30d28a8683631adf9dfd9db3b20190ed4fdd009190be215"
+      }
+    },
+    "review": {
+      "controls": [
+        {
+          "artifacts": {
+            "stderr": {
+              "bytes": 0,
+              "executable": false,
+              "mode": 436,
+              "path": "$P0951/review-controls-v1/0944-source-positive.stderr",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "stdout": {
+              "bytes": 279,
+              "executable": false,
+              "mode": 436,
+              "path": "$P0951/review-controls-v1/0944-source-positive.stdout",
+              "sha256": "6bd690e9e53fa6af4cbce88dd85b46ef1e8d9fe07f2e72d0c2edd0662a40ce51"
+            }
+          },
+          "expected_rejection": false,
+          "name": "source custody",
+          "polarity": "positive",
+          "status": "pass"
+        },
+        {
+          "artifacts": {
+            "stderr": {
+              "bytes": 0,
+              "executable": false,
+              "mode": 436,
+              "path": "$P0951/review-controls-v2/0944-semantic-positive.stderr",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "stdout": {
+              "bytes": 5025,
+              "executable": false,
+              "mode": 436,
+              "path": "$P0951/review-controls-v2/0944-semantic-positive.stdout",
+              "sha256": "5276c7e136687a2bc56bc6e3c69a911e86aa89a120c42f6ca442afb93b573509"
+            }
+          },
+          "expected_rejection": false,
+          "name": "semantic medium",
+          "polarity": "positive",
+          "status": "pass"
+        },
+        {
+          "artifacts": {
+            "stderr": {
+              "bytes": 0,
+              "executable": false,
+              "mode": 436,
+              "path": "$P0951/review-controls-v2/0944-raw-positive.stderr",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "stdout": {
+              "bytes": 80558,
+              "executable": false,
+              "mode": 436,
+              "path": "$P0951/review-controls-v2/0944-raw-positive.stdout",
+              "sha256": "6de412ea46924d337311677e8167da256b7b1a8fc1978235b5749392b9ef3583"
+            }
+          },
+          "expected_rejection": false,
+          "name": "raw Callgrind medium",
+          "polarity": "positive",
+          "status": "pass"
+        },
+        {
+          "artifacts": {
+            "stderr": {
+              "bytes": 82,
+              "executable": false,
+              "mode": 436,
+              "path": "$P0951/review-controls-v2/0944-raw-extra-suffix-reject-corrected.stderr",
+              "sha256": "2e015dc919ad6800ba3888f72d6ddbee7635ceecbde34f26fc5ddd68c2399df9"
+            }
+          },
+          "expected_rejection": true,
+          "name": "malformed numbered Callgrind suffix",
+          "polarity": "negative",
+          "status": "reject"
+        },
+        {
+          "artifacts": {
+            "stderr": {
+              "bytes": 41,
+              "executable": false,
+              "mode": 436,
+              "path": "$P0951/review-controls-v2/0944-raw-terminal-gap-reject-corrected.stderr",
+              "sha256": "8593740b09c1fee6171d9e054220ed299febcdc4baef3384f1e1033720681fb6"
+            }
+          },
+          "expected_rejection": true,
+          "name": "terminal part gap",
+          "polarity": "negative",
+          "status": "reject"
+        },
+        {
+          "artifacts": {
+            "scratch_plan": {
+              "bytes": 20217,
+              "executable": false,
+              "mode": 436,
+              "path": "$P0951/review-controls-v1/mutated-binary-sha-plan.json",
+              "sha256": "46890e357184950a63ff084e0e6b96d2b21c8890fea19f32e2866bc57938c371"
+            },
+            "stderr": {
+              "bytes": 104,
+              "executable": false,
+              "mode": 436,
+              "path": "$P0951/review-controls-v1/0944-source-mutated-binary-reject.stderr",
+              "sha256": "624670e14a12e939bc99cec3ddc0e2fde0cef564ea3b76e784d101e7c2f297ee"
+            }
+          },
+          "expected_rejection": true,
+          "name": "mutated binary custody digest",
+          "polarity": "negative",
+          "status": "reject"
+        }
+      ],
+      "decision": {
+        "callgrind_scope": "Ir attribution inside the exact owner; lifecycle calls remain separate; immediate topology children may be partitioned, nested XML/writer/compression rows are diagnostics and are not summed.",
+        "current_xml_audit_scope": "The direct current audit_source_part_replacement_xml path is a post-raw diagnostic only. Do not use the retained 0944 wrapper row validate_source_part_replacement_xml as a claim for the current direct audit implementation, and do not make an XML attribution claim if the post-raw path is absent.",
+        "formal_child_launch": "permitted by this review after root authorization",
+        "native_claims": false,
+        "no_retry_or_replacement": true,
+        "portability": "No moved-packet/replay claim is made by this receipt; the frozen runner uses its bound absolute source/build/helper paths."
+      },
+      "known_limits": [
+        "The source-binary reuse receipt explicitly records one ignored root Cargo.lock exception; the full 10,790-file census and exact bytes/hashes pass.",
+        "The retained Callgrind adapter is hash-bound 0944 tooling. It is admitted for owner/lifecycle/raw conservation; current direct XML-audit attribution is a separate post-raw helper.",
+        "No latency, p99, allocation, RSS, speedup, adoption, or source-change conclusion is authorized by this diagnostic."
+      ],
+      "status": "GO"
+    },
+    "root_head_byte_equivalence": {
+      "committed_git_object_matches": 10789,
+      "current_head": "ce6f1fbea9902d533b97f6830994d4bc3fd497a1",
+      "declared_ignored_missing": [
+        "Cargo.lock"
+      ],
+      "head_tree_listing_sha256": "ee23d6be651bf20f8fd7da498f66b40a1d1a7490c940be23ae6232f392ae7f36",
+      "ignored_lock_binding": {
+        "bytes": 138443,
+        "candidate_manifest_sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061",
+        "candidate_source_copy_sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061",
+        "current_checkout_is_committed_git_object": false,
+        "current_checkout_sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061",
+        "gitignore_rule": ".gitignore:85:*.lock",
+        "path": "Cargo.lock"
+      },
+      "manifest_paths": 10790,
+      "matched_committed_bytes": 259963894,
+      "matched_committed_rows_digest": "3ad95a16870c2b70be2ce10e0c15dafd19772138bfff1683b7b91dfb056e144a",
+      "status": "pass_with_declared_ignored_lock_exception",
+      "strict_all_files_committed_match": false
+    },
+    "runner_preflight": {
+      "build": {
+        "authorization": {
+          "bytes": 1255,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0950/receipts/root-native-go-v1.json",
+          "sha256": "1e5c31997a7a8345e992bd56dc4c0d4d8f6051d267ff935c0c9e4d5a83417f99"
+        },
+        "binary": {
+          "bytes": 266090728,
+          "executable": true,
+          "mode": 509,
+          "path": "$P0950/target-candidate-native-v1/release/litchi-perf-baseline",
+          "sha256": "198c2e87471a088cf054a23785e4068eaf7f205ffb1fb25cad5ba0b7a6db5bec"
+        },
+        "freeze": {
+          "bytes": 5590,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0950/receipts/candidate-freeze-v1.json",
+          "sha256": "fe776b5c439f1c2c1dcf41bb5ad40336b71bf3896e19cf074943f142c23c3042"
+        },
+        "receipt": {
+          "bytes": 785,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0950/builds/candidate-native-v1/binary.json",
+          "sha256": "b5d9b869bc41209667893f999237992e3869eca37f705042c9efc85ed1c3de25"
+        },
+        "start": {
+          "bytes": 8437,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0950/builds/candidate-native-v1/start.json",
+          "sha256": "ec64f29f2a691f93fab224d11b125448da739fed5180c965f34e17a83cd0008f"
+        },
+        "status": "pass",
+        "terminal": {
+          "bytes": 8846,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0950/builds/candidate-native-v1/terminal.json",
+          "sha256": "1fbd465453f3e2b9658dbc1c48c1450e4557529593d24279dc7fab5943380387"
+        }
+      },
+      "helpers": {
+        "context": {
+          "bytes": 13613,
+          "sha256": "266cbbcf9441ae1e3b054409ec43dd5f1d05f9819f4aaeb01a7cfc2b0c14ca65"
+        },
+        "status": "pass",
+        "tools": 7,
+        "validators": 5
+      },
+      "markers": {
+        "binary": {
+          "bytes": 266090728,
+          "executable": true,
+          "mode": 509,
+          "path": "$P0950/target-candidate-native-v1/release/litchi-perf-baseline",
+          "sha256": "198c2e87471a088cf054a23785e4068eaf7f205ffb1fb25cad5ba0b7a6db5bec"
+        },
+        "status": "pass",
+        "symbols": {
+          "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates": 1,
+          "litchi_perf_baseline::run_xlsx_cell_values_edit_save": 1,
+          "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream": 4
+        }
+      },
+      "source": {
+        "bytes": 260102337,
+        "file_count": 10790,
+        "full_census": true,
+        "manifest": {
+          "bytes": 2037928,
+          "executable": false,
+          "mode": 436,
+          "path": "$P0950/candidate-source-manifest-v1.json",
+          "sha256": "5b16ef65a17f868a2d941355baed30dbbf9e338b817365c02bfb7133fedc80d4"
+        },
+        "root": "$P0950/candidate-source-v1",
+        "status": "pass"
+      },
+      "status": "pass"
+    }
+  },
+  "schema": "litchi.xlsx-publication-profile-reduction-0951.v1",
+  "scope": "Descriptive Callgrind Ir attribution for four source-backed primary publication children; no native latency/p99, allocation/RSS, speedup, adoption, or source-change conclusion.",
+  "status": "pass"
+}

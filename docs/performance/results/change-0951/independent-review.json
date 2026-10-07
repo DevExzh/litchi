@@ -1,0 +1,309 @@
+{
+  "checks": {
+    "all_checks_pass": true,
+    "child_count": 4,
+    "current_audit_calls_per_child": [
+      5,
+      5,
+      5,
+      5
+    ],
+    "current_audit_callsite_count_per_child": [
+      2,
+      2,
+      2,
+      2
+    ],
+    "current_audit_ir_per_child": [
+      27035195,
+      52052412,
+      52052790,
+      27035765
+    ],
+    "lifecycle_owner_count_per_child": 5,
+    "measured_owner_count_per_child": 1,
+    "no_retry_or_replacement_observed": true,
+    "serial_terminal_custody": true,
+    "terminal_success_count": 4
+  },
+  "claims": {
+    "allowed": [
+      "descriptive Callgrind Ir owner attribution",
+      "immediate topology-child disjoint partition",
+      "current direct audit incoming-edge diagnostic with all callsites retained"
+    ],
+    "current_audit_warning": "The earlier single-path current-audit output is not a total. The incoming-v2 outputs and this independent parse retain both callsites and five calls; nested paths remain overlapping diagnostics and are not summed.",
+    "excluded": [
+      "native latency/p50/p95/p99",
+      "native cycles",
+      "allocation/RSS",
+      "speedup/adoption",
+      "XML audit cost as a disjoint partition",
+      "source-change justification"
+    ]
+  },
+  "command": [
+    "python3",
+    "-B",
+    "/home/zhuhe/litchi-performance-0951/review/independent-review-0951-v1.py",
+    "--output",
+    "/home/zhuhe/litchi-performance-0951/review/independent-review-0951-v1.json"
+  ],
+  "findings": [
+    "Each measured owner has one measured incoming call and each child retains five lifecycle-owner calls.",
+    "Each measured topology function passes self plus immediate-child Ir conservation; nested rows remain non-summed diagnostics.",
+    "The direct current audit has two incoming callsites and five total calls in every measured dump. Independent edges and Ir totals match incoming-v2 outputs exactly.",
+    "The earlier single-path current-audit output is not a total; incoming-v2 and this audit are the authoritative all-incoming diagnostic.",
+    "No native latency, p99, allocation, RSS, speedup, adoption, or source-change claim is made."
+  ],
+  "flags": {
+    "event": "Ir",
+    "interpretation": "The logical CPU metadata and brk warning are retained as host/profiler diagnostics. They do not authorize native timing, memory, or adoption claims.",
+    "logical_cpus_available_reported": 1,
+    "taskset_cpu": "12",
+    "valgrind_version": "Valgrind-3.26.0"
+  },
+  "inputs": {
+    "binary": {
+      "bytes": 266090728,
+      "executable": true,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0950/target-candidate-native-v1/release/litchi-perf-baseline",
+      "sha256": "198c2e87471a088cf054a23785e4068eaf7f205ffb1fb25cad5ba0b7a6db5bec"
+    },
+    "current_audit_helper": {
+      "bytes": 10079,
+      "executable": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0951/tools/attribute_current_audit_0951_v1.py",
+      "sha256": "c885ba8bc434a611693b192866b487dec2b54667b4cc73a82a2dd05f3d3fffb0"
+    },
+    "first_child_admission": {
+      "bytes": 2385,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0951/first-child-admission.json",
+      "sha256": "9e857e068d487d9c3164715efbcc0db1df7e3c6530e002531795d7efc8dc870e"
+    },
+    "incoming_v2": [
+      {
+        "bytes": 14932,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0951/analysis/current-audit-00-incoming-v2.json",
+        "sha256": "87c435d592822e06920753e731e2741d3dd498fcd804f8b3395942b5099ef49f"
+      },
+      {
+        "bytes": 14976,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0951/analysis/current-audit-01-incoming-v2.json",
+        "sha256": "3a3aaa2054d50341a861798821b59caa6285f40618a2a0280307104224901744"
+      },
+      {
+        "bytes": 14978,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0951/analysis/current-audit-02-incoming-v2.json",
+        "sha256": "eda6cfe7ef7b9c582b32bf55d3ac8df23c9aa7663c5740e0fc9421c55682aa82"
+      },
+      {
+        "bytes": 14940,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0951/analysis/current-audit-03-incoming-v2.json",
+        "sha256": "9a246a377f0bb5d9e2aa9cabd31502b55897ffc040d48b438faff2a0a8151e87"
+      }
+    ],
+    "plan": {
+      "bytes": 14581,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0951/plan-0951-v1.json",
+      "sha256": "227322ea28ccadb206f00fee3efdc162db83e33431fbaa430d164b4e269b8bad"
+    },
+    "retained_reader": {
+      "bytes": 63017,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0944/docs/performance/results/change-0944/change-0845/reader_v2.py",
+      "sha256": "8a2f2fd71d7f0e67643793d9673805aacd0142be666928f4abb5e12cf57a2203"
+    },
+    "runner": {
+      "bytes": 25770,
+      "executable": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0951/tools/capture_0951_v1.py",
+      "sha256": "9c4ab50803150ecb8c05251ad6a484671878bbd60cbdd98148e166ee146a58da"
+    }
+  },
+  "profiler_warnings": {
+    "message": "Each child stderr contains one Valgrind Callgrind brk segment overflow warning; child terminal status remained rc0, numbered/terminal dump parsing and all conservation checks passed. This review makes no native memory or latency inference.",
+    "per_child": [
+      {
+        "index": 0,
+        "stderr": {
+          "bytes": 1045,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0951/capture/00-medium/stderr.txt",
+          "sha256": "8c6273866f1cb2b5d7ba1e6e3ba8eef59350719ad6c13d76b1271bc077d5e2f9"
+        },
+        "warning_lines": [
+          "==2775993== brk segment overflow in thread #1: can't grow to 0x77d9000",
+          "==2776152== Events    : Ir",
+          "==2776152== Collected : 131809122",
+          "==2775993== Events    : Ir",
+          "==2775993== Collected : 131809122"
+        ]
+      },
+      {
+        "index": 1,
+        "stderr": {
+          "bytes": 1057,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0951/capture/01-dense-sparse/stderr.txt",
+          "sha256": "1183415393d332997b48db6ec8d38ffff0cce2ddd8473ebf196a270efa55f947"
+        },
+        "warning_lines": [
+          "==2776496== brk segment overflow in thread #1: can't grow to 0x77a4000",
+          "==2776751== Events    : Ir",
+          "==2776751== Collected : 359576781",
+          "==2776496== Events    : Ir",
+          "==2776496== Collected : 359576781"
+        ]
+      },
+      {
+        "index": 2,
+        "stderr": {
+          "bytes": 1057,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0951/capture/02-dense-sparse/stderr.txt",
+          "sha256": "9757f2e374bec527fdb6887009260fb479f47bbfe480819bbaef8492e0f89d49"
+        },
+        "warning_lines": [
+          "==2776781== brk segment overflow in thread #1: can't grow to 0x77a4000",
+          "==2776985== Events    : Ir",
+          "==2776985== Collected : 359579757",
+          "==2776781== Events    : Ir",
+          "==2776781== Collected : 359579757"
+        ]
+      },
+      {
+        "index": 3,
+        "stderr": {
+          "bytes": 1045,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0951/capture/03-medium/stderr.txt",
+          "sha256": "8e42bedb71b6b82d84e67057c3c880649a372b5f5399e53f8a1f17fb70f900db"
+        },
+        "warning_lines": [
+          "==2777022== brk segment overflow in thread #1: can't grow to 0x77d9000",
+          "==2777171== Events    : Ir",
+          "==2777171== Collected : 131807918",
+          "==2777022== Events    : Ir",
+          "==2777022== Collected : 131807918"
+        ]
+      }
+    ],
+    "status": "warning_retained"
+  },
+  "review_output": {
+    "bytes": 8143,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0951/review/independent-review-0951-v1.json",
+    "sha256": "7c05e3aeeeddece95e27756a9819ea673ec0647549de8bf44ac41202a6ee2cd9"
+  },
+  "review_script": {
+    "bytes": 15441,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0951/review/independent-review-0951-v1.py",
+    "sha256": "9bb0bbef4b49d9d85965991c969430078a3dac2ede05bdd6cd01fef5f6ba2a18"
+  },
+  "reviewed_utc": "2026-10-07T07:58:41.048010+00:00",
+  "schema": "litchi.xlsx-publication-profile-independent-review-receipt-0951.v2",
+  "scope": "Independent offline audit after all four 0951 children reached terminal success; no workload/build/capture launched by this audit.",
+  "status": "pass",
+  "supersedes": {
+    "bytes": 7696,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0951/review/independent-review-receipt-v1.json",
+    "sha256": "6384eea689808bc33843b7f9e8fa31591e87cdb24f14a8b7963f6fd8568cf500"
+  },
+  "table": [
+    {
+      "current_audit_calls": 5,
+      "current_audit_callsite_lines": [
+        2904,
+        2911
+      ],
+      "current_audit_edges": 2,
+      "current_audit_ir": 27035195,
+      "current_audit_self_direct": 27035195,
+      "index": 0,
+      "measured_owner_ir": 70017755,
+      "multi_window_function_count": 3,
+      "repeat": 0,
+      "shape": "medium",
+      "start_utc": "2026-10-07T07:51:21.105866+00:00",
+      "terminal_utc": "2026-10-07T07:51:49.720714+00:00"
+    },
+    {
+      "current_audit_calls": 5,
+      "current_audit_callsite_lines": [
+        12370,
+        12377
+      ],
+      "current_audit_edges": 2,
+      "current_audit_ir": 52052412,
+      "current_audit_self_direct": 52052412,
+      "index": 1,
+      "measured_owner_ir": 123788788,
+      "multi_window_function_count": 3,
+      "repeat": 0,
+      "shape": "dense-sparse",
+      "start_utc": "2026-10-07T07:52:42.543427+00:00",
+      "terminal_utc": "2026-10-07T07:53:20.761582+00:00"
+    },
+    {
+      "current_audit_calls": 5,
+      "current_audit_callsite_lines": [
+        15257,
+        15264
+      ],
+      "current_audit_edges": 2,
+      "current_audit_ir": 52052790,
+      "current_audit_self_direct": 52052790,
+      "index": 2,
+      "measured_owner_ir": 123788193,
+      "multi_window_function_count": 3,
+      "repeat": 1,
+      "shape": "dense-sparse",
+      "start_utc": "2026-10-07T07:53:21.867902+00:00",
+      "terminal_utc": "2026-10-07T07:54:00.537378+00:00"
+    },
+    {
+      "current_audit_calls": 5,
+      "current_audit_callsite_lines": [
+        17768,
+        17775
+      ],
+      "current_audit_edges": 2,
+      "current_audit_ir": 27035765,
+      "current_audit_self_direct": 27035765,
+      "index": 3,
+      "measured_owner_ir": 70018237,
+      "multi_window_function_count": 3,
+      "repeat": 1,
+      "shape": "medium",
+      "start_utc": "2026-10-07T07:54:01.646794+00:00",
+      "terminal_utc": "2026-10-07T07:54:30.061634+00:00"
+    }
+  ]
+}

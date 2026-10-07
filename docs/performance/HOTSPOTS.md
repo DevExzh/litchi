@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## 0951 — preservation writing leads current publication instructions
+
+[0951](0951-xlsx-post-multi-window-publication-profile.md) refreshes attribution
+after 0950. Writing contributes 57.70–60.95% of publication Ir, and the nested
+source/replacement XML audit contributes 38.61–42.05%. Deflate longest-match
+search is the largest exclusive function. Both audit callsites and all five
+calls reconcile; nested audit/window costs are not additive. Investigate
+changed-member compression next, preserving compression/container contracts,
+unchanged-member passthrough, complete original auditing, and canonical
+fallback. Any candidate needs separate allocation and native qualification,
+including one-edit controls and the retained 0950 tail observation. No native
+speedup or compression-policy change is established by this diagnostic.
+
 ## 0950 — transient windows remove the multi-window allocation regression
 
 [0950](0950-xlsx-transient-multi-window-audit.md) adopts the bounded candidate

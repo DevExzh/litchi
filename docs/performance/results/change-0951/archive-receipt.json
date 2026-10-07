@@ -1,0 +1,58 @@
+{
+  "compressed_archive": {
+    "bytes": 459597,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0951-archive/archive-0951-v1.tar.zst",
+    "sha256": "66f5668e4d8299b1d21519bb83b7d6a2c04bb17e631c1b2cd047628fbc1c2aef"
+  },
+  "dependencies": {
+    "0944_archive": {
+      "copied": false,
+      "path": "/home/zhuhe/litchi-performance-0944-archive/litchi-performance-0944-v1.tar.zst",
+      "sha256": "3f43604846b87843bbc71fcd4c8f075d57219022a1c737c472973186e85fb592"
+    },
+    "0950_archive": {
+      "copied": false,
+      "path": "/home/zhuhe/litchi-performance-0950-archive/archive-0950-v1.tar.zst",
+      "sha256": "cee0b5d2c9e878ca577994d4a4f8e56032c1d119fe6e27ac3b3d8a8e51daa363"
+    }
+  },
+  "helper": {
+    "bytes": 5549,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0951-archive/archive-0951-v1.py",
+    "sha256": "860b48dac572619fc78a702eb4356f4c67015afda2236cb9c5565a7f666b9e76"
+  },
+  "manifest": {
+    "bytes": 28615,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0951-archive/manifest-v1.json",
+    "sha256": "aacca68cc6d39fe0df017c3e00c50e4eb12f5220e01a34a2d05c6267a9cdc6f8"
+  },
+  "packet_census": {
+    "directories": 0,
+    "entries": 126,
+    "excluded": [],
+    "logical_bytes": 4923164,
+    "symlinks": []
+  },
+  "regeneration": "python3 -B /home/zhuhe/litchi-performance-0951-archive/archive-0951-v1.py --packet /home/zhuhe/litchi-performance-0951 --archive-root /home/zhuhe/litchi-performance-0951-archive --seal --go",
+  "schema": "litchi.performance.0951.external-archive-receipt.v1",
+  "selection": {
+    "bytes": 5093,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0951-archive/selection-v1.list",
+    "sha256": "0c6b66d1fbcff6d463aa503ad8fd34a1cfd545f8354e72e7ff0542fc6ea49480"
+  },
+  "status": "sealed",
+  "uncompressed_tar": {
+    "bytes": 5150720,
+    "deleted_after_compression": true,
+    "path": "/home/zhuhe/litchi-performance-0951-archive/archive-0951-v1.tar",
+    "sha256": "37b8e66415dad673789d87b88f8327af7294edbc62c8328c6e907a33267f79a4"
+  }
+}

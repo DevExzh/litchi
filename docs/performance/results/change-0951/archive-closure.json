@@ -1,0 +1,248 @@
+{
+  "adapter_chain": {
+    "v4_parent_imported_by_v5": {
+      "bytes": 9580,
+      "executable": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0951-archive/replay_0951_v4.py",
+      "sha256": "81633d4e96076df63c7401e38ca986ba13d1e7e89abb708202402b263cae53ac"
+    },
+    "v4_parent_role": "path mapping and positive replay patch only; v5 does not call v4 negative_controls",
+    "v4_parent_sha256": "81633d4e96076df63c7401e38ca986ba13d1e7e89abb708202402b263cae53ac",
+    "v5": {
+      "bytes": 12847,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0951-archive/replay_0951_v5.py",
+      "sha256": "c4ea180e478ee04557fe25f218c607959a9b14fde8b42cf4aef4ac243649fbac"
+    }
+  },
+  "archive": {
+    "frozen_reducer_archive_entry": {
+      "bytes": 29192,
+      "path": "tools/reduce_0951_v1.py",
+      "sha256": "c4074267ec9f320671a34fc2ba31461173a68f1d1a3891e1f9b851d974cf6bc2"
+    },
+    "manifest": {
+      "bytes": 28615,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0951-archive/manifest-v1.json",
+      "sha256": "aacca68cc6d39fe0df017c3e00c50e4eb12f5220e01a34a2d05c6267a9cdc6f8"
+    },
+    "manifest_entry_count": 126,
+    "manifest_logical_bytes": 4923164,
+    "sealed_archive_unchanged": true,
+    "selection": {
+      "bytes": 5093,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0951-archive/selection-v1.list",
+      "sha256": "0c6b66d1fbcff6d463aa503ad8fd34a1cfd545f8354e72e7ff0542fc6ea49480"
+    },
+    "tar": {
+      "bytes": 459597,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0951-archive/archive-0951-v1.tar.zst",
+      "sha256": "66f5668e4d8299b1d21519bb83b7d6a2c04bb17e631c1b2cd047628fbc1c2aef"
+    }
+  },
+  "cleanup": {
+    "receipt": {
+      "bytes": 639,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0951-archive/replay-cleanup-receipt-v2.json",
+      "sha256": "c06b938fbdf7df6c3b2d825cbc28b84a25bca56eea4e75d8152445b185bd6b0f"
+    },
+    "scratch_removed": "/home/zhuhe/litchi-performance-0951-replay-v2",
+    "sealed_archive_and_original_packet_preserved": true,
+    "status": "pass; owned scratch removed after output copy, traces, controls, and manifest verification"
+  },
+  "dependencies_not_copied": {
+    "0944_archive": {
+      "path": "/home/zhuhe/litchi-performance-0944-archive/litchi-performance-0944-v1.tar.zst",
+      "sha256": "3f43604846b87843bbc71fcd4c8f075d57219022a1c737c472973186e85fb592"
+    },
+    "0944_manifest": {
+      "path": "/home/zhuhe/litchi-performance-0944-archive/litchi-performance-0944-v1.files.jsonl",
+      "sha256": "940eac1af1d7aae2e9d875b82d2428b025a94d46018d5fe22ee9a85c4f9bb3dd"
+    },
+    "0950_archive": {
+      "path": "/home/zhuhe/litchi-performance-0950-archive/archive-0950-v1.tar.zst",
+      "sha256": "cee0b5d2c9e878ca577994d4a4f8e56032c1d119fe6e27ac3b3d8a8e51daa363"
+    },
+    "0950_manifest": {
+      "path": "/home/zhuhe/litchi-performance-0950-archive/manifest-v1.json",
+      "sha256": "6efa98e164432849a31dd11485160afc4f5f94976a531542d3a03776ff3fd1ab"
+    },
+    "read_policy": "v5 maps only the extracted 0951 packet root; 0944/0950 remain explicitly bound external dependencies."
+  },
+  "extraction": {
+    "bytes": 1335,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0951-archive/extraction-verification-v2.json",
+    "sha256": "69c88c852b721f2f0f67520f131e8d7555eae25eed146cbe391f9c4d664b8b29"
+  },
+  "file_open_guards": {
+    "adapter-v5-negative-strace.log": {
+      "descriptor": {
+        "bytes": 685160,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0951-archive/replay-traces/adapter-v5-negative-strace.log",
+        "sha256": "338b13917b1cc8dd1530d6d728f5734f66def98fe0849fbb99c56ba79d45bace"
+      },
+      "historical_0951_path_occurrences": 0,
+      "scope": "file-open trace for adapter process; zero observed reads under original 0951 root"
+    },
+    "adapter-v5-strace.log": {
+      "descriptor": {
+        "bytes": 16719199,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0951-archive/replay-traces/adapter-v5-strace.log",
+        "sha256": "265871ae59151da03ac58174a8cd1c3212a11b2a7ac75099eb2347146162aa98"
+      },
+      "historical_0951_path_occurrences": 0,
+      "scope": "file-open trace for adapter process; zero observed reads under original 0951 root"
+    }
+  },
+  "frozen_reducer": {
+    "bytes": 29192,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0951/tools/reduce_0951_v1.py",
+    "sha256": "c4074267ec9f320671a34fc2ba31461173a68f1d1a3891e1f9b851d974cf6bc2"
+  },
+  "frozen_reducer_note": "The reducer is sealed inside the archived packet at tools/reduce_0951_v1.py; the descriptor path names the original packet for audit traceability.",
+  "historical_failures_preserved": [
+    {
+      "bytes": 1768,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0951-archive/replay-original-failure-v1.json",
+      "sha256": "41b2c258ead3bf7586cc906595f0e1b44610af6261d3a282ca97135b63a231e7"
+    },
+    {
+      "bytes": 1376,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0951-archive/replay-adapter-initial-failure-v1.json",
+      "sha256": "aa0ab1bceaf8ea0ba9cecfce77f37e9a72117ac6686a38d4cfd1ca7660715fde"
+    },
+    {
+      "bytes": 1446,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0951-archive/replay-adapter-initial-failure-v2.json",
+      "sha256": "16812dd9566448ea35c3d731ffd50626bb6b0c3873d64fd5635f196aa96b8419"
+    },
+    {
+      "bytes": 1443,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0951-archive/replay-adapter-initial-failure-v3.json",
+      "sha256": "006f01dbad37d4b2cb455f947571bddc36f40fcbd2b21b9d4e3d92196117cb6f"
+    }
+  ],
+  "negative_controls": {
+    "command": "python3 -B /home/zhuhe/litchi-performance-0951-archive/replay_0951_v5.py negative-controls --packet /home/zhuhe/litchi-performance-0951-replay-v2 --receipt /home/zhuhe/litchi-performance-0951-archive/replay-results/replay-negative-controls-v5.json",
+    "controls": {
+      "extra_artifact": {
+        "exception": "ReplayError",
+        "message": "manifest regular-file set differs",
+        "status": "rejected",
+        "validator": "verify_manifest"
+      },
+      "manifest_positive": {
+        "logical_bytes": 4923164,
+        "regular_files": 126,
+        "status": "pass",
+        "symlinks": [],
+        "validator": "verify_manifest"
+      },
+      "missing_artifact": {
+        "exception": "ReplayError",
+        "message": "manifest regular-file set differs",
+        "status": "rejected",
+        "validator": "verify_manifest"
+      },
+      "path_escape": {
+        "exception": "ReplayError",
+        "message": "unsafe manifest path: ../outside-control-artifact",
+        "status": "rejected",
+        "validator": "verify_manifest"
+      },
+      "symlink_artifact": {
+        "exception": "ReplayError",
+        "message": "manifest tree contains symlink(s): ['analysis/current-audit-00-incoming-v1.json']",
+        "status": "rejected",
+        "validator": "verify_manifest"
+      },
+      "tampered_argv": {
+        "exception": "ReplayError",
+        "message": "00-medium: captured argv differs",
+        "status": "rejected",
+        "validator": "reducer.verify_historical_argv"
+      },
+      "tampered_artifact_argv": {
+        "exception": "ReplayError",
+        "message": "00-medium: artifact argv differs",
+        "status": "rejected",
+        "validator": "reducer.verify_historical_argv"
+      },
+      "tampered_cwd": {
+        "exception": "ReplayError",
+        "message": "00-medium: cwd differs",
+        "status": "rejected",
+        "validator": "reducer.verify_historical_argv"
+      }
+    },
+    "receipt": {
+      "bytes": 2529,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0951-archive/replay-results/replay-negative-controls-v5.json",
+      "sha256": "b30b6045e175ab16ec48e2f93cb0fdef92be4e17f0bcb1a9857868ccad2f7316"
+    },
+    "schema": "litchi.performance.0951.portable-replay-adapter.v5.negative-controls",
+    "status": "pass",
+    "v4_superseded_flawed_receipt": {
+      "flaw": "v4 asserted mutations differed and checked path containment, but did not invoke a historical argv validator or manifest admission verifier; it is retained as failed historical evidence, not accepted control evidence.",
+      "receipt": {
+        "bytes": 397,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0951-archive/replay-results/replay-negative-controls-v4.json",
+        "sha256": "9c8444d4bfcacf0063eb3a36eab8e3b85bddce063269e79889c37635515d0a1c"
+      }
+    },
+    "validator_contract": "Every rejected case invoked the named validator and required ReplayError; mutation-only assertions are absent."
+  },
+  "positive_replay": {
+    "byte_identical_to_canonical": true,
+    "canonical": {
+      "bytes": 112004,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0951-archive/replay-results/replay-reduction-v1.json",
+      "sha256": "395bdaa7167bdb120e0850ef1c171168ac9439c013a58987a478a0abe6f9cb31"
+    },
+    "children": 4,
+    "command": "python3 -B /home/zhuhe/litchi-performance-0951-archive/replay_0951_v5.py all --packet /home/zhuhe/litchi-performance-0951-replay-v2 --output /home/zhuhe/litchi-performance-0951-replay-v2/replay-reduction-v2.json",
+    "relocated_v5": {
+      "bytes": 112004,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0951-archive/replay-results/replay-reduction-v2.json",
+      "sha256": "395bdaa7167bdb120e0850ef1c171168ac9439c013a58987a478a0abe6f9cb31"
+    },
+    "status": "pass"
+  },
+  "schema": "litchi.performance.0951.archive-replay-closure.v2",
+  "scope": "Offline relocated replay and custody controls only; no workload, benchmark, adoption, or production-source claim.",
+  "status": "replay_verified_cleanup_complete"
+}
