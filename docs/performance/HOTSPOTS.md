@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## 0963 — omission census narrows the readback opportunity
+
+[0963](0963-xlsx-readback-fusion-disposition.md) confirms 4/4/1 reduced-readback
+merges per medium-percent/dense-percent/one-edit iteration. A shared reader
+would retain full validation and merge work, saving only reduced copying and
+parsing while adding full-stream filtering. The diagnostic residual is 6.7184%
+of qualified stage period, not removable CPU or a speedup bound. Decline this
+implementation until specific removable work is isolated. Prior attribute-prefix
+and namespace-pass proposals also require their rejection history to be resolved.
+Focus the next current-source investigation on redundant work within source
+admission; do not promote the older 0587 producer-MCE ranking without checking
+later changes and actual route admission.
+
 ## 0962 — source admission and output validation dominate selected stage ancestry
 
 [0962](0962-xlsx-native-cpu-attribution.md) replaces allocation-traffic guesses

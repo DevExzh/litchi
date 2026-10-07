@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0963 — reduced-readback fusion declined before implementation
+
+[0963](0963-xlsx-readback-fusion-disposition.md) confirms reduced-readback routes
+in all three managed cases. Replaying the existing diagnostic packet leaves
+6.7184% of qualified stage period outside the nested validator but inside
+rewritten readback, including retained merge work. The proposed shared reader
+retains the validator and adds omission filtering; removable cost is not
+isolated sufficiently to justify implementation. No fresh workload or production
+change is claimed.
+
 ## 0962 — managed edit-stage CPU attribution qualifies
 
 [0962](0962-xlsx-native-cpu-attribution.md) qualifies a separate same-source

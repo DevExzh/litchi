@@ -1,0 +1,50 @@
+{
+  "children": [
+    {
+      "index": 0,
+      "period": 606440920,
+      "samples": 138,
+      "selected_period_fraction": 0.0726452729170078
+    },
+    {
+      "index": 1,
+      "period": 1064317903,
+      "samples": 242,
+      "selected_period_fraction": 0.06694664029637805
+    },
+    {
+      "index": 2,
+      "period": 114346544,
+      "samples": 26,
+      "selected_period_fraction": 0.052070704937683135
+    },
+    {
+      "index": 3,
+      "period": 87969571,
+      "samples": 20,
+      "selected_period_fraction": 0.04252406264363573
+    },
+    {
+      "index": 4,
+      "period": 1121482544,
+      "samples": 255,
+      "selected_period_fraction": 0.07012349811360546
+    },
+    {
+      "index": 5,
+      "period": 556306806,
+      "samples": 129,
+      "selected_period_fraction": 0.06663140561767457
+    }
+  ],
+  "input_bytes": 9820,
+  "input_sha256": "14fa5e02723da074f0cf06c494f2ff48e1389bb489e2f189fb09ad6ce08ea477",
+  "interpretation": "Rewritten readback excluding nested validator; includes retained merge and other work. Not removable cost, elapsed time, or a speedup bound.",
+  "pooled": {
+    "period": 3550864288,
+    "samples": 810,
+    "selected_period_fraction": 0.0671842283114959
+  },
+  "schema": "litchi.performance.0963.readback-residual.v1",
+  "scope": "0962 diagnostic-build qualified stage ancestry; no fresh workload"
+}
