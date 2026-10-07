@@ -1,0 +1,75 @@
+{
+  "checks": [
+    {
+      "mapping": "canonical-v1",
+      "name": "positive_protocol_plan_binding",
+      "status": "pass"
+    },
+    {
+      "error": "native.candidate_binary.sha256 changed",
+      "name": "candidate_binary_digest_mismatch",
+      "status": "pass"
+    },
+    {
+      "error": "source.candidate_freeze is pending",
+      "name": "missing_candidate_freeze",
+      "status": "pass"
+    },
+    {
+      "error": "host.receipt.sha256 changed",
+      "name": "host_receipt_digest_mismatch",
+      "status": "pass"
+    },
+    {
+      "error": "root_go.receipt.sha256 changed",
+      "name": "root_go_receipt_digest_mismatch",
+      "status": "pass"
+    },
+    {
+      "error": "native block order changed",
+      "name": "native_order_mutation",
+      "status": "pass"
+    },
+    {
+      "error": "helpers.capture.sha256 changed",
+      "name": "runner_digest_mismatch",
+      "status": "pass"
+    },
+    {
+      "error": "reducer helper binding differs",
+      "name": "reducer_digest_mismatch",
+      "status": "pass"
+    }
+  ],
+  "contract": {
+    "bytes": 2615,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0960/review/screening-plan-contract-v2.json",
+    "sha256": "6583785a0d3ada87af002be2b2e2189fbf81184af74318aa693fef4bee1dd3cd"
+  },
+  "plan_fixture": {
+    "bytes": 50420,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0960/plan-template-0960-v14.json",
+    "sha256": "5087cb88d04fc8e5d4216a2cacfe04de84780bc341091540794f6f34f9ed3b92"
+  },
+  "reducer": {
+    "bytes": 31267,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0960/tools/reduce_0960_v3.py",
+    "sha256": "7000e9094a9c8174907788dd8161b14b7f61210c74fe3930c43306a49c9852f2"
+  },
+  "runner": {
+    "bytes": 36205,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0960/tools/screen_0960_v7.py",
+    "sha256": "8f8b9a8bb83905dafcc109f6b113a3db9ae98420d86f031ba761482b74721238"
+  },
+  "schema": "litchi.performance.0960.screening-controls.v3",
+  "scope": "protocol-plan canonicalization and binding controls only; no workload or build",
+  "status": "passed"
+}

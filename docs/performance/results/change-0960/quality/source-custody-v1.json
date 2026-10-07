@@ -1,0 +1,96 @@
+{
+  "checkout": {
+    "candidate_mechanism_selected": false,
+    "checkout_mutated": false,
+    "expected_head": "a6223afa0899d5800d21ed9dc6c49304fbb2e8ca",
+    "head": "a6223afa0899d5800d21ed9dc6c49304fbb2e8ca",
+    "path": "/home/zhuhe/code/litchi",
+    "status_before_snapshot": [
+      " M tools/check_iwork_leaf_public_api.py",
+      "?? crates/litchi/examples/bench_word_parse.rs",
+      "?? docs/UNIFIED_OPS_API_DESIGN.md"
+    ],
+    "unrelated_wip_preserved": true
+  },
+  "created_utc": "2026-10-07T15:33:29.467094+00:00",
+  "export": {
+    "archive_directories": 1800,
+    "archive_files": 10932,
+    "archive_hardlinks": 0,
+    "archive_members": 12732,
+    "archive_source_bytes": 273429543,
+    "archive_symlinks": 0,
+    "command": [
+      "git",
+      "-C",
+      "/home/zhuhe/code/litchi",
+      "archive",
+      "--format=tar",
+      "a6223afa0899d5800d21ed9dc6c49304fbb2e8ca",
+      "--",
+      ".",
+      ":(exclude)docs/performance/**",
+      ":(exclude)docs/report/**"
+    ],
+    "excluded_prefixes": [
+      "docs/performance/",
+      "docs/report/"
+    ],
+    "excluded_tracked_bytes": 5884410265,
+    "excluded_tracked_file_count": 443298,
+    "included_file_count": 10932,
+    "included_source_bytes": 273429543,
+    "tracked_head_bytes": 6157839808,
+    "tracked_head_file_count": 454230,
+    "tracked_head_only": true
+  },
+  "no_build": true,
+  "no_commit": true,
+  "no_workload": true,
+  "normative_inputs": {
+    "goal_and_adr_files_included_if_tracked_and_outside_excluded_prefixes": true,
+    "root_start": {
+      "bytes": 6581,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/root-start-v1.json",
+      "sha256": "4728b66490351a50b01a71d0a819e9cdbac9cb39d0a76a0587a1636e40f8018d"
+    }
+  },
+  "reuse_0957_binary_status": {
+    "reason": "No binary reuse is claimed at source-custody stage. Eligibility requires a later full relevant runtime-source equality proof against retained 0957 source/build closure; no builds or workloads were run.",
+    "retained_0957_binary_root": "/home/zhuhe/litchi-performance-0957/executables",
+    "source_comparison_pending": true,
+    "status": "not_yet_eligible"
+  },
+  "schema": "litchi.performance.0960.source-custody.v1",
+  "snapshots": {
+    "baseline": {
+      "bytes": 273429543,
+      "file_count": 10932,
+      "manifest": {
+        "bytes": 2561452,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0960/source-manifest-baseline-v1.json",
+        "sha256": "c7fd9c810d77b1e0e90b321dd74b3841b621f001cac15f9222124054f0035d03"
+      },
+      "root": "/home/zhuhe/litchi-performance-0960/source-baseline-v1",
+      "symlink_count": 0
+    },
+    "baseline_candidate_content_equal": true,
+    "baseline_candidate_manifest_equal": true,
+    "candidate": {
+      "bytes": 273429543,
+      "file_count": 10932,
+      "manifest": {
+        "bytes": 2561523,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0960/source-manifest-candidate-v1.json",
+        "sha256": "ca6a6a938890bb7cf0b368025aaf45f045b16d7552402e466bf3c772c3e898ea"
+      },
+      "root": "/home/zhuhe/litchi-performance-0960/source-candidate-v1",
+      "symlink_count": 0
+    },
+    "candidate_overlay_paths": []
+  },
+  "status": "prepared_external_snapshots_only"
+}

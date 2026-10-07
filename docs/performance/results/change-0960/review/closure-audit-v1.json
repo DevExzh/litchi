@@ -1,0 +1,13 @@
+{
+  "schema": "litchi.performance.0960.closure-audit.v1",
+  "command": "python3 -B docs/performance/results/change-0960/epoch2/review/audit_epoch2_raw_v2.py /tmp/litchi-performance-0960-epoch2 --output /tmp/litchi-0960-closure-audit.json",
+  "exit_code": 0,
+  "status": "passed",
+  "decision": "reject_screen",
+  "mismatch_count": 0,
+  "children": 54,
+  "replay_sha256": "7329adea6e19745f925a18cdb07c1d4fb2079def4e87407afe420f00f1914512",
+  "byte_identical_to": "docs/performance/results/change-0960/epoch2/review/independent-raw-audit-v1.json",
+  "workload_launched": false,
+  "temporary_replay_removed": true
+}

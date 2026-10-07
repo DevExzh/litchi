@@ -1,0 +1,24 @@
+{
+  "status": "passed",
+  "scope": "Both actual authorized capture preflight and reducer final-plan bindings; no Popen or workload.",
+  "plan_sha256": "a9c0db61ae9dd48c349d3c264c140d6126c35979c32cecc1f671ded8bb2b176d",
+  "capture_helper_sha256": "8f8b9a8bb83905dafcc109f6b113a3db9ae98420d86f031ba761482b74721238",
+  "reducer_helper_sha256": "7000e9094a9c8174907788dd8161b14b7f61210c74fe3930c43306a49c9852f2",
+  "canonical_mapping": "canonical-v1",
+  "native_children": 36,
+  "allocator_children": 18,
+  "root_selection_rule_bound": {
+    "path": "/home/zhuhe/litchi-performance-0960/review/root-screening-rule-v2.json",
+    "bytes": 1708,
+    "sha256": "2adeb002f4d7d999771d26d743ce29eccb6f2fc8d2226de68aa2cb2ae6afc7a7",
+    "mode": 436,
+    "executable": false
+  },
+  "root_selector_bound": {
+    "path": "/home/zhuhe/litchi-performance-0960/tools/select_screen_0960_v1.py",
+    "bytes": 3037,
+    "sha256": "3a22623881d373907ce9a0843864179f7a5864707b0471a0f2bb6374f1ef8de7",
+    "mode": 436,
+    "executable": false
+  }
+}

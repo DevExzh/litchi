@@ -1,0 +1,577 @@
+--- /home/zhuhe/litchi-performance-0960/source-baseline-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs	2026-10-07 15:33:26.300960216 +0000
++++ /home/zhuhe/litchi-performance-0960/source-candidate-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs	2026-10-07 16:01:39.697993297 +0000
+@@ -1621,6 +1621,80 @@
+     }
+ }
+ 
++/// Opportunistically pre-size the ordinary parser's raw-cell vector from the
++/// exact count produced by the strict worksheet lane.
++///
++/// The shared observer route still owns validation, parser transitions and
++/// every cell's fallible reservation. This helper only supplies capacity: a
++/// declined recognition, an over-cap summary, or a failed hint reservation is
++/// ignored, and [`Parser::finish_cell`] remains authoritative.
++fn reserve_strict_lane_cells<'c>(content: &[u8], cells: &mut Vec<RawCell<'c>>, entry: lane::Entry) {
++    #[cfg(test)]
++    strict_lane_hint_route::note_attempt();
++
++    // Keep the extra recognizer work within the same source bound as the
++    // shared traversal. The caller normally checked this at admission, but
++    // the private codec entry is also exercised directly by differential
++    // tests.
++    if content.len() > super::MAX_SHARED_SOURCE_BYTES {
++        #[cfg(test)]
++        strict_lane_hint_route::note_cap_decline();
++        return;
++    }
++    let Ok(name) = entry.name(content) else {
++        #[cfg(test)]
++        strict_lane_hint_route::note_decline();
++        return;
++    };
++    let Some(summary) = lane::recognize(content, entry.position, name) else {
++        #[cfg(test)]
++        strict_lane_hint_route::note_decline();
++        return;
++    };
++    // The event cap is the resource bound for the shared provisional parser;
++    // do not reserve from a summary that the ordinary route would never
++    // finish provisionally. `cells` is bounded separately so the subtraction
++    // below cannot turn a malformed count into an unbounded request.
++    if summary.events > super::MAX_SHARED_PROVISIONAL_EVENTS
++        || summary.cells > super::MAX_SHARED_PROVISIONAL_EVENTS
++    {
++        #[cfg(test)]
++        strict_lane_hint_route::note_cap_decline();
++        return;
++    }
++    let Some(additional) = summary.cells.checked_sub(cells.len()) else {
++        #[cfg(test)]
++        strict_lane_hint_route::note_decline();
++        return;
++    };
++    #[cfg(test)]
++    strict_lane_hint_route::note_admitted(additional);
++    if additional == 0 {
++        return;
++    }
++    #[cfg(test)]
++    let forced_failure = strict_lane_hint_route::take_forced_reserve_failure();
++    #[cfg(not(test))]
++    let forced_failure = false;
++    if forced_failure {
++        #[cfg(test)]
++        strict_lane_hint_route::note_reserve_failed();
++    } else {
++        match cells.try_reserve_exact(additional) {
++            Ok(()) => {
++                #[cfg(test)]
++                strict_lane_hint_route::note_reserve_succeeded();
++            },
++            Err(_) => {
++                // This is only a hint. Keep the existing per-cell fallible
++                // reservation and its typed error as the allocation boundary.
++                #[cfg(test)]
++                strict_lane_hint_route::note_reserve_failed();
++            },
++        }
++    }
++}
++
+ /// Traverse one eligible source with the ordinary parser while giving a
+ /// caller-owned validator a borrowed view of each event first.
+ ///
+@@ -1650,6 +1724,10 @@
+     let mut stack = Vec::new();
+     let mut closed_root = false;
+     let mut event_count = 0usize;
++    // The first valid worksheet `<sheetData>` is the only body whose strict
++    // summary can supply this parser's raw-cell capacity. A duplicate or
++    // nested spelling must never trigger another source scan.
++    let mut strict_lane_hint_attempted = false;
+     // A source that mentions the MCE namespace is rewritten by the
+     // authoritative path before it is parsed. The traversal parses the source
+     // instead, so it carries the proof that the two agree.
+@@ -1659,16 +1737,36 @@
+     };
+ 
+     loop {
+-        let Some(event_start) = origin.offset(reader.buffer_position()) else {
++        let reader_event_start = reader.buffer_position();
++        let Some(event_start) = origin.offset(reader_event_start) else {
+             return super::SourceParseAttempt::ProvisionalFailed;
+         };
+         let event = match reader.read_event() {
+             Ok(event) => event,
+             Err(_) => return super::SourceParseAttempt::ReaderFailed,
+         };
+-        let Some(event_end) = origin.offset(reader.buffer_position()) else {
++        let reader_event_end = reader.buffer_position();
++        let Some(event_end) = origin.offset(reader_event_end) else {
+             return super::SourceParseAttempt::ProvisionalFailed;
+         };
++        // Keep the entry while the event still owns its `BytesStart`. The
++        // observer runs first, and the ordinary transition below remains the
++        // authority for root, namespace and duplicate-sheetData validation.
++        let strict_lane_entry = if strict_lane_hint_attempted {
++            None
++        } else {
++            match &event {
++                Event::Start(element) if element.local_name().as_ref() == b"sheetData" => {
++                    lane::Entry::locate(
++                        content,
++                        reader_event_start,
++                        element.name().as_ref(),
++                        reader_event_end,
++                    )
++                },
++                _ => None,
++            }
++        };
+         let event_limit_exceeded = match event_count.checked_add(1) {
+             Some(count) => {
+                 event_count = count;
+@@ -1707,6 +1805,14 @@
+             Ok(complete) => complete,
+             Err(_) => return super::SourceParseAttempt::ProvisionalFailed,
+         };
++        if !strict_lane_hint_attempted
++            && let Some(entry) = strict_lane_entry
++            && stack.last() == Some(&Context::SheetData)
++            && lane::children_are_spreadsheetml(resolver)
++        {
++            strict_lane_hint_attempted = true;
++            reserve_strict_lane_cells(content, &mut parser.cells, entry);
++        }
+         if complete {
+             break;
+         }
+@@ -1714,3 +1820,428 @@
+ 
+     super::SourceParseAttempt::Complete(parser.finish_parse(strings))
+ }
++
++#[cfg(test)]
++mod strict_lane_hint_route {
++    use std::cell::Cell;
++
++    #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
++    pub(super) struct Stats {
++        pub(super) attempts: usize,
++        pub(super) admitted: usize,
++        pub(super) declined: usize,
++        pub(super) cap_declines: usize,
++        pub(super) reserved_cells: usize,
++        pub(super) reserve_succeeded: usize,
++        pub(super) reserve_failed: usize,
++    }
++
++    thread_local! {
++        static STATS: Cell<Stats> = const { Cell::new(Stats {
++            attempts: 0,
++            admitted: 0,
++            declined: 0,
++            cap_declines: 0,
++            reserved_cells: 0,
++            reserve_succeeded: 0,
++            reserve_failed: 0,
++        }) };
++        static FORCE_RESERVE_FAILURE: Cell<bool> = const { Cell::new(false) };
++    }
++
++    pub(super) fn reset() {
++        STATS.with(|stats| stats.set(Stats::default()));
++        FORCE_RESERVE_FAILURE.with(|failure| failure.set(false));
++    }
++
++    pub(super) fn stats() -> Stats {
++        STATS.with(Cell::get)
++    }
++
++    pub(super) fn note_attempt() {
++        STATS.with(|stats| {
++            let mut value = stats.get();
++            value.attempts += 1;
++            stats.set(value);
++        });
++    }
++
++    pub(super) fn note_admitted(additional: usize) {
++        STATS.with(|stats| {
++            let mut value = stats.get();
++            value.admitted += 1;
++            value.reserved_cells = value.reserved_cells.saturating_add(additional);
++            stats.set(value);
++        });
++    }
++
++    pub(super) fn force_reserve_failure() {
++        FORCE_RESERVE_FAILURE.with(|failure| failure.set(true));
++    }
++
++    pub(super) fn take_forced_reserve_failure() -> bool {
++        FORCE_RESERVE_FAILURE.with(|failure| failure.replace(false))
++    }
++
++    pub(super) fn note_decline() {
++        STATS.with(|stats| {
++            let mut value = stats.get();
++            value.declined += 1;
++            stats.set(value);
++        });
++    }
++
++    pub(super) fn note_cap_decline() {
++        STATS.with(|stats| {
++            let mut value = stats.get();
++            value.cap_declines += 1;
++            stats.set(value);
++        });
++    }
++
++    pub(super) fn note_reserve_succeeded() {
++        STATS.with(|stats| {
++            let mut value = stats.get();
++            value.reserve_succeeded += 1;
++            stats.set(value);
++        });
++    }
++
++    pub(super) fn note_reserve_failed() {
++        STATS.with(|stats| {
++            let mut value = stats.get();
++            value.reserve_failed += 1;
++            stats.set(value);
++        });
++    }
++}
++
++#[cfg(test)]
++mod strict_lane_hint_tests {
++    use super::strict_lane_hint_route as route;
++    use super::*;
++    use quick_xml::events::Event;
++    use std::fmt::Write as _;
++
++    const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
++
++    fn worksheet(body: &str) -> Vec<u8> {
++        format!("<worksheet xmlns=\"{SML}\"><sheetData>{body}</sheetData></worksheet>").into_bytes()
++    }
++
++    fn authoritative(content: &[u8]) -> Result<Store> {
++        crate::raw::worksheet::parse_refusing_repairs(content, || Ok(None))
++    }
++
++    fn shared(content: &[u8]) -> crate::raw::worksheet::SourceParseAttempt {
++        crate::raw::worksheet::parse_source_with_observer(
++            content,
++            crate::raw::worksheet::SourceAdmission::Borrowed,
++            || Ok(None),
++            |_, _, _| true,
++        )
++    }
++
++    fn recovered(content: &[u8]) -> Result<Store> {
++        match shared(content) {
++            crate::raw::worksheet::SourceParseAttempt::Complete(parsed) => {
++                crate::raw::worksheet::complete_source_parse(content, parsed)
++            },
++            crate::raw::worksheet::SourceParseAttempt::ProvisionalFailed
++            | crate::raw::worksheet::SourceParseAttempt::ReaderFailed => authoritative(content),
++        }
++    }
++
++    fn assert_differential(name: &str, content: &[u8]) {
++        let expected = authoritative(content);
++        let actual = recovered(content);
++        match (&expected, &actual) {
++            (Ok(expected), Ok(actual)) => {
++                assert_eq!(format!("{expected:?}"), format!("{actual:?}"), "{name}");
++            },
++            (Err(expected), Err(actual)) => {
++                assert_eq!(expected.to_string(), actual.to_string(), "{name}");
++            },
++            _ => panic!("{name}: shared route differs: {expected:?} vs {actual:?}"),
++        }
++    }
++
++    #[test]
++    fn admitted_hint_runs_after_observer_and_matches_authority() {
++        let content = worksheet(
++            "<row r=\"1\"><c r=\"A1\"><v>1</v></c><c r=\"B1\"/></row>\n\
++             <row r=\"2\"><c r=\"A2\"><v>2</v></c></row>",
++        );
++        route::reset();
++        let mut saw_sheet_data = false;
++        let attempt = crate::raw::worksheet::parse_source_with_observer(
++            &content,
++            crate::raw::worksheet::SourceAdmission::Borrowed,
++            || Ok(None),
++            |_, event, _| {
++                if matches!(event, Event::Start(element) if element.local_name().as_ref() == b"sheetData")
++                {
++                    // The observer is the first consumer of the event. The
++                    // hint cannot run until this callback and transition have
++                    // both accepted it.
++                    assert_eq!(route::stats().attempts, 0);
++                    saw_sheet_data = true;
++                }
++                true
++            },
++        );
++        assert!(saw_sheet_data);
++        assert!(matches!(
++            attempt,
++            crate::raw::worksheet::SourceParseAttempt::Complete(Ok(_))
++        ));
++        let stats = route::stats();
++        assert_eq!(stats.attempts, 1);
++        assert_eq!(stats.admitted, 1);
++        assert_eq!(stats.declined, 0);
++        assert_eq!(stats.cap_declines, 0);
++        assert_eq!(stats.reserved_cells, 3);
++        assert_eq!(stats.reserve_succeeded, 1);
++        assert_eq!(stats.reserve_failed, 0);
++        assert_differential("admitted strict body", &content);
++
++        // Entry::locate receives quick-xml's raw reader positions and applies
++        // the document's BOM offset itself. Keep this route covered because
++        // the observer's public spans intentionally use document offsets.
++        let mut marked = b"\xEF\xBB\xBF".to_vec();
++        marked.extend_from_slice(&content);
++        route::reset();
++        let attempt = shared(&marked);
++        assert!(matches!(
++            attempt,
++            crate::raw::worksheet::SourceParseAttempt::Complete(Ok(_))
++        ));
++        let stats = route::stats();
++        assert_eq!(stats.attempts, 1);
++        assert_eq!(stats.admitted, 1);
++        assert_eq!(stats.reserved_cells, 3);
++        assert_eq!(stats.reserve_succeeded, 1);
++        assert_differential("BOM strict body", &marked);
++    }
++
++    #[test]
++    fn failed_hint_reservation_keeps_authoritative_growth_and_result() {
++        let content = worksheet("<row r=\"1\"><c r=\"A1\"/><c r=\"B1\"/></row>");
++        route::reset();
++        let expected = authoritative(&content);
++        route::force_reserve_failure();
++        let actual = recovered(&content);
++        let stats = route::stats();
++        assert_eq!(stats.attempts, 1);
++        assert_eq!(stats.admitted, 1);
++        assert_eq!(stats.reserved_cells, 2);
++        assert_eq!(stats.reserve_succeeded, 0);
++        assert_eq!(stats.reserve_failed, 1);
++        match (&expected, &actual) {
++            (Ok(expected), Ok(actual)) => {
++                assert_eq!(format!("{expected:?}"), format!("{actual:?}"));
++            },
++            (Err(expected), Err(actual)) => {
++                assert_eq!(expected.to_string(), actual.to_string());
++            },
++            _ => panic!("forced hint failure changed the parse result"),
++        }
++    }
++
++    #[test]
++    fn strict_lane_declines_non_strict_bodies_without_changing_results() {
++        let cases = [
++            (
++                "formula",
++                worksheet(
++                    "<row r=\"1\"><c r=\"A1\"><f>A1+1</f><v>2</v></c></row>",
++                ),
++            ),
++            (
++                "inline string",
++                worksheet(
++                    "<row r=\"1\"><c r=\"A1\" t=\"inlineStr\"><is><t>x</t></is></c></row>",
++                ),
++            ),
++            (
++                "entity value",
++                worksheet("<row r=\"1\"><c r=\"A1\"><v>&amp;</v></c></row>"),
++            ),
++            (
++                "comment",
++                worksheet("<!-- note --><row r=\"1\"><c r=\"A1\"/></row>"),
++            ),
++            (
++                "prefixed row",
++                format!(
++                    "<worksheet xmlns=\"{SML}\" xmlns:x=\"{SML}\"><sheetData><x:row r=\"1\"><x:c r=\"A1\"/></x:row></sheetData></worksheet>"
++                )
++                .into_bytes(),
++            ),
++        ];
++        for (name, content) in cases {
++            route::reset();
++            assert_differential(name, &content);
++            let stats = route::stats();
++            assert_eq!(stats.attempts, 1, "{name}");
++            assert_eq!(stats.admitted, 0, "{name}");
++            assert_eq!(stats.declined, 1, "{name}");
++            assert_eq!(stats.cap_declines, 0, "{name}");
++        }
++    }
++
++    #[test]
++    fn observer_refusal_precedes_parser_and_hint() {
++        let content = worksheet("<row r=\"1\"><c r=\"A1\"/></row>");
++        route::reset();
++        let attempt = crate::raw::worksheet::parse_source_with_observer(
++            &content,
++            crate::raw::worksheet::SourceAdmission::Borrowed,
++            || Ok(None),
++            |_, event, _| !matches!(event, Event::Start(element) if element.local_name().as_ref() == b"sheetData"),
++        );
++        assert!(matches!(
++            attempt,
++            crate::raw::worksheet::SourceParseAttempt::ProvisionalFailed
++        ));
++        assert_eq!(route::stats(), route::Stats::default());
++        assert!(authoritative(&content).is_ok());
++    }
++
++    #[test]
++    fn malformed_tail_after_admission_falls_back_exactly_once() {
++        let content = format!(
++            "<worksheet xmlns=\"{SML}\"><sheetData><row r=\"1\"><c r=\"A1\"/></row></sheetData><bad>"
++        )
++        .into_bytes();
++        route::reset();
++        let attempt = shared(&content);
++        assert!(matches!(
++            attempt,
++            crate::raw::worksheet::SourceParseAttempt::ProvisionalFailed
++                | crate::raw::worksheet::SourceParseAttempt::ReaderFailed
++        ));
++        let stats = route::stats();
++        assert_eq!(stats.attempts, 1);
++        assert_eq!(stats.admitted, 1);
++        assert_differential("malformed tail", &content);
++    }
++
++    #[test]
++    fn duplicate_sheet_data_does_not_trigger_a_second_hint_scan() {
++        let body = "<row r=\"1\"><c r=\"A1\"/></row>";
++        let content = format!(
++            "<worksheet xmlns=\"{SML}\"><sheetData>{body}</sheetData><sheetData>{body}</sheetData></worksheet>"
++        )
++        .into_bytes();
++        route::reset();
++        let attempt = shared(&content);
++        assert!(matches!(
++            attempt,
++            crate::raw::worksheet::SourceParseAttempt::ProvisionalFailed
++        ));
++        assert_eq!(route::stats().attempts, 1);
++        assert_differential("duplicate sheetData", &content);
++    }
++
++    #[test]
++    fn event_cap_declines_hint_and_uses_authoritative_fallback() {
++        let rows = crate::raw::worksheet::MAX_SHARED_PROVISIONAL_EVENTS / 3 + 1;
++        let mut body = String::new();
++        for row in 1..=rows {
++            write!(body, "<row r=\"{row}\"><c r=\"A{row}\"/></row>")
++                .expect("write generated worksheet");
++        }
++        let content = worksheet(&body);
++        route::reset();
++        // Call the codec entry directly so the recognizer's cap decision is
++        // observable; the public wrapper may decline the same source earlier
++        // using its conservative event bound.
++        let attempt = parse_source_with_observer(
++            &content,
++            crate::raw::worksheet::SourceAdmission::Borrowed,
++            || Ok(None),
++            |_, _, _| true,
++            crate::raw::worksheet::Repairs::Refuse,
++        );
++        assert!(matches!(
++            attempt,
++            crate::raw::worksheet::SourceParseAttempt::ProvisionalFailed
++        ));
++        let stats = route::stats();
++        assert_eq!(stats.attempts, 1);
++        assert_eq!(stats.admitted, 0);
++        assert_eq!(stats.cap_declines, 1);
++        assert_differential("event cap", &content);
++    }
++
++    #[test]
++    #[ignore = "requires external managed worksheet XML route-census input"]
++    fn managed_fixture_route_census_requires_explicit_external_input() {
++        let root = std::env::var_os("LITCHI_0960_ROUTE_CENSUS_DIR")
++            .expect("LITCHI_0960_ROUTE_CENSUS_DIR must name extracted worksheet XML");
++        let root = std::path::PathBuf::from(root);
++        let manifest = std::fs::read_to_string(root.join("manifest.txt"))
++            .expect("route-census manifest must be readable");
++        let entries = manifest
++            .lines()
++            .filter(|line| !line.trim().is_empty())
++            .collect::<Vec<_>>();
++        assert!(
++            !entries.is_empty(),
++            "route-census manifest must list worksheets"
++        );
++
++        let mut total = route::Stats::default();
++        for relative in &entries {
++            let path = root.join(relative);
++            let content = std::fs::read(&path).expect("route-census worksheet must be readable");
++            route::reset();
++            let outcome = shared(&content);
++            let stats = route::stats();
++            assert!(
++                stats.attempts <= 1,
++                "{} scanned more than once",
++                path.display()
++            );
++            println!(
++                "ROUTE_CENSUS path={} bytes={} complete={} attempts={} admitted={} declined={} cap_declines={} reserved_cells={} reserve_succeeded={} reserve_failed={}",
++                path.display(),
++                content.len(),
++                matches!(
++                    outcome,
++                    crate::raw::worksheet::SourceParseAttempt::Complete(_)
++                ),
++                stats.attempts,
++                stats.admitted,
++                stats.declined,
++                stats.cap_declines,
++                stats.reserved_cells,
++                stats.reserve_succeeded,
++                stats.reserve_failed,
++            );
++            total.attempts += stats.attempts;
++            total.admitted += stats.admitted;
++            total.declined += stats.declined;
++            total.cap_declines += stats.cap_declines;
++            total.reserved_cells += stats.reserved_cells;
++            total.reserve_succeeded += stats.reserve_succeeded;
++            total.reserve_failed += stats.reserve_failed;
++        }
++        println!(
++            "ROUTE_CENSUS_TOTAL files={} attempts={} admitted={} declined={} cap_declines={} reserved_cells={} reserve_succeeded={} reserve_failed={}",
++            entries.len(),
++            total.attempts,
++            total.admitted,
++            total.declined,
++            total.cap_declines,
++            total.reserved_cells,
++            total.reserve_succeeded,
++            total.reserve_failed,
++        );
++        assert!(
++            total.attempts > 0,
++            "managed fixtures reached no sheetData hint"
++        );
++    }
++}

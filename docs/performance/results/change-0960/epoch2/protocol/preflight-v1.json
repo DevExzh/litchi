@@ -1,0 +1,20 @@
+{
+  "status": "passed",
+  "runner_actual_capture_preflight": true,
+  "reducer_actual_plan_bindings": true,
+  "plan": {
+    "path": "/tmp/litchi-performance-0960-epoch2/plan-final-v1.json",
+    "bytes": 55801,
+    "mode": 436,
+    "executable": false,
+    "sha256": "374b2072226736d70af2486ceb67c9b6ab83f8517460a2a571f208096b015628"
+  },
+  "capture_cpus_allowed": true,
+  "source_revalidation": {
+    "path": "/tmp/litchi-performance-0960-epoch2/source-revalidation-v1.json",
+    "bytes": 466,
+    "mode": 436,
+    "executable": false,
+    "sha256": "f687116c91dd807905a040759251d1f66f865b5ba6e0a134584a55f4165d6afa"
+  }
+}

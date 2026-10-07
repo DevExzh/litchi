@@ -1,0 +1,37 @@
+{
+  "checks": [
+    {
+      "actions": [
+        "SIGTERM"
+      ],
+      "calls": [
+        [
+          44000,
+          0
+        ],
+        [
+          44000,
+          15
+        ],
+        [
+          44000,
+          0
+        ],
+        [
+          44000,
+          0
+        ]
+      ],
+      "name": "reaped_parent_live_group_uses_pid_as_pgid",
+      "process_group_clear": true,
+      "status": "pass"
+    }
+  ],
+  "runner": {
+    "path": "/home/zhuhe/litchi-performance-0960/tools/screen_0960_v7.py",
+    "sha256": "8f8b9a8bb83905dafcc109f6b113a3db9ae98420d86f031ba761482b74721238"
+  },
+  "schema": "litchi.performance.0960.runner-lifecycle-controls.v1",
+  "scope": "offline mocked cleanup only; parent is already reaped while a descendant remains in its start_new_session group",
+  "status": "passed"
+}

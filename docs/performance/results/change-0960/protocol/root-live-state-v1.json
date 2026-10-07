@@ -1,0 +1,11 @@
+{
+  "status": "native_capture_running",
+  "session_id": 57382,
+  "plan": "/home/zhuhe/litchi-performance-0960/plan-final-v1.json",
+  "runner": "/home/zhuhe/litchi-performance-0960/tools/screen_0960_v7.py",
+  "native_packet": "/home/zhuhe/litchi-performance-0960/capture-native-v1",
+  "allocator_packet": "/home/zhuhe/litchi-performance-0960/capture-allocator-v1",
+  "allocator_started": false,
+  "no_overlapping_builds_profiles": true,
+  "next": "Wait same live native handle terminal, launch allocator once if rc0, then reduce3 and selector1 rule2."
+}

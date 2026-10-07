@@ -1,0 +1,77 @@
+{
+  "schema": "litchi.performance.0960.screening-reducer-freeze-receipt.v1",
+  "status": "prospective_screening_reducer_ready",
+  "scope": "offline reducer and plan-binding controls only; no 0960 workload, build, or packet capture launched",
+  "bindings": {
+    "reducer": {
+      "path": "/home/zhuhe/litchi-performance-0960/tools/reduce_0960_v1.py",
+      "bytes": 21565,
+      "sha256": "52c36b3448b95e558c7334c038db012085d16c57a317ad7abf12edf57b6e38ca"
+    },
+    "plan_contract": {
+      "path": "/home/zhuhe/litchi-performance-0960/review/screening-plan-contract-v1.json",
+      "bytes": 2123,
+      "sha256": "a2870362dba623ecc7054c03f14a3cf5f7ff4f50aa0c876816aff931ae11a368"
+    },
+    "controls_script": {
+      "path": "/home/zhuhe/litchi-performance-0960/tools/check_screening_controls_v1.py",
+      "bytes": 5014,
+      "sha256": "d609890b1463cbdccc698e705e03285e7f7ad9456192d242f63f8b0131057ae8"
+    },
+    "controls_result": {
+      "path": "/home/zhuhe/litchi-performance-0960/review/screening-controls-0960-v1.json",
+      "bytes": 1293,
+      "sha256": "626deee8e834699689200b4d9e16e72ccbb2057e49c8618e3914c04536493f44"
+    },
+    "imported_frozen_base": {
+      "path": "/home/zhuhe/litchi-performance-0959/tools/reduce_0959_v3_finalplan.py",
+      "bytes": 63546,
+      "sha256": "4f13cb43b96081ca4736a2b431eaeb1165fd0e28d6c571b285f974c1c428d2f1"
+    }
+  },
+  "schedule": {
+    "native_children": 36,
+    "native_cases": 3,
+    "native_blocks_per_case": 3,
+    "native_warmups": 10,
+    "native_samples": 60,
+    "allocator_children": 18,
+    "allocator_pairs_per_case": 3,
+    "allocator_warmups": 2,
+    "allocator_rows": 10,
+    "cpu_mask": [12, 13, 14, 15],
+    "deadline_seconds": 900,
+    "serial": true,
+    "retry_or_replacement": false
+  },
+  "policy": {
+    "adoption_allowed": false,
+    "full_followup_required": true,
+    "screening_statistic": "descriptive median of paired legs/repeats; no bootstrap emitted",
+    "promising_or_ambiguous_signal": "requires the full six-block/200-sample native protocol",
+    "allocation_claim": false
+  },
+  "controls": {
+    "status": "passed",
+    "positive_final_plan_binding_fixture": true,
+    "negative_missing_candidate_manifest": true,
+    "negative_native_full_sample_schedule": true,
+    "negative_screening_adoption_enabled": true,
+    "negative_six_block_screening_schedule": true
+  },
+  "implementation": {
+    "report_validation": "imports frozen 0959 common/native/allocator report and packet custody validators",
+    "screening_adaptation": "only the three-block/60-sample native validator and descriptive paired summaries are specialized",
+    "final_plan_binding": "requires authorized 0960 schema, exact source/binary/helper descriptors, runner/cpu/deadline, host, root GO, and packet start plan descriptor"
+  },
+  "commands": [
+    "python3 -m py_compile /home/zhuhe/litchi-performance-0960/tools/reduce_0960_v1.py /home/zhuhe/litchi-performance-0960/tools/check_screening_controls_v1.py",
+    "python3 /home/zhuhe/litchi-performance-0960/tools/check_screening_controls_v1.py",
+    "python3 /home/zhuhe/litchi-performance-0960/tools/reduce_0960_v1.py --plan <authorized-plan-v1> --native-packet <sealed-native-packet> --allocator-packet <sealed-allocator-packet> --output <screening-reduction.json>"
+  ],
+  "notes": [
+    "The plan contract and controls are prospective; no final 0960 authorized plan or workload packet existed when this receipt was created.",
+    "The imported 0959 base remains externally hashed and is not copied or modified.",
+    "A screening result is sufficient to stop on rejection or no useful signal; any promising or ambiguous signal requires the full protocol."
+  ]
+}

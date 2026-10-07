@@ -1,0 +1,9 @@
+{
+  "scope": "No benchmark timing rows inspected for epoch selection. Prior experiment handle missing; current namespace contains no runner/workload. Visibility outside namespace is unavailable.",
+  "prior_capture_counts": {
+    "starts": 34,
+    "validations": 33
+  },
+  "original_lane_terminal_present": false,
+  "prior_allocator_present": false
+}

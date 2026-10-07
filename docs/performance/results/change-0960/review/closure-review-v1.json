@@ -1,0 +1,17 @@
+{
+  "schema": "litchi.performance.0960.closure-review.v1",
+  "reviewer": "independent review_0960 agent",
+  "status": "passed",
+  "raw_audit_mismatches": 0,
+  "raw_audit_sha256": "7329adea6e19745f925a18cdb07c1d4fb2079def4e87407afe420f00f1914512",
+  "reducer_replay": "JSON-identical",
+  "selector_replay": "same reject_screen/adoption=false; output path differs",
+  "external_manifest_entries_verified": 511,
+  "absolute_descriptors_verified": 679,
+  "descriptor_mismatches": 0,
+  "normative_input_hashes_verified": 35,
+  "native_children": 36,
+  "allocator_children": 18,
+  "temporary_replays_removed": true,
+  "finding": "README executable wording clarified to compiled executable; Python scripts are executable text."
+}

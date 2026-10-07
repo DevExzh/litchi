@@ -1,0 +1,150 @@
+{
+  "authorization": {
+    "live_state": {
+      "bytes": 553,
+      "mode": 436,
+      "path": "docs/performance/results/change-0960/protocol/root-live-state-v1.json",
+      "sha256": "d0a8b430a08482b5a2c4f521dbabbd0bbe5aeb97f88266907787970a76242086"
+    },
+    "plan": {
+      "bytes": 54646,
+      "mode": 436,
+      "path": "docs/performance/results/change-0960/protocol/plan-final-v1.json",
+      "sha256": "a9c0db61ae9dd48c349d3c264c140d6126c35979c32cecc1f671ded8bb2b176d"
+    },
+    "preflight": {
+      "bytes": 1024,
+      "mode": 436,
+      "path": "docs/performance/results/change-0960/protocol/root-final-preflight-v1.json",
+      "sha256": "43c18e924040760fa970166744f16bfe9bf4eb65ff9e86c447ecdec3fa884fc0"
+    },
+    "root_go": {
+      "bytes": 5148,
+      "mode": 436,
+      "path": "docs/performance/results/change-0960/protocol/root-go-v1.json",
+      "sha256": "56a004b89bd5830040a4156eef0c231e9155a566bf26d742016bc1d0d0d2648b"
+    },
+    "template": {
+      "bytes": 50420,
+      "mode": 436,
+      "path": "docs/performance/results/change-0960/protocol/plan-template-v14.json",
+      "sha256": "5087cb88d04fc8e5d4216a2cacfe04de84780bc341091540794f6f34f9ed3b92"
+    }
+  },
+  "build": {
+    "binaries_descriptor": {
+      "bytes": 1364,
+      "mode": 436,
+      "path": "docs/performance/results/change-0960/build/candidate-managed-v1-build-binaries.json",
+      "sha256": "f29f5e5655932150e47cc779fff32d6a3d08fe4edb2d6069ca8cdba20d51f530"
+    },
+    "result": {
+      "bytes": 1355,
+      "mode": 436,
+      "path": "docs/performance/results/change-0960/build/candidate-managed-v1-build-result.json",
+      "sha256": "4f257bcebb56e0641a4b1052599db95bb0f65637a5d66701b2f658d7151012b0"
+    },
+    "result_correction": {
+      "bytes": 937,
+      "mode": 436,
+      "path": "docs/performance/results/change-0960/build/candidate-managed-v1-build-result-correction-v1.json",
+      "sha256": "53f4b72e797b7675ffcacdc803aa4699d8b38da5f59c89947d4d9f81a0859d3b"
+    },
+    "retention": {
+      "bytes": 2733,
+      "mode": 436,
+      "path": "docs/performance/results/change-0960/build/candidate-managed-v1-retention.json",
+      "sha256": "b308c2f3a09361d34ec83c95799894d926e7522303d0b9aeb5821cdedb4bebf3"
+    },
+    "retention_correction": {
+      "bytes": 2655,
+      "mode": 436,
+      "path": "docs/performance/results/change-0960/build/candidate-managed-v1-retention-correction-v1.json",
+      "sha256": "48276a9e5815e6cb0aa93ef999f965508a051d7760987d7aa0efdc86e5f64e6c"
+    },
+    "start": {
+      "bytes": 2729,
+      "mode": 436,
+      "path": "docs/performance/results/change-0960/quality/candidate-managed-v1-build-start.json",
+      "sha256": "029f94e1fc7210bbbf6776102d2db55975cf44de285edb112740f4917c9e7f50"
+    },
+    "terminal": {
+      "bytes": 1517,
+      "mode": 436,
+      "path": "docs/performance/results/change-0960/build/candidate-managed-v1-build-terminal.json",
+      "sha256": "f24bdf322d1fa5118392952bf9e3d5c741fe9eebc3e9b4571c9b68a066a4dd8e"
+    }
+  },
+  "candidate_patch": {
+    "bytes": 22069,
+    "mode": 436,
+    "path": "docs/performance/results/change-0960/source/0960-final-codec-v1.patch",
+    "sha256": "dbef0f056316364b466d453767cd0b3fed6a8f713385c183bf732e0cb9892a8a"
+  },
+  "capture": {
+    "allocator": "pending",
+    "native": "running",
+    "raw_capture_external": true,
+    "root_session": 57382
+  },
+  "helpers": {
+    "controls": {
+      "bytes": 2195,
+      "mode": 436,
+      "path": "docs/performance/results/change-0960/protocol/screening-controls-0960-v9.json",
+      "sha256": "5f3ba66b68934b18b9e65691fbe274df8ee51b33ec586fa486578f94c8eb8a3b"
+    },
+    "lifecycle": {
+      "bytes": 814,
+      "mode": 436,
+      "path": "docs/performance/results/change-0960/protocol/runner-lifecycle-controls-v1.json",
+      "sha256": "d61798428e81c245e4aef121b2c53b28423a8c98a15076b37ec07b3e27ab37dc"
+    },
+    "reducer": {
+      "bytes": 31267,
+      "mode": 436,
+      "path": "docs/performance/results/change-0960/protocol/reduce_0960_v3.py",
+      "sha256": "7000e9094a9c8174907788dd8161b14b7f61210c74fe3930c43306a49c9852f2"
+    },
+    "rule": {
+      "bytes": 1708,
+      "mode": 436,
+      "path": "docs/performance/results/change-0960/protocol/root-screening-rule-v2.json",
+      "sha256": "2adeb002f4d7d999771d26d743ce29eccb6f2fc8d2226de68aa2cb2ae6afc7a7"
+    },
+    "runner": {
+      "bytes": 36205,
+      "mode": 493,
+      "path": "docs/performance/results/change-0960/protocol/screen_0960_v7.py",
+      "sha256": "8f8b9a8bb83905dafcc109f6b113a3db9ae98420d86f031ba761482b74721238"
+    },
+    "selector": {
+      "bytes": 3037,
+      "mode": 493,
+      "path": "docs/performance/results/change-0960/protocol/select_screen_0960_v1.py",
+      "sha256": "3a22623881d373907ce9a0843864179f7a5864707b0471a0f2bb6374f1ef8de7"
+    }
+  },
+  "historical_quality_closeout": {
+    "bytes": 14612,
+    "mode": 436,
+    "path": "docs/performance/results/change-0960/history/quality-closeout-v2.json",
+    "sha256": "ffb94124a3d65c99385f77624990d659b0c7fe8f5f37dc8313243047397f8ad8"
+  },
+  "no_result_or_adoption_claim": true,
+  "schema": "litchi.performance.0960.quality-closeout.v3",
+  "scope": "source/quality/build/protocol custody; no result or adoption claim",
+  "source_custody": {
+    "bytes": 4450,
+    "mode": 436,
+    "path": "docs/performance/results/change-0960/quality/source-custody-v3.json",
+    "sha256": "61eea6ae3b53371d79e639ee0db809729591a14506d0a5fe1d93b43f314d6905"
+  },
+  "source_review": {
+    "bytes": 1727,
+    "mode": 436,
+    "path": "docs/performance/results/change-0960/review/final-source-review-v2.md",
+    "sha256": "ec052ecffeb4167dfaf810ca09a82d9c66566b5c2afddb49f52f7019ad1ca879"
+  },
+  "status": "native_capture_running_allocator_pending"
+}

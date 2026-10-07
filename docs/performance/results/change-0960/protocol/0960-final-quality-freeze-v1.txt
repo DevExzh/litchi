@@ -1,0 +1,96 @@
+0960 STRICT-LANE RAW-CELL CAPACITY HINT: FINAL QUALITY FREEZE
+Recorded: 2026-10-07 UTC
+Owner: /root/multiwindow_quality
+Scope: isolated quality candidate; no checkout edits or adoption
+
+SOURCE TREES
+candidate=/home/zhuhe/litchi-performance-0960/source-candidate-v1
+baseline=/home/zhuhe/litchi-performance-0960/source-baseline-v1
+baseline_revision=a6223afa0899d5800d21ed9dc6c49304fbb2e8ca
+candidate_relevant_file=crates/litchi-xlsx/src/raw/worksheet/codec.rs
+baseline_codec_sha256=94b5c115d0e44b51e66bc934a874eb51283567759ccf649a69422f3e096ea2bb
+final_candidate_codec_sha256=19d8be4a882fe1ed8c80d428fdf5780e30b2f979bb22841cf5eef540e3153657
+baseline_Cargo.lock_sha256=d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061
+candidate_Cargo.lock_sha256=d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061
+candidate_vs_baseline_census=only codec.rs differs; Cargo.lock is byte-identical
+final_patch=/home/zhuhe/litchi-performance-0960/receipts/0960-final-codec-v1.patch
+final_patch_sha256_file=/home/zhuhe/litchi-performance-0960/receipts/0960-final-codec-v1.patch.sha256
+final_patch_size_file=/home/zhuhe/litchi-performance-0960/receipts/0960-final-codec-v1.patch.size
+
+IMPLEMENTATION BINDING
+The shared observer parser admits the strict lane only after the observer accepts the
+current event and the ordinary parser transition has validated the first worksheet
+SheetData context plus SpreadsheetML child namespace. It calls lane::recognize once,
+checks source/event/cell bounds, uses checked_sub against already parsed cells, and
+best-effort calls try_reserve_exact on Parser.cells. A hint refusal or allocation
+failure is ignored; finish_cell remains the authoritative fallible growth path. A
+boolean guard prevents nested or duplicate SheetData scans. Raw quick_xml positions
+remain the input to Entry::locate so BOM document offsets are not applied twice.
+
+The final source delta against the full-suite source consists of exactly:
+1. Clippy-only spelling correction: children_are_spreadsheetml(&resolver) ->
+   children_are_spreadsheetml(resolver); no semantic change.
+2. One ignored, test-only external managed-fixture census function. It is not in
+   production builds. Delta patch:
+   /home/zhuhe/litchi-performance-0960/receipts/0960-final-vs-full-v2-delta.patch
+   sha256=82615c11a0433e7f00076eea286612b828cc28afc7f7f7d49ed71315bdaa6a37
+   size=3740 bytes.
+The full-v2 source reconstructed from the final source by removing that test-only
+function and reversing the one Clippy spelling correction hashes to
+ dd85fd4fb42dfc770d50510613c1d0585bcab63384ffb7ec1b5a8ac60643299e; the exact
+reconstruction is /home/zhuhe/litchi-performance-0960/receipts/0960-full-v2-reconstructed-codec.rs.
+
+QUALITY RECEIPTS
+A. Full litchi-xlsx library suite, source dd85fd4f..., Cargo.lock d80...
+   command: receipts/0960-full-xlsx-lib-v2.command
+   env: receipts/0960-full-xlsx-lib-v2.env
+   log: logs/0960-full-xlsx-lib-v2.log
+   manifest: receipts/0960-full-xlsx-lib-v2-manifest.txt.*
+   result: rc=0; 1404 passed; 0 failed; 0 ignored; 282.78s.
+
+B. Final strict-lane focused suite, source 19d8be4a..., Cargo.lock d80...
+   command: receipts/0960-focused-strict-hint-v7.command
+   env: receipts/0960-focused-strict-hint-v7.env
+   log: logs/0960-focused-strict-hint-v7.log
+   manifest: receipts/0960-focused-strict-hint-v7-manifest.txt.*
+   result: rc=0; 7 passed; 0 failed; 1 ignored census; 1397 filtered; 1.17s.
+   Cases cover observer-before-hint ordering, exact differential result parity,
+   forced hint-reservation failure fallback, strict-lane declines, malformed tail,
+   duplicate/nested SheetData one-scan guard, event-cap decline, and BOM input.
+
+C. Final warning-denied Clippy, source 19d8be4a..., Cargo.lock d80...
+   command: receipts/0960-clippy-xlsx-lib-v2.command
+   env: receipts/0960-clippy-xlsx-lib-v2.env
+   log: logs/0960-clippy-xlsx-lib-v2.log
+   manifest: receipts/0960-clippy-xlsx-lib-v2-manifest.txt.*
+   result: rc=0; cargo +1.95.0 clippy -p litchi-xlsx --lib -- -D warnings.
+   The superseded v1 rc=101 needless-borrow receipt remains preserved.
+
+D. Final scoped Rustfmt, source 19d8be4a..., Cargo.lock d80...
+   command: receipts/0960-rustfmt-codec-v1.command
+   env: receipts/0960-rustfmt-codec-v1.env
+   log: logs/0960-rustfmt-codec-v1.log
+   manifest: receipts/0960-rustfmt-codec-v1-manifest.txt.*
+   result: rc=0; codec.rs --check; source hash unchanged.
+
+E. Managed real-fixture route census, source d26067ac..., Cargo.lock d80...
+   command: receipts/0960-managed-route-census-v1.command
+   env: receipts/0960-managed-route-census-v1.env
+   log: logs/0960-managed-route-census-v1.log
+   manifest: receipts/0960-managed-route-census-v1-manifest.txt.*
+   result: rc=0; 8/8 worksheets complete; attempts=8; admitted=8;
+   declined=0; cap_declines=0; reserve_succeeded=8; reserve_failed=0;
+   reserved_cells=27008 (dense-sparse 17792, medium 9216).
+   The census ran before the final Clippy spelling-only delta; no semantic source
+   changed between that run and final 19d8be4a. No third full suite was run.
+   Exact source ZIPs were verified from retained 0947 inputs:
+   medium source.zip sha256=dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036
+   dense-sparse source.zip sha256=893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a
+   ZIP/worksheet manifests and their receipt hashes are in route-census-v1/
+   and receipts/0960-route-census-{source-zips,worksheets}.sha256.
+
+PROCESS / HANDOFF
+No quality Cargo process remains after the recorded checks. The capture agent owns
+release build lifecycle in target-candidate-managed-v1; quality did not run a
+benchmark or performance workload. The final candidate tree is frozen at the
+hashes above for root's release-build and adoption decision.

@@ -1,0 +1,31 @@
+{
+  "binaries": {
+    "xlsx_managed_compression_alloc": {
+      "build_id": "4b102e4c3bbdcd6e58fb9d40208c627ca6fc30e2",
+      "bytes": 43677192,
+      "exists": true,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0960/target-candidate-managed-v1/release/xlsx_managed_compression_alloc",
+      "readelf_returncode": 0,
+      "readelf_sha256": "d3dffb59054890ae999c37b4c51434e8c722034371b74ec9c4511837e0d88e10",
+      "sha256": "06115121a4dde73b7320f3d751232d0aefd0c9d0227d91051f49dc34fc0bcaae"
+    },
+    "xlsx_managed_compression_benchmark": {
+      "build_id": "c80a75a4786bf8de41d654c452a4d2cff1cff55a",
+      "bytes": 43256440,
+      "exists": true,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0960/target-candidate-managed-v1/release/examples/xlsx_managed_compression_benchmark",
+      "readelf_returncode": 0,
+      "readelf_sha256": "04e24853901e7a72a984ca921c77145e14dc4a08e637f23979677b05d5359c16",
+      "sha256": "ec9ecfc7ea4283a11727d8e63309661ed5318bf2093546906f751e10fb9a6ff3"
+    }
+  },
+  "schema": "litchi.performance.0960.candidate-managed-v1.build-binaries",
+  "terminal_receipt": {
+    "bytes": 1517,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0960/receipts/candidate-managed-v1-build-terminal.json",
+    "sha256": "f24bdf322d1fa5118392952bf9e3d5c741fe9eebc3e9b4571c9b68a066a4dd8e"
+  }
+}

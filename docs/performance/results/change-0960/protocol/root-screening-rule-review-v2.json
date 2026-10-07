@@ -1,0 +1,112 @@
+{
+  "artifacts": {
+    "mock_reduction": {
+      "bytes": 97249,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/review/runner-mock-reduction-v2.json",
+      "sha256": "21ef1de20095e760b233db8de507f03592d442210301bf64d691ef688b65d060"
+    },
+    "plan_v14": {
+      "bytes": 50420,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/plan-template-0960-v14.json",
+      "sha256": "5087cb88d04fc8e5d4216a2cacfe04de84780bc341091540794f6f34f9ed3b92"
+    },
+    "rule_v2": {
+      "bytes": 1708,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/review/root-screening-rule-v2.json",
+      "sha256": "2adeb002f4d7d999771d26d743ce29eccb6f2fc8d2226de68aa2cb2ae6afc7a7"
+    },
+    "selector": {
+      "bytes": 3037,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/tools/select_screen_0960_v1.py",
+      "sha256": "3a22623881d373907ce9a0843864179f7a5864707b0471a0f2bb6374f1ef8de7"
+    },
+    "selector_controls": {
+      "bytes": 784,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/review/root-screen-selector-controls-v1.json",
+      "sha256": "5bd01b835847a600a9f949ddb2f8446de03376886b73bc285f2c8713595ee70c"
+    }
+  },
+  "checks": [
+    {
+      "detail": "Stop wording now covers any qualifying metric under signal_any; allocator-only region_peak signal is explicit and calls/requested bytes remain excluded.",
+      "name": "rule_v2_text",
+      "status": "pass"
+    },
+    {
+      "detail": "Selector requires all native primary/RSS and allocator resource metrics to have expected pair count, zero undefined, finite positive medians before signal evaluation.",
+      "name": "selector_required_metric_precedence",
+      "status": "pass"
+    },
+    {
+      "detail": "Only native metrics and allocator region_peak_live_bytes can produce signal; allocation_calls/requested or allocated bytes alone cannot.",
+      "name": "selector_signal_scope",
+      "status": "pass"
+    },
+    {
+      "detail": "Independent selector run on protocol-only unity mock returned reject_screen with no signals and adoption_allowed=false.",
+      "name": "selector_mock_replay",
+      "observed": {
+        "adoption_allowed": false,
+        "decision": "reject_screen",
+        "signals": [],
+        "statistical_effect_claim": false,
+        "stops": [
+          "No qualifying metric among signal_any"
+        ]
+      },
+      "status": "pass"
+    },
+    {
+      "name": "selector_controls",
+      "receipt": {
+        "bytes": 784,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0960/review/root-screen-selector-controls-v1.json",
+        "sha256": "5bd01b835847a600a9f949ddb2f8446de03376886b73bc285f2c8713595ee70c"
+      },
+      "status": "pass"
+    },
+    {
+      "detail": "v14 has no exact rule/selector descriptor fields; final authorized plan or GO receipt must bind them.",
+      "name": "plan_binding",
+      "status": "pending_required"
+    }
+  ],
+  "created_utc": "2026-10-07T16:16:44.838620+00:00",
+  "findings": [
+    {
+      "area": "rule_selector_binding",
+      "detail": "The corrected rule and selector are independently tested, but plan-template-v14 does not bind their descriptors/hashes. Without that binding, a final capture can be evaluated under a different selection rule.",
+      "id": "R2-01",
+      "required_fix": "Add exact rule-v2 and selector-v1 descriptors to final plan/GO receipt and make preflight verify both.",
+      "severity": "blocker_before_capture"
+    },
+    {
+      "area": "undefined_metric_precedence",
+      "detail": "Selector v1 now stops on any invalid/undefined required metric before applying signal_any, matching rule v2.",
+      "id": "R2-02",
+      "severity": "resolved"
+    },
+    {
+      "area": "allocator_signal_wording",
+      "detail": "Rule v2 says no qualifying metric among signal_any, covering allocator region_peak_live_bytes without admitting calls/requested bytes.",
+      "id": "R2-03",
+      "severity": "resolved"
+    }
+  ],
+  "recommendation": "Bind rule v2 and selector v1 in the final plan before authorization; no performance decision is made by this review.",
+  "schema": "litchi.performance.0960.root-screening-rule-review.v2",
+  "scope": "Read-only review of rule v2 and selector v1 against the v14 plan and reducer v3. No performance data, workload, or capture used.",
+  "status": "binding_required_before_capture"
+}

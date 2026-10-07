@@ -1,0 +1,32 @@
+{
+  "checks": [
+    {
+      "name": "capture_start_schema_tamper_rejected",
+      "rejection": "ReductionError: native: capture-start schema changed",
+      "status": "pass"
+    },
+    {
+      "name": "missing_post_terminal_artifacts_rejected",
+      "rejection": "ReductionError: regular JSON file required: /tmp/screen0960-packet-control-11q3fbg8/allocator/children/allocator__medium-one-percent__b02__p0/post-terminal-artifacts.json",
+      "status": "pass"
+    },
+    {
+      "name": "child_argv_tamper_rejected",
+      "rejection": "ReductionError: native__medium-one-percent__b00__p2: workload argv differs from plan/binary binding",
+      "status": "pass"
+    }
+  ],
+  "plan": {
+    "bytes": 51026,
+    "path": "/home/zhuhe/litchi-performance-0960/plan-synthetic-e2e-v4.json",
+    "sha256": "df63241cc1a49abfa7e1247697a602b97c6b6470dd6f5bd1b6c46d2570c4f954"
+  },
+  "reducer": {
+    "bytes": 21565,
+    "path": "/home/zhuhe/litchi-performance-0960/tools/reduce_0960_v1.py",
+    "sha256": "52c36b3448b95e558c7334c038db012085d16c57a317ad7abf12edf57b6e38ca"
+  },
+  "schema": "litchi.performance.0960.packet-controls.v2",
+  "scope": "offline synthetic packet custody controls; no workload/build/capture",
+  "status": "passed"
+}

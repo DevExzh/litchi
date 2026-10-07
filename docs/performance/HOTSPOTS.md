@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## 0960 — temporary cell reservation lowers traffic without qualifying benefit
+
+[0960](0960-xlsx-raw-cell-capacity-trial.md) records the result.
+A strict body scan supplies exact capacity hints for all eight retained
+worksheets, but the complete independent screening epoch rejects adoption.
+Cumulative requested bytes fall 14.4–26.4%; observed live-byte peaks stay flat,
+and total p50 ratios range from 1.0160 to 1.0347. No eligible metric reaches
+the predeclared 5% benefit threshold. Extra scanning to avoid temporary-vector
+growth is therefore not a demonstrated end-to-end optimization here. Preserve
+the existing parser path; semantic materialization and merge storage remain
+measured owners needing mechanism-specific trials. Prior phase/tail/RSS flags
+remain open.
+
 ## 0959 — parser backing allocations lead requested bytes
 
 [0959](0959-xlsx-number-ownership-candidate.md) corrects the 0958 owner labels:

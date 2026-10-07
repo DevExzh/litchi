@@ -1,0 +1,274 @@
+{
+  "all_files_below_1MiB": true,
+  "allocator_children": 18,
+  "analysis": {
+    "audit_script": {
+      "bytes": 32535,
+      "mode": 493,
+      "path": "review/audit_epoch2_raw_v2.py",
+      "sha256": "0e12714f378cb031af026c0618bbc168f43abc503f9d4403adccfbed060ebf12"
+    },
+    "audit_script_v1_historical": {
+      "bytes": 32031,
+      "mode": 493,
+      "path": "review/audit_epoch2_raw_v1.py",
+      "sha256": "5870717d3c0186ea3764f4df44f1ef12673ff59e016ec036e7eb05f8445ca661"
+    },
+    "independent_raw_audit": {
+      "allocator_children": 18,
+      "bytes": 119253,
+      "decision": "reject_screen",
+      "metric_mismatches": 0,
+      "native_children": 36,
+      "path": "review/independent-raw-audit-v1.json",
+      "sha256": "7329adea6e19745f925a18cdb07c1d4fb2079def4e87407afe420f00f1914512",
+      "status": "passed"
+    },
+    "independent_raw_audit_replay": {
+      "bytes": 1426,
+      "mode": 436,
+      "path": "review/independent-raw-audit-v2-replay-receipt.json",
+      "sha256": "b804195e5b75b15d122884ef5a8543f8a0fe9254e228659d0e5725cdda2f00a2"
+    },
+    "independent_summary": {
+      "bytes": 27044,
+      "path": "review/independent-raw-audit-summary-v1.json",
+      "sha256": "57783d25d8b7a4d429c6d44255803cc603c4100cb8a45aa066996ea061e67d1a"
+    },
+    "screen": {
+      "bytes": 104664,
+      "path": "analysis/screen-v1.json",
+      "sha256": "b934b9634a3e9d5e21edaccd34080b8d548f95feeea3ad20efe34b0c42daf15e",
+      "status": "screened"
+    },
+    "selection": {
+      "adoption_allowed": false,
+      "bytes": 10752,
+      "decision": "reject_screen",
+      "path": "analysis/selection-v1.json",
+      "sha256": "973dfe663ad4d8759db6e5def918feea04fbe83fa90efa17999944d9002f7bda"
+    }
+  },
+  "binary_policy": "No binaries copied. Final plan binds four external executable paths and SHA-256 values; this packet records only those external references.",
+  "contains_binary": false,
+  "external_capture_lanes": {
+    "allocator": {
+      "path": "/tmp/litchi-performance-0960-epoch2/capture-allocator-v1",
+      "raw_reports_external": true,
+      "regular_file_count": 165,
+      "total_bytes": 1491661
+    },
+    "native": {
+      "path": "/tmp/litchi-performance-0960-epoch2/capture-native-v1",
+      "raw_reports_external": true,
+      "regular_file_count": 327,
+      "total_bytes": 2054441
+    }
+  },
+  "external_raw_manifest": {
+    "bytes": 199961,
+    "max_file_bytes": 119253,
+    "path": "review/external-artifact-manifest-v1.json",
+    "regular_file_count": 511,
+    "sha256": "2fc2ca4141014e8149cddcb8299e255a248e629445d6bc09289a481b4def57bf",
+    "symlink_count": 0,
+    "total_bytes": 4125917
+  },
+  "file_count_excluding_provenance": 28,
+  "files": [
+    {
+      "bytes": 6100,
+      "mode": 436,
+      "path": "README.md",
+      "sha256": "b759e460ef1c5a7555b5d6e70ce6aa01b57434fefcec2f3d7f102f85b8cb1134"
+    },
+    {
+      "bytes": 104664,
+      "mode": 436,
+      "path": "analysis/screen-v1.json",
+      "sha256": "b934b9634a3e9d5e21edaccd34080b8d548f95feeea3ad20efe34b0c42daf15e"
+    },
+    {
+      "bytes": 10752,
+      "mode": 436,
+      "path": "analysis/selection-v1.json",
+      "sha256": "973dfe663ad4d8759db6e5def918feea04fbe83fa90efa17999944d9002f7bda"
+    },
+    {
+      "bytes": 687,
+      "mode": 436,
+      "path": "capture/allocator-capture-start.json",
+      "sha256": "9cb3b6edde17c525cafbeba889ee5ddc34440b2fbbfb6aaa88128bef055e80de"
+    },
+    {
+      "bytes": 574,
+      "mode": 436,
+      "path": "capture/allocator-capture-terminal.json",
+      "sha256": "48e0d3700b96bcb2c1ba6db91748a6e5528cbc30375f9150dc47e3eac4bd72bf"
+    },
+    {
+      "bytes": 7656,
+      "mode": 436,
+      "path": "capture/allocator-completed-packet.json",
+      "sha256": "c6b8ef06d390e61d2eedbf77b2d5208e45ae6123027c49399fce940a74ed5c56"
+    },
+    {
+      "bytes": 684,
+      "mode": 436,
+      "path": "capture/native-capture-start.json",
+      "sha256": "1e3b650fd4b4d66ede239b5818464a4696d0cd0914d0effd78b524d272847d22"
+    },
+    {
+      "bytes": 568,
+      "mode": 436,
+      "path": "capture/native-capture-terminal.json",
+      "sha256": "8b0e755ca405f39472d0e8b5496754710dc97ffcddbca1cfba240bb57e09d1ac"
+    },
+    {
+      "bytes": 14580,
+      "mode": 436,
+      "path": "capture/native-completed-packet.json",
+      "sha256": "4f15086ae67436c8a2995d1179ead0540258f100910198932f72a7fd310bb86e"
+    },
+    {
+      "bytes": 350,
+      "mode": 436,
+      "path": "history/interruption-recheck-v1.json",
+      "sha256": "77107e0727d7383167113306d6e84647b3a54c36909c4e361dd3ecc737421c5b"
+    },
+    {
+      "bytes": 387,
+      "mode": 436,
+      "path": "history/live-state-v1.json",
+      "sha256": "2f1580de2181d8d8994a3077b4ccc50bb556a416e09dc404b37f1c3d2b4d3b19"
+    },
+    {
+      "bytes": 5994,
+      "mode": 436,
+      "path": "protocol/host-v1.json",
+      "sha256": "655ecc740c4cc1581984abb7d8e918b8534ed911757c66eeb5a9685baf5a1d05"
+    },
+    {
+      "bytes": 55801,
+      "mode": 436,
+      "path": "protocol/plan-final-v1.json",
+      "sha256": "374b2072226736d70af2486ceb67c9b6ab83f8517460a2a571f208096b015628"
+    },
+    {
+      "bytes": 55577,
+      "mode": 436,
+      "path": "protocol/plan-prospective-v1.json",
+      "sha256": "52940ca000304e0431e4f5e264782509d58460a3e8a1241bcabe65b11acc95d8"
+    },
+    {
+      "bytes": 622,
+      "mode": 436,
+      "path": "protocol/preflight-v1.json",
+      "sha256": "4f90ad15485febdd625bfd9b9ef415fbd3bc1f5650e6ad64bafbc3b6be2ecec7"
+    },
+    {
+      "bytes": 1943,
+      "mode": 436,
+      "path": "protocol/root-go-v1.json",
+      "sha256": "07297a6af60e9a8e4ea7c65fb2e504a5f9037f8ef51c8ba4b6af732b9023a3b6"
+    },
+    {
+      "bytes": 466,
+      "mode": 436,
+      "path": "protocol/source-revalidation-v1.json",
+      "sha256": "f687116c91dd807905a040759251d1f66f865b5ba6e0a134584a55f4165d6afa"
+    },
+    {
+      "bytes": 32031,
+      "mode": 493,
+      "path": "review/audit_epoch2_raw_v1.py",
+      "sha256": "5870717d3c0186ea3764f4df44f1ef12673ff59e016ec036e7eb05f8445ca661"
+    },
+    {
+      "bytes": 32535,
+      "mode": 493,
+      "path": "review/audit_epoch2_raw_v2.py",
+      "sha256": "0e12714f378cb031af026c0618bbc168f43abc503f9d4403adccfbed060ebf12"
+    },
+    {
+      "bytes": 199961,
+      "mode": 436,
+      "path": "review/external-artifact-manifest-v1.json",
+      "sha256": "2fc2ca4141014e8149cddcb8299e255a248e629445d6bc09289a481b4def57bf"
+    },
+    {
+      "bytes": 27044,
+      "mode": 436,
+      "path": "review/independent-raw-audit-summary-v1.json",
+      "sha256": "57783d25d8b7a4d429c6d44255803cc603c4100cb8a45aa066996ea061e67d1a"
+    },
+    {
+      "bytes": 119253,
+      "mode": 436,
+      "path": "review/independent-raw-audit-v1.json",
+      "sha256": "7329adea6e19745f925a18cdb07c1d4fb2079def4e87407afe420f00f1914512"
+    },
+    {
+      "bytes": 1426,
+      "mode": 436,
+      "path": "review/independent-raw-audit-v2-replay-receipt.json",
+      "sha256": "b804195e5b75b15d122884ef5a8543f8a0fe9254e228659d0e5725cdda2f00a2"
+    },
+    {
+      "bytes": 7083,
+      "mode": 436,
+      "path": "review/rerun-feasibility-v1.json",
+      "sha256": "fe49c47875661483752746c4fb7eaafd91a735f91b74dbaf8312ca104749d53c"
+    },
+    {
+      "bytes": 1167,
+      "mode": 436,
+      "path": "review/write-limits-cleanup-v1.json",
+      "sha256": "607164f13c34d8d03845b63eabe77cab09fac812bbe8f720cae2cb76899e457c"
+    },
+    {
+      "bytes": 2129,
+      "mode": 436,
+      "path": "tools/authorize_epoch2_v1.py",
+      "sha256": "6009b4c551dac072a745e7c49c4011822192159ca556cb4ec6bf7e967087d452"
+    },
+    {
+      "bytes": 5105,
+      "mode": 420,
+      "path": "tools/build_external_manifest_epoch2_v1.py",
+      "sha256": "9017370bf7436945afbb4e45b9827083bf82a165e5b968361f97e80444fbe0e2"
+    },
+    {
+      "bytes": 2505,
+      "mode": 436,
+      "path": "tools/prepare_epoch2_v1.py",
+      "sha256": "c08fd6234d8776659ba68df04a25e17f15d0a91c448632c36a232c512e0685e1"
+    }
+  ],
+  "historical_parent_packet": "docs/performance/results/change-0960 (untouched; epoch2 is a separate subtree)",
+  "max_file_bytes_excluding_provenance": 199961,
+  "native_children": 36,
+  "no_adoption_claim": true,
+  "observed_utc": "2026-10-07T17:02:00+00:00",
+  "regeneration": {
+    "capture_allocator_historical": "LITCHI_PERF_0960_CAPTURE_APPROVED=1 /usr/bin/taskset --cpu-list 12-15 python3 -B /home/zhuhe/litchi-performance-0960/tools/screen_0960_v7.py --capture --lane allocator --go --plan /tmp/litchi-performance-0960-epoch2/plan-final-v1.json --packet /tmp/litchi-performance-0960-epoch2/capture-allocator-v1",
+    "capture_native_historical": "LITCHI_PERF_0960_CAPTURE_APPROVED=1 /usr/bin/taskset --cpu-list 12-15 python3 -B /home/zhuhe/litchi-performance-0960/tools/screen_0960_v7.py --capture --lane native --go --plan /tmp/litchi-performance-0960-epoch2/plan-final-v1.json --packet /tmp/litchi-performance-0960-epoch2/capture-native-v1",
+    "command": "python3 -B /home/zhuhe/code/litchi/docs/performance/results/change-0960/epoch2/tools/build_external_manifest_epoch2_v1.py --root /tmp/litchi-performance-0960-epoch2 --output /tmp/litchi-performance-0960-epoch2-manifest-v4.json",
+    "future_capture_requirements": "A future epoch requires a newly reviewed plan, source/build/binary bindings, root GO receipt, and fresh non-existing packet/output paths; the frozen plan's capture_root points at retained evidence and must not be reused for overwrite.",
+    "future_capture_template": "LITCHI_PERF_0960_CAPTURE_APPROVED=1 /usr/bin/taskset --cpu-list 12-15 python3 -B /home/zhuhe/litchi-performance-0960/tools/screen_0960_v7.py --capture --lane <native|allocator> --go --plan <FRESH_REVIEWED_PLAN> --packet <FRESH_EMPTY_PACKET>",
+    "historical_capture_scope": "The two capture commands above describe the completed epoch and its retained packet roots. They are provenance only; do not rerun them against those roots or treat them as a safe recapture recipe.",
+    "output_must_not_exist": true,
+    "raw_audit_v2_replay": "python3 -B /home/zhuhe/code/litchi/docs/performance/results/change-0960/epoch2/review/audit_epoch2_raw_v2.py /tmp/litchi-performance-0960-epoch2 --output /tmp/litchi-performance-0960-epoch2/review/independent-raw-audit-v2-replay.json",
+    "reduce_historical_packets": "python3 -B /home/zhuhe/litchi-performance-0960/tools/reduce_0960_v3.py --plan /tmp/litchi-performance-0960-epoch2/plan-final-v1.json --native-packet /tmp/litchi-performance-0960-epoch2/capture-native-v1 --allocator-packet /tmp/litchi-performance-0960-epoch2/capture-allocator-v1 --output /tmp/litchi-performance-0960-epoch2-reduction-replay.json",
+    "select_reduced_output": "python3 -B /home/zhuhe/litchi-performance-0960/tools/select_screen_0960_v1.py --report /tmp/litchi-performance-0960-epoch2-reduction-replay.json --rule /home/zhuhe/litchi-performance-0960/review/root-screening-rule-v2.json --output /tmp/litchi-performance-0960-epoch2-selection-replay.json"
+  },
+  "schema": "litchi.performance.0960.epoch2.packet-provenance.v1",
+  "scope": "Fresh epoch2 bounded protocol/custody, independent raw audit, and screen/selection summaries; raw captures, source trees, binaries, and full logs remain external.",
+  "status": "completed_screened_rejected",
+  "total_bytes_excluding_provenance": 697644,
+  "write_limits_cleanup": {
+    "bytes": 1167,
+    "path": "review/write-limits-cleanup-v1.json",
+    "sha256": "607164f13c34d8d03845b63eabe77cab09fac812bbe8f720cae2cb76899e457c"
+  }
+}

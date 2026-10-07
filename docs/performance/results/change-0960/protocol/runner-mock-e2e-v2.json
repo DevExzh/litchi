@@ -1,0 +1,58 @@
+{
+  "allocator_packet_terminal": {
+    "bytes": 592,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0960/review/runner-mock-packet-v2/allocator/capture-terminal.json",
+    "sha256": "be74a063f5422082028cffc2d2c6ba620a5c1f96c8b4f3f0f3186d3e8175df88"
+  },
+  "interrupt_control": {
+    "children_completed": 0,
+    "children_started": 1,
+    "cleanup_error_recorded": true,
+    "return_code": 2,
+    "terminal_status": "failed"
+  },
+  "native_packet_terminal": {
+    "bytes": 586,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0960/review/runner-mock-packet-v2/native/capture-terminal.json",
+    "sha256": "ab16b7a101cd12ad291952b9ac8ccb27181bc6fab8a1a7ac1f7f11b058c8e404"
+  },
+  "normal_capture_returncodes": {
+    "allocator": 0,
+    "native": 0
+  },
+  "plan": {
+    "bytes": 51340,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0960/plan-synthetic-runner-mock-v2.json",
+    "sha256": "063125baa623469212c63658d01a3781382fc7367e573c36550b5913911274a0"
+  },
+  "reducer": {
+    "bytes": 31267,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0960/tools/reduce_0960_v3.py",
+    "sha256": "7000e9094a9c8174907788dd8161b14b7f61210c74fe3930c43306a49c9852f2"
+  },
+  "reduction": {
+    "bytes": 97249,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0960/review/runner-mock-reduction-v2.json",
+    "sha256": "21ef1de20095e760b233db8de507f03592d442210301bf64d691ef688b65d060"
+  },
+  "runner": {
+    "bytes": 36205,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0960/tools/screen_0960_v7.py",
+    "sha256": "8f8b9a8bb83905dafcc109f6b113a3db9ae98420d86f031ba761482b74721238"
+  },
+  "schema": "litchi.performance.0960.runner-mock-e2e.v2",
+  "scope": "offline mocked Popen only; final v7 runner writes reports/time/packets and v3 reducer parses both lanes; no workload/build",
+  "status": "passed"
+}

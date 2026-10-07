@@ -1,5 +1,17 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0960 — capacity hint rejected in complete second screening epoch
+
+[0960](0960-xlsx-raw-cell-capacity-trial.md) records the result.
+The independently planned second epoch completed 36 native and 18 allocator
+children. Requested bytes fell 14.4–26.4%, but allocator region peaks were
+unchanged. Total p50 candidate/baseline paired-median ratios were 1.0347,
+1.0214 and 1.0160 for medium-percent, dense-percent and one-edit. No qualifying
+latency/native-RSS/live-peak signal reached 0.95, so the frozen selector rejects
+the candidate. These are descriptive screening statistics, not qualified
+effects or a new production baseline. The incomplete first epoch is wholly
+excluded. Production remains unchanged.
+
 ## 0959 — exact owner correction and numeric storage trial
 
 [0959](0959-xlsx-number-ownership-candidate.md) independently reselects the

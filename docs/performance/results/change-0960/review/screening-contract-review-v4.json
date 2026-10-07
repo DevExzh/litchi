@@ -1,0 +1,121 @@
+{
+  "authorized_plan_not_yet_bound": true,
+  "checks": {
+    "candidate_binary_digest_mutation": "rejected",
+    "candidate_freeze_missing": "rejected",
+    "capture_helper_digest_mutation": "rejected",
+    "control_result_status": "passed",
+    "host_receipt_digest_mutation": "rejected",
+    "native_order_mutation": "rejected",
+    "positive_canonical_binding": "pass",
+    "py_compile": "pass",
+    "reducer_digest_mutation": "rejected",
+    "root_go_receipt_digest_mutation": "rejected"
+  },
+  "commands": [
+    "PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile /home/zhuhe/litchi-performance-0960/tools/reduce_0960_v3.py /home/zhuhe/litchi-performance-0960/tools/check_screening_contract_v3.py",
+    "PYTHONDONTWRITEBYTECODE=1 python3 /home/zhuhe/litchi-performance-0960/tools/check_screening_contract_v3.py"
+  ],
+  "contract": {
+    "bytes": 2615,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0960/review/screening-plan-contract-v2.json",
+    "sha256": "6583785a0d3ada87af002be2b2e2189fbf81184af74318aa693fef4bee1dd3cd"
+  },
+  "controls_result": {
+    "bytes": 2195,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0960/review/screening-controls-0960-v6.json",
+    "sha256": "347510d68e82d084b39ae092a06116b5064b33acba2b23727ac681fe6e628558"
+  },
+  "controls_script": {
+    "bytes": 6079,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0960/tools/check_screening_contract_v3.py",
+    "sha256": "3a4a86f824c8f997dc41984ce9aa00c246664672aa2b35da4fb7bf612e02b5ed"
+  },
+  "corrected_v3": {
+    "bytes": 31267,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0960/tools/reduce_0960_v3.py",
+    "sha256": "7000e9094a9c8174907788dd8161b14b7f61210c74fe3930c43306a49c9852f2"
+  },
+  "handoff": {
+    "existing_plan_status": "prospective",
+    "no_workload_started_by_review": true,
+    "protocol_owner_must_create_authorized_final_plan_with_current_v3_and_controls_v3_descriptors": true
+  },
+  "historical_failure_preserved": {
+    "bytes": 2015,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0960/review/screening-controls-0960-v2-failed-v1.json",
+    "sha256": "88680e022165e16d9f05a9ebf465632645790d9f45ab42c4063357d08a6e1704"
+  },
+  "historical_v2": {
+    "descriptor": {
+      "bytes": 27975,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/tools/reduce_0960_v2.py",
+      "sha256": "c3aec725996eb5b9639f381f67cfeca12dc9def6f9ad6df890730f76a33614ff"
+    },
+    "note": "The preexisting v2 bytes and c3aec hash are retained unchanged; v3 is a separate corrected adapter.",
+    "sha256_matches_plan_fixture": true
+  },
+  "p06": {
+    "adoption_or_full_qualification_claim": "never",
+    "max_rss_must_be_positive_and_defined": "yes",
+    "native_primary_samples_must_be_positive": "yes",
+    "undefined_rss_cannot_pass_safety": "yes",
+    "useful_signal_requires_ci": "yes",
+    "v3_decision_values": [
+      "followup_required_for_confirmation",
+      "reject_no_useful_signal"
+    ]
+  },
+  "p07": {
+    "helper_descriptors_rehashed": "yes",
+    "host_receipt_rehashed": "yes",
+    "lane_binary_descriptors_rehashed": "yes",
+    "root_go_receipt_rehashed": "yes",
+    "runtime_manifests_and_source_roots_rechecked_when_present": "yes",
+    "source_manifests_rehashed": "yes"
+  },
+  "plan_fixture": {
+    "bytes": 50421,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0960/plan-template-0960-v11.json",
+    "sha256": "a965317bfb81acf281dbb796c5981f53c170d5166f13ea9774d8719b77ae345d"
+  },
+  "plan_helper_bindings_at_fixture": {
+    "capture": {
+      "bytes": 32867,
+      "executable": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0960/tools/screen_0960_v5.py",
+      "sha256": "4f5251bb5a5072d68655da45100436f01e4b23fa5579ec2d180424d5a59b41b0"
+    },
+    "controls": {
+      "bytes": 5014,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/tools/check_screening_controls_v1.py",
+      "sha256": "d609890b1463cbdccc698e705e03285e7f7ad9456192d242f63f8b0131057ae8"
+    },
+    "reducer": {
+      "bytes": 27975,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/tools/reduce_0960_v2.py",
+      "sha256": "c3aec725996eb5b9639f381f67cfeca12dc9def6f9ad6df890730f76a33614ff"
+    }
+  },
+  "runner_fixture": {
+    "bytes": 32804,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0960/tools/screen_0960_v3.py",
+    "sha256": "eef6768cbdf48fa3942979532064778c6911868ffc924103eb50de2078a1c214"
+  },
+  "schema": "litchi.performance.0960.screening-contract-review.v4",
+  "scope": "offline canonical-plan binding controls only; no build, capture, workload, or report reduction",
+  "status": "passed"
+}

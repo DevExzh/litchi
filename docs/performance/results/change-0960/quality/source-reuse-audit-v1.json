@@ -1,0 +1,100 @@
+{
+  "checkout": {
+    "head": "a6223afa0899d5800d21ed9dc6c49304fbb2e8ca",
+    "mutated": false,
+    "path": "/home/zhuhe/code/litchi",
+    "status_after_audit": [
+      " M tools/check_iwork_leaf_public_api.py",
+      "?? crates/litchi/examples/bench_word_parse.rs",
+      "?? docs/UNIFIED_OPS_API_DESIGN.md"
+    ]
+  },
+  "created_utc": "2026-10-07T15:33:52.195875+00:00",
+  "current_candidate": {
+    "manifest": {
+      "bytes": 2561523,
+      "exists": true,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/source-manifest-candidate-v1.json",
+      "sha256": "ca6a6a938890bb7cf0b368025aaf45f045b16d7552402e466bf3c772c3e898ea"
+    },
+    "root": "/home/zhuhe/litchi-performance-0960/source-candidate-v1",
+    "verification": {
+      "actual_bytes": 273429543,
+      "actual_regular_file_count": 10932,
+      "extra_paths": [],
+      "manifest_bytes": 273429543,
+      "manifest_file_count": 10932,
+      "mismatches": [],
+      "missing_paths": [],
+      "pass": true
+    }
+  },
+  "full_relevant_source_comparison": {
+    "added_paths": [],
+    "byte_equal": true,
+    "changed_paths": [],
+    "current_bytes": 273429543,
+    "current_file_count": 10932,
+    "deleted_paths": [],
+    "evidence": "actual retained source files and current candidate snapshot were independently rehashed against their manifests before path-by-path comparison",
+    "retained_bytes": 273429543,
+    "retained_file_count": 10932,
+    "scope": "all 10,932 regular files in the manifests; docs/performance/ and docs/report/ excluded from both by source export protocol",
+    "test_only_probe_exception": false
+  },
+  "no_build": true,
+  "no_checkout_mutation": true,
+  "no_workload": true,
+  "retained_0957_binaries": [
+    {
+      "binary": {
+        "bytes": 43676872,
+        "exists": true,
+        "mode": 509,
+        "path": "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_alloc.v2",
+        "sha256": "9ba37a6b9796ad0e316e7571ebe117ba7a5f97bcf5d29153c7cb3d74c485e9a5"
+      },
+      "execution_performed": false,
+      "role": "xlsx_managed_compression_alloc"
+    },
+    {
+      "binary": {
+        "bytes": 43259328,
+        "exists": true,
+        "mode": 509,
+        "path": "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+        "sha256": "5886b0f86a697bae757994d5a757cffae4a7e8d61a2769ff1c967029cd1912c3"
+      },
+      "execution_performed": false,
+      "role": "xlsx_managed_compression_benchmark"
+    }
+  ],
+  "retained_0957_source": {
+    "base_commit": "02449f394529766d76794332204c27c4022931fc",
+    "manifest": {
+      "bytes": 2267268,
+      "exists": true,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0957/source-manifest-v2.json",
+      "sha256": "f5fd1ee75b734bb7efaa1882be0397defea98c76c835be0bdf1f565c573ef617"
+    },
+    "manifest_schema": "litchi.performance.0957.source-manifest.v2",
+    "root": "/home/zhuhe/litchi-performance-0957/source-v1",
+    "verification": {
+      "actual_bytes": 273429543,
+      "actual_regular_file_count": 10932,
+      "extra_paths": [],
+      "manifest_bytes": 273429543,
+      "manifest_file_count": 10932,
+      "mismatches": [],
+      "missing_paths": [],
+      "pass": true
+    }
+  },
+  "reuse_decision": "source equality is established for the complete relevant runtime source closure; retained 0957 binaries may be reused later, subject to future plan binding and binary receipt checks",
+  "schema": "litchi.performance.0960.source-reuse-audit.v1",
+  "scope": "read-only source and binary custody verification; no build, binary execution, workload, or checkout mutation",
+  "status": "eligible_for_retained_0957_binary_reuse_pending_future_plan_binding",
+  "supersedes_intermediate_status": "/home/zhuhe/litchi-performance-0960/receipts/source-custody-v1.json reuse_0957_binary_status.status=not_yet_eligible"
+}

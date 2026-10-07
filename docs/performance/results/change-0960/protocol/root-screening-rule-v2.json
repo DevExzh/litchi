@@ -1,0 +1,30 @@
+{
+  "schema": "litchi.performance.0960.root-screening-rule.v2",
+  "frozen_utc": "2026-10-07T16:13:09.491989+00:00",
+  "measurement_status": "no workload launched; candidate release build active",
+  "scope": "Candidate selection rule; descriptive screening cannot authorize adoption or a statistically qualified effect claim.",
+  "statistic": "native median of six paired leg ratios per case/metric; allocator median of three paired repeat ratios",
+  "native_primary_metrics": [
+    "edit_commit_ns.p50",
+    "edit_commit_ns.p95",
+    "total_ns.p50",
+    "total_ns.p95"
+  ],
+  "signal_threshold": 0.95,
+  "safety_review_threshold": 1.05,
+  "signal_any": [
+    "native primary metric median <= 0.95",
+    "native max_rss_kib median <= 0.95",
+    "allocator region_peak_live_bytes median <= 0.95"
+  ],
+  "stop_conditions": [
+    "Any invalid/undefined primary or resource metric, custody or semantic validation failure",
+    "Any native primary metric median > 1.05",
+    "No qualifying metric among signal_any"
+  ],
+  "decision_if_no_stop": "Require independent regression review and full six-block confirmation plus relevant fallback controls before adoption.",
+  "allocation_calls_or_requested_bytes_alone": "Do not qualify as a useful signal.",
+  "other_flags": "All individual pair/block/phase/tail/RSS/allocator regression flags retained for review; reviewers may reject, never adopt from this screen.",
+  "reducer_v3_interpretation": "Its followup_required_for_confirmation on defined metrics is a data-admission result, not an automatic instruction to run confirmation. This pre-capture root selection rule determines whether to continue the candidate.",
+  "supersedes": "root-screening-rule-v1.json"
+}

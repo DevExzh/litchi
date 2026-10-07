@@ -1,0 +1,301 @@
+{
+  "entries": [
+    {
+      "bytes": 2561452,
+      "kind": "file",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/source-manifest-baseline-v1.json",
+      "regeneration": "git -C /home/zhuhe/code/litchi archive --format=tar a6223afa0899d5800d21ed9dc6c49304fbb2e8ca -- . :(exclude)docs/performance/** :(exclude)docs/report/**",
+      "role": "pre-quality baseline source manifest",
+      "sha256": "c7fd9c810d77b1e0e90b321dd74b3841b621f001cac15f9222124054f0035d03",
+      "status": "external_historical"
+    },
+    {
+      "bytes": 2561523,
+      "kind": "file",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/source-manifest-candidate-v1.json",
+      "regeneration": "git -C /home/zhuhe/code/litchi archive --format=tar a6223afa0899d5800d21ed9dc6c49304fbb2e8ca -- . :(exclude)docs/performance/** :(exclude)docs/report/**",
+      "role": "pre-quality candidate source manifest",
+      "sha256": "ca6a6a938890bb7cf0b368025aaf45f045b16d7552402e466bf3c772c3e898ea",
+      "status": "external_historical"
+    },
+    {
+      "bytes": 2561655,
+      "kind": "file",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/source-manifest-baseline-v2.json",
+      "regeneration": "1) git archive the base commit with docs/performance and docs/report excluded; 2) copy the recorded root Cargo.lock overlay into both fresh roots; 3) apply receipts/0960-final-codec-v1.patch to the candidate root; 4) emit sorted path,size,mode,SHA-256 rows for each root",
+      "role": "quality-frozen baseline source manifest",
+      "sha256": "f2ee3192f51f879da63fdacd6fcbf38f76491bc96bab48fbda1994dc504948b0",
+      "status": "external_snapshot"
+    },
+    {
+      "bytes": 2561657,
+      "kind": "file",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/source-manifest-candidate-v2.json",
+      "regeneration": "1) git archive the base commit with docs/performance and docs/report excluded; 2) copy the recorded root Cargo.lock overlay into both fresh roots; 3) apply receipts/0960-final-codec-v1.patch to the candidate root; 4) emit sorted path,size,mode,SHA-256 rows for each root",
+      "role": "quality-frozen candidate source manifest",
+      "sha256": "1e8d968807ce5aaa0fe2b94d0ad61431997baf16b0e9aaa9cfa4d4ef94b0a9fa",
+      "status": "external_snapshot"
+    },
+    {
+      "historical_manifest": {
+        "bytes": 2561655,
+        "bytes_in_snapshot": 273567986,
+        "file_count": 10933,
+        "path": "/home/zhuhe/litchi-performance-0960/source-manifest-baseline-v2.json",
+        "sha256": "f2ee3192f51f879da63fdacd6fcbf38f76491bc96bab48fbda1994dc504948b0",
+        "source_commit": "a6223afa0899d5800d21ed9dc6c49304fbb2e8ca"
+      },
+      "historical_match": {
+        "bytes": true,
+        "classification": "matches_historical_manifest",
+        "file_count": true
+      },
+      "kind": "directory_census",
+      "path": "/home/zhuhe/litchi-performance-0960/source-baseline-v1",
+      "regeneration": "1) git archive the base commit with docs/performance and docs/report excluded; 2) copy the recorded root Cargo.lock overlay into both fresh roots; 3) apply receipts/0960-final-codec-v1.patch to the candidate root; 4) emit sorted path,size,mode,SHA-256 rows for each root",
+      "regular_bytes": 273567986,
+      "regular_file_count": 10933,
+      "role": "quality-frozen baseline source snapshot",
+      "status": "external_snapshot",
+      "symlink_count": 0
+    },
+    {
+      "historical_manifest": {
+        "bytes": 2561657,
+        "bytes_in_snapshot": 273587601,
+        "file_count": 10933,
+        "path": "/home/zhuhe/litchi-performance-0960/source-manifest-candidate-v2.json",
+        "sha256": "1e8d968807ce5aaa0fe2b94d0ad61431997baf16b0e9aaa9cfa4d4ef94b0a9fa",
+        "source_commit": "a6223afa0899d5800d21ed9dc6c49304fbb2e8ca"
+      },
+      "historical_match": {
+        "bytes": true,
+        "classification": "matches_historical_manifest",
+        "file_count": true
+      },
+      "kind": "directory_census",
+      "path": "/home/zhuhe/litchi-performance-0960/source-candidate-v1",
+      "regeneration": "1) git archive the base commit with docs/performance and docs/report excluded; 2) copy the recorded root Cargo.lock overlay into both fresh roots; 3) apply receipts/0960-final-codec-v1.patch to the candidate root; 4) emit sorted path,size,mode,SHA-256 rows for each root",
+      "regular_bytes": 273587601,
+      "regular_file_count": 10933,
+      "role": "quality-frozen candidate source snapshot",
+      "status": "external_snapshot",
+      "symlink_count": 0
+    },
+    {
+      "bytes": 2267268,
+      "kind": "file",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0957/source-manifest-v2.json",
+      "regeneration": "git -C /home/zhuhe/code/litchi archive --format=tar 02449f394529766d76794332204c27c4022931fc",
+      "role": "0957 retained runtime source manifest dependency",
+      "sha256": "f5fd1ee75b734bb7efaa1882be0397defea98c76c835be0bdf1f565c573ef617",
+      "status": "external_dependency"
+    },
+    {
+      "bytes": 43676872,
+      "kind": "file",
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_alloc.v2",
+      "regeneration": "rebuild from the retained 0957 source/build receipt; do not commit executable",
+      "role": "0957 retained binary dependency; execution not performed in 0960",
+      "sha256": "9ba37a6b9796ad0e316e7571ebe117ba7a5f97bcf5d29153c7cb3d74c485e9a5",
+      "status": "external_dependency"
+    },
+    {
+      "bytes": 43259328,
+      "kind": "file",
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+      "regeneration": "rebuild from the retained 0957 source/build receipt; do not commit executable",
+      "role": "0957 retained binary dependency; execution not performed in 0960",
+      "sha256": "5886b0f86a697bae757994d5a757cffae4a7e8d61a2769ff1c967029cd1912c3",
+      "status": "external_dependency"
+    },
+    {
+      "bytes": 43677192,
+      "kind": "file",
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0960/executables/xlsx_managed_compression_alloc.v1",
+      "regeneration": "rebuild with the command and source manifest recorded in receipts/candidate-managed-v1-build-start.json; do not commit executable",
+      "role": "0960 candidate release executable; external only",
+      "sha256": "06115121a4dde73b7320f3d751232d0aefd0c9d0227d91051f49dc34fc0bcaae",
+      "status": "external_candidate_binary"
+    },
+    {
+      "bytes": 43256440,
+      "kind": "file",
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0960/executables/xlsx_managed_compression_benchmark.v1",
+      "regeneration": "rebuild with the command and source manifest recorded in receipts/candidate-managed-v1-build-start.json; do not commit executable",
+      "role": "0960 candidate release executable; external only",
+      "sha256": "ec9ecfc7ea4283a11727d8e63309661ed5318bf2093546906f751e10fb9a6ff3",
+      "status": "external_candidate_binary"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/builds/candidate-managed-v1/build.stdout.log",
+      "regeneration": "re-run the command recorded in receipts/candidate-managed-v1-build-start.json",
+      "role": "0960 candidate build log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "external_build_log"
+    },
+    {
+      "bytes": 9001,
+      "kind": "file",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/builds/candidate-managed-v1/build.stderr.log",
+      "regeneration": "re-run the command recorded in receipts/candidate-managed-v1-build-start.json",
+      "role": "0960 candidate build log",
+      "sha256": "77146b7ce278f3bb8ee101e7e57cc5101607d7247a92cd3fed32b115b917e774",
+      "status": "external_build_log"
+    },
+    {
+      "bytes": 22069,
+      "kind": "file",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/receipts/0960-final-codec-v1.patch",
+      "regeneration": "git -C /home/zhuhe/litchi-performance-0960/source-candidate-v1 apply /home/zhuhe/litchi-performance-0960/receipts/0960-final-codec-v1.patch",
+      "role": "candidate source patch applied after the base export",
+      "sha256": "dbef0f056316364b466d453767cd0b3fed6a8f713385c183bf732e0cb9892a8a",
+      "status": "external_candidate_source"
+    },
+    {
+      "bytes": 133840,
+      "kind": "file",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/logs/0960-full-xlsx-lib-v2.log",
+      "regeneration": "re-run the command recorded in receipts/0960-full-xlsx-lib-v2.command",
+      "role": "full XLSX lib test log; observed 1,404 passed",
+      "sha256": "cecf821da696f29a9dcff6ec6ec6b03d0d2e014ea6895528b4fe601ea2a46672",
+      "status": "quality_receipt"
+    },
+    {
+      "bytes": 182,
+      "kind": "file",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/logs/0960-clippy-xlsx-lib-v2.log",
+      "regeneration": "re-run the command recorded in receipts/0960-clippy-xlsx-lib-v2.command",
+      "role": "Clippy v2 log; observed rc=0 on corrected codec hash",
+      "sha256": "bc8c767ecd526fe43af3ae51a041cd37ccbc1c63d0a59f7d5cd20cb8eea99433",
+      "status": "quality_receipt"
+    },
+    {
+      "bytes": 1420,
+      "kind": "file",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/logs/0960-focused-strict-hint-v7.log",
+      "regeneration": "re-run the command recorded in receipts/0960-focused-strict-hint-v7.command",
+      "role": "focused strict-lane v7 log; observed 7 passed/1 ignored",
+      "sha256": "9385617e0c9030c76eeace7ca8784c4cf6ff416013c02eb92b7f510b87b814e5",
+      "status": "quality_receipt"
+    },
+    {
+      "bytes": 2458,
+      "kind": "file",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/logs/0960-managed-route-census-v1.log",
+      "regeneration": "re-run the command recorded in receipts/0960-managed-route-census-v1.command",
+      "role": "managed route census log; eight worksheets/27,008 cells",
+      "sha256": "1a151f51b9f831a4d8d2f16f9ffe1f659bc1804f0b8d5a2064e2be65559556f8",
+      "status": "quality_receipt"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/logs/0960-rustfmt-codec-v1.log",
+      "regeneration": "re-run the command recorded in receipts/0960-rustfmt-codec-v1.command",
+      "role": "scoped codec rustfmt log; observed rc=0",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "quality_receipt"
+    },
+    {
+      "bytes": 4520,
+      "kind": "file",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/logs/0960-clippy-xlsx-lib-v1.log",
+      "regeneration": "re-run the command recorded in receipts/0960-clippy-xlsx-lib-v1.command",
+      "role": "superseded Clippy failure history",
+      "sha256": "fd910fa60187549e67835ae07ecf2bb3e73b3746c71775640c466ce8ed9df92e",
+      "status": "historical_failure"
+    },
+    {
+      "bytes": 4012,
+      "kind": "file",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/logs/0960-focused-strict-hint-v1.log",
+      "regeneration": "re-run the command recorded in receipts/0960-focused-strict-hint-v1.command",
+      "role": "superseded focused failure history",
+      "sha256": "00c23ab0f735276365f83f8a5679244af25ebc10487df012bdb5845ef37a393f",
+      "status": "historical_failure"
+    },
+    {
+      "bytes": 1534,
+      "kind": "file",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/logs/0960-focused-strict-hint-v2.log",
+      "regeneration": "re-run the command recorded in receipts/0960-focused-strict-hint-v2.command",
+      "role": "superseded focused compile failure history",
+      "sha256": "12640c50dd2d706c30f5eed7955f7b4a1e887f1484c8e5bf1756ca4679e50fee",
+      "status": "historical_failure"
+    },
+    {
+      "bytes": 1234,
+      "kind": "file",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/logs/0960-focused-strict-hint-v3.log",
+      "regeneration": "re-run the command recorded in receipts/0960-focused-strict-hint-v3.command",
+      "role": "superseded focused failure history",
+      "sha256": "711007054342745d347bcacc82d4e1d757ec224a79d516cbace71845d8812cf9",
+      "status": "historical_failure"
+    },
+    {
+      "bytes": 1234,
+      "kind": "file",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/logs/0960-focused-strict-hint-v4.log",
+      "regeneration": "re-run the command recorded in receipts/0960-focused-strict-hint-v4.command",
+      "role": "superseded focused failure history",
+      "sha256": "374857d414ea89275a9bcc7edb7c1e030b0255be74876765503de17865728484",
+      "status": "historical_failure"
+    },
+    {
+      "bytes": 1142,
+      "kind": "file",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/logs/0960-focused-strict-hint-v5.log",
+      "regeneration": "re-run the command recorded in receipts/0960-focused-strict-hint-v5.command",
+      "role": "superseded focused failure history",
+      "sha256": "4e6cbd2e4fea0c2b206e676236391b56b2ee990a6667c067b962c38a7a816c5d",
+      "status": "historical_failure"
+    },
+    {
+      "kind": "directory_census",
+      "path": "/home/zhuhe/litchi-performance-0960/route-census-v1",
+      "regeneration": "recreate the two medium/dense worksheet trees from the route-census input generator; verify receipts/0960-route-census-worksheets.sha256",
+      "regular_bytes": 778975,
+      "regular_file_count": 11,
+      "role": "external eight-worksheet route census inputs",
+      "status": "external_quality_input",
+      "symlink_count": 0
+    }
+  ],
+  "generated_by": "tools/build_external_artifact_manifest_0960_v1.py",
+  "historical_failures_preserved_by_descriptor": true,
+  "large_artifacts_stay_external": true,
+  "notes": [
+    "The copied quality receipts are bounded metadata; full logs, source trees, source manifests, route inputs, and binaries remain external.",
+    "The v1 source manifests are retained as pre-quality history; v2 manifests and the patch bind the current quality-frozen trees.",
+    "The candidate build and authorized measurement plan are separate gates; this manifest records source/quality readiness only."
+  ],
+  "schema": "litchi.performance.0960.external-artifact-manifest.v1",
+  "scope": "quality/provenance packet; no 0960 benchmark workload or formal capture",
+  "status": "native_capture_running_allocator_pending"
+}

@@ -1,0 +1,77 @@
+{
+  "build_dir": "/home/zhuhe/litchi-performance-0960/builds/candidate-managed-v1",
+  "command": [
+    "/home/zhuhe/.cargo/bin/cargo",
+    "+1.95.0",
+    "build",
+    "--release",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "/home/zhuhe/litchi-performance-0960/source-candidate-v1/tools/perf-baseline/Cargo.toml",
+    "--features",
+    "allocator-metrics",
+    "--bin",
+    "xlsx_managed_compression_alloc",
+    "--example",
+    "xlsx_managed_compression_benchmark"
+  ],
+  "cwd": "/home/zhuhe/litchi-performance-0960/source-candidate-v1",
+  "deadline_seconds": 1800,
+  "env_overrides": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_PROFILE_RELEASE_LTO": "fat",
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-performance-0960/target-candidate-managed-v1",
+    "CARGO_TERM_COLOR": "never",
+    "HOME": "/home/zhuhe",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/home/zhuhe/.cargo/bin:/usr/bin:/bin",
+    "RUSTUP_TOOLCHAIN": "1.95.0",
+    "RUST_BACKTRACE": "0",
+    "TMPDIR": "/home/zhuhe/litchi-performance-0960/tmp/candidate-managed-v1",
+    "TZ": "UTC"
+  },
+  "no_rustflags": true,
+  "removed_environment_flags": [
+    "RUSTFLAGS",
+    "CARGO_ENCODED_RUSTFLAGS"
+  ],
+  "roles": [
+    "xlsx_managed_compression_alloc",
+    "xlsx_managed_compression_benchmark"
+  ],
+  "schema": "litchi.performance.0960.candidate-managed-v1.build-start",
+  "source_manifest": {
+    "bytes": 2561657,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0960/source-manifest-candidate-v2.json",
+    "sha256": "1e8d968807ce5aaa0fe2b94d0ad61431997baf16b0e9aaa9cfa4d4ef94b0a9fa"
+  },
+  "source_root": "/home/zhuhe/litchi-performance-0960/source-candidate-v1",
+  "source_verification_start": {
+    "actual_bytes": 273587601,
+    "actual_file_count": 10933,
+    "file_count": 10933,
+    "manifest": {
+      "bytes": 2561657,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/source-manifest-candidate-v2.json",
+      "sha256": "1e8d968807ce5aaa0fe2b94d0ad61431997baf16b0e9aaa9cfa4d4ef94b0a9fa"
+    },
+    "manifest_bytes": 273587601,
+    "mismatch_count": 0,
+    "mismatches": [],
+    "source_root": "/home/zhuhe/litchi-performance-0960/source-candidate-v1",
+    "tree_digest_from_manifest": "dadb727084edfd3e91492f051cecf0e75e339a8855ad67f46a446d30495bf6f7",
+    "tree_digest_from_source": "dadb727084edfd3e91492f051cecf0e75e339a8855ad67f46a446d30495bf6f7",
+    "verified": true
+  },
+  "started_utc": "2026-10-07T16:06:24.505337Z",
+  "target_dir": "/home/zhuhe/litchi-performance-0960/target-candidate-managed-v1"
+}

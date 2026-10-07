@@ -1,0 +1,228 @@
+{
+  "frozen_contract": {
+    "controls": {
+      "bytes": 6079,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0960/tools/check_screening_contract_v9.py",
+      "sha256": "9c52375a689318ace6007b983d71c3508846ddc1a46e64d69b58f7b9344b9f70"
+    },
+    "reducer": {
+      "bytes": 31267,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/tools/reduce_0960_v3.py",
+      "sha256": "7000e9094a9c8174907788dd8161b14b7f61210c74fe3930c43306a49c9852f2"
+    },
+    "runner": {
+      "bytes": 36205,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0960/tools/screen_0960_v7.py",
+      "sha256": "8f8b9a8bb83905dafcc109f6b113a3db9ae98420d86f031ba761482b74721238"
+    },
+    "runner_check_plan": "passed: native 36, allocator 18",
+    "schedule": {
+      "child_owns_output_directory": true,
+      "cpu_mask": [
+        12,
+        13,
+        14,
+        15
+      ],
+      "deadline_seconds": 900,
+      "fresh_process_per_child": true,
+      "no_retries": true,
+      "serial": true,
+      "stop_on_first_failure": true,
+      "terminal_before_parse": true
+    },
+    "selection_rule": {
+      "bytes": 1708,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/review/root-screening-rule-v2.json",
+      "sha256": "2adeb002f4d7d999771d26d743ce29eccb6f2fc8d2226de68aa2cb2ae6afc7a7"
+    },
+    "selector": {
+      "bytes": 3037,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/tools/select_screen_0960_v1.py",
+      "sha256": "3a22623881d373907ce9a0843864179f7a5864707b0471a0f2bb6374f1ef8de7"
+    },
+    "selector_controls": {
+      "bytes": 784,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/review/root-screen-selector-controls-v1.json",
+      "sha256": "5bd01b835847a600a9f949ddb2f8446de03376886b73bc285f2c8713595ee70c"
+    }
+  },
+  "host_custody": {
+    "capture_cpus_online": true,
+    "current_affinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31
+    ],
+    "lscpu_matches_current": true,
+    "output_filesystem": "tmpfs as recorded by host receipt",
+    "receipt": {
+      "bytes": 5994,
+      "mode": 436,
+      "path": "/tmp/litchi-performance-0960-epoch2/host-v1.json",
+      "sha256": "655ecc740c4cc1581984abb7d8e918b8534ed911757c66eeb5a9685baf5a1d05"
+    },
+    "receipt_affinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31
+    ],
+    "target_processes_visible_at_review": false,
+    "uname_matches_current": true
+  },
+  "old_epoch": {
+    "inventory": {
+      "allocator_packet_present": false,
+      "child_directories": 34,
+      "expected_native_children": 36,
+      "incomplete_child": "native__medium-one-edit__b02__p1",
+      "lane_terminal_present": false,
+      "launch_records": 33,
+      "prior_terminal_state": "unknown",
+      "start_records": 34,
+      "terminal_records": 33,
+      "validation_records": 33
+    },
+    "packet": "/home/zhuhe/litchi-performance-0960/capture-native-v1",
+    "plan": {
+      "bytes": 54646,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/plan-final-v1.json",
+      "sha256": "a9c0db61ae9dd48c349d3c264c140d6126c35979c32cecc1f671ded8bb2b176d"
+    },
+    "policy": "retained as failed/incomplete evidence only; no partial timing analysis, pooling, replacement, or reduction",
+    "state": "incomplete and unvalidated"
+  },
+  "prospective_epoch": {
+    "allocator_children": 18,
+    "analysis_root_absent": true,
+    "capture_roots_absent": {
+      "allocator": true,
+      "native": true
+    },
+    "measurements_started": false,
+    "native_children": 36,
+    "plan": {
+      "bytes": 55577,
+      "mode": 436,
+      "path": "/tmp/litchi-performance-0960-epoch2/plan-prospective-v1.json",
+      "sha256": "52940ca000304e0431e4f5e264782509d58460a3e8a1241bcabe65b11acc95d8"
+    },
+    "root_go": {
+      "status": "pending_review"
+    },
+    "status": "prospective",
+    "unique_child_ids": {
+      "allocator": 18,
+      "native": 36
+    },
+    "workload_cwd": "/tmp/litchi-performance-0960-epoch2",
+    "workload_cwd_is_directory": true
+  },
+  "required_after_capture_before_reduction": [
+    "Require capture-terminal.json and completed-packet.json for each lane, status completed, all 36/18 expected children, and every child terminal/validation/post-terminal artifact.",
+    "Require clean reaping/process-group-clear and all report/source/output/oracle checks before reduction.",
+    "Run reducer and selector only against the new epoch packets and final plan; never read or merge old partial packet rows."
+  ],
+  "required_before_capture": [
+    "Replace prospective status with authorized and bind a new root GO receipt to the final plan SHA; do not reuse the old GO.",
+    "Recheck host identity, CPU 12-15 online/available, no benchmark/runner/build/profile process or stale process group, and retain the fresh host receipt descriptor.",
+    "Recheck all source manifests, source revalidation receipt, binaries, helpers, selector/rule/controls, and final plan descriptors immediately before GO.",
+    "Keep both new capture roots absent; launch exactly one native lane and one allocator lane from the fresh plan with approval variable set.",
+    "Treat any child or lane failure as terminal for this epoch; do not retry, replace, repair, or pool it."
+  ],
+  "schema": "litchi.performance.0960.rerun-feasibility-review.v1",
+  "scientific_assessment": {
+    "basis": "A complete fresh epoch is a new descriptive screening sample. The incomplete prior epoch is excluded entirely; unknown prior terminal state is handled as a prelaunch custody condition and does not justify using its partial records.",
+    "defensible": true,
+    "limits": "The result remains screening-only and cannot support adoption, a confidence interval, or a production claim."
+  },
+  "scope": {
+    "build_launched": false,
+    "old_packet_modified": false,
+    "pooling_or_sample_replacement": false,
+    "read_only": true,
+    "timing_values_inspected": false,
+    "workload_launched": false
+  },
+  "source_custody": {
+    "baseline_file_count": 10933,
+    "candidate_file_count": 10933,
+    "candidate_manifest_changed_paths": [
+      "crates/litchi-xlsx/src/raw/worksheet/codec.rs"
+    ],
+    "membership_mode_hash_mismatches": [],
+    "revalidation": {
+      "bytes": 466,
+      "mode": 436,
+      "path": "/tmp/litchi-performance-0960-epoch2/source-revalidation-v1.json",
+      "sha256": "f687116c91dd807905a040759251d1f66f865b5ba6e0a134584a55f4165d6afa"
+    },
+    "source_roots_reused_by_exact_bound_descriptors": true
+  },
+  "status": "passed_with_prelaunch_conditions"
+}

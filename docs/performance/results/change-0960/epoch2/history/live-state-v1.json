@@ -1,0 +1,9 @@
+{
+  "observed_utc": "2026-10-07T16:39:22.695698+00:00",
+  "status": "native_capture_running",
+  "session_id": 16080,
+  "plan": "/tmp/litchi-performance-0960-epoch2/plan-final-v1.json",
+  "native_packet": "/tmp/litchi-performance-0960-epoch2/capture-native-v1",
+  "allocator": "not started",
+  "policy": "Poll same handle. Do not infer completion from this historical live-state file."
+}

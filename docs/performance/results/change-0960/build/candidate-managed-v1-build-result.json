@@ -1,0 +1,37 @@
+{
+  "all_binaries_present": true,
+  "binary_parse_after_terminal": true,
+  "binary_receipt": {
+    "bytes": 1364,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0960/receipts/candidate-managed-v1-build-binaries.json",
+    "sha256": "f29f5e5655932150e47cc779fff32d6a3d08fe4edb2d6069ca8cdba20d51f530"
+  },
+  "launch_error": null,
+  "retained_executables": false,
+  "retention_receipt": {
+    "bytes": 2733,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0960/receipts/candidate-managed-v1-retention.json",
+    "sha256": "b308c2f3a09361d34ec83c95799894d926e7522303d0b9aeb5821cdedb4bebf3"
+  },
+  "returncode": 0,
+  "schema": "litchi.performance.0960.candidate-managed-v1.build-result",
+  "source_error": null,
+  "source_unchanged": true,
+  "source_verification_end_pass": true,
+  "source_verification_start_pass": true,
+  "start_receipt": {
+    "bytes": 2729,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0960/receipts/candidate-managed-v1-build-start.json",
+    "sha256": "029f94e1fc7210bbbf6776102d2db55975cf44de285edb112740f4917c9e7f50"
+  },
+  "terminal_receipt": {
+    "bytes": 1517,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0960/receipts/candidate-managed-v1-build-terminal.json",
+    "sha256": "f24bdf322d1fa5118392952bf9e3d5c741fe9eebc3e9b4571c9b68a066a4dd8e"
+  },
+  "timed_out": false
+}

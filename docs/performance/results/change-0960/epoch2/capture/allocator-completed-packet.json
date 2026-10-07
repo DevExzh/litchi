@@ -1,0 +1,194 @@
+{
+  "capture_terminal": {
+    "bytes": 574,
+    "executable": false,
+    "mode": 436,
+    "path": "/tmp/litchi-performance-0960-epoch2/capture-allocator-v1/capture-terminal.json",
+    "sha256": "48e0d3700b96bcb2c1ba6db91748a6e5528cbc30375f9150dc47e3eac4bd72bf"
+  },
+  "children": [
+    {
+      "child_id": "allocator__medium-one-percent__b00__p0",
+      "validation": {
+        "bytes": 1692,
+        "executable": false,
+        "mode": 436,
+        "path": "/tmp/litchi-performance-0960-epoch2/capture-allocator-v1/children/allocator__medium-one-percent__b00__p0/validation.json",
+        "sha256": "f843800eff1f7608102abacb75685026868c90f421766d5ef6fd58799766be70"
+      }
+    },
+    {
+      "child_id": "allocator__medium-one-percent__b00__p1",
+      "validation": {
+        "bytes": 1693,
+        "executable": false,
+        "mode": 436,
+        "path": "/tmp/litchi-performance-0960-epoch2/capture-allocator-v1/children/allocator__medium-one-percent__b00__p1/validation.json",
+        "sha256": "5aa267970072fa5337f67f1b5db50c318f75588b9adf0709986862025443860a"
+      }
+    },
+    {
+      "child_id": "allocator__medium-one-percent__b01__p0",
+      "validation": {
+        "bytes": 1693,
+        "executable": false,
+        "mode": 436,
+        "path": "/tmp/litchi-performance-0960-epoch2/capture-allocator-v1/children/allocator__medium-one-percent__b01__p0/validation.json",
+        "sha256": "7b0d7884d1a106835385b20cf3258f86710ca7d4d63b15b15c4c9db2aec8ef97"
+      }
+    },
+    {
+      "child_id": "allocator__medium-one-percent__b01__p1",
+      "validation": {
+        "bytes": 1693,
+        "executable": false,
+        "mode": 436,
+        "path": "/tmp/litchi-performance-0960-epoch2/capture-allocator-v1/children/allocator__medium-one-percent__b01__p1/validation.json",
+        "sha256": "5a66397dea4615fe1de44b72008b98c591d724195352c975b6672180bc5c0e44"
+      }
+    },
+    {
+      "child_id": "allocator__medium-one-percent__b02__p0",
+      "validation": {
+        "bytes": 1693,
+        "executable": false,
+        "mode": 436,
+        "path": "/tmp/litchi-performance-0960-epoch2/capture-allocator-v1/children/allocator__medium-one-percent__b02__p0/validation.json",
+        "sha256": "d979c1d2c1cc8becb75de32ee90d7503420cd6cde875246da45b43a5abd1d226"
+      }
+    },
+    {
+      "child_id": "allocator__medium-one-percent__b02__p1",
+      "validation": {
+        "bytes": 1694,
+        "executable": false,
+        "mode": 436,
+        "path": "/tmp/litchi-performance-0960-epoch2/capture-allocator-v1/children/allocator__medium-one-percent__b02__p1/validation.json",
+        "sha256": "4e9ae7927cac566fe4f6faa4d2b4d89a2a42fd563fc197572d9b97e4d4292351"
+      }
+    },
+    {
+      "child_id": "allocator__dense-sparse-one-percent__b00__p0",
+      "validation": {
+        "bytes": 1730,
+        "executable": false,
+        "mode": 436,
+        "path": "/tmp/litchi-performance-0960-epoch2/capture-allocator-v1/children/allocator__dense-sparse-one-percent__b00__p0/validation.json",
+        "sha256": "aa36f233d8812daf81cd4ac1a44f5361ca2bdf315c784424c3ddca06e573c1c0"
+      }
+    },
+    {
+      "child_id": "allocator__dense-sparse-one-percent__b00__p1",
+      "validation": {
+        "bytes": 1731,
+        "executable": false,
+        "mode": 436,
+        "path": "/tmp/litchi-performance-0960-epoch2/capture-allocator-v1/children/allocator__dense-sparse-one-percent__b00__p1/validation.json",
+        "sha256": "29bd61daf41bd8b94bb293261536e8a364a02fe26c6929c0722e46b3c576c6a6"
+      }
+    },
+    {
+      "child_id": "allocator__dense-sparse-one-percent__b01__p0",
+      "validation": {
+        "bytes": 1731,
+        "executable": false,
+        "mode": 436,
+        "path": "/tmp/litchi-performance-0960-epoch2/capture-allocator-v1/children/allocator__dense-sparse-one-percent__b01__p0/validation.json",
+        "sha256": "9447d8bd559d2e6a3c6c34a504344ac04ac129d8a862954cfd550854f5451344"
+      }
+    },
+    {
+      "child_id": "allocator__dense-sparse-one-percent__b01__p1",
+      "validation": {
+        "bytes": 1730,
+        "executable": false,
+        "mode": 436,
+        "path": "/tmp/litchi-performance-0960-epoch2/capture-allocator-v1/children/allocator__dense-sparse-one-percent__b01__p1/validation.json",
+        "sha256": "9241131affdcdf1f4c64688a7056508a6221e810d5b5d2a623007bcd2fc3c71f"
+      }
+    },
+    {
+      "child_id": "allocator__dense-sparse-one-percent__b02__p0",
+      "validation": {
+        "bytes": 1730,
+        "executable": false,
+        "mode": 436,
+        "path": "/tmp/litchi-performance-0960-epoch2/capture-allocator-v1/children/allocator__dense-sparse-one-percent__b02__p0/validation.json",
+        "sha256": "230be83fc2503f22acda8a0d948d5bd41b1a65f29269505065dd315f77c8377a"
+      }
+    },
+    {
+      "child_id": "allocator__dense-sparse-one-percent__b02__p1",
+      "validation": {
+        "bytes": 1730,
+        "executable": false,
+        "mode": 436,
+        "path": "/tmp/litchi-performance-0960-epoch2/capture-allocator-v1/children/allocator__dense-sparse-one-percent__b02__p1/validation.json",
+        "sha256": "03b4cc214858b0a9fdd491a3242b73526c772ead3b3e5ae0c3e1dd198fead504"
+      }
+    },
+    {
+      "child_id": "allocator__medium-one-edit__b00__p0",
+      "validation": {
+        "bytes": 1676,
+        "executable": false,
+        "mode": 436,
+        "path": "/tmp/litchi-performance-0960-epoch2/capture-allocator-v1/children/allocator__medium-one-edit__b00__p0/validation.json",
+        "sha256": "d7ac7ce1b2dd128b75363a5d900b9d164bdaba72b8fee216d046933dd4a9db20"
+      }
+    },
+    {
+      "child_id": "allocator__medium-one-edit__b00__p1",
+      "validation": {
+        "bytes": 1676,
+        "executable": false,
+        "mode": 436,
+        "path": "/tmp/litchi-performance-0960-epoch2/capture-allocator-v1/children/allocator__medium-one-edit__b00__p1/validation.json",
+        "sha256": "7810389b40952e1420e190780213bceeb40f49816875bdf9db838678bcb9ac2c"
+      }
+    },
+    {
+      "child_id": "allocator__medium-one-edit__b01__p0",
+      "validation": {
+        "bytes": 1676,
+        "executable": false,
+        "mode": 436,
+        "path": "/tmp/litchi-performance-0960-epoch2/capture-allocator-v1/children/allocator__medium-one-edit__b01__p0/validation.json",
+        "sha256": "2380ec373c7b708b9a4fbb63e91d9d5bdd5c2f066db24fc5013ad77de3a20f79"
+      }
+    },
+    {
+      "child_id": "allocator__medium-one-edit__b01__p1",
+      "validation": {
+        "bytes": 1675,
+        "executable": false,
+        "mode": 436,
+        "path": "/tmp/litchi-performance-0960-epoch2/capture-allocator-v1/children/allocator__medium-one-edit__b01__p1/validation.json",
+        "sha256": "cc844c0ef54acf4c94a79162799407352948d0fa4a3215b1002725365a5eeb84"
+      }
+    },
+    {
+      "child_id": "allocator__medium-one-edit__b02__p0",
+      "validation": {
+        "bytes": 1675,
+        "executable": false,
+        "mode": 436,
+        "path": "/tmp/litchi-performance-0960-epoch2/capture-allocator-v1/children/allocator__medium-one-edit__b02__p0/validation.json",
+        "sha256": "ee2f2216d7d6e049d68c13c2073420beeb54a21838edc1330d2dc8f6987ba704"
+      }
+    },
+    {
+      "child_id": "allocator__medium-one-edit__b02__p1",
+      "validation": {
+        "bytes": 1676,
+        "executable": false,
+        "mode": 436,
+        "path": "/tmp/litchi-performance-0960-epoch2/capture-allocator-v1/children/allocator__medium-one-edit__b02__p1/validation.json",
+        "sha256": "7952380351e9b6f5747b478359d6af224d528d82e2ce46148c497eee2a0f2de4"
+      }
+    }
+  ],
+  "lane": "allocator",
+  "schema": "litchi.performance.0960.capture.v1.completed-packet",
+  "status": "completed"
+}

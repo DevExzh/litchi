@@ -1,0 +1,63 @@
+{
+  "binaries": {
+    "xlsx_managed_compression_alloc": {
+      "build_output": {
+        "bytes": 43677192,
+        "exists": true,
+        "mode": 509,
+        "path": "/home/zhuhe/litchi-performance-0960/target-candidate-managed-v1/release/xlsx_managed_compression_alloc",
+        "sha256": "06115121a4dde73b7320f3d751232d0aefd0c9d0227d91051f49dc34fc0bcaae"
+      },
+      "byte_hash_mode_match": true,
+      "retained": {
+        "bytes": 43677192,
+        "exists": true,
+        "mode": 509,
+        "path": "/home/zhuhe/litchi-performance-0960/executables/xlsx_managed_compression_alloc.v1",
+        "sha256": "06115121a4dde73b7320f3d751232d0aefd0c9d0227d91051f49dc34fc0bcaae"
+      }
+    },
+    "xlsx_managed_compression_benchmark": {
+      "build_output": {
+        "bytes": 43256440,
+        "exists": true,
+        "mode": 509,
+        "path": "/home/zhuhe/litchi-performance-0960/target-candidate-managed-v1/release/examples/xlsx_managed_compression_benchmark",
+        "sha256": "ec9ecfc7ea4283a11727d8e63309661ed5318bf2093546906f751e10fb9a6ff3"
+      },
+      "byte_hash_mode_match": true,
+      "retained": {
+        "bytes": 43256440,
+        "exists": true,
+        "mode": 509,
+        "path": "/home/zhuhe/litchi-performance-0960/executables/xlsx_managed_compression_benchmark.v1",
+        "sha256": "ec9ecfc7ea4283a11727d8e63309661ed5318bf2093546906f751e10fb9a6ff3"
+      }
+    }
+  },
+  "correction_reason": "Original wrapper compared full descriptors including path, so distinct build-output and retained paths made byte-identical copies report false. This correction compares bytes, mode, and SHA-256 while retaining both path descriptors.",
+  "created_utc": "2026-10-07T16:14:50.589209Z",
+  "helper": {
+    "bytes": 3762,
+    "exists": true,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0960/build-tools/verify_candidate_managed_v1_retention_v1.py",
+    "sha256": "bebef22c53ae3a1d2297f3306097e94d0208cd5bb9423b2ecea966a3dc52a045"
+  },
+  "no_rebuild": true,
+  "no_workload": true,
+  "original_build_result": {
+    "bytes": 1355,
+    "cargo_returncode": 0,
+    "path": "/home/zhuhe/litchi-performance-0960/receipts/candidate-managed-v1-build-result.json",
+    "sha256": "4f257bcebb56e0641a4b1052599db95bb0f65637a5d66701b2f658d7151012b0",
+    "source_unchanged": true
+  },
+  "original_retention_receipt": {
+    "bytes": 2733,
+    "path": "/home/zhuhe/litchi-performance-0960/receipts/candidate-managed-v1-retention.json",
+    "sha256": "b308c2f3a09361d34ec83c95799894d926e7522303d0b9aeb5821cdedb4bebf3"
+  },
+  "schema": "litchi.performance.0960.candidate-managed-v1.retention-correction.v1",
+  "status": "validated"
+}

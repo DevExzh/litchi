@@ -1,0 +1,52 @@
+{
+  "status": "GO",
+  "created_utc": "2026-10-07T16:38:30.296483+00:00",
+  "scope": "One fresh independent screening epoch; no adoption",
+  "prospective_plan": {
+    "path": "/tmp/litchi-performance-0960-epoch2/plan-prospective-v1.json",
+    "bytes": 55577,
+    "mode": 436,
+    "executable": false,
+    "sha256": "52940ca000304e0431e4f5e264782509d58460a3e8a1241bcabe65b11acc95d8"
+  },
+  "independent_review": {
+    "path": "/tmp/litchi-performance-0960-epoch2/review/rerun-feasibility-v1.json",
+    "bytes": 7083,
+    "mode": 436,
+    "executable": false,
+    "sha256": "fe49c47875661483752746c4fb7eaafd91a735f91b74dbaf8312ca104749d53c"
+  },
+  "source_revalidation": {
+    "path": "/tmp/litchi-performance-0960-epoch2/source-revalidation-v1.json",
+    "bytes": 466,
+    "mode": 436,
+    "executable": false,
+    "sha256": "f687116c91dd807905a040759251d1f66f865b5ba6e0a134584a55f4165d6afa"
+  },
+  "host": {
+    "path": "/tmp/litchi-performance-0960-epoch2/host-v1.json",
+    "bytes": 5994,
+    "mode": 436,
+    "executable": false,
+    "sha256": "655ecc740c4cc1581984abb7d8e918b8534ed911757c66eeb5a9685baf5a1d05"
+  },
+  "original_rule": {
+    "path": "/home/zhuhe/litchi-performance-0960/review/root-screening-rule-v2.json",
+    "bytes": 1708,
+    "sha256": "2adeb002f4d7d999771d26d743ce29eccb6f2fc8d2226de68aa2cb2ae6afc7a7",
+    "mode": 436,
+    "executable": false
+  },
+  "original_selector": {
+    "path": "/home/zhuhe/litchi-performance-0960/tools/select_screen_0960_v1.py",
+    "bytes": 3037,
+    "sha256": "3a22623881d373907ce9a0843864179f7a5864707b0471a0f2bb6374f1ef8de7",
+    "mode": 436,
+    "executable": false
+  },
+  "exclusions": "Prior incomplete epoch excluded completely; no timing analysis, pooling, replacement, or retry. No further automatic epoch.",
+  "capture_roots": {
+    "native": "/tmp/litchi-performance-0960-epoch2/capture-native-v1",
+    "allocator": "/tmp/litchi-performance-0960-epoch2/capture-allocator-v1"
+  }
+}

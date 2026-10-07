@@ -1,0 +1,313 @@
+{
+  "decision": "reject_screen",
+  "adoption_allowed": false,
+  "statistical_effect_claim": false,
+  "stops": [
+    "No qualifying metric among signal_any"
+  ],
+  "signals": [],
+  "required_metrics": {
+    "native": {
+      "dense-sparse-one-percent": {
+        "edit_commit_ns.p50": {
+          "max": 1.0697585801579284,
+          "median": 1.0345529121276416,
+          "min": 1.0234790921447168,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 1,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "edit_commit_ns.p95": {
+          "max": 1.0636658624542625,
+          "median": 1.0336775526090995,
+          "min": 1.0241258611973763,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 1,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "total_ns.p50": {
+          "max": 1.038591057105481,
+          "median": 1.0213789061504563,
+          "min": 1.013935664513563,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "total_ns.p95": {
+          "max": 1.0455728392868948,
+          "median": 1.03773789651776,
+          "min": 1.0210052779050183,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "max_rss_kib": {
+          "max": 1.0080948435209383,
+          "median": 0.9992402265153182,
+          "min": 0.994061532629983,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        }
+      },
+      "medium-one-edit": {
+        "edit_commit_ns.p50": {
+          "max": 1.0353802924414142,
+          "median": 1.0214874950219577,
+          "min": 1.0160948046691727,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "edit_commit_ns.p95": {
+          "max": 1.0388114180288066,
+          "median": 1.0204388188645472,
+          "min": 1.004760060087204,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "total_ns.p50": {
+          "max": 1.0286171523261551,
+          "median": 1.0160142077624605,
+          "min": 1.0101203849059448,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "total_ns.p95": {
+          "max": 1.0347351604951736,
+          "median": 1.0217181821221093,
+          "min": 1.0091679542449934,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "max_rss_kib": {
+          "max": 1.0148605196836709,
+          "median": 1.0027617071607462,
+          "min": 0.9999141262344354,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        }
+      },
+      "medium-one-percent": {
+        "edit_commit_ns.p50": {
+          "max": 1.0304480298088594,
+          "median": 1.021759140377004,
+          "min": 0.9738146623144113,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "edit_commit_ns.p95": {
+          "max": 1.0378329268080675,
+          "median": 1.025779307965239,
+          "min": 0.9750620541437368,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "total_ns.p50": {
+          "max": 1.0624648960803442,
+          "median": 1.0347032857057055,
+          "min": 0.9455122676660922,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 3,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "total_ns.p95": {
+          "max": 1.0643855072900403,
+          "median": 1.0344185085321933,
+          "min": 0.9452595291231056,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 3,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "max_rss_kib": {
+          "max": 1.0887459807073956,
+          "median": 0.9904790285548988,
+          "min": 0.9368029739776952,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 1,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        }
+      }
+    },
+    "allocator": {
+      "dense-sparse-one-percent": {
+        "allocated_bytes": {
+          "max": 0.856115134950239,
+          "median": 0.856115134950239,
+          "min": 0.856115134950239,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        },
+        "allocation_calls": {
+          "max": 0.9998526062542494,
+          "median": 0.9998526062542494,
+          "min": 0.9998526062542494,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        },
+        "region_peak_live_bytes": {
+          "max": 1.0,
+          "median": 1.0,
+          "min": 1.0,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        },
+        "core_combined_with_drain.allocated_bytes": {
+          "max": 0.856115134950239,
+          "median": 0.856115134950239,
+          "min": 0.856115134950239,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        },
+        "max_rss_kib": {
+          "max": 1.009164386177051,
+          "median": 1.0064885496183207,
+          "min": 1.0059781226151105,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        }
+      },
+      "medium-one-edit": {
+        "allocated_bytes": {
+          "max": 0.7492235633376911,
+          "median": 0.7492235633376911,
+          "min": 0.7492235633376911,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        },
+        "allocation_calls": {
+          "max": 0.9996446592281999,
+          "median": 0.9996446592281999,
+          "min": 0.9996446592281999,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        },
+        "region_peak_live_bytes": {
+          "max": 1.0,
+          "median": 1.0,
+          "min": 1.0,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        },
+        "core_combined_with_drain.allocated_bytes": {
+          "max": 0.7492235633376911,
+          "median": 0.7492235633376911,
+          "min": 0.7492235633376911,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        },
+        "max_rss_kib": {
+          "max": 1.0147633521493704,
+          "median": 1.011144708423326,
+          "min": 1.007258273567787,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        }
+      },
+      "medium-one-percent": {
+        "allocated_bytes": {
+          "max": 0.7359514821746876,
+          "median": 0.7359514821746876,
+          "min": 0.7359514821746876,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        },
+        "allocation_calls": {
+          "max": 0.9996397207836073,
+          "median": 0.9996397207836073,
+          "min": 0.9996397207836073,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        },
+        "region_peak_live_bytes": {
+          "max": 1.0,
+          "median": 1.0,
+          "min": 1.0,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        },
+        "core_combined_with_drain.allocated_bytes": {
+          "max": 0.7359514821746876,
+          "median": 0.7359514821746876,
+          "min": 0.7359514821746876,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        },
+        "max_rss_kib": {
+          "max": 0.957905619968983,
+          "median": 0.9317647058823529,
+          "min": 0.9226287062988642,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        }
+      }
+    }
+  },
+  "schema": "litchi.performance.0960.root-screen-selection.v1",
+  "report": {
+    "path": "/tmp/litchi-performance-0960-epoch2/analysis-v1/screen-v1.json",
+    "bytes": 104664,
+    "sha256": "b934b9634a3e9d5e21edaccd34080b8d548f95feeea3ad20efe34b0c42daf15e"
+  },
+  "rule": {
+    "path": "/home/zhuhe/litchi-performance-0960/review/root-screening-rule-v2.json",
+    "bytes": 1708,
+    "sha256": "2adeb002f4d7d999771d26d743ce29eccb6f2fc8d2226de68aa2cb2ae6afc7a7"
+  },
+  "helper": {
+    "path": "/home/zhuhe/litchi-performance-0960/tools/select_screen_0960_v1.py",
+    "bytes": 3037,
+    "sha256": "3a22623881d373907ce9a0843864179f7a5864707b0471a0f2bb6374f1ef8de7"
+  }
+}

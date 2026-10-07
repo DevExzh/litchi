@@ -1,0 +1,34 @@
+{
+  "status": "quality_reviewed_release_build_active",
+  "artifacts": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0960/root-start-v1.json",
+      "bytes": 6581,
+      "sha256": "4728b66490351a50b01a71d0a819e9cdbac9cb39d0a76a0587a1636e40f8018d"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0960/receipts/source-custody-v3.json",
+      "bytes": 4450,
+      "sha256": "61eea6ae3b53371d79e639ee0db809729591a14506d0a5fe1d93b43f314d6905"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0960/receipts/0960-final-quality-freeze-v1.txt",
+      "bytes": 5763,
+      "sha256": "14a47fc498f8de51a750fa76c6202e54153136e5ec3b0041b63e11693b53e2cb"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0960/review/final-source-review-v2.md",
+      "bytes": 1727,
+      "sha256": "ec052ecffeb4167dfaf810ca09a82d9c66566b5c2afddb49f52f7019ad1ca879"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0960/receipts/host-v1.json",
+      "bytes": 6153,
+      "sha256": "d55c75225fc42d1503ba428167f726d5f1a2300eeaf15484de412f96b8dcd013"
+    }
+  ],
+  "notes": [
+    "No capture authorization yet.",
+    "Candidate production change is codec.rs only. Full-suite-to-final delta reviewed: one test-only census function and needless-borrow spelling."
+  ]
+}

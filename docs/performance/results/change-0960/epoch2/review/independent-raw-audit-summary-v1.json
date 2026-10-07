@@ -1,0 +1,730 @@
+{
+  "allocator": {
+    "cases": {
+      "dense-sparse-one-percent": {
+        "child_count": 6,
+        "metrics": {
+          "allocated_bytes": {
+            "max": 0.856115134950239,
+            "median": 0.856115134950239,
+            "min": 0.856115134950239,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "allocation_calls": {
+            "max": 0.9998526062542494,
+            "median": 0.9998526062542494,
+            "min": 0.9998526062542494,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "core_combined_with_drain.allocated_bytes": {
+            "max": 0.856115134950239,
+            "median": 0.856115134950239,
+            "min": 0.856115134950239,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "max_rss_kib": {
+            "max": 1.009164386177051,
+            "median": 1.0064885496183207,
+            "min": 1.0059781226151105,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "region_peak_live_bytes": {
+            "max": 1.0,
+            "median": 1.0,
+            "min": 1.0,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          }
+        },
+        "pair_count": 3
+      },
+      "medium-one-edit": {
+        "child_count": 6,
+        "metrics": {
+          "allocated_bytes": {
+            "max": 0.7492235633376911,
+            "median": 0.7492235633376911,
+            "min": 0.7492235633376911,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "allocation_calls": {
+            "max": 0.9996446592281999,
+            "median": 0.9996446592281999,
+            "min": 0.9996446592281999,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "core_combined_with_drain.allocated_bytes": {
+            "max": 0.7492235633376911,
+            "median": 0.7492235633376911,
+            "min": 0.7492235633376911,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "max_rss_kib": {
+            "max": 1.0147633521493704,
+            "median": 1.011144708423326,
+            "min": 1.007258273567787,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "region_peak_live_bytes": {
+            "max": 1.0,
+            "median": 1.0,
+            "min": 1.0,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          }
+        },
+        "pair_count": 3
+      },
+      "medium-one-percent": {
+        "child_count": 6,
+        "metrics": {
+          "allocated_bytes": {
+            "max": 0.7359514821746876,
+            "median": 0.7359514821746876,
+            "min": 0.7359514821746876,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "allocation_calls": {
+            "max": 0.9996397207836073,
+            "median": 0.9996397207836073,
+            "min": 0.9996397207836073,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "core_combined_with_drain.allocated_bytes": {
+            "max": 0.7359514821746876,
+            "median": 0.7359514821746876,
+            "min": 0.7359514821746876,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "max_rss_kib": {
+            "max": 0.957905619968983,
+            "median": 0.9317647058823529,
+            "min": 0.9226287062988642,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "region_peak_live_bytes": {
+            "max": 1.0,
+            "median": 1.0,
+            "min": 1.0,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          }
+        },
+        "pair_count": 3
+      }
+    },
+    "metric_definition": {
+      "allocated_bytes": "mean core_combined_with_drain traffic bytes over ten rows",
+      "allocation_calls": "mean core_combined_with_drain allocation-call counter over ten rows",
+      "core_combined_with_drain.allocated_bytes": "same traffic-byte aggregation as allocated_bytes",
+      "max_rss_kib": "whole-process /usr/bin/time -v maximum RSS; not allocator phase peak",
+      "region_peak_live_bytes": "maximum observer-ordered live high-water over ten core_combined_with_drain rows; not traffic"
+    }
+  },
+  "audit_script": {
+    "bytes": 32031,
+    "path": "/tmp/litchi-performance-0960-epoch2/review/audit_epoch2_raw_v1.py",
+    "sha256": "5870717d3c0186ea3764f4df44f1ef12673ff59e016ec036e7eb05f8445ca661"
+  },
+  "custody_summary": {
+    "allocator_children": 18,
+    "allocator_oracles_passed": 18,
+    "native_children": 36,
+    "native_oracles_passed": 36,
+    "no_retries_or_replacements": true,
+    "pooled_samples": false,
+    "process_group_cleanup_passed": true,
+    "source_input_oracles_passed": true
+  },
+  "full_audit": {
+    "bytes": 119253,
+    "path": "/tmp/litchi-performance-0960-epoch2/review/independent-raw-audit-v1.json",
+    "sha256": "7329adea6e19745f925a18cdb07c1d4fb2079def4e87407afe420f00f1914512"
+  },
+  "native": {
+    "cases": {
+      "dense-sparse-one-percent": {
+        "child_count": 12,
+        "metrics": {
+          "commit_drop_ns.p50": {
+            "max": 1.0241012355453554,
+            "median": 1.0147175561086739,
+            "min": 1.0060262469254677,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "commit_drop_ns.p95": {
+            "max": 1.0402161630735247,
+            "median": 1.0210263225150182,
+            "min": 0.9994002373797318,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "commit_drop_ns.p99": {
+            "max": 1.1164134768550626,
+            "median": 1.0167118252503653,
+            "min": 0.9430010117473488,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 2,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "edit_commit_ns.p50": {
+            "max": 1.0697585801579284,
+            "median": 1.0345529121276416,
+            "min": 1.0234790921447168,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 1,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "edit_commit_ns.p95": {
+            "max": 1.0636658624542625,
+            "median": 1.0336775526090995,
+            "min": 1.0241258611973763,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 1,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "edit_commit_ns.p99": {
+            "max": 1.0376421727092102,
+            "median": 1.032509669291172,
+            "min": 1.0253401137648963,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "ingress_ns.p50": {
+            "max": 1.1469593715861208,
+            "median": 1.0136863375539424,
+            "min": 0.9918812208659342,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 2,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "ingress_ns.p95": {
+            "max": 1.1911778596391802,
+            "median": 1.0198958768157012,
+            "min": 0.9471040319799064,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 2,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "ingress_ns.p99": {
+            "max": 1.2482837949756143,
+            "median": 0.9772059138193183,
+            "min": 0.8837644379372052,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 2,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "max_rss_kib": {
+            "max": 1.0080948435209383,
+            "median": 0.9992402265153182,
+            "min": 0.994061532629983,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "publication_ns.p50": {
+            "max": 1.0027418357514382,
+            "median": 1.0011956921670842,
+            "min": 0.997452417068621,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "publication_ns.p95": {
+            "max": 1.0817470415595951,
+            "median": 1.0389355066104669,
+            "min": 0.9965708063393277,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 3,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "publication_ns.p99": {
+            "max": 1.086967671216137,
+            "median": 1.0722191382848245,
+            "min": 0.9997081563877291,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 5,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "total_ns.p50": {
+            "max": 1.038591057105481,
+            "median": 1.0213789061504563,
+            "min": 1.013935664513563,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "total_ns.p95": {
+            "max": 1.0455728392868948,
+            "median": 1.03773789651776,
+            "min": 1.0210052779050183,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "total_ns.p99": {
+            "max": 1.0524944877068145,
+            "median": 1.0456867494615654,
+            "min": 1.022032147372465,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 1,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          }
+        },
+        "pair_count": 6
+      },
+      "medium-one-edit": {
+        "child_count": 12,
+        "metrics": {
+          "commit_drop_ns.p50": {
+            "max": 1.0264470479062753,
+            "median": 1.0143630209888692,
+            "min": 0.997249079189687,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "commit_drop_ns.p95": {
+            "max": 1.141025641025641,
+            "median": 1.0173628797724565,
+            "min": 0.910829307568438,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 2,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "commit_drop_ns.p99": {
+            "max": 1.0966915769958525,
+            "median": 1.0511890465906002,
+            "min": 0.7639675079953755,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 3,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "edit_commit_ns.p50": {
+            "max": 1.0353802924414142,
+            "median": 1.0214874950219577,
+            "min": 1.0160948046691727,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "edit_commit_ns.p95": {
+            "max": 1.0388114180288066,
+            "median": 1.0204388188645472,
+            "min": 1.004760060087204,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "edit_commit_ns.p99": {
+            "max": 1.0546615540612236,
+            "median": 1.0183632368134168,
+            "min": 0.9947454553868548,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 1,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "ingress_ns.p50": {
+            "max": 1.1187945348761195,
+            "median": 1.0350240639711823,
+            "min": 1.0036960036960036,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 2,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "ingress_ns.p95": {
+            "max": 1.0964730290456433,
+            "median": 1.0656652448056123,
+            "min": 1.039689578713969,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 5,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "ingress_ns.p99": {
+            "max": 1.3545397685812572,
+            "median": 1.1702798355593576,
+            "min": 0.8839581602665452,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 5,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "max_rss_kib": {
+            "max": 1.0148605196836709,
+            "median": 1.0027617071607462,
+            "min": 0.9999141262344354,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "publication_ns.p50": {
+            "max": 1.041991524303296,
+            "median": 1.0017693995324555,
+            "min": 0.9966788127471481,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "publication_ns.p95": {
+            "max": 1.0454032612590178,
+            "median": 1.0194324667561365,
+            "min": 1.0010887605883514,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "publication_ns.p99": {
+            "max": 1.0979225655370954,
+            "median": 1.0500758413133378,
+            "min": 1.0198288373833637,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 3,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "total_ns.p50": {
+            "max": 1.0286171523261551,
+            "median": 1.0160142077624605,
+            "min": 1.0101203849059448,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "total_ns.p95": {
+            "max": 1.0347351604951736,
+            "median": 1.0217181821221093,
+            "min": 1.0091679542449934,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "total_ns.p99": {
+            "max": 1.0513291791152066,
+            "median": 1.0410124197704786,
+            "min": 0.9959722482637205,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 1,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          }
+        },
+        "pair_count": 6
+      },
+      "medium-one-percent": {
+        "child_count": 12,
+        "metrics": {
+          "commit_drop_ns.p50": {
+            "max": 1.0425169702862787,
+            "median": 1.0167317746992306,
+            "min": 1.008694935634892,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "commit_drop_ns.p95": {
+            "max": 1.0445838348026633,
+            "median": 1.0181396015635924,
+            "min": 0.9890274658041833,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "commit_drop_ns.p99": {
+            "max": 1.0472730862820938,
+            "median": 0.9803617317997176,
+            "min": 0.7126649786790782,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "edit_commit_ns.p50": {
+            "max": 1.0304480298088594,
+            "median": 1.021759140377004,
+            "min": 0.9738146623144113,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "edit_commit_ns.p95": {
+            "max": 1.0378329268080675,
+            "median": 1.025779307965239,
+            "min": 0.9750620541437368,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "edit_commit_ns.p99": {
+            "max": 1.0351431050219864,
+            "median": 1.0247714847853302,
+            "min": 0.9724425921099289,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "ingress_ns.p50": {
+            "max": 1.1981082501313716,
+            "median": 1.078108172783435,
+            "min": 0.9339452656483617,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 4,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "ingress_ns.p95": {
+            "max": 1.240453834115806,
+            "median": 1.057767373466055,
+            "min": 0.9268759571209801,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 4,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "ingress_ns.p99": {
+            "max": 1.3343384957695348,
+            "median": 1.0025150890652248,
+            "min": 0.9537676400106506,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 2,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "max_rss_kib": {
+            "max": 1.0887459807073956,
+            "median": 0.9904790285548988,
+            "min": 0.9368029739776952,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 1,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "publication_ns.p50": {
+            "max": 1.114812206478961,
+            "median": 1.0522886903522686,
+            "min": 0.8997173297089077,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 3,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "publication_ns.p95": {
+            "max": 1.1193759331959314,
+            "median": 1.0522857110507304,
+            "min": 0.8975561717844016,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 3,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "publication_ns.p99": {
+            "max": 1.190440874727804,
+            "median": 1.102808168424598,
+            "min": 0.9037573565606187,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 4,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "total_ns.p50": {
+            "max": 1.0624648960803442,
+            "median": 1.0347032857057055,
+            "min": 0.9455122676660922,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 3,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "total_ns.p95": {
+            "max": 1.0643855072900403,
+            "median": 1.0344185085321933,
+            "min": 0.9452595291231056,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 3,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "total_ns.p99": {
+            "max": 1.0803282650716424,
+            "median": 1.0498247687340814,
+            "min": 0.9451363935210644,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 3,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          }
+        },
+        "pair_count": 6
+      }
+    },
+    "metric_definition": "All five raw report phases at p50/p95/p99 plus whole-process max_rss_kib; paired candidate-over-baseline medians over six ABBA/BAAB legs per case; tail review flags count pair ratios >1.05."
+  },
+  "packets": {
+    "allocator": {
+      "completed": {
+        "bytes": 7656,
+        "executable": false,
+        "mode": 436,
+        "path": "/tmp/litchi-performance-0960-epoch2/capture-allocator-v1/completed-packet.json",
+        "sha256": "c6b8ef06d390e61d2eedbf77b2d5208e45ae6123027c49399fce940a74ed5c56"
+      },
+      "start": {
+        "bytes": 687,
+        "executable": false,
+        "mode": 436,
+        "path": "/tmp/litchi-performance-0960-epoch2/capture-allocator-v1/capture-start.json",
+        "sha256": "9cb3b6edde17c525cafbeba889ee5ddc34440b2fbbfb6aaa88128bef055e80de"
+      },
+      "terminal": {
+        "bytes": 574,
+        "executable": false,
+        "mode": 436,
+        "path": "/tmp/litchi-performance-0960-epoch2/capture-allocator-v1/capture-terminal.json",
+        "sha256": "48e0d3700b96bcb2c1ba6db91748a6e5528cbc30375f9150dc47e3eac4bd72bf"
+      }
+    },
+    "native": {
+      "completed": {
+        "bytes": 14580,
+        "executable": false,
+        "mode": 436,
+        "path": "/tmp/litchi-performance-0960-epoch2/capture-native-v1/completed-packet.json",
+        "sha256": "4f15086ae67436c8a2995d1179ead0540258f100910198932f72a7fd310bb86e"
+      },
+      "start": {
+        "bytes": 684,
+        "executable": false,
+        "mode": 436,
+        "path": "/tmp/litchi-performance-0960-epoch2/capture-native-v1/capture-start.json",
+        "sha256": "1e3b650fd4b4d66ede239b5818464a4696d0cd0914d0effd78b524d272847d22"
+      },
+      "terminal": {
+        "bytes": 568,
+        "executable": false,
+        "mode": 436,
+        "path": "/tmp/litchi-performance-0960-epoch2/capture-native-v1/capture-terminal.json",
+        "sha256": "8b0e755ca405f39472d0e8b5496754710dc97ffcddbca1cfba240bb57e09d1ac"
+      }
+    }
+  },
+  "plan": {
+    "bytes": 55801,
+    "executable": false,
+    "mode": 436,
+    "path": "/tmp/litchi-performance-0960-epoch2/plan-final-v1.json",
+    "sha256": "374b2072226736d70af2486ceb67c9b6ab83f8517460a2a571f208096b015628"
+  },
+  "reduction_comparison": {
+    "mismatch_count": 0,
+    "mismatches": [],
+    "reducer_output": {
+      "bytes": 104664,
+      "executable": false,
+      "mode": 436,
+      "path": "/tmp/litchi-performance-0960-epoch2/analysis-v1/screen-v1.json",
+      "sha256": "b934b9634a3e9d5e21edaccd34080b8d548f95feeea3ad20efe34b0c42daf15e"
+    }
+  },
+  "schema": "litchi.performance.0960.independent-raw-audit-summary.v1",
+  "scope": "independent raw packet custody, oracle, allocator conservation, and descriptive median audit; no adoption claim",
+  "selection_comparison": {
+    "independent": {
+      "adoption_allowed": false,
+      "decision": "reject_screen",
+      "signals": [],
+      "statistical_effect_claim": false,
+      "stops": [
+        "No qualifying metric among signal_any"
+      ]
+    },
+    "matched": true,
+    "selection_output": {
+      "bytes": 10752,
+      "executable": false,
+      "mode": 436,
+      "path": "/tmp/litchi-performance-0960-epoch2/analysis-v1/selection-v1.json",
+      "sha256": "973dfe663ad4d8759db6e5def918feea04fbe83fa90efa17999944d9002f7bda"
+    }
+  },
+  "status": "passed",
+  "verdict": "screen rejected by the bound rule because no qualifying signal was present; no full confirmation is indicated; no adoption or statistical effect claim"
+}

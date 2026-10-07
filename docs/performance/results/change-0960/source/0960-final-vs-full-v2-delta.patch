@@ -1,0 +1,86 @@
+--- /home/zhuhe/litchi-performance-0960/receipts/0960-full-v2-reconstructed-codec.rs	2026-10-07 16:07:36.691730585 +0000
++++ /home/zhuhe/litchi-performance-0960/source-candidate-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs	2026-10-07 16:01:39.697993297 +0000
+@@ -1808,7 +1808,7 @@
+         if !strict_lane_hint_attempted
+             && let Some(entry) = strict_lane_entry
+             && stack.last() == Some(&Context::SheetData)
+-            && lane::children_are_spreadsheetml(&resolver)
++            && lane::children_are_spreadsheetml(resolver)
+         {
+             strict_lane_hint_attempted = true;
+             reserve_strict_lane_cells(content, &mut parser.cells, entry);
+@@ -2174,4 +2174,74 @@
+         assert_eq!(stats.cap_declines, 1);
+         assert_differential("event cap", &content);
+     }
++
++    #[test]
++    #[ignore = "requires external managed worksheet XML route-census input"]
++    fn managed_fixture_route_census_requires_explicit_external_input() {
++        let root = std::env::var_os("LITCHI_0960_ROUTE_CENSUS_DIR")
++            .expect("LITCHI_0960_ROUTE_CENSUS_DIR must name extracted worksheet XML");
++        let root = std::path::PathBuf::from(root);
++        let manifest = std::fs::read_to_string(root.join("manifest.txt"))
++            .expect("route-census manifest must be readable");
++        let entries = manifest
++            .lines()
++            .filter(|line| !line.trim().is_empty())
++            .collect::<Vec<_>>();
++        assert!(
++            !entries.is_empty(),
++            "route-census manifest must list worksheets"
++        );
++
++        let mut total = route::Stats::default();
++        for relative in &entries {
++            let path = root.join(relative);
++            let content = std::fs::read(&path).expect("route-census worksheet must be readable");
++            route::reset();
++            let outcome = shared(&content);
++            let stats = route::stats();
++            assert!(
++                stats.attempts <= 1,
++                "{} scanned more than once",
++                path.display()
++            );
++            println!(
++                "ROUTE_CENSUS path={} bytes={} complete={} attempts={} admitted={} declined={} cap_declines={} reserved_cells={} reserve_succeeded={} reserve_failed={}",
++                path.display(),
++                content.len(),
++                matches!(
++                    outcome,
++                    crate::raw::worksheet::SourceParseAttempt::Complete(_)
++                ),
++                stats.attempts,
++                stats.admitted,
++                stats.declined,
++                stats.cap_declines,
++                stats.reserved_cells,
++                stats.reserve_succeeded,
++                stats.reserve_failed,
++            );
++            total.attempts += stats.attempts;
++            total.admitted += stats.admitted;
++            total.declined += stats.declined;
++            total.cap_declines += stats.cap_declines;
++            total.reserved_cells += stats.reserved_cells;
++            total.reserve_succeeded += stats.reserve_succeeded;
++            total.reserve_failed += stats.reserve_failed;
++        }
++        println!(
++            "ROUTE_CENSUS_TOTAL files={} attempts={} admitted={} declined={} cap_declines={} reserved_cells={} reserve_succeeded={} reserve_failed={}",
++            entries.len(),
++            total.attempts,
++            total.admitted,
++            total.declined,
++            total.cap_declines,
++            total.reserved_cells,
++            total.reserve_succeeded,
++            total.reserve_failed,
++        );
++        assert!(
++            total.attempts > 0,
++            "managed fixtures reached no sheetData hint"
++        );
++    }
+ }

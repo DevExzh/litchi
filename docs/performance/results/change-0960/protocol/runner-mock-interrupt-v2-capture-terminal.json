@@ -1,0 +1,19 @@
+{
+  "capture_start": {
+    "bytes": 700,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0960/review/runner-mock-interrupt-v2/capture-start.json",
+    "sha256": "68f12cbf1c8fc6c930cd57308e94ffc22bfab690b5d85ad9e05cbd28c0c54074"
+  },
+  "children_completed": 0,
+  "children_expected": 36,
+  "children_started": 1,
+  "ended_utc": "2026-10-07T16:09:20.568844+00:00",
+  "error": "native__medium-one-percent__b00__p0: ScreenInterrupted: mock interrupt",
+  "lane": "native",
+  "retry_or_replacement": false,
+  "schema": "litchi.performance.0960.capture.v1.capture-terminal",
+  "status": "failed",
+  "terminal_before_parse": true
+}

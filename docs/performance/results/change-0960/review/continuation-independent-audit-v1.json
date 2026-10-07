@@ -1,0 +1,26 @@
+{
+  "schema": "litchi.performance.0960.continuation-audit.v1",
+  "observed_utc": "2026-10-07T16:27:29.872494+00:00",
+  "reviewer": "/root/multiwindow_audit",
+  "scope": "Read-only current packet and visible process namespace; no timing analysis",
+  "native": {
+    "expected": 36,
+    "start_records": 34,
+    "launch_receipts": 33,
+    "terminal_receipts": 33,
+    "validation_receipts": 33,
+    "post_terminal_artifacts": 33,
+    "lane_terminal_present": false,
+    "incomplete_child": "native__medium-one-edit__b02__p1",
+    "incomplete_child_files": [
+      "start.json",
+      "time-v.txt"
+    ],
+    "time_v_bytes": 0
+  },
+  "runner_process_visible": false,
+  "previous_tool_session": "57382",
+  "root_session_poll_result": "Unknown process id 57382",
+  "interpretation": "Incomplete and unvalidated; no recorded terminal outcome for child or lane. Current namespace visibility does not prove prior process exit cause.",
+  "decision": "No reduction or performance decision; no retry or sample replacement."
+}

@@ -1,0 +1,20 @@
+{
+  "schema": "litchi.performance.0960.write-limits.v1",
+  "observed_utc": "2026-10-07T16:29:49.356991+00:00",
+  "staging_attempt": {
+    "command": "git add -- docs/performance/0960-xlsx-raw-cell-capacity-trial.md docs/performance/BASELINE.md docs/performance/HOTSPOTS.md",
+    "exit_code": 128,
+    "stderr": "fatal: Unable to create '/home/zhuhe/code/litchi/.git/index.lock': Read-only file system"
+  },
+  "commit": "pending; no commit created",
+  "push": "not attempted",
+  "cleanup": {
+    "status": "pending: external owner directories read-only in current permission profile",
+    "retained_cache_paths": [
+      "/home/zhuhe/litchi-performance-0960/target-quality-v1",
+      "/home/zhuhe/litchi-performance-0960/target-candidate-managed-v1"
+    ],
+    "deletion_attempted": false
+  },
+  "goal": "active; completion not established"
+}

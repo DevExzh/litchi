@@ -1,0 +1,61 @@
+{
+  "schema": "litchi.performance.0960.screening-plan-contract.v2",
+  "status": "prospective",
+  "purpose": "Compatibility contract between the screen-v2 capture adapter and the 0960 descriptive reducer; it authorizes no workload.",
+  "protocol_plan_schema": "litchi.performance.0960.raw-cell-vector-reserve-screening.v1",
+  "reducer_schema": "litchi.performance.0960.screen-reduction.v2-screen-adapter",
+  "runner": {
+    "path_suffix": "tools/screen_0960_v2.py",
+    "schema": "litchi.performance.0960.screen-capture.v1",
+    "cpu_mask": [12, 13, 14, 15],
+    "deadline_seconds": 900,
+    "environment": {
+      "PATH": "/usr/bin:/bin",
+      "LANG": "C",
+      "LC_ALL": "C",
+      "RUST_BACKTRACE": "0",
+      "TZ": "UTC"
+    }
+  },
+  "schedule": {
+    "cases": ["medium-one-percent", "dense-sparse-one-percent", "medium-one-edit"],
+    "native": {
+      "blocks": [["A", "B", "B", "A"], ["B", "A", "A", "B"], ["A", "B", "B", "A"]],
+      "children": 36,
+      "warmups": 10,
+      "samples": 60
+    },
+    "allocator": {
+      "blocks": [["A", "B"], ["B", "A"], ["A", "B"]],
+      "children": 18,
+      "warmups": 2,
+      "samples": 10
+    },
+    "serial": true,
+    "fresh_process_per_child": true,
+    "no_retries": true,
+    "terminal_before_report_parse": true
+  },
+  "required_bindings": {
+    "plan": ["authorized status", "root_go=GO", "measurements_started=false", "capture_authorization=root_GO_required"],
+    "roles": ["baseline.source_manifest", "baseline.native_binary", "baseline.allocator_binary", "candidate.source_manifest", "candidate.native_binary", "candidate.allocator_binary"],
+    "source": ["baseline_manifest", "candidate_manifest", "baseline_receipt", "candidate_freeze"],
+    "helpers": ["reducer", "capture", "controls"],
+    "custody": ["host", "runner", "cpu_mask", "deadline_seconds", "fixed environment"]
+  },
+  "report_contract": {
+    "native_schema": "litchi.xlsx-managed-compression-benchmark.v1",
+    "allocator_schema": "litchi.xlsx-managed-compression-allocation.v1",
+    "oracles": ["source/output/semantic hashes", "inverse restoration", "sink <= 65536", "finite counters", "zero post-drop resources", "allocator phase conservation"]
+  },
+  "policy": {
+    "adoption_allowed": false,
+    "full_followup_required": true,
+    "bootstrap_emitted": false,
+    "allocation_claim": false
+  },
+  "supersedes": {
+    "path": "/home/zhuhe/litchi-performance-0960/review/screening-plan-contract-v1.json",
+    "reason": "Adds the protocol plan's top-level role bindings and screen-v2 terminal-first packet shape; it does not change the schedule or report/oracle contract."
+  }
+}

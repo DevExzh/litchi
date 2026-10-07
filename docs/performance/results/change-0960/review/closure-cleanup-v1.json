@@ -1,0 +1,32 @@
+{
+  "schema": "litchi.performance.0960.closure-cleanup.v1",
+  "status": "completed",
+  "removed_paths": [
+    "/home/zhuhe/litchi-performance-0960/target-quality-v1",
+    "/home/zhuhe/litchi-performance-0960/target-candidate-managed-v1"
+  ],
+  "allocated_disk_bytes_removed": 2806865920,
+  "cleanup_executor": "verify_cleanup agent",
+  "agent_reported_prechecks": "No live cargo/rustc/perf/capture process and no open files",
+  "root_postcheck": "Both cache paths absent; retained binary hashes and lengths match correction receipt; source roots, manifests, receipts and helpers exist",
+  "retained_binaries": [
+    {
+      "bytes": 43677192,
+      "exists": true,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0960/executables/xlsx_managed_compression_alloc.v1",
+      "sha256": "06115121a4dde73b7320f3d751232d0aefd0c9d0227d91051f49dc34fc0bcaae"
+    },
+    {
+      "bytes": 43256440,
+      "exists": true,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0960/executables/xlsx_managed_compression_benchmark.v1",
+      "sha256": "ec9ecfc7ea4283a11727d8e63309661ed5318bf2093546906f751e10fb9a6ff3"
+    }
+  ],
+  "raw_evidence_removed": false,
+  "source_removed": false,
+  "compiled_binaries_committed": false,
+  "note": "Historical build-output descriptors refer to now-removed disposable caches; retained executable descriptors remain valid."
+}

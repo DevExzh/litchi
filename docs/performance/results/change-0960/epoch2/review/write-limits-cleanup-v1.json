@@ -1,0 +1,24 @@
+{
+  "schema": "litchi.performance.0960.epoch2.write-limits-cleanup.v1",
+  "scope": "Packet staging and cleanup custody only; no workload or analysis execution",
+  "staging": {
+    "status": "failed",
+    "exit_code": 128,
+    "stderr": "fatal: Unable to create '/home/zhuhe/code/litchi/.git/index.lock': Read-only file system",
+    "command_exactly_retained": false,
+    "command_note": "The coordinator reported a normal git-add attempt; the exact epoch2 invocation was not persisted. The parent packet's continuation-write-limits-v1.json retains the earlier exact failed invocation."
+  },
+  "cleanup": {
+    "epoch2_disposable_targets": 0,
+    "epoch2_pycache_directories": 0,
+    "epoch2_cleanup_attempted": false,
+    "raw_capture_cleanup_attempted": false,
+    "source_and_binary_cleanup_attempted": false,
+    "old_target_cleanup": "not attempted; external directories are read-only in the current environment",
+    "retention": "All epoch2 raw, source, binary, and reproducibility assets remain external."
+  },
+  "references": {
+    "historical_parent_write_limits": "../review/continuation-write-limits-v1.json",
+    "historical_parent_untouched": true
+  }
+}

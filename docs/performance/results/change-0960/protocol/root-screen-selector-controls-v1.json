@@ -1,0 +1,26 @@
+{
+  "status": "passed",
+  "controls": [
+    "unity",
+    "latency",
+    "allocator_peak",
+    "requested_only",
+    "regression_with_signal",
+    "one_undefined"
+  ],
+  "helper": {
+    "path": "/home/zhuhe/litchi-performance-0960/tools/select_screen_0960_v1.py",
+    "bytes": 3037,
+    "sha256": "3a22623881d373907ce9a0843864179f7a5864707b0471a0f2bb6374f1ef8de7"
+  },
+  "rule": {
+    "path": "/home/zhuhe/litchi-performance-0960/review/root-screening-rule-v2.json",
+    "bytes": 1708,
+    "sha256": "2adeb002f4d7d999771d26d743ce29eccb6f2fc8d2226de68aa2cb2ae6afc7a7"
+  },
+  "mock_input": {
+    "path": "/home/zhuhe/litchi-performance-0960/review/runner-mock-reduction-v2.json",
+    "bytes": 97249,
+    "sha256": "21ef1de20095e760b233db8de507f03592d442210301bf64d691ef688b65d060"
+  }
+}

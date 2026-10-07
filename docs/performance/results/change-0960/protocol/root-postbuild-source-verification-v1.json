@@ -1,0 +1,28 @@
+{
+  "status": "passed",
+  "created_utc": "2026-10-07T16:16:12.086653+00:00",
+  "sources": [
+    {
+      "role": "baseline",
+      "file_count": 10933,
+      "bytes": 273567986,
+      "manifest": {
+        "path": "/home/zhuhe/litchi-performance-0960/source-manifest-baseline-v2.json",
+        "bytes": 2561655,
+        "sha256": "f2ee3192f51f879da63fdacd6fcbf38f76491bc96bab48fbda1994dc504948b0"
+      },
+      "live_tree_verified": true
+    },
+    {
+      "role": "candidate",
+      "file_count": 10933,
+      "bytes": 273587601,
+      "manifest": {
+        "path": "/home/zhuhe/litchi-performance-0960/source-manifest-candidate-v2.json",
+        "bytes": 2561657,
+        "sha256": "1e8d968807ce5aaa0fe2b94d0ad61431997baf16b0e9aaa9cfa4d4ef94b0a9fa"
+      },
+      "live_tree_verified": true
+    }
+  ]
+}

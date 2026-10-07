@@ -1,0 +1,267 @@
+{
+  "artifacts": {
+    "controls_v9": {
+      "bytes": 2195,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/review/screening-controls-0960-v9.json",
+      "sha256": "5f3ba66b68934b18b9e65691fbe274df8ee51b33ec586fa486578f94c8eb8a3b"
+    },
+    "lifecycle_controls_v1": {
+      "bytes": 814,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/review/runner-lifecycle-controls-v1.json",
+      "sha256": "d61798428e81c245e4aef121b2c53b28423a8c98a15076b37ec07b3e27ab37dc"
+    },
+    "mock_e2e_v2": {
+      "bytes": 2020,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/review/runner-mock-e2e-v2.json",
+      "sha256": "73ac9e4677ed8480d5a97b72739c69f674e0dd0a00e4f6d459c923456ab7e800"
+    },
+    "mock_interrupt_terminal_v2": {
+      "bytes": 662,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/review/runner-mock-interrupt-v2/capture-terminal.json",
+      "sha256": "ccbc46b5a65ebd3b6520c91674ab96664c97244763fd60b3eca044512601f78b"
+    },
+    "mock_plan_v2": {
+      "bytes": 51340,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/plan-synthetic-runner-mock-v2.json",
+      "sha256": "063125baa623469212c63658d01a3781382fc7367e573c36550b5913911274a0"
+    },
+    "mock_reduction_v2": {
+      "bytes": 97249,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/review/runner-mock-reduction-v2.json",
+      "sha256": "21ef1de20095e760b233db8de507f03592d442210301bf64d691ef688b65d060"
+    },
+    "plan_template_v14": {
+      "bytes": 50420,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/plan-template-0960-v14.json",
+      "sha256": "5087cb88d04fc8e5d4216a2cacfe04de84780bc341091540794f6f34f9ed3b92"
+    },
+    "prior_audit_v1": {
+      "bytes": 10969,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/review/independent-protocol-audit-v1.json",
+      "sha256": "65154e01c3b3e065ff8517184f125430e9800d7231d9eb3aa3e2fdcccbf5a0a1"
+    },
+    "prior_audit_v2": {
+      "bytes": 13743,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/review/independent-protocol-audit-v2.json",
+      "sha256": "944aacf39c59ffe5c1b71cd2dd76b5e83d6f74f33025fc393854e71167961b28"
+    },
+    "reducer_v3": {
+      "bytes": 31267,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/tools/reduce_0960_v3.py",
+      "sha256": "7000e9094a9c8174907788dd8161b14b7f61210c74fe3930c43306a49c9852f2"
+    },
+    "runner_v6": {
+      "bytes": 35688,
+      "executable": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0960/tools/screen_0960_v6.py",
+      "sha256": "dbd83107bd0f1493178181394c1f13a00bac2464b1e0d89007a76064b488f6ab"
+    },
+    "runner_v7": {
+      "bytes": 36205,
+      "executable": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0960/tools/screen_0960_v7.py",
+      "sha256": "8f8b9a8bb83905dafcc109f6b113a3db9ae98420d86f031ba761482b74721238"
+    }
+  },
+  "checks": [
+    {
+      "detail": "plan-template-v14 binds screen_0960_v7, reduce_0960_v3, and controls v9 descriptors exactly; reducer and runner hashes match current files.",
+      "name": "v7_reducer_plan_hash_bindings",
+      "status": "pass"
+    },
+    {
+      "detail": "screen_0960_v7 --check-plan accepted plan-template-v14: 36 native and 18 allocator children; frozen 0959 self-test passed; no capture.",
+      "name": "runner_check_plan_v14",
+      "status": "pass"
+    },
+    {
+      "detail": "screen_0960_v7.py, reduce_0960_v3.py, check_screening_contract_v9.py, and check_runner_lifecycle_v1.py compiled.",
+      "name": "python_compile",
+      "status": "pass"
+    },
+    {
+      "detail": "Mocked Popen exercised the v7 writer for both lanes and reducer v3 accepted the resulting packets.",
+      "name": "v7_mock_writer_reducer_e2e",
+      "observed": {
+        "allocator_children": 18,
+        "canonical_mapping": "canonical-v1",
+        "interrupt_control": {
+          "children_completed": 0,
+          "children_started": 1,
+          "cleanup_error_recorded": true,
+          "return_code": 2,
+          "terminal_status": "failed"
+        },
+        "native_children": 36,
+        "normal_capture_returncodes": {
+          "allocator": 0,
+          "native": 0
+        },
+        "reduction_schema": "litchi.performance.0960.screen-reduction.v3-screen-adapter"
+      },
+      "receipt": {
+        "bytes": 2020,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0960/review/runner-mock-e2e-v2.json",
+        "sha256": "73ac9e4677ed8480d5a97b72739c69f674e0dd0a00e4f6d459c923456ab7e800"
+      },
+      "status": "pass"
+    },
+    {
+      "detail": "When getpgid(parent_pid) raises after parent reaping, cleanup retains pid as process-group ID, sends SIGTERM, and observes the group clear.",
+      "name": "v7_lifecycle_pgid_control",
+      "observed": [
+        {
+          "actions": [
+            "SIGTERM"
+          ],
+          "calls": [
+            [
+              44000,
+              0
+            ],
+            [
+              44000,
+              15
+            ],
+            [
+              44000,
+              0
+            ],
+            [
+              44000,
+              0
+            ]
+          ],
+          "name": "reaped_parent_live_group_uses_pid_as_pgid",
+          "process_group_clear": true,
+          "status": "pass"
+        }
+      ],
+      "receipt": {
+        "bytes": 814,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0960/review/runner-lifecycle-controls-v1.json",
+        "sha256": "d61798428e81c245e4aef121b2c53b28423a8c98a15076b37ec07b3e27ab37dc"
+      },
+      "status": "pass"
+    },
+    {
+      "detail": "A second reducer v3 invocation on the v2 mock packets reproduced the v2 reduction byte-for-byte.",
+      "name": "v7_independent_reducer_replay",
+      "sha256": "21ef1de20095e760b233db8de507f03592d442210301bf64d691ef688b65d060",
+      "status": "pass"
+    },
+    {
+      "detail": "Binding positive and digest/order/pending-binding negatives passed against v7/v3/v14.",
+      "name": "screening_controls_v9",
+      "receipt": {
+        "bytes": 2195,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0960/review/screening-controls-0960-v9.json",
+        "sha256": "5f3ba66b68934b18b9e65691fbe274df8ee51b33ec586fa486578f94c8eb8a3b"
+      },
+      "status": "pass"
+    },
+    {
+      "detail": "v14 remains prospective; source candidate manifest/freeze, host receipt, and root-GO receipt are pending_root_binding. This is the intended fail-closed state before live capture.",
+      "name": "actual_binding_gate",
+      "pending": {
+        "candidate_freeze": "pending_root_binding",
+        "candidate_manifest": "pending_root_binding",
+        "host": "pending_root_binding",
+        "root_go": "pending_root_binding"
+      },
+      "plan_status": "prospective",
+      "status": "pending_required"
+    }
+  ],
+  "created_utc": "2026-10-07T16:12:03.969079+00:00",
+  "findings": [
+    {
+      "area": "actual-custody-binding",
+      "detail": "The v14 plan binds the frozen v7/v3 pair exactly but remains prospective. Candidate source manifest/freeze, host receipt, root-GO receipt, and real binary bindings must be replaced with the live build/source custody descriptors before authorization. The synthetic v2 plan is explicitly synthetic_only.",
+      "id": "P3-01",
+      "refs": [
+        "plan-template-0960-v14.json",
+        "review/screening-controls-0960-v9.json"
+      ],
+      "required_fix": "Bind the exact live source, candidate/base binaries, host, and root-GO receipts; set status=authorized and rerun the v7 preflight immediately before capture.",
+      "severity": "blocker_prelaunch"
+    },
+    {
+      "area": "process-group-cleanup",
+      "detail": "v7 preserves process.pid as the start_new_session process-group identity before post-Popen observations and when getpgid reports the parent already reaped. The lifecycle control receipt and mocked interrupt path both pass; this closes the v6 descendant-group cleanup gap within the tested lifecycle.",
+      "id": "P3-02",
+      "refs": [
+        "tools/screen_0960_v7.py:363-429",
+        "tools/check_runner_lifecycle_v1.py",
+        "review/runner-lifecycle-controls-v1.json"
+      ],
+      "severity": "resolved"
+    },
+    {
+      "area": "runner-reducer-packet-contract",
+      "detail": "The actual v7 writer output, including root/child terminal markers, launch timestamps, validation/post-terminal descriptors, native and allocator packet roots, and started/completed counts, is accepted by reducer v3. The reducer output is screen-reduction.v3-screen-adapter with canonical-v1 mapping and adoption disabled.",
+      "id": "P3-03",
+      "refs": [
+        "review/runner-mock-e2e-v2.json",
+        "review/runner-mock-reduction-v2.json"
+      ],
+      "severity": "resolved"
+    },
+    {
+      "area": "useful-signal-policy",
+      "detail": "The v3 reducer validates positive primary samples and paired RSS, but reports useful_signal=false without confidence intervals and keeps adoption_allowed=false. Full follow-up is descriptive confirmation only; the stale v1 all-unity report is not used as final evidence.",
+      "id": "P3-04",
+      "refs": [
+        "tools/reduce_0960_v3.py:425-452",
+        "review/runner-mock-reduction-v2.json"
+      ],
+      "severity": "resolved"
+    },
+    {
+      "area": "pre-packet interruption",
+      "detail": "The lifecycle receipt covers a live child group and the mock interrupt covers interruption after capture-start during a child. An external interruption before packet-root creation cannot produce a terminal receipt because no packet exists; this audit makes no universal guarantee for that pre-packet interval.",
+      "id": "P3-05",
+      "refs": [
+        "tools/screen_0960_v7.py:551-583",
+        "review/runner-mock-e2e-v2.json"
+      ],
+      "severity": "bounded_lifecycle_scope"
+    }
+  ],
+  "non_findings": [
+    "v6 and v2 reports remain preserved; this addendum does not overwrite prior audit bytes.",
+    "No workload, benchmark, real capture, or build was launched by this audit."
+  ],
+  "recommendation": "Proceed only to root-controlled actual binding/preflight. The v7/v3 protocol path is ready for that gate; do not launch while v14 retains pending descriptors.",
+  "schema": "litchi.performance.0960.independent-protocol-audit.v3",
+  "scope": "Narrow final review of runner v6-to-v7 process-group cleanup fix, v7/v3/v14 descriptor custody, mocked runner packet generation and reduction, lifecycle control, and screening fail-closed controls. No workload, benchmark, real capture, or build was launched by this audit.",
+  "status": "ready_prelaunch_pending_actual_binding"
+}

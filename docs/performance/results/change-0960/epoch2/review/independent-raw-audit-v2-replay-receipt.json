@@ -1,0 +1,35 @@
+{
+  "arithmetic_unchanged": "v2 differs from v1 only by argparse optional output path and output destination selection",
+  "build_launched": false,
+  "byte_identical": true,
+  "command": "python3 /tmp/litchi-performance-0960-epoch2/review/audit_epoch2_raw_v2.py --output /tmp/litchi-performance-0960-epoch2/review/independent-raw-audit-v2.json",
+  "json_identical": true,
+  "output_v1": {
+    "bytes": 119253,
+    "mode": 436,
+    "path": "/tmp/litchi-performance-0960-epoch2/review/independent-raw-audit-v1.json",
+    "sha256": "7329adea6e19745f925a18cdb07c1d4fb2079def4e87407afe420f00f1914512"
+  },
+  "output_v2": {
+    "bytes": 119253,
+    "mode": 436,
+    "path": "/tmp/litchi-performance-0960-epoch2/review/independent-raw-audit-v2.json",
+    "sha256": "7329adea6e19745f925a18cdb07c1d4fb2079def4e87407afe420f00f1914512"
+  },
+  "packet_mutated": false,
+  "schema": "litchi.performance.0960.independent-raw-audit-v2-replay.v1",
+  "script_v1": {
+    "bytes": 32031,
+    "mode": 493,
+    "path": "/tmp/litchi-performance-0960-epoch2/review/audit_epoch2_raw_v1.py",
+    "sha256": "5870717d3c0186ea3764f4df44f1ef12673ff59e016ec036e7eb05f8445ca661"
+  },
+  "script_v2": {
+    "bytes": 32535,
+    "mode": 493,
+    "path": "/tmp/litchi-performance-0960-epoch2/review/audit_epoch2_raw_v2.py",
+    "sha256": "0e12714f378cb031af026c0618bbc168f43abc503f9d4403adccfbed060ebf12"
+  },
+  "status": "passed",
+  "workload_launched": false
+}
