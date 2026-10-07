@@ -1,0 +1,234 @@
+{
+  "cases": [
+    {
+      "advisory_widths": [
+        {
+          "cold_width": 1,
+          "max_in_flight_tasks": 1,
+          "warm_width": 1,
+          "workers": 1
+        },
+        {
+          "cold_width": 2,
+          "max_in_flight_tasks": 2,
+          "warm_width": 2,
+          "workers": 2
+        },
+        {
+          "cold_width": 4,
+          "max_in_flight_tasks": 4,
+          "warm_width": 4,
+          "workers": 4
+        },
+        {
+          "cold_width": 5,
+          "max_in_flight_tasks": 8,
+          "warm_width": 5,
+          "workers": 8
+        }
+      ],
+      "id": "medium-one-percent",
+      "largest_bytes": 68488,
+      "matches_0953_identity": true,
+      "output": {
+        "bytes": 4226788,
+        "path": "medium/one-percent/output.zip",
+        "sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c"
+      },
+      "remainder_bytes": 200797,
+      "source": {
+        "bytes": 4226429,
+        "path": "medium/source.zip",
+        "sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      },
+      "task_count": 5,
+      "tasks": [
+        {
+          "compressed_bytes": 279,
+          "logical_bytes": 527,
+          "member": "xl/workbook.xml",
+          "replacement_sha256": "8c3344a56da551b6a987331cec7c4e672ffef2150bf27c5f0f2aaa9cb366bf88"
+        },
+        {
+          "compressed_bytes": 6893,
+          "logical_bytes": 63294,
+          "member": "xl/worksheets/sheet1.xml",
+          "replacement_sha256": "e12f687e5e1a0456338694a505134d53ccd1417cb17e51b12dff85429d6f1220"
+        },
+        {
+          "compressed_bytes": 6854,
+          "logical_bytes": 68488,
+          "member": "xl/worksheets/sheet2.xml",
+          "replacement_sha256": "6e530b0c405315eb4fb29b87da91d29faf3ec346c1e1e3b4c9b29c7fa21fbafa"
+        },
+        {
+          "compressed_bytes": 6855,
+          "logical_bytes": 68488,
+          "member": "xl/worksheets/sheet3.xml",
+          "replacement_sha256": "34a604ebbe87e62535b215bfd648061c0686c45ae6795f43e856088247938811"
+        },
+        {
+          "compressed_bytes": 6850,
+          "logical_bytes": 68488,
+          "member": "xl/worksheets/sheet4.xml",
+          "replacement_sha256": "dc18d296070fce4d64434d03ac400df00e1df53a1d534a9104aaddc4123baf79"
+        }
+      ],
+      "total_bytes": 269285,
+      "untouched_compressed_payloads_verified": 12
+    },
+    {
+      "advisory_widths": [
+        {
+          "cold_width": 1,
+          "max_in_flight_tasks": 1,
+          "warm_width": 1,
+          "workers": 1
+        },
+        {
+          "cold_width": 1,
+          "max_in_flight_tasks": 2,
+          "warm_width": 1,
+          "workers": 2
+        },
+        {
+          "cold_width": 1,
+          "max_in_flight_tasks": 4,
+          "warm_width": 1,
+          "workers": 4
+        },
+        {
+          "cold_width": 1,
+          "max_in_flight_tasks": 8,
+          "warm_width": 1,
+          "workers": 8
+        }
+      ],
+      "id": "medium-one-edit",
+      "largest_bytes": 63294,
+      "matches_0953_identity": false,
+      "output": {
+        "bytes": 4226480,
+        "path": "medium/one-edit/output.zip",
+        "sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1"
+      },
+      "remainder_bytes": 527,
+      "source": {
+        "bytes": 4226429,
+        "path": "medium/source.zip",
+        "sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      },
+      "task_count": 2,
+      "tasks": [
+        {
+          "compressed_bytes": 279,
+          "logical_bytes": 527,
+          "member": "xl/workbook.xml",
+          "replacement_sha256": "8c3344a56da551b6a987331cec7c4e672ffef2150bf27c5f0f2aaa9cb366bf88"
+        },
+        {
+          "compressed_bytes": 6814,
+          "logical_bytes": 63294,
+          "member": "xl/worksheets/sheet1.xml",
+          "replacement_sha256": "fa4f801f0361d957aafaf00bc645ee845477216f8dd572a927350eafdca383b2"
+        }
+      ],
+      "total_bytes": 63821,
+      "untouched_compressed_payloads_verified": 15
+    },
+    {
+      "advisory_widths": [
+        {
+          "cold_width": 1,
+          "max_in_flight_tasks": 1,
+          "warm_width": 1,
+          "workers": 1
+        },
+        {
+          "cold_width": 1,
+          "max_in_flight_tasks": 2,
+          "warm_width": 2,
+          "workers": 2
+        },
+        {
+          "cold_width": 1,
+          "max_in_flight_tasks": 4,
+          "warm_width": 4,
+          "workers": 4
+        },
+        {
+          "cold_width": 1,
+          "max_in_flight_tasks": 8,
+          "warm_width": 5,
+          "workers": 8
+        }
+      ],
+      "id": "dense-sparse-one-percent",
+      "largest_bytes": 462569,
+      "matches_0953_identity": true,
+      "output": {
+        "bytes": 4252436,
+        "path": "dense-sparse/one-percent/output.zip",
+        "sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d"
+      },
+      "remainder_bytes": 46392,
+      "source": {
+        "bytes": 4251863,
+        "path": "dense-sparse/source.zip",
+        "sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a"
+      },
+      "task_count": 5,
+      "tasks": [
+        {
+          "compressed_bytes": 279,
+          "logical_bytes": 527,
+          "member": "xl/workbook.xml",
+          "replacement_sha256": "8c3344a56da551b6a987331cec7c4e672ffef2150bf27c5f0f2aaa9cb366bf88"
+        },
+        {
+          "compressed_bytes": 47101,
+          "logical_bytes": 462569,
+          "member": "xl/worksheets/sheet1.xml",
+          "replacement_sha256": "d079bcce4b785b6de82528458bc8b2ccfd1e8844e25b95bc386dd93f42bf6972"
+        },
+        {
+          "compressed_bytes": 3429,
+          "logical_bytes": 31398,
+          "member": "xl/worksheets/sheet2.xml",
+          "replacement_sha256": "a7e008e774b9f9a97e396bc8879435a3cc6ef09a44ae0cdbd4a2605dce47ddf5"
+        },
+        {
+          "compressed_bytes": 1119,
+          "logical_bytes": 8115,
+          "member": "xl/worksheets/sheet3.xml",
+          "replacement_sha256": "f47c01b58d76b06ccfe243349cfb39cdb1d880dbfd1bb3f5e57dbe9086b01166"
+        },
+        {
+          "compressed_bytes": 1451,
+          "logical_bytes": 6352,
+          "member": "xl/worksheets/sheet4.xml",
+          "replacement_sha256": "ccaa730a58e12521cb441b63e5abebf492bb41e279a346bc84301dea797b0198"
+        }
+      ],
+      "total_bytes": 508961,
+      "untouched_compressed_payloads_verified": 12
+    }
+  ],
+  "manifest": {
+    "bytes": 17221,
+    "path": "/home/zhuhe/litchi-performance-0947/inputs/artifacts/manifest.json",
+    "sha256": "24fcadfb50c88d1edbddb98e863c2be1e61498803b303985aa1ab5cbbeafd931"
+  },
+  "policy": {
+    "cold_remainder_floor": 65536,
+    "limits": "Advisory only; actual execution also requires explicit context, memory and task budgets. Warm means an existing pool/session, not warm CPU caches.",
+    "min_task_bytes": 0,
+    "warm_remainder_floor": 8192
+  },
+  "prior_identity": {
+    "bytes": 9589,
+    "path": "docs/performance/results/change-0953/task-census.json",
+    "sha256": "c96d66a72db59ec847247b1e8e2472b821a54c7a4221bdd61c90abcfe1be281a"
+  },
+  "schema": "litchi.performance.0954.task-census.v1"
+}

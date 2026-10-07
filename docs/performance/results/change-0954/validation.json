@@ -1,0 +1,37 @@
+{
+  "byte_identical_replay": true,
+  "new_build_or_workload": false,
+  "source_bindings": [
+    {
+      "path": "docs/performance/results/change-0954/census.py",
+      "bytes": 4615,
+      "sha256": "cbd01b77b9365237f489a0d299a1ea2b4f681c73d1393339b12a49039914ebac"
+    },
+    {
+      "path": "docs/performance/results/change-0954/census.json",
+      "bytes": 7203,
+      "sha256": "4edde4f45601f95057264b0bdafa3b219614129dbbab862af5e45bec30a6a719"
+    },
+    {
+      "path": "crates/soapberry-zip/src/preserve.rs",
+      "bytes": 254176,
+      "sha256": "21e679a6c0cdc027859d13c87a24564fba3ba59f7ecfc651b971930b1fa063ae"
+    },
+    {
+      "path": "crates/soapberry-zip/src/office/parallel_write.rs",
+      "bytes": 12934,
+      "sha256": "c8228b7ce57a11338a5a3e84480ac23f0d1d7e47760f1245b2050161390954f0"
+    },
+    {
+      "path": "tools/perf-baseline/src/lib.rs",
+      "bytes": 3076502,
+      "sha256": "0d8d00f265157083af4d1e31f035dadd0a624969f43ef8f1b5ca97f350f2535d"
+    },
+    {
+      "path": "docs/performance/results/change-0904/artifacts/manifest.json",
+      "bytes": 17221,
+      "sha256": "24fcadfb50c88d1edbddb98e863c2be1e61498803b303985aa1ab5cbbeafd931"
+    }
+  ],
+  "cleanup": "Duplicate replay removed; retained historical fixtures and review evidence preserved."
+}
