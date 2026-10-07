@@ -1,0 +1,365 @@
+{
+  "corrected_plan": {
+    "path": "/home/zhuhe/litchi-performance-0945/plan-v2.json",
+    "sha256": "a60587fcd651dac117f4b88ed74011e8d7fbeb4856ef96f01389ae75d5352dc9"
+  },
+  "corrected_relative_fixture": {
+    "capture": {
+      "children": 1,
+      "path": "corrected-relative/qualification/capture.json",
+      "receipt_count": 1,
+      "status": "pass"
+    },
+    "captured_output": "qualification: 1 children / 2 samples passed\n",
+    "escape_controls_rejected": 3,
+    "relative_descriptor_count": 70,
+    "relative_descriptors": [
+      {
+        "file": "plan-v2.json",
+        "path": "tools/capture_0945_v2.py"
+      },
+      {
+        "file": "plan-v2.json",
+        "path": "tools/freeze_0945_v2.py"
+      },
+      {
+        "file": "plan-v2.json",
+        "path": "METHOD.md"
+      },
+      {
+        "file": "plan-v2.json",
+        "path": "tools/reduce_0945_v2.py"
+      },
+      {
+        "file": "plan-v2.json",
+        "path": "tools/bind_baseline_native_reuse_v2.py"
+      },
+      {
+        "file": "plan-v2.json",
+        "path": "tools/reuse_v2.py"
+      },
+      {
+        "file": "plan-v2.json",
+        "path": "tools/semantic_0705.py"
+      },
+      {
+        "file": "plan-v2.json",
+        "path": "builds/baseline-allocator-v1/terminal.json"
+      },
+      {
+        "file": "plan-v2.json",
+        "path": "binaries/baseline-allocator"
+      },
+      {
+        "file": "plan-v2.json",
+        "path": "receipts/baseline-native-reuse-v2.json"
+      },
+      {
+        "file": "plan-v2.json",
+        "path": "binaries/baseline-native"
+      },
+      {
+        "file": "plan-v2.json",
+        "path": "builds/candidate-allocator-v2/terminal.json"
+      },
+      {
+        "file": "plan-v2.json",
+        "path": "target-candidate-allocator-v2/release/litchi-perf-baseline-alloc"
+      },
+      {
+        "file": "plan-v2.json",
+        "path": "builds/candidate-native-v2/terminal.json"
+      },
+      {
+        "file": "plan-v2.json",
+        "path": "target-candidate-native-v2/release/litchi-perf-baseline"
+      },
+      {
+        "file": "plan-v2.json",
+        "path": "tools/semantic_0705.py"
+      },
+      {
+        "file": "plan-v2.json",
+        "path": "baseline-source-manifest.json"
+      },
+      {
+        "file": "plan-v2.json",
+        "path": "receipts/candidate-freeze-v2.json"
+      },
+      {
+        "file": "plan-v2.json",
+        "path": "candidate-source-manifest-v2.json"
+      },
+      {
+        "file": "plan-v2.json",
+        "path": "source-export.json"
+      },
+      {
+        "file": "qualification/capture.json",
+        "path": "fake-binary"
+      },
+      {
+        "file": "qualification/capture.json",
+        "path": "fake-binary"
+      },
+      {
+        "file": "qualification/capture.json",
+        "path": "fake-binary"
+      },
+      {
+        "file": "qualification/capture.json",
+        "path": "fake-binary"
+      },
+      {
+        "file": "qualification/capture.json",
+        "path": "tools/capture_0945.py"
+      },
+      {
+        "file": "qualification/capture.json",
+        "path": "plan-v2.json"
+      },
+      {
+        "file": "qualification/capture.json",
+        "path": "qualification/q00-baseline-native-fixture-case/report.json"
+      },
+      {
+        "file": "qualification/capture.json",
+        "path": "qualification/q00-baseline-native-fixture-case/resource.json"
+      },
+      {
+        "file": "qualification/capture.json",
+        "path": "qualification/q00-baseline-native-fixture-case/stderr.txt"
+      },
+      {
+        "file": "qualification/capture.json",
+        "path": "qualification/q00-baseline-native-fixture-case/stdout.txt"
+      },
+      {
+        "file": "qualification/capture.json",
+        "path": "qualification/q00-baseline-native-fixture-case/terminal.json"
+      },
+      {
+        "file": "qualification/capture.json",
+        "path": "fake-binary"
+      },
+      {
+        "file": "qualification/capture.json",
+        "path": "tools/capture_0945.py"
+      },
+      {
+        "file": "qualification/capture.json",
+        "path": "plan-v2.json"
+      },
+      {
+        "file": "qualification/capture.json",
+        "path": "qualification/q00-baseline-native-fixture-case/terminal.json"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/command.json",
+        "path": "qualification/q00-baseline-native-fixture-case/report.json"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/command.json",
+        "path": "qualification/q00-baseline-native-fixture-case/resource.json"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/command.json",
+        "path": "qualification/q00-baseline-native-fixture-case/stderr.txt"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/command.json",
+        "path": "qualification/q00-baseline-native-fixture-case/stdout.txt"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/command.json",
+        "path": "qualification/q00-baseline-native-fixture-case/terminal.json"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/command.json",
+        "path": "fake-binary"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/command.json",
+        "path": "tools/capture_0945.py"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/command.json",
+        "path": "plan-v2.json"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/command.json",
+        "path": "qualification/q00-baseline-native-fixture-case/report.json"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/command.json",
+        "path": "qualification/q00-baseline-native-fixture-case/resource.json"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/command.json",
+        "path": "qualification/q00-baseline-native-fixture-case/stderr.txt"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/command.json",
+        "path": "qualification/q00-baseline-native-fixture-case/stdout.txt"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/command.json",
+        "path": "fake-binary"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/command.json",
+        "path": "tools/capture_0945.py"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/command.json",
+        "path": "plan-v2.json"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/command.json",
+        "path": "qualification/q00-baseline-native-fixture-case/terminal.json"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/receipt.json",
+        "path": "qualification/q00-baseline-native-fixture-case/report.json"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/receipt.json",
+        "path": "qualification/q00-baseline-native-fixture-case/resource.json"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/receipt.json",
+        "path": "qualification/q00-baseline-native-fixture-case/stderr.txt"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/receipt.json",
+        "path": "qualification/q00-baseline-native-fixture-case/stdout.txt"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/receipt.json",
+        "path": "qualification/q00-baseline-native-fixture-case/terminal.json"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/receipt.json",
+        "path": "fake-binary"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/receipt.json",
+        "path": "tools/capture_0945.py"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/receipt.json",
+        "path": "plan-v2.json"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/receipt.json",
+        "path": "qualification/q00-baseline-native-fixture-case/terminal.json"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/start.json",
+        "path": "fake-binary"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/start.json",
+        "path": "tools/capture_0945.py"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/start.json",
+        "path": "plan-v2.json"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/terminal.json",
+        "path": "qualification/q00-baseline-native-fixture-case/report.json"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/terminal.json",
+        "path": "qualification/q00-baseline-native-fixture-case/resource.json"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/terminal.json",
+        "path": "qualification/q00-baseline-native-fixture-case/stderr.txt"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/terminal.json",
+        "path": "qualification/q00-baseline-native-fixture-case/stdout.txt"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/terminal.json",
+        "path": "fake-binary"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/terminal.json",
+        "path": "tools/capture_0945.py"
+      },
+      {
+        "file": "qualification/q00-baseline-native-fixture-case/terminal.json",
+        "path": "plan-v2.json"
+      }
+    ],
+    "runner_sha256": "1662654f7f410e1a87093a461745bf0da102bf8f965802c93cfeef3bb93c8d13",
+    "status": "passed_fake_child_orchestration",
+    "terminal": {
+      "process_group_clear": true,
+      "returncode": 0,
+      "terminal_before_parse": true
+    }
+  },
+  "corrected_runner": {
+    "path": "/home/zhuhe/litchi-performance-0945/tools/capture_0945_v2.py",
+    "sha256": "1662654f7f410e1a87093a461745bf0da102bf8f965802c93cfeef3bb93c8d13"
+  },
+  "correction_scope": "two internal plan descriptor call sites use plan_descriptor() with packet-relative plan-v2.json; no gates or schedule changed",
+  "finding": "frozen run_child/stage_capture passed absolute PLAN_PATH to strict descriptor_path",
+  "frozen_plan": {
+    "path": "/home/zhuhe/litchi-performance-0945/plan.json",
+    "sha256": "fec65e50a0eaaed07e3e5a0ad6c4272da76715f3a4dcf08e6566c711a733fa70"
+  },
+  "frozen_runner": {
+    "path": "/home/zhuhe/litchi-performance-0945/tools/capture_0945.py",
+    "sha256": "d4fdf0553e5cd178d6a4524f213e3b700ff6166064bf30a6f0284c556b7e9dce"
+  },
+  "measurements_started": false,
+  "old_frozen_failure": {
+    "captured_output": "",
+    "child_directory": "old-frozen/qualification/q00-baseline-native-fixture-case",
+    "child_files": [],
+    "error": "CaptureError('plan descriptor path must be packet-relative')",
+    "runner_sha256": "d4fdf0553e5cd178d6a4524f213e3b700ff6166064bf30a6f0284c556b7e9dce",
+    "status": "failed_before_child_start_expected"
+  },
+  "plan_invariants": {
+    "fields": {
+      "allocator": true,
+      "cases": true,
+      "gate": true,
+      "native": true,
+      "protocol_revision": true,
+      "qualification": true,
+      "schema": true,
+      "seed": true
+    },
+    "new_plan_sha256": "a60587fcd651dac117f4b88ed74011e8d7fbeb4856ef96f01389ae75d5352dc9",
+    "old_plan_sha256": "fec65e50a0eaaed07e3e5a0ad6c4272da76715f3a4dcf08e6566c711a733fa70",
+    "status": "unchanged"
+  },
+  "reducer_relative_fixture": {
+    "corrected_descriptor": {
+      "bytes": 40791,
+      "executable": false,
+      "mode": 436,
+      "path": "tools/capture_0945_v2.py",
+      "sha256": "1662654f7f410e1a87093a461745bf0da102bf8f965802c93cfeef3bb93c8d13"
+    },
+    "corrected_runner_sha256": "c11326da83dddf78b610cad921ede12bc7c1154d55f0ae55ceb085bea140cf3b",
+    "old_failure": "ReviewError('capture helper path must be packet-relative')",
+    "old_runner_sha256": "f46e59f89ecb949fc118e2791aca2ebe3b72cd0da0fef942c7fedbb6ec083222",
+    "old_source": "versioned emulation of the two pre-fix absolute RUNNER call sites",
+    "status": "passed_reducer_relative_descriptor_fixture"
+  },
+  "reducer_v2": {
+    "path": "/home/zhuhe/litchi-performance-0945/tools/reduce_0945_v2.py",
+    "sha256": "c11326da83dddf78b610cad921ede12bc7c1154d55f0ae55ceb085bea140cf3b"
+  },
+  "schema": "litchi.performance.0945.capture-orchestration-preflight.v1",
+  "status": "pass",
+  "workloads_started": false
+}

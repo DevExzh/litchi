@@ -1,0 +1,10 @@
+{
+  "schema": "litchi.performance.0945.archive-preflight-failure.v1",
+  "utc": "2026-10-07T02:59:06.643808+00:00",
+  "returncode": 2,
+  "error": "0945 archive operation refused: ArchiveError: quality v1 freeze rows are not sorted: baseline",
+  "script_sha256": "a61c6140b83f5fd1cd72453940eba8bfbec8f40f7195242f9f0c65c3b3774296",
+  "archive_created": false,
+  "manifest_created": false,
+  "cleanup_ran": false
+}

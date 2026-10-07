@@ -1,0 +1,66 @@
+{
+  "checks": [
+    {
+      "id": "real-quality-freeze-v1-with-unsorted-rows",
+      "status": "pass"
+    },
+    {
+      "id": "real-quality-input-origins-and-boundary-copies",
+      "status": "pass"
+    },
+    {
+      "id": "real-quality-set-equality-with-boundary-union",
+      "roles": [
+        "baseline",
+        "candidate"
+      ],
+      "status": "pass"
+    },
+    {
+      "id": "duplicate-freeze-row-rejected",
+      "rejection": "quality v1 freeze duplicate path: baseline:.cargo/config.toml",
+      "status": "pass"
+    },
+    {
+      "id": "missing-selected-freeze-row-rejected",
+      "rejection": "quality v1 freeze path missing from selection: quality/baseline-source/clippy.toml",
+      "status": "pass"
+    },
+    {
+      "id": "mismatched-selected-freeze-row-rejected",
+      "rejection": "quality v1 freeze selected copy changed: quality/candidate-source/clippy.toml",
+      "status": "pass"
+    }
+  ],
+  "notes": [
+    "Quality freeze rows are validated as an unordered unique census; real rows are not lexicographically sorted.",
+    "Quality-root set equality is checked against freeze rows union the two boundary-input copies.",
+    "Negative mutations were in-memory only."
+  ],
+  "regeneration_command": "/usr/bin/python3 -B <this read-only validator invocation>",
+  "schema": "litchi.performance.0945.archive-v2-real-quality-controls.v1",
+  "scope": {
+    "archive_mode_invoked": false,
+    "cleanup_mode_invoked": false,
+    "frozen_files_modified": false,
+    "real_quality_roots_hashed": true,
+    "verify_mode_invoked": false
+  },
+  "script": {
+    "bytes": 50265,
+    "path": "/home/zhuhe/litchi-performance-0945/archive-0945-v2.py",
+    "sha256": "5dcf898f4d6f84a18615a745d67ad7f67ea98dca9e3fac08388ac043ab7d2aee"
+  },
+  "source": {
+    "boundary_inputs": {
+      "path": "quality/boundary-inputs-v1.json",
+      "sha256": "754acc95258300180b2ee212f6653e405868cb9e0f1cf575a9531d18654bc798"
+    },
+    "quality_freeze": {
+      "path": "quality/source-freeze-v1.json",
+      "sha256": "3664eb3f28b8e9587b05de5ef638a41589f0b85f638965e4663856a2dae426fe"
+    },
+    "quality_records": 21586
+  },
+  "status": "pass"
+}

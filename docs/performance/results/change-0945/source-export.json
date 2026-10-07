@@ -1,0 +1,36 @@
+{
+  "0944_source_equivalence": {
+    "all_file_bytes_equal": true,
+    "all_git_objects_equal": true,
+    "manifest_sha256": "b63113ce5251218be817ba29c466b0ace535c546a416b97413ae8a73f0caea64",
+    "native_binary_reuse_eligible": true
+  },
+  "argv": [
+    "git",
+    "archive",
+    "e037befa6ce52b3988c8ae2032ae652196f2a09d",
+    ".cargo",
+    "crates",
+    "test-data",
+    "tools/perf-baseline",
+    "Cargo.toml",
+    "README.md",
+    "clippy.toml",
+    "deny.toml",
+    "rust-toolchain.toml",
+    "rustfmt.toml"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "elapsed_seconds": 1.2815911769866943,
+  "exit_code": 0,
+  "extract_exit_code": 0,
+  "file_count": 10788,
+  "manifest": {
+    "bytes": 2993755,
+    "path": "baseline-source-manifest.json",
+    "sha256": "c276582f412ac9c670a8b0fc3cc85ef12dc8a8705c201dd78e5584efa3a5a100"
+  },
+  "schema": "litchi.performance.0945.source-export-v1",
+  "source_bytes": 259872266,
+  "source_commit": "e037befa6ce52b3988c8ae2032ae652196f2a09d"
+}

@@ -1,0 +1,494 @@
+{
+  "blockers": [],
+  "builds_started": false,
+  "case_count": 47,
+  "cases": [
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "primary-percent-medium: actual_primary_validate",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "primary-percent-medium: reducer_source_identity",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "primary-percent-dense-sparse: actual_primary_validate",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "primary-percent-dense-sparse: reducer_source_identity",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "control-xlsx-one-edit-medium: actual_xlsx_control_validate",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "control-xlsx-managed-one-edit-medium: actual_xlsx_control_validate",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": "ReviewError: managed-mutation source ownership mode changed",
+      "expected": "reject",
+      "name": "control-xlsx-managed-one-edit-medium: managed_oracle_mutation_rejects",
+      "observed": "reject",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "publication_quantiles_independently_sorted",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "publication_phase_alignment_preserves_workflow_order",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "allocator_counter_conservation_valid",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": "ReviewError: mismatch allocator byte conservation",
+      "expected": "reject",
+      "name": "allocator_counter_conservation_mismatch",
+      "observed": "reject",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": "ReviewError: region allocator peak/live boundaries",
+      "expected": "reject",
+      "name": "allocator_region_peak_boundary",
+      "observed": "reject",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "zero_baseline_equal_zero_status",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": "ReviewError: zero-nonzero has a nonzero candidate over a zero baseline (non-comparable)",
+      "expected": "reject",
+      "name": "zero_baseline_nonzero_rejects",
+      "observed": "reject",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": "ReviewError: negative ratio input is negative",
+      "expected": "reject",
+      "name": "negative_ratio_rejects",
+      "observed": "reject",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "bootstrap_95_percentile_configuration",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "native_all_four_rows_both_latency_metrics_pass",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "native_gate_propagates_whole_workflow_p50_primary-percent-medium",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "native_gate_propagates_publication_p50_primary-percent-medium",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "native_gate_propagates_whole_workflow_p50_primary-percent-dense-sparse",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "native_gate_propagates_publication_p50_primary-percent-dense-sparse",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "native_gate_propagates_whole_workflow_p50_control-xlsx-one-edit-medium",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "native_gate_propagates_publication_p50_control-xlsx-one-edit-medium",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "native_gate_propagates_whole_workflow_p50_control-xlsx-managed-one-edit-medium",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "native_gate_propagates_publication_p50_control-xlsx-managed-one-edit-medium",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "fail",
+      "name": "top_level_analysis_propagates_failed_latency_gate",
+      "observed": "fail",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "allocator_all_rows_safety_and_primary_pass",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "allocator_gate_propagates_allocated_bytes",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "allocator_gate_propagates_allocation_calls",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "allocator_gate_propagates_region_peak_live_bytes",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "allocator_gate_propagates_live_bytes_after",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "allocator_gate_propagates_max_rss_kib",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "freeze_source_binding_actual_manifests",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "capture_artifact_allowlist_positive",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": "CaptureError: unexpected capture artifact /home/zhuhe/litchi-performance-0945/comparison-tooling-review/tmp-final-custody/unexpected.bin",
+      "expected": "reject",
+      "name": "capture_artifact_allowlist_rejects_extra",
+      "observed": "reject",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "reducer_artifact_binding_positive",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": "ReviewError: artifact descriptor drift in /home/zhuhe/litchi-performance-0945/comparison-tooling-review/tmp-final-custody",
+      "expected": "reject",
+      "name": "reducer_artifact_binding_rejects_hash_drift",
+      "observed": "reject",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "capture_relative_resolve_is_explicit",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "capture_command_and_environment_binding",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": "FreezeError: bound path is outside packet: /etc/hosts",
+      "expected": "reject",
+      "name": "freeze_relative_path_rejects_outside_packet",
+      "observed": "reject",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": "ReviewError: replay path must be packet-relative",
+      "expected": "reject",
+      "name": "reduce_absolute_replay_path_is_rejected",
+      "observed": "reject",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": "superseded v1 receipt rejected",
+      "expected": "reject",
+      "name": "baseline_reuse_requires_manifest_and_build_binding",
+      "observed": "reject",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": "superseded v1 receipt rejected",
+      "expected": "reject",
+      "name": "capture_baseline_reuse_requires_manifest_and_build_binding",
+      "observed": "reject",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "reducer_portable_reuse_v2_positive",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": null,
+      "expected": "pass",
+      "name": "capture_portable_reuse_v2_positive",
+      "observed": "pass",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": "receipt rejected by nested terminal/source binding",
+      "expected": "reject",
+      "name": "reducer_build_receipt_requires_source_census",
+      "observed": "reject",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    },
+    {
+      "detail": "receipt rejected by nested terminal/source binding",
+      "expected": "reject",
+      "name": "capture_build_receipt_requires_source_census",
+      "observed": "reject",
+      "passed": true,
+      "unexpected_acceptance": false,
+      "unexpected_rejection": false
+    }
+  ],
+  "failed_controls": 0,
+  "findings": [
+    "Publication quantiles are computed by metric_summary after sorting the publication vector; phase_alignment retains elapsed sample order.",
+    "Both native latency metrics are represented for all four rows and native_reduce propagates a single-row mutation to the aggregate gate.",
+    "Allocator conservation and peak/live boundaries reject malformed counters; allocator_reduce propagates each safety metric mutation.",
+    "Absolute replay paths are rejected by reduce.path_value; packet-relative descriptors remain portable under relocation.",
+    "The primary positive fixture exercises both the scalar semantic source contract and the reducer acquisition-ordered generic vectors.",
+    "Both build_check implementations recursively validate the packet-local reuse-v2 receipt and reject the superseded v1 and incomplete ordinary receipt; this provenance path passed the positive and negative controls.",
+    "Top-level analysis status propagates a failing native gate instead of accepting a failed reduction."
+  ],
+  "prepared_candidate_v2_receipts": {
+    "allocator": {
+      "bytes": 5244,
+      "path": "/home/zhuhe/litchi-performance-0945/receipts/candidate-allocator-build-prepared-v2.json",
+      "sha256": "9d44c7ee2beb1fc280245e0300d6da800605b4f40259c1f9fdbe88095f4d37d2"
+    },
+    "native": {
+      "bytes": 5134,
+      "path": "/home/zhuhe/litchi-performance-0945/receipts/candidate-native-build-prepared-v2.json",
+      "sha256": "37a0f3aae1c85204209548b44c3d92c290188415151762e87106183e28dacbd3"
+    }
+  },
+  "regeneration": "PYTHONDONTWRITEBYTECODE=1 python3 -B /home/zhuhe/litchi-performance-0945/comparison-tooling-review/actual-final-xlsx-controls-v1.py",
+  "schema": "litchi.performance.0945.actual-final-xlsx-controls.v1",
+  "scope": {
+    "actual_modules_called": [
+      "reduce_0945.xlsx_control_validate",
+      "reduce_0945.source_identity",
+      "reduce_0945.allocator_sample",
+      "reduce_0945.native_reduce",
+      "reduce_0945.allocator_reduce",
+      "reduce_0945.ratio",
+      "reduce_0945.metric_summary",
+      "capture_0945.resolve_path",
+      "freeze_0945.relative_path",
+      "reduce_0945.build_check"
+    ],
+    "four_xlsx_cases": [
+      "primary-percent-medium",
+      "primary-percent-dense-sparse",
+      "control-xlsx-one-edit-medium",
+      "control-xlsx-managed-one-edit-medium"
+    ],
+    "no_measurement_or_build": true
+  },
+  "status": "passed",
+  "tool_bindings": {
+    "capture": {
+      "bytes": 40612,
+      "path": "/home/zhuhe/litchi-performance-0945/tools/capture_0945.py",
+      "sha256": "d4fdf0553e5cd178d6a4524f213e3b700ff6166064bf30a6f0284c556b7e9dce"
+    },
+    "freeze": {
+      "bytes": 13118,
+      "path": "/home/zhuhe/litchi-performance-0945/tools/freeze_0945.py",
+      "sha256": "2e34f78742e2d369afe4a0bca30e6de768cc36dee206cba4e058c304de158d68"
+    },
+    "reduce": {
+      "bytes": 83979,
+      "path": "/home/zhuhe/litchi-performance-0945/tools/reduce_0945.py",
+      "sha256": "dd5edfe84630520dbec05e1837427b76a45e6ca25ef41d3636325a01da8d225e"
+    }
+  },
+  "workloads_started": false
+}

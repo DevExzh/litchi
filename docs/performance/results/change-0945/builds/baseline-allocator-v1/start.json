@@ -1,0 +1,125 @@
+{
+  "argv": [
+    "/home/zhuhe/.cargo/bin/cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "/home/zhuhe/litchi-performance-0945/baseline-source/tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "litchi-perf-baseline-alloc",
+    "--features",
+    "allocator-metrics",
+    "-j2"
+  ],
+  "binary_receipt": "builds/baseline-allocator-v1/binary.json",
+  "binary_relative": "target-baseline-allocator-v1/release/litchi-perf-baseline-alloc",
+  "bindings": {
+    "bytes": 3764,
+    "executable": false,
+    "mode": 436,
+    "path": "builds/baseline-allocator-v1/bindings.json",
+    "sha256": "39638195b3f321ebf354453103bbbb17caac8b7950a912a9ac865f8fa88b5418"
+  },
+  "cargo": {
+    "bytes": 21113232,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/.cargo/bin/cargo",
+    "resolved_path": "/home/zhuhe/.cargo/bin/rustup",
+    "sha256": "dda7234360b7f578ca8b0ddcb80145646fa61a67c1720a5abc7051b35c9fcb71"
+  },
+  "cwd": "/home/zhuhe/litchi-performance-0945/baseline-source",
+  "cwd_relative": "baseline-source",
+  "deadline_seconds": 1800,
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_HOME": "/home/zhuhe/.cargo",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_PROFILE_RELEASE_LTO": "fat",
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-performance-0945/target-baseline-allocator-v1",
+    "HOME": "/home/zhuhe",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/home/zhuhe/.cargo/bin:/usr/bin:/bin",
+    "RUSTUP_HOME": "/home/zhuhe/.rustup",
+    "RUSTUP_TOOLCHAIN": "1.95.0",
+    "RUST_BACKTRACE": "0",
+    "TEMP": "/home/zhuhe/litchi-performance-0945/tmp/baseline-allocator-v1",
+    "TMP": "/home/zhuhe/litchi-performance-0945/tmp/baseline-allocator-v1",
+    "TMPDIR": "/home/zhuhe/litchi-performance-0945/tmp/baseline-allocator-v1",
+    "TZ": "UTC"
+  },
+  "launch_receipt": "builds/baseline-allocator-v1/launch.json",
+  "process_group": true,
+  "receipt_kind": "start",
+  "result_receipt": "builds/baseline-allocator-v1/result.json",
+  "runner": {
+    "bytes": 20025,
+    "executable": true,
+    "mode": 493,
+    "path": "tools/build_baseline_allocator.py",
+    "sha256": "04f83a73c42bca1533061974b5474105136f46ec4ac5c3108cf9b8fa3f79af6e"
+  },
+  "schema": "litchi.performance.0945.baseline-allocator-build-v1",
+  "source": {
+    "bytes": 259872266,
+    "cargo_config": {
+      "bytes": 470,
+      "executable": false,
+      "mode": 436,
+      "path": "baseline-source/.cargo/config.toml",
+      "sha256": "50b044c83828f2c448ee59c362afaa79de2dd47fbd390f0cd2888391f1d1119d"
+    },
+    "cargo_lock": {
+      "bytes": 56289,
+      "executable": false,
+      "mode": 436,
+      "path": "baseline-source/tools/perf-baseline/Cargo.lock",
+      "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+    },
+    "cargo_manifest": {
+      "bytes": 3286,
+      "executable": false,
+      "mode": 436,
+      "path": "baseline-source/tools/perf-baseline/Cargo.toml",
+      "sha256": "53fd47997ae969e709e2ee45575a6050f75de10df339f48dd427f35538768202"
+    },
+    "file_count": 10788,
+    "manifest": {
+      "bytes": 2993755,
+      "executable": false,
+      "mode": 436,
+      "path": "baseline-source-manifest.json",
+      "sha256": "c276582f412ac9c670a8b0fc3cc85ef12dc8a8705c201dd78e5584efa3a5a100"
+    },
+    "manifest_size": 2993755,
+    "source_commit": "e037befa6ce52b3988c8ae2032ae652196f2a09d",
+    "source_export": {
+      "bytes": 981,
+      "executable": false,
+      "mode": 436,
+      "path": "source-export.json",
+      "sha256": "f00ca571e5ea299dcfe038bb4fad2ba5b8be2ae013f500127f418fcc90f7f3ba"
+    },
+    "source_root": "baseline-source"
+  },
+  "start_new_session": true,
+  "started_utc": "2026-10-07T01:02:56.947612+00:00",
+  "stderr_path": "builds/baseline-allocator-v1/build.stderr.log",
+  "stdout_path": "builds/baseline-allocator-v1/build.stdout.log",
+  "target_relative": "target-baseline-allocator-v1",
+  "terminal_before_binary_parse": true,
+  "terminal_receipt": "builds/baseline-allocator-v1/terminal.json",
+  "unset_environment": [
+    "CARGO_BUILD_RUSTC_WRAPPER",
+    "CARGO_ENCODED_RUSTFLAGS",
+    "RUSTC_WRAPPER",
+    "RUSTFLAGS"
+  ]
+}

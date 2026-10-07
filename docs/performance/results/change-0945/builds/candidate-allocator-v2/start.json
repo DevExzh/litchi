@@ -1,0 +1,138 @@
+{
+  "argv": [
+    "/home/zhuhe/.cargo/bin/cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "/home/zhuhe/litchi-performance-0945/candidate-source-v2/tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "litchi-perf-baseline-alloc",
+    "--features",
+    "allocator-metrics",
+    "-j2"
+  ],
+  "binary_receipt": "builds/candidate-allocator-v2/binary.json",
+  "binary_relative": "target-candidate-allocator-v2/release/litchi-perf-baseline-alloc",
+  "bindings": {
+    "bytes": 4416,
+    "executable": false,
+    "mode": 436,
+    "path": "builds/candidate-allocator-v2/bindings.json",
+    "sha256": "34d32c306c6bb0dda0d78fe96c00f8def6b4eccb3adf94347b5bbbd3d343adf6"
+  },
+  "cargo": {
+    "bytes": 21113232,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/.cargo/bin/cargo",
+    "resolved_path": "/home/zhuhe/.cargo/bin/rustup",
+    "sha256": "dda7234360b7f578ca8b0ddcb80145646fa61a67c1720a5abc7051b35c9fcb71"
+  },
+  "cwd": "/home/zhuhe/litchi-performance-0945/candidate-source-v2",
+  "cwd_relative": "candidate-source-v2",
+  "deadline_seconds": 1800,
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_HOME": "/home/zhuhe/.cargo",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_PROFILE_RELEASE_LTO": "fat",
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-performance-0945/target-candidate-allocator-v2",
+    "HOME": "/home/zhuhe",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/home/zhuhe/.cargo/bin:/usr/bin:/bin",
+    "RUSTUP_HOME": "/home/zhuhe/.rustup",
+    "RUSTUP_TOOLCHAIN": "1.95.0",
+    "RUST_BACKTRACE": "0",
+    "TEMP": "/home/zhuhe/litchi-performance-0945/tmp/candidate-allocator-v2",
+    "TMP": "/home/zhuhe/litchi-performance-0945/tmp/candidate-allocator-v2",
+    "TMPDIR": "/home/zhuhe/litchi-performance-0945/tmp/candidate-allocator-v2",
+    "TZ": "UTC"
+  },
+  "launch_receipt": "builds/candidate-allocator-v2/launch.json",
+  "process_group": true,
+  "receipt_kind": "start",
+  "result_receipt": "builds/candidate-allocator-v2/result.json",
+  "runner": {
+    "bytes": 21361,
+    "executable": true,
+    "mode": 493,
+    "path": "tools/build_candidate_allocator_v2.py",
+    "sha256": "4ffa4f381e30f98373f9dd2bb0af2ec2a618c1cce3a2bdf7eaf3027fe29bb485"
+  },
+  "schema": "litchi.performance.0945.candidate-allocator-build-v2",
+  "source": {
+    "bytes": 259886223,
+    "cargo_config": {
+      "bytes": 470,
+      "executable": false,
+      "mode": 436,
+      "path": "candidate-source-v2/.cargo/config.toml",
+      "sha256": "50b044c83828f2c448ee59c362afaa79de2dd47fbd390f0cd2888391f1d1119d"
+    },
+    "cargo_lock": {
+      "bytes": 56289,
+      "executable": false,
+      "mode": 436,
+      "path": "candidate-source-v2/tools/perf-baseline/Cargo.lock",
+      "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+    },
+    "cargo_manifest": {
+      "bytes": 3286,
+      "executable": false,
+      "mode": 436,
+      "path": "candidate-source-v2/tools/perf-baseline/Cargo.toml",
+      "sha256": "53fd47997ae969e709e2ee45575a6050f75de10df339f48dd427f35538768202"
+    },
+    "changes": [
+      {
+        "baseline_sha256": "d28843caf8245bd6f0ff0f953b9b5545c4d9ad7a4e11f362d29ce226cc251cc2",
+        "candidate_sha256": "5e0cf3451e70784ff76896b0b2dc93b4409b15db9ef7c88535cc6a20885f8c43",
+        "path": "crates/litchi-opc/src/source_backed.rs"
+      },
+      {
+        "baseline_sha256": "3542991373935e27e5ce253a84f6cdfeac24d008bcf06500b7450c8b975bca96",
+        "candidate_sha256": "fff0da0fd3fe86824ba6a84531ad81d8499ebff0e73c824e4c16bf53d77129a5",
+        "path": "crates/litchi-xlsx/src/cell_values/snapshot.rs"
+      }
+    ],
+    "file_count": 10788,
+    "freeze_receipt": {
+      "bytes": 1269,
+      "bytes_verified": 1269,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/candidate-freeze-v2.json",
+      "sha256": "f624f161ad7e04499f6ae3a5f5079533ecc489c3690a2f46fdf947f3492dce32"
+    },
+    "manifest": {
+      "bytes": 3048241,
+      "executable": false,
+      "mode": 436,
+      "path": "candidate-source-manifest-v2.json",
+      "sha256": "da7128f699b4bf7a9a4745e99b99606830df1aa192ce389a0b7fe3cceb8a0994"
+    },
+    "manifest_size": 3048241,
+    "source_commit": "e037befa6ce52b3988c8ae2032ae652196f2a09d",
+    "source_root": "candidate-source-v2"
+  },
+  "start_new_session": true,
+  "started_utc": "2026-10-07T02:27:12.355003+00:00",
+  "stderr_path": "builds/candidate-allocator-v2/build.stderr.log",
+  "stdout_path": "builds/candidate-allocator-v2/build.stdout.log",
+  "target_relative": "target-candidate-allocator-v2",
+  "terminal_before_binary_parse": true,
+  "terminal_receipt": "builds/candidate-allocator-v2/terminal.json",
+  "unset_environment": [
+    "CARGO_BUILD_RUSTC_WRAPPER",
+    "CARGO_ENCODED_RUSTFLAGS",
+    "RUSTC_WRAPPER",
+    "RUSTFLAGS"
+  ]
+}

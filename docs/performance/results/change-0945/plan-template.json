@@ -1,0 +1,192 @@
+{
+  "allocator": {
+    "children": 16,
+    "repeats": 2,
+    "samples": 3,
+    "schedule": "two alternating repeats; even baseline then candidate and forward case order; odd candidate then baseline and reverse case order",
+    "warmup": 2
+  },
+  "build_binding_ids": {
+    "baseline": "baseline1",
+    "candidate": "candidate2"
+  },
+  "build_revisions": {
+    "baseline": "v1",
+    "candidate": "v2"
+  },
+  "cases": [
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "id": "primary-percent-medium",
+      "kind": "primary",
+      "xlsx_cell_crud_shape": "medium"
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "id": "primary-percent-dense-sparse",
+      "kind": "primary",
+      "xlsx_cell_crud_shape": "dense-sparse"
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_edit_save",
+      "id": "control-xlsx-one-edit-medium",
+      "kind": "control",
+      "xlsx_cell_crud_shape": "medium"
+    },
+    {
+      "case": "xlsx_source_backed_managed_cell_values_one_edit_save",
+      "id": "control-xlsx-managed-one-edit-medium",
+      "kind": "managed-control",
+      "xlsx_cell_crud_shape": "medium"
+    }
+  ],
+  "cpu": 12,
+  "environment": {
+    "fixed": {
+      "LANG": "C",
+      "LC_ALL": "C",
+      "PATH": "/usr/bin:/bin",
+      "RUST_BACKTRACE": "0",
+      "TZ": "UTC"
+    }
+  },
+  "expected_artifacts": {
+    "child": [
+      "start.json",
+      "terminal.json",
+      "stdout.txt",
+      "stderr.txt",
+      "report.json",
+      "resource.json",
+      "command.json",
+      "receipt.json"
+    ],
+    "no_retry": true,
+    "terminal_before_parse": true,
+    "unexpected_artifact_is_failure": true
+  },
+  "gate": {
+    "allocation": {
+      "individual_review_ratio_gt": 1.05,
+      "primary_bootstrap": false,
+      "primary_case_ids": [
+        "primary-percent-medium",
+        "primary-percent-dense-sparse"
+      ],
+      "primary_every_pair_ratio_max": 0.95,
+      "primary_pair_count": 2,
+      "publication_metric": "allocated_bytes",
+      "safety_metrics": [
+        "allocation_calls",
+        "region_peak_live_bytes",
+        "live_bytes_after",
+        "max_rss_kib"
+      ],
+      "safety_paired_median_ratio_max": 1.05
+    },
+    "bootstrap": {
+      "confidence_level": 0.95,
+      "lower_percentile": 2.5,
+      "replicates": 10000,
+      "seed": 945009,
+      "statistic": "paired_median_ratio",
+      "upper_percentile": 97.5
+    },
+    "latency": {
+      "bootstrap_upper_95_lt": 1.05,
+      "case_ids": [
+        "primary-percent-medium",
+        "primary-percent-dense-sparse",
+        "control-xlsx-one-edit-medium",
+        "control-xlsx-managed-one-edit-medium"
+      ],
+      "metrics": [
+        "whole_workflow_p50",
+        "publication_p50"
+      ],
+      "paired_median_ratio_max": 1.05
+    },
+    "review": {
+      "p50_spread_gt": 1.2,
+      "regression_ratio_gt": 1.05,
+      "tail_metrics": [
+        "p50",
+        "p95",
+        "p99"
+      ]
+    }
+  },
+  "helpers": {
+    "capture": "tools/capture_0945.py",
+    "freeze": "tools/freeze_0945.py",
+    "reducer": "tools/reduce_0945.py",
+    "semantic": "tools/semantic_0705.py"
+  },
+  "native": {
+    "blocks": 6,
+    "children": 48,
+    "samples": 100,
+    "schedule": "six alternating blocks; even baseline then candidate and forward case order; odd candidate then baseline and reverse case order",
+    "warmup": 10
+  },
+  "plan_id": "0945",
+  "protocol_revision": 1,
+  "qualification": {
+    "children": 16,
+    "kinds": [
+      "native",
+      "allocator"
+    ],
+    "roles": [
+      "baseline",
+      "candidate"
+    ],
+    "samples": 2,
+    "warmup": 0
+  },
+  "resource": {
+    "deadline_seconds": 900,
+    "enabled": true,
+    "format": "{\"max_rss_kib\":%M,\"elapsed_seconds\":%e,\"user_seconds\":%U,\"system_seconds\":%S}",
+    "process_group": true,
+    "time_path": "/usr/bin/time"
+  },
+  "roles": {
+    "baseline": {
+      "allocator": null,
+      "native": null
+    },
+    "candidate": {
+      "allocator": null,
+      "native": null
+    }
+  },
+  "schema": "litchi.paired-audit-capture-0945.v1",
+  "seed": 945009,
+  "semantic_gates": {
+    "allocator_counter_conservation": true,
+    "full_xml_audit": true,
+    "managed_budget_release": true,
+    "output_sha256": true,
+    "relationship_and_member_identity": true,
+    "reopen_semantic_hash": true,
+    "sink_largest_write_max": 65536,
+    "source_backed": true,
+    "typed_refusal_and_zero_output": true,
+    "unmanaged_budget_zero": true,
+    "untouched_member_preservation": true
+  },
+  "semantic_validator": "tools/semantic_0705.py",
+  "source": {
+    "baseline_manifest": "baseline-source-manifest.json",
+    "baseline_root": "baseline-source",
+    "candidate_files": null,
+    "candidate_manifest": null,
+    "candidate_root": "candidate-source-v2",
+    "file_count": 10788,
+    "root_worktree": "/home/zhuhe/code/litchi",
+    "source_export": "source-export.json"
+  },
+  "status": "protocol-frozen",
+  "workload_cwd": "/home/zhuhe/litchi-performance-0945"
+}

@@ -1,0 +1,18 @@
+{
+  "schema": "litchi.performance.0945.reducer-invocation-failure.v1",
+  "created_utc": "2026-10-07T02:48:18.072639+00:00",
+  "session_id": 9411,
+  "returncode": 1,
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/litchi-performance-0945/tools/reduce_0945_v2.py",
+    "qualification"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "error": "0945 reduction failed: [Errno 2] No such file or directory: '/home/zhuhe/code/litchi/tools/semantic_0705.py'",
+  "cause": "semantic import uses verified packet-relative path against process cwd",
+  "qualification_children_completed": 16,
+  "analysis_output_created": false,
+  "recovery": "invoke same frozen reducer with cwd equal to packet; no workloads repeated and no code or plan changes"
+}

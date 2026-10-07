@@ -1,0 +1,87 @@
+{
+  "schema": "litchi.performance.0945-corrected-test-counts.v1",
+  "scope": "Successful corrected all-targets commands only; test executions repeat across default/all-features configurations, not a count of unique tests. Doctests and Clippy are separately recorded.",
+  "rows": [
+    {
+      "stdout": "quality-v2/000-baseline-opc-test-default-baseline.stdout.log",
+      "stdout_sha256": "832a905c34a76ecceec703ff49cf12acde6b93f7cd53a40a9bb98f0678d63ccc",
+      "target_result_lines": 46,
+      "passed_test_executions": 1013,
+      "failed": 0,
+      "ignored": 1,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "stdout": "quality-v2/001-baseline-opc-test-all-features-baseline.stdout.log",
+      "stdout_sha256": "74ed6831e67b1dc0a23cd22fd6814e7e1c93b47d12eb26f2eb129609972baa3e",
+      "target_result_lines": 46,
+      "passed_test_executions": 1035,
+      "failed": 0,
+      "ignored": 1,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "stdout": "quality-v2/004-baseline-xlsx-test-default-baseline.stdout.log",
+      "stdout_sha256": "d6eccc34dd8407f84aed6751de7882b49f9a157930fbed680a9ec674ec44a432",
+      "target_result_lines": 95,
+      "passed_test_executions": 2109,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "stdout": "quality-v2/005-baseline-xlsx-test-all-features-baseline.stdout.log",
+      "stdout_sha256": "b3c1b17062deaf4c17e0306d017274dad8bd516f78fd4715d9e350c2e37c0ac1",
+      "target_result_lines": 95,
+      "passed_test_executions": 2129,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "stdout": "quality-v2/008-candidate-opc-test-default-candidate.stdout.log",
+      "stdout_sha256": "21e739babbbe55c95a2dc9152104f2b525aebd5b79bcc2757e7749c16e911e83",
+      "target_result_lines": 46,
+      "passed_test_executions": 1016,
+      "failed": 0,
+      "ignored": 1,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "stdout": "quality-v2/009-candidate-opc-test-all-features-candidate.stdout.log",
+      "stdout_sha256": "c11d0d15c565e01cc47f206cb3597ba06a402b2f5a4b2da89661b616e2f1becd",
+      "target_result_lines": 46,
+      "passed_test_executions": 1038,
+      "failed": 0,
+      "ignored": 1,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "stdout": "quality-v2/012-candidate-xlsx-test-default-candidate.stdout.log",
+      "stdout_sha256": "12ffbf75529745c816d0e7c027c4b67784ed68b80dc237786de817e4d59205c5",
+      "target_result_lines": 95,
+      "passed_test_executions": 2112,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "stdout": "quality-v2/013-candidate-xlsx-test-all-features-candidate.stdout.log",
+      "stdout_sha256": "bcbac398b58ddbf8399cda9c85fda50a5742340985b0d3f2124d5f354e67bcbf",
+      "target_result_lines": 95,
+      "passed_test_executions": 2132,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    }
+  ],
+  "passed_test_executions": 12584
+}

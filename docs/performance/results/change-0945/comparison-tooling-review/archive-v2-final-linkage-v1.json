@@ -1,0 +1,71 @@
+{
+  "completed_external_checks": {
+    "archive_receipt": {
+      "bytes": 57156,
+      "path": "/home/zhuhe/litchi-performance-0945-archive/litchi-performance-0945-v1.archive-receipt.json",
+      "sha256": "df3f8af8546c1c2c34ea4ca067d9e1df16cfb0df353f6e584648fe3209cdbd53"
+    },
+    "cleanup_receipt": {
+      "bytes": 4037192,
+      "path": "/home/zhuhe/litchi-performance-0945-archive/litchi-performance-0945-v1.cleanup-receipt.json",
+      "sha256": "45df1f8bc2fddc1cb83ead23a530f021a0746bffa81cab762a2a1156993a26dc"
+    },
+    "moved_replay": {
+      "bytes": 1792992,
+      "path": "/home/zhuhe/litchi-performance-0945-archive/independent-moved-replay-v1.json",
+      "sha256": "29363794df4309f926a2da85606b0c159fa6a87037f6c88bf037e6f81c617009"
+    },
+    "preflight": {
+      "bytes": 2795,
+      "path": "/home/zhuhe/litchi-performance-0945-archive/archive-preflight-v2.json",
+      "sha256": "a6635588199fe7913f5fe4bf48161f6240ab2cb093cfc6c56c7a52cf84970a8e"
+    },
+    "reported_archive": {
+      "bytes": 782627603,
+      "sha256": "a7bd7f729acf633483e6b5cfd639deb7f8a46db24f91ada6484fdbf382ef07ea"
+    },
+    "reported_population": {
+      "bytes": 3226301466,
+      "files": 76730
+    },
+    "root_preflight": {
+      "bytes": 618,
+      "path": "/home/zhuhe/litchi-performance-0945-archive/root-archive-preflight-v2.json",
+      "sha256": "b24c627cc3ec62fd057b423b948ba5ec03d94de4096a833887259f068cb7904d"
+    },
+    "verify_receipt": {
+      "bytes": 2402,
+      "path": "/home/zhuhe/litchi-performance-0945-archive/litchi-performance-0945-v1.verify-receipt.json",
+      "sha256": "c9bd1c8b725f4e68a46d11c6dd72a684860c230369a5b52778d5ab1cc89c4301"
+    }
+  },
+  "diff_review": {
+    "base_script_sha256": "a61c6140b83f5fd1cd72453940eba8bfbec8f40f7195242f9f0c65c3b3774296",
+    "final_changes_reviewed": [
+      "validates declared relative_destination fields against copied quality destinations",
+      "validates boundary relative_path fields against role-specific quality copies",
+      "accepts real unsorted quality-freeze rows while rejecting duplicate paths and malformed hashes",
+      "adds exact quality-root census equality for freeze rows plus registered quality inputs/boundary copies"
+    ],
+    "unrelated_archive_logic_changed": false
+  },
+  "final_script": {
+    "bytes": 54583,
+    "path": "/home/zhuhe/litchi-performance-0945/archive-0945-v2.py",
+    "sha256": "6cdb9b8788de001631c49153f87a449e8692259d724e6ea1e86b4d25487df5b9"
+  },
+  "finding": "No blocker. Final hash is bound to the author/root preflight, archive/extract/hash replay, moved replay, and cleanup receipts; prior negative controls remain applicable to the strengthened validator.",
+  "prior_review": {
+    "controls_receipt": {
+      "bytes": 2146,
+      "path": "/home/zhuhe/litchi-performance-0945-archive/comparison-tooling-review/archive-v2-real-quality-controls-v1.json",
+      "sha256": "ee6172f2942027db020668017134b90d05dc6f42d81f4f6b501a7f130747bef8"
+    },
+    "earlier_controls_status": "pass",
+    "reviewed_script_sha256": "5dcf898f4d6f84a18615a745d67ad7f67ea98dca9e3fac08388ac043ab7d2aee"
+  },
+  "regeneration_command": "/usr/bin/python3 -B <read-only final linkage review>",
+  "schema": "litchi.performance.0945.archive-v2-final-linkage.v1",
+  "scope": "narrow final-hash/diff linkage review; no archive, extraction, cleanup, or workload execution by this reviewer",
+  "status": "pass"
+}

@@ -1,0 +1,25 @@
+{
+  "status": "pass",
+  "script_sha256": "6cdb9b8788de001631c49153f87a449e8692259d724e6ea1e86b4d25487df5b9",
+  "files": 76730,
+  "bytes": 3226301466,
+  "utc": "2026-10-07T03:03:51.473647+00:00",
+  "quality_census": {
+    "quality/baseline-source": {
+      "files": 10793,
+      "declared_quality_extras": 2
+    },
+    "quality/candidate-source": {
+      "files": 10793,
+      "declared_quality_extras": 2
+    },
+    "quality-v2/baseline-source": {
+      "files": 10796,
+      "declared_quality_extras": 8
+    },
+    "quality-v2/candidate-source": {
+      "files": 10796,
+      "declared_quality_extras": 8
+    }
+  }
+}

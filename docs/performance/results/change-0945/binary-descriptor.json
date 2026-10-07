@@ -1,0 +1,37 @@
+{
+  "binaries": [
+    {
+      "bytes": 265794648,
+      "path": "binaries/baseline-native",
+      "sha256": "63cbffd8c17299a4e2d1096e4ffa2a2d34a549cc452dfdf8ba5691b8ab7e75a3"
+    },
+    {
+      "bytes": 269005056,
+      "path": "binaries/baseline-allocator",
+      "sha256": "342a722d897d4cb52f945836298a9cccdf41df2b77292d618e4b8067a930973d"
+    },
+    {
+      "bytes": 269005056,
+      "path": "target-baseline-allocator-v1/release/litchi-perf-baseline-alloc",
+      "sha256": "342a722d897d4cb52f945836298a9cccdf41df2b77292d618e4b8067a930973d"
+    },
+    {
+      "bytes": 265669200,
+      "path": "target-candidate-native-v2/release/litchi-perf-baseline",
+      "sha256": "087aec962f5251d1255e7a54dc188e53f9b8a722c5da95eaa1c69439caa138c8"
+    },
+    {
+      "bytes": 269016128,
+      "path": "target-candidate-allocator-v2/release/litchi-perf-baseline-alloc",
+      "sha256": "c19971a7e923accd822e9744382aa757d0a67d9d7ba4e47e27354e05767de713"
+    }
+  ],
+  "build_receipts": [
+    "receipts/baseline-native-reuse-v2.json",
+    "builds/baseline-allocator-v1/result.json",
+    "builds/candidate-native-v2/result.json",
+    "builds/candidate-allocator-v2/result.json"
+  ],
+  "schema": "litchi.performance.0945.binary-descriptor.v1",
+  "source_root": "/home/zhuhe/litchi-performance-0945"
+}

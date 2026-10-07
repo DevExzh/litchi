@@ -1,0 +1,428 @@
+{
+  "created_utc": "2026-10-07T01:48:59.286168Z",
+  "independent_source_review": {
+    "limitation": "These reviews establish source-level ordering and API checks only. They do not establish quality success, binary parity, comparative performance, or adoption.",
+    "reviews": [
+      {
+        "artifact": {
+          "bytes": 2723,
+          "path": "/home/zhuhe/litchi-performance-0945/receipts/review-source/review-v1.json",
+          "sha256": "0be55408d0a39fc45343f30ab5568de9d96b38b4e0c9f154033e44eac2317294"
+        },
+        "id": "v1",
+        "scope": "read-only static review; OPC semantically clear with doc follow-ups; XLSX overlay pending; no build/test/workload result"
+      },
+      {
+        "artifact": {
+          "bytes": 3405,
+          "path": "/home/zhuhe/litchi-performance-0945/receipts/review-source/review-v2.json",
+          "sha256": "cd27fd9c91dc39f0d9237d3f5c369a6a77d9616032dcf38337e578c527f0098a"
+        },
+        "id": "v2",
+        "scope": "static review of combined v1 candidate; said no remaining source blocker, but did not detect the consuming-receiver test misuse"
+      },
+      {
+        "artifact": {
+          "bytes": 3360,
+          "path": "/home/zhuhe/litchi-performance-0945/receipts/review-source/review-v3.json",
+          "sha256": "d1cdaed4e6f3b8986af8803964616317610c6b838f7b7c06f1dddcec78909acd"
+        },
+        "id": "v3",
+        "scope": "static review of frozen v2; corrected the v2 test API limitation and Copy-drop issue; no build/test/workload execution"
+      }
+    ]
+  },
+  "missing_fixture_inputs": {
+    "binding_receipt": {
+      "bytes": 8912,
+      "path": "/home/zhuhe/litchi-performance-0945/quality-v2/quality-inputs-v2.json",
+      "sha256": "49abd99e8f46de5529448f0d10a58a1d085abf6c4e2ddb0c4f219bb2aef54272"
+    },
+    "items": [
+      {
+        "bytes": 1348,
+        "destination": "docs/performance/results/change-0416/corpus/opc-local-only-signed.zip",
+        "id": "opc-local-only-signed",
+        "origin": "/home/zhuhe/code/litchi/docs/performance/results/change-0416/corpus/opc-local-only-signed.zip",
+        "sha256": "6c534b529d6546bac4f9c7d1e9a0a18991751101d0e6b1b1488547b1f8d2d51a",
+        "used_by": [
+          "crates/litchi-opc/tests/python_zip64_source.rs",
+          "crates/litchi-opc/tests/forced_zip64_failures.rs"
+        ]
+      },
+      {
+        "bytes": 11467,
+        "destination": "docs/report/spec-gap-validation-evidence/xlsx-form-control-properties/native-corpus.json",
+        "id": "xlsx-native-corpus",
+        "origin": "/home/zhuhe/code/litchi/docs/report/spec-gap-validation-evidence/xlsx-form-control-properties/native-corpus.json",
+        "sha256": "a0e5055863909579a8b325468e9729900b16c652d61743b6a050bd4d19777077",
+        "used_by": [
+          "crates/litchi-xlsx/tests/form_control_properties.rs",
+          "crates/litchi-xlsx/tests/form_control_scalar_lifecycle.rs",
+          "other form-control tests"
+        ]
+      },
+      {
+        "bytes": 12470,
+        "destination": "3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx",
+        "id": "tdf169496-hidden-graphic",
+        "origin": "/home/zhuhe/code/litchi/docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/fixtures/tdf169496_hidden_graphic.xlsx",
+        "sha256": "0b647da300a085f39914fdfae961463ae9e54ffe772b2e0eb9860a841ab93f72",
+        "used_by": [
+          "crates/litchi-xlsx/tests/drawing_svg_read.rs"
+        ]
+      }
+    ],
+    "v1_observation": "All three below were missing from the isolated quality source copies during the first quality matrix.",
+    "v2_action": "Copied as quality-only inputs to both baseline and candidate quality trees; source manifests remained 10,788 matching files."
+  },
+  "packet_root": "/home/zhuhe/litchi-performance-0945",
+  "quality_v2_observation": {
+    "inputs_and_freeze_bound": true,
+    "observation_limit": "At ledger creation the corrected follow-up runner was still active; these partial result files are not a final quality verdict.",
+    "observed_partial_result_files": [
+      {
+        "bytes": 2413,
+        "id": "opc-test-default-baseline",
+        "path": "/home/zhuhe/litchi-performance-0945/quality-v2/000-baseline-opc-test-default-baseline.result.json",
+        "returncode": 0,
+        "sha256": "5f1a2337e4ddca9e927724934a0b727be09bbd8fa5e71dbcd35064b49b2520a9",
+        "status": "pass"
+      },
+      {
+        "bytes": 2469,
+        "id": "opc-test-all-features-baseline",
+        "path": "/home/zhuhe/litchi-performance-0945/quality-v2/001-baseline-opc-test-all-features-baseline.result.json",
+        "returncode": 0,
+        "sha256": "9455a811d93a09287373d13c08b2f49240ef8c8c9e79df018358399fcad73c5b",
+        "status": "pass"
+      },
+      {
+        "bytes": 2460,
+        "id": "opc-clippy-default-baseline",
+        "path": "/home/zhuhe/litchi-performance-0945/quality-v2/002-baseline-opc-clippy-default-baseline.result.json",
+        "returncode": 0,
+        "sha256": "fd8d2ed35a2360ac415718eaf894c44bfe3e22d5c6aef525ca8840153c728ff2",
+        "status": "pass"
+      },
+      {
+        "bytes": 2517,
+        "id": "opc-clippy-all-features-baseline",
+        "path": "/home/zhuhe/litchi-performance-0945/quality-v2/003-baseline-opc-clippy-all-features-baseline.result.json",
+        "returncode": 0,
+        "sha256": "76e3268081f1941f48fcc9d067d5f6cc92ef93d3cee77279f7aa98317b049361",
+        "status": "pass"
+      },
+      {
+        "bytes": 2422,
+        "id": "xlsx-test-default-baseline",
+        "path": "/home/zhuhe/litchi-performance-0945/quality-v2/004-baseline-xlsx-test-default-baseline.result.json",
+        "returncode": 0,
+        "sha256": "4a40f04fccac51913d817b8dec9ba279530eed8c98159e07628f14291ecf84b8",
+        "status": "pass"
+      }
+    ]
+  },
+  "schema": "litchi.performance.0945.preparation-history.v1",
+  "scope": {
+    "checkout_edited": false,
+    "comparative_measurements": {
+      "basis": {
+        "bytes": 2063,
+        "path": "/home/zhuhe/litchi-performance-0945/receipts/root-protocol-preflight-v1.json",
+        "sha256": "6b42e167c75bdd81cb9a49b389fad806c111297498edd71126ac9a00a90a3a52"
+      },
+      "qualification_or_capture_claim": "none",
+      "status": "not_started",
+      "workloads_started": 0
+    },
+    "existing_artifacts_overwritten": false,
+    "purpose": "Bounded preparation history for the 0945 candidate before any comparative qualification.",
+    "quality_is_separate_from_measurement": true
+  },
+  "source_drafts": [
+    {
+      "bytes": 25463,
+      "id": "opc-v1",
+      "note": "initial OPC draft",
+      "path": "/home/zhuhe/litchi-performance-0945/candidate-source-0945-source_backed.patch",
+      "sha256": "6b0ed8e73abeb057ef81a80b1596d8fbaea6b6761836dd9d3bb29a30940f696e"
+    },
+    {
+      "bytes": 25617,
+      "id": "opc-v2",
+      "note": "OPC draft after helper/error typing correction",
+      "path": "/home/zhuhe/litchi-performance-0945/candidate-source-0945-source_backed-v2.patch",
+      "sha256": "48e1cddb1fdd7411daa421a9bbaee9c7ed436cd25e6a889542075a1cca670859"
+    },
+    {
+      "bytes": 30917,
+      "id": "opc-v3",
+      "note": "OPC draft with final review scope",
+      "path": "/home/zhuhe/litchi-performance-0945/candidate-source-0945-source_backed-v3.patch",
+      "sha256": "c541085361664ac0fa4dd751f52b097e6da89dc87ef2330f0c6fee8f0202c6c0"
+    },
+    {
+      "bytes": 5699,
+      "id": "opc-v3-formatting-only",
+      "note": "formatting-only OPC draft",
+      "path": "/home/zhuhe/litchi-performance-0945/candidate-source-0945-source_backed-v3-formatting-only.patch",
+      "sha256": "72bf44f80e103fc02e3baf860304d901d882264c9058e0f950ff99577146849c"
+    },
+    {
+      "bytes": 22380,
+      "id": "combined-v1",
+      "note": "combined v1 patch",
+      "path": "/home/zhuhe/litchi-performance-0945/candidate-v1.patch",
+      "sha256": "5cf39429ca410a83c6bcfe0f78633361d4024327b360b00e079898d5d6c5d793"
+    },
+    {
+      "bytes": 21968,
+      "id": "combined-v1-portable",
+      "note": "portable combined v1 patch",
+      "path": "/home/zhuhe/litchi-performance-0945/candidate-v1-portable.patch",
+      "sha256": "24de00b98a59d5cdd652c6d85683820116e2ea2c5f7b27328b82db915d4bbbd0"
+    },
+    {
+      "bytes": 21996,
+      "id": "combined-v2-portable",
+      "note": "portable combined v2 patch; frozen operative patch",
+      "path": "/home/zhuhe/litchi-performance-0945/candidate-v2-portable.patch",
+      "sha256": "f79ab27d3f723b1138638deca36e474153c5b0dbf2d975ad2a872f35d8f11666"
+    },
+    {
+      "bytes": 7867,
+      "id": "opc-v2-delta",
+      "note": "test-only OPC correction delta",
+      "path": "/home/zhuhe/litchi-performance-0945/candidate-source-v2-source_backed-delta.patch",
+      "sha256": "c32f0f6f0983039b272c922aef65cdd9a5635cd7f5b97ca2b90a6a75e342beb1"
+    },
+    {
+      "bytes": 30972,
+      "id": "opc-v2-full",
+      "note": "full OPC v2 patch",
+      "path": "/home/zhuhe/litchi-performance-0945/candidate-source-v2-source_backed.patch",
+      "sha256": "fc252766d866d05f23db64c3f786b2ad4f24759f17577acf527e02c1bab0e54d"
+    }
+  ],
+  "source_identity": {
+    "base_commit": "e037befa6ce52b3988c8ae2032ae652196f2a09d",
+    "baseline_manifest": {
+      "bytes": 2993755,
+      "path": "/home/zhuhe/litchi-performance-0945/baseline-source-manifest.json",
+      "sha256": "c276582f412ac9c670a8b0fc3cc85ef12dc8a8705c201dd78e5584efa3a5a100"
+    },
+    "candidate_v1_manifest": {
+      "bytes": 3048238,
+      "path": "/home/zhuhe/litchi-performance-0945/candidate-source-manifest-v1.json",
+      "sha256": "39e813810818fdfd45f8c7862f22a71c3c9e89b16c84588ea9affa0a0199b353"
+    },
+    "candidate_v2": {
+      "file_count": 10788,
+      "production_files_changed": [
+        {
+          "baseline_sha256": "d28843caf8245bd6f0ff0f953b9b5545c4d9ad7a4e11f362d29ce226cc251cc2",
+          "candidate_sha256": "5e0cf3451e70784ff76896b0b2dc93b4409b15db9ef7c88535cc6a20885f8c43",
+          "path": "crates/litchi-opc/src/source_backed.rs"
+        },
+        {
+          "baseline_sha256": "3542991373935e27e5ce253a84f6cdfeac24d008bcf06500b7450c8b975bca96",
+          "candidate_sha256": "fff0da0fd3fe86824ba6a84531ad81d8499ebff0e73c824e4c16bf53d77129a5",
+          "path": "crates/litchi-xlsx/src/cell_values/snapshot.rs"
+        }
+      ],
+      "source_bytes": 259886223,
+      "status": "frozen-before-corrected-quality-and-build",
+      "unchanged_related_file": {
+        "path": "crates/litchi-xlsx/src/source_payload.rs",
+        "sha256": "20d90a45659711e078c5b376823952d04b90a325e69ce6f3e3797b7ea17fff1f"
+      }
+    },
+    "candidate_v2_manifest": {
+      "bytes": 3048241,
+      "path": "/home/zhuhe/litchi-performance-0945/candidate-source-manifest-v2.json",
+      "sha256": "da7128f699b4bf7a9a4745e99b99606830df1aa192ce389a0b7fe3cceb8a0994"
+    }
+  },
+  "v1_quality": {
+    "failure_causes": [
+      {
+        "detail": "The isolated baseline and candidate source copies initially lacked three include_bytes!/include_str! inputs; this caused baseline and candidate OPC/XLSX test and clippy failures before semantic execution.",
+        "fixtures": [
+          "opc-local-only-signed",
+          "xlsx-native-corpus",
+          "tdf169496-hidden-graphic"
+        ],
+        "id": "three_missing_fixture_inputs",
+        "representative_logs": [
+          {
+            "bytes": 3712,
+            "note": "baseline OPC missing signed ZIP fixture",
+            "path": "/home/zhuhe/litchi-performance-0945/quality/000-baseline-opc-test-default-all-targets.stderr.log",
+            "sha256": "fa93c64a002a142d6372ce55744cb731239aa7757d80b97936a3e0651f5f9d95"
+          },
+          {
+            "bytes": 3433,
+            "note": "baseline XLSX missing hidden-graphic fixture",
+            "path": "/home/zhuhe/litchi-performance-0945/quality/009-baseline-xlsx-test-default-all-targets.stderr.log",
+            "sha256": "05b47569d10b03364a8c046d5ea43457e39cb27a3b948fc39be35393f2d69259"
+          },
+          {
+            "bytes": 4111,
+            "note": "candidate XLSX missing native corpus fixture",
+            "path": "/home/zhuhe/litchi-performance-0945/quality/028-candidate-xlsx-test-default-all-targets.stderr.log",
+            "sha256": "551699d2866979ae90b3336d7bd451a945063ca0d0c9ca9d984095a61c090f61"
+          }
+        ]
+      },
+      {
+        "detail": "The v1 added OPC equality test reused package after write_topology_to_stream consumed self; compiler reported E0382 at source_backed.rs:14978.",
+        "id": "candidate_opc_test_moved_value",
+        "representative_log": {
+          "bytes": 4212,
+          "note": "candidate OPC added test reused consuming package receiver (E0382), plus fixture failures in the run",
+          "path": "/home/zhuhe/litchi-performance-0945/quality/019-candidate-opc-test-default-all-targets.stderr.log",
+          "sha256": "2699309f479fac86bae32a64c50754b4c999193be13552a83cfa55280210766a"
+        }
+      },
+      {
+        "detail": "The v1 XLSX test called drop(part) although PartView is Copy; -D dropping-copy-types rejected it at snapshot.rs:2692.",
+        "id": "candidate_xlsx_copy_drop",
+        "representative_log": {
+          "bytes": 3791,
+          "note": "candidate XLSX Copy PartView drop under -D warnings, plus fixture failure in the run",
+          "path": "/home/zhuhe/litchi-performance-0945/quality/032-candidate-xlsx-clippy-default.stderr.log",
+          "sha256": "823f14ca9d6fe88fd5d701cd66a5867ab01dd9ebf3c1e30939d4ac1f7f2e0c5e"
+        }
+      },
+      {
+        "detail": "OPC package fmt failed for baseline and candidate at the known pre-existing source_backed.rs:3763 drift; the quality summary retains this as shared baseline drift rather than a candidate pass.",
+        "id": "known_shared_format_drift",
+        "summary_artifact": {
+          "bytes": 104292,
+          "path": "/home/zhuhe/litchi-performance-0945/quality/quality-summary-v2.json",
+          "sha256": "37339eb08f0311ac57729f5690566a5c06c087b0792d40f72d3996ee986e2efc"
+        }
+      }
+    ],
+    "main_summary": {
+      "artifact": {
+        "bytes": 104292,
+        "path": "/home/zhuhe/litchi-performance-0945/quality/quality-summary-v2.json",
+        "sha256": "37339eb08f0311ac57729f5690566a5c06c087b0792d40f72d3996ee986e2efc"
+      },
+      "cargo_commands_started": 38,
+      "no_retry": true,
+      "quality_only_not_measurement": true,
+      "status": "review-failures"
+    },
+    "runner_import_failure": {
+      "artifact": {
+        "bytes": 1009,
+        "path": "/home/zhuhe/litchi-performance-0945/quality/quality-run-attempt-v2-import-failure.json",
+        "sha256": "37e1586af564f9a0d81b88a17b0e36e98e43430fcf589467cc60915f2dcb03ec"
+      },
+      "cause": "NameError: QUALITY was referenced while defining CANDIDATE_BINDING; no Cargo subprocess was launched.",
+      "recorded_correction": "Move QUALITY definition before CANDIDATE_BINDING and BOUNDARY_INPUTS in the v3 runner; no source or quality-tree mutation.",
+      "status": "failed-before-cargo"
+    }
+  },
+  "v2_test_only_corrections": {
+    "corrections": [
+      "OPC equality test now constructs independent SourceBackedPackage values from cloned source bytes because write_topology_to_stream consumes self.",
+      "XLSX test removes only the needless drop(part) call; PartView is Copy and the managed payload release assertions remain.",
+      "Production candidate behavior is unchanged between v1 and v2; only test source was corrected."
+    ],
+    "freeze_receipt": {
+      "bytes": 1269,
+      "path": "/home/zhuhe/litchi-performance-0945/receipts/candidate-freeze-v2.json",
+      "sha256": "f624f161ad7e04499f6ae3a5f5079533ecc489c3690a2f46fdf947f3492dce32"
+    },
+    "portable_check": {
+      "bytes": 705,
+      "path": "/home/zhuhe/litchi-performance-0945/receipts/portable-patch-v2-check.json",
+      "sha256": "d596369b1c5bf092aface8bb8c915eb1fdf52e3b02b16b6a066bb08af42384be"
+    },
+    "portable_patch": {
+      "bytes": 21996,
+      "path": "/home/zhuhe/litchi-performance-0945/candidate-v2-portable.patch",
+      "sha256": "f79ab27d3f723b1138638deca36e474153c5b0dbf2d975ad2a872f35d8f11666"
+    }
+  },
+  "wrapper_and_preflight_corrections": {
+    "candidate_binding_v1_failed": {
+      "artifact": {
+        "bytes": 4342,
+        "path": "/home/zhuhe/litchi-performance-0945/quality/candidate-binding-v1.json",
+        "sha256": "81a0e11346f6fc9b75d0570cfc3b81afcebdaa57f86bd40c062b3d5181f5cbc6"
+      },
+      "cause": "Three declared quality-only inputs (Cargo.lock and two boundary files) were incorrectly counted as unexpected extras."
+    },
+    "candidate_binding_v2_passed": {
+      "artifact": {
+        "bytes": 5025,
+        "path": "/home/zhuhe/litchi-performance-0945/quality/candidate-binding-v2.json",
+        "sha256": "b46bc421fc057631565d678988a96b5f1b0184795c374a8c5afc7c40700921e7"
+      },
+      "correction": "Classified those three files explicitly as quality-only; all 10,788 manifest paths remained byte-identical."
+    },
+    "candidate_binding_v3_passed": {
+      "artifact": {
+        "bytes": 6344,
+        "path": "/home/zhuhe/litchi-performance-0945/quality/candidate-binding-v3.json",
+        "sha256": "8738ce7405438e9b0137f8cc7ec3deef86e1325d5852b2b965105eb69ed59af4"
+      },
+      "correction": "Added the two ADR boundary documents as expected quality-only inputs for the quality copy.",
+      "precision_note": "The receipt lists five quality-only paths, while its status_basis prose still says three intentional additions; source counts/matches are explicit and unchanged."
+    },
+    "comparison_tooling_preflight": {
+      "artifact": {
+        "bytes": 4625,
+        "path": "/home/zhuhe/litchi-performance-0945/comparison-tooling-review/actual-final-xlsx-review-v3.json",
+        "sha256": "09a7b0b81232c0c4d6e9cab294a84bf25d07a1106699ef657a71f2ec3b4e455f"
+      },
+      "scope": "tooling/source review only; no workload result claimed",
+      "status": "GO"
+    },
+    "followup_plan": {
+      "artifact": {
+        "bytes": 12346,
+        "path": "/home/zhuhe/litchi-performance-0945/quality-plan-followup-v1.json",
+        "sha256": "ea5b84f47605dd91f3627251d08ab89b67be3483229650de43f20cc7e9f5646b"
+      },
+      "completion_claim": "none; no final follow-up status is asserted in this ledger.",
+      "no_retry": true,
+      "no_workloads": true,
+      "purpose": "Corrected quality-only rerun after v1 source-export closure and v2 test/lint corrections.",
+      "status": "frozen-followup-ready"
+    },
+    "protocol_preflight": {
+      "artifact": {
+        "bytes": 2063,
+        "path": "/home/zhuhe/litchi-performance-0945/receipts/root-protocol-preflight-v1.json",
+        "sha256": "6b42e167c75bdd81cb9a49b389fad806c111297498edd71126ac9a00a90a3a52"
+      },
+      "status": "reviewed-before-measurements-awaiting-quality-and-builds",
+      "workloads_started": 0
+    },
+    "quality_v2_source_binding": {
+      "all_status": "pass",
+      "candidate_binding": {
+        "bytes": 2300,
+        "path": "/home/zhuhe/litchi-performance-0945/quality-v2/candidate-binding-v4.json",
+        "sha256": "f223080b29e3ba2c59bdcb5a366e87436d077a536f0c048ea4da85c34df4f90e"
+      },
+      "inputs": {
+        "bytes": 8912,
+        "path": "/home/zhuhe/litchi-performance-0945/quality-v2/quality-inputs-v2.json",
+        "sha256": "49abd99e8f46de5529448f0d10a58a1d085abf6c4e2ddb0c4f219bb2aef54272"
+      },
+      "measurement_sources_untouched": true,
+      "source_freeze": {
+        "bytes": 10463,
+        "path": "/home/zhuhe/litchi-performance-0945/quality-v2/source-freeze-v2.json",
+        "sha256": "eb87c42b6811c497f1e4de7453d75ecee05ae8ac19ae1386b6cdba2bd82bc331"
+      }
+    }
+  }
+}

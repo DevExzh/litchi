@@ -1,0 +1,331 @@
+{
+  "allocator": {
+    "children": 16,
+    "repeats": 2,
+    "samples": 3,
+    "schedule": "two alternating repeats; even baseline then candidate and forward case order; odd candidate then baseline and reverse case order",
+    "warmup": 2
+  },
+  "build_binding_ids": {
+    "baseline": "baseline1",
+    "candidate": "candidate2"
+  },
+  "build_revisions": {
+    "baseline": "v1",
+    "candidate": "v2"
+  },
+  "cases": [
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "id": "primary-percent-medium",
+      "kind": "primary",
+      "xlsx_cell_crud_shape": "medium"
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "id": "primary-percent-dense-sparse",
+      "kind": "primary",
+      "xlsx_cell_crud_shape": "dense-sparse"
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_edit_save",
+      "id": "control-xlsx-one-edit-medium",
+      "kind": "control",
+      "xlsx_cell_crud_shape": "medium"
+    },
+    {
+      "case": "xlsx_source_backed_managed_cell_values_one_edit_save",
+      "id": "control-xlsx-managed-one-edit-medium",
+      "kind": "managed-control",
+      "xlsx_cell_crud_shape": "medium"
+    }
+  ],
+  "cpu": 12,
+  "environment": {
+    "fixed": {
+      "LANG": "C",
+      "LC_ALL": "C",
+      "PATH": "/usr/bin:/bin",
+      "RUST_BACKTRACE": "0",
+      "TZ": "UTC"
+    }
+  },
+  "expected_artifacts": {
+    "child": [
+      "start.json",
+      "terminal.json",
+      "stdout.txt",
+      "stderr.txt",
+      "report.json",
+      "resource.json",
+      "command.json",
+      "receipt.json"
+    ],
+    "no_retry": true,
+    "terminal_before_parse": true,
+    "unexpected_artifact_is_failure": true
+  },
+  "gate": {
+    "allocation": {
+      "individual_review_ratio_gt": 1.05,
+      "primary_bootstrap": false,
+      "primary_case_ids": [
+        "primary-percent-medium",
+        "primary-percent-dense-sparse"
+      ],
+      "primary_every_pair_ratio_max": 0.95,
+      "primary_pair_count": 2,
+      "publication_metric": "allocated_bytes",
+      "safety_metrics": [
+        "allocation_calls",
+        "region_peak_live_bytes",
+        "live_bytes_after",
+        "max_rss_kib"
+      ],
+      "safety_paired_median_ratio_max": 1.05
+    },
+    "bootstrap": {
+      "confidence_level": 0.95,
+      "lower_percentile": 2.5,
+      "replicates": 10000,
+      "seed": 945009,
+      "statistic": "paired_median_ratio",
+      "upper_percentile": 97.5
+    },
+    "latency": {
+      "bootstrap_upper_95_lt": 1.05,
+      "case_ids": [
+        "primary-percent-medium",
+        "primary-percent-dense-sparse",
+        "control-xlsx-one-edit-medium",
+        "control-xlsx-managed-one-edit-medium"
+      ],
+      "metrics": [
+        "whole_workflow_p50",
+        "publication_p50"
+      ],
+      "paired_median_ratio_max": 1.05
+    },
+    "review": {
+      "p50_spread_gt": 1.2,
+      "regression_ratio_gt": 1.05,
+      "tail_metrics": [
+        "p50",
+        "p95",
+        "p99"
+      ]
+    }
+  },
+  "helpers": {
+    "capture": {
+      "bytes": 40612,
+      "executable": false,
+      "mode": 436,
+      "path": "tools/capture_0945.py",
+      "sha256": "d4fdf0553e5cd178d6a4524f213e3b700ff6166064bf30a6f0284c556b7e9dce"
+    },
+    "freeze": {
+      "bytes": 13118,
+      "executable": false,
+      "mode": 436,
+      "path": "tools/freeze_0945.py",
+      "sha256": "2e34f78742e2d369afe4a0bca30e6de768cc36dee206cba4e058c304de158d68"
+    },
+    "method": {
+      "bytes": 3705,
+      "executable": false,
+      "mode": 436,
+      "path": "METHOD.md",
+      "sha256": "556ef3d65468fc0ea8a26550cfee1d024ad03d51ab1d7eb39507c07cac2b22d3"
+    },
+    "reducer": {
+      "bytes": 83979,
+      "executable": false,
+      "mode": 436,
+      "path": "tools/reduce_0945.py",
+      "sha256": "dd5edfe84630520dbec05e1837427b76a45e6ca25ef41d3636325a01da8d225e"
+    },
+    "reuse_binder": {
+      "bytes": 11757,
+      "executable": true,
+      "mode": 493,
+      "path": "tools/bind_baseline_native_reuse_v2.py",
+      "sha256": "241b0e0cd8db01cf294ad7186acf93fcee647bb96725eaa9dd313b558ec648c5"
+    },
+    "reuse_validator": {
+      "bytes": 25764,
+      "executable": false,
+      "mode": 436,
+      "path": "tools/reuse_v2.py",
+      "sha256": "3f0f28d2426b787242e2e9894ff29b9bf669e06b9fd1987c78f7019cb4dcd9ed"
+    },
+    "semantic": {
+      "bytes": 33177,
+      "executable": false,
+      "mode": 436,
+      "path": "tools/semantic_0705.py",
+      "sha256": "567c7ad1eecc4c93d51615076088809b38c5498a4f29ac929a1661bf9fd265dc"
+    }
+  },
+  "native": {
+    "blocks": 6,
+    "children": 48,
+    "samples": 100,
+    "schedule": "six alternating blocks; even baseline then candidate and forward case order; odd candidate then baseline and reverse case order",
+    "warmup": 10
+  },
+  "plan_id": "0945",
+  "protocol_revision": 1,
+  "qualification": {
+    "children": 16,
+    "kinds": [
+      "native",
+      "allocator"
+    ],
+    "roles": [
+      "baseline",
+      "candidate"
+    ],
+    "samples": 2,
+    "warmup": 0
+  },
+  "resource": {
+    "deadline_seconds": 900,
+    "enabled": true,
+    "format": "{\"max_rss_kib\":%M,\"elapsed_seconds\":%e,\"user_seconds\":%U,\"system_seconds\":%S}",
+    "process_group": true,
+    "time_path": "/usr/bin/time"
+  },
+  "roles": {
+    "baseline": {
+      "allocator": {
+        "build_binding_id": "baseline1",
+        "build_receipt": {
+          "bytes": 4712,
+          "executable": false,
+          "mode": 436,
+          "path": "builds/baseline-allocator-v1/terminal.json",
+          "sha256": "ac1269c47ee92d43a81b2284ccbe2f0247999b5168dab92e9d8bbc45308c5518"
+        },
+        "build_revision": "v1",
+        "bytes": 269005056,
+        "executable": true,
+        "mode": 509,
+        "path": "binaries/baseline-allocator",
+        "sha256": "342a722d897d4cb52f945836298a9cccdf41df2b77292d618e4b8067a930973d"
+      },
+      "native": {
+        "build_binding_id": "baseline1",
+        "build_receipt": {
+          "bytes": 5932,
+          "executable": false,
+          "mode": 436,
+          "path": "receipts/baseline-native-reuse-v2.json",
+          "sha256": "303fdb714df4dd84aff8a61bdf72872024719ae58fd15e82af708a295c1ce9a8"
+        },
+        "build_revision": "v1",
+        "bytes": 265794648,
+        "executable": true,
+        "mode": 509,
+        "path": "binaries/baseline-native",
+        "sha256": "63cbffd8c17299a4e2d1096e4ffa2a2d34a549cc452dfdf8ba5691b8ab7e75a3"
+      }
+    },
+    "candidate": {
+      "allocator": {
+        "build_binding_id": "candidate2",
+        "build_receipt": {
+          "bytes": 5368,
+          "executable": false,
+          "mode": 436,
+          "path": "builds/candidate-allocator-v2/terminal.json",
+          "sha256": "a3cb0e4a7cf6fa395618fe4ce1d3b888f04c7c559d0171743d7429e679f6a03a"
+        },
+        "build_revision": "v2",
+        "bytes": 269016128,
+        "executable": true,
+        "mode": 509,
+        "path": "target-candidate-allocator-v2/release/litchi-perf-baseline-alloc",
+        "sha256": "c19971a7e923accd822e9744382aa757d0a67d9d7ba4e47e27354e05767de713"
+      },
+      "native": {
+        "build_binding_id": "candidate2",
+        "build_receipt": {
+          "bytes": 5268,
+          "executable": false,
+          "mode": 436,
+          "path": "builds/candidate-native-v2/terminal.json",
+          "sha256": "c321315a84c69b8202499b969a2b1bf67aad9bf10e122da04f68d55eb24c1266"
+        },
+        "build_revision": "v2",
+        "bytes": 265669200,
+        "executable": true,
+        "mode": 509,
+        "path": "target-candidate-native-v2/release/litchi-perf-baseline",
+        "sha256": "087aec962f5251d1255e7a54dc188e53f9b8a722c5da95eaa1c69439caa138c8"
+      }
+    }
+  },
+  "schema": "litchi.paired-audit-capture-0945.v1",
+  "seed": 945009,
+  "semantic_gates": {
+    "allocator_counter_conservation": true,
+    "full_xml_audit": true,
+    "managed_budget_release": true,
+    "output_sha256": true,
+    "relationship_and_member_identity": true,
+    "reopen_semantic_hash": true,
+    "sink_largest_write_max": 65536,
+    "source_backed": true,
+    "typed_refusal_and_zero_output": true,
+    "unmanaged_budget_zero": true,
+    "untouched_member_preservation": true
+  },
+  "semantic_validator": {
+    "bytes": 33177,
+    "executable": false,
+    "mode": 436,
+    "path": "tools/semantic_0705.py",
+    "sha256": "567c7ad1eecc4c93d51615076088809b38c5498a4f29ac929a1661bf9fd265dc"
+  },
+  "source": {
+    "baseline_manifest": {
+      "bytes": 2993755,
+      "executable": false,
+      "mode": 436,
+      "path": "baseline-source-manifest.json",
+      "sha256": "c276582f412ac9c670a8b0fc3cc85ef12dc8a8705c201dd78e5584efa3a5a100"
+    },
+    "baseline_root": "baseline-source",
+    "candidate_files": [
+      "crates/litchi-opc/src/source_backed.rs",
+      "crates/litchi-xlsx/src/cell_values/snapshot.rs"
+    ],
+    "candidate_freeze_receipt": {
+      "bytes": 1269,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/candidate-freeze-v2.json",
+      "sha256": "f624f161ad7e04499f6ae3a5f5079533ecc489c3690a2f46fdf947f3492dce32"
+    },
+    "candidate_manifest": {
+      "bytes": 3048241,
+      "executable": false,
+      "mode": 436,
+      "path": "candidate-source-manifest-v2.json",
+      "sha256": "da7128f699b4bf7a9a4745e99b99606830df1aa192ce389a0b7fe3cceb8a0994"
+    },
+    "candidate_root": "candidate-source-v2",
+    "file_count": 10788,
+    "root_worktree": ".",
+    "source_export": {
+      "bytes": 981,
+      "executable": false,
+      "mode": 436,
+      "path": "source-export.json",
+      "sha256": "f00ca571e5ea299dcfe038bb4fad2ba5b8be2ae013f500127f418fcc90f7f3ba"
+    }
+  },
+  "status": "frozen",
+  "workload_cwd": "/home/zhuhe/litchi-performance-0945"
+}

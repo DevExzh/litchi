@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/litchi-performance-0945/tools/capture_0945_v2.py",
+    "check"
+  ],
+  "started_utc": "2026-10-07T02:47:10.208621+00:00",
+  "terminal_utc": "2026-10-07T02:47:12.867612+00:00",
+  "returncode": 0,
+  "plan_sha256": "a60587fcd651dac117f4b88ed74011e8d7fbeb4856ef96f01389ae75d5352dc9",
+  "unchanged_protocol_and_bindings": true
+}

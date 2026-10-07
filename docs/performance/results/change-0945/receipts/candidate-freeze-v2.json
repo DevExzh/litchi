@@ -1,0 +1,31 @@
+{
+  "changes": [
+    {
+      "baseline_sha256": "d28843caf8245bd6f0ff0f953b9b5545c4d9ad7a4e11f362d29ce226cc251cc2",
+      "candidate_sha256": "5e0cf3451e70784ff76896b0b2dc93b4409b15db9ef7c88535cc6a20885f8c43",
+      "path": "crates/litchi-opc/src/source_backed.rs"
+    },
+    {
+      "baseline_sha256": "3542991373935e27e5ce253a84f6cdfeac24d008bcf06500b7450c8b975bca96",
+      "candidate_sha256": "fff0da0fd3fe86824ba6a84531ad81d8499ebff0e73c824e4c16bf53d77129a5",
+      "path": "crates/litchi-xlsx/src/cell_values/snapshot.rs"
+    }
+  ],
+  "correction": "Only added test fixes: consuming OPC receiver reused in v1; redundant drop of Copy PartView in XLSX test. Production candidate unchanged.",
+  "created_utc": "2026-10-07T01:29:05.160611+00:00",
+  "file_count": 10788,
+  "manifest": {
+    "bytes": 3048241,
+    "path": "candidate-source-manifest-v2.json",
+    "sha256": "da7128f699b4bf7a9a4745e99b99606830df1aa192ce389a0b7fe3cceb8a0994"
+  },
+  "patch": {
+    "bytes": 21996,
+    "path": "candidate-v2-portable.patch",
+    "sha256": "f79ab27d3f723b1138638deca36e474153c5b0dbf2d975ad2a872f35d8f11666"
+  },
+  "prior_version_preserved": true,
+  "source_bytes": 259886223,
+  "source_root": "candidate-source-v2",
+  "status": "frozen-before-corrected-quality-and-build"
+}

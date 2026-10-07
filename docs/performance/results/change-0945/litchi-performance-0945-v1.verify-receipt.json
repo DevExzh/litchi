@@ -1,0 +1,55 @@
+{
+  "archive": {
+    "bytes": 782627603,
+    "path": "/home/zhuhe/litchi-performance-0945-archive/litchi-performance-0945-v1.tar.zst",
+    "sha256": "a7bd7f729acf633483e6b5cfd639deb7f8a46db24f91ada6484fdbf382ef07ea"
+  },
+  "archive_receipt": {
+    "bytes": 57156,
+    "path": "/home/zhuhe/litchi-performance-0945-archive/litchi-performance-0945-v1.archive-receipt.json",
+    "sha256": "df3f8af8546c1c2c34ea4ca067d9e1df16cfb0df353f6e584648fe3209cdbd53"
+  },
+  "bytes": 3226301466,
+  "cleanup_authorized_by_this_receipt": false,
+  "every_file_rehashed": true,
+  "extraction_root": "/home/zhuhe/litchi-performance-0945-archive/litchi-performance-0945-v1.extract",
+  "file_set_exact": true,
+  "files": 76730,
+  "manifest": {
+    "bytes": 13944297,
+    "path": "/home/zhuhe/litchi-performance-0945-archive/litchi-performance-0945-v1.files.jsonl",
+    "sha256": "fdbbf9eedadf81f0a04fa32a2ee8a664174116cf5ad7ed83815baeeedbedd39c"
+  },
+  "schema": "litchi.performance.0945.archive-verify-receipt.v1",
+  "script": {
+    "bytes": 54583,
+    "path": "/home/zhuhe/litchi-performance-0945/archive-0945-v2.py",
+    "sha256": "6cdb9b8788de001631c49153f87a449e8692259d724e6ea1e86b4d25487df5b9"
+  },
+  "source_rechecked_before_extraction": true,
+  "status": "passed",
+  "tar_command": [
+    "/usr/bin/tar",
+    "--zstd",
+    "--extract",
+    "--file",
+    "/home/zhuhe/litchi-performance-0945-archive/litchi-performance-0945-v1.tar.zst",
+    "--directory",
+    "/home/zhuhe/litchi-performance-0945-archive/litchi-performance-0945-v1.extract",
+    "--no-same-owner",
+    "--no-same-permissions",
+    "--no-overwrite-dir"
+  ],
+  "tar_command_shell": "/usr/bin/tar --zstd --extract --file /home/zhuhe/litchi-performance-0945-archive/litchi-performance-0945-v1.tar.zst --directory /home/zhuhe/litchi-performance-0945-archive/litchi-performance-0945-v1.extract --no-same-owner --no-same-permissions --no-overwrite-dir",
+  "verified_utc": "2026-10-07T03:05:00.968892Z",
+  "verify_stderr": {
+    "bytes": 0,
+    "path": "/home/zhuhe/litchi-performance-0945-archive/litchi-performance-0945-v1.verify.stderr.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "verify_stdout": {
+    "bytes": 0,
+    "path": "/home/zhuhe/litchi-performance-0945-archive/litchi-performance-0945-v1.verify.stdout.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "archive_actions_executed": false,
+  "archive_plan": "not started",
+  "archive_workspace": "/home/zhuhe/litchi-performance-0945-archive",
+  "binary_descriptor": {
+    "bytes": 1287,
+    "path": "/home/zhuhe/litchi-performance-0945-archive/binary-descriptor.json",
+    "sha256": "5b809c543417b34e58e16dbec35e8bb06527c43c835b803b2c4f33c1190c2077"
+  },
+  "cargo_or_rust_actions_executed": false,
+  "cleanup_actions_executed": false,
+  "created_utc": "2026-10-07T03:03:16.736727Z",
+  "custody_snapshot": {
+    "bound_binary_count": 5,
+    "frozen_control_count": 13,
+    "preselection_quality_v1_census": 10793,
+    "preselection_quality_v2_census": 10796,
+    "quality_sections": [
+      "boundary",
+      "candidate_binding",
+      "freeze",
+      "origins",
+      "quality_v1_freeze",
+      "registry"
+    ]
+  },
+  "exact_excluded_directories": [
+    "quality-v2/target-baseline",
+    "quality-v2/target-candidate",
+    "quality/target-baseline",
+    "quality/target-candidate",
+    "target-baseline-allocator-v1",
+    "target-candidate-allocator-v2",
+    "target-candidate-native-v2"
+  ],
+  "helper": {
+    "bytes": 54583,
+    "path": "/home/zhuhe/litchi-performance-0945/archive-0945-v2.py",
+    "sha256": "6cdb9b8788de001631c49153f87a449e8692259d724e6ea1e86b4d25487df5b9"
+  },
+  "ordering_policy": {
+    "duplicate_paths_rejected": true,
+    "normalized_path_sort_used": true,
+    "quality_v1_manifest_order_used_for_comparison": false,
+    "row_size_and_sha256_rechecked": true
+  },
+  "preflight_command": "/usr/bin/python3 -B <import archive-0945-v2.py; custody_snapshot(); collect_records()>",
+  "preserved_v1_helper": {
+    "bytes": 49882,
+    "path": "/home/zhuhe/litchi-performance-0945/archive-0945-v1.py",
+    "sha256": "a61c6140b83f5fd1cd72453940eba8bfbec8f40f7195242f9f0c65c3b3774296"
+  },
+  "schema": "litchi.performance.0945.archive-preflight.v2",
+  "selection": {
+    "bytes": 3226301466,
+    "files": 76730,
+    "first": {
+      "bytes": 3705,
+      "path": "METHOD.md",
+      "sha256": "556ef3d65468fc0ea8a26550cfee1d024ad03d51ab1d7eb39507c07cac2b22d"
+    },
+    "last": {
+      "bytes": 11705,
+      "path": "tools/summarize_0945_v1.py",
+      "sha256": "e1624e99c011c5d53fef158b423debdb525b2d352a867409d2fb9de924cc33b"
+    },
+    "quality_root_census": {
+      "quality-v2/baseline-source": {
+        "declared_quality_extras": 8,
+        "files": 10796
+      },
+      "quality-v2/candidate-source": {
+        "declared_quality_extras": 8,
+        "files": 10796
+      },
+      "quality/baseline-source": {
+        "declared_quality_extras": 2,
+        "files": 10793
+      },
+      "quality/candidate-source": {
+        "declared_quality_extras": 2,
+        "files": 10793
+      }
+    }
+  },
+  "source_root": "/home/zhuhe/litchi-performance-0945",
+  "status": "passed"
+}

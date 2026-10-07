@@ -1892,55 +1892,27 @@ impl SourceTopologyPlan {
     /// The source-backed publisher verifies that the Part exists and that the
     /// replacement remains within the package read policy before output.
     pub fn try_replace_part(&mut self, partname: PackURI, replacement: Vec<u8>) -> Result<()> {
-        if partname.as_str() == PACKAGE_URI {
-            return Err(OpcError::InvalidPackUri(
-                "the package root is not a Part URI".to_string(),
-            ));
-        }
-        let operation_count = self
-            .replacements
-            .len()
-            .checked_add(self.additions.len())
-            .and_then(|count| count.checked_add(self.removals.len()))
-            .ok_or_else(|| overlay_unavailable("topology Part operation count overflows usize"))?;
-        if operation_count >= MAX_SOURCE_TOPOLOGY_PARTS {
-            return Err(overlay_unavailable(format!(
-                "topology replacement set exceeds the {MAX_SOURCE_TOPOLOGY_PARTS}-Part bound"
-            )));
-        }
-        if self
-            .replacements
-            .iter()
-            .any(|candidate| candidate.partname.is_equivalent_to(&partname))
-        {
-            return Err(OpcError::DuplicatePartName(partname.to_string()));
-        }
-        if self
-            .additions
-            .iter()
-            .any(|candidate| candidate.partname.is_equivalent_to(&partname))
-        {
-            return Err(OpcError::DuplicatePartName(partname.to_string()));
-        }
-        if self
-            .removals
-            .iter()
-            .any(|candidate| candidate.is_equivalent_to(&partname))
-        {
-            return Err(OpcError::DuplicatePartName(partname.to_string()));
-        }
-        self.replacements
-            .try_reserve(1)
-            .map_err(|source| OpcError::Allocation {
-                resource: "source-backed OPC topology replacements",
-                source,
-            })?;
-        self.replacements.push(TopologyReplacement {
-            partname,
-            replacement: Arc::new(replacement),
-            source_xml: None,
-        });
-        Ok(())
+        self.try_replace_part_with_payload(partname, || Arc::new(replacement))
+    }
+
+    /// Replace the payload of one existing Part while retaining the caller's
+    /// immutable byte allocation.
+    ///
+    /// The URI, operation-count, duplicate-name, and fallible reservation
+    /// checks run before the shared payload is installed. The source XML
+    /// authorization path remains separate, so this is still the ordinary
+    /// replacement route and stores no source proof.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same typed URI, duplicate-name, operation-bound, and
+    /// allocation errors as [`Self::try_replace_part`].
+    pub fn try_replace_part_shared(
+        &mut self,
+        partname: PackURI,
+        replacement: Arc<Vec<u8>>,
+    ) -> Result<()> {
+        self.try_replace_part_with_payload(partname, || replacement)
     }
 
     /// Replace one existing XML Part with a source-authorized payload.
@@ -1977,6 +1949,25 @@ impl SourceTopologyPlan {
             partname,
             replacement,
             source_xml: Some(source_xml),
+        });
+        Ok(())
+    }
+
+    fn try_replace_part_with_payload<F>(&mut self, partname: PackURI, replacement: F) -> Result<()>
+    where
+        F: FnOnce() -> Arc<Vec<u8>>,
+    {
+        self.validate_replacement_name(&partname)?;
+        self.replacements
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC topology replacements",
+                source,
+            })?;
+        self.replacements.push(TopologyReplacement {
+            partname,
+            replacement: replacement(),
+            source_xml: None,
         });
         Ok(())
     }
@@ -3777,7 +3768,7 @@ impl SourceInput {
             Self::Owned(source) => {
                 let read_at: Arc<dyn ReadAt> = source.clone();
                 (read_at, Some(source))
-            }
+            },
         }
     }
 }
@@ -14937,6 +14928,175 @@ mod tests {
         assert_eq!(Arc::strong_count(&retained_payload), 1);
         Arc::make_mut(&mut retained_payload)[0] = b'C';
         assert_eq!(retained_payload.as_slice(), b"Copy-on-write");
+    }
+
+    #[test]
+    fn topology_replace_part_shared_preserves_arc_identity_and_cow_isolation() {
+        let partname = PackURI::new("/word/document.xml").unwrap();
+        let mut payload = Arc::new(b"<shared/>".to_vec());
+        let mut plan = SourceTopologyPlan::new();
+        plan.try_replace_part_shared(partname, Arc::clone(&payload))
+            .unwrap();
+
+        let TopologyReplacement {
+            replacement,
+            source_xml,
+            ..
+        } = &plan.replacements[0];
+        assert!(Arc::ptr_eq(&payload, replacement));
+        assert!(source_xml.is_none());
+        assert_eq!(Arc::strong_count(&payload), 2);
+
+        Arc::make_mut(&mut payload)[0] = b'X';
+        assert_eq!(payload.as_slice(), b"Xshared/>");
+        assert_eq!(replacement.as_slice(), b"<shared/>");
+
+        drop(plan);
+        assert_eq!(Arc::strong_count(&payload), 1);
+    }
+
+    #[test]
+    fn topology_replace_part_shared_publishes_the_same_bytes_as_owned_replacement() {
+        let source_bytes = archive_bytes(root_relationships(), b"<before/>", false);
+        let partname = PackURI::new("/word/document.xml").unwrap();
+
+        let mut owned_plan = SourceTopologyPlan::new();
+        owned_plan
+            .try_replace_part(partname.clone(), b"<after/>".to_vec())
+            .unwrap();
+        let mut owned_output = Vec::new();
+        SourceBackedPackage::from_vec(source_bytes.clone())
+            .unwrap()
+            .write_topology_to_stream(&mut owned_output, owned_plan)
+            .unwrap();
+
+        let mut shared_plan = SourceTopologyPlan::new();
+        shared_plan
+            .try_replace_part_shared(partname.clone(), Arc::new(b"<after/>".to_vec()))
+            .unwrap();
+        let mut shared_output = Vec::new();
+        SourceBackedPackage::from_vec(source_bytes)
+            .unwrap()
+            .write_topology_to_stream(&mut shared_output, shared_plan)
+            .unwrap();
+
+        assert_eq!(shared_output, owned_output);
+        assert_eq!(
+            soapberry_zip::office::ArchiveReader::new(&shared_output)
+                .unwrap()
+                .read(partname.membername())
+                .unwrap(),
+            b"<after/>"
+        );
+    }
+
+    #[test]
+    fn topology_replace_part_shared_preserves_refusal_order_and_plan_on_failure() {
+        let root = PackURI::new("/").unwrap();
+        let mut root_plan = SourceTopologyPlan::new();
+        let root_payload = Arc::new(b"root payload".to_vec());
+        assert!(matches!(
+            root_plan.try_replace_part_shared(root, Arc::clone(&root_payload)),
+            Err(OpcError::InvalidPackUri(_))
+        ));
+        assert!(root_plan.replacements.is_empty());
+        assert_eq!(Arc::strong_count(&root_payload), 1);
+
+        let mut lazy_root_plan = SourceTopologyPlan::new();
+        let constructed = Arc::new(AtomicBool::new(false));
+        let constructed_marker = Arc::clone(&constructed);
+        assert!(matches!(
+            lazy_root_plan.try_replace_part_with_payload(PackURI::new("/").unwrap(), || {
+                constructed_marker.store(true, Ordering::SeqCst);
+                Arc::new(Vec::new())
+            },),
+            Err(OpcError::InvalidPackUri(_))
+        ));
+        assert!(!constructed.load(Ordering::SeqCst));
+
+        let duplicate_name = PackURI::new("/word/document.xml").unwrap();
+        let mut duplicate_plan = SourceTopologyPlan::new();
+        duplicate_plan
+            .try_replace_part_shared(duplicate_name.clone(), Arc::new(b"<first/>".to_vec()))
+            .unwrap();
+        let duplicate_payload = Arc::new(b"<second/>".to_vec());
+        let duplicate_equivalent = PackURI::new("/WORD/DOCUMENT.XML").unwrap();
+        assert!(matches!(
+            duplicate_plan
+                .try_replace_part_shared(duplicate_equivalent, Arc::clone(&duplicate_payload),),
+            Err(OpcError::DuplicatePartName(_))
+        ));
+        assert_eq!(duplicate_plan.replacements.len(), 1);
+        assert_eq!(
+            duplicate_plan.replacements[0].replacement.as_slice(),
+            b"<first/>"
+        );
+        assert_eq!(Arc::strong_count(&duplicate_payload), 1);
+
+        let cross_duplicate = PackURI::new("/custom/cross-duplicate.bin").unwrap();
+        let mut addition_plan = SourceTopologyPlan::new();
+        addition_plan
+            .try_add_part(
+                cross_duplicate.clone(),
+                "application/octet-stream",
+                b"existing".to_vec(),
+            )
+            .unwrap();
+        assert!(matches!(
+            addition_plan
+                .try_replace_part_shared(cross_duplicate, Arc::new(b"replacement".to_vec()),),
+            Err(OpcError::DuplicatePartName(_))
+        ));
+        assert_eq!(addition_plan.additions.len(), 1);
+        assert!(addition_plan.replacements.is_empty());
+
+        let removed_name = PackURI::new("/custom/removed.bin").unwrap();
+        let mut removal_plan = SourceTopologyPlan::new();
+        removal_plan.try_remove_part(removed_name.clone()).unwrap();
+        assert!(matches!(
+            removal_plan.try_replace_part_shared(removed_name, Arc::new(b"replacement".to_vec()),),
+            Err(OpcError::DuplicatePartName(_))
+        ));
+        assert_eq!(removal_plan.removals.len(), 1);
+        assert!(removal_plan.replacements.is_empty());
+
+        let mut bounded_plan = SourceTopologyPlan::new();
+        for index in 0..MAX_SOURCE_TOPOLOGY_PARTS {
+            bounded_plan
+                .try_replace_part_shared(
+                    PackURI::new(format!("/custom/bounded{index}.bin")).unwrap(),
+                    Arc::new(Vec::new()),
+                )
+                .unwrap();
+        }
+        let over_bound_payload = Arc::new(b"over bound".to_vec());
+        assert!(matches!(
+            bounded_plan.try_replace_part_shared(
+                PackURI::new("/custom/over-bound.bin").unwrap(),
+                Arc::clone(&over_bound_payload),
+            ),
+            Err(OpcError::SourceBackedOverlayUnavailable { .. })
+        ));
+        assert_eq!(bounded_plan.replacements.len(), MAX_SOURCE_TOPOLOGY_PARTS);
+        assert_eq!(Arc::strong_count(&over_bound_payload), 1);
+
+        let mut full_root_plan = SourceTopologyPlan::new();
+        for index in 0..MAX_SOURCE_TOPOLOGY_PARTS {
+            full_root_plan
+                .try_add_part(
+                    PackURI::new(format!("/custom/root-bound{index}.bin")).unwrap(),
+                    "application/octet-stream",
+                    Vec::new(),
+                )
+                .unwrap();
+        }
+        assert!(matches!(
+            full_root_plan
+                .try_replace_part_shared(PackURI::new("/").unwrap(), Arc::new(Vec::new()),),
+            Err(OpcError::InvalidPackUri(_))
+        ));
+        assert_eq!(full_root_plan.additions.len(), MAX_SOURCE_TOPOLOGY_PARTS);
+        assert!(full_root_plan.replacements.is_empty());
     }
 
     #[test]

@@ -1,0 +1,75 @@
+{
+  "conditional_cwd_site": {
+    "condition": "only when inputs_before/inputs_after are present",
+    "current_packet_receipts": "build terminal records checked for this packet omit both fields and use nested source provenance",
+    "expression": "Path(item['path']).resolve()",
+    "site": "role_input_bindings"
+  },
+  "cwd_independent_paths": [
+    {
+      "detail": "imports PACKET/tools/reuse_v2.py as an absolute path",
+      "site": "_reuse_validator"
+    },
+    {
+      "detail": "reuse_v2.validate_receipt resolves its relative input under its PACKET",
+      "site": "build_check/validate_receipt"
+    },
+    {
+      "detail": "path_value and PACKET-rooted paths",
+      "site": "plan/source/binary/report reads"
+    }
+  ],
+  "cwd_sensitive_callsites": [
+    {
+      "descriptor_path": "tools/semantic_0705.py",
+      "expression": "spec_from_file_location('litchi_0905_semantic_validator', actual['path'])",
+      "line": 1179,
+      "requires_cwd": "packet root"
+    }
+  ],
+  "measurement_started": false,
+  "moved_replay_command_template": [
+    "cd",
+    "$MOVED_PACKET",
+    "&&",
+    "PYTHONDONTWRITEBYTECODE=1",
+    "python3",
+    "-B",
+    "tools/reduce_0945_v2.py",
+    "qualification",
+    "--output",
+    "qualification-analysis-replay.json"
+  ],
+  "moved_replay_requirement": "execute the reducer copy inside the moved packet; do not invoke the original absolute reducer script",
+  "observed_failure": {
+    "before_first_report_validation": true,
+    "cause": "load_validator imports packet-relative semantic_validator path as cwd-relative when reducer is launched from checkout cwd",
+    "source": "root execution report",
+    "stage": "qualification"
+  },
+  "original_replay_command": [
+    "cd",
+    "/home/zhuhe/litchi-performance-0945",
+    "&&",
+    "PYTHONDONTWRITEBYTECODE=1",
+    "python3",
+    "-B",
+    "tools/reduce_0945_v2.py",
+    "qualification",
+    "--output",
+    "qualification-analysis-v2.json"
+  ],
+  "plan": {
+    "bytes": 9678,
+    "path": "/home/zhuhe/litchi-performance-0945/plan-v2.json",
+    "sha256": "a60587fcd651dac117f4b88ed74011e8d7fbeb4856ef96f01389ae75d5352dc9"
+  },
+  "reducer": {
+    "bytes": 84352,
+    "path": "/home/zhuhe/litchi-performance-0945/tools/reduce_0945_v2.py",
+    "sha256": "c11326da83dddf78b610cad921ede12bc7c1154d55f0ae55ceb085bea140cf3b"
+  },
+  "schema": "litchi.performance.0945.reducer-cwd-audit.v1",
+  "status": "pass",
+  "workloads_started": false
+}

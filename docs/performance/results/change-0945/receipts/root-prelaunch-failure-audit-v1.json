@@ -1,0 +1,21 @@
+{
+  "checked_utc": "2026-10-07T02:45:18.122732+00:00",
+  "code_order": {
+    "failed_plan_descriptor_line": 644,
+    "start_receipt_line": 668,
+    "subprocess_launch_line": 680
+  },
+  "failure_receipt": {
+    "bytes": 1526,
+    "path": "preflight/qualification-failed-v1/prelaunch-failure.json",
+    "sha256": "be35e4e2df92c01912c28a4a8182a11e28077287813097e09bd48ada72b70a0d"
+  },
+  "observed_error": "0945 capture failed: plan descriptor path must be packet-relative",
+  "observed_exec_session": 24987,
+  "observed_exit_code": 1,
+  "prior_helper_preserved": true,
+  "prior_plan_preserved": true,
+  "retained_child_directory_empty": true,
+  "schema": "litchi.performance.0945.root-prelaunch-failure-audit.v1",
+  "status": "verified-zero-workload-launches"
+}

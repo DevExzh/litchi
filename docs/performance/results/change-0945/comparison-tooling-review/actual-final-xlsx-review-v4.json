@@ -1,0 +1,90 @@
+{
+  "baseline_native_reuse_v2": {
+    "bytes": 5932,
+    "path": "/home/zhuhe/litchi-performance-0945/receipts/baseline-native-reuse-v2.json",
+    "sha256": "303fdb714df4dd84aff8a61bdf72872024719ae58fd15e82af708a295c1ce9a8"
+  },
+  "candidate_source_manifest": {
+    "bytes": 3048241,
+    "path": "/home/zhuhe/litchi-performance-0945/candidate-source-manifest-v2.json",
+    "sha256": "da7128f699b4bf7a9a4745e99b99606830df1aa192ce389a0b7fe3cceb8a0994"
+  },
+  "checks": [
+    "actual primary and control XLSX validators, managed oracle mutation, phase ordering, allocator conservation and gate propagation",
+    "zero-baseline and negative-ratio failure handling, source/artifact hash custody, relative replay paths",
+    "incomplete build receipt rejection and recursive portable reuse-v2 positive validation",
+    "actual prepared candidate native-v2 and allocator-v2 no-launch receipt schema/target/source-manifest checks"
+  ],
+  "control_result": {
+    "byte_identical_snapshot_of": {
+      "result": {
+        "bytes": 15696,
+        "path": "/home/zhuhe/litchi-performance-0945/comparison-tooling-review/actual-final-xlsx-controls-v1.json",
+        "sha256": "abe4ace0f083d14a4af5fee08974e0a4bb64c434b0b5e6fce8a91de5acf07d2d"
+      },
+      "script": {
+        "bytes": 36864,
+        "path": "/home/zhuhe/litchi-performance-0945/comparison-tooling-review/actual-final-xlsx-controls-v1.py",
+        "sha256": "bb9d57ef0340f9e61eaa810db75deba96e0f363de88d61a51199137a1e0deaa9"
+      }
+    },
+    "controls": 47,
+    "failed_controls": 0,
+    "note": "The v1 scratch output was overwritten during iterative preflight runs; these final-v3 files preserve the last passing bytes under unique names. The copied script retains its original v1 output path and was not rerun after copying.",
+    "regeneration": "PYTHONDONTWRITEBYTECODE=1 python3 -B /home/zhuhe/litchi-performance-0945/comparison-tooling-review/actual-final-xlsx-controls-v1.py",
+    "result": {
+      "bytes": 15696,
+      "path": "/home/zhuhe/litchi-performance-0945/comparison-tooling-review/actual-final-xlsx-controls-final-v3.json",
+      "sha256": "abe4ace0f083d14a4af5fee08974e0a4bb64c434b0b5e6fce8a91de5acf07d2d"
+    },
+    "script": {
+      "bytes": 36864,
+      "path": "/home/zhuhe/litchi-performance-0945/comparison-tooling-review/actual-final-xlsx-controls-final-v3.py",
+      "sha256": "bb9d57ef0340f9e61eaa810db75deba96e0f363de88d61a51199137a1e0deaa9"
+    },
+    "status": "passed"
+  },
+  "helper_bindings": {
+    "capture_0945.py": {
+      "bytes": 40612,
+      "path": "/home/zhuhe/litchi-performance-0945/tools/capture_0945.py",
+      "sha256": "d4fdf0553e5cd178d6a4524f213e3b700ff6166064bf30a6f0284c556b7e9dce"
+    },
+    "freeze_0945.py": {
+      "bytes": 13118,
+      "path": "/home/zhuhe/litchi-performance-0945/tools/freeze_0945.py",
+      "sha256": "2e34f78742e2d369afe4a0bca30e6de768cc36dee206cba4e058c304de158d68"
+    },
+    "reduce_0945.py": {
+      "bytes": 83979,
+      "path": "/home/zhuhe/litchi-performance-0945/tools/reduce_0945.py",
+      "sha256": "dd5edfe84630520dbec05e1837427b76a45e6ca25ef41d3636325a01da8d225e"
+    },
+    "reuse_v2.py": {
+      "bytes": 25764,
+      "path": "/home/zhuhe/litchi-performance-0945/tools/reuse_v2.py",
+      "sha256": "3f0f28d2426b787242e2e9894ff29b9bf669e06b9fd1987c78f7019cb4dcd9ed"
+    }
+  },
+  "prepared_candidate_v2_receipts": {
+    "candidate-allocator-build-prepared-v2.json": {
+      "bytes": 5244,
+      "path": "/home/zhuhe/litchi-performance-0945/receipts/candidate-allocator-build-prepared-v2.json",
+      "sha256": "9d44c7ee2beb1fc280245e0300d6da800605b4f40259c1f9fdbe88095f4d37d2"
+    },
+    "candidate-native-build-prepared-v2.json": {
+      "bytes": 5134,
+      "path": "/home/zhuhe/litchi-performance-0945/receipts/candidate-native-build-prepared-v2.json",
+      "sha256": "37a0f3aae1c85204209548b44c3d92c290188415151762e87106183e28dacbd3"
+    }
+  },
+  "prior_review_v3": {
+    "bytes": 4625,
+    "path": "/home/zhuhe/litchi-performance-0945/comparison-tooling-review/actual-final-xlsx-review-v3.json",
+    "sha256": "09a7b0b81232c0c4d6e9cab294a84bf25d07a1106699ef657a71f2ec3b4e455f"
+  },
+  "review_scope": "offline tooling/validator review only; no workloads, builds, or comparative measurements were started",
+  "schema": "litchi.performance.0945.comparison-tooling-review.v4",
+  "status": "GO",
+  "supersedes": "No prior receipt is overwritten; review-v3 remains retained unchanged."
+}

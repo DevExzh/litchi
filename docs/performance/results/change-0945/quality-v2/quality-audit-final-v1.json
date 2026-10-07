@@ -1,0 +1,144 @@
+{
+  "created_utc": "2026-10-07T02:16:32.139497Z",
+  "execution": {
+    "all_corrected_or_scoped_terminal_groups_clear": true,
+    "corrected_followup": {
+      "child_terminals": 19,
+      "failed": 1,
+      "groups_clear": true,
+      "no_retry": true,
+      "passed": 18,
+      "scope": "Eight baseline and eight candidate test/Clippy failures after fixture closure; candidate v2 OPC/XLSX format and boundary checks.",
+      "summary": {
+        "bytes": 56261,
+        "mode_bits": 436,
+        "path": "/home/zhuhe/litchi-performance-0945/quality-v2/quality-summary-followup-v1.json",
+        "sha256": "d797abde9cf7895d64422f830b2f49a3f47d022161989b903498081a3da6ce96"
+      }
+    },
+    "initial_matrix": {
+      "child_terminals": 38,
+      "failed": 18,
+      "groups_clear": true,
+      "no_retry": true,
+      "passed": 20,
+      "summary": {
+        "bytes": 104292,
+        "mode_bits": 436,
+        "path": "/home/zhuhe/litchi-performance-0945/quality/quality-summary-v2.json",
+        "sha256": "37339eb08f0311ac57729f5690566a5c06c087b0792d40f72d3996ee986e2efc"
+      }
+    },
+    "scoped_changed_file_rustfmt": {
+      "bytes": 1816,
+      "mode_bits": 436,
+      "path": "/home/zhuhe/litchi-performance-0945/quality-v2/scoped-rustfmt-v2.result.json",
+      "sha256": "75a9f7c500c72a3b9c1da3941b06348b69a4d56e7606b47f56cc839ef42bbf43"
+    }
+  },
+  "findings": {
+    "boundary": "Candidate v2 boundary check passes; baseline boundary passed in initial matrix.",
+    "candidate_v2_tests_and_clippy": "All 16 corrected default/all-features test and Clippy checks pass for baseline and candidate.",
+    "format": "Candidate OPC package fmt remains exit 1 only because unchanged crates/litchi-opc/tests/source_fingerprint_quality.rs has pre-existing package-wide formatting drift; this is retained as a review failure and is not converted to pass.",
+    "initial_failures": "Initial failures were preserved: omitted quality fixtures and candidate v1 ownership/lint defects; no initial child was retried.",
+    "postprocessing": "Follow-up runner exited after all 19 child terminals while reading absent known_format_drift; offline summary recovery preserved this failure and added no execution.",
+    "rustfmt_changed_files": "Both changed v2 files pass scoped rustfmt --check."
+  },
+  "integrity": {
+    "measurement_sources_untouched": true,
+    "quality_copies": "All copied manifest rows match; declared quality-only inputs are separately hash-bound.",
+    "raw_sources_and_manifest_rows": "All raw v1/v2 source roots match their manifests; raw source trees have no extras.",
+    "receipt": {
+      "bytes": 21521,
+      "mode_bits": 436,
+      "path": "/home/zhuhe/litchi-performance-0945/quality-v2/post-run-integrity-v2.json",
+      "sha256": "0938aeeb9f7ed4bc2da81a3fa776b56f51d0a21c48ccf5e4539c86f4a007f748"
+    }
+  },
+  "no_further_cargo_commands_authorized_in_this_lane": true,
+  "retained_failure_artifacts": {
+    "candidate_binding_v1_superseded": {
+      "bytes": 4342,
+      "mode_bits": 436,
+      "path": "/home/zhuhe/litchi-performance-0945/quality/candidate-binding-v1.json",
+      "sha256": "81a0e11346f6fc9b75d0570cfc3b81afcebdaa57f86bd40c062b3d5181f5cbc6"
+    },
+    "followup_runner": {
+      "bytes": 1255,
+      "mode_bits": 436,
+      "path": "/home/zhuhe/litchi-performance-0945/quality-v2/quality-followup-runner-failure-v1.json",
+      "sha256": "535e40eba251ef31ba70377fa967003850b1b869a5d1af2f727e17665f1fa0a9"
+    },
+    "initial_runner": {
+      "bytes": 1009,
+      "mode_bits": 436,
+      "path": "/home/zhuhe/litchi-performance-0945/quality/quality-run-attempt-v2-import-failure.json",
+      "sha256": "37e1586af564f9a0d81b88a17b0e36e98e43430fcf589467cc60915f2dcb03ec"
+    },
+    "integrity_v1_superseded": {
+      "bytes": 20625,
+      "mode_bits": 436,
+      "path": "/home/zhuhe/litchi-performance-0945/quality-v2/post-run-integrity-v1.json",
+      "sha256": "daa3317e84e25c9185ac7a5f47c598d290c697405d449bca6f271ffa511a8e7e"
+    }
+  },
+  "root_admission": {
+    "bytes": 6519,
+    "mode_bits": 436,
+    "path": "/home/zhuhe/litchi-performance-0945/receipts/root-quality-admission-v1.json",
+    "sha256": "6ed3b5d85b2e9e41254911a5c6c42d5951cc2a206244916cf753f328c147cf50"
+  },
+  "schema": "litchi.performance.0945-quality-audit-final.v1",
+  "scope": "Read-only quality audit for frozen 0945 candidate; no production checkout edits or benchmark workloads.",
+  "source_binding": {
+    "candidate_binding_v4": {
+      "bytes": 2300,
+      "mode_bits": 436,
+      "path": "/home/zhuhe/litchi-performance-0945/quality-v2/candidate-binding-v4.json",
+      "sha256": "f223080b29e3ba2c59bdcb5a366e87436d077a536f0c048ea4da85c34df4f90e"
+    },
+    "candidate_freeze_v1": {
+      "bytes": 901,
+      "mode_bits": 436,
+      "path": "/home/zhuhe/litchi-performance-0945/receipts/candidate-freeze-v1.json",
+      "sha256": "94f2e75ad659214ed5310017bd0670df0f11d821c54263b1e6f0f8397fea2af3"
+    },
+    "candidate_freeze_v2": {
+      "bytes": 1269,
+      "mode_bits": 436,
+      "path": "/home/zhuhe/litchi-performance-0945/receipts/candidate-freeze-v2.json",
+      "sha256": "f624f161ad7e04499f6ae3a5f5079533ecc489c3690a2f46fdf947f3492dce32"
+    },
+    "candidate_manifest_v1": {
+      "bytes": 3048238,
+      "mode_bits": 436,
+      "path": "/home/zhuhe/litchi-performance-0945/candidate-source-manifest-v1.json",
+      "sha256": "39e813810818fdfd45f8c7862f22a71c3c9e89b16c84588ea9affa0a0199b353"
+    },
+    "candidate_manifest_v2": {
+      "bytes": 3048241,
+      "mode_bits": 436,
+      "path": "/home/zhuhe/litchi-performance-0945/candidate-source-manifest-v2.json",
+      "sha256": "da7128f699b4bf7a9a4745e99b99606830df1aa192ce389a0b7fe3cceb8a0994"
+    },
+    "quality_inputs_v2": {
+      "bytes": 8912,
+      "mode_bits": 436,
+      "path": "/home/zhuhe/litchi-performance-0945/quality-v2/quality-inputs-v2.json",
+      "sha256": "49abd99e8f46de5529448f0d10a58a1d085abf6c4e2ddb0c4f219bb2aef54272"
+    },
+    "quality_v1_freeze": {
+      "bytes": 5107822,
+      "mode_bits": 436,
+      "path": "/home/zhuhe/litchi-performance-0945/quality/source-freeze-v1.json",
+      "sha256": "3664eb3f28b8e9587b05de5ef638a41589f0b85f638965e4663856a2dae426fe"
+    },
+    "quality_v2_freeze": {
+      "bytes": 10463,
+      "mode_bits": 436,
+      "path": "/home/zhuhe/litchi-performance-0945/quality-v2/source-freeze-v2.json",
+      "sha256": "eb87c42b6811c497f1e4de7453d75ecee05ae8ac19ae1386b6cdba2bd82bc331"
+    }
+  },
+  "status": "pass-with-retained-format-review"
+}

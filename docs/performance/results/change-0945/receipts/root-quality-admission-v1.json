@@ -1,0 +1,196 @@
+{
+  "schema": "litchi.performance.0945-root-quality-admission.v1",
+  "created_utc": "2026-10-07T02:15:14.062404+00:00",
+  "status": "admitted-with-unchanged-baseline-format-drift",
+  "source_checks": [
+    {
+      "manifest": {
+        "path": "baseline-source-manifest.json",
+        "bytes": 2993755,
+        "sha256": "c276582f412ac9c670a8b0fc3cc85ef12dc8a8705c201dd78e5584efa3a5a100"
+      },
+      "source_root": "baseline-source",
+      "file_count": 10788,
+      "source_exact_file_set": true,
+      "source_and_quality_copy_hashes_match": true
+    },
+    {
+      "manifest": {
+        "path": "candidate-source-manifest-v2.json",
+        "bytes": 3048241,
+        "sha256": "da7128f699b4bf7a9a4745e99b99606830df1aa192ce389a0b7fe3cceb8a0994"
+      },
+      "source_root": "candidate-source-v2",
+      "file_count": 10788,
+      "source_exact_file_set": true,
+      "source_and_quality_copy_hashes_match": true
+    }
+  ],
+  "quality_input_copies_verified": 16,
+  "terminals": [
+    {
+      "terminal": {
+        "path": "quality-v2/000-baseline-opc-test-default-baseline.terminal.json",
+        "bytes": 1375,
+        "sha256": "6b3c3d8c62210f643ae860988a5f070e7f1fb51dba4c8edc782662d073eb2b61"
+      },
+      "exit_code": 0
+    },
+    {
+      "terminal": {
+        "path": "quality-v2/001-baseline-opc-test-all-features-baseline.terminal.json",
+        "bytes": 1412,
+        "sha256": "56396908b796e14336bc5591815820b348cf23bbc2d3e0ce5eed60a42250c146"
+      },
+      "exit_code": 0
+    },
+    {
+      "terminal": {
+        "path": "quality-v2/002-baseline-opc-clippy-default-baseline.terminal.json",
+        "bytes": 1419,
+        "sha256": "2e00805d252bd344cf51dd21fe087c0ce4869ce21cbe8409e25421fa418afe8b"
+      },
+      "exit_code": 0
+    },
+    {
+      "terminal": {
+        "path": "quality-v2/003-baseline-opc-clippy-all-features-baseline.terminal.json",
+        "bytes": 1456,
+        "sha256": "fda9fca79370477a1982068ffd06431676061164ca90511ed71db9cc4fda102c"
+      },
+      "exit_code": 0
+    },
+    {
+      "terminal": {
+        "path": "quality-v2/004-baseline-xlsx-test-default-baseline.terminal.json",
+        "bytes": 1379,
+        "sha256": "52208c9c3444782130225896922d351d89c6426335c9836849581a3f8ddf95ee"
+      },
+      "exit_code": 0
+    },
+    {
+      "terminal": {
+        "path": "quality-v2/005-baseline-xlsx-test-all-features-baseline.terminal.json",
+        "bytes": 1417,
+        "sha256": "3169637a34e6e0eea08cede1f3e8f97affadf35b7d41ef7a8445400f025772de"
+      },
+      "exit_code": 0
+    },
+    {
+      "terminal": {
+        "path": "quality-v2/006-baseline-xlsx-clippy-default-baseline.terminal.json",
+        "bytes": 1423,
+        "sha256": "afa0350a6e65c7a1e6aaae4a220275ce431d2104f2e9e2cedd6fb6bde241661b"
+      },
+      "exit_code": 0
+    },
+    {
+      "terminal": {
+        "path": "quality-v2/007-baseline-xlsx-clippy-all-features-baseline.terminal.json",
+        "bytes": 1460,
+        "sha256": "04faf0713ddf9eaa546e01c320e1d45a68aa84d83f036207098c24cb6b651bea"
+      },
+      "exit_code": 0
+    },
+    {
+      "terminal": {
+        "path": "quality-v2/008-candidate-opc-test-default-candidate.terminal.json",
+        "bytes": 1383,
+        "sha256": "4fe17fb2d77dd3e636d679a3da738a18d652effd315970949386600f6790356a"
+      },
+      "exit_code": 0
+    },
+    {
+      "terminal": {
+        "path": "quality-v2/009-candidate-opc-test-all-features-candidate.terminal.json",
+        "bytes": 1420,
+        "sha256": "4cd87e21806e5ac54a778e0cad5be73348356b6692bdff0bd7fe318d3cbaa494"
+      },
+      "exit_code": 0
+    },
+    {
+      "terminal": {
+        "path": "quality-v2/010-candidate-opc-clippy-default-candidate.terminal.json",
+        "bytes": 1428,
+        "sha256": "c0b254b091938b20019258afc3aba0b79fe94923293c34d6eadd6442db593a54"
+      },
+      "exit_code": 0
+    },
+    {
+      "terminal": {
+        "path": "quality-v2/011-candidate-opc-clippy-all-features-candidate.terminal.json",
+        "bytes": 1465,
+        "sha256": "d1b750c26de448c46c9d8ea7ac02b72b773c358a7f203e81d7413c39eae704cd"
+      },
+      "exit_code": 0
+    },
+    {
+      "terminal": {
+        "path": "quality-v2/012-candidate-xlsx-test-default-candidate.terminal.json",
+        "bytes": 1389,
+        "sha256": "0f186e4ae51229038a9c74f686f48c490d4501fa1c9373fe9296b1814b5c247b"
+      },
+      "exit_code": 0
+    },
+    {
+      "terminal": {
+        "path": "quality-v2/013-candidate-xlsx-test-all-features-candidate.terminal.json",
+        "bytes": 1426,
+        "sha256": "4686ba2b8503c9f8657d16ad7bb5dfb7bba7f35d2403df3e76dd87ee6503f075"
+      },
+      "exit_code": 0
+    },
+    {
+      "terminal": {
+        "path": "quality-v2/014-candidate-xlsx-clippy-default-candidate.terminal.json",
+        "bytes": 1432,
+        "sha256": "a7afbeda71ab3aa4889390d670d19ca3c473315079c7aa14060d7dd4bf6f3132"
+      },
+      "exit_code": 0
+    },
+    {
+      "terminal": {
+        "path": "quality-v2/015-candidate-xlsx-clippy-all-features-candidate.terminal.json",
+        "bytes": 1469,
+        "sha256": "55b388d3e0df6a3f2dfae44601602549d4198847883fe229c4ca72db8a667f63"
+      },
+      "exit_code": 0
+    },
+    {
+      "terminal": {
+        "path": "quality-v2/016-candidate-opc-fmt-candidate-v2.terminal.json",
+        "bytes": 1331,
+        "sha256": "b28e053f7b6ff16a7fa4dd24c92e6de808f264bdc05ce3c6194b2ef46be3e5ce"
+      },
+      "exit_code": 1
+    },
+    {
+      "terminal": {
+        "path": "quality-v2/017-candidate-xlsx-fmt-candidate-v2.terminal.json",
+        "bytes": 1335,
+        "sha256": "de5dbf7264f405ccac2ccb8a4c9cbd96ba81d2f8b61e147de5ad690e8a2bfdb8"
+      },
+      "exit_code": 0
+    },
+    {
+      "terminal": {
+        "path": "quality-v2/018-candidate-crate-boundary-candidate-v2.terminal.json",
+        "bytes": 1295,
+        "sha256": "3d576a2f1754a133f14412226cae52b6443032a1eba146d7b40c361d192ae331"
+      },
+      "exit_code": 0
+    },
+    {
+      "terminal": {
+        "path": "quality-v2/scoped-rustfmt-v2.terminal.json",
+        "bytes": 871,
+        "sha256": "f6ff647e91fe0247502fd378731318b66b199999748a08cb262b6944e7405ca7"
+      },
+      "exit_code": 0
+    }
+  ],
+  "known_format_drift": "Only crates/litchi-opc/tests/source_fingerprint_quality.rs; byte-identical baseline/candidate. Both changed files pass scoped Rustfmt.",
+  "carried_forward": "Initial default/all-feature doctests and rustdoc checks passed for production-identical candidate v1; candidate v2 changes added tests only.",
+  "build_lane_released": true,
+  "comparative_workloads_started": 0
+}

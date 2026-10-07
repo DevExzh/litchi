@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0945 — share owned XLSX replacement payloads
+
+[0945](0945-xlsx-shared-replacement-payloads.md) adopts ordinary shared OPC
+replacement storage for detached XLSX payloads. Medium/dense-sparse one-percent
+edits request 9.75%/15.55% fewer publication allocation bytes. Publication p50
+is nearly unchanged; workflow p50 rises 1.21–1.46% across all four cases, within
+the frozen 5% guardrail. All 80 processes pass semantic/custody checks and the
+independent reduction agrees; allocation and latency review flags are empty.
+Full XML auditing and managed-budget fallback remain. These are requested-byte
+savings, not physical-copy or general RSS claims. The XML/writer hotspots from
+0944 remain follow-up targets under the existing preservation constraints.
+
 ## 0944 — current XLSX publication remains XML- and writer-heavy
 
 [0944](0944-xlsx-post-attribute-publication-profile.md) refreshes the stale

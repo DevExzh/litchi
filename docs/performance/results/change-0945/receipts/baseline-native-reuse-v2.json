@@ -1,0 +1,174 @@
+{
+  "binary": {
+    "bytes": 265794648,
+    "executable": true,
+    "mode": 509,
+    "path": "binaries/baseline-native",
+    "sha256": "63cbffd8c17299a4e2d1096e4ffa2a2d34a549cc452dfdf8ba5691b8ab7e75a3"
+  },
+  "current_source": {
+    "commit": "e037befa6ce52b3988c8ae2032ae652196f2a09d",
+    "export": {
+      "bytes": 981,
+      "executable": false,
+      "mode": 436,
+      "path": "source-export.json",
+      "sha256": "f00ca571e5ea299dcfe038bb4fad2ba5b8be2ae013f500127f418fcc90f7f3ba"
+    },
+    "file_count": 10788,
+    "manifest": {
+      "bytes": 2993755,
+      "executable": false,
+      "mode": 436,
+      "path": "baseline-source-manifest.json",
+      "sha256": "c276582f412ac9c670a8b0fc3cc85ef12dc8a8705c201dd78e5584efa3a5a100"
+    },
+    "root": "baseline-source"
+  },
+  "original_build": {
+    "contract": {
+      "argv": [
+        "/home/zhuhe/.cargo/bin/cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--offline",
+        "--manifest-path",
+        "/home/zhuhe/litchi-performance-0944/source-build/tools/perf-baseline/Cargo.toml",
+        "--bin",
+        "litchi-perf-baseline",
+        "-j",
+        "2"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0944/source-build",
+      "deadline_seconds": 900,
+      "environment": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_HOME": "/home/zhuhe/.cargo",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_NET_OFFLINE": "true",
+        "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+        "CARGO_PROFILE_RELEASE_DEBUG": "1",
+        "CARGO_PROFILE_RELEASE_LTO": "fat",
+        "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+        "CARGO_TARGET_DIR": "/home/zhuhe/litchi-performance-0944/target-native",
+        "HOME": "/home/zhuhe",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PATH": "/home/zhuhe/.cargo/bin:/usr/bin:/bin",
+        "RUSTUP_HOME": "/home/zhuhe/.rustup",
+        "RUSTUP_TOOLCHAIN": "1.95.0",
+        "RUST_BACKTRACE": "0",
+        "TEMP": "/home/zhuhe/litchi-performance-0944/tmp/build-native",
+        "TMP": "/home/zhuhe/litchi-performance-0944/tmp/build-native",
+        "TMPDIR": "/home/zhuhe/litchi-performance-0944/tmp/build-native",
+        "TZ": "UTC"
+      },
+      "profile": {
+        "allocator_metrics": false,
+        "jobs": 2,
+        "locked": true,
+        "offline": true,
+        "release": true,
+        "toolchain": "1.95.0"
+      },
+      "unset_environment": [
+        "RUSTFLAGS",
+        "CARGO_ENCODED_RUSTFLAGS",
+        "RUSTC_WRAPPER",
+        "CARGO_BUILD_RUSTC_WRAPPER"
+      ]
+    },
+    "input_binding": {
+      "cargo_config": "source-build/.cargo/config.toml",
+      "cargo_config_sha256": "50b044c83828f2c448ee59c362afaa79de2dd47fbd390f0cd2888391f1d1119d",
+      "root_manifest": "source-build/tools/perf-baseline/Cargo.toml",
+      "root_manifest_sha256": "53fd47997ae969e709e2ee45575a6050f75de10df339f48dd427f35538768202",
+      "source_manifest": "source-build-manifest.json",
+      "source_manifest_sha256": "b63113ce5251218be817ba29c466b0ace535c546a416b97413ae8a73f0caea64",
+      "tracked_lock": "source-build/tools/perf-baseline/Cargo.lock",
+      "tracked_lock_sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+    },
+    "start": {
+      "bytes": 2492,
+      "executable": false,
+      "mode": 436,
+      "path": "references/0944-baseline-native/native-build-start.json",
+      "sha256": "58a5a58383d76f24908d0dda39a6a9600e120d5b760903cc277f7a1301b9eae3"
+    },
+    "terminal": {
+      "bytes": 820,
+      "executable": false,
+      "mode": 436,
+      "path": "references/0944-baseline-native/native-build-terminal.json",
+      "sha256": "5b0c8cde3292d6577e0b3a544a877954907052c379852040005e9f05d4e0df3a"
+    },
+    "terminal_status": {
+      "binary": {
+        "bytes": 265794648,
+        "path": "target-native/release/litchi-perf-baseline",
+        "sha256": "63cbffd8c17299a4e2d1096e4ffa2a2d34a549cc452dfdf8ba5691b8ab7e75a3"
+      },
+      "returncode": 0,
+      "terminal_before_parse": true,
+      "timed_out": false
+    }
+  },
+  "portable_binding": {
+    "absolute_paths_preserved_only_inside_original_command_environment": true,
+    "all_paths_relative_to_packet": true,
+    "original_receipts_copied_from": "0944 build/native and source closure receipts"
+  },
+  "reuse_kind": "native-baseline",
+  "schema": "litchi.performance.0945.native-baseline-reuse-v2",
+  "source_equivalence": {
+    "closure_selection": {
+      "bytes": 754,
+      "executable": false,
+      "mode": 436,
+      "path": "references/0944-baseline-native/source-closure-selection.json",
+      "sha256": "ffec8134b4d49b26bb68f57213b97b3c3a44439c735df1ec14ba4fbec42f4f21"
+    },
+    "compared_fields": [
+      "path",
+      "bytes",
+      "sha256",
+      "git_oid",
+      "git_mode"
+    ],
+    "comparison": "per-path bytes, SHA-256, Git blob, mode, and normalized path equality",
+    "current_commit": "e037befa6ce52b3988c8ae2032ae652196f2a09d",
+    "current_manifest": {
+      "bytes": 2993755,
+      "executable": false,
+      "mode": 436,
+      "path": "baseline-source-manifest.json",
+      "sha256": "c276582f412ac9c670a8b0fc3cc85ef12dc8a8705c201dd78e5584efa3a5a100"
+    },
+    "file_count": 10788,
+    "matched_path_count": 10788,
+    "mismatches": {
+      "bytes": 0,
+      "git_mode": 0,
+      "git_oid": 0,
+      "path": 0,
+      "sha256": 0
+    },
+    "original_commit": "933ee45cbb5d2ef9dc29583f7ec890ad234e04fb",
+    "original_export": {
+      "bytes": 734,
+      "executable": false,
+      "mode": 436,
+      "path": "references/0944-baseline-native/export-receipt.json",
+      "sha256": "1bc0724ffb9b00910bcbf3453bd9bfd6e22133a4e1e534c1b49349ba3c1fda4b"
+    },
+    "original_manifest": {
+      "bytes": 3674260,
+      "executable": false,
+      "mode": 436,
+      "path": "references/0944-baseline-native/source-build-manifest.json",
+      "sha256": "b63113ce5251218be817ba29c466b0ace535c546a416b97413ae8a73f0caea64"
+    }
+  },
+  "status": "passed"
+}

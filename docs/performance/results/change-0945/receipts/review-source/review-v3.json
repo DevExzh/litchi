@@ -1,0 +1,57 @@
+{
+  "base_commit": "e037befa6ce52b3988c8ae2032ae652196f2a09d",
+  "candidate_source_root": "/home/zhuhe/litchi-performance-0945/candidate-source-v2",
+  "correction_acknowledgement": "Review-v2 incorrectly described the added tests as API-consistent without checking that SourceBackedPackage::write_topology_to_stream consumes self. The v2 OPC test now constructs independent packages from cloned source bytes for the two consuming calls.",
+  "decision": "static_review_pass_no_remaining_source_or_test_api_blocker",
+  "execution": "No builds, tests, or workloads were run by this review.",
+  "files": [
+    {
+      "baseline_sha256": "d28843caf8245bd6f0ff0f953b9b5545c4d9ad7a4e11f362d29ce226cc251cc2",
+      "path": "crates/litchi-opc/src/source_backed.rs",
+      "sha256": "5e0cf3451e70784ff76896b0b2dc93b4409b15db9ef7c88535cc6a20885f8c43"
+    },
+    {
+      "baseline_sha256": "3542991373935e27e5ce253a84f6cdfeac24d008bcf06500b7450c8b975bca96",
+      "path": "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+      "sha256": "fff0da0fd3fe86824ba6a84531ad81d8499ebff0e73c824e4c16bf53d77129a5"
+    },
+    {
+      "baseline_sha256": "20d90a45659711e078c5b376823952d04b90a325e69ce6f3e3797b7ea17fff1f",
+      "path": "crates/litchi-xlsx/src/source_payload.rs",
+      "sha256": "20d90a45659711e078c5b376823952d04b90a325e69ce6f3e3797b7ea17fff1f"
+    }
+  ],
+  "findings": [
+    {
+      "area": "consuming_receiver_fix",
+      "detail": "write_topology_to_stream takes self by value. The corrected test creates SourceBackedPackage::from_vec(source_bytes.clone()) for the owned output and a separate SourceBackedPackage::from_vec(source_bytes) for the shared output, so no moved-value reuse remains.",
+      "result": "pass_static"
+    },
+    {
+      "area": "xlsx_test_lifetime",
+      "detail": "The needless drop(part) was removed because PartView is Copy and its borrow ends after the last use; data and package remain explicitly dropped in the order needed to release the managed payload before the budget assertion.",
+      "result": "pass_static"
+    },
+    {
+      "area": "xlsx_test_typing",
+      "detail": "The helper returns crate::Result and maps litchi_opc::OpcError through Error::Package. Owned uses try_replace_part_shared; Managed and OwnedBudgeted use copy_payload followed by try_replace_part. Existing fixture and managed APIs match their declared types.",
+      "result": "pass_static"
+    },
+    {
+      "area": "semantic_routes",
+      "detail": "The earlier review findings remain: fallback copy/check/reserve/Arc ordering, managed lease containment, ordinary source-first XML publication audit, and unchanged calculation-chain handling.",
+      "result": "pass"
+    }
+  ],
+  "reviewed_delta": {
+    "path": "/home/zhuhe/litchi-performance-0945/candidate-source-v2-source_backed-delta.patch",
+    "semantic_change": "Only the OPC equality test was changed in this delta: each output is produced from a separate SourceBackedPackage; no production behavior changed.",
+    "sha256": "c32f0f6f0983039b272c922aef65cdd9a5635cd7f5b97ca2b90a6a75e342beb1"
+  },
+  "reviewed_utc": "2026-10-07T01:29:12Z",
+  "schema": "litchi-performance-0945-source-review-v3",
+  "supersedes": {
+    "path": "/home/zhuhe/litchi-performance-0945/receipts/review-source/review-v2.json",
+    "sha256": "cd27fd9c91dc39f0d9237d3f5c369a6a77d9616032dcf38337e578c527f0098a"
+  }
+}

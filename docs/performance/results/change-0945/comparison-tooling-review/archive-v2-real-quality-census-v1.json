@@ -1,0 +1,49 @@
+{
+  "roles": {
+    "baseline": {
+      "actual_regular_file_count": 10793,
+      "declared_bytes": 263197721,
+      "declared_count": 10791,
+      "first_unsorted_inversion": [
+        "crates/litchi/tests/xlsb_facade.rs",
+        "crates/litchi-biff/Cargo.toml"
+      ],
+      "mismatches": [],
+      "missing_rows": [],
+      "quality_root": "/home/zhuhe/litchi-performance-0945/quality/baseline-source",
+      "row_bytes": 263197721,
+      "row_count": 10791,
+      "set_equal": false,
+      "unexpected_files": [
+        "docs/adr/0008-migration-and-verification.md",
+        "docs/adr/0028-iwa-monolith-exit.md"
+      ],
+      "unique_row_count": 10791,
+      "unsafe_rows": []
+    },
+    "candidate": {
+      "actual_regular_file_count": 10793,
+      "declared_bytes": 263211650,
+      "declared_count": 10791,
+      "first_unsorted_inversion": [
+        "crates/litchi/tests/xlsb_facade.rs",
+        "crates/litchi-biff/Cargo.toml"
+      ],
+      "mismatches": [],
+      "missing_rows": [],
+      "quality_root": "/home/zhuhe/litchi-performance-0945/quality/candidate-source",
+      "row_bytes": 263211650,
+      "row_count": 10791,
+      "set_equal": false,
+      "unexpected_files": [
+        "docs/adr/0008-migration-and-verification.md",
+        "docs/adr/0028-iwa-monolith-exit.md"
+      ],
+      "unique_row_count": 10791,
+      "unsafe_rows": []
+    }
+  },
+  "schema": "litchi.performance.0945.real-quality-freeze-census.v1",
+  "source": "quality/source-freeze-v1.json",
+  "status": "fail"
+}

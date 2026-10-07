@@ -1,0 +1,17 @@
+{
+  "schema": "litchi.performance.0945.moved-main-reducer-failure.v1",
+  "utc": "2026-10-07T03:05:55.023217+00:00",
+  "session_id": 3286,
+  "commands": [
+    "python3 -B tools/reduce_0945_v2.py qualification --output /home/zhuhe/litchi-performance-0945-archive/qualification-analysis-replay-v1.json",
+    "python3 -B tools/reduce_0945_v2.py all --output /home/zhuhe/litchi-performance-0945-archive/analysis-replay-v1.json"
+  ],
+  "cwd": "/home/zhuhe/litchi-performance-0945-archive/litchi-performance-0945-v1.extract/litchi-performance-0945",
+  "returncode": 1,
+  "error_suffix": "qualification/q00-baseline-native-primary-percent-medium start invocation custody",
+  "cause": "Main reducer reconstructs argv using relocated packet paths, but retained invocation paths describe original execution; main output also contains absolute folder labels.",
+  "outputs_created": false,
+  "workloads_repeated": false,
+  "source_or_plan_changed": false,
+  "supported_relocation": "Independent raw auditor validates historical commands and relative artifact descriptors; result pending separately"
+}

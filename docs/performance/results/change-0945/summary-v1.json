@@ -1,0 +1,699 @@
+{
+  "allocator": {
+    "all_row_safety_gate_pass": true,
+    "primary_every_pair_gate_pass": true,
+    "review_flags": [],
+    "rows": {
+      "control-xlsx-managed-one-edit-medium": {
+        "pairs": [
+          {
+            "ratios": {
+              "allocated_bytes": 0.9400579337101777,
+              "allocation_calls": 0.9870967741935484,
+              "live_bytes_after": 1.0000017169721909,
+              "max_rss_kib": 0.8350751468099931,
+              "region_peak_live_bytes": 0.9972666771556322
+            },
+            "repeat": 0
+          },
+          {
+            "ratios": {
+              "allocated_bytes": 0.9400579337101777,
+              "allocation_calls": 0.9870967741935484,
+              "live_bytes_after": 1.0000017169721909,
+              "max_rss_kib": 0.8681779168980663,
+              "region_peak_live_bytes": 0.9972666771556322
+            },
+            "repeat": 1
+          }
+        ],
+        "primary_every_pair_gate_pass": null,
+        "publication_allocated_bytes_pair_ratios": [
+          0.9400579337101777,
+          0.9400579337101777
+        ],
+        "safety": {
+          "allocation_calls": {
+            "accepted": true,
+            "pair_ratios": [
+              0.9870967741935484,
+              0.9870967741935484
+            ],
+            "paired_median": 0.9870967741935484
+          },
+          "live_bytes_after": {
+            "accepted": true,
+            "pair_ratios": [
+              1.0000017169721909,
+              1.0000017169721909
+            ],
+            "paired_median": 1.0000017169721909
+          },
+          "max_rss_kib": {
+            "accepted": true,
+            "pair_ratios": [
+              0.8350751468099931,
+              0.8681779168980663
+            ],
+            "paired_median": 0.8516265318540297
+          },
+          "region_peak_live_bytes": {
+            "accepted": true,
+            "pair_ratios": [
+              0.9972666771556322,
+              0.9972666771556322
+            ],
+            "paired_median": 0.9972666771556322
+          }
+        }
+      },
+      "control-xlsx-one-edit-medium": {
+        "pairs": [
+          {
+            "ratios": {
+              "allocated_bytes": 0.9400534351001815,
+              "allocation_calls": 0.987012987012987,
+              "live_bytes_after": 1.0000017170121032,
+              "max_rss_kib": 0.8746440221612386,
+              "region_peak_live_bytes": 0.9972666050894511
+            },
+            "repeat": 0
+          },
+          {
+            "ratios": {
+              "allocated_bytes": 0.9400534351001815,
+              "allocation_calls": 0.987012987012987,
+              "live_bytes_after": 1.0000017170121032,
+              "max_rss_kib": 0.823066007731076,
+              "region_peak_live_bytes": 0.9972666050894511
+            },
+            "repeat": 1
+          }
+        ],
+        "primary_every_pair_gate_pass": null,
+        "publication_allocated_bytes_pair_ratios": [
+          0.9400534351001815,
+          0.9400534351001815
+        ],
+        "safety": {
+          "allocation_calls": {
+            "accepted": true,
+            "pair_ratios": [
+              0.987012987012987,
+              0.987012987012987
+            ],
+            "paired_median": 0.987012987012987
+          },
+          "live_bytes_after": {
+            "accepted": true,
+            "pair_ratios": [
+              1.0000017170121032,
+              1.0000017170121032
+            ],
+            "paired_median": 1.0000017170121032
+          },
+          "max_rss_kib": {
+            "accepted": true,
+            "pair_ratios": [
+              0.8746440221612386,
+              0.823066007731076
+            ],
+            "paired_median": 0.8488550149461573
+          },
+          "region_peak_live_bytes": {
+            "accepted": true,
+            "pair_ratios": [
+              0.9972666050894511,
+              0.9972666050894511
+            ],
+            "paired_median": 0.9972666050894511
+          }
+        }
+      },
+      "primary-percent-dense-sparse": {
+        "pairs": [
+          {
+            "ratios": {
+              "allocated_bytes": 0.8445310398378504,
+              "allocation_calls": 0.9759615384615384,
+              "live_bytes_after": 1.0000011422341608,
+              "max_rss_kib": 0.8967632748043156,
+              "region_peak_live_bytes": 0.985761136849279
+            },
+            "repeat": 0
+          },
+          {
+            "ratios": {
+              "allocated_bytes": 0.8445310398378504,
+              "allocation_calls": 0.9759615384615384,
+              "live_bytes_after": 1.0000011422341608,
+              "max_rss_kib": 0.8979080918233122,
+              "region_peak_live_bytes": 0.985761136849279
+            },
+            "repeat": 1
+          }
+        ],
+        "primary_every_pair_gate_pass": true,
+        "publication_allocated_bytes_pair_ratios": [
+          0.8445310398378504,
+          0.8445310398378504
+        ],
+        "safety": {
+          "allocation_calls": {
+            "accepted": true,
+            "pair_ratios": [
+              0.9759615384615384,
+              0.9759615384615384
+            ],
+            "paired_median": 0.9759615384615384
+          },
+          "live_bytes_after": {
+            "accepted": true,
+            "pair_ratios": [
+              1.0000011422341608,
+              1.0000011422341608
+            ],
+            "paired_median": 1.0000011422341608
+          },
+          "max_rss_kib": {
+            "accepted": true,
+            "pair_ratios": [
+              0.8967632748043156,
+              0.8979080918233122
+            ],
+            "paired_median": 0.897335683313814
+          },
+          "region_peak_live_bytes": {
+            "accepted": true,
+            "pair_ratios": [
+              0.985761136849279,
+              0.985761136849279
+            ],
+            "paired_median": 0.985761136849279
+          }
+        }
+      },
+      "primary-percent-medium": {
+        "pairs": [
+          {
+            "ratios": {
+              "allocated_bytes": 0.9025405247842934,
+              "allocation_calls": 0.9759615384615384,
+              "live_bytes_after": 1.0000015042906418,
+              "max_rss_kib": 0.8372034956304619,
+              "region_peak_live_bytes": 0.9900311231881403
+            },
+            "repeat": 0
+          },
+          {
+            "ratios": {
+              "allocated_bytes": 0.9025405247842934,
+              "allocation_calls": 0.9759615384615384,
+              "live_bytes_after": 1.0000015042906418,
+              "max_rss_kib": 0.842367758186398,
+              "region_peak_live_bytes": 0.9900311231881403
+            },
+            "repeat": 1
+          }
+        ],
+        "primary_every_pair_gate_pass": true,
+        "publication_allocated_bytes_pair_ratios": [
+          0.9025405247842934,
+          0.9025405247842934
+        ],
+        "safety": {
+          "allocation_calls": {
+            "accepted": true,
+            "pair_ratios": [
+              0.9759615384615384,
+              0.9759615384615384
+            ],
+            "paired_median": 0.9759615384615384
+          },
+          "live_bytes_after": {
+            "accepted": true,
+            "pair_ratios": [
+              1.0000015042906418,
+              1.0000015042906418
+            ],
+            "paired_median": 1.0000015042906418
+          },
+          "max_rss_kib": {
+            "accepted": true,
+            "pair_ratios": [
+              0.8372034956304619,
+              0.842367758186398
+            ],
+            "paired_median": 0.83978562690843
+          },
+          "region_peak_live_bytes": {
+            "accepted": true,
+            "pair_ratios": [
+              0.9900311231881403,
+              0.9900311231881403
+            ],
+            "paired_median": 0.9900311231881403
+          }
+        }
+      }
+    }
+  },
+  "analysis_status": "pass",
+  "binaries": {
+    "baseline": {
+      "allocator": {
+        "binary": {
+          "bytes": 269005056,
+          "path": "binaries/baseline-allocator",
+          "sha256": "342a722d897d4cb52f945836298a9cccdf41df2b77292d618e4b8067a930973d"
+        },
+        "build_receipt": {
+          "bytes": 4712,
+          "path": "builds/baseline-allocator-v1/terminal.json",
+          "sha256": "ac1269c47ee92d43a81b2284ccbe2f0247999b5168dab92e9d8bbc45308c5518"
+        }
+      },
+      "native": {
+        "binary": {
+          "bytes": 265794648,
+          "path": "binaries/baseline-native",
+          "sha256": "63cbffd8c17299a4e2d1096e4ffa2a2d34a549cc452dfdf8ba5691b8ab7e75a3"
+        },
+        "build_receipt": {
+          "bytes": 5932,
+          "path": "receipts/baseline-native-reuse-v2.json",
+          "sha256": "303fdb714df4dd84aff8a61bdf72872024719ae58fd15e82af708a295c1ce9a8"
+        }
+      }
+    },
+    "candidate": {
+      "allocator": {
+        "binary": {
+          "bytes": 269016128,
+          "path": "target-candidate-allocator-v2/release/litchi-perf-baseline-alloc",
+          "sha256": "c19971a7e923accd822e9744382aa757d0a67d9d7ba4e47e27354e05767de713"
+        },
+        "build_receipt": {
+          "bytes": 5368,
+          "path": "builds/candidate-allocator-v2/terminal.json",
+          "sha256": "a3cb0e4a7cf6fa395618fe4ce1d3b888f04c7c559d0171743d7429e679f6a03a"
+        }
+      },
+      "native": {
+        "binary": {
+          "bytes": 265669200,
+          "path": "target-candidate-native-v2/release/litchi-perf-baseline",
+          "sha256": "087aec962f5251d1255e7a54dc188e53f9b8a722c5da95eaa1c69439caa138c8"
+        },
+        "build_receipt": {
+          "bytes": 5268,
+          "path": "builds/candidate-native-v2/terminal.json",
+          "sha256": "c321315a84c69b8202499b969a2b1bf67aad9bf10e122da04f68d55eb24c1266"
+        }
+      }
+    }
+  },
+  "generator": {
+    "bytes": 11705,
+    "path": "tools/summarize_0945_v1.py",
+    "sha256": "e1624e99c011c5d53fef158b423debdb525b2d352a867409d2fb9de924cc33b9"
+  },
+  "inputs": {
+    "analysis": {
+      "bytes": 5439340,
+      "path": "analysis.json",
+      "sha256": "1246d3644ada2a12f6f3d2c580664e51fa35aea2e892d2cd87f960f1102db840"
+    },
+    "captures": {
+      "allocator": {
+        "bytes": 106176,
+        "path": "allocator/capture.json",
+        "sha256": "fbc17088b638e25236f5eac0626312e6b76def9e841d5ffd8376a6ccc52953d9"
+      },
+      "native": {
+        "bytes": 306218,
+        "path": "native/capture.json",
+        "sha256": "788bbae3c6efb243b569be16ab1b0717821c907b8ff24111c7c42be03c36b46d"
+      },
+      "qualification": {
+        "bytes": 107903,
+        "path": "qualification/capture.json",
+        "sha256": "61796fbc2f9b261f40d2801f39dc4fd77d0b076b45ab807373292b6a544bf028"
+      }
+    },
+    "plan": {
+      "bytes": 9678,
+      "path": "plan-v2.json",
+      "sha256": "a60587fcd651dac117f4b88ed74011e8d7fbeb4856ef96f01389ae75d5352dc9"
+    }
+  },
+  "native": {
+    "all_case_latency_gate_pass": true,
+    "review_flags": [],
+    "rows": {
+      "control-xlsx-managed-one-edit-medium": {
+        "publication_p50": {
+          "bootstrap": {
+            "accepted": true,
+            "estimate": 0.998985711607812,
+            "lower_95": 0.9949933727074256,
+            "replicates": 10000,
+            "seed": 945009,
+            "statistic": "paired_median_ratio",
+            "upper_95": 1.004237881656844
+          },
+          "pair_ratios": [
+            0.9942474947203034,
+            1.0042480081561758,
+            0.9957392506945479,
+            1.0042277551575123,
+            0.9989796111069483,
+            0.9989918121086758
+          ]
+        },
+        "whole_workflow_p50": {
+          "bootstrap": {
+            "accepted": true,
+            "estimate": 1.0145592671430874,
+            "lower_95": 1.0116125414518233,
+            "replicates": 10000,
+            "seed": 945009,
+            "statistic": "paired_median_ratio",
+            "upper_95": 1.0172706473333983
+          },
+          "pair_ratios": [
+            1.0122779714124015,
+            1.0109471114912454,
+            1.014489773380706,
+            1.0146287609054692,
+            1.0149930839632508,
+            1.019548210703546
+          ]
+        }
+      },
+      "control-xlsx-one-edit-medium": {
+        "publication_p50": {
+          "bootstrap": {
+            "accepted": true,
+            "estimate": 0.9948369074720984,
+            "lower_95": 0.985041414651739,
+            "replicates": 10000,
+            "seed": 945009,
+            "statistic": "paired_median_ratio",
+            "upper_95": 1.0010810250272417
+          },
+          "pair_ratios": [
+            1.0009523157950035,
+            0.9962845142756868,
+            0.9791763493810546,
+            0.9933893006685101,
+            1.00120973425948,
+            0.9909064799224233
+          ]
+        },
+        "whole_workflow_p50": {
+          "bootstrap": {
+            "accepted": true,
+            "estimate": 1.0121402422508647,
+            "lower_95": 1.0100809741009655,
+            "replicates": 10000,
+            "seed": 945009,
+            "statistic": "paired_median_ratio",
+            "upper_95": 1.0170119342799777
+          },
+          "pair_ratios": [
+            1.0135848507044376,
+            1.0106956337972917,
+            1.010590262817751,
+            1.0178428816011391,
+            1.0161809869588163,
+            1.0095716853841803
+          ]
+        }
+      },
+      "primary-percent-dense-sparse": {
+        "publication_p50": {
+          "bootstrap": {
+            "accepted": true,
+            "estimate": 0.9992161409291535,
+            "lower_95": 0.9763882102379491,
+            "replicates": 10000,
+            "seed": 945009,
+            "statistic": "paired_median_ratio",
+            "upper_95": 1.023195948127209
+          },
+          "pair_ratios": [
+            1.0425936462355354,
+            0.9564006681091498,
+            1.0037982500188825,
+            1.0013056013191495,
+            0.9963757523667484,
+            0.9971266805391574
+          ]
+        },
+        "whole_workflow_p50": {
+          "bootstrap": {
+            "accepted": true,
+            "estimate": 1.0137079464397165,
+            "lower_95": 1.001294509731916,
+            "replicates": 10000,
+            "seed": 945009,
+            "statistic": "paired_median_ratio",
+            "upper_95": 1.0303944503047568
+          },
+          "pair_ratios": [
+            1.0335451585580762,
+            0.9928899191701949,
+            1.0144559053573539,
+            1.0272437420514375,
+            1.009699100293637,
+            1.012959987522079
+          ]
+        }
+      },
+      "primary-percent-medium": {
+        "publication_p50": {
+          "bootstrap": {
+            "accepted": true,
+            "estimate": 0.9996820483960793,
+            "lower_95": 0.9965901931523147,
+            "replicates": 10000,
+            "seed": 945009,
+            "statistic": "paired_median_ratio",
+            "upper_95": 1.0024949295377226
+          },
+          "pair_ratios": [
+            1.0035537098263372,
+            0.9991612961536046,
+            1.0002028006385542,
+            0.9958586536834554,
+            0.997321732621174,
+            1.001436149249108
+          ]
+        },
+        "whole_workflow_p50": {
+          "bootstrap": {
+            "accepted": true,
+            "estimate": 1.013536124563815,
+            "lower_95": 1.0121534645665944,
+            "replicates": 10000,
+            "seed": 945009,
+            "statistic": "paired_median_ratio",
+            "upper_95": 1.0178667373557595
+          },
+          "pair_ratios": [
+            1.0171868694719872,
+            1.0125510802936317,
+            1.0185466052395318,
+            1.0126555855658907,
+            1.011755848839557,
+            1.014416663561739
+          ]
+        }
+      }
+    }
+  },
+  "population": {
+    "children": 80,
+    "samples": 4880,
+    "stages": {
+      "allocator": {
+        "children": 16,
+        "jobs": 16,
+        "receipts": 16,
+        "samples_per_child": 3,
+        "total_samples": 48,
+        "warmup_per_child": 2
+      },
+      "native": {
+        "children": 48,
+        "jobs": 48,
+        "receipts": 48,
+        "samples_per_child": 100,
+        "total_samples": 4800,
+        "warmup_per_child": 10
+      },
+      "qualification": {
+        "children": 16,
+        "jobs": 16,
+        "receipts": 16,
+        "samples_per_child": 2,
+        "total_samples": 32,
+        "warmup_per_child": 0
+      }
+    }
+  },
+  "protocol": {
+    "allocation_gate": {
+      "individual_review_ratio_gt": 1.05,
+      "primary_bootstrap": false,
+      "primary_case_ids": [
+        "primary-percent-medium",
+        "primary-percent-dense-sparse"
+      ],
+      "primary_every_pair_ratio_max": 0.95,
+      "primary_pair_count": 2,
+      "publication_metric": "allocated_bytes",
+      "safety_metrics": [
+        "allocation_calls",
+        "region_peak_live_bytes",
+        "live_bytes_after",
+        "max_rss_kib"
+      ],
+      "safety_paired_median_ratio_max": 1.05
+    },
+    "allocator": {
+      "children": 16,
+      "repeats": 2,
+      "samples": 3,
+      "schedule": "two alternating repeats; even baseline then candidate and forward case order; odd candidate then baseline and reverse case order",
+      "warmup": 2
+    },
+    "bootstrap": {
+      "confidence_level": 0.95,
+      "lower_percentile": 2.5,
+      "replicates": 10000,
+      "seed": 945009,
+      "statistic": "paired_median_ratio",
+      "upper_percentile": 97.5
+    },
+    "latency_gate": {
+      "bootstrap_upper_95_lt": 1.05,
+      "case_ids": [
+        "primary-percent-medium",
+        "primary-percent-dense-sparse",
+        "control-xlsx-one-edit-medium",
+        "control-xlsx-managed-one-edit-medium"
+      ],
+      "metrics": [
+        "whole_workflow_p50",
+        "publication_p50"
+      ],
+      "paired_median_ratio_max": 1.05
+    },
+    "native": {
+      "blocks": 6,
+      "children": 48,
+      "samples": 100,
+      "schedule": "six alternating blocks; even baseline then candidate and forward case order; odd candidate then baseline and reverse case order",
+      "warmup": 10
+    },
+    "qualification": {
+      "children": 16,
+      "kinds": [
+        "native",
+        "allocator"
+      ],
+      "roles": [
+        "baseline",
+        "candidate"
+      ],
+      "samples": 2,
+      "warmup": 0
+    },
+    "seed": 945009
+  },
+  "quality": {
+    "quality-v2/quality-audit-final-v1.json": {
+      "descriptor": {
+        "bytes": 6496,
+        "path": "quality-v2/quality-audit-final-v1.json",
+        "sha256": "2bc4b33324aef0bdec74e2f6ec18ff5780bc911edadd644b8d18b6c66a4249ca"
+      },
+      "schema": "litchi.performance.0945-quality-audit-final.v1",
+      "status": "pass-with-retained-format-review"
+    },
+    "quality-v2/quality-inputs-v2.json": {
+      "descriptor": {
+        "bytes": 8912,
+        "path": "quality-v2/quality-inputs-v2.json",
+        "sha256": "49abd99e8f46de5529448f0d10a58a1d085abf6c4e2ddb0c4f219bb2aef54272"
+      },
+      "schema": "litchi.performance.0945-quality-v2-inputs.v1",
+      "status": "pass"
+    },
+    "quality-v2/quality-summary-followup-v1.json": {
+      "descriptor": {
+        "bytes": 56261,
+        "path": "quality-v2/quality-summary-followup-v1.json",
+        "sha256": "d797abde9cf7895d64422f830b2f49a3f47d022161989b903498081a3da6ce96"
+      },
+      "schema": "litchi.performance.0945-quality-followup-summary.v1",
+      "status": "review-failures"
+    },
+    "quality-v2/source-freeze-v2.json": {
+      "descriptor": {
+        "bytes": 10463,
+        "path": "quality-v2/source-freeze-v2.json",
+        "sha256": "eb87c42b6811c497f1e4de7453d75ecee05ae8ac19ae1386b6cdba2bd82bc331"
+      },
+      "schema": "litchi.performance.0945-quality-v2-source-freeze.v1",
+      "status": "pass"
+    },
+    "receipts/root-adoption-v1.json": {
+      "decision": "adopt",
+      "descriptor": {
+        "bytes": 1047,
+        "path": "receipts/root-adoption-v1.json",
+        "sha256": "23a7792b02c642fdcf2f36e0ec16f5fdabe6e104b6265d912737638f278d2f84"
+      },
+      "frozen_gates_pass": true,
+      "schema": "litchi.performance.0945.root-adoption.v1"
+    },
+    "receipts/root-quality-admission-v1.json": {
+      "descriptor": {
+        "bytes": 6519,
+        "path": "receipts/root-quality-admission-v1.json",
+        "sha256": "6ed3b5d85b2e9e41254911a5c6c42d5951cc2a206244916cf753f328c147cf50"
+      },
+      "schema": "litchi.performance.0945-root-quality-admission.v1",
+      "status": "admitted-with-unchanged-baseline-format-drift"
+    }
+  },
+  "schema": "litchi.performance.0945-summary.v1",
+  "scope": "bounded projection of retained 0945 analysis and stage receipts; no execution",
+  "source": {
+    "candidate_files": [
+      "crates/litchi-opc/src/source_backed.rs",
+      "crates/litchi-xlsx/src/cell_values/snapshot.rs"
+    ],
+    "checked_files": {
+      "baseline": 10788,
+      "candidate": 10788
+    },
+    "full": true,
+    "manifests": {
+      "baseline_manifest": {
+        "bytes": 2993755,
+        "path": "baseline-source-manifest.json",
+        "sha256": "c276582f412ac9c670a8b0fc3cc85ef12dc8a8705c201dd78e5584efa3a5a100"
+      },
+      "candidate_manifest": {
+        "bytes": 3048241,
+        "path": "candidate-source-manifest-v2.json",
+        "sha256": "da7128f699b4bf7a9a4745e99b99606830df1aa192ce389a0b7fe3cceb8a0994"
+      }
+    }
+  },
+  "status": "pass"
+}

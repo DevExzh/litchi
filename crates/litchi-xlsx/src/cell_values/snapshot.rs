@@ -1627,6 +1627,27 @@ fn copy_payload(bytes: &[u8], resource: &'static str) -> Result<Vec<u8>> {
     Ok(output)
 }
 
+fn try_replace_source_payload(
+    plan: &mut SourceTopologyPlan,
+    partname: PackURI,
+    payload: &SourcePayload,
+    resource: &'static str,
+) -> Result<()> {
+    // Only already-detached bytes may cross the OPC publication boundary by
+    // Arc. Keep managed and budgeted payloads on the old fallible Vec copy so
+    // their reservation and allocation behavior stays unchanged.
+    match payload {
+        SourcePayload::Owned(bytes) => plan
+            .try_replace_part_shared(partname, Arc::clone(bytes))
+            .map_err(Error::Package)?,
+        SourcePayload::Managed(_) | SourcePayload::OwnedBudgeted { .. } => {
+            plan.try_replace_part(partname, copy_payload(payload.as_bytes(), resource)?)
+                .map_err(Error::Package)?;
+        },
+    }
+    Ok(())
+}
+
 fn append_worksheet_replacement(
     plan: &mut SourceTopologyPlan,
     before: &SourceState,
@@ -1644,12 +1665,11 @@ fn append_worksheet_replacement(
         // bytes only for the `<dimension>` tag and the edited `<c>` records.
         // The replacement therefore carries the producer's own formatting,
         // which publication audits with source rules since change 0657.
-        plan.try_replace_part(
+        try_replace_source_payload(
+            plan,
             after.worksheet.uri.clone(),
-            copy_payload(
-                after.worksheet.bytes.as_bytes(),
-                "source-backed worksheet topology replacement",
-            )?,
+            &after.worksheet.bytes,
+            "source-backed worksheet topology replacement",
         )?;
     }
     Ok(())
@@ -1671,12 +1691,11 @@ fn append_owner_topology(
         // at its schema position, and copies every other byte of the workbook
         // from the source, so the replacement carries the producer's
         // formatting for the same reason the worksheet's does.
-        plan.try_replace_part(
+        try_replace_source_payload(
+            plan,
             after.workbook.uri.clone(),
-            copy_payload(
-                after.workbook.bytes.as_bytes(),
-                "source-backed workbook topology replacement",
-            )?,
+            &after.workbook.bytes,
+            "source-backed workbook topology replacement",
         )?;
     }
     match (&before.calculation_chain, &after.calculation_chain) {
@@ -2544,12 +2563,139 @@ fn relationships_match(values: &Relationships, expected: &[SourceRelationship]) 
 
 #[cfg(test)]
 mod tests {
-    use super::checked_multi_bytes;
+    use std::num::{NonZeroU64, NonZeroUsize};
+    use std::path::PathBuf;
+    use std::sync::Arc;
+
+    use litchi_core::{
+        Budget, CancellationSource, ExecutionContext, ExecutionLimits, FileSource,
+        Limits as BudgetLimits, Resource,
+    };
+    use litchi_opc::{OpcError, PackURI, ReadLimits, SourceBackedPackage, SourceTopologyPlan};
+
+    use super::{checked_multi_bytes, try_replace_source_payload};
+    use crate::error::Error;
+    use crate::source_payload::{SourcePayload, retained_budget_hold};
 
     #[test]
     fn aggregate_cap_accepts_exact_total_and_rejects_one_over() {
         assert_eq!(checked_multi_bytes(0, 4, 4).unwrap(), 4);
         assert!(checked_multi_bytes(4, 1, 4).is_err());
+    }
+
+    #[test]
+    fn topology_payload_replacement_shares_owned_and_copies_budgeted_bytes() {
+        let owned_bytes = Arc::new(b"owned replacement".to_vec());
+        let owned = SourcePayload::Owned(Arc::clone(&owned_bytes));
+        assert_eq!(Arc::strong_count(&owned_bytes), 2);
+        let mut owned_plan = SourceTopologyPlan::new();
+        try_replace_source_payload(
+            &mut owned_plan,
+            PackURI::new("/xl/workbook.xml").unwrap(),
+            &owned,
+            "owned replacement test",
+        )
+        .unwrap();
+        assert_eq!(Arc::strong_count(&owned_bytes), 3);
+        drop(owned);
+        assert_eq!(Arc::strong_count(&owned_bytes), 2);
+        drop(owned_plan);
+        assert_eq!(Arc::strong_count(&owned_bytes), 1);
+
+        let budget = Budget::root(
+            "xlsx-topology-payload-test",
+            BudgetLimits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let reservation = budget
+            .reserve(Resource::Memory, 17)
+            .expect("payload reservation");
+        let hold = retained_budget_hold(Some(reservation), None);
+        let budgeted_bytes = Arc::new(b"budgeted replacement".to_vec());
+        let budgeted = SourcePayload::owned_budgeted(Arc::clone(&budgeted_bytes), Some(hold));
+        let mut budgeted_plan = SourceTopologyPlan::new();
+        try_replace_source_payload(
+            &mut budgeted_plan,
+            PackURI::new("/xl/worksheets/sheet1.xml").unwrap(),
+            &budgeted,
+            "budgeted replacement test",
+        )
+        .unwrap();
+        assert_eq!(
+            Arc::strong_count(&budgeted_bytes),
+            2,
+            "fallback copy must not retain the source Arc"
+        );
+        drop(budgeted);
+        assert_eq!(Arc::strong_count(&budgeted_bytes), 1);
+        assert_eq!(budget.used(Resource::Memory), 0);
+        drop(budgeted_plan);
+        assert_eq!(Arc::strong_count(&budgeted_bytes), 1);
+    }
+
+    fn managed_context() -> (Budget, ExecutionContext) {
+        let budget = Budget::root(
+            "xlsx-managed-topology-payload-test",
+            BudgetLimits::new(
+                64 * 1024 * 1024,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+            ),
+        );
+        let (_cancellation_source, cancellation) = CancellationSource::pair();
+        let limits = ExecutionLimits::new(
+            NonZeroUsize::new(1).expect("one worker"),
+            NonZeroUsize::new(1).expect("one in-flight task"),
+            NonZeroU64::new(64 * 1024 * 1024).expect("in-flight bytes"),
+            0,
+        )
+        .expect("execution limits");
+        (
+            budget.clone(),
+            ExecutionContext::new(budget, cancellation, limits),
+        )
+    }
+
+    #[test]
+    fn topology_payload_replacement_copies_managed_bytes_before_plan_ownership() {
+        let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/form_control_properties/tdf134769.xlsx");
+        let (budget, context) = managed_context();
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(FileSource::open(&fixture).expect("managed fixture source")),
+            ReadLimits::default(),
+            context,
+        )
+        .expect("managed fixture package");
+        let part = package
+            .part(&PackURI::new("/xl/ctrlProps/ctrlProp1.xml").unwrap())
+            .unwrap();
+        let data = part.data().unwrap();
+        let payload = SourcePayload::Managed(data.clone());
+        let mut plan = SourceTopologyPlan::new();
+        try_replace_source_payload(
+            &mut plan,
+            PackURI::new("/xl/ctrlProps/ctrlProp1.xml").unwrap(),
+            &payload,
+            "managed replacement test",
+        )
+        .unwrap();
+        assert!(matches!(
+            payload.detached_arc(),
+            Err(Error::Package(OpcError::ManagedPartDataArcEscape))
+        ));
+
+        drop(payload);
+        drop(data);
+        drop(package);
+        assert_eq!(
+            budget.used(Resource::Memory),
+            0,
+            "the copied plan payload must not retain the managed source lease"
+        );
+        drop(plan);
     }
 }
 
@@ -3238,5 +3384,60 @@ mod row_reuse_tests {
         assert!(!commit.changed());
         assert!(commit.snapshot().shares_cell_store_with(&before));
         assert_eq!(commit.snapshot().source_xml(), before.source_xml());
+    }
+
+    #[test]
+    fn changed_publication_preserves_unrelated_parts_and_typed_values() {
+        let worksheet = scalar_fixture();
+        let original = fixture_package(&worksheet);
+        let original_workbook = original
+            .get_part(&PackURI::new(MAIN).unwrap())
+            .unwrap()
+            .blob()
+            .to_vec();
+        let original_styles = original
+            .get_part(&PackURI::new(STYLES).unwrap())
+            .unwrap()
+            .blob()
+            .to_vec();
+
+        let editor = source_backed_editor(&worksheet);
+        let mut edit = editor.edit("Sheet1").unwrap();
+        edit.set(Address::from_a1("A1").unwrap(), Number::new("42").unwrap())
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        let mut published = Vec::new();
+        editor
+            .publish_commit_to_stream(&mut published, &commit)
+            .unwrap();
+
+        let package = OpcPackage::from_bytes(&published).unwrap();
+        let published_workbook = package
+            .get_part(&PackURI::new(MAIN).unwrap())
+            .unwrap()
+            .blob();
+        let published_worksheet = package
+            .get_part(&PackURI::new(SHEET).unwrap())
+            .unwrap()
+            .blob();
+        assert_ne!(published_workbook, original_workbook.as_slice());
+        assert_ne!(published_worksheet, worksheet.as_bytes());
+        assert_eq!(
+            package
+                .get_part(&PackURI::new(STYLES).unwrap())
+                .unwrap()
+                .blob(),
+            original_styles.as_slice()
+        );
+
+        let reopened = Snapshot::load(&package, "Sheet1").unwrap();
+        assert!(matches!(
+            reopened.value(Address::from_a1("A1").unwrap()),
+            Some(Value::Number(number)) if number.as_str() == "42"
+        ));
+        assert!(matches!(
+            reopened.value(Address::from_a1("C1").unwrap()),
+            Some(Value::Bool(true))
+        ));
     }
 }

@@ -1,0 +1,42 @@
+{
+  "attempted_plan_descriptor": "/home/zhuhe/litchi-performance-0945/plan.json",
+  "case_id": "primary-percent-medium",
+  "child_name": "q00-baseline-native-primary-percent-medium",
+  "capture_session_id": 24987,
+  "capture_process_exit_code": 1,
+  "error": "plan descriptor path must be packet-relative",
+  "error_type": "CaptureError",
+  "failure_point": "run_child plan descriptor binding before start.json and subprocess launch",
+  "helper": {
+    "bytes": 40612,
+    "path": "tools/capture_0945.py",
+    "sha256": "d4fdf0553e5cd178d6a4524f213e3b700ff6166064bf30a6f0284c556b7e9dce"
+  },
+  "index": 0,
+  "kind": "native",
+  "moved_utc": "2026-10-07T02:43:27.476271+00:00",
+  "original_namespace": "qualification/q00-baseline-native-primary-percent-medium",
+  "plan": {
+    "bytes": 9669,
+    "path": "plan.json",
+    "sha256": "fec65e50a0eaaed07e3e5a0ad6c4272da76715f3a4dcf08e6566c711a733fa70"
+  },
+  "prelaunch": {
+    "build_launched": false,
+    "command_json_written": false,
+    "receipt_json_written": false,
+    "start_json_written": false,
+    "stderr_created": false,
+    "stdout_created": false,
+    "subprocess_created": false,
+    "subprocess_pid": null,
+    "terminal_json_written": false,
+    "workload_launched": false
+  },
+  "retained_namespace": "preflight/qualification-failed-v1/q00-baseline-native-primary-percent-medium",
+  "retained_namespace_entries": [],
+  "role": "baseline",
+  "schema": "litchi.performance.0945.prelaunch-failure-v1",
+  "stage": "qualification",
+  "status": "prelaunch_failed"
+}

@@ -1,0 +1,134 @@
+{
+  "checks": [
+    {
+      "id": "exact-cache-exclusions",
+      "selected_count": 8,
+      "status": "pass"
+    },
+    {
+      "expected": [
+        "target-baseline-allocator-v1/release/litchi-perf-baseline-alloc",
+        "target-candidate-allocator-v2/release/litchi-perf-baseline-alloc",
+        "target-candidate-native-v2/release/litchi-perf-baseline"
+      ],
+      "id": "all-three-allowlisted-release-files-selected",
+      "status": "pass"
+    },
+    {
+      "id": "nested-target-names-preserved",
+      "paths": [
+        "target-unlisted-top/keep.bin",
+        "crates/example/source/fuzz/target-corpus/input.bin",
+        "crates/example/source/target-generated/keep.bin",
+        "quality-v2/candidate-source/crates/fuzz/target-samples/case.bin"
+      ],
+      "status": "pass"
+    },
+    {
+      "id": "unlisted-target-top-level-preserved",
+      "status": "pass"
+    },
+    {
+      "error": "symlink encountered under source root: /home/zhuhe/litchi-performance-0945-archive/archive-0945-controls-xopg_pk7/fake-source/symlink-file",
+      "id": "symlink-file-rejected",
+      "status": "pass"
+    },
+    {
+      "error": "symlink encountered under source root: /home/zhuhe/litchi-performance-0945-archive/archive-0945-controls-xopg_pk7/fake-source/symlink-directory",
+      "id": "symlink-directory-rejected",
+      "status": "pass"
+    },
+    {
+      "error": "expected regular file: /home/zhuhe/litchi-performance-0945-archive/archive-0945-controls-xopg_pk7/fake-source/control.json",
+      "id": "missing-frozen-control-rejected",
+      "status": "pass"
+    },
+    {
+      "error": "frozen control hash changed: control.json",
+      "id": "mismatched-frozen-control-rejected",
+      "status": "pass"
+    },
+    {
+      "error": "bound binary descriptor is pending: /home/zhuhe/litchi-performance-0945-archive/archive-0945-controls-xopg_pk7/fake-work/binary-descriptor.json",
+      "id": "missing-binary-descriptor-rejected",
+      "status": "pass"
+    },
+    {
+      "id": "complete-binary-descriptor-accepted",
+      "status": "pass"
+    },
+    {
+      "error": "bound binary size changed: binaries/baseline-allocator",
+      "id": "mismatched-binary-rejected",
+      "status": "pass"
+    },
+    {
+      "error": "source manifest path missing from selection: ordinary.txt",
+      "id": "missing-source-manifest-selection-rejected",
+      "status": "pass"
+    },
+    {
+      "error": "source manifest row differs from selected source: ordinary.txt",
+      "id": "mismatched-source-manifest-selection-rejected",
+      "status": "pass"
+    },
+    {
+      "error": "fake-quality copy changed: q/candidate-source/fixture.bin",
+      "id": "mismatched-quality-input-copy-rejected",
+      "status": "pass"
+    },
+    {
+      "error": "refusing removal outside source root: /home/zhuhe/litchi-performance-0945-archive/archive-0945-controls-xopg_pk7/outside.txt",
+      "id": "cleanup-outside-source-rejected",
+      "status": "pass"
+    },
+    {
+      "id": "fake-cleanup-exact-and-contained",
+      "removed_count": 11,
+      "removed_paths": [
+        "quality-v2/target-baseline",
+        "quality-v2/target-baseline/discard.bin",
+        "quality-v2/target-candidate",
+        "quality-v2/target-candidate/discard.bin",
+        "quality/target-baseline",
+        "quality/target-baseline/discard.bin",
+        "quality/target-candidate",
+        "quality/target-candidate/discard.bin",
+        "target-baseline-allocator-v1/discard.bin",
+        "target-candidate-allocator-v2/discard.bin",
+        "target-candidate-native-v2/discard.bin"
+      ],
+      "status": "pass"
+    }
+  ],
+  "command_scope": {
+    "fake_source_root": "/home/zhuhe/litchi-performance-0945-archive/archive-0945-controls-xopg_pk7/fake-source",
+    "fake_tree_removed_after_tests": true,
+    "real_archive_invoked": false,
+    "real_cleanup_invoked": false,
+    "real_verify_invoked": false
+  },
+  "controls": [
+    "exact top-level cache exclusions",
+    "all three allowlisted release files",
+    "nested source/fuzz target-* preservation",
+    "file and directory symlink rejection",
+    "cleanup containment",
+    "missing and mismatched frozen controls",
+    "missing/mismatched binary descriptor",
+    "missing/mismatched source manifest selection",
+    "mismatched quality input copy"
+  ],
+  "created_utc": "2026-10-07T02:19:51.043597Z",
+  "errors": [],
+  "frozen_script": {
+    "bytes": 49882,
+    "expected_sha256": "a61c6140b83f5fd1cd72453940eba8bfbec8f40f7195242f9f0c65c3b3774296",
+    "path": "/home/zhuhe/litchi-performance-0945/archive-0945-v1.py",
+    "sha256_after": "a61c6140b83f5fd1cd72453940eba8bfbec8f40f7195242f9f0c65c3b3774296",
+    "sha256_before": "a61c6140b83f5fd1cd72453940eba8bfbec8f40f7195242f9f0c65c3b3774296"
+  },
+  "regeneration_command": "/usr/bin/python3 -B /home/zhuhe/litchi-performance-0945/comparison-tooling-review/archive-0945-controls-v1.py",
+  "schema": "litchi.performance.0945.archive-controls-review.v1",
+  "status": "pass"
+}

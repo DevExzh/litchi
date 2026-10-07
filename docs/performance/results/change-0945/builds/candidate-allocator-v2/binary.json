@@ -1,0 +1,21 @@
+{
+  "binary": {
+    "bytes": 269016128,
+    "executable": true,
+    "mode": 509,
+    "path": "target-candidate-allocator-v2/release/litchi-perf-baseline-alloc",
+    "sha256": "c19971a7e923accd822e9744382aa757d0a67d9d7ba4e47e27354e05767de713",
+    "status": "present",
+    "terminal_receipt": "builds/candidate-allocator-v2/terminal.json",
+    "terminal_sha256": "a3cb0e4a7cf6fa395618fe4ce1d3b888f04c7c559d0171743d7429e679f6a03a"
+  },
+  "build_terminal": {
+    "bytes": 5368,
+    "executable": false,
+    "mode": 436,
+    "path": "builds/candidate-allocator-v2/terminal.json",
+    "sha256": "a3cb0e4a7cf6fa395618fe4ce1d3b888f04c7c559d0171743d7429e679f6a03a"
+  },
+  "schema": "litchi.performance.0945.candidate-allocator-binary-receipt-v2",
+  "source_commit": "e037befa6ce52b3988c8ae2032ae652196f2a09d"
+}

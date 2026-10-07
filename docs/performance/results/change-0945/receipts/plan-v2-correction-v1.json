@@ -1,0 +1,149 @@
+{
+  "build_launched": false,
+  "changed_plan_sections": [
+    "helpers.capture",
+    "helpers.reducer",
+    "helpers.freeze"
+  ],
+  "corrected_helpers": {
+    "capture": {
+      "bytes": 40791,
+      "executable": false,
+      "mode": 436,
+      "path": "tools/capture_0945_v2.py",
+      "sha256": "1662654f7f410e1a87093a461745bf0da102bf8f965802c93cfeef3bb93c8d13"
+    },
+    "freeze": {
+      "bytes": 13130,
+      "executable": false,
+      "mode": 436,
+      "path": "tools/freeze_0945_v2.py",
+      "sha256": "4d271a96f8d8d199acae285a50623a8a2e37ae7561b794148e3960c2c80210aa"
+    },
+    "reducer": {
+      "bytes": 84352,
+      "executable": false,
+      "mode": 436,
+      "path": "tools/reduce_0945_v2.py",
+      "sha256": "c11326da83dddf78b610cad921ede12bc7c1154d55f0ae55ceb085bea140cf3b"
+    }
+  },
+  "created_utc": "2026-10-07T02:46:06.873792+00:00",
+  "descriptor_fixes": [
+    {
+      "binding": "plan-v2.json packet-relative descriptor",
+      "path": "tools/capture_0945_v2.py",
+      "sites": [
+        "run_child plan custody",
+        "stage_capture plan custody"
+      ]
+    },
+    {
+      "binding": "plan-v2.json packet-relative descriptor",
+      "path": "tools/reduce_0945_v2.py",
+      "sites": [
+        "leaf_review plan custody",
+        "capture_review plan custody"
+      ]
+    },
+    {
+      "binding": "tools/capture_0945_v2.py packet-relative descriptor",
+      "path": "tools/reduce_0945_v2.py",
+      "sites": [
+        "leaf_review capture-helper custody",
+        "capture_review capture-helper custody"
+      ]
+    }
+  ],
+  "new_plan": {
+    "bytes": 9678,
+    "executable": false,
+    "mode": 436,
+    "path": "plan-v2.json",
+    "sha256": "a60587fcd651dac117f4b88ed74011e8d7fbeb4856ef96f01389ae75d5352dc9"
+  },
+  "old_plan": {
+    "bytes": 9669,
+    "executable": false,
+    "mode": 436,
+    "path": "plan.json",
+    "sha256": "fec65e50a0eaaed07e3e5a0ad6c4272da76715f3a4dcf08e6566c711a733fa70"
+  },
+  "prelaunch_failure_namespace": "preflight/qualification-failed-v1/q00-baseline-native-primary-percent-medium",
+  "prelaunch_failure_namespace_entries": [],
+  "prelaunch_failure_receipt": {
+    "bytes": 1526,
+    "executable": false,
+    "mode": 436,
+    "path": "preflight/qualification-failed-v1/prelaunch-failure.json",
+    "sha256": "be35e4e2df92c01912c28a4a8182a11e28077287813097e09bd48ada72b70a0d"
+  },
+  "preserved_old_helpers": {
+    "bytes": 422,
+    "executable": false,
+    "mode": 436,
+    "path": "tools/snapshots/pre-plan-v2-descriptor-fix-v1/SHA256SUMS",
+    "sha256": "f502c73f37644bc27ec912cc8017fda4a6665157bb7eb44df4d57e3f1d1ac17b"
+  },
+  "preserved_old_plan": {
+    "bytes": 9669,
+    "executable": false,
+    "mode": 436,
+    "path": "tools/snapshots/pre-plan-v2-descriptor-fix-v1/plan.json",
+    "sha256": "fec65e50a0eaaed07e3e5a0ad6c4272da76715f3a4dcf08e6566c711a733fa70"
+  },
+  "schema": "litchi.performance.0945.plan-v2-correction-v1",
+  "status": "ready-no-launch",
+  "unchanged_helpers": {
+    "method": {
+      "bytes": 3705,
+      "executable": false,
+      "mode": 436,
+      "path": "METHOD.md",
+      "sha256": "556ef3d65468fc0ea8a26550cfee1d024ad03d51ab1d7eb39507c07cac2b22d3"
+    },
+    "reuse_binder": {
+      "bytes": 11757,
+      "executable": true,
+      "mode": 493,
+      "path": "tools/bind_baseline_native_reuse_v2.py",
+      "sha256": "241b0e0cd8db01cf294ad7186acf93fcee647bb96725eaa9dd313b558ec648c5"
+    },
+    "reuse_validator": {
+      "bytes": 25764,
+      "executable": false,
+      "mode": 436,
+      "path": "tools/reuse_v2.py",
+      "sha256": "3f0f28d2426b787242e2e9894ff29b9bf669e06b9fd1987c78f7019cb4dcd9ed"
+    },
+    "semantic": {
+      "bytes": 33177,
+      "executable": false,
+      "mode": 436,
+      "path": "tools/semantic_0705.py",
+      "sha256": "567c7ad1eecc4c93d51615076088809b38c5498a4f29ac929a1661bf9fd265dc"
+    }
+  },
+  "unchanged_plan_sections": [
+    "protocol_revision",
+    "cases",
+    "qualification",
+    "native",
+    "allocator",
+    "cpu",
+    "environment",
+    "resource",
+    "gate",
+    "semantic_gates",
+    "source",
+    "roles",
+    "build_revisions",
+    "build_binding_ids",
+    "workload_cwd"
+  ],
+  "validation_commands": [
+    "PYTHONDONTWRITEBYTECODE=1 python3 -B -m py_compile tools/capture_0945_v2.py tools/reduce_0945_v2.py tools/freeze_0945_v2.py",
+    "PYTHONDONTWRITEBYTECODE=1 python3 -B tools/capture_0945_v2.py check"
+  ],
+  "workload_launched": false
+}

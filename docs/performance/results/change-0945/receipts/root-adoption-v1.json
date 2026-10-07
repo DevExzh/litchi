@@ -1,0 +1,24 @@
+{
+  "schema": "litchi.performance.0945.root-adoption.v1",
+  "utc": "2026-10-07T02:54:35.657269+00:00",
+  "decision": "adopt",
+  "files": [
+    {
+      "path": "crates/litchi-opc/src/source_backed.rs",
+      "bytes": 942148,
+      "sha256": "5e0cf3451e70784ff76896b0b2dc93b4409b15db9ef7c88535cc6a20885f8c43"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+      "bytes": 134510,
+      "sha256": "fff0da0fd3fe86824ba6a84531ad81d8499ebff0e73c824e4c16bf53d77129a5"
+    }
+  ],
+  "main_analysis_sha256": "1246d3644ada2a12f6f3d2c580664e51fa35aea2e892d2cd87f960f1102db840",
+  "independent_audit_sha256": "bac99015cf4ea57ea2b285be8c0481c4d3048f91f4caa98a81e49f631320378e",
+  "frozen_gates_pass": true,
+  "native_review_flags": [],
+  "allocator_review_flags": [],
+  "quality": "root-quality-admission-v1.json",
+  "limitation": "Whole-workflow p50 increases 1.21\u20131.46 percent across four rows; within frozen 5 percent gate. Allocation claim is publication requested bytes, not physical copy volume or general RSS saving."
+}
