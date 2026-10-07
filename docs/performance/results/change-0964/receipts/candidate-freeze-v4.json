@@ -1,0 +1,50 @@
+{
+  "baseline_manifest": {
+    "bytes": 2267944,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0964/source-manifest-baseline-v2.json",
+    "sha256": "74d3ead27a1518093be3f80fbe50cfa1280526e08957b1774dbc6fd891bc4eda"
+  },
+  "build_or_workload_launched": false,
+  "candidate_manifest": {
+    "bytes": 2268238,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0964/source-manifest-candidate-v4.json",
+    "sha256": "19e4bdf18aee484ade90067a98ec6ab0ff5f6d017105840df4030f697f25779b"
+  },
+  "candidate_template": {
+    "bytes": 2268268,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0964/source-manifest-candidate-v3.json",
+    "sha256": "e5590834456ba28868b3a92ba7e654c6d11d828e47a49ddbdac10fc25d8294d2"
+  },
+  "changed_paths": [
+    "crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs",
+    "crates/litchi-xlsx/src/cell_values/validation.rs",
+    "crates/litchi-xlsx/src/cell_values/validation_borrow_tests.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/codec.rs"
+  ],
+  "created_utc": "2026-10-07T21:05:51.621920Z",
+  "production_paths": [
+    "crates/litchi-xlsx/src/cell_values/validation.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/codec.rs"
+  ],
+  "quality_and_root_go_required_before_build": true,
+  "schema": "litchi.performance.0964.candidate-freeze.v1",
+  "source_count": 10933,
+  "source_roots": {
+    "baseline": "/home/zhuhe/litchi-performance-0964/source-baseline",
+    "candidate": "/home/zhuhe/litchi-performance-0964/source-candidate"
+  },
+  "status": "pass",
+  "test_allowlist": {
+    "bytes": 682,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0964/protocol/candidate-test-allowlist-v2.json",
+    "sha256": "bc86e54656e2b2f5c9cb8a1ee79b94a7f296aa4bce283c98ffbfe6a64fc14190"
+  },
+  "test_paths": [
+    "crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs",
+    "crates/litchi-xlsx/src/cell_values/validation_borrow_tests.rs"
+  ]
+}

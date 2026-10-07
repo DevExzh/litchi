@@ -1,5 +1,19 @@
 # Performance hotspot inventory
 
+## 0964 — direct event transport screen rejected; ingress tail is separate
+
+[0964](0964-xlsx-direct-event-transport-trial.md) tests the current-source
+`NsReader` transport hypothesis with a direct `Reader` and borrowed namespace
+resolver. The valid epoch-2 screen shows descriptive total-p50 ratios of
+0.933596, 0.928109, and 0.931374 for medium one-percent, dense-sparse
+one-percent, and medium one-edit. The screen has no confidence intervals, so
+these are not statistical-effect estimates. Ingress-p99 safety medians are
+1.111553 and 1.107516 for the two medium cases, exceeding the 1.05 bound;
+the candidate is rejected. Allocator calls, bytes, and live peaks remain at
+1.0, and RSS is near 1.0. Any future ingress-tail investigation is a new
+hypothesis with fresh controls; the safety gate must not be relaxed, and
+ordinary/fallback/malformed-input controls remain required.
+
 ## 0963 — omission census narrows the readback opportunity
 
 [0963](0963-xlsx-readback-fusion-disposition.md) confirms 4/4/1 reduced-readback

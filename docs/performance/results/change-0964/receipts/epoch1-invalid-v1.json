@@ -1,0 +1,34 @@
+{
+  "status": "invalid_screen",
+  "created_utc": "2026-10-07T21:41:19.784526+00:00",
+  "reason": "Launch affinity witness races taskset startup and fails frozen exact affinity gate. No ratios or performance decision computed; all epoch1 measurements excluded.",
+  "reduction": {
+    "argv": [
+      "python3",
+      "/home/zhuhe/litchi-performance-0964/tools/reduce_0964_v1.py",
+      "--plan",
+      "/home/zhuhe/litchi-performance-0964/protocol/plan-final-v1.json",
+      "--native-packet",
+      "/home/zhuhe/litchi-performance-0964/capture-native-v1",
+      "--allocator-packet",
+      "/home/zhuhe/litchi-performance-0964/capture-allocator-v1",
+      "--output",
+      "/home/zhuhe/litchi-performance-0964/analysis/screen-v1.json"
+    ],
+    "returncode": 2,
+    "stderr": "reduce_0964_v1: native__medium-one-percent__b00__p0 affinity changed"
+  },
+  "affinity_counts": [
+    {
+      "lane": "native",
+      "children": 36,
+      "matching_affinity": 0
+    },
+    {
+      "lane": "allocator",
+      "children": 18,
+      "matching_affinity": 0
+    }
+  ],
+  "disposition": "Preserve entire failed epoch. Correct launcher and independently predeclare separate complete epoch; no child replacements or relaxed criteria."
+}

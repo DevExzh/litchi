@@ -1,0 +1,28 @@
+{
+  "status": "passed",
+  "mapping": "canonical-v1",
+  "binding": {
+    "plan": {
+      "path": "/home/zhuhe/litchi-performance-0964/protocol/plan-final-epoch2-v1.json",
+      "bytes": 59570,
+      "mode": 436,
+      "executable": false,
+      "sha256": "dcfabed26427c6a117b41c2e4b6209baec40afe06c218054b2187ae9c49b0a64"
+    },
+    "runner": {
+      "path": "/home/zhuhe/litchi-performance-0964/tools/screen_0964_v2.py",
+      "bytes": 43659,
+      "mode": 493,
+      "executable": true,
+      "sha256": "7a3ac47c744c34cadf852557a44e7645ca36a1c72cc45e7d2350438cfcb8fab9"
+    },
+    "reducer": {
+      "path": "/home/zhuhe/litchi-performance-0964/tools/reduce_0964_v1.py",
+      "bytes": 31282,
+      "mode": 509,
+      "executable": true,
+      "sha256": "8162ed82a9fba22a405ac5b6946dc2a93e76f66ab7ffe881c5d4c897b177397b"
+    }
+  },
+  "capture_preflight": "passed"
+}

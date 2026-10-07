@@ -1,0 +1,272 @@
+{
+  "generated_at_utc": "2026-10-07T21:14:39.336579+00:00",
+  "inputs": {
+    "baseline_0957_ordinary": {
+      "build_id": "ea4820fa68469c6a2f8985f38873d4e07c05101d",
+      "bytes": 43259328,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+      "sha256": "5886b0f86a697bae757994d5a757cffae4a7e8d61a2769ff1c967029cd1912c3"
+    },
+    "candidate_0964": {
+      "build_id": "ea4820fa68469c6a2f8985f38873d4e07c05101d",
+      "bytes": 43259328,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+      "sha256": "5886b0f86a697bae757994d5a757cffae4a7e8d61a2769ff1c967029cd1912c3"
+    }
+  },
+  "interpretation": {
+    "direct_process_event_and_resolve_event_edges": "candidate must have zero direct calls in both changed callers",
+    "global_other_nsreader_calls": "reported separately because unrelated NsReader users are expected",
+    "namespace_semantic_work": "requires separate source review; this assembly check does not infer removal from named-call absence",
+    "resolver_push_and_prefix": "raw named-call counts are reported; missing named calls are inconclusive because the compiler may inline them"
+  },
+  "observations": {
+    "baseline": {
+      "functions": {
+        "validate_xml": {
+          "call_counts": {
+            "process_event": 1,
+            "resolve_event": 1,
+            "resolver_push": 0,
+            "resolver_resolve_prefix": 0
+          },
+          "calls": {
+            "process_event": [
+              {
+                "address": "0x3eddf0",
+                "instruction": "3eddf0:\tcall   1842b0 <quick_xml::reader::ns_reader::NsReader<R>::process_event>",
+                "offset": "0x280"
+              }
+            ],
+            "resolve_event": [
+              {
+                "address": "0x3ede78",
+                "instruction": "3ede78:\tcall   66a030 <quick_xml::name::NamespaceResolver::resolve_event>",
+                "offset": "0x308"
+              }
+            ],
+            "resolver_push": [],
+            "resolver_resolve_prefix": []
+          },
+          "size": 1644,
+          "start": "0x3edb70",
+          "stop_exclusive": "0x3ee1dc",
+          "symbol": "litchi_xlsx::cell_values::validation::validate_xml"
+        },
+        "worksheet_xml_and_parse_source": {
+          "call_counts": {
+            "process_event": 1,
+            "resolve_event": 1,
+            "resolver_push": 0,
+            "resolver_resolve_prefix": 1
+          },
+          "calls": {
+            "process_event": [
+              {
+                "address": "0x4b190b",
+                "instruction": "4b190b:\tcall   1842b0 <quick_xml::reader::ns_reader::NsReader<R>::process_event>",
+                "offset": "0x159b"
+              }
+            ],
+            "resolve_event": [
+              {
+                "address": "0x4b19a4",
+                "instruction": "4b19a4:\tcall   66a030 <quick_xml::name::NamespaceResolver::resolve_event>",
+                "offset": "0x1634"
+              }
+            ],
+            "resolver_push": [],
+            "resolver_resolve_prefix": [
+              {
+                "address": "0x4b1dc6",
+                "instruction": "4b1dc6:\tcall   66a250 <quick_xml::name::NamespaceResolver::resolve_prefix>",
+                "offset": "0x1a56"
+              }
+            ]
+          },
+          "size": 11890,
+          "start": "0x4b0370",
+          "stop_exclusive": "0x4b31e2",
+          "symbol": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source"
+        }
+      },
+      "reference_symbol_presence": {
+        "process_event": [
+          "quick_xml::reader::ns_reader::NsReader<R>::process_event"
+        ],
+        "resolve_event": [
+          "quick_xml::name::NamespaceResolver::resolve_event"
+        ],
+        "resolver_push": [
+          "quick_xml::name::NamespaceResolver::push"
+        ],
+        "resolver_resolve_prefix": [
+          "quick_xml::name::NamespaceResolver::resolve_prefix"
+        ]
+      }
+    },
+    "candidate": {
+      "functions": {
+        "validate_xml": {
+          "call_counts": {
+            "process_event": 1,
+            "resolve_event": 1,
+            "resolver_push": 0,
+            "resolver_resolve_prefix": 0
+          },
+          "calls": {
+            "process_event": [
+              {
+                "address": "0x3eddf0",
+                "instruction": "3eddf0:\tcall   1842b0 <quick_xml::reader::ns_reader::NsReader<R>::process_event>",
+                "offset": "0x280"
+              }
+            ],
+            "resolve_event": [
+              {
+                "address": "0x3ede78",
+                "instruction": "3ede78:\tcall   66a030 <quick_xml::name::NamespaceResolver::resolve_event>",
+                "offset": "0x308"
+              }
+            ],
+            "resolver_push": [],
+            "resolver_resolve_prefix": []
+          },
+          "size": 1644,
+          "start": "0x3edb70",
+          "stop_exclusive": "0x3ee1dc",
+          "symbol": "litchi_xlsx::cell_values::validation::validate_xml"
+        },
+        "worksheet_xml_and_parse_source": {
+          "call_counts": {
+            "process_event": 1,
+            "resolve_event": 1,
+            "resolver_push": 0,
+            "resolver_resolve_prefix": 1
+          },
+          "calls": {
+            "process_event": [
+              {
+                "address": "0x4b190b",
+                "instruction": "4b190b:\tcall   1842b0 <quick_xml::reader::ns_reader::NsReader<R>::process_event>",
+                "offset": "0x159b"
+              }
+            ],
+            "resolve_event": [
+              {
+                "address": "0x4b19a4",
+                "instruction": "4b19a4:\tcall   66a030 <quick_xml::name::NamespaceResolver::resolve_event>",
+                "offset": "0x1634"
+              }
+            ],
+            "resolver_push": [],
+            "resolver_resolve_prefix": [
+              {
+                "address": "0x4b1dc6",
+                "instruction": "4b1dc6:\tcall   66a250 <quick_xml::name::NamespaceResolver::resolve_prefix>",
+                "offset": "0x1a56"
+              }
+            ]
+          },
+          "size": 11890,
+          "start": "0x4b0370",
+          "stop_exclusive": "0x4b31e2",
+          "symbol": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source"
+        }
+      },
+      "reference_symbol_presence": {
+        "process_event": [
+          "quick_xml::reader::ns_reader::NsReader<R>::process_event"
+        ],
+        "resolve_event": [
+          "quick_xml::name::NamespaceResolver::resolve_event"
+        ],
+        "resolver_push": [
+          "quick_xml::name::NamespaceResolver::push"
+        ],
+        "resolver_resolve_prefix": [
+          "quick_xml::name::NamespaceResolver::resolve_prefix"
+        ]
+      }
+    },
+    "changed_caller_edge_checks": {
+      "validate_xml": {
+        "baseline": {
+          "process_event": 1,
+          "resolve_event": 1,
+          "resolver_push": 0,
+          "resolver_resolve_prefix": 0
+        },
+        "candidate": {
+          "process_event": 1,
+          "resolve_event": 1,
+          "resolver_push": 0,
+          "resolver_resolve_prefix": 0
+        },
+        "delta_candidate_minus_baseline": {
+          "process_event": 0,
+          "resolve_event": 0,
+          "resolver_push": 0,
+          "resolver_resolve_prefix": 0
+        },
+        "direct_process_event_disappeared": false,
+        "direct_resolve_event_disappeared": false,
+        "resolver_push_assembly_observation": "not_observed_may_be_inlined",
+        "resolver_push_named_edge": false,
+        "resolver_resolve_prefix_assembly_observation": "not_observed_may_be_inlined",
+        "resolver_resolve_prefix_named_edge": false
+      },
+      "worksheet_xml_and_parse_source": {
+        "baseline": {
+          "process_event": 1,
+          "resolve_event": 1,
+          "resolver_push": 0,
+          "resolver_resolve_prefix": 1
+        },
+        "candidate": {
+          "process_event": 1,
+          "resolve_event": 1,
+          "resolver_push": 0,
+          "resolver_resolve_prefix": 1
+        },
+        "delta_candidate_minus_baseline": {
+          "process_event": 0,
+          "resolve_event": 0,
+          "resolver_push": 0,
+          "resolver_resolve_prefix": 0
+        },
+        "direct_process_event_disappeared": false,
+        "direct_resolve_event_disappeared": false,
+        "resolver_push_assembly_observation": "not_observed_may_be_inlined",
+        "resolver_push_named_edge": false,
+        "resolver_resolve_prefix_assembly_observation": "observed_named_call",
+        "resolver_resolve_prefix_named_edge": true
+      }
+    }
+  },
+  "schema": "litchi.performance.0964.codegen-check.v1",
+  "scope": {
+    "builds_source": false,
+    "disassembly_scope": "two exact nm function ranges plus streaming global edge scan",
+    "performance_claim": false,
+    "read_only": true,
+    "runs_workload": false
+  },
+  "status": "failed",
+  "tool": {
+    "argv": [
+      "python3",
+      "--baseline",
+      "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+      "--candidate",
+      "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+      "--output",
+      "/home/zhuhe/litchi-performance-0964/review/codegen-identical-binary-control-v1.json",
+      "--no-global-scan"
+    ],
+    "path": "/home/zhuhe/litchi-performance-0964/tools/check_codegen_v1.py",
+    "sha256": "3220faf429ec5f84fb19f8c8a43cd5d4e4183dfde74ed0925e8ed39c52c40743"
+  }
+}

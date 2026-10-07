@@ -1,0 +1,44 @@
+{
+  "schema": "litchi.performance.0964.root-screening-rule.v1",
+  "scope": "Descriptive candidate selection only; screening cannot authorize adoption or a qualified effect claim.",
+  "native_primary_metrics": [
+    "edit_commit_ns.p50",
+    "edit_commit_ns.p95",
+    "total_ns.p50",
+    "total_ns.p95"
+  ],
+  "native_tail_metrics": [
+    "ingress_ns.p99",
+    "edit_commit_ns.p99",
+    "publication_ns.p99",
+    "commit_drop_ns.p99",
+    "total_ns.p99"
+  ],
+  "signal_metrics": [
+    "native primary median",
+    "native max_rss_kib median",
+    "allocator region_peak_live_bytes median"
+  ],
+  "signal_threshold": 0.95,
+  "safety_review_threshold": 1.05,
+  "signal_comparator": "candidate_over_baseline <= threshold",
+  "safety_comparator": "candidate_over_baseline > threshold",
+  "required_pair_counts": {
+    "native": 6,
+    "allocator": 3
+  },
+  "stop_conditions": [
+    "Any invalid or undefined required metric, custody, terminal, report, semantic, output, inverse, resource, allocator, or control result",
+    "Any native primary, native p99 tail, or native max_rss_kib median > 1.05",
+    "Any allocator region_peak_live_bytes or max_rss_kib median > 1.05",
+    "No qualifying signal metric"
+  ],
+  "allocation_calls_or_requested_bytes_alone": "Do not qualify as a signal or adoption claim.",
+  "equality_boundaries": {
+    "signal_0_95": "qualifies when all other gates pass",
+    "safety_1_05": "does not stop; only values strictly greater stop"
+  },
+  "decision_if_no_stop": "Require independent full confirmation and regression review; never adopt from screening.",
+  "no_retry": true,
+  "screening_adoption_allowed": false
+}

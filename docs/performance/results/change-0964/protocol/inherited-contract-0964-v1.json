@@ -1,0 +1,1528 @@
+{
+  "cases": [
+    {
+      "case_id": "medium-one-percent",
+      "context_limits": {
+        "depth": 256,
+        "execution_in_flight_bytes": 2956761,
+        "execution_in_flight_tasks": 1,
+        "execution_min_parallel_bytes": 0,
+        "execution_min_task_bytes": 0,
+        "execution_workers": 1,
+        "input_bytes": 67108864,
+        "memory": 2956761,
+        "objects": 1000000,
+        "output_bytes": 8519112,
+        "root_cpu_tasks": 5,
+        "root_io_concurrency": 1,
+        "root_workers": 1,
+        "work": 1000000000
+      },
+      "expected_cpu_tasks": 5,
+      "expected_worker_permits": 0,
+      "output_bytes": 4226788,
+      "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+      "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+      "shape": "medium",
+      "source_bytes": 4226429,
+      "source_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+      "update_count": 93,
+      "workload": "one-percent"
+    },
+    {
+      "case_id": "dense-sparse-one-percent",
+      "context_limits": {
+        "depth": 256,
+        "execution_in_flight_bytes": 3196436,
+        "execution_in_flight_tasks": 1,
+        "execution_min_parallel_bytes": 0,
+        "execution_min_task_bytes": 0,
+        "execution_workers": 1,
+        "input_bytes": 67108864,
+        "memory": 3196436,
+        "objects": 1000000,
+        "output_bytes": 8570408,
+        "root_cpu_tasks": 5,
+        "root_io_concurrency": 1,
+        "root_workers": 1,
+        "work": 1000000000
+      },
+      "expected_cpu_tasks": 5,
+      "expected_worker_permits": 0,
+      "output_bytes": 4252436,
+      "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+      "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+      "shape": "dense-sparse",
+      "source_bytes": 4251863,
+      "source_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+      "update_count": 178,
+      "workload": "one-percent"
+    },
+    {
+      "case_id": "medium-one-edit",
+      "context_limits": {
+        "depth": 256,
+        "execution_in_flight_bytes": 2751297,
+        "execution_in_flight_tasks": 1,
+        "execution_min_parallel_bytes": 0,
+        "execution_min_task_bytes": 0,
+        "execution_workers": 1,
+        "input_bytes": 67108864,
+        "memory": 2751297,
+        "objects": 1000000,
+        "output_bytes": 8518496,
+        "root_cpu_tasks": 2,
+        "root_io_concurrency": 1,
+        "root_workers": 1,
+        "work": 1000000000
+      },
+      "expected_cpu_tasks": 2,
+      "expected_worker_permits": 0,
+      "output_bytes": 4226480,
+      "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+      "semantic_sha256": "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+      "shape": "medium",
+      "source_bytes": 4226429,
+      "source_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+      "update_count": 1,
+      "workload": "one-edit"
+    }
+  ],
+  "comparison": {
+    "allocator_blocks": [
+      {
+        "id": 0,
+        "order": [
+          "A",
+          "B"
+        ]
+      },
+      {
+        "id": 1,
+        "order": [
+          "B",
+          "A"
+        ]
+      },
+      {
+        "id": 2,
+        "order": [
+          "A",
+          "B"
+        ]
+      }
+    ],
+    "allocator_repeats_per_role": 3,
+    "allocator_statistic": "descriptive median of three paired screening repeats",
+    "block_count": 3,
+    "blocks": [
+      {
+        "id": 0,
+        "order": [
+          "A",
+          "B",
+          "B",
+          "A"
+        ]
+      },
+      {
+        "id": 1,
+        "order": [
+          "B",
+          "A",
+          "A",
+          "B"
+        ]
+      },
+      {
+        "id": 2,
+        "order": [
+          "A",
+          "B",
+          "B",
+          "A"
+        ]
+      }
+    ],
+    "full_followup_required": true,
+    "id": "baseline-vs-0964-candidate",
+    "native_statistic": "descriptive median of six paired screening legs",
+    "pairing": "adjacent A/B or B/A within each frozen block; native and allocator lanes never pair",
+    "pairs_per_case_allocator": 3,
+    "pairs_per_case_native": 6,
+    "role_A": "retained 0957 baseline executable",
+    "role_B": "0964 raw-reader and NamespaceResolver transport candidate executable",
+    "screening_only": true,
+    "workers": 1
+  },
+  "lanes": {
+    "allocator": {
+      "baseline_binary": {
+        "bytes": 43676872,
+        "executable": true,
+        "mode": 509,
+        "path": "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_alloc.v2",
+        "sha256": "9ba37a6b9796ad0e316e7571ebe117ba7a5f97bcf5d29153c7cb3d74c485e9a5"
+      },
+      "candidate_binary": {
+        "bytes": 43669696,
+        "executable": true,
+        "mode": 509,
+        "path": "/home/zhuhe/litchi-performance-0964/executables/xlsx_managed_compression_alloc.v1",
+        "sha256": "3ad5573d6b7cb26a13d238a313c31100812da70edf7a06331ef8b7ef573b23ef"
+      },
+      "candidate_receipt": {
+        "bytes": 1354,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0964/receipts/candidate-managed-v1-build-result.json",
+        "sha256": "7eff6a6fb29d9378f81730ffd87f627d147bfe09e2559ef2e353bfa45d32069f"
+      },
+      "child_count": 18,
+      "children": [
+        {
+          "binary_role": "baseline",
+          "block": 0,
+          "case_id": "medium-one-percent",
+          "child_id": "allocator__medium-one-percent__b00__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 0,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 0,
+          "case_id": "medium-one-percent",
+          "child_id": "allocator__medium-one-percent__b00__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 1,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 1,
+          "case_id": "medium-one-percent",
+          "child_id": "allocator__medium-one-percent__b01__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 0,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 1,
+          "case_id": "medium-one-percent",
+          "child_id": "allocator__medium-one-percent__b01__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 1,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 2,
+          "case_id": "medium-one-percent",
+          "child_id": "allocator__medium-one-percent__b02__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 0,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 2,
+          "case_id": "medium-one-percent",
+          "child_id": "allocator__medium-one-percent__b02__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 1,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 0,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "allocator__dense-sparse-one-percent__b00__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 0,
+          "role": "A",
+          "shape": "dense-sparse",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 0,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "allocator__dense-sparse-one-percent__b00__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 1,
+          "role": "B",
+          "shape": "dense-sparse",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 1,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "allocator__dense-sparse-one-percent__b01__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 0,
+          "role": "B",
+          "shape": "dense-sparse",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 1,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "allocator__dense-sparse-one-percent__b01__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 1,
+          "role": "A",
+          "shape": "dense-sparse",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 2,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "allocator__dense-sparse-one-percent__b02__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 0,
+          "role": "A",
+          "shape": "dense-sparse",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 2,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "allocator__dense-sparse-one-percent__b02__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 1,
+          "role": "B",
+          "shape": "dense-sparse",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 0,
+          "case_id": "medium-one-edit",
+          "child_id": "allocator__medium-one-edit__b00__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 0,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 0,
+          "case_id": "medium-one-edit",
+          "child_id": "allocator__medium-one-edit__b00__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 1,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 1,
+          "case_id": "medium-one-edit",
+          "child_id": "allocator__medium-one-edit__b01__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 0,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 1,
+          "case_id": "medium-one-edit",
+          "child_id": "allocator__medium-one-edit__b01__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 1,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 2,
+          "case_id": "medium-one-edit",
+          "child_id": "allocator__medium-one-edit__b02__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 0,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 2,
+          "case_id": "medium-one-edit",
+          "child_id": "allocator__medium-one-edit__b02__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 1,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-edit"
+        }
+      ],
+      "execution": {
+        "argv_template": [
+          "/usr/bin/taskset",
+          "--cpu-list",
+          "12-15",
+          "<BINARY>",
+          "--shape",
+          "<SHAPE>",
+          "--workload",
+          "<WORKLOAD>",
+          "--workers",
+          "1",
+          "--warmup",
+          "2",
+          "--samples",
+          "10",
+          "--output",
+          "<OUTPUT>"
+        ],
+        "cpu_mask": [
+          12,
+          13,
+          14,
+          15
+        ],
+        "deadline_seconds": 900,
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin",
+          "RUST_BACKTRACE": "0",
+          "TZ": "UTC",
+          "approval_variable": "LITCHI_PERF_0964_CAPTURE_APPROVED"
+        },
+        "max_parallel_children": 1,
+        "retry_or_replacement": false,
+        "taskset_path": "/usr/bin/taskset",
+        "terminal_before_parse": true,
+        "time_argv_prefix": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "time-v.txt",
+          "--"
+        ],
+        "time_path": "/usr/bin/time",
+        "workload_cwd": "/home/zhuhe/litchi-performance-0964/source-baseline/tools/perf-baseline"
+      },
+      "measured_samples": 10,
+      "report_schema": "litchi.xlsx-managed-compression-allocation.v1",
+      "warmup_iterations": 2
+    },
+    "native": {
+      "baseline_binary": {
+        "bytes": 43259328,
+        "executable": true,
+        "mode": 509,
+        "path": "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+        "sha256": "5886b0f86a697bae757994d5a757cffae4a7e8d61a2769ff1c967029cd1912c3"
+      },
+      "candidate_binary": {
+        "bytes": 43245840,
+        "executable": true,
+        "mode": 509,
+        "path": "/home/zhuhe/litchi-performance-0964/executables/xlsx_managed_compression_benchmark.v1",
+        "sha256": "2a9712593fe9e4ef682fa4d6ad4fe0bec528259b0342340f8215a49f3f2c3bed"
+      },
+      "candidate_receipt": {
+        "bytes": 1354,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0964/receipts/candidate-managed-v1-build-result.json",
+        "sha256": "7eff6a6fb29d9378f81730ffd87f627d147bfe09e2559ef2e353bfa45d32069f"
+      },
+      "child_count": 36,
+      "children": [
+        {
+          "binary_role": "baseline",
+          "block": 0,
+          "case_id": "medium-one-percent",
+          "child_id": "native__medium-one-percent__b00__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 0,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 0,
+          "case_id": "medium-one-percent",
+          "child_id": "native__medium-one-percent__b00__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 1,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 0,
+          "case_id": "medium-one-percent",
+          "child_id": "native__medium-one-percent__b00__p2",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 2,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 0,
+          "case_id": "medium-one-percent",
+          "child_id": "native__medium-one-percent__b00__p3",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 3,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 1,
+          "case_id": "medium-one-percent",
+          "child_id": "native__medium-one-percent__b01__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 0,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 1,
+          "case_id": "medium-one-percent",
+          "child_id": "native__medium-one-percent__b01__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 1,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 1,
+          "case_id": "medium-one-percent",
+          "child_id": "native__medium-one-percent__b01__p2",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 2,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 1,
+          "case_id": "medium-one-percent",
+          "child_id": "native__medium-one-percent__b01__p3",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 3,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 2,
+          "case_id": "medium-one-percent",
+          "child_id": "native__medium-one-percent__b02__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 0,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 2,
+          "case_id": "medium-one-percent",
+          "child_id": "native__medium-one-percent__b02__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 1,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 2,
+          "case_id": "medium-one-percent",
+          "child_id": "native__medium-one-percent__b02__p2",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 2,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 2,
+          "case_id": "medium-one-percent",
+          "child_id": "native__medium-one-percent__b02__p3",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 3,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 0,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "native__dense-sparse-one-percent__b00__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 0,
+          "role": "A",
+          "shape": "dense-sparse",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 0,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "native__dense-sparse-one-percent__b00__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 1,
+          "role": "B",
+          "shape": "dense-sparse",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 0,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "native__dense-sparse-one-percent__b00__p2",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 2,
+          "role": "B",
+          "shape": "dense-sparse",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 0,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "native__dense-sparse-one-percent__b00__p3",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 3,
+          "role": "A",
+          "shape": "dense-sparse",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 1,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "native__dense-sparse-one-percent__b01__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 0,
+          "role": "B",
+          "shape": "dense-sparse",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 1,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "native__dense-sparse-one-percent__b01__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 1,
+          "role": "A",
+          "shape": "dense-sparse",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 1,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "native__dense-sparse-one-percent__b01__p2",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 2,
+          "role": "A",
+          "shape": "dense-sparse",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 1,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "native__dense-sparse-one-percent__b01__p3",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 3,
+          "role": "B",
+          "shape": "dense-sparse",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 2,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "native__dense-sparse-one-percent__b02__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 0,
+          "role": "A",
+          "shape": "dense-sparse",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 2,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "native__dense-sparse-one-percent__b02__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 1,
+          "role": "B",
+          "shape": "dense-sparse",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 2,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "native__dense-sparse-one-percent__b02__p2",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 2,
+          "role": "B",
+          "shape": "dense-sparse",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 2,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "native__dense-sparse-one-percent__b02__p3",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 3,
+          "role": "A",
+          "shape": "dense-sparse",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 0,
+          "case_id": "medium-one-edit",
+          "child_id": "native__medium-one-edit__b00__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 0,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 0,
+          "case_id": "medium-one-edit",
+          "child_id": "native__medium-one-edit__b00__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 1,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 0,
+          "case_id": "medium-one-edit",
+          "child_id": "native__medium-one-edit__b00__p2",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 2,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 0,
+          "case_id": "medium-one-edit",
+          "child_id": "native__medium-one-edit__b00__p3",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 3,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 1,
+          "case_id": "medium-one-edit",
+          "child_id": "native__medium-one-edit__b01__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 0,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 1,
+          "case_id": "medium-one-edit",
+          "child_id": "native__medium-one-edit__b01__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 1,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 1,
+          "case_id": "medium-one-edit",
+          "child_id": "native__medium-one-edit__b01__p2",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 2,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 1,
+          "case_id": "medium-one-edit",
+          "child_id": "native__medium-one-edit__b01__p3",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 3,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 2,
+          "case_id": "medium-one-edit",
+          "child_id": "native__medium-one-edit__b02__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 0,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 2,
+          "case_id": "medium-one-edit",
+          "child_id": "native__medium-one-edit__b02__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 1,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 2,
+          "case_id": "medium-one-edit",
+          "child_id": "native__medium-one-edit__b02__p2",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 2,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 2,
+          "case_id": "medium-one-edit",
+          "child_id": "native__medium-one-edit__b02__p3",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 3,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-edit"
+        }
+      ],
+      "execution": {
+        "argv_template": [
+          "/usr/bin/taskset",
+          "--cpu-list",
+          "12-15",
+          "<BINARY>",
+          "--shape",
+          "<SHAPE>",
+          "--workload",
+          "<WORKLOAD>",
+          "--workers",
+          "1",
+          "--warmup",
+          "10",
+          "--samples",
+          "60",
+          "--output",
+          "<OUTPUT>"
+        ],
+        "cpu_mask": [
+          12,
+          13,
+          14,
+          15
+        ],
+        "deadline_seconds": 900,
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin",
+          "RUST_BACKTRACE": "0",
+          "TZ": "UTC",
+          "approval_variable": "LITCHI_PERF_0964_CAPTURE_APPROVED"
+        },
+        "max_parallel_children": 1,
+        "retry_or_replacement": false,
+        "taskset_path": "/usr/bin/taskset",
+        "terminal_before_parse": true,
+        "time_argv_prefix": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "time-v.txt",
+          "--"
+        ],
+        "time_path": "/usr/bin/time",
+        "workload_cwd": "/home/zhuhe/litchi-performance-0964/source-baseline/tools/perf-baseline"
+      },
+      "measured_samples": 60,
+      "report_schema": "litchi.xlsx-managed-compression-benchmark.v1",
+      "warmup_iterations": 10
+    }
+  },
+  "report_contract": {
+    "allocator": {
+      "allocation_scope": "global system-allocator callbacks serialized by allocation_metrics; process-wide across threads; observer peaks are not RSS, unique heap, per-thread bytes, OS-thread counts, or timing",
+      "allocator_identity": "CountingSystemAllocator(std::alloc::System)",
+      "case_identity_fields": [
+        "shape",
+        "workload",
+        "workers",
+        "warmup_iterations",
+        "measured_samples"
+      ],
+      "counter_revision": "serialized_region_peak_v3",
+      "instrumentation_identity": "system_allocator_operation_scoped",
+      "measured_samples": 10,
+      "performance_claim": "none; allocator counters do not claim latency, throughput, RSS, OS-thread width, worker/task overlap, speedup, or adoption; procfs Threads values are quiescence observations only",
+      "raw_sample_count": 10,
+      "resource_field": "resources_after_core",
+      "root_identity_fields": [],
+      "sample_phase_fields": [
+        "setup",
+        "ingress",
+        "edit_commit",
+        "publication",
+        "commit_drop",
+        "worker_drain",
+        "core_combined",
+        "core_combined_with_drain",
+        "postdrop"
+      ],
+      "schema": "litchi.xlsx-managed-compression-allocation.v1",
+      "scope": "process-wide serialized allocator regions with exact phase conservation; no latency or adoption claim",
+      "warmup_count": 2,
+      "warmup_iterations": 2
+    },
+    "cleanup_resources": [
+      "memory",
+      "workers",
+      "io_concurrency",
+      "objects"
+    ],
+    "native": {
+      "measured_samples": 60,
+      "performance_claim": "none; raw phase timings describe this explicit in-memory harness and do not claim OS thread counts, speedup, allocation behavior, or physical I/O",
+      "raw_sample_count": 60,
+      "resource_field": "resources_after_drop",
+      "root_identity_fields": [
+        "shape",
+        "workload",
+        "workers",
+        "warmup_iterations",
+        "measured_samples"
+      ],
+      "sample_phase_fields": [
+        "ingress_ns",
+        "edit_commit_ns",
+        "publication_ns",
+        "commit_drop_ns",
+        "total_ns"
+      ],
+      "schema": "litchi.xlsx-managed-compression-benchmark.v1",
+      "scope": "timed in-memory phase report with source/output/semantic/resource oracles outside timers",
+      "warmup_count": 10,
+      "warmup_iterations": 10
+    },
+    "shared_oracles": [
+      "source_bytes",
+      "source_sha256",
+      "output_bytes",
+      "output_sha256",
+      "semantic_sha256",
+      "update_count",
+      "expected_cpu_tasks",
+      "context_limits",
+      "sink_capacity_bytes",
+      "sink_max_write_bytes",
+      "preflight_actual_commit_inverse_verified",
+      "fixture_inverse_restored_exact_source"
+    ],
+    "sink_max_write_bytes": 65536
+  }
+}

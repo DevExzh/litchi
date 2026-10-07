@@ -1,0 +1,39 @@
+{
+  "schema": "litchi.performance.0964.quality-final.v1",
+  "created_utc": "2026-10-07T21:17:43.277197+00:00",
+  "status": "pass",
+  "coder_receipt": {
+    "path": "/home/zhuhe/litchi-performance-0964/receipts/quality-0964-coder-v1.json",
+    "bytes": 17134,
+    "mode": 436,
+    "sha256": "0b0673cbbe676104840f4c218236ac1ed187cf0712f7c2d79ead5d361907ac70"
+  },
+  "boundary_audit": {
+    "command": [
+      "python3",
+      "tools/check_crate_boundaries.py"
+    ],
+    "cwd": "/home/zhuhe/litchi-performance-0964/source-candidate",
+    "exit_code": 0,
+    "log": {
+      "path": "/home/zhuhe/litchi-performance-0964/receipts/crate-boundaries.log",
+      "bytes": 565,
+      "mode": 436,
+      "sha256": "9e0e2ab2ac2ef6b534622708ed674217fb34b69d81a73eb96caa3d7dfd0bedc1"
+    }
+  },
+  "fixture_cleanup": {
+    "path": "/home/zhuhe/litchi-performance-0964/receipts/quality-overlay-cleanup-v1.json",
+    "bytes": 2700,
+    "mode": 436,
+    "sha256": "8f08775f3b9cbd9ba39ff2952c80f8abcc343dc6551e6185669ce6a7156a3e1b"
+  },
+  "candidate_freeze": {
+    "path": "/home/zhuhe/litchi-performance-0964/receipts/candidate-freeze-v4.json",
+    "bytes": 1924,
+    "mode": 436,
+    "sha256": "4f1df545ee500b404596a90068dba815f96cb810b315658798f6793a2fdc4335"
+  },
+  "source_verified_after_quality": true,
+  "scope": "XLSX default/all-features unit and integration, all-targets check and warning-denied Clippy, rustdoc, scoped format, full repository boundary audit; historical failed attempts retained."
+}

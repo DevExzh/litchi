@@ -1,0 +1,515 @@
+{
+  "schema": "litchi.performance.0964.quality-coder.v1",
+  "status": "passed_with_retained_failed_attempts",
+  "created_utc": "2026-10-07T21:16:51.647549+00:00",
+  "source_root": "/home/zhuhe/litchi-performance-0964/source-candidate",
+  "target_dir": "/home/zhuhe/litchi-performance-0964/target-quality",
+  "source_commit": "93d32552d98586f42822b2dc9bbec7c8ef6cafc9",
+  "candidate_freeze": {
+    "path": "/home/zhuhe/litchi-performance-0964/receipts/candidate-freeze-v4.json",
+    "bytes": 1924,
+    "sha256": "4f1df545ee500b404596a90068dba815f96cb810b315658798f6793a2fdc4335"
+  },
+  "source_hashes": [
+    {
+      "path": "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+      "bytes": 69731,
+      "sha256": "0ed7754f2b6ebb9eb16fcdb9896d0383c471709af2579770138936147e6bebaa"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/cell_values/validation.rs",
+      "bytes": 26138,
+      "sha256": "f588cd2b1983c96df3d58a07c21ba5b4c14a57e776e35d5ac152159d788cb39e"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs",
+      "bytes": 42507,
+      "sha256": "5f367d65230a167c8d10b2ff6ef248aba72a55cd6a589eb4e1202aaec0caaa08"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/cell_values/validation_borrow_tests.rs",
+      "bytes": 32898,
+      "sha256": "3fb105f2397b7b4d1f048bb1b5c84e628b18cb4aef8d7508c025424064d7b62e"
+    }
+  ],
+  "commands": [
+    {
+      "name": "focused-validation-initial-code-compile",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-xlsx",
+        "cell_values::validation",
+        "--locked",
+        "--offline",
+        "-j2",
+        "--no-fail-fast"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0964/source-candidate",
+      "target_dir": "/home/zhuhe/litchi-performance-0964/target-quality",
+      "exit_status": 101,
+      "status": "failed",
+      "log": {
+        "path": "/home/zhuhe/litchi-performance-0964/receipts/focused-validation-test.log",
+        "bytes": 7027,
+        "sha256": "b3de7017d435df816821951589b76a80d777e622cd01b788fe699a20805d99ad"
+      },
+      "test_counts": null,
+      "failure": "Candidate compile errors: unused NsReader import, grouped Start/Empty/End binding type mismatch, and unnecessary qualification in the new oracle test."
+    },
+    {
+      "name": "focused-validation-missing-fixture",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-xlsx",
+        "cell_values::validation",
+        "--locked",
+        "--offline",
+        "-j2",
+        "--no-fail-fast"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0964/source-candidate",
+      "target_dir": "/home/zhuhe/litchi-performance-0964/target-quality",
+      "exit_status": 101,
+      "status": "failed",
+      "log": {
+        "path": "/home/zhuhe/litchi-performance-0964/receipts/focused-validation-test-r2.log",
+        "bytes": 1283,
+        "sha256": "04a00f7d247833e8f3e7779f34caf0c260e27f6c772e24fdacfcc39bf8edd8ed"
+      },
+      "test_counts": null,
+      "failure": "Test-target compilation could not read the absent temporary LibreOffice fixture tdf169496_hidden_graphic.xlsx."
+    },
+    {
+      "name": "focused-validation-lib-pass",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-xlsx",
+        "--lib",
+        "cell_values::validation",
+        "--locked",
+        "--offline",
+        "-j2",
+        "--no-fail-fast"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0964/source-candidate",
+      "target_dir": "/home/zhuhe/litchi-performance-0964/target-quality",
+      "exit_status": 0,
+      "status": "passed",
+      "log": {
+        "path": "/home/zhuhe/litchi-performance-0964/receipts/focused-validation-lib-test.log",
+        "bytes": 4849,
+        "sha256": "182f7d2d001a330d289773f408035ffc3be78167573effc2061ffe91565d030f"
+      },
+      "test_counts": {
+        "result_lines": 1,
+        "passed": 33,
+        "failed": 0,
+        "ignored": 0
+      },
+      "note": "Library-only focused run after source fixes; no external test fixtures required."
+    },
+    {
+      "name": "focused-validation-lib-pass-final",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-xlsx",
+        "--lib",
+        "cell_values::validation",
+        "--locked",
+        "--offline",
+        "-j2",
+        "--no-fail-fast"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0964/source-candidate",
+      "target_dir": "/home/zhuhe/litchi-performance-0964/target-quality",
+      "exit_status": 0,
+      "status": "passed",
+      "log": {
+        "path": "/home/zhuhe/litchi-performance-0964/receipts/focused-validation-lib-test-r3.log",
+        "bytes": 4155,
+        "sha256": "dd09b89af7e9a70f1093c56c71a2a330ce89bf251550628c972202896003e9e1"
+      },
+      "test_counts": {
+        "result_lines": 1,
+        "passed": 33,
+        "failed": 0,
+        "ignored": 0
+      },
+      "note": "Final focused receipt retained after the source stabilized."
+    },
+    {
+      "name": "full-xlsx-library-tests",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-xlsx",
+        "--lib",
+        "--locked",
+        "--offline",
+        "-j2",
+        "--no-fail-fast"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0964/source-candidate",
+      "target_dir": "/home/zhuhe/litchi-performance-0964/target-quality",
+      "exit_status": 0,
+      "status": "passed",
+      "log": {
+        "path": "/home/zhuhe/litchi-performance-0964/receipts/full-xlsx-lib-test.log",
+        "bytes": 133388,
+        "sha256": "016d1ef2e6d75a9cdda70ab25fc88353ea9f0b27e2d48a732d14b7f779c0907e"
+      },
+      "test_counts": {
+        "result_lines": 1,
+        "passed": 1400,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "name": "xlsx-check-lib-all-features",
+      "argv": [
+        "cargo",
+        "check",
+        "-p",
+        "litchi-xlsx",
+        "--lib",
+        "--all-features",
+        "--locked",
+        "--offline",
+        "-j2"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0964/source-candidate",
+      "target_dir": "/home/zhuhe/litchi-performance-0964/target-quality",
+      "exit_status": 0,
+      "status": "passed",
+      "log": {
+        "path": "/home/zhuhe/litchi-performance-0964/receipts/xlsx-check-lib-all-features.log",
+        "bytes": 5179,
+        "sha256": "0daa7a550427555b25310fb09c2a4814d055040b1f84d550403ac1a4ae95f382"
+      },
+      "test_counts": null
+    },
+    {
+      "name": "xlsx-clippy-lib-all-features",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "litchi-xlsx",
+        "--lib",
+        "--all-features",
+        "--no-deps",
+        "--locked",
+        "--offline",
+        "-j2",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0964/source-candidate",
+      "target_dir": "/home/zhuhe/litchi-performance-0964/target-quality",
+      "exit_status": 0,
+      "status": "passed",
+      "log": {
+        "path": "/home/zhuhe/litchi-performance-0964/receipts/xlsx-clippy-lib-all-features.log",
+        "bytes": 1867,
+        "sha256": "721699217933006e0cbfa59f090796da809cfd47f6dd3ec611a7cddbeadd0e22"
+      },
+      "test_counts": null
+    },
+    {
+      "name": "xlsx-rustdoc",
+      "argv": [
+        "cargo",
+        "doc",
+        "-p",
+        "litchi-xlsx",
+        "--no-deps",
+        "--locked",
+        "--offline",
+        "-j2"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0964/source-candidate",
+      "target_dir": "/home/zhuhe/litchi-performance-0964/target-quality",
+      "exit_status": 0,
+      "status": "passed",
+      "log": {
+        "path": "/home/zhuhe/litchi-performance-0964/receipts/xlsx-doc.log",
+        "bytes": 1887,
+        "sha256": "a37c810a95755b4c27c7bfb2a4e678297a34b8992671c4b6620d46edc5b8d243"
+      },
+      "test_counts": null,
+      "environment": {
+        "RUSTDOCFLAGS": "-D warnings"
+      }
+    },
+    {
+      "name": "scoped-rustfmt-check",
+      "argv": [
+        "rustfmt",
+        "--edition",
+        "2024",
+        "--check",
+        "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+        "crates/litchi-xlsx/src/cell_values/validation.rs",
+        "crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs",
+        "crates/litchi-xlsx/src/cell_values/validation_borrow_tests.rs"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0964/source-candidate",
+      "target_dir": "/home/zhuhe/litchi-performance-0964/target-quality",
+      "exit_status": 0,
+      "status": "passed",
+      "log": {
+        "path": "/home/zhuhe/litchi-performance-0964/receipts/scoped-rustfmt-check.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "test_counts": null,
+      "note": "Scoped to the four candidate source/test files; cargo fmt --all side effects on unrelated files were restored before freeze."
+    },
+    {
+      "name": "xlsx-check-all-targets-missing-fixture",
+      "argv": [
+        "cargo",
+        "check",
+        "-p",
+        "litchi-xlsx",
+        "--all-targets",
+        "--all-features",
+        "--locked",
+        "--offline",
+        "-j2"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0964/source-candidate",
+      "target_dir": "/home/zhuhe/litchi-performance-0964/target-quality",
+      "exit_status": 101,
+      "status": "failed",
+      "log": {
+        "path": "/home/zhuhe/litchi-performance-0964/receipts/xlsx-check-all-targets-attempt.log",
+        "bytes": 695,
+        "sha256": "4a93eb5a21b5bb8f54a67654b5afedd3ce3809fde4a0377fc0b1c2a1d4120229"
+      },
+      "test_counts": null,
+      "failure": "Could not read absent tdf169496_hidden_graphic.xlsx; retained before the exact temporary quality overlay."
+    },
+    {
+      "name": "xlsx-check-all-targets-overlay",
+      "argv": [
+        "cargo",
+        "check",
+        "-p",
+        "litchi-xlsx",
+        "--all-targets",
+        "--all-features",
+        "--locked",
+        "--offline",
+        "-j2"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0964/source-candidate",
+      "target_dir": "/home/zhuhe/litchi-performance-0964/target-quality",
+      "exit_status": 0,
+      "status": "passed",
+      "log": {
+        "path": "/home/zhuhe/litchi-performance-0964/receipts/xlsx-check-all-targets-overlay.log",
+        "bytes": 178,
+        "sha256": "f241d723e79c74890c60512dcf5877bd4b41c089e248651df02f250cec9224bb"
+      },
+      "test_counts": null
+    },
+    {
+      "name": "xlsx-clippy-all-targets-missing-fixture",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "litchi-xlsx",
+        "--all-targets",
+        "--all-features",
+        "--no-deps",
+        "--locked",
+        "--offline",
+        "-j2",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0964/source-candidate",
+      "target_dir": "/home/zhuhe/litchi-performance-0964/target-quality",
+      "exit_status": 101,
+      "status": "failed",
+      "log": {
+        "path": "/home/zhuhe/litchi-performance-0964/receipts/xlsx-clippy-all-targets-attempt.log",
+        "bytes": 824,
+        "sha256": "63cd3d02c9ad1b004576fee6bfcb9730e361c3fbf0e15411bc9bc98ba52060ae"
+      },
+      "test_counts": null,
+      "failure": "Could not read absent docs/report/spec-gap-validation-evidence/xlsx-form-control-properties/native-corpus.json; retained before the exact temporary quality overlay."
+    },
+    {
+      "name": "xlsx-clippy-all-targets-overlay",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "litchi-xlsx",
+        "--all-targets",
+        "--all-features",
+        "--no-deps",
+        "--locked",
+        "--offline",
+        "-j2",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0964/source-candidate",
+      "target_dir": "/home/zhuhe/litchi-performance-0964/target-quality",
+      "exit_status": 0,
+      "status": "passed",
+      "log": {
+        "path": "/home/zhuhe/litchi-performance-0964/receipts/xlsx-clippy-all-targets-overlay.log",
+        "bytes": 178,
+        "sha256": "0603d71153e3eaaf0a97fac1ffa69b1fcb614f291fd380b7e64437690ae4fec0"
+      },
+      "test_counts": null
+    },
+    {
+      "name": "xlsx-tests-all-features",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-xlsx",
+        "--tests",
+        "--all-features",
+        "--locked",
+        "--offline",
+        "-j2",
+        "--no-fail-fast"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0964/source-candidate",
+      "target_dir": "/home/zhuhe/litchi-performance-0964/target-quality",
+      "exit_status": 0,
+      "status": "passed",
+      "log": {
+        "path": "/home/zhuhe/litchi-performance-0964/receipts/xlsx-integration-tests-overlay.log",
+        "bytes": 212850,
+        "sha256": "4f080806ac9206283be4776c880d53e7ebf3bf993171e4d9c83fdb1f965e3fd8"
+      },
+      "test_counts": {
+        "result_lines": 78,
+        "passed": 2139,
+        "failed": 0,
+        "ignored": 0,
+        "result_groups": 78
+      },
+      "note": "The --tests invocation includes 1407 library/unit tests plus 732 integration tests."
+    },
+    {
+      "name": "xlsx-integration-tests-star",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-xlsx",
+        "--test",
+        "*",
+        "--all-features",
+        "--locked",
+        "--offline",
+        "-j2",
+        "--no-fail-fast"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0964/source-candidate",
+      "target_dir": "/home/zhuhe/litchi-performance-0964/target-quality",
+      "exit_status": 0,
+      "status": "passed",
+      "log": {
+        "path": "/home/zhuhe/litchi-performance-0964/receipts/xlsx-integration-tests-star-overlay.log",
+        "bytes": 76227,
+        "sha256": "feca168de965fb0377171b675dc9f2d6e492912703ce32cefe130d21ab468548"
+      },
+      "test_counts": {
+        "result_lines": 77,
+        "passed": 732,
+        "failed": 0,
+        "ignored": 0,
+        "result_groups": 77
+      },
+      "note": "Integration-only form requested for the final quality gate."
+    }
+  ],
+  "failed_attempts_retained": [
+    {
+      "name": "focused-validation-initial-code-compile",
+      "exit_status": 101,
+      "failure": "Candidate compile errors: unused NsReader import, grouped Start/Empty/End binding type mismatch, and unnecessary qualification in the new oracle test.",
+      "log": {
+        "path": "/home/zhuhe/litchi-performance-0964/receipts/focused-validation-test.log",
+        "bytes": 7027,
+        "sha256": "b3de7017d435df816821951589b76a80d777e622cd01b788fe699a20805d99ad"
+      }
+    },
+    {
+      "name": "focused-validation-missing-fixture",
+      "exit_status": 101,
+      "failure": "Test-target compilation could not read the absent temporary LibreOffice fixture tdf169496_hidden_graphic.xlsx.",
+      "log": {
+        "path": "/home/zhuhe/litchi-performance-0964/receipts/focused-validation-test-r2.log",
+        "bytes": 1283,
+        "sha256": "04a00f7d247833e8f3e7779f34caf0c260e27f6c772e24fdacfcc39bf8edd8ed"
+      }
+    },
+    {
+      "name": "xlsx-check-all-targets-missing-fixture",
+      "exit_status": 101,
+      "failure": "Could not read absent tdf169496_hidden_graphic.xlsx; retained before the exact temporary quality overlay.",
+      "log": {
+        "path": "/home/zhuhe/litchi-performance-0964/receipts/xlsx-check-all-targets-attempt.log",
+        "bytes": 695,
+        "sha256": "4a93eb5a21b5bb8f54a67654b5afedd3ce3809fde4a0377fc0b1c2a1d4120229"
+      }
+    },
+    {
+      "name": "xlsx-clippy-all-targets-missing-fixture",
+      "exit_status": 101,
+      "failure": "Could not read absent docs/report/spec-gap-validation-evidence/xlsx-form-control-properties/native-corpus.json; retained before the exact temporary quality overlay.",
+      "log": {
+        "path": "/home/zhuhe/litchi-performance-0964/receipts/xlsx-clippy-all-targets-attempt.log",
+        "bytes": 824,
+        "sha256": "63cd3d02c9ad1b004576fee6bfcb9730e361c3fbf0e15411bc9bc98ba52060ae"
+      }
+    }
+  ],
+  "quality_fixture_overlay": {
+    "path": "/home/zhuhe/litchi-performance-0964/receipts/quality-fixture-overlay-v1.json",
+    "bytes": 2622,
+    "sha256": "583ccfd29e39fac85048403cbf0dfb481d22c14de19c2d52946ac5d628deef69",
+    "status": "retained_for_root_guarded_cleanup",
+    "created_files": 7,
+    "preexisting_identical_files": 2
+  },
+  "boundary_audit": {
+    "owner": "root",
+    "status": "pending_root_terminal_receipt",
+    "log": "/home/zhuhe/litchi-performance-0964/receipts/crate-boundaries.log"
+  },
+  "performance": {
+    "build_launched": false,
+    "workload_launched": false
+  },
+  "notes": [
+    "Production change is limited to direct Reader plus NamespaceResolver transport in parse_source_with_observer and validate_xml; validator authority and all fallback/error/resource semantics remain enabled.",
+    "No root checkout edits or git commit were made by this coder receipt.",
+    "All quality commands used locked offline Cargo resolution and external target output; no performance workload was run."
+  ]
+}

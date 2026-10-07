@@ -1,0 +1,21 @@
+{
+  "schema": "litchi.performance.0964.candidate-test-allowlist.v3",
+  "status": "bound_to_current_candidate_source_snapshot",
+  "source_manifest": {
+    "path": "/home/zhuhe/litchi-performance-0964/source-manifest-candidate-v4.json",
+    "bytes": 2268238,
+    "sha256": "19e4bdf18aee484ade90067a98ec6ab0ff5f6d017105840df4030f697f25779b"
+  },
+  "paths": [
+    "crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs",
+    "crates/litchi-xlsx/src/cell_values/validation_borrow_tests.rs"
+  ],
+  "production_paths_are_separate": true,
+  "note": "Rebinds the unchanged explicit test paths to the final v4 candidate manifest after quality. Freeze v4 retains its historical v2 allowlist reference; source bytes and allowed paths are unchanged by this metadata update.",
+  "created_utc": "2026-10-07T21:23:36.830502+00:00",
+  "supersedes": {
+    "path": "/home/zhuhe/litchi-performance-0964/protocol/candidate-test-allowlist-v2.json",
+    "bytes": 682,
+    "sha256": "bc86e54656e2b2f5c9cb8a1ee79b94a7f296aa4bce283c98ffbfe6a64fc14190"
+  }
+}

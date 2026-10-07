@@ -1,0 +1,13 @@
+{
+  "schema": "litchi.performance.0964.codegen-negative-control.v1",
+  "created_utc": "2026-10-07T21:26:28.342397+00:00",
+  "status": "pass",
+  "expected_checker_exit_code": 1,
+  "observed_checker_exit_code": 1,
+  "result": {
+    "path": "/home/zhuhe/litchi-performance-0964/review/codegen-identical-binary-control-v1.json",
+    "bytes": 9638,
+    "sha256": "8e693dd27514f66732989088bc4805e85290ceb58f4bdd5397910efce6f25364"
+  },
+  "interpretation": "Identical retained baseline binaries preserve both wrapper calls in both target functions; checker correctly rejects claiming their disappearance. No workload."
+}

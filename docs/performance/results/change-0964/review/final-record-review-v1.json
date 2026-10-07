@@ -1,0 +1,162 @@
+{
+  "checks": {
+    "candidate_mechanism": {
+      "claim_scope": "static source PASS; no performance claim",
+      "loops": [
+        "cell_values::validation::validate_xml",
+        "raw worksheet parse_source_with_observer"
+      ],
+      "production_paths": [
+        "crates/litchi-xlsx/src/cell_values/validation.rs",
+        "crates/litchi-xlsx/src/raw/worksheet/codec.rs"
+      ],
+      "semantic_boundaries": "state-machine ordering, namespace/error behavior, BOM/caps, MCE, parser/fallback, borrowed lifetimes and cleanup retained",
+      "status": "passed",
+      "test_paths": [
+        "crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs",
+        "crates/litchi-xlsx/src/cell_values/validation_borrow_tests.rs"
+      ],
+      "transport": "quick-xml Reader plus borrowed local NamespaceResolver"
+    },
+    "epoch_boundary": {
+      "epoch1": "invalid_screen; excluded before ratios/decision",
+      "epoch1_allocator_children": 18,
+      "epoch1_matching_affinity": {
+        "allocator": 0,
+        "native": 0
+      },
+      "epoch1_native_children": 36,
+      "epoch2_allocator_children": 18,
+      "epoch2_native_children": 36,
+      "epoch2_no_retries_or_replacements": true,
+      "only_epoch2_feeds_final_screen": true,
+      "status": "passed"
+    },
+    "no_adoption": {
+      "adoption_allowed": false,
+      "decision": "reject_screen",
+      "full_confirmation_indicated": false,
+      "production_unchanged": true,
+      "statistical_effect_claim": false,
+      "status": "passed"
+    },
+    "reproduction_record": {
+      "fresh_output_path_used": "/home/zhuhe/litchi-performance-0964/review/raw-audit-replay.json",
+      "status": "passed",
+      "workload_or_build_run_by_review": false
+    },
+    "safety_flags": {
+      "dense_sparse_ingress_p99": 1.0247250029289336,
+      "safety_gate_relaxed": false,
+      "status": "passed",
+      "threshold": 1.05,
+      "triggered": [
+        "native/medium-one-percent/ingress_ns.p99",
+        "native/medium-one-edit/ingress_ns.p99"
+      ]
+    },
+    "screen_ratios": {
+      "allocator_calls_bytes_live_peak_exact_one": true,
+      "allocator_pairs_per_case": 3,
+      "cases": {
+        "dense-sparse-one-percent": {
+          "allocator_live_peak": 1.0,
+          "edit_p50": 0.8861155743973652,
+          "ingress_p99": 1.0247250029289336,
+          "native_rss": 0.9966857545528771,
+          "total_p50": 0.9281089997812242
+        },
+        "medium-one-edit": {
+          "allocator_live_peak": 1.0,
+          "edit_p50": 0.8873391670001992,
+          "ingress_p99": 1.1075162249245518,
+          "native_rss": 0.9924007738825676,
+          "total_p50": 0.9313736676596616
+        },
+        "medium-one-percent": {
+          "allocator_live_peak": 1.0,
+          "edit_p50": 0.8920368142870636,
+          "ingress_p99": 1.1115534802297398,
+          "native_rss": 0.9940759284505165,
+          "total_p50": 0.9335961741912338
+        }
+      },
+      "independent_signal_count": 12,
+      "matches_independent_raw_audit": true,
+      "native_pairs_per_case": 6,
+      "status": "passed"
+    }
+  },
+  "created_utc": "2026-10-07T21:58:02.785883Z",
+  "external_bindings": [
+    {
+      "bytes": 150014,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/review/independent-epoch2-raw-audit-v1.json",
+      "sha256": "cb5822541294a3710ffb1cb198f08c37c4f00f724274ce6b2165e27a5f071938"
+    },
+    {
+      "bytes": 1225,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/receipts/epoch1-invalid-v1.json",
+      "sha256": "1ec732e4c520552f4f4728179714f3ee3689081a2445eb5df3bef17dfd4c961b"
+    },
+    {
+      "bytes": 59570,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/protocol/plan-final-epoch2-v1.json",
+      "sha256": "dcfabed26427c6a117b41c2e4b6209baec40afe06c218054b2187ae9c49b0a64"
+    }
+  ],
+  "inventory_v3": "deferred to root after this receipt; transient absence was not treated as a review failure",
+  "mismatch_count": 0,
+  "mismatches": [],
+  "repository_inputs": [
+    {
+      "bytes": 7045,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/0964-xlsx-direct-event-transport-trial.md",
+      "sha256": "da7289e415627739b463c0e6f644dbde1a0e50fabf973614ffe86921362ee3b7"
+    },
+    {
+      "bytes": 504278,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/BASELINE.md",
+      "sha256": "c498f42cdcf1a27aff1498177cccbc72a480ce1fe2860267ce25e88a077a31fc"
+    },
+    {
+      "bytes": 818672,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/HOTSPOTS.md",
+      "sha256": "2f29fe5f5d6e54d32233a841251407ecc364f19149086bc4e345e449ef54176d"
+    },
+    {
+      "bytes": 5552,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0964/README.md",
+      "sha256": "65d77f1bcbf84b77c4a923b8a96264a090f3c3dc9a30d6f80c0854bc716c5d2e"
+    },
+    {
+      "bytes": 5793,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0964/source-review.md",
+      "sha256": "6d79d91059b6bbea3d117a417a4f7ffdce515fe40ecf62fef1b67cb4992f4c03"
+    },
+    {
+      "bytes": 2565,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0964/candidate-hypothesis-v1.md",
+      "sha256": "a6c215a2ac0b999715d0bd0ad36927991e4ed5fd4ae597b81afc68028c06d07c"
+    },
+    {
+      "bytes": 15560,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0964/candidate-v4.patch",
+      "sha256": "3a8d42c0af69a9de57575076b2a034798df2b33e854e2a3bd038dfe24c926fc5"
+    }
+  ],
+  "review_mode": "read_only",
+  "schema": "litchi.performance.0964.final-record-review.v1",
+  "scope": "final record consistency review of mechanism, screen ratios, safety flags, epoch boundary, and disposition against independent epoch2 raw audit",
+  "status": "passed"
+}

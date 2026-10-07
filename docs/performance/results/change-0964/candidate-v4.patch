@@ -1,0 +1,402 @@
+diff --git a/crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs b/crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs
+--- a/crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs
++++ b/crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs
+@@ -7,8 +7,10 @@
+ use std::{fmt::Write as _, sync::Arc};
+ 
+ use litchi_core::OwnedSource;
++use litchi_core::xml::ReaderOrigin;
+ use litchi_opc::constants::content_type as ct;
+ use quick_xml::events::Event;
++use quick_xml::name::{Namespace, ResolveResult};
+ use quick_xml::reader::NsReader;
+ use soapberry_zip::office::StreamingArchiveWriter;
+ 
+@@ -40,6 +42,180 @@
+ enum DirectEventCount {
+     Complete(usize),
+     ReaderError(usize),
++}
++
++#[derive(Debug, Eq, PartialEq)]
++enum SourceNamespace {
++    Unbound,
++    Bound(Vec<u8>),
++    Unknown(Vec<u8>),
++}
++
++#[derive(Debug, Eq, PartialEq)]
++enum SourceEvent {
++    Start(Vec<u8>),
++    Empty(Vec<u8>),
++    End(Vec<u8>),
++    Text(Vec<u8>),
++    CData(Vec<u8>),
++    Comment(Vec<u8>),
++    Decl(Vec<u8>),
++    Pi(Vec<u8>),
++    DocType(Vec<u8>),
++    GeneralRef(Vec<u8>),
++    Eof,
++}
++
++#[derive(Debug, Eq, PartialEq)]
++struct SourceObservation {
++    namespace: SourceNamespace,
++    event: SourceEvent,
++    start: usize,
++    end: usize,
++}
++
++fn source_namespace(namespace: &ResolveResult<'_>) -> SourceNamespace {
++    match namespace {
++        ResolveResult::Unbound => SourceNamespace::Unbound,
++        ResolveResult::Bound(Namespace(value)) => SourceNamespace::Bound(value.to_vec()),
++        ResolveResult::Unknown(prefix) => SourceNamespace::Unknown(prefix.to_vec()),
++    }
++}
++
++fn source_event(event: &Event<'_>) -> SourceEvent {
++    match event {
++        Event::Start(value) => SourceEvent::Start(value.as_ref().to_vec()),
++        Event::Empty(value) => SourceEvent::Empty(value.as_ref().to_vec()),
++        Event::End(value) => SourceEvent::End(value.as_ref().to_vec()),
++        Event::Text(value) => SourceEvent::Text(value.as_ref().to_vec()),
++        Event::CData(value) => SourceEvent::CData(value.as_ref().to_vec()),
++        Event::Comment(value) => SourceEvent::Comment(value.as_ref().to_vec()),
++        Event::Decl(value) => SourceEvent::Decl(value.as_ref().to_vec()),
++        Event::PI(value) => SourceEvent::Pi(value.as_ref().to_vec()),
++        Event::DocType(value) => SourceEvent::DocType(value.as_ref().to_vec()),
++        Event::GeneralRef(value) => SourceEvent::GeneralRef(value.as_ref().to_vec()),
++        Event::Eof => SourceEvent::Eof,
++    }
++}
++
++fn source_observation(
++    namespace: &ResolveResult<'_>,
++    event: &Event<'_>,
++    start: usize,
++    end: usize,
++) -> SourceObservation {
++    SourceObservation {
++        namespace: source_namespace(namespace),
++        event: source_event(event),
++        start,
++        end,
++    }
++}
++
++/// Frozen transport oracle for the source-backed loop.  The production loop
++/// deliberately no longer uses this path; keeping it here makes namespace
++/// scope, borrowed event bytes, and BOM-adjusted spans independently visible.
++fn frozen_ns_reader_source_events(content: &[u8]) -> Result<Vec<SourceObservation>, String> {
++    let origin = ReaderOrigin::of(content);
++    let mut reader = NsReader::from_reader(content);
++    reader.config_mut().check_end_names = true;
++    let mut observations = Vec::new();
++    loop {
++        let start = origin
++            .offset(reader.buffer_position())
++            .ok_or_else(|| "reader start offset outside source".to_owned())?;
++        let event = reader.read_event().map_err(|error| error.to_string())?;
++        let end = origin
++            .offset(reader.buffer_position())
++            .ok_or_else(|| "reader end offset outside source".to_owned())?;
++        let (namespace, event) = reader.resolver().resolve_event(event);
++        observations.push(source_observation(&namespace, &event, start, end));
++        if matches!(event, Event::Eof) {
++            return Ok(observations);
++        }
++    }
++}
++
++fn borrowed_source_observations(
++    content: &[u8],
++    admission: crate::raw::worksheet::SourceAdmission,
++) -> (
++    crate::raw::worksheet::SourceParseAttempt,
++    Vec<SourceObservation>,
++) {
++    let mut observations = Vec::new();
++    let attempt = crate::raw::worksheet::parse_source_with_observer(
++        content,
++        admission,
++        || Ok(None),
++        |namespace, event, span| {
++            observations.push(source_observation(namespace, event, span.start, span.end));
++            true
++        },
++    );
++    (attempt, observations)
++}
++
++fn source_namespace_scope_fixture() -> Vec<u8> {
++    format!(
++        r#"<o:worksheet xmlns:o="{SML}" xmlns:a="urn:litchi:foreign"><o:sheetData><o:row r="1"><a:c xmlns:a="{SML}" r="A1"/><a:c r="A2"/></o:row></o:sheetData></o:worksheet>"#
++    )
++    .into_bytes()
++}
++
++#[test]
++fn borrowed_source_transport_matches_frozen_ns_reader_with_bom_and_scopes() {
++    let mut content = vec![0xef, 0xbb, 0xbf];
++    content.extend_from_slice(&source_namespace_scope_fixture());
++
++    let expected = frozen_ns_reader_source_events(&content).expect("frozen source reader");
++    let (attempt, actual) =
++        borrowed_source_observations(&content, crate::raw::worksheet::SourceAdmission::Borrowed);
++    assert!(matches!(
++        attempt,
++        crate::raw::worksheet::SourceParseAttempt::Complete(Ok(_))
++    ));
++    assert_eq!(actual, expected);
++}
++
++#[test]
++fn borrowed_source_transport_keeps_namespace_failure_boundaries() {
++    let reserved = format!(
++        r#"<worksheet xmlns="{SML}" xmlns:xml="urn:litchi:invalid"><sheetData/></worksheet>"#
++    )
++    .into_bytes();
++    let mut declaration_cap = format!(r#"<worksheet xmlns="{SML}""#);
++    for index in 0..=256 {
++        write!(declaration_cap, r#" xmlns:p{index}="urn:litchi:{index}""#)
++            .expect("namespace declaration");
++    }
++    declaration_cap.push_str("></worksheet>");
++    let declaration_cap = declaration_cap.into_bytes();
++
++    for (label, content) in [
++        ("reserved namespace", reserved),
++        ("declaration cap", declaration_cap),
++    ] {
++        assert!(
++            frozen_ns_reader_source_events(&content).is_err(),
++            "frozen reader accepted {label}"
++        );
++        let (attempt, observations) = borrowed_source_observations(
++            &content,
++            crate::raw::worksheet::SourceAdmission::Borrowed,
++        );
++        assert!(
++            matches!(
++                attempt,
++                crate::raw::worksheet::SourceParseAttempt::ReaderFailed
++            ),
++            "direct reader changed {label} outcome"
++        );
++        assert!(
++            observations.is_empty(),
++            "namespace failure reached observer for {label}"
++        );
++    }
+ }
+ 
+ impl DirectEventCount {
+diff --git a/crates/litchi-xlsx/src/cell_values/validation.rs b/crates/litchi-xlsx/src/cell_values/validation.rs
+--- a/crates/litchi-xlsx/src/cell_values/validation.rs
++++ b/crates/litchi-xlsx/src/cell_values/validation.rs
+@@ -38,8 +38,8 @@
+ 
+ use quick_xml::events::BytesStart;
+ use quick_xml::events::Event;
+-use quick_xml::name::{Namespace, ResolveResult};
+-use quick_xml::reader::NsReader;
++use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
++use quick_xml::reader::Reader;
+ 
+ use crate::error::{Error, Result, allocation, invalid};
+ use crate::raw;
+@@ -263,7 +263,7 @@
+     }
+ }
+ 
+-/// Validate and parse an eligible source using one borrowed `NsReader`.
++/// Validate and parse an eligible source using one borrowed source reader.
+ ///
+ /// Early reader, parser-transition, or provisional-cap uncertainty is
+ /// converted into a provisional failure. After the observer accepts the
+@@ -331,15 +331,47 @@
+ /// borrowed traversal above, so the two cannot disagree about what is
+ /// admitted or about which refusal wins.
+ fn validate_xml(content: &[u8], owner: XmlOwner) -> Result<()> {
+-    let mut reader = NsReader::from_reader(content);
++    let mut reader = Reader::from_reader(content);
++    let mut resolver = NamespaceResolver::default();
++    let mut pending_pop = false;
+     let mut validator = Validator::new(owner);
+     loop {
+-        let event = reader
+-            .read_event()
+-            .map_err(|error| invalid(format!("value-only XML scan failed: {error}")))?;
++        if pending_pop {
++            resolver.pop();
++            pending_pop = false;
++        }
++        let event = match reader.read_event() {
++            Ok(event) => event,
++            Err(error) => return Err(invalid(format!("value-only XML scan failed: {error}"))),
++        };
++        // Spell out the namespace transport formerly hidden in NsReader. The
++        // push/pop order is part of validation: a declaration is visible to
++        // its own element, and an End remains in scope until this iteration
++        // completes. Events continue to borrow `content`.
++        let namespace = match &event {
++            Event::Start(element) => {
++                resolver
++                    .push(element)
++                    .map_err(quick_xml::Error::from)
++                    .map_err(|error| invalid(format!("value-only XML scan failed: {error}")))?;
++                resolver.resolve_prefix(element.name().prefix(), true)
++            },
++            Event::Empty(element) => {
++                resolver
++                    .push(element)
++                    .map_err(quick_xml::Error::from)
++                    .map_err(|error| invalid(format!("value-only XML scan failed: {error}")))?;
++                pending_pop = true;
++                resolver.resolve_prefix(element.name().prefix(), true)
++            },
++            Event::End(element) => {
++                pending_pop = true;
++                resolver.resolve_prefix(element.name().prefix(), true)
++            },
++            _ => ResolveResult::Unbound,
++        };
+         // Events borrow the input slice; namespaces are inspected before the
+         // next read advances the resolver's scope.
+-        let (namespace, event) = reader.resolver().resolve_event(event);
+         let eof = matches!(event, Event::Eof);
+         if !validator.observe(&namespace, &event) {
+             break;
+diff --git a/crates/litchi-xlsx/src/cell_values/validation_borrow_tests.rs b/crates/litchi-xlsx/src/cell_values/validation_borrow_tests.rs
+--- a/crates/litchi-xlsx/src/cell_values/validation_borrow_tests.rs
++++ b/crates/litchi-xlsx/src/cell_values/validation_borrow_tests.rs
+@@ -4,6 +4,8 @@
+ //! pre-borrowing loop.  It shares the validator helpers with the production
+ //! implementation, so these tests compare event lifetime/resolver handling
+ //! without copying the policy tables into a second implementation.
++
++use std::fmt::Write as _;
+ 
+ use quick_xml::events::Event;
+ 
+@@ -628,6 +630,31 @@
+         XmlOwner::Worksheet,
+         false,
+     );
++}
++
++#[test]
++fn namespace_push_failures_match_frozen_reader_errors() {
++    let sml = namespace(TRANSITIONAL_SML);
++    let reserved_xml = format!(
++        r#"<worksheet xmlns="{sml}" xmlns:xml="urn:litchi:invalid"><sheetData/></worksheet>"#
++    );
++    let reserved_xmlns = format!(
++        r#"<worksheet xmlns="{sml}" xmlns:xmlns="urn:litchi:invalid"><sheetData/></worksheet>"#
++    );
++    let mut declaration_cap = format!(r#"<worksheet xmlns="{sml}""#);
++    for index in 0..=256 {
++        write!(declaration_cap, r#" xmlns:p{index}="urn:litchi:{index}""#)
++            .expect("namespace declaration");
++    }
++    declaration_cap.push_str("><sheetData/></worksheet>");
++
++    for (label, content) in [
++        ("invalid xml namespace binding", reserved_xml),
++        ("invalid xmlns namespace binding", reserved_xmlns),
++        ("per-element namespace declaration cap", declaration_cap),
++    ] {
++        assert_differential(label, content.as_bytes(), XmlOwner::Worksheet, false);
++    }
+ }
+ 
+ #[test]
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/codec.rs b/crates/litchi-xlsx/src/raw/worksheet/codec.rs
+--- a/crates/litchi-xlsx/src/raw/worksheet/codec.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/codec.rs
+@@ -10,7 +10,7 @@
+ use quick_xml::encoding::Decoder;
+ use quick_xml::events::{BytesStart, Event, attributes::Attribute};
+ use quick_xml::name::{NamespaceResolver, ResolveResult};
+-use quick_xml::reader::NsReader;
++use quick_xml::reader::{NsReader, Reader};
+ 
+ use super::super::formula::Range as FormulaRange;
+ use super::super::namespace::is_spreadsheetml_name;
+@@ -1641,8 +1641,10 @@
+     F: FnOnce() -> Result<Option<&'a [Text]>>,
+     O: for<'event> FnMut(&ResolveResult<'event>, &Event<'event>, super::EventSpan) -> bool,
+ {
+-    let mut reader = NsReader::from_reader(content);
++    let mut reader = Reader::from_reader(content);
+     reader.config_mut().check_end_names = true;
++    let mut resolver = NamespaceResolver::default();
++    let mut pending_pop = false;
+     // Event spans become source facts: byte offsets into `content`, whose
+     // leading byte-order mark precedes reader position zero.
+     let origin = ReaderOrigin::of(content);
+@@ -1662,9 +1664,34 @@
+         let Some(event_start) = origin.offset(reader.buffer_position()) else {
+             return super::SourceParseAttempt::ProvisionalFailed;
+         };
++        if pending_pop {
++            resolver.pop();
++            pending_pop = false;
++        }
+         let event = match reader.read_event() {
+             Ok(event) => event,
+             Err(_) => return super::SourceParseAttempt::ReaderFailed,
++        };
++        // Keep the transport ordering of `NsReader::read_event`: namespace
++        // scope installation happens before the caller can inspect spans,
++        // count events, or observe the event.  The event remains borrowed from
++        // `content`; only the resolver owns bounded namespace state.
++        match &event {
++            Event::Start(element) => {
++                if resolver.push(element).is_err() {
++                    return super::SourceParseAttempt::ReaderFailed;
++                }
++            },
++            Event::Empty(element) => {
++                if resolver.push(element).is_err() {
++                    return super::SourceParseAttempt::ReaderFailed;
++                }
++                pending_pop = true;
++            },
++            Event::End(_) => {
++                pending_pop = true;
++            },
++            _ => {},
+         };
+         let Some(event_end) = origin.offset(reader.buffer_position()) else {
+             return super::SourceParseAttempt::ProvisionalFailed;
+@@ -1676,10 +1703,15 @@
+             },
+             None => true,
+         };
+-        let (namespace, event) = reader.resolver().resolve_event(event);
+-        let resolver = reader.resolver();
++        let namespace = match &event {
++            Event::Start(element) | Event::Empty(element) => {
++                resolver.resolve_prefix(element.name().prefix(), true)
++            },
++            Event::End(element) => resolver.resolve_prefix(element.name().prefix(), true),
++            _ => ResolveResult::Unbound,
++        };
+         if let Some(equivalence) = equivalence.as_mut()
+-            && !equivalence.observe(&event, resolver)
++            && !equivalence.observe(&event, &resolver)
+         {
+             return super::SourceParseAttempt::ProvisionalFailed;
+         }
+@@ -1702,7 +1734,7 @@
+             &namespace,
+             event,
+             decoder,
+-            resolver,
++            &resolver,
+         ) {
+             Ok(complete) => complete,
+             Err(_) => return super::SourceParseAttempt::ProvisionalFailed,

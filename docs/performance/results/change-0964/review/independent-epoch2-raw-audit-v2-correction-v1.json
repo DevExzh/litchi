@@ -1,0 +1,40 @@
+{
+  "changed_lines": [
+    "-REDUCED_PATH = ROOT / \"analysis-screen-epoch2-v1/screen-v1.json\"",
+    "-SELECTION_PATH = ROOT / \"analysis-screen-epoch2-v1/selection-v1.json\"",
+    "+REDUCED_PATH = ROOT / \"analysis-epoch2/screen-v1.json\"",
+    "+SELECTION_PATH = ROOT / \"analysis-epoch2/selection-v1.json\""
+  ],
+  "changed_paths": {
+    "reduced": {
+      "from": "analysis-screen-epoch2-v1/screen-v1.json",
+      "to": "analysis-epoch2/screen-v1.json"
+    },
+    "selection": {
+      "from": "analysis-screen-epoch2-v1/selection-v1.json",
+      "to": "analysis-epoch2/selection-v1.json"
+    }
+  },
+  "corrected_helper": {
+    "bytes": 45755,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0964/tools/audit_screen_v2.py",
+    "sha256": "4cda49b11c5d5bf70de2b47ec04549466733657524f5b6503e949d93c24c0a99"
+  },
+  "created_utc": "2026-10-07T21:54:55.619296Z",
+  "delta_kind": "path_only",
+  "initial_failure_receipt": {
+    "path": "/home/zhuhe/litchi-performance-0964/review/independent-epoch2-raw-audit-v2-failure-v1.json",
+    "sha256": "b4ac8184a209d20e491629679094c738bd1d48047f1295250e4d93c279b0226e"
+  },
+  "initial_helper": {
+    "bytes": 45775,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0964/tools/audit_screen_v2.initial-v1.py",
+    "sha256": "149cc221b621c4aec2df7c26f27d70b9b86a9707a7c424a673923dd171b3dde7"
+  },
+  "other_source_changes": false,
+  "schema": "litchi.performance.0964.independent-epoch2-raw-audit-correction.v1",
+  "scope": "preservation and exact delta record for independent epoch2 audit helper path correction",
+  "status": "passed"
+}

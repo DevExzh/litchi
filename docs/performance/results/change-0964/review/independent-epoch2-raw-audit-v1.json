@@ -1,0 +1,4318 @@
+{
+  "affinity_binding": {
+    "controls": {
+      "bytes": 1410,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/protocol/affinity-controls-epoch2-v3.json",
+      "sha256": "ebe795c155d6827e77fb007ec2010ac0e88ca12fbcb33e293929bbb2abd90f78"
+    },
+    "runner": {
+      "bytes": 43659,
+      "executable": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0964/tools/screen_0964_v2.py",
+      "sha256": "7a3ac47c744c34cadf852557a44e7645ca36a1c72cc45e7d2350438cfcb8fab9"
+    },
+    "status": "pass",
+    "workload_started": false
+  },
+  "allocator": {
+    "cases": {
+      "dense-sparse-one-percent": {
+        "child_count": 6,
+        "metrics": {
+          "allocated_bytes": {
+            "max": 1.0,
+            "median": 1.0,
+            "min": 1.0,
+            "pair_count": 3,
+            "pair_values": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "allocation_calls": {
+            "max": 1.0,
+            "median": 1.0,
+            "min": 1.0,
+            "pair_count": 3,
+            "pair_values": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "core_combined_with_drain.allocated_bytes": {
+            "max": 1.0,
+            "median": 1.0,
+            "min": 1.0,
+            "pair_count": 3,
+            "pair_values": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "max_rss_kib": {
+            "max": 1.0010859150431173,
+            "median": 0.9949206349206349,
+            "min": 0.99423831834874,
+            "pair_count": 3,
+            "pair_values": [
+              0.9949206349206349,
+              0.99423831834874,
+              1.0010859150431173
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "region_peak_live_bytes": {
+            "max": 1.0,
+            "median": 1.0,
+            "min": 1.0,
+            "pair_count": 3,
+            "pair_values": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          }
+        },
+        "pair_count": 3,
+        "pairs": [
+          {
+            "baseline_child": "allocator__dense-sparse-one-percent__b00__p0",
+            "block": 0,
+            "candidate_child": "allocator__dense-sparse-one-percent__b00__p1",
+            "pair_id": "repeat-0",
+            "ratios": {
+              "allocated_bytes": {
+                "denominator": 27673682.0,
+                "numerator": 27673682.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "allocation_calls": {
+                "denominator": 210321.0,
+                "numerator": 210321.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "core_combined_with_drain.allocated_bytes": {
+                "denominator": 27673682.0,
+                "numerator": 27673682.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "max_rss_kib": {
+                "denominator": 63000.0,
+                "numerator": 62680.0,
+                "status": "defined",
+                "value": 0.9949206349206349
+              },
+              "region_peak_live_bytes": {
+                "denominator": 43397042.0,
+                "numerator": 43397042.0,
+                "status": "defined",
+                "value": 1.0
+              }
+            }
+          },
+          {
+            "baseline_child": "allocator__dense-sparse-one-percent__b01__p1",
+            "block": 1,
+            "candidate_child": "allocator__dense-sparse-one-percent__b01__p0",
+            "pair_id": "repeat-1",
+            "ratios": {
+              "allocated_bytes": {
+                "denominator": 27673682.0,
+                "numerator": 27673682.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "allocation_calls": {
+                "denominator": 210321.0,
+                "numerator": 210321.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "core_combined_with_drain.allocated_bytes": {
+                "denominator": 27673682.0,
+                "numerator": 27673682.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "max_rss_kib": {
+                "denominator": 63176.0,
+                "numerator": 62812.0,
+                "status": "defined",
+                "value": 0.99423831834874
+              },
+              "region_peak_live_bytes": {
+                "denominator": 43397042.0,
+                "numerator": 43397042.0,
+                "status": "defined",
+                "value": 1.0
+              }
+            }
+          },
+          {
+            "baseline_child": "allocator__dense-sparse-one-percent__b02__p0",
+            "block": 2,
+            "candidate_child": "allocator__dense-sparse-one-percent__b02__p1",
+            "pair_id": "repeat-2",
+            "ratios": {
+              "allocated_bytes": {
+                "denominator": 27673682.0,
+                "numerator": 27673682.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "allocation_calls": {
+                "denominator": 210321.0,
+                "numerator": 210321.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "core_combined_with_drain.allocated_bytes": {
+                "denominator": 27673682.0,
+                "numerator": 27673682.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "max_rss_kib": {
+                "denominator": 62620.0,
+                "numerator": 62688.0,
+                "status": "defined",
+                "value": 1.0010859150431173
+              },
+              "region_peak_live_bytes": {
+                "denominator": 43397042.0,
+                "numerator": 43397042.0,
+                "status": "defined",
+                "value": 1.0
+              }
+            }
+          }
+        ]
+      },
+      "medium-one-edit": {
+        "child_count": 6,
+        "metrics": {
+          "allocated_bytes": {
+            "max": 1.0,
+            "median": 1.0,
+            "min": 1.0,
+            "pair_count": 3,
+            "pair_values": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "allocation_calls": {
+            "max": 1.0,
+            "median": 1.0,
+            "min": 1.0,
+            "pair_count": 3,
+            "pair_values": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "core_combined_with_drain.allocated_bytes": {
+            "max": 1.0,
+            "median": 1.0,
+            "min": 1.0,
+            "pair_count": 3,
+            "pair_values": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "max_rss_kib": {
+            "max": 1.0009518041014105,
+            "median": 0.9968831168831169,
+            "min": 0.9958445156263527,
+            "pair_count": 3,
+            "pair_values": [
+              0.9958445156263527,
+              1.0009518041014105,
+              0.9968831168831169
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "region_peak_live_bytes": {
+            "max": 1.0,
+            "median": 1.0,
+            "min": 1.0,
+            "pair_count": 3,
+            "pair_values": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          }
+        },
+        "pair_count": 3,
+        "pairs": [
+          {
+            "baseline_child": "allocator__medium-one-edit__b00__p0",
+            "block": 0,
+            "candidate_child": "allocator__medium-one-edit__b00__p1",
+            "pair_id": "repeat-0",
+            "ratios": {
+              "allocated_bytes": {
+                "denominator": 5255741.0,
+                "numerator": 5255741.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "allocation_calls": {
+                "denominator": 28142.0,
+                "numerator": 28142.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "core_combined_with_drain.allocated_bytes": {
+                "denominator": 5255741.0,
+                "numerator": 5255741.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "max_rss_kib": {
+                "denominator": 46204.0,
+                "numerator": 46012.0,
+                "status": "defined",
+                "value": 0.9958445156263527
+              },
+              "region_peak_live_bytes": {
+                "denominator": 24361317.0,
+                "numerator": 24361317.0,
+                "status": "defined",
+                "value": 1.0
+              }
+            }
+          },
+          {
+            "baseline_child": "allocator__medium-one-edit__b01__p1",
+            "block": 1,
+            "candidate_child": "allocator__medium-one-edit__b01__p0",
+            "pair_id": "repeat-1",
+            "ratios": {
+              "allocated_bytes": {
+                "denominator": 5255741.0,
+                "numerator": 5255741.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "allocation_calls": {
+                "denominator": 28142.0,
+                "numerator": 28142.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "core_combined_with_drain.allocated_bytes": {
+                "denominator": 5255741.0,
+                "numerator": 5255741.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "max_rss_kib": {
+                "denominator": 46228.0,
+                "numerator": 46272.0,
+                "status": "defined",
+                "value": 1.0009518041014105
+              },
+              "region_peak_live_bytes": {
+                "denominator": 24361317.0,
+                "numerator": 24361317.0,
+                "status": "defined",
+                "value": 1.0
+              }
+            }
+          },
+          {
+            "baseline_child": "allocator__medium-one-edit__b02__p0",
+            "block": 2,
+            "candidate_child": "allocator__medium-one-edit__b02__p1",
+            "pair_id": "repeat-2",
+            "ratios": {
+              "allocated_bytes": {
+                "denominator": 5255741.0,
+                "numerator": 5255741.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "allocation_calls": {
+                "denominator": 28142.0,
+                "numerator": 28142.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "core_combined_with_drain.allocated_bytes": {
+                "denominator": 5255741.0,
+                "numerator": 5255741.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "max_rss_kib": {
+                "denominator": 46200.0,
+                "numerator": 46056.0,
+                "status": "defined",
+                "value": 0.9968831168831169
+              },
+              "region_peak_live_bytes": {
+                "denominator": 24361317.0,
+                "numerator": 24361317.0,
+                "status": "defined",
+                "value": 1.0
+              }
+            }
+          }
+        ]
+      },
+      "medium-one-percent": {
+        "child_count": 6,
+        "metrics": {
+          "allocated_bytes": {
+            "max": 1.0,
+            "median": 1.0,
+            "min": 1.0,
+            "pair_count": 3,
+            "pair_values": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "allocation_calls": {
+            "max": 1.0,
+            "median": 1.0,
+            "min": 1.0,
+            "pair_count": 3,
+            "pair_values": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "core_combined_with_drain.allocated_bytes": {
+            "max": 1.0,
+            "median": 1.0,
+            "min": 1.0,
+            "pair_count": 3,
+            "pair_values": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "max_rss_kib": {
+            "max": 1.0063065736756196,
+            "median": 1.001489757914339,
+            "min": 0.9948945615982242,
+            "pair_count": 3,
+            "pair_values": [
+              1.001489757914339,
+              0.9948945615982242,
+              1.0063065736756196
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "region_peak_live_bytes": {
+            "max": 1.0,
+            "median": 1.0,
+            "min": 1.0,
+            "pair_count": 3,
+            "pair_values": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          }
+        },
+        "pair_count": 3,
+        "pairs": [
+          {
+            "baseline_child": "allocator__medium-one-percent__b00__p0",
+            "block": 0,
+            "candidate_child": "allocator__medium-one-percent__b00__p1",
+            "pair_id": "repeat-0",
+            "ratios": {
+              "allocated_bytes": {
+                "denominator": 19966270.0,
+                "numerator": 19966270.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "allocation_calls": {
+                "denominator": 111025.0,
+                "numerator": 111025.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "core_combined_with_drain.allocated_bytes": {
+                "denominator": 19966270.0,
+                "numerator": 19966270.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "max_rss_kib": {
+                "denominator": 53700.0,
+                "numerator": 53780.0,
+                "status": "defined",
+                "value": 1.001489757914339
+              },
+              "region_peak_live_bytes": {
+                "denominator": 31033921.0,
+                "numerator": 31033921.0,
+                "status": "defined",
+                "value": 1.0
+              }
+            }
+          },
+          {
+            "baseline_child": "allocator__medium-one-percent__b01__p1",
+            "block": 1,
+            "candidate_child": "allocator__medium-one-percent__b01__p0",
+            "pair_id": "repeat-1",
+            "ratios": {
+              "allocated_bytes": {
+                "denominator": 19966270.0,
+                "numerator": 19966270.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "allocation_calls": {
+                "denominator": 111025.0,
+                "numerator": 111025.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "core_combined_with_drain.allocated_bytes": {
+                "denominator": 19966270.0,
+                "numerator": 19966270.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "max_rss_kib": {
+                "denominator": 54060.0,
+                "numerator": 53784.0,
+                "status": "defined",
+                "value": 0.9948945615982242
+              },
+              "region_peak_live_bytes": {
+                "denominator": 31033921.0,
+                "numerator": 31033921.0,
+                "status": "defined",
+                "value": 1.0
+              }
+            }
+          },
+          {
+            "baseline_child": "allocator__medium-one-percent__b02__p0",
+            "block": 2,
+            "candidate_child": "allocator__medium-one-percent__b02__p1",
+            "pair_id": "repeat-2",
+            "ratios": {
+              "allocated_bytes": {
+                "denominator": 19966270.0,
+                "numerator": 19966270.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "allocation_calls": {
+                "denominator": 111025.0,
+                "numerator": 111025.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "core_combined_with_drain.allocated_bytes": {
+                "denominator": 19966270.0,
+                "numerator": 19966270.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "max_rss_kib": {
+                "denominator": 53912.0,
+                "numerator": 54252.0,
+                "status": "defined",
+                "value": 1.0063065736756196
+              },
+              "region_peak_live_bytes": {
+                "denominator": 31033921.0,
+                "numerator": 31033921.0,
+                "status": "defined",
+                "value": 1.0
+              }
+            }
+          }
+        ]
+      }
+    },
+    "metric_semantics": {
+      "allocated_bytes": "mean core_combined_with_drain traffic bytes over ten rows",
+      "allocation_calls": "mean core_combined_with_drain allocation-call counter over ten rows",
+      "core_combined_with_drain.allocated_bytes": "same traffic-byte aggregation as allocated_bytes",
+      "max_rss_kib": "whole-process /usr/bin/time -v maximum RSS; not allocator phase peak",
+      "region_peak_live_bytes": "maximum observer-ordered live high-water over ten core_combined_with_drain rows; not traffic"
+    }
+  },
+  "custody_summary": {
+    "allocator_children": 18,
+    "allocator_oracles_passed": 18,
+    "native_children": 36,
+    "native_oracles_passed": 36,
+    "no_retries_or_replacements": true,
+    "pooled_samples": false,
+    "process_group_cleanup_passed": true,
+    "source_input_oracles_passed": true
+  },
+  "native": {
+    "cases": {
+      "dense-sparse-one-percent": {
+        "child_count": 12,
+        "metrics": {
+          "commit_drop_ns.p50": {
+            "max": 1.016714880546527,
+            "median": 0.9926143635091234,
+            "min": 0.9720540062404619,
+            "pair_count": 6,
+            "pair_values": [
+              1.016714880546527,
+              1.0036067074877884,
+              0.9886524496585882,
+              0.9951615273720488,
+              0.9900671996461978,
+              0.9720540062404619
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "commit_drop_ns.p95": {
+            "max": 1.0020010052745099,
+            "median": 0.9905354328930914,
+            "min": 0.9772114102572128,
+            "pair_count": 6,
+            "pair_values": [
+              1.0020010052745099,
+              0.9772114102572128,
+              0.9978194882041036,
+              0.998596686389776,
+              0.9818736936493202,
+              0.9832513775820793
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "commit_drop_ns.p99": {
+            "max": 1.0993248194739327,
+            "median": 1.0000775493982714,
+            "min": 0.8893314633536987,
+            "pair_count": 6,
+            "pair_values": [
+              1.0248917304490937,
+              0.9943296918793417,
+              0.8893314633536987,
+              1.0993248194739327,
+              0.9860670016539737,
+              1.005825406917201
+            ],
+            "review_flag_pair_gt_1_05": 1,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "edit_commit_ns.p50": {
+            "max": 0.9360677009746433,
+            "median": 0.8861155743973652,
+            "min": 0.881647217623721,
+            "pair_count": 6,
+            "pair_values": [
+              0.8849517379218073,
+              0.881647217623721,
+              0.8892948636139913,
+              0.8868419646314839,
+              0.9360677009746433,
+              0.8853891841632466
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "edit_commit_ns.p95": {
+            "max": 0.937329669113241,
+            "median": 0.8881962966569508,
+            "min": 0.8821306820745607,
+            "pair_count": 6,
+            "pair_values": [
+              0.8849383952074427,
+              0.8821306820745607,
+              0.8918439757682319,
+              0.8890219951987611,
+              0.937329669113241,
+              0.8873705981151404
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "edit_commit_ns.p99": {
+            "max": 0.9379793705972792,
+            "median": 0.8917611437273711,
+            "min": 0.8758987123604545,
+            "pair_count": 6,
+            "pair_values": [
+              0.8908778111635198,
+              0.8758987123604545,
+              0.8895626851723839,
+              0.893312189403591,
+              0.9379793705972792,
+              0.8926444762912225
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "ingress_ns.p50": {
+            "max": 1.1849761181068172,
+            "median": 1.010443164247333,
+            "min": 0.9537537284774135,
+            "pair_count": 6,
+            "pair_values": [
+              1.1849761181068172,
+              1.012759814931515,
+              1.0081265135631512,
+              0.9537537284774135,
+              1.1226646557126319,
+              0.9845203336809176
+            ],
+            "review_flag_pair_gt_1_05": 2,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "ingress_ns.p95": {
+            "max": 1.1893044779916055,
+            "median": 1.0098639000287348,
+            "min": 0.9121368020544357,
+            "pair_count": 6,
+            "pair_values": [
+              1.1893044779916055,
+              1.049845738526803,
+              0.9698820615306668,
+              0.9645020031678002,
+              1.1409665636414723,
+              0.9121368020544357
+            ],
+            "review_flag_pair_gt_1_05": 2,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "ingress_ns.p99": {
+            "max": 1.2385064794102933,
+            "median": 1.0247250029289336,
+            "min": 0.7710891173282513,
+            "pair_count": 6,
+            "pair_values": [
+              1.2385064794102933,
+              1.1408588848634797,
+              0.9806985294117647,
+              0.7710891173282513,
+              1.0687514764461026,
+              0.8908057101379143
+            ],
+            "review_flag_pair_gt_1_05": 3,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "max_rss_kib": {
+            "max": 1.0007664793050588,
+            "median": 0.9966857545528771,
+            "min": 0.993185147442838,
+            "pair_count": 6,
+            "pair_values": [
+              1.0007664793050588,
+              0.9946466127079218,
+              0.993884571282966,
+              0.9987248963978324,
+              1.0,
+              0.993185147442838
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "publication_ns.p50": {
+            "max": 0.9956763124100038,
+            "median": 0.9856992555804442,
+            "min": 0.9509180684145376,
+            "pair_count": 6,
+            "pair_values": [
+              0.9956763124100038,
+              0.9509180684145376,
+              0.9837661241759865,
+              0.9866081437193854,
+              0.9956695278529144,
+              0.984790367441503
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "publication_ns.p95": {
+            "max": 0.9983890787708717,
+            "median": 0.9826895885103664,
+            "min": 0.9456034992838855,
+            "pair_count": 6,
+            "pair_values": [
+              0.9930701793589966,
+              0.9456034992838855,
+              0.9769697255116115,
+              0.9855725001827412,
+              0.9983890787708717,
+              0.9798066768379916
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "publication_ns.p99": {
+            "max": 0.9949918345932203,
+            "median": 0.9828198575874503,
+            "min": 0.9461709308280998,
+            "pair_count": 6,
+            "pair_values": [
+              0.99418072086912,
+              0.9461709308280998,
+              0.9731206939407236,
+              0.9882683886604585,
+              0.9949918345932203,
+              0.9773713265144421
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "total_ns.p50": {
+            "max": 0.9603147045779608,
+            "median": 0.9281089997812242,
+            "min": 0.9112677798570271,
+            "pair_count": 6,
+            "pair_values": [
+              0.9313802239149944,
+              0.9112677798570271,
+              0.9282879444431854,
+              0.9279300551192629,
+              0.9603147045779608,
+              0.9260778099183887
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "total_ns.p95": {
+            "max": 0.961034779293681,
+            "median": 0.9289904199717802,
+            "min": 0.911753663704656,
+            "pair_count": 6,
+            "pair_values": [
+              0.9353188221338387,
+              0.911753663704656,
+              0.9294652264732507,
+              0.9285156134703098,
+              0.961034779293681,
+              0.9257624685424365
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "total_ns.p99": {
+            "max": 0.9589328254208666,
+            "median": 0.928076547418912,
+            "min": 0.9020904232768282,
+            "pair_count": 6,
+            "pair_values": [
+              0.9364226223878085,
+              0.9020904232768282,
+              0.9267207358058248,
+              0.9284616254429755,
+              0.9589328254208666,
+              0.9276914693948485
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          }
+        },
+        "pair_count": 6,
+        "pairs": [
+          {
+            "baseline_child": "native__dense-sparse-one-percent__b00__p0",
+            "block": 0,
+            "candidate_child": "native__dense-sparse-one-percent__b00__p1",
+            "pair_id": "b00-leg0",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 302126.0,
+                "numerator": 307176.0,
+                "status": "defined",
+                "value": 1.016714880546527
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 314342.0,
+                "numerator": 314971.0,
+                "status": "defined",
+                "value": 1.0020010052745099
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 316571.0,
+                "numerator": 324451.0,
+                "status": "defined",
+                "value": 1.0248917304490937
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 17556745.0,
+                "numerator": 15536872.0,
+                "status": "defined",
+                "value": 0.8849517379218073
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 17699110.0,
+                "numerator": 15662622.0,
+                "status": "defined",
+                "value": 0.8849383952074427
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 17789031.0,
+                "numerator": 15847853.0,
+                "status": "defined",
+                "value": 0.8908778111635198
+              },
+              "ingress_ns.p50": {
+                "denominator": 92120.0,
+                "numerator": 109160.0,
+                "status": "defined",
+                "value": 1.1849761181068172
+              },
+              "ingress_ns.p95": {
+                "denominator": 102211.0,
+                "numerator": 121560.0,
+                "status": "defined",
+                "value": 1.1893044779916055
+              },
+              "ingress_ns.p99": {
+                "denominator": 105951.0,
+                "numerator": 131221.0,
+                "status": "defined",
+                "value": 1.2385064794102933
+              },
+              "max_rss_kib": {
+                "denominator": 62624.0,
+                "numerator": 62672.0,
+                "status": "defined",
+                "value": 1.0007664793050588
+              },
+              "publication_ns.p50": {
+                "denominator": 12019948.0,
+                "numerator": 11967977.5,
+                "status": "defined",
+                "value": 0.9956763124100038
+              },
+              "publication_ns.p95": {
+                "denominator": 12127298.0,
+                "numerator": 12043258.0,
+                "status": "defined",
+                "value": 0.9930701793589966
+              },
+              "publication_ns.p99": {
+                "denominator": 12230209.0,
+                "numerator": 12159038.0,
+                "status": "defined",
+                "value": 0.99418072086912
+              },
+              "total_ns.p50": {
+                "denominator": 29983164.0,
+                "numerator": 27925726.0,
+                "status": "defined",
+                "value": 0.9313802239149944
+              },
+              "total_ns.p95": {
+                "denominator": 30094319.0,
+                "numerator": 28147783.0,
+                "status": "defined",
+                "value": 0.9353188221338387
+              },
+              "total_ns.p99": {
+                "denominator": 30241370.0,
+                "numerator": 28318703.0,
+                "status": "defined",
+                "value": 0.9364226223878085
+              }
+            }
+          },
+          {
+            "baseline_child": "native__dense-sparse-one-percent__b00__p3",
+            "block": 0,
+            "candidate_child": "native__dense-sparse-one-percent__b00__p2",
+            "pair_id": "b00-leg1",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 303601.0,
+                "numerator": 304696.0,
+                "status": "defined",
+                "value": 1.0036067074877884
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 319502.0,
+                "numerator": 312221.0,
+                "status": "defined",
+                "value": 0.9772114102572128
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 324321.0,
+                "numerator": 322482.0,
+                "status": "defined",
+                "value": 0.9943296918793417
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 17622589.5,
+                "numerator": 15536907.0,
+                "status": "defined",
+                "value": 0.881647217623721
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 17729440.0,
+                "numerator": 15639683.0,
+                "status": "defined",
+                "value": 0.8821306820745607
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 18007291.0,
+                "numerator": 15772563.0,
+                "status": "defined",
+                "value": 0.8758987123604545
+              },
+              "ingress_ns.p50": {
+                "denominator": 92830.5,
+                "numerator": 94015.0,
+                "status": "defined",
+                "value": 1.012759814931515
+              },
+              "ingress_ns.p95": {
+                "denominator": 103720.0,
+                "numerator": 108890.0,
+                "status": "defined",
+                "value": 1.049845738526803
+              },
+              "ingress_ns.p99": {
+                "denominator": 113170.0,
+                "numerator": 129111.0,
+                "status": "defined",
+                "value": 1.1408588848634797
+              },
+              "max_rss_kib": {
+                "denominator": 62764.0,
+                "numerator": 62428.0,
+                "status": "defined",
+                "value": 0.9946466127079218
+              },
+              "publication_ns.p50": {
+                "denominator": 12512384.5,
+                "numerator": 11898252.5,
+                "status": "defined",
+                "value": 0.9509180684145376
+              },
+              "publication_ns.p95": {
+                "denominator": 12658590.0,
+                "numerator": 11970007.0,
+                "status": "defined",
+                "value": 0.9456034992838855
+              },
+              "publication_ns.p99": {
+                "denominator": 12736111.0,
+                "numerator": 12050538.0,
+                "status": "defined",
+                "value": 0.9461709308280998
+              },
+              "total_ns.p50": {
+                "denominator": 30542006.0,
+                "numerator": 27831946.0,
+                "status": "defined",
+                "value": 0.9112677798570271
+              },
+              "total_ns.p95": {
+                "denominator": 30719111.0,
+                "numerator": 28008262.0,
+                "status": "defined",
+                "value": 0.911753663704656
+              },
+              "total_ns.p99": {
+                "denominator": 31156513.0,
+                "numerator": 28105992.0,
+                "status": "defined",
+                "value": 0.9020904232768282
+              }
+            }
+          },
+          {
+            "baseline_child": "native__dense-sparse-one-percent__b01__p1",
+            "block": 1,
+            "candidate_child": "native__dense-sparse-one-percent__b01__p0",
+            "pair_id": "b01-leg0",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 304471.0,
+                "numerator": 301016.0,
+                "status": "defined",
+                "value": 0.9886524496585882
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 312312.0,
+                "numerator": 311631.0,
+                "status": "defined",
+                "value": 0.9978194882041036
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 352232.0,
+                "numerator": 313251.0,
+                "status": "defined",
+                "value": 0.8893314633536987
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 17489184.0,
+                "numerator": 15553041.5,
+                "status": "defined",
+                "value": 0.8892948636139913
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 17571809.0,
+                "numerator": 15671312.0,
+                "status": "defined",
+                "value": 0.8918439757682319
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 17670359.0,
+                "numerator": 15718892.0,
+                "status": "defined",
+                "value": 0.8895626851723839
+              },
+              "ingress_ns.p50": {
+                "denominator": 92290.5,
+                "numerator": 93040.5,
+                "status": "defined",
+                "value": 1.0081265135631512
+              },
+              "ingress_ns.p95": {
+                "denominator": 106581.0,
+                "numerator": 103371.0,
+                "status": "defined",
+                "value": 0.9698820615306668
+              },
+              "ingress_ns.p99": {
+                "denominator": 108800.0,
+                "numerator": 106700.0,
+                "status": "defined",
+                "value": 0.9806985294117647
+              },
+              "max_rss_kib": {
+                "denominator": 62792.0,
+                "numerator": 62408.0,
+                "status": "defined",
+                "value": 0.993884571282966
+              },
+              "publication_ns.p50": {
+                "denominator": 12057903.0,
+                "numerator": 11862156.5,
+                "status": "defined",
+                "value": 0.9837661241759865
+              },
+              "publication_ns.p95": {
+                "denominator": 12188348.0,
+                "numerator": 11907647.0,
+                "status": "defined",
+                "value": 0.9769697255116115
+              },
+              "publication_ns.p99": {
+                "denominator": 12278628.0,
+                "numerator": 11948587.0,
+                "status": "defined",
+                "value": 0.9731206939407236
+              },
+              "total_ns.p50": {
+                "denominator": 29961113.0,
+                "numerator": 27812540.0,
+                "status": "defined",
+                "value": 0.9282879444431854
+              },
+              "total_ns.p95": {
+                "denominator": 30077349.0,
+                "numerator": 27955850.0,
+                "status": "defined",
+                "value": 0.9294652264732507
+              },
+              "total_ns.p99": {
+                "denominator": 30210579.0,
+                "numerator": 27996770.0,
+                "status": "defined",
+                "value": 0.9267207358058248
+              }
+            }
+          },
+          {
+            "baseline_child": "native__dense-sparse-one-percent__b01__p2",
+            "block": 1,
+            "candidate_child": "native__dense-sparse-one-percent__b01__p3",
+            "pair_id": "b01-leg1",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 302781.5,
+                "numerator": 301316.5,
+                "status": "defined",
+                "value": 0.9951615273720488
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 312831.0,
+                "numerator": 312392.0,
+                "status": "defined",
+                "value": 0.998596686389776
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 345241.0,
+                "numerator": 379532.0,
+                "status": "defined",
+                "value": 1.0993248194739327
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 17524314.5,
+                "numerator": 15541297.5,
+                "status": "defined",
+                "value": 0.8868419646314839
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 17637531.0,
+                "numerator": 15680153.0,
+                "status": "defined",
+                "value": 0.8890219951987611
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 17708471.0,
+                "numerator": 15819193.0,
+                "status": "defined",
+                "value": 0.893312189403591
+              },
+              "ingress_ns.p50": {
+                "denominator": 95045.5,
+                "numerator": 90650.0,
+                "status": "defined",
+                "value": 0.9537537284774135
+              },
+              "ingress_ns.p95": {
+                "denominator": 107330.0,
+                "numerator": 103520.0,
+                "status": "defined",
+                "value": 0.9645020031678002
+              },
+              "ingress_ns.p99": {
+                "denominator": 141151.0,
+                "numerator": 108840.0,
+                "status": "defined",
+                "value": 0.7710891173282513
+              },
+              "max_rss_kib": {
+                "denominator": 62740.0,
+                "numerator": 62660.0,
+                "status": "defined",
+                "value": 0.9987248963978324
+              },
+              "publication_ns.p50": {
+                "denominator": 12045417.5,
+                "numerator": 11884107.0,
+                "status": "defined",
+                "value": 0.9866081437193854
+              },
+              "publication_ns.p95": {
+                "denominator": 12148328.0,
+                "numerator": 11973058.0,
+                "status": "defined",
+                "value": 0.9855725001827412
+              },
+              "publication_ns.p99": {
+                "denominator": 12169769.0,
+                "numerator": 12026998.0,
+                "status": "defined",
+                "value": 0.9882683886604585
+              },
+              "total_ns.p50": {
+                "denominator": 29991330.0,
+                "numerator": 27829856.5,
+                "status": "defined",
+                "value": 0.9279300551192629
+              },
+              "total_ns.p95": {
+                "denominator": 30153130.0,
+                "numerator": 27997652.0,
+                "status": "defined",
+                "value": 0.9285156134703098
+              },
+              "total_ns.p99": {
+                "denominator": 30271711.0,
+                "numerator": 28106122.0,
+                "status": "defined",
+                "value": 0.9284616254429755
+              }
+            }
+          },
+          {
+            "baseline_child": "native__dense-sparse-one-percent__b02__p0",
+            "block": 2,
+            "candidate_child": "native__dense-sparse-one-percent__b02__p1",
+            "pair_id": "b02-leg0",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 307516.5,
+                "numerator": 304462.0,
+                "status": "defined",
+                "value": 0.9900671996461978
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 316722.0,
+                "numerator": 310981.0,
+                "status": "defined",
+                "value": 0.9818736936493202
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 318022.0,
+                "numerator": 313591.0,
+                "status": "defined",
+                "value": 0.9860670016539737
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 17375998.0,
+                "numerator": 16265110.5,
+                "status": "defined",
+                "value": 0.9360677009746433
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 17489488.0,
+                "numerator": 16393416.0,
+                "status": "defined",
+                "value": 0.937329669113241
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 17519848.0,
+                "numerator": 16433256.0,
+                "status": "defined",
+                "value": 0.9379793705972792
+              },
+              "ingress_ns.p50": {
+                "denominator": 94151.0,
+                "numerator": 105700.0,
+                "status": "defined",
+                "value": 1.1226646557126319
+              },
+              "ingress_ns.p95": {
+                "denominator": 106770.0,
+                "numerator": 121821.0,
+                "status": "defined",
+                "value": 1.1409665636414723
+              },
+              "ingress_ns.p99": {
+                "denominator": 122761.0,
+                "numerator": 131201.0,
+                "status": "defined",
+                "value": 1.0687514764461026
+              },
+              "max_rss_kib": {
+                "denominator": 62584.0,
+                "numerator": 62584.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "publication_ns.p50": {
+                "denominator": 12024208.5,
+                "numerator": 11972138.0,
+                "status": "defined",
+                "value": 0.9956695278529144
+              },
+              "publication_ns.p95": {
+                "denominator": 12120394.0,
+                "numerator": 12100869.0,
+                "status": "defined",
+                "value": 0.9983890787708717
+              },
+              "publication_ns.p99": {
+                "denominator": 12183104.0,
+                "numerator": 12122089.0,
+                "status": "defined",
+                "value": 0.9949918345932203
+              },
+              "total_ns.p50": {
+                "denominator": 29822318.0,
+                "numerator": 28638810.5,
+                "status": "defined",
+                "value": 0.9603147045779608
+              },
+              "total_ns.p95": {
+                "denominator": 30000523.0,
+                "numerator": 28831546.0,
+                "status": "defined",
+                "value": 0.961034779293681
+              },
+              "total_ns.p99": {
+                "denominator": 30086024.0,
+                "numerator": 28850476.0,
+                "status": "defined",
+                "value": 0.9589328254208666
+              }
+            }
+          },
+          {
+            "baseline_child": "native__dense-sparse-one-percent__b02__p3",
+            "block": 2,
+            "candidate_child": "native__dense-sparse-one-percent__b02__p2",
+            "pair_id": "b02-leg1",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 308631.0,
+                "numerator": 300006.0,
+                "status": "defined",
+                "value": 0.9720540062404619
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 317041.0,
+                "numerator": 311731.0,
+                "status": "defined",
+                "value": 0.9832513775820793
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 319291.0,
+                "numerator": 321151.0,
+                "status": "defined",
+                "value": 1.005825406917201
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 17507540.5,
+                "numerator": 15500987.0,
+                "status": "defined",
+                "value": 0.8853891841632466
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 17651501.0,
+                "numerator": 15663423.0,
+                "status": "defined",
+                "value": 0.8873705981151404
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 17683282.0,
+                "numerator": 15784884.0,
+                "status": "defined",
+                "value": 0.8926444762912225
+              },
+              "ingress_ns.p50": {
+                "denominator": 95900.0,
+                "numerator": 94415.5,
+                "status": "defined",
+                "value": 0.9845203336809176
+              },
+              "ingress_ns.p95": {
+                "denominator": 116431.0,
+                "numerator": 106201.0,
+                "status": "defined",
+                "value": 0.9121368020544357
+              },
+              "ingress_ns.p99": {
+                "denominator": 123990.0,
+                "numerator": 110451.0,
+                "status": "defined",
+                "value": 0.8908057101379143
+              },
+              "max_rss_kib": {
+                "denominator": 62804.0,
+                "numerator": 62376.0,
+                "status": "defined",
+                "value": 0.993185147442838
+              },
+              "publication_ns.p50": {
+                "denominator": 12053578.5,
+                "numerator": 11870248.0,
+                "status": "defined",
+                "value": 0.984790367441503
+              },
+              "publication_ns.p95": {
+                "denominator": 12159019.0,
+                "numerator": 11913488.0,
+                "status": "defined",
+                "value": 0.9798066768379916
+              },
+              "publication_ns.p99": {
+                "denominator": 12248619.0,
+                "numerator": 11971449.0,
+                "status": "defined",
+                "value": 0.9773713265144421
+              },
+              "total_ns.p50": {
+                "denominator": 29989750.0,
+                "numerator": 27772842.0,
+                "status": "defined",
+                "value": 0.9260778099183887
+              },
+              "total_ns.p95": {
+                "denominator": 30192262.0,
+                "numerator": 27950863.0,
+                "status": "defined",
+                "value": 0.9257624685424365
+              },
+              "total_ns.p99": {
+                "denominator": 30255462.0,
+                "numerator": 28067734.0,
+                "status": "defined",
+                "value": 0.9276914693948485
+              }
+            }
+          }
+        ]
+      },
+      "medium-one-edit": {
+        "child_count": 12,
+        "metrics": {
+          "commit_drop_ns.p50": {
+            "max": 1.0096385542168675,
+            "median": 1.003871599757874,
+            "min": 0.9973614775725593,
+            "pair_count": 6,
+            "pair_values": [
+              1.0082635009310987,
+              1.0033693505286394,
+              0.9973614775725593,
+              1.0043738489871086,
+              0.999885753455958,
+              1.0096385542168675
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "commit_drop_ns.p95": {
+            "max": 1.132342857142857,
+            "median": 1.0552636652848741,
+            "min": 0.9919823611946282,
+            "pair_count": 6,
+            "pair_values": [
+              1.132342857142857,
+              1.002710027100271,
+              0.9919823611946282,
+              1.1279155743765543,
+              0.9928811548348824,
+              1.1078173034694774
+            ],
+            "review_flag_pair_gt_1_05": 3,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "commit_drop_ns.p99": {
+            "max": 1.1540900022168035,
+            "median": 1.003323041893514,
+            "min": 0.8978870187724255,
+            "pair_count": 6,
+            "pair_values": [
+              1.0757654075546719,
+              0.9475822050290136,
+              1.019580446721391,
+              1.1540900022168035,
+              0.8978870187724255,
+              0.9870656370656371
+            ],
+            "review_flag_pair_gt_1_05": 2,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "edit_commit_ns.p50": {
+            "max": 0.897744021061913,
+            "median": 0.8873391670001992,
+            "min": 0.8828253856146557,
+            "pair_count": 6,
+            "pair_values": [
+              0.8881148661553685,
+              0.8865634678450299,
+              0.8828253856146557,
+              0.8834990615687909,
+              0.897744021061913,
+              0.8916372340826002
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "edit_commit_ns.p95": {
+            "max": 0.9010273218448986,
+            "median": 0.8891473275246218,
+            "min": 0.8801094000101313,
+            "pair_count": 6,
+            "pair_values": [
+              0.8892367498190515,
+              0.8890579052301919,
+              0.880971768823971,
+              0.8801094000101313,
+              0.9010273218448986,
+              0.8959237913063127
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "edit_commit_ns.p99": {
+            "max": 0.9128742266103065,
+            "median": 0.8874051838735755,
+            "min": 0.8793292903471087,
+            "pair_count": 6,
+            "pair_values": [
+              0.8839281276029408,
+              0.89088224014421,
+              0.8829716279089602,
+              0.8793292903471087,
+              0.9076544687366629,
+              0.9128742266103065
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "ingress_ns.p50": {
+            "max": 1.037883043125507,
+            "median": 1.0194394591969238,
+            "min": 0.9956052568121534,
+            "pair_count": 6,
+            "pair_values": [
+              1.037883043125507,
+              1.0128272092317037,
+              1.0027520701412567,
+              0.9956052568121534,
+              1.026051709162144,
+              1.0274198473282443
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "ingress_ns.p95": {
+            "max": 1.0598556357579123,
+            "median": 1.0401935883898212,
+            "min": 1.008111658456486,
+            "pair_count": 6,
+            "pair_values": [
+              1.0351378098303967,
+              1.0598556357579123,
+              1.0452493669492458,
+              1.014547515586624,
+              1.0577330690528293,
+              1.008111658456486
+            ],
+            "review_flag_pair_gt_1_05": 2,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "ingress_ns.p99": {
+            "max": 1.2582140038335776,
+            "median": 1.1075162249245518,
+            "min": 1.0137755642683055,
+            "pair_count": 6,
+            "pair_values": [
+              1.0809196460244868,
+              1.1017761795793832,
+              1.1283045120254422,
+              1.0137755642683055,
+              1.2582140038335776,
+              1.1132562702697206
+            ],
+            "review_flag_pair_gt_1_05": 5,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "max_rss_kib": {
+            "max": 1.0081265291855994,
+            "median": 0.9924007738825676,
+            "min": 0.9808999397745849,
+            "pair_count": 6,
+            "pair_values": [
+              1.0081265291855994,
+              0.9926099808728917,
+              0.9921915668922436,
+              0.9948704573117718,
+              0.9851236810240442,
+              0.9808999397745849
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "publication_ns.p50": {
+            "max": 1.0443287619134207,
+            "median": 0.989456043339094,
+            "min": 0.9842076701350544,
+            "pair_count": 6,
+            "pair_values": [
+              1.0443287619134207,
+              0.9842076701350544,
+              0.9893548085550711,
+              0.9895572781231168,
+              0.9899257222376353,
+              0.9891718011907217
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "publication_ns.p95": {
+            "max": 1.0411637909439786,
+            "median": 0.9876966587817225,
+            "min": 0.9782396559769747,
+            "pair_count": 6,
+            "pair_values": [
+              1.0411637909439786,
+              0.9962223068764099,
+              0.9858041697018944,
+              0.9845172655569667,
+              0.9895891478615506,
+              0.9782396559769747
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "publication_ns.p99": {
+            "max": 1.0556510922782818,
+            "median": 0.992565472733965,
+            "min": 0.9818773736470519,
+            "pair_count": 6,
+            "pair_values": [
+              1.0556510922782818,
+              0.9962206382743916,
+              0.986600579248354,
+              0.9818773736470519,
+              0.9920691066381921,
+              0.9930618388297378
+            ],
+            "review_flag_pair_gt_1_05": 1,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "total_ns.p50": {
+            "max": 0.9546026184228074,
+            "median": 0.9313736676596616,
+            "min": 0.9285601911534894,
+            "pair_count": 6,
+            "pair_values": [
+              0.9546026184228074,
+              0.9285601911534894,
+              0.9288742443595576,
+              0.9289415405706469,
+              0.93913604800227,
+              0.9338057947486761
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "total_ns.p95": {
+            "max": 0.9525355899920872,
+            "median": 0.9371117439350778,
+            "min": 0.9265036050646811,
+            "pair_count": 6,
+            "pair_values": [
+              0.9525355899920872,
+              0.937335263938509,
+              0.9286268207336892,
+              0.9265036050646811,
+              0.9376267881946255,
+              0.9368882239316465
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "total_ns.p99": {
+            "max": 0.9699916972196799,
+            "median": 0.947024492773345,
+            "min": 0.9249279264142363,
+            "pair_count": 6,
+            "pair_values": [
+              0.9699916972196799,
+              0.9420515609574424,
+              0.9407523544065992,
+              0.9249279264142363,
+              0.9519974245892476,
+              0.9557154321485004
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          }
+        },
+        "pair_count": 6,
+        "pairs": [
+          {
+            "baseline_child": "native__medium-one-edit__b00__p0",
+            "block": 0,
+            "candidate_child": "native__medium-one-edit__b00__p1",
+            "pair_id": "b00-leg0",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 42960.0,
+                "numerator": 43315.0,
+                "status": "defined",
+                "value": 1.0082635009310987
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 43750.0,
+                "numerator": 49540.0,
+                "status": "defined",
+                "value": 1.132342857142857
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 50300.0,
+                "numerator": 54111.0,
+                "status": "defined",
+                "value": 1.0757654075546719
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 2256609.0,
+                "numerator": 2004128.0,
+                "status": "defined",
+                "value": 0.8881148661553685
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 2283799.0,
+                "numerator": 2030838.0,
+                "status": "defined",
+                "value": 0.8892367498190515
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 2313489.0,
+                "numerator": 2044958.0,
+                "status": "defined",
+                "value": 0.8839281276029408
+              },
+              "ingress_ns.p50": {
+                "denominator": 80115.0,
+                "numerator": 83150.0,
+                "status": "defined",
+                "value": 1.037883043125507
+              },
+              "ingress_ns.p95": {
+                "denominator": 87911.0,
+                "numerator": 91000.0,
+                "status": "defined",
+                "value": 1.0351378098303967
+              },
+              "ingress_ns.p99": {
+                "denominator": 104301.0,
+                "numerator": 112741.0,
+                "status": "defined",
+                "value": 1.0809196460244868
+              },
+              "max_rss_kib": {
+                "denominator": 45776.0,
+                "numerator": 46148.0,
+                "status": "defined",
+                "value": 1.0081265291855994
+              },
+              "publication_ns.p50": {
+                "denominator": 1561841.5,
+                "numerator": 1631076.0,
+                "status": "defined",
+                "value": 1.0443287619134207
+              },
+              "publication_ns.p95": {
+                "denominator": 1596816.0,
+                "numerator": 1662547.0,
+                "status": "defined",
+                "value": 1.0411637909439786
+              },
+              "publication_ns.p99": {
+                "denominator": 1635206.0,
+                "numerator": 1726207.0,
+                "status": "defined",
+                "value": 1.0556510922782818
+              },
+              "total_ns.p50": {
+                "denominator": 3940425.5,
+                "numerator": 3761540.5,
+                "status": "defined",
+                "value": 0.9546026184228074
+              },
+              "total_ns.p95": {
+                "denominator": 3998596.0,
+                "numerator": 3808805.0,
+                "status": "defined",
+                "value": 0.9525355899920872
+              },
+              "total_ns.p99": {
+                "denominator": 4049246.0,
+                "numerator": 3927735.0,
+                "status": "defined",
+                "value": 0.9699916972196799
+              }
+            }
+          },
+          {
+            "baseline_child": "native__medium-one-edit__b00__p3",
+            "block": 0,
+            "candidate_child": "native__medium-one-edit__b00__p2",
+            "pair_id": "b00-leg1",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 43035.0,
+                "numerator": 43180.0,
+                "status": "defined",
+                "value": 1.0033693505286394
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 44280.0,
+                "numerator": 44400.0,
+                "status": "defined",
+                "value": 1.002710027100271
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 51700.0,
+                "numerator": 48990.0,
+                "status": "defined",
+                "value": 0.9475822050290136
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 2281809.0,
+                "numerator": 2022968.5,
+                "status": "defined",
+                "value": 0.8865634678450299
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 2302210.0,
+                "numerator": 2046798.0,
+                "status": "defined",
+                "value": 0.8890579052301919
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 2323279.0,
+                "numerator": 2069768.0,
+                "status": "defined",
+                "value": 0.89088224014421
+              },
+              "ingress_ns.p50": {
+                "denominator": 82325.0,
+                "numerator": 83381.0,
+                "status": "defined",
+                "value": 1.0128272092317037
+              },
+              "ingress_ns.p95": {
+                "denominator": 90050.0,
+                "numerator": 95440.0,
+                "status": "defined",
+                "value": 1.0598556357579123
+              },
+              "ingress_ns.p99": {
+                "denominator": 91770.0,
+                "numerator": 101110.0,
+                "status": "defined",
+                "value": 1.1017761795793832
+              },
+              "max_rss_kib": {
+                "denominator": 46008.0,
+                "numerator": 45668.0,
+                "status": "defined",
+                "value": 0.9926099808728917
+              },
+              "publication_ns.p50": {
+                "denominator": 1579216.0,
+                "numerator": 1554276.5,
+                "status": "defined",
+                "value": 0.9842076701350544
+              },
+              "publication_ns.p95": {
+                "denominator": 1606536.0,
+                "numerator": 1600467.0,
+                "status": "defined",
+                "value": 0.9962223068764099
+              },
+              "publication_ns.p99": {
+                "denominator": 1621967.0,
+                "numerator": 1615837.0,
+                "status": "defined",
+                "value": 0.9962206382743916
+              },
+              "total_ns.p50": {
+                "denominator": 3991766.0,
+                "numerator": 3706595.0,
+                "status": "defined",
+                "value": 0.9285601911534894
+              },
+              "total_ns.p95": {
+                "denominator": 4032587.0,
+                "numerator": 3779886.0,
+                "status": "defined",
+                "value": 0.937335263938509
+              },
+              "total_ns.p99": {
+                "denominator": 4059816.0,
+                "numerator": 3824556.0,
+                "status": "defined",
+                "value": 0.9420515609574424
+              }
+            }
+          },
+          {
+            "baseline_child": "native__medium-one-edit__b01__p1",
+            "block": 1,
+            "candidate_child": "native__medium-one-edit__b01__p0",
+            "pair_id": "b01-leg0",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 43585.0,
+                "numerator": 43470.0,
+                "status": "defined",
+                "value": 0.9973614775725593
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 49890.0,
+                "numerator": 49490.0,
+                "status": "defined",
+                "value": 0.9919823611946282
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 51531.0,
+                "numerator": 52540.0,
+                "status": "defined",
+                "value": 1.019580446721391
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 2295134.5,
+                "numerator": 2026203.0,
+                "status": "defined",
+                "value": 0.8828253856146557
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 2327179.0,
+                "numerator": 2050179.0,
+                "status": "defined",
+                "value": 0.880971768823971
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 2344910.0,
+                "numerator": 2070489.0,
+                "status": "defined",
+                "value": 0.8829716279089602
+              },
+              "ingress_ns.p50": {
+                "denominator": 82120.0,
+                "numerator": 82346.0,
+                "status": "defined",
+                "value": 1.0027520701412567
+              },
+              "ingress_ns.p95": {
+                "denominator": 90830.0,
+                "numerator": 94940.0,
+                "status": "defined",
+                "value": 1.0452493669492458
+              },
+              "ingress_ns.p99": {
+                "denominator": 100620.0,
+                "numerator": 113530.0,
+                "status": "defined",
+                "value": 1.1283045120254422
+              },
+              "max_rss_kib": {
+                "denominator": 46104.0,
+                "numerator": 45744.0,
+                "status": "defined",
+                "value": 0.9921915668922436
+              },
+              "publication_ns.p50": {
+                "denominator": 1572541.0,
+                "numerator": 1555801.0,
+                "status": "defined",
+                "value": 0.9893548085550711
+              },
+              "publication_ns.p95": {
+                "denominator": 1604767.0,
+                "numerator": 1581986.0,
+                "status": "defined",
+                "value": 0.9858041697018944
+              },
+              "publication_ns.p99": {
+                "denominator": 1626936.0,
+                "numerator": 1605136.0,
+                "status": "defined",
+                "value": 0.986600579248354
+              },
+              "total_ns.p50": {
+                "denominator": 3995121.0,
+                "numerator": 3710965.0,
+                "status": "defined",
+                "value": 0.9288742443595576
+              },
+              "total_ns.p95": {
+                "denominator": 4060657.0,
+                "numerator": 3770835.0,
+                "status": "defined",
+                "value": 0.9286268207336892
+              },
+              "total_ns.p99": {
+                "denominator": 4073107.0,
+                "numerator": 3831785.0,
+                "status": "defined",
+                "value": 0.9407523544065992
+              }
+            }
+          },
+          {
+            "baseline_child": "native__medium-one-edit__b01__p2",
+            "block": 1,
+            "candidate_child": "native__medium-one-edit__b01__p3",
+            "pair_id": "b01-leg1",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 43440.0,
+                "numerator": 43630.0,
+                "status": "defined",
+                "value": 1.0043738489871086
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 44631.0,
+                "numerator": 50340.0,
+                "status": "defined",
+                "value": 1.1279155743765543
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 45110.0,
+                "numerator": 52061.0,
+                "status": "defined",
+                "value": 1.1540900022168035
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 2284664.0,
+                "numerator": 2018498.5,
+                "status": "defined",
+                "value": 0.8834990615687909
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 2309689.0,
+                "numerator": 2032779.0,
+                "status": "defined",
+                "value": 0.8801094000101313
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 2325179.0,
+                "numerator": 2044598.0,
+                "status": "defined",
+                "value": 0.8793292903471087
+              },
+              "ingress_ns.p50": {
+                "denominator": 82940.0,
+                "numerator": 82575.5,
+                "status": "defined",
+                "value": 0.9956052568121534
+              },
+              "ingress_ns.p95": {
+                "denominator": 89981.0,
+                "numerator": 91290.0,
+                "status": "defined",
+                "value": 1.014547515586624
+              },
+              "ingress_ns.p99": {
+                "denominator": 94370.0,
+                "numerator": 95670.0,
+                "status": "defined",
+                "value": 1.0137755642683055
+              },
+              "max_rss_kib": {
+                "denominator": 46008.0,
+                "numerator": 45772.0,
+                "status": "defined",
+                "value": 0.9948704573117718
+              },
+              "publication_ns.p50": {
+                "denominator": 1574781.0,
+                "numerator": 1558336.0,
+                "status": "defined",
+                "value": 0.9895572781231168
+              },
+              "publication_ns.p95": {
+                "denominator": 1603076.0,
+                "numerator": 1578256.0,
+                "status": "defined",
+                "value": 0.9845172655569667
+              },
+              "publication_ns.p99": {
+                "denominator": 1628296.0,
+                "numerator": 1598787.0,
+                "status": "defined",
+                "value": 0.9818773736470519
+              },
+              "total_ns.p50": {
+                "denominator": 3988561.0,
+                "numerator": 3705140.0,
+                "status": "defined",
+                "value": 0.9289415405706469
+              },
+              "total_ns.p95": {
+                "denominator": 4036266.0,
+                "numerator": 3739615.0,
+                "status": "defined",
+                "value": 0.9265036050646811
+              },
+              "total_ns.p99": {
+                "denominator": 4059046.0,
+                "numerator": 3754325.0,
+                "status": "defined",
+                "value": 0.9249279264142363
+              }
+            }
+          },
+          {
+            "baseline_child": "native__medium-one-edit__b02__p0",
+            "block": 2,
+            "candidate_child": "native__medium-one-edit__b02__p1",
+            "pair_id": "b02-leg0",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 43765.0,
+                "numerator": 43760.0,
+                "status": "defined",
+                "value": 0.999885753455958
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 50570.0,
+                "numerator": 50210.0,
+                "status": "defined",
+                "value": 0.9928811548348824
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 57691.0,
+                "numerator": 51800.0,
+                "status": "defined",
+                "value": 0.8978870187724255
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 2247849.0,
+                "numerator": 2017993.0,
+                "status": "defined",
+                "value": 0.897744021061913
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 2265989.0,
+                "numerator": 2041718.0,
+                "status": "defined",
+                "value": 0.9010273218448986
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 2272790.0,
+                "numerator": 2062908.0,
+                "status": "defined",
+                "value": 0.9076544687366629
+              },
+              "ingress_ns.p50": {
+                "denominator": 81165.5,
+                "numerator": 83280.0,
+                "status": "defined",
+                "value": 1.026051709162144
+              },
+              "ingress_ns.p95": {
+                "denominator": 87281.0,
+                "numerator": 92320.0,
+                "status": "defined",
+                "value": 1.0577330690528293
+              },
+              "ingress_ns.p99": {
+                "denominator": 88690.0,
+                "numerator": 111591.0,
+                "status": "defined",
+                "value": 1.2582140038335776
+              },
+              "max_rss_kib": {
+                "denominator": 46248.0,
+                "numerator": 45560.0,
+                "status": "defined",
+                "value": 0.9851236810240442
+              },
+              "publication_ns.p50": {
+                "denominator": 1587756.5,
+                "numerator": 1571761.0,
+                "status": "defined",
+                "value": 0.9899257222376353
+              },
+              "publication_ns.p95": {
+                "denominator": 1632047.0,
+                "numerator": 1615056.0,
+                "status": "defined",
+                "value": 0.9895891478615506
+              },
+              "publication_ns.p99": {
+                "denominator": 1656686.0,
+                "numerator": 1643547.0,
+                "status": "defined",
+                "value": 0.9920691066381921
+              },
+              "total_ns.p50": {
+                "denominator": 3961146.0,
+                "numerator": 3720055.0,
+                "status": "defined",
+                "value": 0.93913604800227
+              },
+              "total_ns.p95": {
+                "denominator": 4027386.0,
+                "numerator": 3776185.0,
+                "status": "defined",
+                "value": 0.9376267881946255
+              },
+              "total_ns.p99": {
+                "denominator": 4050616.0,
+                "numerator": 3856176.0,
+                "status": "defined",
+                "value": 0.9519974245892476
+              }
+            }
+          },
+          {
+            "baseline_child": "native__medium-one-edit__b02__p3",
+            "block": 2,
+            "candidate_child": "native__medium-one-edit__b02__p2",
+            "pair_id": "b02-leg1",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 43575.0,
+                "numerator": 43995.0,
+                "status": "defined",
+                "value": 1.0096385542168675
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 45540.0,
+                "numerator": 50450.0,
+                "status": "defined",
+                "value": 1.1078173034694774
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 51800.0,
+                "numerator": 51130.0,
+                "status": "defined",
+                "value": 0.9870656370656371
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 2257985.0,
+                "numerator": 2013303.5,
+                "status": "defined",
+                "value": 0.8916372340826002
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 2283519.0,
+                "numerator": 2045859.0,
+                "status": "defined",
+                "value": 0.8959237913063127
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 2297839.0,
+                "numerator": 2097638.0,
+                "status": "defined",
+                "value": 0.9128742266103065
+              },
+              "ingress_ns.p50": {
+                "denominator": 81875.0,
+                "numerator": 84120.0,
+                "status": "defined",
+                "value": 1.0274198473282443
+              },
+              "ingress_ns.p95": {
+                "denominator": 91350.0,
+                "numerator": 92091.0,
+                "status": "defined",
+                "value": 1.008111658456486
+              },
+              "ingress_ns.p99": {
+                "denominator": 98361.0,
+                "numerator": 109501.0,
+                "status": "defined",
+                "value": 1.1132562702697206
+              },
+              "max_rss_kib": {
+                "denominator": 46492.0,
+                "numerator": 45604.0,
+                "status": "defined",
+                "value": 0.9808999397745849
+              },
+              "publication_ns.p50": {
+                "denominator": 1578286.5,
+                "numerator": 1561196.5,
+                "status": "defined",
+                "value": 0.9891718011907217
+              },
+              "publication_ns.p95": {
+                "denominator": 1622217.0,
+                "numerator": 1586917.0,
+                "status": "defined",
+                "value": 0.9782396559769747
+              },
+              "publication_ns.p99": {
+                "denominator": 1635736.0,
+                "numerator": 1624387.0,
+                "status": "defined",
+                "value": 0.9930618388297378
+              },
+              "total_ns.p50": {
+                "denominator": 3964486.0,
+                "numerator": 3702060.0,
+                "status": "defined",
+                "value": 0.9338057947486761
+              },
+              "total_ns.p95": {
+                "denominator": 4020977.0,
+                "numerator": 3767206.0,
+                "status": "defined",
+                "value": 0.9368882239316465
+              },
+              "total_ns.p99": {
+                "denominator": 4058547.0,
+                "numerator": 3878816.0,
+                "status": "defined",
+                "value": 0.9557154321485004
+              }
+            }
+          }
+        ]
+      },
+      "medium-one-percent": {
+        "child_count": 12,
+        "metrics": {
+          "commit_drop_ns.p50": {
+            "max": 1.0182891909034368,
+            "median": 1.0059660701453912,
+            "min": 0.9959758673987337,
+            "pair_count": 6,
+            "pair_values": [
+              0.9959758673987337,
+              1.006997659233707,
+              1.014975665696164,
+              1.0044156990289166,
+              1.0182891909034368,
+              1.0049344810570755
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "commit_drop_ns.p95": {
+            "max": 1.0172139285945092,
+            "median": 1.004168724928081,
+            "min": 0.987037751827677,
+            "pair_count": 6,
+            "pair_values": [
+              0.9954913017256017,
+              1.0172139285945092,
+              1.0170009000476496,
+              1.0026590872830627,
+              1.0056783625730994,
+              0.987037751827677
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "commit_drop_ns.p99": {
+            "max": 1.0760161015023797,
+            "median": 1.0037713229214447,
+            "min": 0.9636515446701921,
+            "pair_count": 6,
+            "pair_values": [
+              1.0006941655670931,
+              1.0193073356967548,
+              1.0760161015023797,
+              0.9798886016636537,
+              1.0068484802757964,
+              0.9636515446701921
+            ],
+            "review_flag_pair_gt_1_05": 1,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "edit_commit_ns.p50": {
+            "max": 0.9658942885220743,
+            "median": 0.8920368142870636,
+            "min": 0.8816125290460063,
+            "pair_count": 6,
+            "pair_values": [
+              0.9658942885220743,
+              0.8936549757801908,
+              0.8843713768611478,
+              0.8904186527939365,
+              0.8947157852924638,
+              0.8816125290460063
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "edit_commit_ns.p95": {
+            "max": 0.9650001148785647,
+            "median": 0.8948659952858048,
+            "min": 0.8880880550514226,
+            "pair_count": 6,
+            "pair_values": [
+              0.9650001148785647,
+              0.8968882018123988,
+              0.8880880550514226,
+              0.8924684137073259,
+              0.8928437887592108,
+              0.9234360503453944
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "edit_commit_ns.p99": {
+            "max": 0.9675267505887758,
+            "median": 0.8964580636477564,
+            "min": 0.8873361678390762,
+            "pair_count": 6,
+            "pair_values": [
+              0.9675267505887758,
+              0.8961916402860453,
+              0.8873361678390762,
+              0.8939502953590365,
+              0.8967244870094676,
+              0.9081145065924685
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "ingress_ns.p50": {
+            "max": 1.279860454880843,
+            "median": 1.0582075940614462,
+            "min": 0.8900351380648405,
+            "pair_count": 6,
+            "pair_values": [
+              0.8900351380648405,
+              1.0941951733467996,
+              1.1199595042336483,
+              1.0222200147760925,
+              1.279860454880843,
+              1.0101483985827036
+            ],
+            "review_flag_pair_gt_1_05": 3,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "ingress_ns.p95": {
+            "max": 1.3086996024985804,
+            "median": 1.0707179012051145,
+            "min": 0.8806880232981434,
+            "pair_count": 6,
+            "pair_values": [
+              0.8806880232981434,
+              1.177044346149484,
+              1.1566759002770084,
+              0.910435596341353,
+              1.3086996024985804,
+              0.9847599021332206
+            ],
+            "review_flag_pair_gt_1_05": 3,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "ingress_ns.p99": {
+            "max": 1.3150146213572653,
+            "median": 1.1115534802297398,
+            "min": 0.8264864484116115,
+            "pair_count": 6,
+            "pair_values": [
+              0.8264864484116115,
+              1.170127368622745,
+              1.210525783619818,
+              0.8965042742292721,
+              1.3150146213572653,
+              1.0529795918367346
+            ],
+            "review_flag_pair_gt_1_05": 4,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "max_rss_kib": {
+            "max": 1.0769537480063796,
+            "median": 0.9940759284505165,
+            "min": 0.922642616219387,
+            "pair_count": 6,
+            "pair_values": [
+              1.0769537480063796,
+              0.9981378026070763,
+              0.9561259513505447,
+              0.9900140542939566,
+              0.922642616219387,
+              1.0295157571099154
+            ],
+            "review_flag_pair_gt_1_05": 1,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "publication_ns.p50": {
+            "max": 1.1008324192417516,
+            "median": 0.9912788405046152,
+            "min": 0.8838843347012351,
+            "pair_count": 6,
+            "pair_values": [
+              0.8838843347012351,
+              0.9957735511484245,
+              1.095502734323054,
+              0.986784129860806,
+              1.1008324192417516,
+              0.8929365800580285
+            ],
+            "review_flag_pair_gt_1_05": 2,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "publication_ns.p95": {
+            "max": 1.095851376648642,
+            "median": 0.9945862742948907,
+            "min": 0.8804728731331553,
+            "pair_count": 6,
+            "pair_values": [
+              0.8804728731331553,
+              0.9995669038707273,
+              1.0952413900807212,
+              0.989605644719054,
+              1.095851376648642,
+              0.8872137537523591
+            ],
+            "review_flag_pair_gt_1_05": 2,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "publication_ns.p99": {
+            "max": 1.090504545302129,
+            "median": 0.9887687488624699,
+            "min": 0.870182914425198,
+            "pair_count": 6,
+            "pair_values": [
+              0.870182914425198,
+              1.0013021314207369,
+              1.090504545302129,
+              0.976235366304203,
+              1.0851717264436873,
+              0.8911576529076827
+            ],
+            "review_flag_pair_gt_1_05": 2,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "total_ns.p50": {
+            "max": 0.973136394670892,
+            "median": 0.9335961741912338,
+            "min": 0.8879813971537347,
+            "pair_count": 6,
+            "pair_values": [
+              0.9333232067022327,
+              0.9338691416802347,
+              0.9636681006411001,
+              0.9280578066868228,
+              0.973136394670892,
+              0.8879813971537347
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "total_ns.p95": {
+            "max": 0.9715292021275931,
+            "median": 0.9336060748234978,
+            "min": 0.9105724700933837,
+            "pair_count": 6,
+            "pair_values": [
+              0.9311441865237285,
+              0.936067963123267,
+              0.9675382676173363,
+              0.9278140002965426,
+              0.9715292021275931,
+              0.9105724700933837
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "total_ns.p99": {
+            "max": 0.9662066438325236,
+            "median": 0.9369312745146983,
+            "min": 0.9036283487359525,
+            "pair_count": 6,
+            "pair_values": [
+              0.9326962172348001,
+              0.9411663317945963,
+              0.9638840629789249,
+              0.9238004608380664,
+              0.9662066438325236,
+              0.9036283487359525
+            ],
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          }
+        },
+        "pair_count": 6,
+        "pairs": [
+          {
+            "baseline_child": "native__medium-one-percent__b00__p0",
+            "block": 0,
+            "candidate_child": "native__medium-one-percent__b00__p1",
+            "pair_id": "b00-leg0",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 164010.5,
+                "numerator": 163350.5,
+                "status": "defined",
+                "value": 0.9959758673987337
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 170781.0,
+                "numerator": 170011.0,
+                "status": "defined",
+                "value": 0.9954913017256017
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 174310.0,
+                "numerator": 174431.0,
+                "status": "defined",
+                "value": 1.0006941655670931
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 9209586.5,
+                "numerator": 8895487.0,
+                "status": "defined",
+                "value": 0.9658942885220743
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 9270659.0,
+                "numerator": 8946187.0,
+                "status": "defined",
+                "value": 0.9650001148785647
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 9303627.0,
+                "numerator": 9001508.0,
+                "status": "defined",
+                "value": 0.9675267505887758
+              },
+              "ingress_ns.p50": {
+                "denominator": 95480.5,
+                "numerator": 84981.0,
+                "status": "defined",
+                "value": 0.8900351380648405
+              },
+              "ingress_ns.p95": {
+                "denominator": 109880.0,
+                "numerator": 96770.0,
+                "status": "defined",
+                "value": 0.8806880232981434
+              },
+              "ingress_ns.p99": {
+                "denominator": 127771.0,
+                "numerator": 105601.0,
+                "status": "defined",
+                "value": 0.8264864484116115
+              },
+              "max_rss_kib": {
+                "denominator": 50160.0,
+                "numerator": 54020.0,
+                "status": "defined",
+                "value": 1.0769537480063796
+              },
+              "publication_ns.p50": {
+                "denominator": 6229370.5,
+                "numerator": 5506043.0,
+                "status": "defined",
+                "value": 0.8838843347012351
+              },
+              "publication_ns.p95": {
+                "denominator": 6297926.0,
+                "numerator": 5545153.0,
+                "status": "defined",
+                "value": 0.8804728731331553
+              },
+              "publication_ns.p99": {
+                "denominator": 6424917.0,
+                "numerator": 5590853.0,
+                "status": "defined",
+                "value": 0.870182914425198
+              },
+              "total_ns.p50": {
+                "denominator": 15694591.0,
+                "numerator": 14648126.0,
+                "status": "defined",
+                "value": 0.9333232067022327
+              },
+              "total_ns.p95": {
+                "denominator": 15828206.0,
+                "numerator": 14738342.0,
+                "status": "defined",
+                "value": 0.9311441865237285
+              },
+              "total_ns.p99": {
+                "denominator": 15937336.0,
+                "numerator": 14864693.0,
+                "status": "defined",
+                "value": 0.9326962172348001
+              }
+            }
+          },
+          {
+            "baseline_child": "native__medium-one-percent__b00__p3",
+            "block": 0,
+            "candidate_child": "native__medium-one-percent__b00__p2",
+            "pair_id": "b00-leg1",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 162340.0,
+                "numerator": 163476.0,
+                "status": "defined",
+                "value": 1.006997659233707
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 170211.0,
+                "numerator": 173141.0,
+                "status": "defined",
+                "value": 1.0172139285945092
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 183350.0,
+                "numerator": 186890.0,
+                "status": "defined",
+                "value": 1.0193073356967548
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 9226332.0,
+                "numerator": 8245157.5,
+                "status": "defined",
+                "value": 0.8936549757801908
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 9286367.0,
+                "numerator": 8328833.0,
+                "status": "defined",
+                "value": 0.8968882018123988
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 9361038.0,
+                "numerator": 8389284.0,
+                "status": "defined",
+                "value": 0.8961916402860453
+              },
+              "ingress_ns.p50": {
+                "denominator": 80200.5,
+                "numerator": 87755.0,
+                "status": "defined",
+                "value": 1.0941951733467996
+              },
+              "ingress_ns.p95": {
+                "denominator": 88170.0,
+                "numerator": 103780.0,
+                "status": "defined",
+                "value": 1.177044346149484
+              },
+              "ingress_ns.p99": {
+                "denominator": 99161.0,
+                "numerator": 116031.0,
+                "status": "defined",
+                "value": 1.170127368622745
+              },
+              "max_rss_kib": {
+                "denominator": 53700.0,
+                "numerator": 53600.0,
+                "status": "defined",
+                "value": 0.9981378026070763
+              },
+              "publication_ns.p50": {
+                "denominator": 5540112.0,
+                "numerator": 5516697.0,
+                "status": "defined",
+                "value": 0.9957735511484245
+              },
+              "publication_ns.p95": {
+                "denominator": 5589983.0,
+                "numerator": 5587562.0,
+                "status": "defined",
+                "value": 0.9995669038707273
+              },
+              "publication_ns.p99": {
+                "denominator": 5659183.0,
+                "numerator": 5666552.0,
+                "status": "defined",
+                "value": 1.0013021314207369
+              },
+              "total_ns.p50": {
+                "denominator": 15019985.0,
+                "numerator": 14026700.5,
+                "status": "defined",
+                "value": 0.9338691416802347
+              },
+              "total_ns.p95": {
+                "denominator": 15121730.0,
+                "numerator": 14154967.0,
+                "status": "defined",
+                "value": 0.936067963123267
+              },
+              "total_ns.p99": {
+                "denominator": 15148571.0,
+                "numerator": 14257325.0,
+                "status": "defined",
+                "value": 0.9411663317945963
+              }
+            }
+          },
+          {
+            "baseline_child": "native__medium-one-percent__b01__p1",
+            "block": 1,
+            "candidate_child": "native__medium-one-percent__b01__p0",
+            "pair_id": "b01-leg0",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 162630.5,
+                "numerator": 165066.0,
+                "status": "defined",
+                "value": 1.014975665696164
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 169991.0,
+                "numerator": 172881.0,
+                "status": "defined",
+                "value": 1.0170009000476496
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 171661.0,
+                "numerator": 184710.0,
+                "status": "defined",
+                "value": 1.0760161015023797
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 9285802.0,
+                "numerator": 8212097.5,
+                "status": "defined",
+                "value": 0.8843713768611478
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 9344427.0,
+                "numerator": 8298674.0,
+                "status": "defined",
+                "value": 0.8880880550514226
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 9393760.0,
+                "numerator": 8335423.0,
+                "status": "defined",
+                "value": 0.8873361678390762
+              },
+              "ingress_ns.p50": {
+                "denominator": 81490.0,
+                "numerator": 91265.5,
+                "status": "defined",
+                "value": 1.1199595042336483
+              },
+              "ingress_ns.p95": {
+                "denominator": 90250.0,
+                "numerator": 104390.0,
+                "status": "defined",
+                "value": 1.1566759002770084
+              },
+              "ingress_ns.p99": {
+                "denominator": 98900.0,
+                "numerator": 119721.0,
+                "status": "defined",
+                "value": 1.210525783619818
+              },
+              "max_rss_kib": {
+                "denominator": 53608.0,
+                "numerator": 51256.0,
+                "status": "defined",
+                "value": 0.9561259513505447
+              },
+              "publication_ns.p50": {
+                "denominator": 5553385.5,
+                "numerator": 6083749.0,
+                "status": "defined",
+                "value": 1.095502734323054
+              },
+              "publication_ns.p95": {
+                "denominator": 5622062.0,
+                "numerator": 6157515.0,
+                "status": "defined",
+                "value": 1.0952413900807212
+              },
+              "publication_ns.p99": {
+                "denominator": 5666290.0,
+                "numerator": 6179115.0,
+                "status": "defined",
+                "value": 1.090504545302129
+              },
+              "total_ns.p50": {
+                "denominator": 15101385.0,
+                "numerator": 14552723.0,
+                "status": "defined",
+                "value": 0.9636681006411001
+              },
+              "total_ns.p95": {
+                "denominator": 15176670.0,
+                "numerator": 14684009.0,
+                "status": "defined",
+                "value": 0.9675382676173363
+              },
+              "total_ns.p99": {
+                "denominator": 15314901.0,
+                "numerator": 14761789.0,
+                "status": "defined",
+                "value": 0.9638840629789249
+              }
+            }
+          },
+          {
+            "baseline_child": "native__medium-one-percent__b01__p2",
+            "block": 1,
+            "candidate_child": "native__medium-one-percent__b01__p3",
+            "pair_id": "b01-leg1",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 162035.5,
+                "numerator": 162751.0,
+                "status": "defined",
+                "value": 1.0044156990289166
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 169231.0,
+                "numerator": 169681.0,
+                "status": "defined",
+                "value": 1.0026590872830627
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 177561.0,
+                "numerator": 173990.0,
+                "status": "defined",
+                "value": 0.9798886016636537
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 9247687.0,
+                "numerator": 8234313.0,
+                "status": "defined",
+                "value": 0.8904186527939365
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 9345747.0,
+                "numerator": 8340784.0,
+                "status": "defined",
+                "value": 0.8924684137073259
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 9382987.0,
+                "numerator": 8387924.0,
+                "status": "defined",
+                "value": 0.8939502953590365
+              },
+              "ingress_ns.p50": {
+                "denominator": 80535.5,
+                "numerator": 82325.0,
+                "status": "defined",
+                "value": 1.0222200147760925
+              },
+              "ingress_ns.p95": {
+                "denominator": 99381.0,
+                "numerator": 90480.0,
+                "status": "defined",
+                "value": 0.910435596341353
+              },
+              "ingress_ns.p99": {
+                "denominator": 106101.0,
+                "numerator": 95120.0,
+                "status": "defined",
+                "value": 0.8965042742292721
+              },
+              "max_rss_kib": {
+                "denominator": 54076.0,
+                "numerator": 53536.0,
+                "status": "defined",
+                "value": 0.9900140542939566
+              },
+              "publication_ns.p50": {
+                "denominator": 5552037.0,
+                "numerator": 5478662.0,
+                "status": "defined",
+                "value": 0.986784129860806
+              },
+              "publication_ns.p95": {
+                "denominator": 5620262.0,
+                "numerator": 5561843.0,
+                "status": "defined",
+                "value": 0.989605644719054
+              },
+              "publication_ns.p99": {
+                "denominator": 5713953.0,
+                "numerator": 5578163.0,
+                "status": "defined",
+                "value": 0.976235366304203
+              },
+              "total_ns.p50": {
+                "denominator": 15044349.5,
+                "numerator": 13962026.0,
+                "status": "defined",
+                "value": 0.9280578066868228
+              },
+              "total_ns.p95": {
+                "denominator": 15195121.0,
+                "numerator": 14098246.0,
+                "status": "defined",
+                "value": 0.9278140002965426
+              },
+              "total_ns.p99": {
+                "denominator": 15372862.0,
+                "numerator": 14201457.0,
+                "status": "defined",
+                "value": 0.9238004608380664
+              }
+            }
+          },
+          {
+            "baseline_child": "native__medium-one-percent__b02__p0",
+            "block": 2,
+            "candidate_child": "native__medium-one-percent__b02__p1",
+            "pair_id": "b02-leg0",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 162391.0,
+                "numerator": 165361.0,
+                "status": "defined",
+                "value": 1.0182891909034368
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 171000.0,
+                "numerator": 171971.0,
+                "status": "defined",
+                "value": 1.0056783625730994
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 172301.0,
+                "numerator": 173481.0,
+                "status": "defined",
+                "value": 1.0068484802757964
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 9254412.0,
+                "numerator": 8280068.5,
+                "status": "defined",
+                "value": 0.8947157852924638
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 9363097.0,
+                "numerator": 8359783.0,
+                "status": "defined",
+                "value": 0.8928437887592108
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 9385797.0,
+                "numerator": 8416474.0,
+                "status": "defined",
+                "value": 0.8967244870094676
+              },
+              "ingress_ns.p50": {
+                "denominator": 77251.0,
+                "numerator": 98870.5,
+                "status": "defined",
+                "value": 1.279860454880843
+              },
+              "ingress_ns.p95": {
+                "denominator": 88050.0,
+                "numerator": 115231.0,
+                "status": "defined",
+                "value": 1.3086996024985804
+              },
+              "ingress_ns.p99": {
+                "denominator": 99170.0,
+                "numerator": 130410.0,
+                "status": "defined",
+                "value": 1.3150146213572653
+              },
+              "max_rss_kib": {
+                "denominator": 54552.0,
+                "numerator": 50332.0,
+                "status": "defined",
+                "value": 0.922642616219387
+              },
+              "publication_ns.p50": {
+                "denominator": 5558797.5,
+                "numerator": 6119304.5,
+                "status": "defined",
+                "value": 1.1008324192417516
+              },
+              "publication_ns.p95": {
+                "denominator": 5637822.0,
+                "numerator": 6178215.0,
+                "status": "defined",
+                "value": 1.095851376648642
+              },
+              "publication_ns.p99": {
+                "denominator": 5734673.0,
+                "numerator": 6223105.0,
+                "status": "defined",
+                "value": 1.0851717264436873
+              },
+              "total_ns.p50": {
+                "denominator": 15071190.0,
+                "numerator": 14666323.5,
+                "status": "defined",
+                "value": 0.973136394670892
+              },
+              "total_ns.p95": {
+                "denominator": 15207231.0,
+                "numerator": 14774269.0,
+                "status": "defined",
+                "value": 0.9715292021275931
+              },
+              "total_ns.p99": {
+                "denominator": 15369382.0,
+                "numerator": 14849999.0,
+                "status": "defined",
+                "value": 0.9662066438325236
+              }
+            }
+          },
+          {
+            "baseline_child": "native__medium-one-percent__b02__p3",
+            "block": 2,
+            "candidate_child": "native__medium-one-percent__b02__p2",
+            "pair_id": "b02-leg1",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 164151.0,
+                "numerator": 164961.0,
+                "status": "defined",
+                "value": 1.0049344810570755
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 173581.0,
+                "numerator": 171331.0,
+                "status": "defined",
+                "value": 0.987037751827677
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 179650.0,
+                "numerator": 173120.0,
+                "status": "defined",
+                "value": 0.9636515446701921
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 9294307.0,
+                "numerator": 8193977.5,
+                "status": "defined",
+                "value": 0.8816125290460063
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 9375078.0,
+                "numerator": 8657285.0,
+                "status": "defined",
+                "value": 0.9234360503453944
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 9614608.0,
+                "numerator": 8731165.0,
+                "status": "defined",
+                "value": 0.9081145065924685
+              },
+              "ingress_ns.p50": {
+                "denominator": 86220.5,
+                "numerator": 87095.5,
+                "status": "defined",
+                "value": 1.0101483985827036
+              },
+              "ingress_ns.p95": {
+                "denominator": 101771.0,
+                "numerator": 100220.0,
+                "status": "defined",
+                "value": 0.9847599021332206
+              },
+              "ingress_ns.p99": {
+                "denominator": 110250.0,
+                "numerator": 116091.0,
+                "status": "defined",
+                "value": 1.0529795918367346
+              },
+              "max_rss_kib": {
+                "denominator": 52040.0,
+                "numerator": 53576.0,
+                "status": "defined",
+                "value": 1.0295157571099154
+              },
+              "publication_ns.p50": {
+                "denominator": 6151984.5,
+                "numerator": 5493332.0,
+                "status": "defined",
+                "value": 0.8929365800580285
+              },
+              "publication_ns.p95": {
+                "denominator": 6244405.0,
+                "numerator": 5540122.0,
+                "status": "defined",
+                "value": 0.8872137537523591
+              },
+              "publication_ns.p99": {
+                "denominator": 6263665.0,
+                "numerator": 5581913.0,
+                "status": "defined",
+                "value": 0.8911576529076827
+              },
+              "total_ns.p50": {
+                "denominator": 15698888.0,
+                "numerator": 13940320.5,
+                "status": "defined",
+                "value": 0.8879813971537347
+              },
+              "total_ns.p95": {
+                "denominator": 15847413.0,
+                "numerator": 14430218.0,
+                "status": "defined",
+                "value": 0.9105724700933837
+              },
+              "total_ns.p99": {
+                "denominator": 16101374.0,
+                "numerator": 14549658.0,
+                "status": "defined",
+                "value": 0.9036283487359525
+              }
+            }
+          }
+        ]
+      }
+    },
+    "metrics_included": "all five phases at p50/p95/p99 plus whole-process max_rss_kib; review flags retained"
+  },
+  "packets": {
+    "allocator": {
+      "completed": {
+        "bytes": 7789,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0964/capture-allocator-epoch2-v1/completed-packet.json",
+        "sha256": "f0e4d373e6b008cf42dde66381987a8caa59fdc853fd65a61970edaa8b404924"
+      },
+      "start": {
+        "bytes": 703,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0964/capture-allocator-epoch2-v1/capture-start.json",
+        "sha256": "d8166b6f3fd84f06bf2b97ba76cc5397c6acb22522d8478a3f997912a0de3d9e"
+      },
+      "terminal": {
+        "bytes": 581,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0964/capture-allocator-epoch2-v1/capture-terminal.json",
+        "sha256": "1c387f932746947b0c149472febbd85189b9b71c14b171387ffaf75b87e75e70"
+      }
+    },
+    "native": {
+      "completed": {
+        "bytes": 14839,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0964/capture-native-epoch2-v1/completed-packet.json",
+        "sha256": "d9934f4ffbf4646953d18909de48ccea4db36aceaa1e5367c7c3d18a241fd69f"
+      },
+      "start": {
+        "bytes": 700,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0964/capture-native-epoch2-v1/capture-start.json",
+        "sha256": "7903939b5b13c2c597ae0a6732facede68b90fe3830236f350711649571d7cf1"
+      },
+      "terminal": {
+        "bytes": 575,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0964/capture-native-epoch2-v1/capture-terminal.json",
+        "sha256": "16bb0261e04fdd8bd2208e0e6402a5aa9464d05ebbc023507018388e75e83bb3"
+      }
+    }
+  },
+  "plan": {
+    "bytes": 59570,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0964/protocol/plan-final-epoch2-v1.json",
+    "sha256": "dcfabed26427c6a117b41c2e4b6209baec40afe06c218054b2187ae9c49b0a64"
+  },
+  "reduction_comparison": {
+    "mismatch_count": 0,
+    "mismatches": [],
+    "reducer_output": {
+      "bytes": 103881,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/analysis-epoch2/screen-v1.json",
+      "sha256": "6b2680a0b906b6b6908a06338794954135f46277db18360369f7e3cbedfe0742"
+    }
+  },
+  "root_go_binding": {
+    "bindings": [
+      {
+        "bytes": 59404,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0964/protocol/plan-epoch2-0964-v3.json",
+        "sha256": "6743204eb830a8e002a210f3f1447384e5ea7efd2a6327e56fd77add130dd869"
+      },
+      {
+        "bytes": 6029,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0964/review/independent-epoch2-pre-capture-admission-v1.json",
+        "sha256": "fcfbad398da95a41a22d4451c9313113be382761a900d27f45addfff49b249f3"
+      },
+      {
+        "bytes": 1410,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0964/protocol/affinity-controls-epoch2-v3.json",
+        "sha256": "ebe795c155d6827e77fb007ec2010ac0e88ca12fbcb33e293929bbb2abd90f78"
+      },
+      {
+        "bytes": 3320,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0964/protocol/epoch2-affinity-preflight-v1.json",
+        "sha256": "f05e4193af29d280daba88c242fd935d7fbeb7e21fb7f1cd0d26015dbe83da06"
+      },
+      {
+        "bytes": 1225,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0964/receipts/epoch1-invalid-v1.json",
+        "sha256": "1ec732e4c520552f4f4728179714f3ee3689081a2445eb5df3bef17dfd4c961b"
+      },
+      {
+        "bytes": 5642,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0964/receipts/build-cache-cleanup-v1.json",
+        "sha256": "87a197f2030522712bab41717a74cb5765487d438938d4370777c5294c82401f"
+      }
+    ],
+    "receipt": {
+      "bytes": 1503,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/protocol/root-go-epoch2-v1.json",
+      "sha256": "18d1ec5347f378e7554896782732cf12017d80481d5c0db98cf172afa634659f"
+    }
+  },
+  "schema": "litchi.performance.0964.independent-epoch2-raw-audit.v1",
+  "scope": "independent raw packet custody, oracle, allocator conservation, and descriptive 0964 paired median audit; no adoption claim",
+  "selection_comparison": {
+    "independent": {
+      "adoption_allowed": false,
+      "decision": "reject_screen",
+      "requested_bytes_or_allocation_calls_signal": false,
+      "required_metrics": {
+        "allocator": {
+          "dense-sparse-one-percent": {
+            "allocated_bytes": {
+              "max": 1.0,
+              "median": 1.0,
+              "min": 1.0,
+              "pair_count": 3,
+              "pair_values": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of three paired repeats",
+              "undefined_count": 0
+            },
+            "allocation_calls": {
+              "max": 1.0,
+              "median": 1.0,
+              "min": 1.0,
+              "pair_count": 3,
+              "pair_values": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of three paired repeats",
+              "undefined_count": 0
+            },
+            "core_combined_with_drain.allocated_bytes": {
+              "max": 1.0,
+              "median": 1.0,
+              "min": 1.0,
+              "pair_count": 3,
+              "pair_values": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of three paired repeats",
+              "undefined_count": 0
+            },
+            "max_rss_kib": {
+              "max": 1.0010859150431173,
+              "median": 0.9949206349206349,
+              "min": 0.99423831834874,
+              "pair_count": 3,
+              "pair_values": [
+                0.9949206349206349,
+                0.99423831834874,
+                1.0010859150431173
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of three paired repeats",
+              "undefined_count": 0
+            },
+            "region_peak_live_bytes": {
+              "max": 1.0,
+              "median": 1.0,
+              "min": 1.0,
+              "pair_count": 3,
+              "pair_values": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of three paired repeats",
+              "undefined_count": 0
+            }
+          },
+          "medium-one-edit": {
+            "allocated_bytes": {
+              "max": 1.0,
+              "median": 1.0,
+              "min": 1.0,
+              "pair_count": 3,
+              "pair_values": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of three paired repeats",
+              "undefined_count": 0
+            },
+            "allocation_calls": {
+              "max": 1.0,
+              "median": 1.0,
+              "min": 1.0,
+              "pair_count": 3,
+              "pair_values": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of three paired repeats",
+              "undefined_count": 0
+            },
+            "core_combined_with_drain.allocated_bytes": {
+              "max": 1.0,
+              "median": 1.0,
+              "min": 1.0,
+              "pair_count": 3,
+              "pair_values": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of three paired repeats",
+              "undefined_count": 0
+            },
+            "max_rss_kib": {
+              "max": 1.0009518041014105,
+              "median": 0.9968831168831169,
+              "min": 0.9958445156263527,
+              "pair_count": 3,
+              "pair_values": [
+                0.9958445156263527,
+                1.0009518041014105,
+                0.9968831168831169
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of three paired repeats",
+              "undefined_count": 0
+            },
+            "region_peak_live_bytes": {
+              "max": 1.0,
+              "median": 1.0,
+              "min": 1.0,
+              "pair_count": 3,
+              "pair_values": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of three paired repeats",
+              "undefined_count": 0
+            }
+          },
+          "medium-one-percent": {
+            "allocated_bytes": {
+              "max": 1.0,
+              "median": 1.0,
+              "min": 1.0,
+              "pair_count": 3,
+              "pair_values": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of three paired repeats",
+              "undefined_count": 0
+            },
+            "allocation_calls": {
+              "max": 1.0,
+              "median": 1.0,
+              "min": 1.0,
+              "pair_count": 3,
+              "pair_values": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of three paired repeats",
+              "undefined_count": 0
+            },
+            "core_combined_with_drain.allocated_bytes": {
+              "max": 1.0,
+              "median": 1.0,
+              "min": 1.0,
+              "pair_count": 3,
+              "pair_values": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of three paired repeats",
+              "undefined_count": 0
+            },
+            "max_rss_kib": {
+              "max": 1.0063065736756196,
+              "median": 1.001489757914339,
+              "min": 0.9948945615982242,
+              "pair_count": 3,
+              "pair_values": [
+                1.001489757914339,
+                0.9948945615982242,
+                1.0063065736756196
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of three paired repeats",
+              "undefined_count": 0
+            },
+            "region_peak_live_bytes": {
+              "max": 1.0,
+              "median": 1.0,
+              "min": 1.0,
+              "pair_count": 3,
+              "pair_values": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of three paired repeats",
+              "undefined_count": 0
+            }
+          }
+        },
+        "native": {
+          "dense-sparse-one-percent": {
+            "commit_drop_ns.p99": {
+              "max": 1.0993248194739327,
+              "median": 1.0000775493982714,
+              "min": 0.8893314633536987,
+              "pair_count": 6,
+              "pair_values": [
+                1.0248917304490937,
+                0.9943296918793417,
+                0.8893314633536987,
+                1.0993248194739327,
+                0.9860670016539737,
+                1.005825406917201
+              ],
+              "review_flag_pair_gt_1_05": 1,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            },
+            "edit_commit_ns.p50": {
+              "max": 0.9360677009746433,
+              "median": 0.8861155743973652,
+              "min": 0.881647217623721,
+              "pair_count": 6,
+              "pair_values": [
+                0.8849517379218073,
+                0.881647217623721,
+                0.8892948636139913,
+                0.8868419646314839,
+                0.9360677009746433,
+                0.8853891841632466
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            },
+            "edit_commit_ns.p95": {
+              "max": 0.937329669113241,
+              "median": 0.8881962966569508,
+              "min": 0.8821306820745607,
+              "pair_count": 6,
+              "pair_values": [
+                0.8849383952074427,
+                0.8821306820745607,
+                0.8918439757682319,
+                0.8890219951987611,
+                0.937329669113241,
+                0.8873705981151404
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            },
+            "edit_commit_ns.p99": {
+              "max": 0.9379793705972792,
+              "median": 0.8917611437273711,
+              "min": 0.8758987123604545,
+              "pair_count": 6,
+              "pair_values": [
+                0.8908778111635198,
+                0.8758987123604545,
+                0.8895626851723839,
+                0.893312189403591,
+                0.9379793705972792,
+                0.8926444762912225
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            },
+            "ingress_ns.p99": {
+              "max": 1.2385064794102933,
+              "median": 1.0247250029289336,
+              "min": 0.7710891173282513,
+              "pair_count": 6,
+              "pair_values": [
+                1.2385064794102933,
+                1.1408588848634797,
+                0.9806985294117647,
+                0.7710891173282513,
+                1.0687514764461026,
+                0.8908057101379143
+              ],
+              "review_flag_pair_gt_1_05": 3,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            },
+            "max_rss_kib": {
+              "max": 1.0007664793050588,
+              "median": 0.9966857545528771,
+              "min": 0.993185147442838,
+              "pair_count": 6,
+              "pair_values": [
+                1.0007664793050588,
+                0.9946466127079218,
+                0.993884571282966,
+                0.9987248963978324,
+                1.0,
+                0.993185147442838
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            },
+            "publication_ns.p99": {
+              "max": 0.9949918345932203,
+              "median": 0.9828198575874503,
+              "min": 0.9461709308280998,
+              "pair_count": 6,
+              "pair_values": [
+                0.99418072086912,
+                0.9461709308280998,
+                0.9731206939407236,
+                0.9882683886604585,
+                0.9949918345932203,
+                0.9773713265144421
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            },
+            "total_ns.p50": {
+              "max": 0.9603147045779608,
+              "median": 0.9281089997812242,
+              "min": 0.9112677798570271,
+              "pair_count": 6,
+              "pair_values": [
+                0.9313802239149944,
+                0.9112677798570271,
+                0.9282879444431854,
+                0.9279300551192629,
+                0.9603147045779608,
+                0.9260778099183887
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            },
+            "total_ns.p95": {
+              "max": 0.961034779293681,
+              "median": 0.9289904199717802,
+              "min": 0.911753663704656,
+              "pair_count": 6,
+              "pair_values": [
+                0.9353188221338387,
+                0.911753663704656,
+                0.9294652264732507,
+                0.9285156134703098,
+                0.961034779293681,
+                0.9257624685424365
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            },
+            "total_ns.p99": {
+              "max": 0.9589328254208666,
+              "median": 0.928076547418912,
+              "min": 0.9020904232768282,
+              "pair_count": 6,
+              "pair_values": [
+                0.9364226223878085,
+                0.9020904232768282,
+                0.9267207358058248,
+                0.9284616254429755,
+                0.9589328254208666,
+                0.9276914693948485
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            }
+          },
+          "medium-one-edit": {
+            "commit_drop_ns.p99": {
+              "max": 1.1540900022168035,
+              "median": 1.003323041893514,
+              "min": 0.8978870187724255,
+              "pair_count": 6,
+              "pair_values": [
+                1.0757654075546719,
+                0.9475822050290136,
+                1.019580446721391,
+                1.1540900022168035,
+                0.8978870187724255,
+                0.9870656370656371
+              ],
+              "review_flag_pair_gt_1_05": 2,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            },
+            "edit_commit_ns.p50": {
+              "max": 0.897744021061913,
+              "median": 0.8873391670001992,
+              "min": 0.8828253856146557,
+              "pair_count": 6,
+              "pair_values": [
+                0.8881148661553685,
+                0.8865634678450299,
+                0.8828253856146557,
+                0.8834990615687909,
+                0.897744021061913,
+                0.8916372340826002
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            },
+            "edit_commit_ns.p95": {
+              "max": 0.9010273218448986,
+              "median": 0.8891473275246218,
+              "min": 0.8801094000101313,
+              "pair_count": 6,
+              "pair_values": [
+                0.8892367498190515,
+                0.8890579052301919,
+                0.880971768823971,
+                0.8801094000101313,
+                0.9010273218448986,
+                0.8959237913063127
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            },
+            "edit_commit_ns.p99": {
+              "max": 0.9128742266103065,
+              "median": 0.8874051838735755,
+              "min": 0.8793292903471087,
+              "pair_count": 6,
+              "pair_values": [
+                0.8839281276029408,
+                0.89088224014421,
+                0.8829716279089602,
+                0.8793292903471087,
+                0.9076544687366629,
+                0.9128742266103065
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            },
+            "ingress_ns.p99": {
+              "max": 1.2582140038335776,
+              "median": 1.1075162249245518,
+              "min": 1.0137755642683055,
+              "pair_count": 6,
+              "pair_values": [
+                1.0809196460244868,
+                1.1017761795793832,
+                1.1283045120254422,
+                1.0137755642683055,
+                1.2582140038335776,
+                1.1132562702697206
+              ],
+              "review_flag_pair_gt_1_05": 5,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            },
+            "max_rss_kib": {
+              "max": 1.0081265291855994,
+              "median": 0.9924007738825676,
+              "min": 0.9808999397745849,
+              "pair_count": 6,
+              "pair_values": [
+                1.0081265291855994,
+                0.9926099808728917,
+                0.9921915668922436,
+                0.9948704573117718,
+                0.9851236810240442,
+                0.9808999397745849
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            },
+            "publication_ns.p99": {
+              "max": 1.0556510922782818,
+              "median": 0.992565472733965,
+              "min": 0.9818773736470519,
+              "pair_count": 6,
+              "pair_values": [
+                1.0556510922782818,
+                0.9962206382743916,
+                0.986600579248354,
+                0.9818773736470519,
+                0.9920691066381921,
+                0.9930618388297378
+              ],
+              "review_flag_pair_gt_1_05": 1,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            },
+            "total_ns.p50": {
+              "max": 0.9546026184228074,
+              "median": 0.9313736676596616,
+              "min": 0.9285601911534894,
+              "pair_count": 6,
+              "pair_values": [
+                0.9546026184228074,
+                0.9285601911534894,
+                0.9288742443595576,
+                0.9289415405706469,
+                0.93913604800227,
+                0.9338057947486761
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            },
+            "total_ns.p95": {
+              "max": 0.9525355899920872,
+              "median": 0.9371117439350778,
+              "min": 0.9265036050646811,
+              "pair_count": 6,
+              "pair_values": [
+                0.9525355899920872,
+                0.937335263938509,
+                0.9286268207336892,
+                0.9265036050646811,
+                0.9376267881946255,
+                0.9368882239316465
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            },
+            "total_ns.p99": {
+              "max": 0.9699916972196799,
+              "median": 0.947024492773345,
+              "min": 0.9249279264142363,
+              "pair_count": 6,
+              "pair_values": [
+                0.9699916972196799,
+                0.9420515609574424,
+                0.9407523544065992,
+                0.9249279264142363,
+                0.9519974245892476,
+                0.9557154321485004
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            }
+          },
+          "medium-one-percent": {
+            "commit_drop_ns.p99": {
+              "max": 1.0760161015023797,
+              "median": 1.0037713229214447,
+              "min": 0.9636515446701921,
+              "pair_count": 6,
+              "pair_values": [
+                1.0006941655670931,
+                1.0193073356967548,
+                1.0760161015023797,
+                0.9798886016636537,
+                1.0068484802757964,
+                0.9636515446701921
+              ],
+              "review_flag_pair_gt_1_05": 1,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            },
+            "edit_commit_ns.p50": {
+              "max": 0.9658942885220743,
+              "median": 0.8920368142870636,
+              "min": 0.8816125290460063,
+              "pair_count": 6,
+              "pair_values": [
+                0.9658942885220743,
+                0.8936549757801908,
+                0.8843713768611478,
+                0.8904186527939365,
+                0.8947157852924638,
+                0.8816125290460063
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            },
+            "edit_commit_ns.p95": {
+              "max": 0.9650001148785647,
+              "median": 0.8948659952858048,
+              "min": 0.8880880550514226,
+              "pair_count": 6,
+              "pair_values": [
+                0.9650001148785647,
+                0.8968882018123988,
+                0.8880880550514226,
+                0.8924684137073259,
+                0.8928437887592108,
+                0.9234360503453944
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            },
+            "edit_commit_ns.p99": {
+              "max": 0.9675267505887758,
+              "median": 0.8964580636477564,
+              "min": 0.8873361678390762,
+              "pair_count": 6,
+              "pair_values": [
+                0.9675267505887758,
+                0.8961916402860453,
+                0.8873361678390762,
+                0.8939502953590365,
+                0.8967244870094676,
+                0.9081145065924685
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            },
+            "ingress_ns.p99": {
+              "max": 1.3150146213572653,
+              "median": 1.1115534802297398,
+              "min": 0.8264864484116115,
+              "pair_count": 6,
+              "pair_values": [
+                0.8264864484116115,
+                1.170127368622745,
+                1.210525783619818,
+                0.8965042742292721,
+                1.3150146213572653,
+                1.0529795918367346
+              ],
+              "review_flag_pair_gt_1_05": 4,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            },
+            "max_rss_kib": {
+              "max": 1.0769537480063796,
+              "median": 0.9940759284505165,
+              "min": 0.922642616219387,
+              "pair_count": 6,
+              "pair_values": [
+                1.0769537480063796,
+                0.9981378026070763,
+                0.9561259513505447,
+                0.9900140542939566,
+                0.922642616219387,
+                1.0295157571099154
+              ],
+              "review_flag_pair_gt_1_05": 1,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            },
+            "publication_ns.p99": {
+              "max": 1.090504545302129,
+              "median": 0.9887687488624699,
+              "min": 0.870182914425198,
+              "pair_count": 6,
+              "pair_values": [
+                0.870182914425198,
+                1.0013021314207369,
+                1.090504545302129,
+                0.976235366304203,
+                1.0851717264436873,
+                0.8911576529076827
+              ],
+              "review_flag_pair_gt_1_05": 2,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            },
+            "total_ns.p50": {
+              "max": 0.973136394670892,
+              "median": 0.9335961741912338,
+              "min": 0.8879813971537347,
+              "pair_count": 6,
+              "pair_values": [
+                0.9333232067022327,
+                0.9338691416802347,
+                0.9636681006411001,
+                0.9280578066868228,
+                0.973136394670892,
+                0.8879813971537347
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            },
+            "total_ns.p95": {
+              "max": 0.9715292021275931,
+              "median": 0.9336060748234978,
+              "min": 0.9105724700933837,
+              "pair_count": 6,
+              "pair_values": [
+                0.9311441865237285,
+                0.936067963123267,
+                0.9675382676173363,
+                0.9278140002965426,
+                0.9715292021275931,
+                0.9105724700933837
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            },
+            "total_ns.p99": {
+              "max": 0.9662066438325236,
+              "median": 0.9369312745146983,
+              "min": 0.9036283487359525,
+              "pair_count": 6,
+              "pair_values": [
+                0.9326962172348001,
+                0.9411663317945963,
+                0.9638840629789249,
+                0.9238004608380664,
+                0.9662066438325236,
+                0.9036283487359525
+              ],
+              "review_flag_pair_gt_1_05": 0,
+              "screening_statistic": "median of six paired screening legs",
+              "undefined_count": 0
+            }
+          }
+        }
+      },
+      "safety_comparator": "candidate_over_baseline > threshold",
+      "safety_review_threshold": 1.05,
+      "signal_comparator": "candidate_over_baseline <= threshold",
+      "signal_threshold": 0.95,
+      "signals": [
+        {
+          "median": 0.8920368142870636,
+          "metric": "native/medium-one-percent/edit_commit_ns.p50",
+          "threshold": 0.95
+        },
+        {
+          "median": 0.8948659952858048,
+          "metric": "native/medium-one-percent/edit_commit_ns.p95",
+          "threshold": 0.95
+        },
+        {
+          "median": 0.9335961741912338,
+          "metric": "native/medium-one-percent/total_ns.p50",
+          "threshold": 0.95
+        },
+        {
+          "median": 0.9336060748234978,
+          "metric": "native/medium-one-percent/total_ns.p95",
+          "threshold": 0.95
+        },
+        {
+          "median": 0.8861155743973652,
+          "metric": "native/dense-sparse-one-percent/edit_commit_ns.p50",
+          "threshold": 0.95
+        },
+        {
+          "median": 0.8881962966569508,
+          "metric": "native/dense-sparse-one-percent/edit_commit_ns.p95",
+          "threshold": 0.95
+        },
+        {
+          "median": 0.9281089997812242,
+          "metric": "native/dense-sparse-one-percent/total_ns.p50",
+          "threshold": 0.95
+        },
+        {
+          "median": 0.9289904199717802,
+          "metric": "native/dense-sparse-one-percent/total_ns.p95",
+          "threshold": 0.95
+        },
+        {
+          "median": 0.8873391670001992,
+          "metric": "native/medium-one-edit/edit_commit_ns.p50",
+          "threshold": 0.95
+        },
+        {
+          "median": 0.8891473275246218,
+          "metric": "native/medium-one-edit/edit_commit_ns.p95",
+          "threshold": 0.95
+        },
+        {
+          "median": 0.9313736676596616,
+          "metric": "native/medium-one-edit/total_ns.p50",
+          "threshold": 0.95
+        },
+        {
+          "median": 0.9371117439350778,
+          "metric": "native/medium-one-edit/total_ns.p95",
+          "threshold": 0.95
+        }
+      ],
+      "statistical_effect_claim": false,
+      "stops": [
+        "native/medium-one-percent/ingress_ns.p99: safety median exceeds 1.05",
+        "native/medium-one-edit/ingress_ns.p99: safety median exceeds 1.05"
+      ]
+    },
+    "matched": true,
+    "mismatch_count": 0,
+    "mismatches": [],
+    "selection_output": {
+      "bytes": 17092,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/analysis-epoch2/selection-v1.json",
+      "sha256": "4df45aa05a1f67289b2f4df4c5151f8eb5d94d2c9c00d0f3cb34005b335444da"
+    }
+  },
+  "source_binding": {
+    "allowlist": [
+      "crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs",
+      "crates/litchi-xlsx/src/cell_values/validation.rs",
+      "crates/litchi-xlsx/src/cell_values/validation_borrow_tests.rs",
+      "crates/litchi-xlsx/src/raw/worksheet/codec.rs"
+    ],
+    "baseline_manifest": {
+      "bytes": 2267944,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/source-manifest-baseline-v2.json",
+      "sha256": "74d3ead27a1518093be3f80fbe50cfa1280526e08957b1774dbc6fd891bc4eda"
+    },
+    "candidate_manifest": {
+      "bytes": 2268238,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/source-manifest-candidate-v4.json",
+      "sha256": "19e4bdf18aee484ade90067a98ec6ab0ff5f6d017105840df4030f697f25779b"
+    },
+    "changed_paths": [
+      "crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs",
+      "crates/litchi-xlsx/src/cell_values/validation.rs",
+      "crates/litchi-xlsx/src/cell_values/validation_borrow_tests.rs",
+      "crates/litchi-xlsx/src/raw/worksheet/codec.rs"
+    ],
+    "test_allowlist": {
+      "bytes": 1039,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/protocol/candidate-test-allowlist-v3.json",
+      "sha256": "a1c62adbe848111d1370e223614473d8f1500797d52cce4a74f7f24eab045c97"
+    }
+  },
+  "status": "passed",
+  "verdict": "screen rejected by the bound rule; no full confirmation is indicated; no adoption or statistical effect claim"
+}

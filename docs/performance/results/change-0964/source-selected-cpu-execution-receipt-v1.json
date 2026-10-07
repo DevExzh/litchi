@@ -1,0 +1,103 @@
+{
+  "attempts": [
+    {
+      "exports_or_workloads_started": false,
+      "helper_sha256": "d730d4b38a1a1fe9633981cc43e20a524ff655894db435ef61ee8a0754eb93e2",
+      "label": "initial-v1",
+      "observed_exit_code": 130,
+      "output_written": false,
+      "raw_input_mutation": false,
+      "reason": "unbounded addr2line subprocess per observed instruction offset made final aggregation unnecessarily unbounded; stopped by SIGINT",
+      "status": "interrupted_before_output_write"
+    },
+    {
+      "change": "addr2line is bounded to top 16 offsets per target; all observed offsets retain period, instruction and boundary evidence",
+      "exports_or_workloads_started": false,
+      "helper_sha256": "e5c6a91f8c89e0f91db8eb34cd408d7c809d4f2ecffebeeb9a239e9fb9a7767d",
+      "label": "revised-v1",
+      "output_written": true,
+      "raw_input_mutation": false,
+      "status": "passed"
+    }
+  ],
+  "binary": {
+    "bytes": 104819848,
+    "path": "/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+    "sha256": "843ae35a0f5131a8cba965f917b2a4c5fccb6926ae3d66862e5f78512820fb33"
+  },
+  "final_helper": {
+    "bytes": 25021,
+    "path": "/home/zhuhe/litchi-performance-0964/tools/analyze_source_selected_v1.py",
+    "sha256": "e5c6a91f8c89e0f91db8eb34cd408d7c809d4f2ecffebeeb9a239e9fb9a7767d"
+  },
+  "final_output": {
+    "bytes": 227388,
+    "path": "/home/zhuhe/litchi-performance-0964/source-selected-cpu-receipt-v1.json",
+    "sha256": "0636efe9c9c4df2b05e14e2748831f5c91a015c7168b5efbfc658709bf23b5fd"
+  },
+  "frozen_analyzer": {
+    "bytes": 62780,
+    "path": "/home/zhuhe/litchi-performance-0962/tools/analyze_native_cpu_v1.py",
+    "sha256": "f5f7a387f99ba3a587eeb8f27c8f422a9fa696306c2ae47724952b861910bd3d"
+  },
+  "generated_utc": "2026-10-07T21:01:22.112118+00:00",
+  "initial_helper_retained": {
+    "bytes": 24704,
+    "path": "/home/zhuhe/litchi-performance-0964/tools/analyze_source_selected_v1.initial-v1.py",
+    "sha256": "d730d4b38a1a1fe9633981cc43e20a524ff655894ffede4f41ee8a0754eb93e2"
+  },
+  "interpretation": "Top self offsets are payload/tuple movement in the exact diagnostic binary. Namespace semantic work in resolver push/prefix traversal is a separate callee scope and is not added to these exclusive rows; no causal benefit or source change is claimed.",
+  "schema": "litchi.performance.0964.source-selected-cpu.execution-receipt.v1",
+  "scope": {
+    "qualified_period": 52852646778,
+    "qualified_samples": 12319,
+    "source_file_policy": "source locations are observed only; no source-file coverage or owner claim",
+    "source_selected_period": 32395631006,
+    "source_selected_samples": 7645
+  },
+  "status": "passed",
+  "top_exact_offsets": {
+    "process_event": [
+      {
+        "instruction": "movups %xmm0,0x10(%rdi)",
+        "offset": "0x92",
+        "period": 1176807546,
+        "samples": 278
+      },
+      {
+        "instruction": "movups 0x10(%rdx),%xmm1",
+        "offset": "0x71",
+        "period": 703626971,
+        "samples": 167
+      }
+    ],
+    "resolve_event": [
+      {
+        "instruction": "movups %xmm0,(%r14)",
+        "offset": "0x13b",
+        "period": 753159347,
+        "samples": 178
+      },
+      {
+        "instruction": "movups %xmm0,(%r14)",
+        "offset": "0x175",
+        "period": 634732830,
+        "samples": 150
+      }
+    ],
+    "worksheet_xml_and_parse_source": [
+      {
+        "instruction": "movups 0x10(%rcx),%xmm1",
+        "offset": "0x140f",
+        "period": 1434492417,
+        "samples": 340
+      },
+      {
+        "instruction": "movups 0x10(%rcx),%xmm1",
+        "offset": "0x148e",
+        "period": 782608992,
+        "samples": 185
+      }
+    ]
+  }
+}

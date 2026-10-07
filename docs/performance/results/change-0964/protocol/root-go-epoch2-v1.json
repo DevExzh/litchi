@@ -1,0 +1,37 @@
+{
+  "status": "GO",
+  "created_utc": "2026-10-07T21:46:03.479792+00:00",
+  "scope": "Fresh entire epoch2:36 native then18 allocator serial children; no retry or replacement; epoch1 excluded, no adoption authorized.",
+  "bindings": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0964/protocol/plan-epoch2-0964-v3.json",
+      "bytes": 59404,
+      "sha256": "6743204eb830a8e002a210f3f1447384e5ea7efd2a6327e56fd77add130dd869"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0964/review/independent-epoch2-pre-capture-admission-v1.json",
+      "bytes": 6029,
+      "sha256": "fcfbad398da95a41a22d4451c9313113be382761a900d27f45addfff49b249f3"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0964/protocol/affinity-controls-epoch2-v3.json",
+      "bytes": 1410,
+      "sha256": "ebe795c155d6827e77fb007ec2010ac0e88ca12fbcb33e293929bbb2abd90f78"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0964/protocol/epoch2-affinity-preflight-v1.json",
+      "bytes": 3320,
+      "sha256": "f05e4193af29d280daba88c242fd935d7fbeb7e21fb7f1cd0d26015dbe83da06"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0964/receipts/epoch1-invalid-v1.json",
+      "bytes": 1225,
+      "sha256": "1ec732e4c520552f4f4728179714f3ee3689081a2445eb5df3bef17dfd4c961b"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0964/receipts/build-cache-cleanup-v1.json",
+      "bytes": 5642,
+      "sha256": "87a197f2030522712bab41717a74cb5765487d438938d4370777c5294c82401f"
+    }
+  ]
+}

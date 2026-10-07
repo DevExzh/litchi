@@ -1,0 +1,29 @@
+{
+  "command": [
+    "python3",
+    "/home/zhuhe/litchi-performance-0964/tools/audit_screen_v2.py"
+  ],
+  "created_utc": "2026-10-07T21:52:37.948029Z",
+  "error": "missing regular file: /home/zhuhe/litchi-performance-0964/analysis-screen-epoch2-v1/screen-v1.json",
+  "exit_code": 2,
+  "expected_by_helper": {
+    "reduced": "/home/zhuhe/litchi-performance-0964/analysis-screen-epoch2-v1/screen-v1.json",
+    "selection": "/home/zhuhe/litchi-performance-0964/analysis-screen-epoch2-v1/selection-v1.json"
+  },
+  "failure_kind": "audit_input_path_mismatch",
+  "helper": {
+    "path": "/home/zhuhe/litchi-performance-0964/tools/audit_screen_v2.py",
+    "sha256": "149cc221b621c4aec2df7c26f27d70b9b86a9707a7c424a673923dd171b3dde7"
+  },
+  "observed_bound_outputs": {
+    "reduced": "/home/zhuhe/litchi-performance-0964/analysis-epoch2/screen-v1.json",
+    "selection": "/home/zhuhe/litchi-performance-0964/analysis-epoch2/selection-v1.json"
+  },
+  "plan": {
+    "path": "/home/zhuhe/litchi-performance-0964/protocol/plan-final-epoch2-v1.json",
+    "sha256": "dcfabed26427c6a117b41c2e4b6209baec40afe06c218054b2187ae9c49b0a64"
+  },
+  "schema": "litchi.performance.0964.independent-epoch2-raw-audit-failure.v1",
+  "status": "failed",
+  "workload_started_by_audit": false
+}

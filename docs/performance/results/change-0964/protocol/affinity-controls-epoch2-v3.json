@@ -1,0 +1,76 @@
+{
+  "command": [
+    "/usr/bin/taskset",
+    "--cpu-list",
+    "12-15",
+    "/usr/bin/true"
+  ],
+  "cpu_mask": [
+    12,
+    13,
+    14,
+    15
+  ],
+  "negative": {
+    "cleanup": {
+      "actions": [
+        "SIGTERM"
+      ],
+      "process_group_clear": true,
+      "reaped": true
+    },
+    "command": [
+      "/usr/bin/taskset",
+      "--cpu-list",
+      "12-15",
+      "/usr/bin/true"
+    ],
+    "guard_error": "negative control observed affinity [12]",
+    "guard_rejected": true,
+    "observed_affinity": [
+      12
+    ],
+    "pid": 3270109,
+    "requested_preexec_affinity": [
+      12
+    ]
+  },
+  "positive": {
+    "cleanup": {
+      "actions": [],
+      "process_group_clear": true,
+      "reaped": true
+    },
+    "command": [
+      "/usr/bin/taskset",
+      "--cpu-list",
+      "12-15",
+      "/usr/bin/true"
+    ],
+    "guard_passed": true,
+    "observed_affinity": [
+      12,
+      13,
+      14,
+      15
+    ],
+    "pid": 3270108,
+    "requested_preexec_affinity": [
+      12,
+      13,
+      14,
+      15
+    ],
+    "returncode": 0
+  },
+  "runner": {
+    "bytes": 43659,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0964/tools/screen_0964_v2.py",
+    "sha256": "7a3ac47c744c34cadf852557a44e7645ca36a1c72cc45e7d2350438cfcb8fab9"
+  },
+  "schema": "litchi.performance.0964.affinity-launch-controls.v1",
+  "status": "pass",
+  "workload_started": false
+}

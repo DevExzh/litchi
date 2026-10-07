@@ -1,0 +1,15 @@
+{
+  "status": "passed",
+  "created_utc": "2026-10-07T21:54:14.104209+00:00",
+  "removed": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0964/tmp",
+      "bytes": 0
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0964/tools/__pycache__",
+      "bytes": 725119
+    }
+  ],
+  "retained": "All raw evidence, source exports, binaries, source patch and failure receipts"
+}

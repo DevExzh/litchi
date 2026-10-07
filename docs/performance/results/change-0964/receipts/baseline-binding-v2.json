@@ -1,0 +1,36 @@
+{
+  "baseline_source": {
+    "files": 10933,
+    "path": "/home/zhuhe/litchi-performance-0964/source-baseline"
+  },
+  "mode": "baseline",
+  "perf_baseline_lock_sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5",
+  "retained_executables": [
+    {
+      "bytes": 43259328,
+      "executable": true,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+      "sha256": "5886b0f86a697bae757994d5a757cffae4a7e8d61a2769ff1c967029cd1912c3"
+    },
+    {
+      "bytes": 43676872,
+      "executable": true,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_alloc.v2",
+      "sha256": "9ba37a6b9796ad0e316e7571ebe117ba7a5f97bcf5d29153c7cb3d74c485e9a5"
+    }
+  ],
+  "retained_source": {
+    "files": 10932,
+    "path": "/home/zhuhe/litchi-performance-0957/source-v1"
+  },
+  "root_lock_overlay": {
+    "excluded_from_retained_comparison": true,
+    "path": "/home/zhuhe/litchi-performance-0964/source-baseline/Cargo.lock",
+    "present": true,
+    "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+  },
+  "schema": "litchi.performance.0964.source-binary-binding.v1",
+  "status": "pass"
+}

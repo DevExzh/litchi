@@ -1,0 +1,210 @@
+{
+  "affinity_controls": {
+    "bytes": 1410,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0964/protocol/affinity-controls-epoch2-v3.json",
+    "sha256": "ebe795c155d6827e77fb007ec2010ac0e88ca12fbcb33e293929bbb2abd90f78"
+  },
+  "affinity_gate": {
+    "cleanup_passed": true,
+    "cpu_mask": [
+      12,
+      13,
+      14,
+      15
+    ],
+    "getter": "os.sched_getaffinity(pid)",
+    "mismatch_policy": "fail before wait/report parsing; no retry or replacement",
+    "negative_observed": [
+      12
+    ],
+    "negative_rejected": true,
+    "parent_preexec_affinity": [
+      12,
+      13,
+      14,
+      15
+    ],
+    "positive_observed": [
+      12,
+      13,
+      14,
+      15
+    ],
+    "workload_started": false
+  },
+  "checks": [
+    {
+      "name": "plan_schema_and_prospective_status",
+      "status": "pass"
+    },
+    {
+      "name": "exact_54_child_schedule_and_ABBA_AB",
+      "status": "pass"
+    },
+    {
+      "name": "runner_control_reducer_generator_descriptor_custody",
+      "status": "pass"
+    },
+    {
+      "name": "source_manifest_diff_and_allowlist",
+      "status": "pass"
+    },
+    {
+      "name": "binary_bindings_and_report_oracles",
+      "status": "pass"
+    },
+    {
+      "name": "affinity_positive_negative_controls",
+      "status": "pass"
+    },
+    {
+      "name": "epoch2_affinity_preflight",
+      "status": "pass"
+    },
+    {
+      "name": "epoch1_excluded_no_salvage",
+      "status": "pass"
+    }
+  ],
+  "created_utc": "2026-10-07T21:45:48.263296+00:00",
+  "decision": "admit_for_root_go",
+  "epoch1_invalid_receipt": {
+    "bytes": 1225,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0964/receipts/epoch1-invalid-v1.json",
+    "sha256": "1ec732e4c520552f4f4728179714f3ee3689081a2445eb5df3bef17dfd4c961b"
+  },
+  "findings": [],
+  "generator": {
+    "bytes": 21416,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0964/tools/prepare_plan_0964_epoch2_v1.py",
+    "sha256": "c88594b96134d247241a67ff1d79ece3196de72a8efcd333953cbcd25f95aa4a"
+  },
+  "limitations": [
+    "Root GO and authorized final epoch2 plan are intentionally pending; this receipt admits the frozen prospective plan for the root GO gate and does not authorize capture."
+  ],
+  "plan": {
+    "bytes": 59404,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0964/protocol/plan-epoch2-0964-v3.json",
+    "sha256": "6743204eb830a8e002a210f3f1447384e5ea7efd2a6327e56fd77add130dd869"
+  },
+  "preflight": {
+    "bytes": 3320,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0964/protocol/epoch2-affinity-preflight-v1.json",
+    "sha256": "f05e4193af29d280daba88c242fd935d7fbeb7e21fb7f1cd0d26015dbe83da06"
+  },
+  "reducer": {
+    "bytes": 31282,
+    "executable": true,
+    "mode": 509,
+    "path": "/home/zhuhe/litchi-performance-0964/tools/reduce_0964_v1.py",
+    "sha256": "8162ed82a9fba22a405ac5b6946dc2a93e76f66ab7ffe881c5d4c897b177397b"
+  },
+  "reviewer": "/root/staging_review",
+  "root_go": {
+    "path": "/home/zhuhe/litchi-performance-0964/protocol/root-go-epoch2-v1.json",
+    "status": "pending_root_binding"
+  },
+  "runner": {
+    "bytes": 43659,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0964/tools/screen_0964_v2.py",
+    "sha256": "7a3ac47c744c34cadf852557a44e7645ca36a1c72cc45e7d2350438cfcb8fab9"
+  },
+  "schedule": {
+    "allocator_children": 18,
+    "allocator_order": [
+      [
+        "A",
+        "B"
+      ],
+      [
+        "B",
+        "A"
+      ],
+      [
+        "A",
+        "B"
+      ]
+    ],
+    "allocator_samples": 10,
+    "allocator_warmups": 2,
+    "fresh_epoch2_roots": {
+      "allocator": "/home/zhuhe/litchi-performance-0964/capture-allocator-epoch2-v1",
+      "native": "/home/zhuhe/litchi-performance-0964/capture-native-epoch2-v1"
+    },
+    "native_children": 36,
+    "native_order": [
+      [
+        "A",
+        "B",
+        "B",
+        "A"
+      ],
+      [
+        "B",
+        "A",
+        "A",
+        "B"
+      ],
+      [
+        "A",
+        "B",
+        "B",
+        "A"
+      ]
+    ],
+    "native_samples": 60,
+    "native_warmups": 10,
+    "prior_epoch_reusable": false
+  },
+  "schema": "litchi.performance.0964.independent-epoch2-pre-capture-admission.v1",
+  "scope": "Independent static admission of the sealed epoch2 prospective plan, runner affinity gate, tiny controls, custody bindings, and preflight; no workload, build, packet, ratio, or selector result was run or inspected.",
+  "source_binding": {
+    "allowlist_descriptor": {
+      "bytes": 1039,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/protocol/candidate-test-allowlist-v3.json",
+      "sha256": "a1c62adbe848111d1370e223614473d8f1500797d52cce4a74f7f24eab045c97"
+    },
+    "baseline_manifest": {
+      "bytes": 2267944,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/source-manifest-baseline-v2.json",
+      "sha256": "74d3ead27a1518093be3f80fbe50cfa1280526e08957b1774dbc6fd891bc4eda"
+    },
+    "candidate_change_allowlist": [
+      "crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs",
+      "crates/litchi-xlsx/src/cell_values/validation.rs",
+      "crates/litchi-xlsx/src/cell_values/validation_borrow_tests.rs",
+      "crates/litchi-xlsx/src/raw/worksheet/codec.rs"
+    ],
+    "candidate_manifest": {
+      "bytes": 2268238,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/source-manifest-candidate-v4.json",
+      "sha256": "19e4bdf18aee484ade90067a98ec6ab0ff5f6d017105840df4030f697f25779b"
+    },
+    "freeze_descriptor": {
+      "bytes": 1924,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/receipts/candidate-freeze-v4.json",
+      "sha256": "4f1df545ee500b404596a90068dba815f96cb810b315658798f6793a2fdc4335"
+    }
+  },
+  "status": "passed"
+}

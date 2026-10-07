@@ -1,0 +1,633 @@
+{
+  "children": [
+    {
+      "boundary_partition": {
+        "ambiguous_source_and_rewritten": {
+          "period": 0,
+          "samples": 0
+        },
+        "ambiguous_symbol_dso": {
+          "period": 0,
+          "samples": 0
+        },
+        "ambiguous_unknown": {
+          "period": 0,
+          "samples": 0
+        },
+        "neither": {
+          "period": 202193906,
+          "samples": 46
+        },
+        "rewritten_value_source": {
+          "period": 3001289777,
+          "samples": 683
+        },
+        "source_selected": {
+          "period": 5144491287,
+          "samples": 1170
+        }
+      },
+      "case_directory": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent",
+      "index": 0,
+      "prior_boundary": {
+        "bytes": 206201,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent/offline-decode-v2/boundary-attribution-v1.json",
+        "sha256": "0e087bd9bc47e4382cb5bed39bb53d183e09c465e546aa931235657123bf0301"
+      },
+      "qualified": {
+        "period": 8347974970,
+        "samples": 1899
+      },
+      "raw_inputs": [
+        {
+          "bytes": 121827387,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent/offline-decode-v1/perf-script-inline.txt",
+          "sha256": "449dbd74047e19d5a39543a5f9694c9938311de134efa6580e216bfa27593dbd"
+        },
+        {
+          "bytes": 70279951,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/00-medium-one-percent/offline-decode-v2/perf-script-physical.txt",
+          "sha256": "22cbc78c3d3ff8be7178484babd7bcf74a78a5562fdfefbc317ebee042c3ee5d"
+        }
+      ],
+      "source_selected": {
+        "period": 5144491287,
+        "samples": 1170
+      }
+    },
+    {
+      "boundary_partition": {
+        "ambiguous_source_and_rewritten": {
+          "period": 0,
+          "samples": 0
+        },
+        "ambiguous_symbol_dso": {
+          "period": 0,
+          "samples": 0
+        },
+        "ambiguous_unknown": {
+          "period": 0,
+          "samples": 0
+        },
+        "neither": {
+          "period": 437772229,
+          "samples": 100
+        },
+        "rewritten_value_source": {
+          "period": 5719717664,
+          "samples": 1303
+        },
+        "source_selected": {
+          "period": 9740513327,
+          "samples": 2319
+        }
+      },
+      "case_directory": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent",
+      "index": 1,
+      "prior_boundary": {
+        "bytes": 336144,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v2/boundary-attribution-v1.json",
+        "sha256": "c4efa685c620faf17fbc4c10bc58e44116c140cd30511d8db62128ae2f1dcf9f"
+      },
+      "qualified": {
+        "period": 15898003220,
+        "samples": 3722
+      },
+      "raw_inputs": [
+        {
+          "bytes": 161276877,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v1/perf-script-inline.txt",
+          "sha256": "51a5c3d582a5d74e0058f6cd9aacf9854233b3609804219f99c1da7b37641e73"
+        },
+        {
+          "bytes": 93976058,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/01-dense-sparse-one-percent/offline-decode-v2/perf-script-physical.txt",
+          "sha256": "0028be076d7a9828bf69e39a726488566835a8d5498f368beea981659c767799"
+        }
+      ],
+      "source_selected": {
+        "period": 9740513327,
+        "samples": 2319
+      }
+    },
+    {
+      "boundary_partition": {
+        "ambiguous_source_and_rewritten": {
+          "period": 0,
+          "samples": 0
+        },
+        "ambiguous_symbol_dso": {
+          "period": 0,
+          "samples": 0
+        },
+        "ambiguous_unknown": {
+          "period": 0,
+          "samples": 0
+        },
+        "neither": {
+          "period": 66088815,
+          "samples": 15
+        },
+        "rewritten_value_source": {
+          "period": 796096709,
+          "samples": 181
+        },
+        "source_selected": {
+          "period": 1333800571,
+          "samples": 303
+        }
+      },
+      "case_directory": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit",
+      "index": 2,
+      "prior_boundary": {
+        "bytes": 74411,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/offline-decode-v2/boundary-attribution-v1.json",
+        "sha256": "a21679ab0e8f12d264e7847951e4454431bf9d577eea1a077fa8ec1704450215"
+      },
+      "qualified": {
+        "period": 2195986095,
+        "samples": 499
+      },
+      "raw_inputs": [
+        {
+          "bytes": 106161388,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/offline-decode-v1/perf-script-inline.txt",
+          "sha256": "0e0a72ce2592818d41f4f059e6f28ad20dc55e8c3d7b86fb77e25c1ef0b8f7fe"
+        },
+        {
+          "bytes": 59675780,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/02-medium-one-edit/offline-decode-v2/perf-script-physical.txt",
+          "sha256": "bdf91f64224acd397b042e0fe956c476d7f94bf65ffb93cc36809700eb406949"
+        }
+      ],
+      "source_selected": {
+        "period": 1333800571,
+        "samples": 303
+      }
+    },
+    {
+      "boundary_partition": {
+        "ambiguous_source_and_rewritten": {
+          "period": 0,
+          "samples": 0
+        },
+        "ambiguous_symbol_dso": {
+          "period": 0,
+          "samples": 0
+        },
+        "ambiguous_unknown": {
+          "period": 0,
+          "samples": 0
+        },
+        "neither": {
+          "period": 92435931,
+          "samples": 21
+        },
+        "rewritten_value_source": {
+          "period": 703537217,
+          "samples": 160
+        },
+        "source_selected": {
+          "period": 1272727854,
+          "samples": 289
+        }
+      },
+      "case_directory": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit",
+      "index": 3,
+      "prior_boundary": {
+        "bytes": 81556,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/offline-decode-v2/boundary-attribution-v1.json",
+        "sha256": "ed2335966c0d1508fd4a30a39460741b851f4fa661c2be59cb6abea549937d3b"
+      },
+      "qualified": {
+        "period": 2068701002,
+        "samples": 470
+      },
+      "raw_inputs": [
+        {
+          "bytes": 106002574,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/offline-decode-v1/perf-script-inline.txt",
+          "sha256": "1c8d9867e652f4395d54dffd7c8ba9392449f4ad25fbba6dd2b204d1a12ae1b6"
+        },
+        {
+          "bytes": 59606963,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/03-medium-one-edit/offline-decode-v2/perf-script-physical.txt",
+          "sha256": "d0fe5e6c984fd2b20f363c6eee68c76b8ccf08fd1bcd07f8fd94a243fa188bc0"
+        }
+      ],
+      "source_selected": {
+        "period": 1272727854,
+        "samples": 289
+      }
+    },
+    {
+      "boundary_partition": {
+        "ambiguous_source_and_rewritten": {
+          "period": 0,
+          "samples": 0
+        },
+        "ambiguous_symbol_dso": {
+          "period": 0,
+          "samples": 0
+        },
+        "ambiguous_unknown": {
+          "period": 0,
+          "samples": 0
+        },
+        "neither": {
+          "period": 503607781,
+          "samples": 115
+        },
+        "rewritten_value_source": {
+          "period": 5761576043,
+          "samples": 1313
+        },
+        "source_selected": {
+          "period": 9727779650,
+          "samples": 2319
+        }
+      },
+      "case_directory": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent",
+      "index": 4,
+      "prior_boundary": {
+        "bytes": 321262,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent/offline-decode-v2/boundary-attribution-v1.json",
+        "sha256": "7c3735597da645166582915a278068f48f1e470b4b966685338a2c41b390b33f"
+      },
+      "qualified": {
+        "period": 15992963474,
+        "samples": 3747
+      },
+      "raw_inputs": [
+        {
+          "bytes": 167491834,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent/offline-decode-v1/perf-script-inline.txt",
+          "sha256": "4670bb845b494710c3faefe35f45dc524139dfa3fe4a9960129601a44a52acae"
+        },
+        {
+          "bytes": 97311363,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/04-dense-sparse-one-percent/offline-decode-v2/perf-script-physical.txt",
+          "sha256": "2b37bac9a0c354d23ebb6e9b789acd1bec389ce96f27971ad3623e4c01ec28e8"
+        }
+      ],
+      "source_selected": {
+        "period": 9727779650,
+        "samples": 2319
+      }
+    },
+    {
+      "boundary_partition": {
+        "ambiguous_source_and_rewritten": {
+          "period": 0,
+          "samples": 0
+        },
+        "ambiguous_symbol_dso": {
+          "period": 0,
+          "samples": 0
+        },
+        "ambiguous_unknown": {
+          "period": 0,
+          "samples": 0
+        },
+        "neither": {
+          "period": 249787716,
+          "samples": 58
+        },
+        "rewritten_value_source": {
+          "period": 2922911984,
+          "samples": 679
+        },
+        "source_selected": {
+          "period": 5176318317,
+          "samples": 1245
+        }
+      },
+      "case_directory": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/05-medium-one-percent",
+      "index": 5,
+      "prior_boundary": {
+        "bytes": 193994,
+        "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/05-medium-one-percent/offline-decode-v2/boundary-attribution-v1.json",
+        "sha256": "9b50c4bf732c7599ba431e68192720e1660bf2f8179400850dca9aa18750b1ef"
+      },
+      "qualified": {
+        "period": 8349018017,
+        "samples": 1982
+      },
+      "raw_inputs": [
+        {
+          "bytes": 122888338,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/05-medium-one-percent/offline-decode-v1/perf-script-inline.txt",
+          "sha256": "b91b0d26d7a0e31ee4304b6282803a143bbea28f30215c4d4837d7a8f6430f09"
+        },
+        {
+          "bytes": 70652103,
+          "path": "/home/zhuhe/litchi-performance-0962/fp-wave-v1/05-medium-one-percent/offline-decode-v2/perf-script-physical.txt",
+          "sha256": "a6c5e7ed9b0ad87d1ba1d426f6cfe06d904a6e1bcaba3680fecd1b6b47b55bdc"
+        }
+      ],
+      "source_selected": {
+        "period": 5176318317,
+        "samples": 1245
+      }
+    }
+  ],
+  "denominators": {
+    "boundary_partition": {
+      "ambiguous_source_and_rewritten": {
+        "period": 0,
+        "samples": 0
+      },
+      "ambiguous_symbol_dso": {
+        "period": 0,
+        "samples": 0
+      },
+      "ambiguous_unknown": {
+        "period": 0,
+        "samples": 0
+      },
+      "neither": {
+        "period": 1551886378,
+        "samples": 355
+      },
+      "rewritten_value_source": {
+        "period": 18905129394,
+        "samples": 4319
+      },
+      "source_selected": {
+        "period": 32395631006,
+        "samples": 7645
+      }
+    },
+    "qualified_wave": {
+      "period": 52852646778,
+      "samples": 12319
+    },
+    "source_selected": {
+      "period": 32395631006,
+      "samples": 7645
+    },
+    "source_share_of_qualified_period": 0.6129424538012869
+  },
+  "generated_utc": "2026-10-07T21:06:24.899258+00:00",
+  "helper_review": {
+    "ambiguity_classes": [
+      "ambiguous_unknown",
+      "ambiguous_symbol_dso",
+      "ambiguous_source_and_rewritten"
+    ],
+    "exact_symbols": {
+      "rewritten_value_source": "litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_value_source",
+      "source_selected": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected"
+    },
+    "observed_aggregate_ambiguity": {
+      "ambiguous_source_and_rewritten": {
+        "period": 0,
+        "samples": 0
+      },
+      "ambiguous_symbol_dso": {
+        "period": 0,
+        "samples": 0
+      },
+      "ambiguous_unknown": {
+        "period": 0,
+        "samples": 0
+      }
+    },
+    "scope": "Reviewed exact-symbol source/rewritten classification, binary-DSO gate, deepest physical self target selection, symbol-relative offset parsing, and fail-closed disjoint ambiguity classes.",
+    "status": "passed"
+  },
+  "inputs": {
+    "binary": {
+      "bytes": 104819848,
+      "path": "/home/zhuhe/litchi-performance-0962/executables/xlsx_managed_compression_benchmark.fp-debug2.v1",
+      "sha256": "843ae35a0f5131a8cba965f917b2a4c5fccb6926ae3d66862e5f78512820fb33"
+    },
+    "frozen_analyzer": {
+      "bytes": 62780,
+      "path": "/home/zhuhe/litchi-performance-0962/tools/analyze_native_cpu_v1.py",
+      "sha256": "f5f7a387f99ba3a587eeb8f27c8f422a9fa696306c2ae47724952b861910bd3d"
+    },
+    "raw_custody_policy": "Every child inline/physical stream descriptor and prior boundary descriptor was rehashed; raw files remain untouched.",
+    "reviewed_0964_helper": {
+      "bytes": 25021,
+      "path": "/home/zhuhe/litchi-performance-0964/tools/analyze_source_selected_v1.py",
+      "sha256": "e5c6a91f8c89e0f91db8eb34cd408d7c809d4f2ecffebeeb9a239e9fb9a7767d"
+    },
+    "source_selected_receipt": {
+      "bytes": 227388,
+      "path": "/home/zhuhe/litchi-performance-0964/source-selected-cpu-receipt-v1.json",
+      "sha256": "0636efe9c9c4df2b05e14e2748831f5c91a015c7168b5efbfc658709bf23b5fd"
+    }
+  },
+  "interpretation_limits": [
+    "Source-selected means exact physical Snapshot::from_source_selected symbol in the bound executable DSO after frozen paired qualification; it is an ancestry presence class.",
+    "Target self rows charge sampled period to the deepest physical frame once. Inclusive ancestry presence rows overlap and must not be summed.",
+    "Top offsets are sampled instruction locations, not causal savings. The process_event and resolve_event rows identify namespace transport/resolution machinery; worksheet_xml_and_parse_source copy/move instructions identify a hypothesis for payload movement only.",
+    "No source-owner, elapsed-time, optimization, or production claim follows. Any candidate must preserve namespace behavior, error ordering, MCE/limits, borrowed ownership, and ordinary-build validation."
+  ],
+  "method": {
+    "denominator": "Re-summed each child qualified/source-selected record and cross-bound the source-selected values to each retained prior boundary output.",
+    "offsets": "Re-summed every child target_offsets map, checked target self and offset conservation, then independently ran the receipt-bound nm/objdump commands and compared every reported ELF address/instruction text.",
+    "scope": "Target subset reduction from sealed child reductions plus independent disassembly; no full capture replay or new decoder output."
+  },
+  "reviewer": "cpu_review",
+  "schema": "litchi.performance.0964.source-selected-cpu-independent-review.v2",
+  "scope": "Read-only independent review of the sealed 0964 source-selected reduction over the retained 0962 paired streams. No workload, profiler, build, source rewrite, or raw-capture rewrite was performed.",
+  "status": "passed",
+  "supersedes": {
+    "bytes": 19833,
+    "path": "/home/zhuhe/litchi-performance-0964/review/source-selected-cpu-independent-review-v1.json",
+    "sha256": "050cd4329f05807e45a170938efa72fb4bd76cfe159c34fa318005d4775ee458"
+  },
+  "targets": {
+    "process_event": {
+      "all_reported_offsets_instruction_boundaries": true,
+      "elf_range": {
+        "elf_start": 1494544,
+        "size": 341
+      },
+      "exclusive_self": {
+        "period": 2242851999,
+        "period_share": 0.0692331629096714,
+        "samples": 531
+      },
+      "inclusive_ancestry_presence": {
+        "period": 3716933405,
+        "period_share": 0.11473563840480792,
+        "samples": 880
+      },
+      "instruction_count": 100,
+      "offset_sum_matches_exclusive_self": true,
+      "symbol": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+      "top_offsets": [
+        {
+          "elf_address": "0x16cea2",
+          "instruction": "movups %xmm0,0x10(%rdi)",
+          "offset": "0x92",
+          "period": 1176807546,
+          "period_share": 0.036326118969006754,
+          "samples": 278
+        },
+        {
+          "elf_address": "0x16ce81",
+          "instruction": "movups 0x10(%rdx),%xmm1",
+          "offset": "0x71",
+          "period": 703626971,
+          "period_share": 0.02171981063957918,
+          "samples": 167
+        },
+        {
+          "elf_address": "0x16ce11",
+          "instruction": "mov    %rsp,%rbp",
+          "offset": "0x1",
+          "period": 67746161,
+          "period_share": 0.0020912128856959977,
+          "samples": 16
+        },
+        {
+          "elf_address": "0x16ce32",
+          "instruction": "jne    16ce7e <quick_xml::reader::ns_reader::NsReader<R>::process_event+0x6e>",
+          "offset": "0x22",
+          "period": 41750370,
+          "period_share": 0.001288765450880318,
+          "samples": 10
+        },
+        {
+          "elf_address": "0x16ce3c",
+          "instruction": "je     16ceaf <quick_xml::reader::ns_reader::NsReader<R>::process_event+0x9f>",
+          "offset": "0x2c",
+          "period": 34124587,
+          "period_share": 0.0010533700360298517,
+          "samples": 8
+        }
+      ],
+      "top_offsets_are_sampled_self_only": true
+    },
+    "resolve_event": {
+      "all_reported_offsets_instruction_boundaries": true,
+      "elf_range": {
+        "elf_start": 6558640,
+        "size": 563
+      },
+      "exclusive_self": {
+        "period": 1442015420,
+        "period_share": 0.044512651095850675,
+        "samples": 341
+      },
+      "inclusive_ancestry_presence": {
+        "period": 1524905689,
+        "period_share": 0.04707133775901979,
+        "samples": 361
+      },
+      "instruction_count": 152,
+      "offset_sum_matches_exclusive_self": true,
+      "symbol": "quick_xml::name::NamespaceResolver::resolve_event",
+      "top_offsets": [
+        {
+          "elf_address": "0x6414eb",
+          "instruction": "movups %xmm0,(%r14)",
+          "offset": "0x13b",
+          "period": 753159347,
+          "period_share": 0.0232487938531127,
+          "samples": 178
+        },
+        {
+          "elf_address": "0x641525",
+          "instruction": "movups %xmm0,(%r14)",
+          "offset": "0x175",
+          "period": 634732830,
+          "period_share": 0.019593161493981735,
+          "samples": 150
+        },
+        {
+          "elf_address": "0x6413ca",
+          "instruction": "test   %rax,%rax",
+          "offset": "0x1a",
+          "period": 21405145,
+          "period_share": 0.000660741721500518,
+          "samples": 5
+        },
+        {
+          "elf_address": "0x641469",
+          "instruction": "mov    0x18(%rdx),%r12",
+          "offset": "0xb9",
+          "period": 4327594,
+          "period_share": 0.00013358572948304312,
+          "samples": 1
+        },
+        {
+          "elf_address": "0x6414cd",
+          "instruction": "lea    -0x48(%rbp),%rdi",
+          "offset": "0x11d",
+          "period": 4259063,
+          "period_share": 0.00013147028990456085,
+          "samples": 1
+        }
+      ],
+      "top_offsets_are_sampled_self_only": true
+    },
+    "worksheet_xml_and_parse_source": {
+      "all_reported_offsets_instruction_boundaries": true,
+      "elf_range": {
+        "elf_start": 4774192,
+        "size": 11201
+      },
+      "exclusive_self": {
+        "period": 3475748072,
+        "period_share": 0.1072906427214292,
+        "samples": 820
+      },
+      "inclusive_ancestry_presence": {
+        "period": 31360864435,
+        "period_share": 0.9680584529806395,
+        "samples": 7407
+      },
+      "instruction_count": 2225,
+      "offset_sum_matches_exclusive_self": true,
+      "symbol": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+      "top_offsets": [
+        {
+          "elf_address": "0x48ed3f",
+          "instruction": "movups 0x10(%rcx),%xmm1",
+          "offset": "0x140f",
+          "period": 1434492417,
+          "period_share": 0.04428042833103999,
+          "samples": 340
+        },
+        {
+          "elf_address": "0x48edbe",
+          "instruction": "movups 0x10(%rcx),%xmm1",
+          "offset": "0x148e",
+          "period": 782608992,
+          "period_share": 0.024157856096553663,
+          "samples": 185
+        },
+        {
+          "elf_address": "0x48e646",
+          "instruction": "cmp    $0x26,%eax",
+          "offset": "0xd16",
+          "period": 178526764,
+          "period_share": 0.005510828419021535,
+          "samples": 41
+        },
+        {
+          "elf_address": "0x48e633",
+          "instruction": "mov    -0x60(%rbp),%rcx",
+          "offset": "0xd03",
+          "period": 149122908,
+          "period_share": 0.004603179606916159,
+          "samples": 34
+        },
+        {
+          "elf_address": "0x48eda2",
+          "instruction": "movaps %xmm0,-0x160(%rbp)",
+          "offset": "0x1472",
+          "period": 112803977,
+          "period_share": 0.0034820737703521675,
+          "samples": 27
+        }
+      ],
+      "top_offsets_are_sampled_self_only": true
+    }
+  }
+}

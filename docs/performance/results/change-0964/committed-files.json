@@ -1,0 +1,301 @@
+{
+  "scope": "Files present before this manifest; excludes this manifest itself.",
+  "file_count": 59,
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 5552,
+      "sha256": "65d77f1bcbf84b77c4a923b8a96264a090f3c3dc9a30d6f80c0854bc716c5d2e"
+    },
+    {
+      "path": "analysis-epoch2/screen-v1.json",
+      "bytes": 103881,
+      "sha256": "6b2680a0b906b6b6908a06338794954135f46277db18360369f7e3cbedfe0742"
+    },
+    {
+      "path": "analysis-epoch2/selection-v1.json",
+      "bytes": 17092,
+      "sha256": "4df45aa05a1f67289b2f4df4c5151f8eb5d94d2c9c00d0f3cb34005b335444da"
+    },
+    {
+      "path": "candidate-hypothesis-v1.md",
+      "bytes": 2565,
+      "sha256": "a6c215a2ac0b999715d0bd0ad36927991e4ed5fd4ae597b81afc68028c06d07c"
+    },
+    {
+      "path": "candidate-v4.patch",
+      "bytes": 15560,
+      "sha256": "3a8d42c0af69a9de57575076b2a034798df2b33e854e2a3bd038dfe24c926fc5"
+    },
+    {
+      "path": "control-survey-v1.md",
+      "bytes": 5359,
+      "sha256": "37e2d97cb6e8e900071a6e308fc5a390ee2bd5203eae33c3c1d87858a013cf64"
+    },
+    {
+      "path": "external-evidence-inventory-v3.json",
+      "bytes": 715177,
+      "sha256": "52fc7c8dfa684d1fb195f804ee40d9237859a39ce130433d7cc4b7fa79f08c95"
+    },
+    {
+      "path": "normative-inputs.json",
+      "bytes": 6393,
+      "sha256": "799bdb0adcb543c6d61025ce70a71d018ddc5a08004b4c9619778b68fb8040ae"
+    },
+    {
+      "path": "protocol/affinity-controls-epoch2-v3.json",
+      "bytes": 1410,
+      "sha256": "ebe795c155d6827e77fb007ec2010ac0e88ca12fbcb33e293929bbb2abd90f78"
+    },
+    {
+      "path": "protocol/candidate-test-allowlist-v3.json",
+      "bytes": 1039,
+      "sha256": "a1c62adbe848111d1370e223614473d8f1500797d52cce4a74f7f24eab045c97"
+    },
+    {
+      "path": "protocol/epoch2-affinity-preflight-v1.json",
+      "bytes": 3320,
+      "sha256": "f05e4193af29d280daba88c242fd935d7fbeb7e21fb7f1cd0d26015dbe83da06"
+    },
+    {
+      "path": "protocol/final-epoch2-generator-argv-v1.json",
+      "bytes": 1787,
+      "sha256": "eb357b43273cbd35ce6dd1d0ec4188bb24ca579b7dceb1aac0df8ab5574cfad7"
+    },
+    {
+      "path": "protocol/final-epoch2-preflight-v1.json",
+      "bytes": 867,
+      "sha256": "b5acb7cdbeca74bb28c4fd4a7e404fa90d691ffd0caf6eb84c78de6a5510be0f"
+    },
+    {
+      "path": "protocol/host-v1.json",
+      "bytes": 5935,
+      "sha256": "3d5306d93761c02f0624f267514829330ed8dbaf5b4fe9eec8a0c075c127bb15"
+    },
+    {
+      "path": "protocol/inherited-contract-0964-v1.json",
+      "bytes": 43019,
+      "sha256": "c38016782b77c28637c3cc313ec18afc7fb4e007a061b084d1bc725ac46b85ce"
+    },
+    {
+      "path": "protocol/plan-final-epoch2-v1.json",
+      "bytes": 59570,
+      "sha256": "dcfabed26427c6a117b41c2e4b6209baec40afe06c218054b2187ae9c49b0a64"
+    },
+    {
+      "path": "protocol/root-go-epoch2-v1.json",
+      "bytes": 1503,
+      "sha256": "18d1ec5347f378e7554896782732cf12017d80481d5c0db98cf172afa634659f"
+    },
+    {
+      "path": "protocol/root-screening-rule-0964-v1.json",
+      "bytes": 1640,
+      "sha256": "fc1b15d117e1a39ef6e114634772c711144bd9d7952aa965a544aff17b75a436"
+    },
+    {
+      "path": "receipts/baseline-binding-v2.json",
+      "bytes": 1253,
+      "sha256": "01cdeb24289f5e13dbabc71964113dccb827498a52e529e8f171423b8752c2dc"
+    },
+    {
+      "path": "receipts/build-cache-cleanup-v1.json",
+      "bytes": 5642,
+      "sha256": "87a197f2030522712bab41717a74cb5765487d438938d4370777c5294c82401f"
+    },
+    {
+      "path": "receipts/candidate-freeze-v4.json",
+      "bytes": 1924,
+      "sha256": "4f1df545ee500b404596a90068dba815f96cb810b315658798f6793a2fdc4335"
+    },
+    {
+      "path": "receipts/candidate-managed-v3-build-result.json",
+      "bytes": 1354,
+      "sha256": "0d9ffc2f3b711b6de8b75569ab2f42cd8701b24fe874371d34b7672064fb923e"
+    },
+    {
+      "path": "receipts/epoch1-invalid-v1.json",
+      "bytes": 1225,
+      "sha256": "1ec732e4c520552f4f4728179714f3ee3689081a2445eb5df3bef17dfd4c961b"
+    },
+    {
+      "path": "receipts/post-build-binding-v1.json",
+      "bytes": 2400,
+      "sha256": "60da6889bb7deb180751cd02f5ca4a5bbfe3bc6561786f6261420b2e9fb19b00"
+    },
+    {
+      "path": "receipts/quality-0964-coder-v1.json",
+      "bytes": 17134,
+      "sha256": "0b0673cbbe676104840f4c218236ac1ed187cf0712f7c2d79ead5d361907ac70"
+    },
+    {
+      "path": "receipts/quality-0964-final-v1.json",
+      "bytes": 1491,
+      "sha256": "fd84a9dd71cf73691c091e00444a7649331da2ee0da045781484049a930a247e"
+    },
+    {
+      "path": "receipts/quality-overlay-cleanup-v1.json",
+      "bytes": 2700,
+      "sha256": "8f08775f3b9cbd9ba39ff2952c80f8abcc343dc6551e6185669ce6a7156a3e1b"
+    },
+    {
+      "path": "receipts/scratch-cleanup-v1.json",
+      "bytes": 385,
+      "sha256": "9e80cd02b2e26837acd59203714683ee047c677cb8b3fec4dd66b38dab0df3d3"
+    },
+    {
+      "path": "receipts/source-export-v1.json",
+      "bytes": 3634,
+      "sha256": "835d8824742955f6606853df1679c7509b902932b698ee1ce685f471c300ccf9"
+    },
+    {
+      "path": "receipts/source-overlay-v4.json",
+      "bytes": 5679,
+      "sha256": "5e0806df231f5d4fb34837b12caed680d97f1a09fc16c2007665964722c05a54"
+    },
+    {
+      "path": "review/codegen-candidate-v1.json",
+      "bytes": 232460,
+      "sha256": "b47617b055c27bde326882032f3230afcd96e6e7d45d2046bc078dbfd522441b"
+    },
+    {
+      "path": "review/codegen-identical-binary-control-admission-v1.json",
+      "bytes": 614,
+      "sha256": "66b9fe1a5b3178f6809532d548c061a683eb595b632546ca222bf0ba68d9fe07"
+    },
+    {
+      "path": "review/codegen-identical-binary-control-v1.json",
+      "bytes": 9638,
+      "sha256": "8e693dd27514f66732989088bc4805e85290ceb58f4bdd5397910efce6f25364"
+    },
+    {
+      "path": "review/final-record-review-v1.json",
+      "bytes": 5891,
+      "sha256": "fc94f2b65303a72d31bdbadde0da5ab3fb429ec2ddc704ecf62ed781da820c47"
+    },
+    {
+      "path": "review/independent-epoch2-final-plan-admission-v1.json",
+      "bytes": 3997,
+      "sha256": "693299a61a2e61dc8a21a80a45af1612bfbafa884c91afae2da6ccf4fab85205"
+    },
+    {
+      "path": "review/independent-epoch2-pre-capture-admission-v1.json",
+      "bytes": 6029,
+      "sha256": "fcfbad398da95a41a22d4451c9313113be382761a900d27f45addfff49b249f3"
+    },
+    {
+      "path": "review/independent-epoch2-raw-audit-v1.json",
+      "bytes": 150014,
+      "sha256": "cb5822541294a3710ffb1cb198f08c37c4f00f724274ce6b2165e27a5f071938"
+    },
+    {
+      "path": "review/independent-epoch2-raw-audit-v2-correction-v1.json",
+      "bytes": 1599,
+      "sha256": "0dd4b1950ea40c9f8d70172426caac42cd58879587300ef035a9cb6e6817857d"
+    },
+    {
+      "path": "review/independent-epoch2-raw-audit-v2-failure-v1.json",
+      "bytes": 1264,
+      "sha256": "b4ac8184a209d20e491629679094c738bd1d48047f1295250e4d93c279b0226e"
+    },
+    {
+      "path": "review/source-selected-cpu-independent-review-v2.json",
+      "bytes": 21209,
+      "sha256": "18bf9aff25fda599ca309b68ce39b58eaec895ad7a922d4d50b3786093951826"
+    },
+    {
+      "path": "source-review.md",
+      "bytes": 5793,
+      "sha256": "6d79d91059b6bbea3d117a417a4f7ffdce515fe40ecf62fef1b67cb4992f4c03"
+    },
+    {
+      "path": "source-selected-cpu-execution-receipt-v1.json",
+      "bytes": 3717,
+      "sha256": "18a725354ba52fb9596039c8a73eab3c5c462e144c4f8f01d315045ec9925c27"
+    },
+    {
+      "path": "source-selected-cpu-findings-v1.md",
+      "bytes": 4762,
+      "sha256": "92461d1444bb72c43db7a3857bbfa1175e0c8158b661c4d901fe3b497094b997"
+    },
+    {
+      "path": "source-selected-cpu-receipt-v1.json",
+      "bytes": 227388,
+      "sha256": "0636efe9c9c4df2b05e14e2748831f5c91a015c7168b5efbfc658709bf23b5fd"
+    },
+    {
+      "path": "tools/analyze_source_selected_v1.py",
+      "bytes": 25021,
+      "sha256": "e5c6a91f8c89e0f91db8eb34cd408d7c809d4f2ecffebeeb9a239e9fb9a7767d"
+    },
+    {
+      "path": "tools/audit_screen_v2.py",
+      "bytes": 45755,
+      "sha256": "4cda49b11c5d5bf70de2b47ec04549466733657524f5b6503e949d93c24c0a99"
+    },
+    {
+      "path": "tools/build_candidate_managed_v3.py",
+      "bytes": 13039,
+      "sha256": "04c9060d35f53fbb4f6dcf7c3b308f1d2fca20c302d9bcd9c5655fea4de0236b"
+    },
+    {
+      "path": "tools/check_codegen_v1.py",
+      "bytes": 14873,
+      "sha256": "3220faf429ec5f84fb19f8c8a43cd5d4e4183dfde74ed0925e8ed39c52c40743"
+    },
+    {
+      "path": "tools/check_selector_0964_v1.py",
+      "bytes": 2699,
+      "sha256": "141fcdfb289fa514b3118ca697f2e8adf17554856f8d9be6b6805f3ce1675614"
+    },
+    {
+      "path": "tools/freeze_candidate_scope_v1.py",
+      "bytes": 8497,
+      "sha256": "a2218876426ddd1872d6e866d87564673bb924f71de1f707ee96753496d523cb"
+    },
+    {
+      "path": "tools/inventory_evidence_v1.py",
+      "bytes": 8192,
+      "sha256": "e7ca5284705bfd1430c6a0391735e3f1f49dfe12f4049152be26944749f94180"
+    },
+    {
+      "path": "tools/prepare_plan_0964_epoch2_v1.py",
+      "bytes": 21416,
+      "sha256": "c88594b96134d247241a67ff1d79ece3196de72a8efcd333953cbcd25f95aa4a"
+    },
+    {
+      "path": "tools/reduce_0964_core_v1.py",
+      "bytes": 21570,
+      "sha256": "d5f8c59117872cb0ba949e06296483252792bdeb556a914008a570c62ea3864d"
+    },
+    {
+      "path": "tools/reduce_0964_v1.py",
+      "bytes": 31282,
+      "sha256": "8162ed82a9fba22a405ac5b6946dc2a93e76f66ab7ffe881c5d4c897b177397b"
+    },
+    {
+      "path": "tools/screen_0964_v1.py",
+      "bytes": 36205,
+      "sha256": "f1ed30b833b09833c687b31f013c4ec699c2ebda5465b51ee5f08b790b8fa0bc"
+    },
+    {
+      "path": "tools/screen_0964_v2.py",
+      "bytes": 43659,
+      "sha256": "7a3ac47c744c34cadf852557a44e7645ca36a1c72cc45e7d2350438cfcb8fab9"
+    },
+    {
+      "path": "tools/select_screen_0964_v1.py",
+      "bytes": 5066,
+      "sha256": "b36e8643c057c10880eeb37f4176e44fd7f5ea034b875978d6889d4ab5a78806"
+    },
+    {
+      "path": "tools/verify_0964_bindings_v2.py",
+      "bytes": 11005,
+      "sha256": "8e68d742268b4ef31f09ad6fd715e1f34157dcbd2ed6a49dc98d53ea0608fb1e"
+    },
+    {
+      "path": "tools/verify_0964_bindings_v4.py",
+      "bytes": 11005,
+      "sha256": "717191c9501e6d4d5a09023cc32964c0822c61ccfb76110d96774fe0373f4575"
+    }
+  ]
+}

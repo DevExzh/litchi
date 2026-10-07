@@ -1,5 +1,21 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0964 — direct XLSX event transport screen rejected
+
+[0964](0964-xlsx-direct-event-transport-trial.md) evaluates the external
+`Reader` plus borrowed `NamespaceResolver` transport in the two XLSX worksheet
+loops. Epoch 1 is wholly excluded after its launch-affinity witness raced
+`taskset`; the corrected epoch 2 completes 36 native and 18 allocator
+children with fresh bindings and independent raw-oracle custody. The selector
+rejects the screen: twelve descriptive native primary medians are at or below
+0.95, providing screening signals but no confidence intervals or qualified
+effects. Native ingress-p99 medians are 1.111553 for medium one-percent and
+1.107516 for medium one-edit, both over the 1.05 safety threshold; dense
+sparse is 1.024725. Allocator allocation calls, bytes, and region peaks are
+exactly 1.0, with RSS medians near 1.0. This is descriptive screening data,
+not a statistical-effect claim. The candidate is rejected and production
+remains unchanged; no confirmation or adoption follows.
+
 ## 0963 — reduced-readback fusion declined before implementation
 
 [0963](0963-xlsx-readback-fusion-disposition.md) confirms reduced-readback routes

@@ -1,0 +1,514 @@
+{
+  "adoption_allowed": false,
+  "decision": "reject_screen",
+  "helper": {
+    "bytes": 5066,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0964/tools/select_screen_0964_v1.py",
+    "sha256": "b36e8643c057c10880eeb37f4176e44fd7f5ea034b875978d6889d4ab5a78806"
+  },
+  "report": {
+    "bytes": 103881,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0964/analysis-epoch2/screen-v1.json",
+    "sha256": "6b2680a0b906b6b6908a06338794954135f46277db18360369f7e3cbedfe0742"
+  },
+  "requested_bytes_or_allocation_calls_signal": false,
+  "required_metrics": {
+    "allocator": {
+      "dense-sparse-one-percent": {
+        "allocated_bytes": {
+          "max": 1.0,
+          "median": 1.0,
+          "min": 1.0,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        },
+        "allocation_calls": {
+          "max": 1.0,
+          "median": 1.0,
+          "min": 1.0,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        },
+        "core_combined_with_drain.allocated_bytes": {
+          "max": 1.0,
+          "median": 1.0,
+          "min": 1.0,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        },
+        "max_rss_kib": {
+          "max": 1.0010859150431173,
+          "median": 0.9949206349206349,
+          "min": 0.99423831834874,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        },
+        "region_peak_live_bytes": {
+          "max": 1.0,
+          "median": 1.0,
+          "min": 1.0,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        }
+      },
+      "medium-one-edit": {
+        "allocated_bytes": {
+          "max": 1.0,
+          "median": 1.0,
+          "min": 1.0,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        },
+        "allocation_calls": {
+          "max": 1.0,
+          "median": 1.0,
+          "min": 1.0,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        },
+        "core_combined_with_drain.allocated_bytes": {
+          "max": 1.0,
+          "median": 1.0,
+          "min": 1.0,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        },
+        "max_rss_kib": {
+          "max": 1.0009518041014105,
+          "median": 0.9968831168831169,
+          "min": 0.9958445156263527,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        },
+        "region_peak_live_bytes": {
+          "max": 1.0,
+          "median": 1.0,
+          "min": 1.0,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        }
+      },
+      "medium-one-percent": {
+        "allocated_bytes": {
+          "max": 1.0,
+          "median": 1.0,
+          "min": 1.0,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        },
+        "allocation_calls": {
+          "max": 1.0,
+          "median": 1.0,
+          "min": 1.0,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        },
+        "core_combined_with_drain.allocated_bytes": {
+          "max": 1.0,
+          "median": 1.0,
+          "min": 1.0,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        },
+        "max_rss_kib": {
+          "max": 1.0063065736756196,
+          "median": 1.001489757914339,
+          "min": 0.9948945615982242,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        },
+        "region_peak_live_bytes": {
+          "max": 1.0,
+          "median": 1.0,
+          "min": 1.0,
+          "pair_count": 3,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of three paired repeats",
+          "undefined_count": 0
+        }
+      }
+    },
+    "native": {
+      "dense-sparse-one-percent": {
+        "commit_drop_ns.p99": {
+          "max": 1.0993248194739327,
+          "median": 1.0000775493982714,
+          "min": 0.8893314633536987,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 1,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "edit_commit_ns.p50": {
+          "max": 0.9360677009746433,
+          "median": 0.8861155743973652,
+          "min": 0.881647217623721,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "edit_commit_ns.p95": {
+          "max": 0.937329669113241,
+          "median": 0.8881962966569508,
+          "min": 0.8821306820745607,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "edit_commit_ns.p99": {
+          "max": 0.9379793705972792,
+          "median": 0.8917611437273711,
+          "min": 0.8758987123604545,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "ingress_ns.p99": {
+          "max": 1.2385064794102933,
+          "median": 1.0247250029289336,
+          "min": 0.7710891173282513,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 3,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "max_rss_kib": {
+          "max": 1.0007664793050588,
+          "median": 0.9966857545528771,
+          "min": 0.993185147442838,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "publication_ns.p99": {
+          "max": 0.9949918345932203,
+          "median": 0.9828198575874503,
+          "min": 0.9461709308280998,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "total_ns.p50": {
+          "max": 0.9603147045779608,
+          "median": 0.9281089997812242,
+          "min": 0.9112677798570271,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "total_ns.p95": {
+          "max": 0.961034779293681,
+          "median": 0.9289904199717802,
+          "min": 0.911753663704656,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "total_ns.p99": {
+          "max": 0.9589328254208666,
+          "median": 0.928076547418912,
+          "min": 0.9020904232768282,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        }
+      },
+      "medium-one-edit": {
+        "commit_drop_ns.p99": {
+          "max": 1.1540900022168035,
+          "median": 1.003323041893514,
+          "min": 0.8978870187724255,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 2,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "edit_commit_ns.p50": {
+          "max": 0.897744021061913,
+          "median": 0.8873391670001992,
+          "min": 0.8828253856146557,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "edit_commit_ns.p95": {
+          "max": 0.9010273218448986,
+          "median": 0.8891473275246218,
+          "min": 0.8801094000101313,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "edit_commit_ns.p99": {
+          "max": 0.9128742266103065,
+          "median": 0.8874051838735755,
+          "min": 0.8793292903471087,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "ingress_ns.p99": {
+          "max": 1.2582140038335776,
+          "median": 1.1075162249245518,
+          "min": 1.0137755642683055,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 5,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "max_rss_kib": {
+          "max": 1.0081265291855994,
+          "median": 0.9924007738825676,
+          "min": 0.9808999397745849,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "publication_ns.p99": {
+          "max": 1.0556510922782818,
+          "median": 0.992565472733965,
+          "min": 0.9818773736470519,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 1,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "total_ns.p50": {
+          "max": 0.9546026184228074,
+          "median": 0.9313736676596616,
+          "min": 0.9285601911534894,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "total_ns.p95": {
+          "max": 0.9525355899920872,
+          "median": 0.9371117439350778,
+          "min": 0.9265036050646811,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "total_ns.p99": {
+          "max": 0.9699916972196799,
+          "median": 0.947024492773345,
+          "min": 0.9249279264142363,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        }
+      },
+      "medium-one-percent": {
+        "commit_drop_ns.p99": {
+          "max": 1.0760161015023797,
+          "median": 1.0037713229214447,
+          "min": 0.9636515446701921,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 1,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "edit_commit_ns.p50": {
+          "max": 0.9658942885220743,
+          "median": 0.8920368142870636,
+          "min": 0.8816125290460063,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "edit_commit_ns.p95": {
+          "max": 0.9650001148785647,
+          "median": 0.8948659952858048,
+          "min": 0.8880880550514226,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "edit_commit_ns.p99": {
+          "max": 0.9675267505887758,
+          "median": 0.8964580636477564,
+          "min": 0.8873361678390762,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "ingress_ns.p99": {
+          "max": 1.3150146213572653,
+          "median": 1.1115534802297398,
+          "min": 0.8264864484116115,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 4,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "max_rss_kib": {
+          "max": 1.0769537480063796,
+          "median": 0.9940759284505165,
+          "min": 0.922642616219387,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 1,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "publication_ns.p99": {
+          "max": 1.090504545302129,
+          "median": 0.9887687488624699,
+          "min": 0.870182914425198,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 2,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "total_ns.p50": {
+          "max": 0.973136394670892,
+          "median": 0.9335961741912338,
+          "min": 0.8879813971537347,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "total_ns.p95": {
+          "max": 0.9715292021275931,
+          "median": 0.9336060748234978,
+          "min": 0.9105724700933837,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        },
+        "total_ns.p99": {
+          "max": 0.9662066438325236,
+          "median": 0.9369312745146983,
+          "min": 0.9036283487359525,
+          "pair_count": 6,
+          "review_flag_pair_gt_1_05": 0,
+          "screening_statistic": "median of six paired screening legs",
+          "undefined_count": 0
+        }
+      }
+    }
+  },
+  "safety_comparator": "candidate_over_baseline > threshold",
+  "safety_review_threshold": 1.05,
+  "schema": "litchi.performance.0964.root-screen-selection.v1",
+  "signal_comparator": "candidate_over_baseline <= threshold",
+  "signal_threshold": 0.95,
+  "signals": [
+    {
+      "median": 0.8920368142870636,
+      "metric": "native/medium-one-percent/edit_commit_ns.p50",
+      "threshold": 0.95
+    },
+    {
+      "median": 0.8948659952858048,
+      "metric": "native/medium-one-percent/edit_commit_ns.p95",
+      "threshold": 0.95
+    },
+    {
+      "median": 0.9335961741912338,
+      "metric": "native/medium-one-percent/total_ns.p50",
+      "threshold": 0.95
+    },
+    {
+      "median": 0.9336060748234978,
+      "metric": "native/medium-one-percent/total_ns.p95",
+      "threshold": 0.95
+    },
+    {
+      "median": 0.8861155743973652,
+      "metric": "native/dense-sparse-one-percent/edit_commit_ns.p50",
+      "threshold": 0.95
+    },
+    {
+      "median": 0.8881962966569508,
+      "metric": "native/dense-sparse-one-percent/edit_commit_ns.p95",
+      "threshold": 0.95
+    },
+    {
+      "median": 0.9281089997812242,
+      "metric": "native/dense-sparse-one-percent/total_ns.p50",
+      "threshold": 0.95
+    },
+    {
+      "median": 0.9289904199717802,
+      "metric": "native/dense-sparse-one-percent/total_ns.p95",
+      "threshold": 0.95
+    },
+    {
+      "median": 0.8873391670001992,
+      "metric": "native/medium-one-edit/edit_commit_ns.p50",
+      "threshold": 0.95
+    },
+    {
+      "median": 0.8891473275246218,
+      "metric": "native/medium-one-edit/edit_commit_ns.p95",
+      "threshold": 0.95
+    },
+    {
+      "median": 0.9313736676596616,
+      "metric": "native/medium-one-edit/total_ns.p50",
+      "threshold": 0.95
+    },
+    {
+      "median": 0.9371117439350778,
+      "metric": "native/medium-one-edit/total_ns.p95",
+      "threshold": 0.95
+    }
+  ],
+  "statistical_effect_claim": false,
+  "stops": [
+    "native/medium-one-percent/ingress_ns.p99: safety median exceeds 1.05",
+    "native/medium-one-edit/ingress_ns.p99: safety median exceeds 1.05"
+  ]
+}

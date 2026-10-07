@@ -1,0 +1,120 @@
+{
+  "checks": [
+    {
+      "name": "expected_final_status_and_root_go",
+      "status": "pass"
+    },
+    {
+      "name": "schedule_source_binary_oracle_bindings_unchanged",
+      "status": "pass"
+    },
+    {
+      "name": "final_capture_preflight",
+      "status": "pass"
+    },
+    {
+      "name": "root_go_bindings_rehash",
+      "status": "pass"
+    }
+  ],
+  "comparison": {
+    "allowed_paths": [
+      "created_utc",
+      "plan_revision",
+      "root_go.path",
+      "root_go.receipt",
+      "root_go.status",
+      "status",
+      "status_note"
+    ],
+    "binding_sections_unchanged": true,
+    "diff_count": 7,
+    "diffs": [
+      {
+        "final": "2026-10-07T21:46:03.603619+00:00",
+        "path": "created_utc",
+        "prospective": "2026-10-07T21:43:41.115760+00:00"
+      },
+      {
+        "final": "epoch2-root-final-v1",
+        "path": "plan_revision",
+        "prospective": "epoch2-prospective-v1"
+      },
+      {
+        "final": "<missing>",
+        "path": "root_go.path",
+        "prospective": "/home/zhuhe/litchi-performance-0964/protocol/root-go-epoch2-v1.json"
+      },
+      {
+        "final": {
+          "bytes": 1503,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0964/protocol/root-go-epoch2-v1.json",
+          "sha256": "18d1ec5347f378e7554896782732cf12017d80481d5c0db98cf172afa634659f"
+        },
+        "path": "root_go.receipt",
+        "prospective": "<missing>"
+      },
+      {
+        "final": "GO",
+        "path": "root_go.status",
+        "prospective": "pending_root_binding"
+      },
+      {
+        "final": "authorized",
+        "path": "status",
+        "prospective": "prospective"
+      },
+      {
+        "final": "Fresh candidate custody and root bindings supplied; measurements remain false until capture authorization.",
+        "path": "status_note",
+        "prospective": "No build or workload is started by this generator; candidate custody and root GO remain pending."
+      }
+    ],
+    "root_go_binding_errors": [],
+    "unexpected_paths": []
+  },
+  "created_utc": "2026-10-07T21:46:42.289081+00:00",
+  "decision": "capture_admitted",
+  "final_plan": {
+    "bytes": 59570,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0964/protocol/plan-final-epoch2-v1.json",
+    "sha256": "dcfabed26427c6a117b41c2e4b6209baec40afe06c218054b2187ae9c49b0a64"
+  },
+  "final_preflight": {
+    "bytes": 867,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0964/protocol/final-epoch2-preflight-v1.json",
+    "sha256": "b5acb7cdbeca74bb28c4fd4a7e404fa90d691ffd0caf6eb84c78de6a5510be0f"
+  },
+  "note": "Only fresh generator timestamp, epoch2 root-final revision, root GO receipt/status binding, authorized status, and expected status note changed. Capture roots and measurements marker remain the epoch2 values; epoch1 remains excluded.",
+  "prior_admission": {
+    "bytes": 6029,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0964/review/independent-epoch2-pre-capture-admission-v1.json",
+    "sha256": "fcfbad398da95a41a22d4451c9313113be382761a900d27f45addfff49b249f3"
+  },
+  "prospective_plan": {
+    "bytes": 59404,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0964/protocol/plan-epoch2-0964-v3.json",
+    "sha256": "6743204eb830a8e002a210f3f1447384e5ea7efd2a6327e56fd77add130dd869"
+  },
+  "reviewer": "/root/staging_review",
+  "root_go": {
+    "bytes": 1503,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0964/protocol/root-go-epoch2-v1.json",
+    "sha256": "18d1ec5347f378e7554896782732cf12017d80481d5c0db98cf172afa634659f"
+  },
+  "schema": "litchi.performance.0964.independent-epoch2-final-plan-admission.v1",
+  "scope": "Independent static comparison of authorized epoch2 final plan against sealed prospective v3; no workload or ratio audit performed here.",
+  "status": "passed"
+}

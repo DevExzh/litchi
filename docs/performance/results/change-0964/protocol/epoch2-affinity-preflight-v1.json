@@ -1,0 +1,106 @@
+{
+  "adapter_preflight": {
+    "authorized_structural_validate_plan_bindings": "pass with synthetic in-memory GO only",
+    "canonical_plan": "pass/canonical-v1",
+    "frozen_core_schedule_and_bindings": "pass",
+    "prospective_validate_plan_bindings": "expected refusal: reduction requires an authorized plan",
+    "runner_validate_plan": "pass"
+  },
+  "affinity_controls": {
+    "bytes": 1410,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0964/protocol/affinity-controls-epoch2-v3.json",
+    "sha256": "ebe795c155d6827e77fb007ec2010ac0e88ca12fbcb33e293929bbb2abd90f78"
+  },
+  "control_assertions": {
+    "cleanup_passed": true,
+    "negative_guard_rejected": true,
+    "negative_observed_affinity": [
+      12
+    ],
+    "positive_observed_affinity": [
+      12,
+      13,
+      14,
+      15
+    ],
+    "schema": "litchi.performance.0964.affinity-launch-controls.v1",
+    "status": "pass",
+    "workload_started": false
+  },
+  "created_utc": "2026-10-07T21:44:00.023296+00:00",
+  "epoch_boundary": {
+    "epoch1_artifacts_preserved": true,
+    "epoch1_capture": "invalid_due_to_launch_affinity",
+    "epoch2_capture_roots": {
+      "allocator": "/home/zhuhe/litchi-performance-0964/capture-allocator-epoch2-v1",
+      "native": "/home/zhuhe/litchi-performance-0964/capture-native-epoch2-v1"
+    },
+    "root_go": {
+      "path": "/home/zhuhe/litchi-performance-0964/protocol/root-go-epoch2-v1.json",
+      "status": "pending_root_binding"
+    }
+  },
+  "generator": {
+    "bytes": 21416,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0964/tools/prepare_plan_0964_epoch2_v1.py",
+    "sha256": "c88594b96134d247241a67ff1d79ece3196de72a8efcd333953cbcd25f95aa4a"
+  },
+  "plan": {
+    "bytes": 59404,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0964/protocol/plan-epoch2-0964-v3.json",
+    "sha256": "6743204eb830a8e002a210f3f1447384e5ea7efd2a6327e56fd77add130dd869"
+  },
+  "reducer": {
+    "bytes": 31282,
+    "executable": true,
+    "mode": 509,
+    "path": "/home/zhuhe/litchi-performance-0964/tools/reduce_0964_v1.py",
+    "sha256": "8162ed82a9fba22a405ac5b6946dc2a93e76f66ab7ffe881c5d4c897b177397b"
+  },
+  "runner": {
+    "bytes": 43659,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0964/tools/screen_0964_v2.py",
+    "sha256": "7a3ac47c744c34cadf852557a44e7645ca36a1c72cc45e7d2350438cfcb8fab9"
+  },
+  "runner_binding_assertions": {
+    "capture_helper_hash_bound_in_plan": true,
+    "control_hash_bound_in_plan": true,
+    "exact_getter": "os.sched_getaffinity(pid)",
+    "explicit_taskset": [
+      "/usr/bin/taskset",
+      "--cpu-list",
+      "12-15"
+    ],
+    "fail_at_launch_on_mismatch": true,
+    "preexec_affinity": [
+      12,
+      13,
+      14,
+      15
+    ]
+  },
+  "schedule": {
+    "allocator_children": 18,
+    "cpu_mask": [
+      12,
+      13,
+      14,
+      15
+    ],
+    "deadline_seconds": 900,
+    "fresh_epoch2_required": true,
+    "native_children": 36,
+    "retry_or_replacement": false
+  },
+  "schema": "litchi.performance.0964.epoch2-affinity-preflight.v1",
+  "scope_note": "Static custody, adapter, and tiny /usr/bin/true launch controls only; no benchmark workload, packet, ratio, or result was opened.",
+  "status": "pass"
+}

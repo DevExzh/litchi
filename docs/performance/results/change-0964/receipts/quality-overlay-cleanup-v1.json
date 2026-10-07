@@ -1,0 +1,69 @@
+{
+  "schema": "litchi.performance.0964.quality-overlay-cleanup.v1",
+  "created_utc": "2026-10-07T21:17:43.277197+00:00",
+  "status": "pass",
+  "removed": [
+    {
+      "relative_path": "3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/button-form-control.xlsx",
+      "bytes": 11190,
+      "sha256": "624321843560b792805592d604e7a645040f19f0ae1f661fec024b9aeec9613f",
+      "created_by_overlay": true
+    },
+    {
+      "relative_path": "3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/checkbox-form-control.xlsx",
+      "bytes": 11394,
+      "sha256": "8b602b21777bc06ca574f61783594caa5c37f68bdf66c66e58ef598758367038",
+      "created_by_overlay": true
+    },
+    {
+      "relative_path": "3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/singlecontrol.xlsx",
+      "bytes": 17915,
+      "sha256": "a13fd1a411a499f4b474bbe553c7950959ab8895131c40687522d14379885cde",
+      "created_by_overlay": true
+    },
+    {
+      "relative_path": "3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf120301_xmlSpaceParsing.xlsx",
+      "bytes": 11538,
+      "sha256": "73709ecaa9270324eaf3f0c4fae8ec5e733ab639daa7b407f08d42538bac60bf",
+      "created_by_overlay": true
+    },
+    {
+      "relative_path": "3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf134769.xlsx",
+      "bytes": 16892,
+      "sha256": "50d4f7d5d0ffe17e2251b21cfb66bd5018e3b1791c7f5c27592a47a9d9e004b1",
+      "created_by_overlay": true
+    },
+    {
+      "relative_path": "3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf161365.xlsx",
+      "bytes": 12161,
+      "sha256": "5c5ec45c1dd5db0a911e74d0e7e6cde5bf713b5ef38fcf84483903ddad583957",
+      "created_by_overlay": true
+    },
+    {
+      "relative_path": "3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx",
+      "bytes": 12470,
+      "sha256": "0b647da300a085f39914fdfae961463ae9e54ffe772b2e0eb9860a841ab93f72",
+      "created_by_overlay": false
+    },
+    {
+      "relative_path": "3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf60673.xlsx",
+      "bytes": 13249,
+      "sha256": "d9abab27b6cb7ae4eda4729473d8d48175f63fa66457e64a8134f9fa59689bc8",
+      "created_by_overlay": true
+    },
+    {
+      "relative_path": "docs/report/spec-gap-validation-evidence/xlsx-form-control-properties/native-corpus.json",
+      "bytes": 11467,
+      "sha256": "a0e5055863909579a8b325468e9729900b16c652d61743b6a050bd4d19777077",
+      "created_by_overlay": false
+    }
+  ],
+  "verified_candidate_manifest": {
+    "path": "/home/zhuhe/litchi-performance-0964/source-manifest-candidate-v4.json",
+    "bytes": 2268238,
+    "mode": 436,
+    "sha256": "19e4bdf18aee484ade90067a98ec6ab0ff5f6d017105840df4030f697f25779b"
+  },
+  "file_count": 10933,
+  "no_extra_files": true
+}
