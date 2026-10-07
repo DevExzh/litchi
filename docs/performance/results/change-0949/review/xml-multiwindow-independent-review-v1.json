@@ -1,0 +1,360 @@
+{
+  "accounting": {
+    "classes": {
+      "candidate-dense": {
+        "open_vec": {
+          "alloc_bytes": 384,
+          "alloc_calls": 3,
+          "bytes": 1152,
+          "calls": 6,
+          "realloc_bytes": 768,
+          "realloc_calls": 3,
+          "rows": 2
+        },
+        "parser_windows": {
+          "alloc_bytes": 8496,
+          "alloc_calls": 531,
+          "bytes": 8496,
+          "calls": 531,
+          "realloc_bytes": 0,
+          "realloc_calls": 0,
+          "rows": 3
+        },
+        "window_vec": {
+          "alloc_bytes": 8832,
+          "alloc_calls": 3,
+          "bytes": 397440,
+          "calls": 11,
+          "realloc_bytes": 388608,
+          "realloc_calls": 8,
+          "rows": 2
+        }
+      },
+      "candidate-medium": {
+        "open_vec": {
+          "alloc_bytes": 512,
+          "alloc_calls": 4,
+          "bytes": 1536,
+          "calls": 8,
+          "realloc_bytes": 1024,
+          "realloc_calls": 4,
+          "rows": 2
+        },
+        "parser_windows": {
+          "alloc_bytes": 4464,
+          "alloc_calls": 279,
+          "bytes": 4464,
+          "calls": 279,
+          "realloc_bytes": 0,
+          "realloc_calls": 0,
+          "rows": 3
+        },
+        "window_vec": {
+          "alloc_bytes": 11776,
+          "alloc_calls": 4,
+          "bytes": 176640,
+          "calls": 16,
+          "realloc_bytes": 164864,
+          "realloc_calls": 12,
+          "rows": 2
+        }
+      }
+    },
+    "dual": {
+      "baseline-dense": {
+        "alloc_bytes": 2759686,
+        "alloc_calls": 357,
+        "bytes": 2765840,
+        "calls": 406,
+        "realloc_bytes": 6154,
+        "realloc_calls": 49,
+        "rows": 129
+      },
+      "baseline-medium": {
+        "alloc_bytes": 2489853,
+        "alloc_calls": 356,
+        "bytes": 2495613,
+        "calls": 406,
+        "realloc_bytes": 5760,
+        "realloc_calls": 50,
+        "rows": 125
+      },
+      "candidate-dense": {
+        "alloc_bytes": 2777288,
+        "alloc_calls": 881,
+        "bytes": 3172336,
+        "calls": 931,
+        "realloc_bytes": 395048,
+        "realloc_calls": 50,
+        "rows": 141
+      },
+      "candidate-medium": {
+        "alloc_bytes": 2506517,
+        "alloc_calls": 627,
+        "bytes": 2677821,
+        "calls": 681,
+        "realloc_bytes": 171304,
+        "realloc_calls": 54,
+        "rows": 136
+      }
+    },
+    "pairs": {
+      "dense": {
+        "baseline": {
+          "alloc_bytes": 2759686,
+          "alloc_calls": 357,
+          "bytes": 2765840,
+          "calls": 406,
+          "realloc_bytes": 6154,
+          "realloc_calls": 49,
+          "rows": 129
+        },
+        "candidate": {
+          "alloc_bytes": 2777288,
+          "alloc_calls": 881,
+          "bytes": 3172336,
+          "calls": 931,
+          "realloc_bytes": 395048,
+          "realloc_calls": 50,
+          "rows": 141
+        },
+        "delta": {
+          "bytes": 406496,
+          "calls": 525,
+          "realloc_delta": 1
+        }
+      },
+      "medium": {
+        "baseline": {
+          "alloc_bytes": 2489853,
+          "alloc_calls": 356,
+          "bytes": 2495613,
+          "calls": 406,
+          "realloc_bytes": 5760,
+          "realloc_calls": 50,
+          "rows": 125
+        },
+        "candidate": {
+          "alloc_bytes": 2506517,
+          "alloc_calls": 627,
+          "bytes": 2677821,
+          "calls": 681,
+          "realloc_bytes": 171304,
+          "realloc_calls": 54,
+          "rows": 136
+        },
+        "delta": {
+          "bytes": 182208,
+          "calls": 275,
+          "realloc_delta": 4
+        }
+      }
+    },
+    "reports": {
+      "baseline-dense": {
+        "metric": {
+          "allocated_bytes": 2765840,
+          "allocation_calls": 406,
+          "deallocated_bytes": 2781702,
+          "deallocation_calls": 534,
+          "failed_allocation_calls": 0,
+          "live_bytes_after": 34136448,
+          "live_bytes_before": 34152310,
+          "peak_live_bytes_after": 69103803,
+          "peak_live_bytes_before": 69103803,
+          "reallocation_calls": 49,
+          "region_peak_live_bytes": 35239479,
+          "scope": "operation_global_system_allocator",
+          "status": "measured"
+        },
+        "report": {
+          "bytes": 24102,
+          "path": "/home/zhuhe/litchi-performance-0949/capture-v1/children/h02-baseline-primary-percent-dense-sparse/report.json",
+          "sha256": "94c517601ed6a9583305634e874cbc05a9e6a4753e1902a4faf63ec24c82d129"
+        }
+      },
+      "baseline-medium": {
+        "metric": {
+          "allocated_bytes": 2495613,
+          "allocation_calls": 406,
+          "deallocated_bytes": 2511475,
+          "deallocation_calls": 533,
+          "failed_allocation_calls": 0,
+          "live_bytes_after": 25918677,
+          "live_bytes_before": 25934539,
+          "peak_live_bytes_after": 52336445,
+          "peak_live_bytes_before": 52336445,
+          "reallocation_calls": 50,
+          "region_peak_live_bytes": 26752073,
+          "scope": "operation_global_system_allocator",
+          "status": "measured"
+        },
+        "report": {
+          "bytes": 24074,
+          "path": "/home/zhuhe/litchi-performance-0949/capture-v1/children/h00-baseline-primary-percent-medium/report.json",
+          "sha256": "dc7f58348562e3a0d4b72635d4915a8fbdf23ab1ea8151d453341aef7afb4e08"
+        }
+      },
+      "candidate-dense": {
+        "metric": {
+          "allocated_bytes": 3172336,
+          "allocation_calls": 931,
+          "deallocated_bytes": 3188198,
+          "deallocation_calls": 1058,
+          "failed_allocation_calls": 0,
+          "live_bytes_after": 34142769,
+          "live_bytes_before": 34158631,
+          "peak_live_bytes_after": 69104556,
+          "peak_live_bytes_before": 69104556,
+          "reallocation_calls": 50,
+          "region_peak_live_bytes": 35245992,
+          "scope": "operation_global_system_allocator",
+          "status": "measured"
+        },
+        "report": {
+          "bytes": 24133,
+          "path": "/home/zhuhe/litchi-performance-0949/capture-v1/children/h03-candidate-primary-percent-dense-sparse/report.json",
+          "sha256": "261037461dc22be3064f1794317ec533a250d3ea264714ba0bd500eb5172f5bb"
+        }
+      },
+      "candidate-medium": {
+        "metric": {
+          "allocated_bytes": 2677821,
+          "allocation_calls": 681,
+          "deallocated_bytes": 2693683,
+          "deallocation_calls": 804,
+          "failed_allocation_calls": 0,
+          "live_bytes_after": 25922326,
+          "live_bytes_before": 25938188,
+          "peak_live_bytes_after": 52337198,
+          "peak_live_bytes_before": 52337198,
+          "reallocation_calls": 54,
+          "region_peak_live_bytes": 26755914,
+          "scope": "operation_global_system_allocator",
+          "status": "measured"
+        },
+        "report": {
+          "bytes": 24105,
+          "path": "/home/zhuhe/litchi-performance-0949/capture-v1/children/h01-candidate-primary-percent-medium/report.json",
+          "sha256": "ce5da6bdcf3996117f56438ab1265e727189cd8ce97731233da2c734168f9d1b"
+        }
+      }
+    },
+    "residuals": {
+      "dense": {
+        "candidate_class_subtotal": {
+          "alloc_bytes": 17712,
+          "alloc_calls": 537,
+          "bytes": 407088,
+          "calls": 548,
+          "realloc_bytes": 389376,
+          "realloc_calls": 11,
+          "rows": 7
+        },
+        "residual": {
+          "bytes": -592,
+          "calls": -23
+        }
+      },
+      "medium": {
+        "candidate_class_subtotal": {
+          "alloc_bytes": 16752,
+          "alloc_calls": 287,
+          "bytes": 182640,
+          "calls": 303,
+          "realloc_bytes": 165888,
+          "realloc_calls": 16,
+          "rows": 7
+        },
+        "residual": {
+          "bytes": -432,
+          "calls": -28
+        }
+      }
+    }
+  },
+  "attribution_binding": {
+    "final_attribution_terminal": {
+      "bytes": 23866,
+      "path": "/home/zhuhe/litchi-performance-0949/attribution-final-v1/attribution-terminal.json",
+      "sha256": "a20e1cc065150dfadd981767d9ac93c3ddf7c3270419b33c43c7e244359e5d80"
+    },
+    "final_attributor": {
+      "bytes": 30671,
+      "path": "/home/zhuhe/litchi-performance-0949/tools/attribute_heaptrack_0949_v1.py",
+      "sha256": "19a19687d138ddcb47b9b4bd1f383ffd2a88396de91d7fd523a73c0e77a68637"
+    },
+    "final_profiles_one_config": true,
+    "final_seal": {
+      "bytes": 1367,
+      "path": "/home/zhuhe/litchi-performance-0949/receipts/root-offline-attribution-seal-v1.json",
+      "sha256": "1a68bd895951644ecc085565e4c0d9e0d280ada7f655568dc80c0bc4fd752f4c"
+    },
+    "final_sealed_attributor_sha256": "19a19687d138ddcb47b9b4bd1f383ffd2a88396de91d7fd523a73c0e77a68637",
+    "historical_binding_not_used_for_final_claim": true,
+    "historical_summary_attributor_sha256": "ef61c3a016c64dd5f7f5d4b9626b7f31a4c9f1898c945a77af1f503c0f894070",
+    "historical_summary_is_superseded": true
+  },
+  "canonical_replay": {
+    "byte_identical": true,
+    "canonical": {
+      "bytes": 16987,
+      "path": "/home/zhuhe/litchi-performance-0949/review/xml-multiwindow-source-profile-reconciliation-v2.json",
+      "sha256": "18f27ae921871a9321069f6fe4f72919b140d873aac35100f1f88dc7d5813d84"
+    },
+    "replay": {
+      "bytes": 16987,
+      "path": "/home/zhuhe/litchi-performance-0949/review/xml-multiwindow-source-profile-reconciliation-independent.json",
+      "sha256": "18f27ae921871a9321069f6fe4f72919b140d873aac35100f1f88dc7d5813d84"
+    }
+  },
+  "checks": {
+    "all_four_report_publication_counters_match_dual_raw_sums": true,
+    "canonical_replay_byte_identical": true,
+    "corrected_pair_residuals_verified": true,
+    "dual_frame_publication_filter": true,
+    "final_attribution_seal_preferred_over_historical_helper_summary": true,
+    "reallocation_subset_verified": true,
+    "site_contributions_have_no_overlap": true
+  },
+  "documentation": {
+    "assessment": "pass: numeric claims reviewed against byte-identical canonical replay and independent raw/report accounting; scope limits and rejected-candidate status are stated accurately.",
+    "no_workload_or_source_mutation": true,
+    "reconciliation_markdown": {
+      "bytes": 13877,
+      "path": "/home/zhuhe/litchi-performance-0949/review/xml-multiwindow-source-profile-reconciliation-v2.md",
+      "sha256": "d9b6570d848674793915cebc76844c1063b5856792fdc3ca4e0a1abfd370fec9"
+    },
+    "report": {
+      "bytes": 6634,
+      "path": "/home/zhuhe/code/litchi/docs/performance/0949-xlsx-multi-window-allocation-attribution.md",
+      "sha256": "78a81c574f9fc87198bc34e84afaaaec9e68ff66a4529643ece6e2544f18968a"
+    }
+  },
+  "schema": "litchi.performance.0949.xml-multiwindow-independent-review.v1",
+  "source_profile_reconciliation": {
+    "candidate_site_classes_mutually_exclusive": true,
+    "dense_corrected_residual": {
+      "bytes": -592,
+      "calls": -23
+    },
+    "dual_filter_requires_publisher_and_caller_line": true,
+    "medium_corrected_residual": {
+      "bytes": -432,
+      "calls": -28
+    },
+    "reallocation_is_subset_not_additive": true,
+    "whole_profile_residuals_are_separate_scope": {
+      "dense": {
+        "bytes": 31841,
+        "calls": -10
+      },
+      "medium": {
+        "bytes": 23656,
+        "calls": -16
+      }
+    }
+  },
+  "status": "pass",
+  "workload_launched": false
+}

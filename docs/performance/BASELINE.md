@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0949 — allocation attribution of the rejected multi-window candidate
+
+[0949](0949-xlsx-multi-window-allocation-attribution.md) retains four serial
+heaptrack children on reused 0948 allocator binaries, zero warmups and one
+sample each. All reproduce the earlier publication allocation counters exactly.
+Independent raw/histogram/folded conservation and disjoint source-site checks
+pass. Window storage explains most added bytes and per-window parser buffers
+most added calls. These are diagnostic allocation measurements, not a new
+production baseline or native timing comparison.
+
 ## 0948 — rejected XLSX multi-window candidate
 
 [0948](0948-xlsx-multi-window-audit-rejected.md) retains 16 qualification,

@@ -1,0 +1,160 @@
+{
+  "artifacts": [
+    {
+      "bytes": 543462,
+      "path": "capture-v1/children/h00-baseline-primary-percent-medium/heaptrack.data.gz.zst",
+      "sha256": "e1ad7f64f151c2e26a11bde455074e0eaec8f01587535c7df6914a4d4aac4feb"
+    },
+    {
+      "bytes": 24074,
+      "path": "capture-v1/children/h00-baseline-primary-percent-medium/report.json",
+      "sha256": "dc7f58348562e3a0d4b72635d4915a8fbdf23ab1ea8151d453341aef7afb4e08"
+    },
+    {
+      "bytes": 3030,
+      "path": "capture-v1/children/h00-baseline-primary-percent-medium/start.json",
+      "sha256": "cb47677007425377f2ba665a4678b60c70c580859e610f23874f91c4e5f65f21"
+    },
+    {
+      "bytes": 105,
+      "path": "capture-v1/children/h00-baseline-primary-percent-medium/stderr.log",
+      "sha256": "a24d3499af9f60fd77aaaaf4985b56ff93e96a73f11b56c8747d9c8bcc98dab8"
+    },
+    {
+      "bytes": 409,
+      "path": "capture-v1/children/h00-baseline-primary-percent-medium/stdout.log",
+      "sha256": "599bee27e3e0c3da1a316a4f5517a71c9af726ed21db1d3fba97a5f89403ffc7"
+    },
+    {
+      "bytes": 3644,
+      "path": "capture-v1/children/h00-baseline-primary-percent-medium/terminal.json",
+      "sha256": "b53cbf3946543e71783faa0e59d1d3a5883f70b7781b5ffb45497e20d6854577"
+    },
+    {
+      "bytes": 1196,
+      "path": "capture-v1/children/h00-baseline-primary-percent-medium/time.txt",
+      "sha256": "6891c53e3219ef878429e30c9629f4ec07aa5d91d44ca5d8b2ade551076c26bb"
+    },
+    {
+      "bytes": 543780,
+      "path": "capture-v1/children/h01-candidate-primary-percent-medium/heaptrack.data.gz.zst",
+      "sha256": "bb4cf9c2a498c24d962a5597f338dcb439647965dd381733c89c4673f1e346f4"
+    },
+    {
+      "bytes": 24105,
+      "path": "capture-v1/children/h01-candidate-primary-percent-medium/report.json",
+      "sha256": "ce5da6bdcf3996117f56438ab1265e727189cd8ce97731233da2c734168f9d1b"
+    },
+    {
+      "bytes": 3104,
+      "path": "capture-v1/children/h01-candidate-primary-percent-medium/start.json",
+      "sha256": "019da281adf0f5296d81e9b6094823162b61349e07c6c28cf16390855da6530d"
+    },
+    {
+      "bytes": 105,
+      "path": "capture-v1/children/h01-candidate-primary-percent-medium/stderr.log",
+      "sha256": "fb53c176e0eb30138d17883a8e3a5769701695012e3ae6bbb52a97643e712bde"
+    },
+    {
+      "bytes": 411,
+      "path": "capture-v1/children/h01-candidate-primary-percent-medium/stdout.log",
+      "sha256": "e3ad4649f0aa188526c57482424ce651fea0fcd18a0954b4bb79cc75f724f356"
+    },
+    {
+      "bytes": 3717,
+      "path": "capture-v1/children/h01-candidate-primary-percent-medium/terminal.json",
+      "sha256": "6799e08efa165133d2d3b6badb7ac7b9e1414eca0731fd8d998a3caee2735b87"
+    },
+    {
+      "bytes": 1225,
+      "path": "capture-v1/children/h01-candidate-primary-percent-medium/time.txt",
+      "sha256": "c9ebfde3f6fd2701e50c4f196114006a981f5c278f8caa62b2b1e2a2719ad525"
+    },
+    {
+      "bytes": 585256,
+      "path": "capture-v1/children/h02-baseline-primary-percent-dense-sparse/heaptrack.data.gz.zst",
+      "sha256": "26b1c5fb0b92942b865d3b9cf3087481cce7fd025ef0006e500936c36c4e6225"
+    },
+    {
+      "bytes": 24102,
+      "path": "capture-v1/children/h02-baseline-primary-percent-dense-sparse/report.json",
+      "sha256": "94c517601ed6a9583305634e874cbc05a9e6a4753e1902a4faf63ec24c82d129"
+    },
+    {
+      "bytes": 3066,
+      "path": "capture-v1/children/h02-baseline-primary-percent-dense-sparse/start.json",
+      "sha256": "d44a53b4b837d39846fc4bcde22345199da97abbc6f2726e6bfad3084a389c5a"
+    },
+    {
+      "bytes": 106,
+      "path": "capture-v1/children/h02-baseline-primary-percent-dense-sparse/stderr.log",
+      "sha256": "581a68c962f6d3408829e856af8b0680c81450ac9f78084f3dada689c0dd5589"
+    },
+    {
+      "bytes": 421,
+      "path": "capture-v1/children/h02-baseline-primary-percent-dense-sparse/stdout.log",
+      "sha256": "bce54b01807493c4177730657fa67f5f4e5c09793e1e418277074d646407ac8c"
+    },
+    {
+      "bytes": 3686,
+      "path": "capture-v1/children/h02-baseline-primary-percent-dense-sparse/terminal.json",
+      "sha256": "a6de0f9203d1f2b9c02be7466c2b43a0021ae5eae24ebaa92ec8337b7efb140e"
+    },
+    {
+      "bytes": 1212,
+      "path": "capture-v1/children/h02-baseline-primary-percent-dense-sparse/time.txt",
+      "sha256": "32643423c1dbe49ecf6dacd54fec2f49bdc953fe5c836d8d791b66874db58159"
+    },
+    {
+      "bytes": 598273,
+      "path": "capture-v1/children/h03-candidate-primary-percent-dense-sparse/heaptrack.data.gz.zst",
+      "sha256": "a0921db570e2b33f2c2882e489c6bcac47c96a02f3b9bb6eaa7fd9ba7542312c"
+    },
+    {
+      "bytes": 24133,
+      "path": "capture-v1/children/h03-candidate-primary-percent-dense-sparse/report.json",
+      "sha256": "261037461dc22be3064f1794317ec533a250d3ea264714ba0bd500eb5172f5bb"
+    },
+    {
+      "bytes": 3140,
+      "path": "capture-v1/children/h03-candidate-primary-percent-dense-sparse/start.json",
+      "sha256": "3a3552614072da704ed5ee09ff81488ba45e40ff36a132508dcfaf069056ff9e"
+    },
+    {
+      "bytes": 106,
+      "path": "capture-v1/children/h03-candidate-primary-percent-dense-sparse/stderr.log",
+      "sha256": "ee3da9dc5e38ac29e8f1bf380b8aeddc6d25061e1a735720198f4e3e859cab51"
+    },
+    {
+      "bytes": 423,
+      "path": "capture-v1/children/h03-candidate-primary-percent-dense-sparse/stdout.log",
+      "sha256": "3e2672b4ff8c73bdb987c38d6cbd93d8a518bd5cef275172582b0a2198199e21"
+    },
+    {
+      "bytes": 3760,
+      "path": "capture-v1/children/h03-candidate-primary-percent-dense-sparse/terminal.json",
+      "sha256": "f35e447275ef2d3681e94e492945cb5c1fb2dbec6c3f564ee2ec6fd343dbaa6c"
+    },
+    {
+      "bytes": 1244,
+      "path": "capture-v1/children/h03-candidate-primary-percent-dense-sparse/time.txt",
+      "sha256": "5bce437348ce66b1e060681c7968113b7dae017f8ac6e54449db4f64d21667de"
+    },
+    {
+      "bytes": 2573,
+      "path": "capture-v1/runner-start.json",
+      "sha256": "5472aaca4aa7cd026b51d1dbf49d08d56ab9a353bc7b61752d75cf0a3621db90"
+    },
+    {
+      "bytes": 1413,
+      "path": "capture-v1/runner-terminal.json",
+      "sha256": "c598fce228d4fa841f0f7379fdcf2061639d5efd2d9fa99e5ca4aaffbb7d6901"
+    }
+  ],
+  "created_utc": "2026-10-07T05:49:05.735385+00:00",
+  "exit_code": 0,
+  "retries": 0,
+  "schema": "litchi.performance.0949.root-capture-terminal.v1",
+  "session_id": 97388,
+  "workload_children": 4
+}

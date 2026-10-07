@@ -1,0 +1,60 @@
+{
+  "dependencies": {
+    "0948_archive": {
+      "bytes": 1348106492,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0948-archive/archive-0948-v1.tar.zst",
+      "sha256": "15a4008a6b888fed4fea50f0746d9787df32e1a2df6b164d25a7dabb19f1db95"
+    },
+    "0948_manifest": {
+      "bytes": 54217762,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0948-archive/manifest-v1.json",
+      "sha256": "fe29a9f975907cad76a455f60397c7c211a9dc91805b3e8d15ab0e54ec9c21af"
+    },
+    "baseline_allocator_binary": {
+      "bytes": 269016128,
+      "executable": true,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0948/binaries/baseline-allocator",
+      "sha256": "c19971a7e923accd822e9744382aa757d0a67d9d7ba4e47e27354e05767de713"
+    },
+    "baseline_source_manifest": {
+      "bytes": 2033638,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0948/baseline-source-manifest-v1.json",
+      "sha256": "dd66b044540d185c448cae78b16e9aa61556a10f01252e27f2075f48aa5121c2"
+    },
+    "candidate_allocator_binary": {
+      "bytes": 269145952,
+      "executable": true,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0948/binaries/candidate-v3-preserved/litchi-perf-baseline-alloc",
+      "sha256": "7f7c1a0c0148dd283db27ec7b0cb2870572d94cc4d8de1920c4f7de302f3590e"
+    },
+    "candidate_source_manifest": {
+      "bytes": 2296969,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0948/candidate-build-manifest-v3.json",
+      "sha256": "f565a52b36e8657453448d1f097179002b8fd7c95b4417996f62e1cbf6a4b992"
+    }
+  },
+  "note": "0949 packet intentionally contains no duplicated source tree or benchmark binary; the reconciler reads the external 0948 candidate source snapshot.",
+  "required_replay_inputs": [
+    "candidate_source_manifest",
+    "candidate_allocator_binary",
+    "baseline_allocator_binary",
+    "0948_archive",
+    "0948_manifest"
+  ],
+  "schema": "litchi.performance.0949.external-dependency-binding.v1",
+  "source_roots": {
+    "baseline_build_source": "/home/zhuhe/litchi-performance-0948/baseline-source",
+    "candidate_for_reconciliation": "/home/zhuhe/litchi-performance-0948/candidate-build-v3"
+  },
+  "status": "prepared_external_dependency_only"
+}

@@ -1,0 +1,82 @@
+{
+  "analysis_started": false,
+  "capture_root": "/home/zhuhe/litchi-performance-0949/capture-v1",
+  "children": [
+    "h00-baseline-primary-percent-medium",
+    "h01-candidate-primary-percent-medium",
+    "h02-baseline-primary-percent-dense-sparse",
+    "h03-candidate-primary-percent-dense-sparse"
+  ],
+  "matrix": {
+    "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "children": 4,
+    "cpu": 12,
+    "deadline_seconds": 600,
+    "edit_fraction": "one-percent",
+    "jobs": [
+      {
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "case_id": "primary-percent-medium",
+        "name": "h00-baseline-primary-percent-medium",
+        "role": "baseline",
+        "shape": "medium"
+      },
+      {
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "case_id": "primary-percent-medium",
+        "name": "h01-candidate-primary-percent-medium",
+        "role": "candidate",
+        "shape": "medium"
+      },
+      {
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "case_id": "primary-percent-dense-sparse",
+        "name": "h02-baseline-primary-percent-dense-sparse",
+        "role": "baseline",
+        "shape": "dense-sparse"
+      },
+      {
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "case_id": "primary-percent-dense-sparse",
+        "name": "h03-candidate-primary-percent-dense-sparse",
+        "role": "candidate",
+        "shape": "dense-sparse"
+      }
+    ],
+    "locale": "C",
+    "no_retry": true,
+    "order": "baseline medium, candidate medium, baseline dense-sparse, candidate dense-sparse",
+    "roles": [
+      "baseline",
+      "candidate"
+    ],
+    "samples": 1,
+    "serial": true,
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "timezone": "UTC",
+    "warmup": 0
+  },
+  "no_retry": true,
+  "plan": {
+    "bytes": 18513,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0949/heaptrack-plan-v3.json",
+    "sha256": "b570304cecc9f2fb888b44b7921d0a595dbed35873c044e8adff743d64906af8"
+  },
+  "runner": {
+    "bytes": 28023,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0949/tooling/run_heaptrack_0949_v3.py",
+    "sha256": "6ee66f92a6b93431af11227ac886efe555ddb49af32804dd020efc5b89721f4c"
+  },
+  "schema": "litchi.performance.0949.heaptrack-runner-terminal.v1",
+  "serial": true,
+  "started_utc": "2026-10-07T05:48:28.088709+00:00",
+  "status": "started",
+  "terminal_before_any_report_or_profile_parse": true
+}

@@ -1,0 +1,40 @@
+{
+  "created_utc": "2026-10-07T05:58:04.456956+00:00",
+  "mixed_v1_not_final": true,
+  "original_current_config_sha256": "e540eba15cb7cc6b3f7e2726171057796071296d5566eab9640158f6ba3d998d",
+  "output": "attribution-final-v1",
+  "refs": [
+    {
+      "bytes": 30671,
+      "path": "tools/attribute_heaptrack_0949_v1.py",
+      "sha256": "19a19687d138ddcb47b9b4bd1f383ffd2a88396de91d7fd523a73c0e77a68637"
+    },
+    {
+      "bytes": 16649,
+      "path": "tools/decode_heaptrack_0949_v1.py",
+      "sha256": "c87e7089774f0eac24ffde262b7fe27b1f1ff4586798683bcc44fa68049bc7bf"
+    },
+    {
+      "bytes": 2924,
+      "path": "tools/attribution-config-root-v1.json",
+      "sha256": "bfa0f2558f03e41eed7af59f75ba11a6ca115b6248db731cd741e172753f8723"
+    },
+    {
+      "bytes": 7035,
+      "path": "heaptrack-exports-v2/exports.json",
+      "sha256": "4c620e26654cea4e23a207507275284ce4f6d1be2d477b4f5f1621158c2d8e5b"
+    },
+    {
+      "bytes": 9645,
+      "path": "raw-decoder-v1/decoder-terminal.json",
+      "sha256": "d09c494491bf860c536e6bd3b690a310b6c228eccaf44aa27924d350b2b0a525"
+    },
+    {
+      "bytes": 6335,
+      "path": "receipts/capture-artifact-index-v1.json",
+      "sha256": "45a0959f1139be348d0cd3c70d709c100d1c5d833d014e1c5535a17b2dc28a27"
+    }
+  ],
+  "schema": "litchi.performance.0949.root-offline-attribution-seal.v1",
+  "workload_rerun": false
+}

@@ -1,0 +1,12 @@
+{
+  "error": "GNU tar rejected positional --no-recursion after --files-from; no sealed archive was produced",
+  "packet_untouched": true,
+  "partial_tar": {
+    "bytes": 717506560,
+    "path": "/home/zhuhe/litchi-performance-0949-archive/archive-0949-v1.tar",
+    "sha256": "7d32359d58b968a1e024c6a48ed1e3231cc9694ba05f636aa6949f90e35436d8"
+  },
+  "recorded_utc": "2026-10-07T06:06:11.317121+00:00",
+  "schema": "litchi.performance.0949.archive-seal-attempt.v1",
+  "status": "failed_before_compression"
+}

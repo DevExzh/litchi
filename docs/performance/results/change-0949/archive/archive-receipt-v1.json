@@ -1,0 +1,38 @@
+{
+  "compressed_archive": {
+    "bytes": 10206299,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0949-archive/archive-0949-v1.tar.zst",
+    "sha256": "d38a2d38904de6d49cf186326332268da3199734be3215ba12b65ace90fb3a54"
+  },
+  "moved_replay_required_before_cleanup": true,
+  "packet_manifest": {
+    "bytes": 49561,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0949-archive/manifest-v1.json",
+    "sha256": "58070fbcc5ee8f2da8f7edf3a8d369f386ef3715b349c3710e59b3019c7b1b56"
+  },
+  "receipt_correction": "The deterministic uncompressed tar was hashed before zstd compression and deleted after the sealed .tar.zst was written; only the compressed archive is retained.",
+  "regeneration": "python3 -B /home/zhuhe/litchi-performance-0949-archive/archive-0949-v1.py --seal --go --packet /home/zhuhe/litchi-performance-0949 --archive-root /home/zhuhe/litchi-performance-0949-archive --manifest /home/zhuhe/litchi-performance-0949-archive/manifest-v1.json",
+  "schema": "litchi.performance.0949.external-archive-receipt.v1",
+  "selection": {
+    "bytes": 11741,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0949-archive/selection-v1.list",
+    "sha256": "eacc7a18cfdbde20a123a6330dd5793312baca08a83e01b2ddc47f281a107eac"
+  },
+  "source_cleanup_performed": false,
+  "status": "sealed",
+  "uncompressed_tar": {
+    "bytes": 717506560,
+    "deleted_after_compression": true,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0949-archive/archive-0949-v1.tar",
+    "retained": false,
+    "sha256": "7d32359d58b968a1e024c6a48ed1e3231cc9694ba05f636aa6949f90e35436d8"
+  }
+}

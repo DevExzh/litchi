@@ -1,0 +1,78 @@
+{
+  "categories": {
+    "namespace": {
+      "file_only": false,
+      "file_substrings": [
+        "crates/xml-minifier/src/audit/namespaces.rs"
+      ],
+      "function_substrings": [
+        "xml_minifier::audit::namespaces::",
+        "Namespaces::"
+      ]
+    },
+    "window": {
+      "file_only": false,
+      "file_substrings": [],
+      "function_substrings": [
+        "xml_minifier::audit::verify_source_replacement_with_spans",
+        "xml_minifier::audit::prove_windows",
+        "xml_minifier::audit::audit_window",
+        "xml_minifier::audit::MultiWindowSearch::",
+        "xml_minifier::audit::WindowSearch::",
+        "xml_minifier::audit::Window::",
+        "litchi_opc::source_backed::audit_source_part_replacement_xml"
+      ]
+    },
+    "writer": {
+      "file_only": false,
+      "file_substrings": [
+        "crates/litchi-opc/src/pkgwriter.rs",
+        "crates/litchi-xlsx/src/cell_values/source.rs"
+      ],
+      "function_substrings": [
+        "litchi_opc::pkgwriter::",
+        "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream",
+        "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+        "write_topology_to_stream",
+        "write_part_overlays"
+      ]
+    },
+    "xml_audit": {
+      "file_only": false,
+      "file_substrings": [
+        "crates/xml-minifier/src/audit.rs",
+        "crates/xml-minifier/src/audit/"
+      ],
+      "function_substrings": [
+        "xml_minifier::audit::"
+      ]
+    }
+  },
+  "category_order": [
+    "window",
+    "namespace",
+    "xml_audit",
+    "writer",
+    "other"
+  ],
+  "publish_audit_symbols": [
+    "xml_minifier::audit::verify_source_replacement",
+    "xml_minifier::audit::verify_source_replacement_with_spans",
+    "litchi_opc::source_backed::audit_source_part_replacement_xml",
+    "litchi_opc::source_backed::validate_source_part_replacement_xml"
+  ],
+  "publish_scope": {
+    "interpretation": "symbol scope only; not a temporal profiler phase and not a claim that every publication allocation is captured",
+    "match": "any identifiable publish_audit_symbols in any resolved physical or inline location",
+    "name": "publication_symbol_scoped"
+  },
+  "resolution_policy": {
+    "inline": "all locations attached to each IP frame, walking frame and inline order from leaf to root",
+    "inline_ownership": "inline-only matches are reported in the inline partition and never promoted to physical ownership",
+    "nearest": "first matching category in stack order; category_order resolves ties within one location",
+    "physical": "first location attached to each IP frame, walking the recorded stack from leaf to root"
+  },
+  "root_seal_note": "One fixed current configuration for all four retained profiles; supersedes mixed-config exploratory attribution-v1.",
+  "schema": "litchi.performance.0949.heaptrack-attribution-config.v1",
+  "status": "exploratory_offline"
+}

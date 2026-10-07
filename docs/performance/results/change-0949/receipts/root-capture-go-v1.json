@@ -1,0 +1,46 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "tooling/run_heaptrack_0949_v3.py",
+    "--capture",
+    "--go"
+  ],
+  "created_utc": "2026-10-07T05:48:26.799999+00:00",
+  "cwd": "/home/zhuhe/litchi-performance-0949",
+  "fixed_child_count": 4,
+  "later_validation": "All child terminals precede report/profile parsing; bind exact actual profile/report hashes before offline export, validate semantic identities and publication counters against0948, then decoder/histogram conservation. Capture success alone does not establish diagnostic admissibility.",
+  "no_builds": true,
+  "no_retries": true,
+  "profile_name_rule": "V3 capture.accepted_actual_profile_names and exact runner predicate are authoritative: exactly one regular non-symlink file named heaptrack.data.gz or heaptrack.data.gz.zst. This narrows/supersedes inherited prefix/glob wording; all unexpected artifacts must be rejected by offline validation.",
+  "refs": [
+    {
+      "bytes": 18513,
+      "path": "heaptrack-plan-v3.json",
+      "sha256": "b570304cecc9f2fb888b44b7921d0a595dbed35873c044e8adff743d64906af8"
+    },
+    {
+      "bytes": 28023,
+      "path": "tooling/run_heaptrack_0949_v3.py",
+      "sha256": "6ee66f92a6b93431af11227ac886efe555ddb49af32804dd020efc5b89721f4c"
+    },
+    {
+      "bytes": 4178,
+      "path": "receipts/0948-reuse-reverified-v1.json",
+      "sha256": "b405ccea9733ae4d5f327fc3ec8b1510d962d79bd04bd1cfb3f33ac30ac083d1"
+    },
+    {
+      "bytes": 6076,
+      "path": "receipts/capture-preflight-v3.json",
+      "sha256": "8aa54b1dd5f441b1fdfe89bda3a9d317fbdd2da1d1a9e0b5afd9cf1f4d2b7801"
+    },
+    {
+      "bytes": 334,
+      "path": "receipts/profile-name-control-v3.json",
+      "sha256": "b09774c7bf2f260aee6efe64c1df35eca92acdbc9bb3550917c0f4fd8e5f4a08"
+    }
+  ],
+  "review": "Independent reviewer accepted v3 runner under explicit filename-wording supersession; strict prior source/build/binary reverification composed with runner preflight.",
+  "schema": "litchi.performance.0949.root-capture-go.v1",
+  "status": "authorized"
+}

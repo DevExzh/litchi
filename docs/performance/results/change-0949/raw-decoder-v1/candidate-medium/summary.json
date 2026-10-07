@@ -1,0 +1,62 @@
+{
+  "a_plus_adjacency_mismatches": 0,
+  "allocation_events": 979434,
+  "allocation_info_definitions": 22070,
+  "allocation_minus_deallocation": 1,
+  "deallocation_events": 979433,
+  "debuggee_command": "/home/zhuhe/litchi-performance-0948/binaries/candidate-v3-preserved/litchi-perf-baseline-alloc",
+  "decoder_scope": "Disjoint by implicit allocation-info index and trace_id: every '+' event looks up its referenced a-record's size and trace. Requested bytes are before frees; this is whole-profile allocation accounting.",
+  "header_version": [
+    "10500",
+    "3"
+  ],
+  "ip_definitions": 2075,
+  "label": "candidate-medium",
+  "outputs": {
+    "size_aggregates": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/candidate-medium/size-aggregates.tsv",
+    "trace_aggregates": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/candidate-medium/trace-aggregates.jsonl",
+    "trace_size_aggregates": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/candidate-medium/trace-size-aggregates.tsv"
+  },
+  "plus_without_metadata": 0,
+  "profile": {
+    "bytes": 543780,
+    "path": "/home/zhuhe/litchi-performance-0949/capture-v1/children/h01-candidate-primary-percent-medium/heaptrack.data.gz.zst",
+    "sha256": "bb4cf9c2a498c24d962a5597f338dcb439647965dd381733c89c4673f1e346f4"
+  },
+  "raw_marker_counts": {
+    "#": 2,
+    "+": 979434,
+    "-": 979433,
+    "I": 1,
+    "R": 99,
+    "X": 1,
+    "a": 22070,
+    "c": 99,
+    "i": 2075,
+    "s": 2878,
+    "t": 44892,
+    "v": 1
+  },
+  "requested_bytes_total": 476010899,
+  "schema": "litchi.performance.0949.heaptrack-raw-decode.v1",
+  "status": "completed",
+  "string_definitions": 2878,
+  "string_length_errors": [],
+  "trace_definitions": 44892,
+  "unique_trace_ids": 14773,
+  "unknown_any_frame": {
+    "calls": 1,
+    "requested_bytes": 73728,
+    "trace_count": 1
+  },
+  "unknown_leaf_frame": {
+    "calls": 1,
+    "requested_bytes": 73728,
+    "trace_count": 1
+  },
+  "unresolved_trace_definitions": 0,
+  "zstd": {
+    "path": "/usr/bin/zstd",
+    "version": "*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***"
+  }
+}

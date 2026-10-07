@@ -1,0 +1,175 @@
+{
+  "category_partitions": {
+    "inline": {
+      "namespace": {
+        "calls": 111,
+        "requested_bytes": 11322,
+        "trace_count": 65
+      },
+      "other": {
+        "calls": 802570,
+        "requested_bytes": 347050499,
+        "trace_count": 12799
+      },
+      "window": {
+        "calls": 16,
+        "requested_bytes": 176640,
+        "trace_count": 2
+      },
+      "writer": {
+        "calls": 176082,
+        "requested_bytes": 128749886,
+        "trace_count": 1778
+      },
+      "xml_audit": {
+        "calls": 655,
+        "requested_bytes": 22552,
+        "trace_count": 129
+      }
+    },
+    "physical": {
+      "namespace": {
+        "calls": 0,
+        "requested_bytes": 0,
+        "trace_count": 0
+      },
+      "other": {
+        "calls": 975806,
+        "requested_bytes": 379312322,
+        "trace_count": 13917
+      },
+      "window": {
+        "calls": 315,
+        "requested_bytes": 5982,
+        "trace_count": 18
+      },
+      "writer": {
+        "calls": 2894,
+        "requested_bytes": 96666907,
+        "trace_count": 669
+      },
+      "xml_audit": {
+        "calls": 419,
+        "requested_bytes": 25688,
+        "trace_count": 169
+      }
+    }
+  },
+  "config": {
+    "bytes": 2924,
+    "path": "/home/zhuhe/litchi-performance-0949/tools/attribution-config-root-v1.json",
+    "sha256": "bfa0f2558f03e41eed7af59f75ba11a6ca115b6248db731cd741e172753f8723"
+  },
+  "conservation": {
+    "all_exact": true,
+    "decoder_allocation_events": 979434,
+    "decoder_requested_bytes": 476010899,
+    "external_heaptrack_histogram": {
+      "decoder_calls": 979434,
+      "heaptrack_print_calls": 979434,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "status": "pass"
+    },
+    "size_aggregate_calls": 979434,
+    "size_aggregate_requested_bytes": 476010899,
+    "trace_aggregate_count": 14773,
+    "trace_size_aggregate_calls": 979434,
+    "trace_size_aggregate_requested_bytes": 476010899
+  },
+  "decoder_summary": {
+    "bytes": 2083,
+    "path": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/candidate-medium/summary.json",
+    "sha256": "1f80566be5d84693278b0c3f6b9fccba6e4cb4ec54ba00b2b8d2d47fbae9bf3c"
+  },
+  "label": "candidate-medium",
+  "physical_inline_cross_resolution": {
+    "other->other": {
+      "calls": 802570,
+      "requested_bytes": 347050499,
+      "trace_count": 12799
+    },
+    "other->writer": {
+      "calls": 173236,
+      "requested_bytes": 32261823,
+      "trace_count": 1118
+    },
+    "window->xml_audit": {
+      "calls": 315,
+      "requested_bytes": 5982,
+      "trace_count": 18
+    },
+    "writer->window": {
+      "calls": 16,
+      "requested_bytes": 176640,
+      "trace_count": 2
+    },
+    "writer->writer": {
+      "calls": 2846,
+      "requested_bytes": 96488063,
+      "trace_count": 660
+    },
+    "writer->xml_audit": {
+      "calls": 32,
+      "requested_bytes": 2204,
+      "trace_count": 7
+    },
+    "xml_audit->namespace": {
+      "calls": 111,
+      "requested_bytes": 11322,
+      "trace_count": 65
+    },
+    "xml_audit->xml_audit": {
+      "calls": 308,
+      "requested_bytes": 14366,
+      "trace_count": 104
+    }
+  },
+  "publication_symbol_scoped": {
+    "calls": 459,
+    "requested_bytes": 192962,
+    "trace_count": 74
+  },
+  "schema": "litchi.performance.0949.heaptrack-attribution.v1",
+  "scope_notes": {
+    "inline": "all resolved inline locations; nearest matching category",
+    "inline_only": "retained as inline evidence and excluded from physical ownership",
+    "ownership": "diagnostic attribution; no category is claimed to own allocations solely from inline frames",
+    "physical": "first location per recorded IP frame; nearest matching category",
+    "publication": "stacks containing configured source-replacement audit symbols only",
+    "whole_process": "all decoded allocation events and requested bytes before frees"
+  },
+  "status": "pass",
+  "whole_process": {
+    "calls": 979434,
+    "requested_bytes": 476010899,
+    "trace_count": 14773
+  },
+  "window_artifacts": {
+    "inline_size_histogram": {
+      "bytes": 47,
+      "path": "/home/zhuhe/litchi-performance-0949/attribution-final-v1/candidate-medium/window-inline-size.histogram",
+      "sha256": "19cf72e5c76257c497b3af7fbe2b2748907ec548b810001d0c1a7593efa244dc"
+    },
+    "inline_stacks": {
+      "bytes": 4193,
+      "path": "/home/zhuhe/litchi-performance-0949/attribution-final-v1/candidate-medium/window-inline-stacks.folded",
+      "sha256": "b36f9801558832aa3fdc6dbe9d6a52f12df138ae6c957c7b14bd9da0180d78ca"
+    },
+    "physical_size_histogram": {
+      "bytes": 66,
+      "path": "/home/zhuhe/litchi-performance-0949/attribution-final-v1/candidate-medium/window-physical-size.histogram",
+      "sha256": "289a3dbc4391bd5afa270d6354aeb4a81be67ee807339a8927d0fd77fbf47d82"
+    },
+    "physical_stacks": {
+      "bytes": 17385,
+      "path": "/home/zhuhe/litchi-performance-0949/attribution-final-v1/candidate-medium/window-physical-stacks.folded",
+      "sha256": "aa35d590b84d61d2342ebf20082202471745cfa9081db2abc07919309db4a0ae"
+    },
+    "raw_traces": {
+      "bytes": 220414,
+      "path": "/home/zhuhe/litchi-performance-0949/attribution-final-v1/candidate-medium/window-traces.jsonl",
+      "sha256": "8ede55a124cffa744dc7374223b5a6314f5973c2f450b5ca061b2ee515921a7f"
+    }
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/litchi-performance-0949/capture-v1/children/h00-baseline-primary-percent-medium/time.txt",
+    "/usr/bin/taskset",
+    "--cpu-list",
+    "12",
+    "/usr/bin/heaptrack",
+    "--record-only",
+    "-o",
+    "/home/zhuhe/litchi-performance-0949/capture-v1/children/h00-baseline-primary-percent-medium/heaptrack.data.gz",
+    "/home/zhuhe/litchi-performance-0948/binaries/baseline-allocator",
+    "--warmup",
+    "0",
+    "--samples",
+    "1",
+    "--case",
+    "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "medium",
+    "--json",
+    "/home/zhuhe/litchi-performance-0949/capture-v1/children/h00-baseline-primary-percent-medium/report.json"
+  ],
+  "artifacts": {
+    "profile_prefix": "heaptrack.data.gz",
+    "profile_requested": "heaptrack.data.gz",
+    "report": "report.json",
+    "start": "start.json",
+    "stderr": "stderr.log",
+    "stdout": "stdout.log",
+    "terminal": "terminal.json",
+    "time": "time.txt"
+  },
+  "binary": {
+    "bytes": 269016128,
+    "executable": true,
+    "mode": 509,
+    "path": "/home/zhuhe/litchi-performance-0948/binaries/baseline-allocator",
+    "sha256": "c19971a7e923accd822e9744382aa757d0a67d9d7ba4e47e27354e05767de713"
+  },
+  "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+  "cwd": "/home/zhuhe/litchi-performance-0948/baseline-source",
+  "deadline_seconds": 600,
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "RUST_BACKTRACE": "0",
+    "TZ": "UTC"
+  },
+  "environment_sha256": "383434704bf4ff22086cbfe94239df84bcd243db2d09b06a18e069903754a948",
+  "id": "h00-baseline-primary-percent-medium",
+  "no_retry": true,
+  "plan": {
+    "bytes": 18513,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0949/heaptrack-plan-v3.json",
+    "sha256": "b570304cecc9f2fb888b44b7921d0a595dbed35873c044e8adff743d64906af8"
+  },
+  "process_group": true,
+  "role": "baseline",
+  "runner": {
+    "bytes": 28023,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0949/tooling/run_heaptrack_0949_v3.py",
+    "sha256": "6ee66f92a6b93431af11227ac886efe555ddb49af32804dd020efc5b89721f4c"
+  },
+  "sample_index": 0,
+  "schema": "litchi.performance.0949.heaptrack-child-terminal.v1",
+  "source": {
+    "checked_files": 10789,
+    "file_count": 10789,
+    "manifest": {
+      "bytes": 2033638,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0948/baseline-source-manifest-v1.json",
+      "sha256": "dd66b044540d185c448cae78b16e9aa61556a10f01252e27f2075f48aa5121c2"
+    },
+    "role": "baseline",
+    "root": "/home/zhuhe/litchi-performance-0948/baseline-source",
+    "source_commit": "b6c5c80ffbcb60736d6c4c2f3b590838640008a9"
+  },
+  "start_new_session": true,
+  "started_utc": "2026-10-07T05:48:28.092011+00:00",
+  "status": "started",
+  "terminal_receipt": "terminal.json",
+  "warmup": 0,
+  "xlsx_cell_crud_shape": "medium"
+}

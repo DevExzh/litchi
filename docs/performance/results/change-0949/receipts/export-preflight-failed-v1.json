@@ -1,0 +1,10 @@
+{
+  "schema": "litchi.performance.0949.export-preflight-failure.v1",
+  "exit_code": 1,
+  "error": "KeyError: profile_actual; final capture terminal field is profile_actual_name",
+  "export_processes_started": 0,
+  "workload_retries": 0,
+  "failed_helper_sha256": "c10371c121676fc83f408677661c14df5e4fdb5c5813caef55aa2dd7cef5a7b4",
+  "retained_output": "heaptrack-exports-v1",
+  "correction": "tools/export_heaptrack_0949_v2.py uses the actual recorded field and a fresh output directory"
+}

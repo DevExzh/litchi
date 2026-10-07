@@ -1,0 +1,454 @@
+{
+  "0948_bindings": {
+    "baseline_reuse_receipt": {
+      "bytes": 4678,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0948/receipts/baseline-reuse-v2.json",
+      "sha256": "a05ddc9f28879df314e0dc583d9871c60a82b2a78938c03b0a4389c252bef1bc"
+    },
+    "binding_note": "These are provenance/report identities only. The committed 0948 rejection remains a prior result; this diagnostic does not reopen its gate or turn heaptrack output into an adoption decision.",
+    "candidate_binary_preservation": {
+      "bytes": 3065,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0948/receipts/candidate-v3-preservation-v1.json",
+      "sha256": "5815e0f1a84c792986ec824e23e553da1e2f1e6f0820bfe7ab64599bb1dc6e58"
+    },
+    "candidate_freeze_receipt": {
+      "bytes": 4900,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0948/receipts/candidate-freeze-v3.json",
+      "sha256": "8f68153a809c729cbdb082b336e0b841f242892904929643917d5fee41d514a6"
+    },
+    "final_source_binding": {
+      "bytes": 5147,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/final-source-binding-v2.json",
+      "sha256": "55fac50726a61b802f0f4ef8fd1489cb823c41feb4fa301e2d62dd799b2acf80"
+    },
+    "plan": {
+      "bytes": 10861,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0948/plan-v3.json",
+      "sha256": "e4bb028993ec25b0b538616153a09b17fdfb26b91c8255336eab9393d87de73f"
+    },
+    "quality_composition": {
+      "bytes": 23513,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/quality-composition-v2.json",
+      "sha256": "468362082be75d5bd6e8e9f2bb223d3ca3f2fdf543c981d332cb20b8f2dbe091"
+    },
+    "quality_summary": {
+      "bytes": 36890,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/quality-summary-v2.json",
+      "sha256": "51656e424665c5970b57e8e22164142416d7818df3e03315a9ca18710b75d857"
+    },
+    "rejection_report": {
+      "bytes": 10161,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/0948-xlsx-multi-window-audit-rejected.md",
+      "sha256": "525df95996d0f0fd58c70a5cb57bf3ef874f5597f9d32f53038de1a530d95bad"
+    }
+  },
+  "application_report_contract": {
+    "allocator_counter_revision": "serialized_region_peak_v3",
+    "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "fresh_report_boundary": "--json report.json from each profiled child; compare its operation/publication fields with the exact 0948 role/case report identities in semantic_context",
+    "instrumentation": "system_allocator_operation_scoped",
+    "schema_version": 1,
+    "tool_name": "litchi-perf-baseline",
+    "whole_process_profile_is_not_report_publication_interval": true
+  },
+  "binaries": {
+    "baseline": {
+      "binary": {
+        "bytes": 269016128,
+        "executable": true,
+        "mode": 509,
+        "path": "/home/zhuhe/litchi-performance-0948/binaries/baseline-allocator",
+        "sha256": "c19971a7e923accd822e9744382aa757d0a67d9d7ba4e47e27354e05767de713"
+      },
+      "build_receipt": {
+        "bytes": 4678,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0948/receipts/baseline-reuse-v2.json",
+        "sha256": "a05ddc9f28879df314e0dc583d9871c60a82b2a78938c03b0a4389c252bef1bc"
+      },
+      "build_revision": "0948-reused-baseline-v1",
+      "role": "baseline allocator; CountingSystemAllocator(std::alloc::System)"
+    },
+    "candidate": {
+      "binary": {
+        "bytes": 269145952,
+        "executable": true,
+        "mode": 509,
+        "path": "/home/zhuhe/litchi-performance-0948/binaries/candidate-v3-preserved/litchi-perf-baseline-alloc",
+        "sha256": "7f7c1a0c0148dd283db27ec7b0cb2870572d94cc4d8de1920c4f7de302f3590e"
+      },
+      "build_receipt": {
+        "bytes": 8666,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0948/builds/candidate-allocator-v3/terminal.json",
+        "sha256": "5a467ced86b26a7fd091261de8b2a65089eeb72e55a2651db5186c2103dc0b00"
+      },
+      "build_revision": "0948-candidate-v3",
+      "preservation_receipt": {
+        "bytes": 3065,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0948/receipts/candidate-v3-preservation-v1.json",
+        "sha256": "5815e0f1a84c792986ec824e23e553da1e2f1e6f0820bfe7ab64599bb1dc6e58"
+      },
+      "role": "candidate allocator; CountingSystemAllocator(std::alloc::System)"
+    }
+  },
+  "capture": {
+    "accepted_actual_profile_names": [
+      "heaptrack.data.gz",
+      "heaptrack.data.gz.zst"
+    ],
+    "analysis_helper_not_invoked_by_runner": true,
+    "child_artifacts": [
+      "start.json",
+      "terminal.json",
+      "stdout.log",
+      "stderr.log",
+      "time.txt",
+      "report.json",
+      "heaptrack.data.gz*"
+    ],
+    "outer_artifacts": [
+      "runner-start.json",
+      "runner-terminal.json"
+    ],
+    "profile_output": {
+      "missing_or_multiple": "child fails closed after terminal; no retry",
+      "observed_name_rule": "one regular file whose name starts with heaptrack.data.gz; heaptrack may append its compression suffix, including .zst",
+      "post_terminal_hash_custody": "After runner-terminal.json is durable, an independent reducer/custodian hashes the exact terminal.artifacts.profile_actual_path and binds that descriptor before heaptrack_print or any profile parse. The runner deliberately records the actual path but does not read or hash profile contents.",
+      "requested_name": "heaptrack.data.gz",
+      "terminal_records_actual_name": true,
+      "terminal_records_actual_path": true
+    },
+    "raw_artifacts_external": true,
+    "root": "/home/zhuhe/litchi-performance-0949/capture-v1",
+    "terminal_before_parse": true,
+    "unexpected_artifact_policy": "independent reducer must fail closed on unexpected files; capture runner does not parse or delete any child artifact."
+  },
+  "capture_authorization": "root_GO_required",
+  "child_command_template": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "<child>/time.txt",
+    "/usr/bin/taskset",
+    "--cpu-list",
+    "12",
+    "/usr/bin/heaptrack",
+    "--record-only",
+    "-o",
+    "<child>/heaptrack.data.gz",
+    "<role allocator binary>",
+    "--warmup",
+    "0",
+    "--samples",
+    "1",
+    "--case",
+    "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "<medium|dense-sparse>",
+    "--json",
+    "<child>/report.json"
+  ],
+  "claim_scope": {
+    "analysis_order": "Write and verify all child terminal receipts before any independent reducer reads report.json or heaptrack.data.gz.",
+    "excluded_claims": [
+      "latency",
+      "speedup",
+      "allocation acceptance",
+      "allocation reduction gate",
+      "adoption",
+      "publication-only attribution from heaptrack alone"
+    ],
+    "heaptrack_interval": "whole_process",
+    "profiler_position": "heaptrack interposes below the application CountingSystemAllocator(std::alloc::System) wrapper; the application report counters remain the wrapper-defined operation/publication counters.",
+    "publication_attribution_rule": "Do not attribute a heaptrack stack to publication without independent stack-region or boundary evidence. Compare report publication counters exactly before discussing any stack as publication-specific.",
+    "publication_interval_context": "The application report carries the exact 0948 publication/operation counters for the same workload command. Those counters describe the publication boundary; heaptrack samples are not restricted to that interval.",
+    "whole_process_definition": "heaptrack wraps the complete allocator child, including setup, fixture construction, workbook load, edits, save/publication, report emission, and teardown."
+  },
+  "created_utc": "2026-10-07T05:47:27.548949+00:00",
+  "diagnostic_goal": "Locate XML audit/window allocation stacks and retain allocator evidence for mechanism review; this packet makes no performance acceptance, latency, speedup, or source-adoption claim.",
+  "environment": {
+    "fixed": {
+      "LANG": "C",
+      "LC_ALL": "C",
+      "PATH": "/usr/bin:/bin",
+      "RUST_BACKTRACE": "0",
+      "TZ": "UTC"
+    },
+    "inheritance": "No caller environment is inherited; only these five variables are passed to each child. heaptrack manages its own injection; LD_PRELOAD is not supplied by the runner."
+  },
+  "failure_policy": "A launch error, nonzero exit, timeout, uncleared process group, malformed report, or malformed profile invalidates that child and is retained. No child is retried or recaptured.",
+  "matrix": {
+    "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "children": 4,
+    "cpu": 12,
+    "deadline_seconds": 600,
+    "edit_fraction": "one-percent",
+    "jobs": [
+      {
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "case_id": "primary-percent-medium",
+        "name": "h00-baseline-primary-percent-medium",
+        "role": "baseline",
+        "shape": "medium"
+      },
+      {
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "case_id": "primary-percent-medium",
+        "name": "h01-candidate-primary-percent-medium",
+        "role": "candidate",
+        "shape": "medium"
+      },
+      {
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "case_id": "primary-percent-dense-sparse",
+        "name": "h02-baseline-primary-percent-dense-sparse",
+        "role": "baseline",
+        "shape": "dense-sparse"
+      },
+      {
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "case_id": "primary-percent-dense-sparse",
+        "name": "h03-candidate-primary-percent-dense-sparse",
+        "role": "candidate",
+        "shape": "dense-sparse"
+      }
+    ],
+    "locale": "C",
+    "no_retry": true,
+    "order": "baseline medium, candidate medium, baseline dense-sparse, candidate dense-sparse",
+    "roles": [
+      "baseline",
+      "candidate"
+    ],
+    "samples": 1,
+    "serial": true,
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "timezone": "UTC",
+    "warmup": 0
+  },
+  "no_acceptance_gate": true,
+  "plan_id": "0949",
+  "plan_revision": "v3",
+  "postprocessing_boundary": {
+    "later_reducer_required": "A separate offline helper may run heaptrack_print after terminal receipts and must bind heaptrack_print version/hash, preserve raw profile, and report unknown/unattributed allocations.",
+    "publication_counters": "Use each fresh report.json to verify application operation/publication fields against the exact 0948 role/case report schema; do not sum or reinterpret whole-process heaptrack bytes as publication bytes.",
+    "runner_output": "Custody only: start/terminal records, stdout/stderr, time output, application report, and raw heaptrack profile."
+  },
+  "protocol_revision": 1,
+  "purpose": "Diagnostic whole-process heaptrack allocation attribution for the retained 0948 allocator binaries on two one-percent XLSX source-backed cell-value edit/save shapes.",
+  "runner": {
+    "bytes": 28023,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0949/tooling/run_heaptrack_0949_v3.py",
+    "sha256": "6ee66f92a6b93431af11227ac886efe555ddb49af32804dd020efc5b89721f4c"
+  },
+  "schema": "litchi.performance.0949.heaptrack-allocation-diagnostic.v1",
+  "semantic_context": [
+    {
+      "bytes": 10861,
+      "executable": false,
+      "id": "0948-plan-v3",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0948/plan-v3.json",
+      "sha256": "e4bb028993ec25b0b538616153a09b17fdfb26b91c8255336eab9393d87de73f"
+    },
+    {
+      "bytes": 182648,
+      "executable": false,
+      "id": "0948-allocator-capture",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0948/allocator/capture.json",
+      "sha256": "9e335997539b9ced76e8d0998b0798dd44b5d575be534a5cbd4dbd962c896ff1"
+    },
+    {
+      "bytes": 333796,
+      "executable": false,
+      "id": "0948-qualification-analysis",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0948/qualification-analysis.json",
+      "sha256": "d588d6e7b28156d2676065544e71490ab9af81f0055935a367d4faf56ee815d4"
+    },
+    {
+      "bytes": 44036,
+      "executable": false,
+      "id": "0948-baseline-primary-medium-report",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0948/allocator/r00-baseline-primary-percent-medium/report.json",
+      "sha256": "d8117cd4b1d797c17033a5bdf370947674b6553247fe09dc84e75e6b1e66a984"
+    },
+    {
+      "bytes": 44086,
+      "executable": false,
+      "id": "0948-baseline-primary-dense-sparse-report",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0948/allocator/r00-baseline-primary-percent-dense-sparse/report.json",
+      "sha256": "2d8fe08425270c4d73920a57ac86ff4d30e5c75eb0d832fad4b5a3f66c6daea6"
+    },
+    {
+      "bytes": 44072,
+      "executable": false,
+      "id": "0948-candidate-primary-medium-report",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0948/allocator/r00-candidate-primary-percent-medium/report.json",
+      "sha256": "4b96ec6644a87c628d5d6d0a7c7b3c1887de58678bfc43cbf95224231172cda5"
+    },
+    {
+      "bytes": 44126,
+      "executable": false,
+      "id": "0948-candidate-primary-dense-sparse-report",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0948/allocator/r00-candidate-primary-percent-dense-sparse/report.json",
+      "sha256": "2db1a91efbccb3a48e43368876fe296c1d889eafbbc0b2de261b07e25b80ff9f"
+    },
+    {
+      "bytes": 23513,
+      "executable": false,
+      "id": "0948-quality-composition",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/quality-composition-v2.json",
+      "sha256": "468362082be75d5bd6e8e9f2bb223d3ca3f2fdf543c981d332cb20b8f2dbe091"
+    },
+    {
+      "bytes": 36890,
+      "executable": false,
+      "id": "0948-quality-summary",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/quality-summary-v2.json",
+      "sha256": "51656e424665c5970b57e8e22164142416d7818df3e03315a9ca18710b75d857"
+    },
+    {
+      "bytes": 5147,
+      "executable": false,
+      "id": "0948-final-source-binding",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0948/quality/final-v4/final-source-binding-v2.json",
+      "sha256": "55fac50726a61b802f0f4ef8fd1489cb823c41feb4fa301e2d62dd799b2acf80"
+    },
+    {
+      "bytes": 4944,
+      "executable": false,
+      "id": "0948-focused-xlsx-integration",
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0948/quality/final-v3/focused-xlsx-integration-v1.summary.json",
+      "sha256": "23ce4e4cbe2cf00a18cc86684787161b2ebf42526a294a7de83497a65aa5a0f5"
+    },
+    {
+      "bytes": 10161,
+      "executable": false,
+      "id": "0948-committed-rejection-report",
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/0948-xlsx-multi-window-audit-rejected.md",
+      "sha256": "525df95996d0f0fd58c70a5cb57bf3ef874f5597f9d32f53038de1a530d95bad"
+    }
+  ],
+  "sources": {
+    "baseline": {
+      "file_count": 10789,
+      "manifest": {
+        "bytes": 2033638,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0948/baseline-source-manifest-v1.json",
+        "sha256": "dd66b044540d185c448cae78b16e9aa61556a10f01252e27f2075f48aa5121c2"
+      },
+      "role": "0948 retained baseline source closure",
+      "root": "/home/zhuhe/litchi-performance-0948/baseline-source",
+      "source_commit": "b6c5c80ffbcb60736d6c4c2f3b590838640008a9"
+    },
+    "candidate": {
+      "file_count": 10789,
+      "manifest": {
+        "bytes": 2296969,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0948/candidate-build-manifest-v3.json",
+        "sha256": "f565a52b36e8657453448d1f097179002b8fd7c95b4417996f62e1cbf6a4b992"
+      },
+      "role": "0948 measured production candidate build-v3 source closure",
+      "root": "/home/zhuhe/litchi-performance-0948/candidate-build-v3",
+      "source_commit": "b6c5c80ffbcb60736d6c4c2f3b590838640008a9",
+      "source_tree_digest": "228e74ebb6fee5bbd64d1ee81a4ec8334a4d1277cbf89d9b365c3bbe7cae8a28"
+    },
+    "source_closure_note": "The allocator executables and their source manifests are retained external 0948 artifacts. Current checkout changes are not used to rebuild or relabel these binaries."
+  },
+  "status": "prospective_no_capture",
+  "supersedes": {
+    "plan": "heaptrack-plan-v2.json",
+    "reason": "Tighten actual-profile filename admission to the two known tool outputs; no workload/source/binary/schedule change.",
+    "sha256": "8d98254b04b78d75340585e4c4775ec208fa47b76f507254665710338b531f44"
+  },
+  "terminal_custody": {
+    "deadline_is_per_child_seconds": 600,
+    "no_retry": true,
+    "process_group": true,
+    "retain_failures": true,
+    "start_before_launch": true,
+    "terminal_after_reap_and_process_group_clear": true,
+    "terminal_before_report_or_profile_read": true
+  },
+  "tools": {
+    "heaptrack": {
+      "bytes": 12702,
+      "executable": true,
+      "mode": 493,
+      "path": "/usr/bin/heaptrack",
+      "sha256": "11ef8b89a93d43b63e4dec187f4c7dca2644f10254c5639e55a563fb5465b574",
+      "version": "1.5.0"
+    },
+    "heaptrack_print": {
+      "bytes": 346488,
+      "executable": true,
+      "mode": 493,
+      "path": "/usr/bin/heaptrack_print",
+      "sha256": "aaef3e0ba4df8ce202f5418c4289e36504a5154b1a806e177d46384ac93ae01d",
+      "version": "1.5.0"
+    },
+    "taskset": {
+      "bytes": 31184,
+      "executable": true,
+      "mode": 493,
+      "path": "/usr/bin/taskset",
+      "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2",
+      "version": "util-linux 2.41.3"
+    },
+    "time": {
+      "bytes": 27232,
+      "executable": true,
+      "mode": 493,
+      "path": "/usr/bin/time",
+      "sha256": "919efdcc04c1dbc7a1479c2f3310d491c95f028e1762a84c47810ac0ec1c0d88",
+      "version": "GNU Time UNKNOWN"
+    }
+  },
+  "tools_versions": {
+    "heaptrack": "1.5.0",
+    "heaptrack_print": "1.5.0",
+    "taskset": "util-linux 2.41.3",
+    "time": "GNU Time UNKNOWN"
+  }
+}

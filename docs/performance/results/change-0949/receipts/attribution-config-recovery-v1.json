@@ -1,0 +1,26 @@
+{
+  "current_config_preserved": {
+    "bytes": 2785,
+    "expected_sha256": "e540eba15cb7cc6b3f7e2726171057796071296d5566eab9640158f6ba3d998d",
+    "path": "/home/zhuhe/litchi-performance-0949/tools/attribution-config-v1.json",
+    "sha256": "e540eba15cb7cc6b3f7e2726171057796071296d5566eab9640158f6ba3d998d"
+  },
+  "purpose": "Retained exact historical attribution config used by the baseline portion of attribution-v1; current attribution-config-v1.json is preserved independently.",
+  "recovered_config": {
+    "bytes": 2645,
+    "expected_sha256": "7dd39ee39f5b2d3593b5b9e9a07888d91bdf7945add060bb9b50ab7875ad2319",
+    "path": "/home/zhuhe/litchi-performance-0949/tools/attribution-config-v1-baseline-retained.json",
+    "sha256": "7dd39ee39f5b2d3593b5b9e9a07888d91bdf7945add060bb9b50ab7875ad2319"
+  },
+  "schema": "litchi.performance.0949.attribution-config-recovery.v1",
+  "source": {
+    "add_patch_line": 4789,
+    "initial_add_bytes": 2695,
+    "initial_add_sha256": "832f467380053e02bdd7ef89d00fa298a933f7e849c79a8860c771f0e21bb8c9",
+    "operation": "Extract exact add-file bytes from line 4789, then replace the one window file_substrings audit.rs block with an empty list as recorded by line 4852.",
+    "replacement_line": 4852,
+    "session_path": "/home/zhuhe/.codex/sessions/2026/10/07/rollout-2026-10-07T03-46-19-01a11478-2285-7611-b503-7d08473d6119.jsonl",
+    "session_sha256": "30b7744a22db7228b48a0458c266fd1e9ffb3aff3d935095c90c20dbba31c4c9"
+  },
+  "status": "pass"
+}

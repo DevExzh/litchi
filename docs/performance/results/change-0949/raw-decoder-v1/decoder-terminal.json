@@ -1,0 +1,258 @@
+{
+  "ended_utc": "2026-10-07T05:49:13.042188+00:00",
+  "output_root": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1",
+  "profiles": [
+    {
+      "a_plus_adjacency_mismatches": 0,
+      "allocation_events": 979147,
+      "allocation_info_definitions": 22064,
+      "allocation_minus_deallocation": 1,
+      "deallocation_events": 979146,
+      "debuggee_command": "/home/zhuhe/litchi-performance-0948/binaries/baseline-allocator",
+      "decoder_scope": "Disjoint by implicit allocation-info index and trace_id: every '+' event looks up its referenced a-record's size and trace. Requested bytes are before frees; this is whole-profile allocation accounting.",
+      "header_version": [
+        "10500",
+        "3"
+      ],
+      "ip_definitions": 2061,
+      "label": "baseline-medium",
+      "outputs": {
+        "size_aggregates": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/baseline-medium/size-aggregates.tsv",
+        "trace_aggregates": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/baseline-medium/trace-aggregates.jsonl",
+        "trace_size_aggregates": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/baseline-medium/trace-size-aggregates.tsv"
+      },
+      "plus_without_metadata": 0,
+      "profile": {
+        "bytes": 543462,
+        "path": "/home/zhuhe/litchi-performance-0949/capture-v1/children/h00-baseline-primary-percent-medium/heaptrack.data.gz.zst",
+        "sha256": "e1ad7f64f151c2e26a11bde455074e0eaec8f01587535c7df6914a4d4aac4feb"
+      },
+      "raw_marker_counts": {
+        "#": 2,
+        "+": 979147,
+        "-": 979146,
+        "I": 1,
+        "R": 101,
+        "X": 1,
+        "a": 22064,
+        "c": 101,
+        "i": 2061,
+        "s": 2865,
+        "t": 44847,
+        "v": 1
+      },
+      "requested_bytes_total": 475804603,
+      "schema": "litchi.performance.0949.heaptrack-raw-decode.v1",
+      "status": "completed",
+      "string_definitions": 2865,
+      "string_length_errors": [],
+      "trace_definitions": 44847,
+      "unique_trace_ids": 14759,
+      "unknown_any_frame": {
+        "calls": 1,
+        "requested_bytes": 73728,
+        "trace_count": 1
+      },
+      "unknown_leaf_frame": {
+        "calls": 1,
+        "requested_bytes": 73728,
+        "trace_count": 1
+      },
+      "unresolved_trace_definitions": 0,
+      "zstd": {
+        "path": "/usr/bin/zstd",
+        "version": "*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***"
+      }
+    },
+    {
+      "a_plus_adjacency_mismatches": 0,
+      "allocation_events": 979434,
+      "allocation_info_definitions": 22070,
+      "allocation_minus_deallocation": 1,
+      "deallocation_events": 979433,
+      "debuggee_command": "/home/zhuhe/litchi-performance-0948/binaries/candidate-v3-preserved/litchi-perf-baseline-alloc",
+      "decoder_scope": "Disjoint by implicit allocation-info index and trace_id: every '+' event looks up its referenced a-record's size and trace. Requested bytes are before frees; this is whole-profile allocation accounting.",
+      "header_version": [
+        "10500",
+        "3"
+      ],
+      "ip_definitions": 2075,
+      "label": "candidate-medium",
+      "outputs": {
+        "size_aggregates": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/candidate-medium/size-aggregates.tsv",
+        "trace_aggregates": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/candidate-medium/trace-aggregates.jsonl",
+        "trace_size_aggregates": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/candidate-medium/trace-size-aggregates.tsv"
+      },
+      "plus_without_metadata": 0,
+      "profile": {
+        "bytes": 543780,
+        "path": "/home/zhuhe/litchi-performance-0949/capture-v1/children/h01-candidate-primary-percent-medium/heaptrack.data.gz.zst",
+        "sha256": "bb4cf9c2a498c24d962a5597f338dcb439647965dd381733c89c4673f1e346f4"
+      },
+      "raw_marker_counts": {
+        "#": 2,
+        "+": 979434,
+        "-": 979433,
+        "I": 1,
+        "R": 99,
+        "X": 1,
+        "a": 22070,
+        "c": 99,
+        "i": 2075,
+        "s": 2878,
+        "t": 44892,
+        "v": 1
+      },
+      "requested_bytes_total": 476010899,
+      "schema": "litchi.performance.0949.heaptrack-raw-decode.v1",
+      "status": "completed",
+      "string_definitions": 2878,
+      "string_length_errors": [],
+      "trace_definitions": 44892,
+      "unique_trace_ids": 14773,
+      "unknown_any_frame": {
+        "calls": 1,
+        "requested_bytes": 73728,
+        "trace_count": 1
+      },
+      "unknown_leaf_frame": {
+        "calls": 1,
+        "requested_bytes": 73728,
+        "trace_count": 1
+      },
+      "unresolved_trace_definitions": 0,
+      "zstd": {
+        "path": "/usr/bin/zstd",
+        "version": "*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***"
+      }
+    },
+    {
+      "a_plus_adjacency_mismatches": 0,
+      "allocation_events": 2596848,
+      "allocation_info_definitions": 22555,
+      "allocation_minus_deallocation": 1,
+      "deallocation_events": 2596847,
+      "debuggee_command": "/home/zhuhe/litchi-performance-0948/binaries/baseline-allocator",
+      "decoder_scope": "Disjoint by implicit allocation-info index and trace_id: every '+' event looks up its referenced a-record's size and trace. Requested bytes are before frees; this is whole-profile allocation accounting.",
+      "header_version": [
+        "10500",
+        "3"
+      ],
+      "ip_definitions": 2068,
+      "label": "baseline-dense",
+      "outputs": {
+        "size_aggregates": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/baseline-dense/size-aggregates.tsv",
+        "trace_aggregates": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/baseline-dense/trace-aggregates.jsonl",
+        "trace_size_aggregates": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/baseline-dense/trace-size-aggregates.tsv"
+      },
+      "plus_without_metadata": 0,
+      "profile": {
+        "bytes": 585256,
+        "path": "/home/zhuhe/litchi-performance-0949/capture-v1/children/h02-baseline-primary-percent-dense-sparse/heaptrack.data.gz.zst",
+        "sha256": "26b1c5fb0b92942b865d3b9cf3087481cce7fd025ef0006e500936c36c4e6225"
+      },
+      "raw_marker_counts": {
+        "#": 2,
+        "+": 2596848,
+        "-": 2596847,
+        "I": 1,
+        "R": 171,
+        "X": 1,
+        "a": 22555,
+        "c": 171,
+        "i": 2068,
+        "s": 2870,
+        "t": 45013,
+        "v": 1
+      },
+      "requested_bytes_total": 667496174,
+      "schema": "litchi.performance.0949.heaptrack-raw-decode.v1",
+      "status": "completed",
+      "string_definitions": 2870,
+      "string_length_errors": [],
+      "trace_definitions": 45013,
+      "unique_trace_ids": 14785,
+      "unknown_any_frame": {
+        "calls": 1,
+        "requested_bytes": 73728,
+        "trace_count": 1
+      },
+      "unknown_leaf_frame": {
+        "calls": 1,
+        "requested_bytes": 73728,
+        "trace_count": 1
+      },
+      "unresolved_trace_definitions": 0,
+      "zstd": {
+        "path": "/usr/bin/zstd",
+        "version": "*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***"
+      }
+    },
+    {
+      "a_plus_adjacency_mismatches": 0,
+      "allocation_events": 2597386,
+      "allocation_info_definitions": 22576,
+      "allocation_minus_deallocation": 1,
+      "deallocation_events": 2597385,
+      "debuggee_command": "/home/zhuhe/litchi-performance-0948/binaries/candidate-v3-preserved/litchi-perf-baseline-alloc",
+      "decoder_scope": "Disjoint by implicit allocation-info index and trace_id: every '+' event looks up its referenced a-record's size and trace. Requested bytes are before frees; this is whole-profile allocation accounting.",
+      "header_version": [
+        "10500",
+        "3"
+      ],
+      "ip_definitions": 2082,
+      "label": "candidate-dense",
+      "outputs": {
+        "size_aggregates": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/candidate-dense/size-aggregates.tsv",
+        "trace_aggregates": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/candidate-dense/trace-aggregates.jsonl",
+        "trace_size_aggregates": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/candidate-dense/trace-size-aggregates.tsv"
+      },
+      "plus_without_metadata": 0,
+      "profile": {
+        "bytes": 598273,
+        "path": "/home/zhuhe/litchi-performance-0949/capture-v1/children/h03-candidate-primary-percent-dense-sparse/heaptrack.data.gz.zst",
+        "sha256": "a0921db570e2b33f2c2882e489c6bcac47c96a02f3b9bb6eaa7fd9ba7542312c"
+      },
+      "raw_marker_counts": {
+        "#": 2,
+        "+": 2597386,
+        "-": 2597385,
+        "I": 1,
+        "R": 171,
+        "X": 1,
+        "a": 22576,
+        "c": 171,
+        "i": 2082,
+        "s": 2881,
+        "t": 45067,
+        "v": 1
+      },
+      "requested_bytes_total": 667935103,
+      "schema": "litchi.performance.0949.heaptrack-raw-decode.v1",
+      "status": "completed",
+      "string_definitions": 2881,
+      "string_length_errors": [],
+      "trace_definitions": 45067,
+      "unique_trace_ids": 14802,
+      "unknown_any_frame": {
+        "calls": 1,
+        "requested_bytes": 73728,
+        "trace_count": 1
+      },
+      "unknown_leaf_frame": {
+        "calls": 1,
+        "requested_bytes": 73728,
+        "trace_count": 1
+      },
+      "unresolved_trace_definitions": 0,
+      "zstd": {
+        "path": "/usr/bin/zstd",
+        "version": "*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***"
+      }
+    }
+  ],
+  "schema": "litchi.performance.0949.heaptrack-raw-decode-run.v1",
+  "scope": "offline raw heaptrack decoding only; no workload or profiler launch",
+  "started_utc": "2026-10-07T05:49:02.858777+00:00",
+  "status": "terminal"
+}

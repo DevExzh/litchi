@@ -1,0 +1,49 @@
+{
+  "checks": {
+    "profile_names": "synthetic no-workload control accepted heaptrack.data.gz and heaptrack.data.gz.zst, excluded heaptrack.data.gz.bad, and rejected both valid files as multiple",
+    "runner_validate_only": {
+      "argv": "PYTHONDONTWRITEBYTECODE=1 python3 tooling/run_heaptrack_0949_v3.py --validate-only",
+      "exit_code": 0
+    },
+    "schedule": "exactly four serial children: baseline/candidate x medium/dense-sparse; warmup=0, samples=1, CPU=12, deadline=600s, no retry",
+    "scope": "whole-process heaptrack requested allocation calls/bytes before frees; application report publication counters and symbol-scoped stack subset remain separate; no latency/speedup/adoption claim",
+    "source_binary": "root strict 0948 source/binary/build verifier passed; this review did not rebuild or launch binaries",
+    "terminal_custody": "start receipt before launch; terminal after reap and process-group clear; no report/profile parsing in runner"
+  },
+  "created_utc": "2026-10-07T05:48:30.471843+00:00",
+  "metadata_note": {
+    "authoritative_behavior": "v3 runner exact predicate admits only heaptrack.data.gz and heaptrack.data.gz.zst; GO receipt records this narrowing",
+    "plan_text": "v3 inherited profile_output.observed_name_rule says starts with heaptrack.data.gz and child artifact uses a glob"
+  },
+  "offline_tools": {
+    "attribution": {
+      "bytes": 29602,
+      "path": "/home/zhuhe/litchi-performance-0949/tools/attribute_heaptrack_0949_v1.py",
+      "sha256": "ef61c3a016c64dd5f7f5d4b9626b7f31a4c9f1898c945a77af1f503c0f894070"
+    },
+    "decoder": {
+      "bytes": 16649,
+      "path": "/home/zhuhe/litchi-performance-0949/tools/decode_heaptrack_0949_v1.py",
+      "sha256": "c87e7089774f0eac24ffde262b7fe27b1f1ff4586798683bcc44fa68049bc7bf"
+    }
+  },
+  "plan": {
+    "bytes": 18513,
+    "path": "/home/zhuhe/litchi-performance-0949/heaptrack-plan-v3.json",
+    "sha256": "b570304cecc9f2fb888b44b7921d0a595dbed35873c044e8adff743d64906af8"
+  },
+  "profile_name_controls": {
+    "bytes": 334,
+    "path": "/home/zhuhe/litchi-performance-0949/receipts/profile-name-control-v3.json",
+    "sha256": "b09774c7bf2f260aee6efe64c1df35eca92acdbc9bb3550917c0f4fd8e5f4a08"
+  },
+  "remaining_offline_work": "decode and attribution are deferred until retained profiles and terminal receipts exist; decoder/attribution were not run against workload data",
+  "runner": {
+    "bytes": 28023,
+    "path": "/home/zhuhe/litchi-performance-0949/tooling/run_heaptrack_0949_v3.py",
+    "sha256": "6ee66f92a6b93431af11227ac886efe555ddb49af32804dd020efc5b89721f4c"
+  },
+  "schema": "litchi.performance.0949.comparison-tooling-final-review.v1",
+  "status": "go_for_root_authorization",
+  "workload_launched": false
+}

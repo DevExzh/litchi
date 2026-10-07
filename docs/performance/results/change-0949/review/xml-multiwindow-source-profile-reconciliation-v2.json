@@ -1,0 +1,537 @@
+{
+  "pair_deltas": {
+    "dense": {
+      "baseline": {
+        "alloc_bytes": 2759686,
+        "alloc_calls": 357,
+        "bytes": 2765840,
+        "calls": 406,
+        "realloc_bytes": 6154,
+        "realloc_calls": 49,
+        "rows": 129
+      },
+      "candidate": {
+        "alloc_bytes": 2777288,
+        "alloc_calls": 881,
+        "bytes": 3172336,
+        "calls": 931,
+        "realloc_bytes": 395048,
+        "realloc_calls": 50,
+        "rows": 141
+      },
+      "delta": {
+        "bytes": 406496,
+        "calls": 525,
+        "realloc_delta": 1
+      }
+    },
+    "medium": {
+      "baseline": {
+        "alloc_bytes": 2489853,
+        "alloc_calls": 356,
+        "bytes": 2495613,
+        "calls": 406,
+        "realloc_bytes": 5760,
+        "realloc_calls": 50,
+        "rows": 125
+      },
+      "candidate": {
+        "alloc_bytes": 2506517,
+        "alloc_calls": 627,
+        "bytes": 2677821,
+        "calls": 681,
+        "realloc_bytes": 171304,
+        "realloc_calls": 54,
+        "rows": 136
+      },
+      "delta": {
+        "bytes": 182208,
+        "calls": 275,
+        "realloc_delta": 4
+      }
+    }
+  },
+  "raw_profiles": {
+    "baseline-dense": {
+      "aggregate": {
+        "bytes": 667496174,
+        "calls": 2596848
+      },
+      "profile": {
+        "bytes": 585256,
+        "path": "/home/zhuhe/litchi-performance-0949/capture-v1/children/h02-baseline-primary-percent-dense-sparse/heaptrack.data.gz.zst",
+        "sha256": "26b1c5fb0b92942b865d3b9cf3087481cce7fd025ef0006e500936c36c4e6225"
+      },
+      "summary": {
+        "bytes": 2055,
+        "path": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/baseline-dense/summary.json",
+        "sha256": "454126dbabf90d25ee68c5a96f4bdeea362b748f4def2c70d5a6094094ab21ec"
+      },
+      "trace_aggregates": {
+        "bytes": 134563133,
+        "path": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/baseline-dense/trace-aggregates.jsonl",
+        "sha256": "015d95303b5eea46eb22b15fff5e40d08720e6b486062c061dea2a53829f7bfc"
+      }
+    },
+    "baseline-medium": {
+      "aggregate": {
+        "bytes": 475804603,
+        "calls": 979147
+      },
+      "profile": {
+        "bytes": 543462,
+        "path": "/home/zhuhe/litchi-performance-0949/capture-v1/children/h00-baseline-primary-percent-medium/heaptrack.data.gz.zst",
+        "sha256": "e1ad7f64f151c2e26a11bde455074e0eaec8f01587535c7df6914a4d4aac4feb"
+      },
+      "summary": {
+        "bytes": 2049,
+        "path": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/baseline-medium/summary.json",
+        "sha256": "6a02219a6f19f42371e9f5d96fb576a0469c02096fbfd405ba7d20497b84727d"
+      },
+      "trace_aggregates": {
+        "bytes": 134268023,
+        "path": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/baseline-medium/trace-aggregates.jsonl",
+        "sha256": "09e597cf15591461e90d3fb03b8c92d13ff95c61336206cf3617672d1aaacffa"
+      }
+    },
+    "candidate-dense": {
+      "aggregate": {
+        "bytes": 667935103,
+        "calls": 2597386
+      },
+      "profile": {
+        "bytes": 598273,
+        "path": "/home/zhuhe/litchi-performance-0949/capture-v1/children/h03-candidate-primary-percent-dense-sparse/heaptrack.data.gz.zst",
+        "sha256": "a0921db570e2b33f2c2882e489c6bcac47c96a02f3b9bb6eaa7fd9ba7542312c"
+      },
+      "summary": {
+        "bytes": 2091,
+        "path": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/candidate-dense/summary.json",
+        "sha256": "f817c0962c9ee0a00da5a7d9bdfa09d64b057d72731c99fe3c0a3ce56c5d529a"
+      },
+      "trace_aggregates": {
+        "bytes": 140975378,
+        "path": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/candidate-dense/trace-aggregates.jsonl",
+        "sha256": "feffa736dc609e6e29f8b44ab3f69dffb3e21248c7b9f26a4368531d424df635"
+      }
+    },
+    "candidate-medium": {
+      "aggregate": {
+        "bytes": 476010899,
+        "calls": 979434
+      },
+      "profile": {
+        "bytes": 543780,
+        "path": "/home/zhuhe/litchi-performance-0949/capture-v1/children/h01-candidate-primary-percent-medium/heaptrack.data.gz.zst",
+        "sha256": "bb4cf9c2a498c24d962a5597f338dcb439647965dd381733c89c4673f1e346f4"
+      },
+      "summary": {
+        "bytes": 2083,
+        "path": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/candidate-medium/summary.json",
+        "sha256": "1f80566be5d84693278b0c3f6b9fccba6e4cb4ec54ba00b2b8d2d47fbae9bf3c"
+      },
+      "trace_aggregates": {
+        "bytes": 140640174,
+        "path": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/candidate-medium/trace-aggregates.jsonl",
+        "sha256": "647da9fd09cc486ea1c2325674f2b62fe392a1a1118a5a2ec114f756704066fd"
+      }
+    }
+  },
+  "residuals_after_disjoint_candidate_classes": {
+    "dense": {
+      "candidate_class_subtotal": {
+        "alloc_bytes": 17712,
+        "alloc_calls": 537,
+        "bytes": 407088,
+        "calls": 548,
+        "realloc_bytes": 389376,
+        "realloc_calls": 11,
+        "rows": 7
+      },
+      "pair_delta": {
+        "bytes": 406496,
+        "calls": 525,
+        "realloc_delta": 1
+      },
+      "residual": {
+        "bytes": -592,
+        "calls": -23
+      }
+    },
+    "medium": {
+      "candidate_class_subtotal": {
+        "alloc_bytes": 16752,
+        "alloc_calls": 287,
+        "bytes": 182640,
+        "calls": 303,
+        "realloc_bytes": 165888,
+        "realloc_calls": 16,
+        "rows": 7
+      },
+      "pair_delta": {
+        "bytes": 182208,
+        "calls": 275,
+        "realloc_delta": 4
+      },
+      "residual": {
+        "bytes": -432,
+        "calls": -28
+      }
+    }
+  },
+  "roles": {
+    "baseline-dense": {
+      "density": "dense",
+      "dual_filter": {
+        "caller_function": "run_xlsx_cell_values_edit_save",
+        "caller_line": 44840,
+        "publisher_function": "SourceBackedEditor::publish_multi_commit_to_stream",
+        "summary": {
+          "alloc_bytes": 2759686,
+          "alloc_calls": 357,
+          "bytes": 2765840,
+          "calls": 406,
+          "realloc_bytes": 6154,
+          "realloc_calls": 49,
+          "rows": 129
+        }
+      },
+      "publisher_only": {
+        "alloc_bytes": 5795413,
+        "alloc_calls": 958,
+        "bytes": 56181853,
+        "calls": 1089,
+        "realloc_bytes": 50386440,
+        "realloc_calls": 131,
+        "rows": 275
+      },
+      "rows": 14785,
+      "side": "baseline"
+    },
+    "baseline-medium": {
+      "density": "medium",
+      "dual_filter": {
+        "caller_function": "run_xlsx_cell_values_edit_save",
+        "caller_line": 44840,
+        "publisher_function": "SourceBackedEditor::publish_multi_commit_to_stream",
+        "summary": {
+          "alloc_bytes": 2489853,
+          "alloc_calls": 356,
+          "bytes": 2495613,
+          "calls": 406,
+          "realloc_bytes": 5760,
+          "realloc_calls": 50,
+          "rows": 125
+        }
+      },
+      "publisher_only": {
+        "alloc_bytes": 4627213,
+        "alloc_calls": 957,
+        "bytes": 38082187,
+        "calls": 1087,
+        "realloc_bytes": 33454974,
+        "realloc_calls": 130,
+        "rows": 270
+      },
+      "rows": 14759,
+      "side": "baseline"
+    },
+    "candidate-dense": {
+      "density": "dense",
+      "disjoint_site_classes": {
+        "classes": {
+          "open_vec": {
+            "alloc_bytes": 384,
+            "alloc_calls": 3,
+            "bytes": 1152,
+            "calls": 6,
+            "realloc_bytes": 768,
+            "realloc_calls": 3,
+            "rows": 2
+          },
+          "parser_windows": {
+            "alloc_bytes": 8496,
+            "alloc_calls": 531,
+            "bytes": 8496,
+            "calls": 531,
+            "realloc_bytes": 0,
+            "realloc_calls": 0,
+            "rows": 3
+          },
+          "window_vec": {
+            "alloc_bytes": 8832,
+            "alloc_calls": 3,
+            "bytes": 397440,
+            "calls": 11,
+            "realloc_bytes": 388608,
+            "realloc_calls": 8,
+            "rows": 2
+          }
+        },
+        "subtotal": {
+          "alloc_bytes": 17712,
+          "alloc_calls": 537,
+          "bytes": 407088,
+          "calls": 548,
+          "realloc_bytes": 389376,
+          "realloc_calls": 11,
+          "rows": 7
+        },
+        "trace_ids": {
+          "open_vec": [
+            "8cde",
+            "8ce4"
+          ],
+          "parser_windows": [
+            "8cef",
+            "8cf2",
+            "8cf4"
+          ],
+          "window_vec": [
+            "8ce7",
+            "8ce9"
+          ]
+        },
+        "unclassified_dual_rows": 134
+      },
+      "dual_filter": {
+        "caller_function": "run_xlsx_cell_values_edit_save",
+        "caller_line": 44840,
+        "publisher_function": "SourceBackedEditor::publish_multi_commit_to_stream",
+        "summary": {
+          "alloc_bytes": 2777288,
+          "alloc_calls": 881,
+          "bytes": 3172336,
+          "calls": 931,
+          "realloc_bytes": 395048,
+          "realloc_calls": 50,
+          "rows": 141
+        }
+      },
+      "publisher_only": {
+        "alloc_bytes": 5813495,
+        "alloc_calls": 1482,
+        "bytes": 56588829,
+        "calls": 1614,
+        "realloc_bytes": 50775334,
+        "realloc_calls": 132,
+        "rows": 287
+      },
+      "rows": 14802,
+      "side": "candidate"
+    },
+    "candidate-medium": {
+      "density": "medium",
+      "disjoint_site_classes": {
+        "classes": {
+          "open_vec": {
+            "alloc_bytes": 512,
+            "alloc_calls": 4,
+            "bytes": 1536,
+            "calls": 8,
+            "realloc_bytes": 1024,
+            "realloc_calls": 4,
+            "rows": 2
+          },
+          "parser_windows": {
+            "alloc_bytes": 4464,
+            "alloc_calls": 279,
+            "bytes": 4464,
+            "calls": 279,
+            "realloc_bytes": 0,
+            "realloc_calls": 0,
+            "rows": 3
+          },
+          "window_vec": {
+            "alloc_bytes": 11776,
+            "alloc_calls": 4,
+            "bytes": 176640,
+            "calls": 16,
+            "realloc_bytes": 164864,
+            "realloc_calls": 12,
+            "rows": 2
+          }
+        },
+        "subtotal": {
+          "alloc_bytes": 16752,
+          "alloc_calls": 287,
+          "bytes": 182640,
+          "calls": 303,
+          "realloc_bytes": 165888,
+          "realloc_calls": 16,
+          "rows": 7
+        },
+        "trace_ids": {
+          "open_vec": [
+            "8c3c",
+            "8c42"
+          ],
+          "parser_windows": [
+            "8c4d",
+            "8c50",
+            "8c52"
+          ],
+          "window_vec": [
+            "8c45",
+            "8c47"
+          ]
+        },
+        "unclassified_dual_rows": 129
+      },
+      "dual_filter": {
+        "caller_function": "run_xlsx_cell_values_edit_save",
+        "caller_line": 44840,
+        "publisher_function": "SourceBackedEditor::publish_multi_commit_to_stream",
+        "summary": {
+          "alloc_bytes": 2506517,
+          "alloc_calls": 627,
+          "bytes": 2677821,
+          "calls": 681,
+          "realloc_bytes": 171304,
+          "realloc_calls": 54,
+          "rows": 136
+        }
+      },
+      "publisher_only": {
+        "alloc_bytes": 4644357,
+        "alloc_calls": 1228,
+        "bytes": 38264875,
+        "calls": 1362,
+        "realloc_bytes": 33620518,
+        "realloc_calls": 134,
+        "rows": 281
+      },
+      "rows": 14773,
+      "side": "candidate"
+    }
+  },
+  "schema": "litchi.performance.0949.xml-multiwindow-source-profile-reconciliation.v2",
+  "scope": {
+    "create_only": true,
+    "decoder": {
+      "bytes": 16649,
+      "path": "/home/zhuhe/litchi-performance-0949/tools/decode_heaptrack_0949_v1.py",
+      "sha256": "c87e7089774f0eac24ffde262b7fe27b1f1ff4586798683bcc44fa68049bc7bf"
+    },
+    "dual_filter": "resolved publisher function plus run_xlsx_cell_values_edit_save at src/lib.rs:44840",
+    "raw_accounting": "decoded heaptrack + records over the whole profile; requested bytes before frees",
+    "reallocation_note": "allocation_calls includes successful reallocations; reallocation_calls is a subset and must not be added",
+    "temporal_claim": false
+  },
+  "source": {
+    "files": {
+      "crates/litchi-xlsx/src/cell_values/source.rs": {
+        "bytes": 53720,
+        "path": "/home/zhuhe/litchi-performance-0948/candidate-build-v3/crates/litchi-xlsx/src/cell_values/source.rs",
+        "sha256": "60d89d8af3847d3df5c96801537e58ec676446fb5d1828b4adbc54d92fc6a462"
+      },
+      "crates/xml-minifier/src/audit.rs": {
+        "bytes": 139194,
+        "path": "/home/zhuhe/litchi-performance-0948/candidate-build-v3/crates/xml-minifier/src/audit.rs",
+        "sha256": "29efd9aa99c9491a1e86cfc25f1bbb31b3da7b6cbfc4438a1638c15b18b95cee"
+      },
+      "crates/xml-minifier/src/audit/namespaces.rs": {
+        "bytes": 32468,
+        "path": "/home/zhuhe/litchi-performance-0948/candidate-build-v3/crates/xml-minifier/src/audit/namespaces.rs",
+        "sha256": "2b24bf90377ba75db3a15eeaa53d010bf817b17b2741b8b20e6e377fd34bbdfe"
+      },
+      "tools/perf-baseline/src/allocation_metrics.rs": {
+        "bytes": 61932,
+        "path": "/home/zhuhe/litchi-performance-0948/candidate-build-v3/tools/perf-baseline/src/allocation_metrics.rs",
+        "sha256": "0fcec3e5c4972031b23542fd359a38401e25f32a133c77ef4c6e75facf0710d5"
+      },
+      "tools/perf-baseline/src/bin/support/counting_allocator.rs": {
+        "bytes": 11537,
+        "path": "/home/zhuhe/litchi-performance-0948/candidate-build-v3/tools/perf-baseline/src/bin/support/counting_allocator.rs",
+        "sha256": "80977e55c2213eeee2af9a3133295d70cff38505e663a68e4757bf7939c60068"
+      },
+      "tools/perf-baseline/src/lib.rs": {
+        "bytes": 3076502,
+        "path": "/home/zhuhe/litchi-performance-0948/candidate-build-v3/tools/perf-baseline/src/lib.rs",
+        "sha256": "0d8d00f265157083af4d1e31f035dadd0a624969f43ef8f1b5ca97f350f2535d"
+      }
+    },
+    "root": "/home/zhuhe/litchi-performance-0948/candidate-build-v3",
+    "targets": [
+      {
+        "file": "crates/xml-minifier/src/audit.rs",
+        "line": 2509,
+        "name": "MultiWindowSearch::consider Vec<Window>::try_reserve",
+        "text": "if self.windows.try_reserve(1).is_err() {"
+      },
+      {
+        "file": "crates/xml-minifier/src/audit.rs",
+        "line": 2554,
+        "name": "MultiWindowSearch::accepted open.try_reserve",
+        "text": "if self.open.try_reserve(1).is_err() {"
+      },
+      {
+        "file": "crates/xml-minifier/src/audit.rs",
+        "line": 2106,
+        "name": "scan State::spaces.try_reserve",
+        "text": ".try_reserve(1)"
+      },
+      {
+        "file": "crates/xml-minifier/src/audit.rs",
+        "line": 2651,
+        "name": "prove_windows audit_window loop",
+        "text": "let counters = audit_window(bytes, limits, window.depth, window.namespaces)?;"
+      },
+      {
+        "file": "crates/xml-minifier/src/audit.rs",
+        "line": 1173,
+        "name": "verify_source_replacement_with_spans prove_windows call",
+        "text": "let Some(proof) = prove_windows(search.windows, report, replacement, limits) else {"
+      },
+      {
+        "file": "crates/xml-minifier/src/audit.rs",
+        "line": 2061,
+        "name": "scan reader.read_event",
+        "text": "let event = reader.read_event().map_err(|error| {"
+      },
+      {
+        "file": "crates/xml-minifier/src/audit/namespaces.rs",
+        "line": 140,
+        "name": "Namespaces::try_clone",
+        "text": "pub(super) fn try_clone(&self) -> Option<Self> {"
+      },
+      {
+        "file": "crates/xml-minifier/src/audit/namespaces.rs",
+        "line": 571,
+        "name": "Namespaces::try_clone_vec",
+        "text": "fn try_clone_vec<T: Copy>(items: &[T]) -> Option<Vec<T>> {"
+      },
+      {
+        "file": "tools/perf-baseline/src/allocation_metrics.rs",
+        "line": 699,
+        "name": "allocation_metrics reallocation counter",
+        "text": "fn reallocation(&self, old_size: usize, new_size: usize) {"
+      },
+      {
+        "file": "tools/perf-baseline/src/bin/support/counting_allocator.rs",
+        "line": 51,
+        "name": "publication allocator wrapper",
+        "text": "allocation_metrics::record_reallocation(layout.size(), new_size);"
+      },
+      {
+        "file": "crates/litchi-xlsx/src/cell_values/source.rs",
+        "line": 649,
+        "name": "publisher function",
+        "text": "self.package.write_topology_to_stream(writer, plan)?;"
+      },
+      {
+        "file": "tools/perf-baseline/src/lib.rs",
+        "line": 44840,
+        "name": "publisher benchmark caller",
+        "text": "let _published = editor.publish_multi_commit_to_stream(&mut sink, &commit)?;"
+      }
+    ]
+  },
+  "verifier": {
+    "script": {
+      "bytes": 15903,
+      "path": "/home/zhuhe/litchi-performance-0949/review/xml-multiwindow-source-profile-reconciliation-v2.py",
+      "sha256": "e039a99aa4d505692cd12d0a2c4ef17de37b0ebf1546d295f7c362765a7a1cd4"
+    }
+  }
+}

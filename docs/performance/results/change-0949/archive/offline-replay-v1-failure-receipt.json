@@ -1,0 +1,18 @@
+{
+  "binary_launched": false,
+  "completed_stages": [
+    "decoder",
+    "attribution",
+    "reconciliation"
+  ],
+  "failure": "initial validator compared location-bearing decoder outputs and summary descriptors without normalization; tool stages exited zero, but final semantic comparison raised before terminal receipt write",
+  "helper": "/home/zhuhe/litchi-performance-0949-archive/replay-0949-offline-v1.py",
+  "helper_sha256": "ceb64cef7b76b64c7f1ff5aed9debfe0f940c8906d2265fde04ce5d454f01bdd",
+  "output_root": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007",
+  "preserve_for_audit": true,
+  "profiler_launched": false,
+  "recorded_utc": "2026-10-07T06:09:10.560898+00:00",
+  "schema": "litchi.performance.0949.offline-replay-failure.v1",
+  "status": "failed_final_comparison_only",
+  "workload_launched": false
+}

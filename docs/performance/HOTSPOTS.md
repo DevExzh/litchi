@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## 0949 — window storage dominates rejected candidate allocation bytes
+
+[0949](0949-xlsx-multi-window-allocation-attribution.md) attributes four fresh
+heaptrack captures of 0948. Window-vector growth contributes 176,640 / 397,440
+requested bytes; three fresh parser buffers per window contribute 279 / 531
+requests. Disjoint source classes reconcile to publication increases of
+275 / 525 requests and 182,208 / 406,496 bytes after common-path subtraction.
+No dynamic namespace-clone allocation is resolved in these fixtures.
+Next investigate smaller retained window state and parser-capacity reuse,
+keeping complete original auditing, exact gaps, inherited state, aggregate
+bounds, fallible allocation, and canonical fallback. The candidate remains
+rejected; no new native latency or adoption claim is made.
+
 ## 0948 — multi-window audit saves latency but fails allocation safety
 
 [0948](0948-xlsx-multi-window-audit-rejected.md) prospectively evaluates the

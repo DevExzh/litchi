@@ -1,0 +1,62 @@
+{
+  "a_plus_adjacency_mismatches": 0,
+  "allocation_events": 979147,
+  "allocation_info_definitions": 22064,
+  "allocation_minus_deallocation": 1,
+  "deallocation_events": 979146,
+  "debuggee_command": "/home/zhuhe/litchi-performance-0948/binaries/baseline-allocator",
+  "decoder_scope": "Disjoint by implicit allocation-info index and trace_id: every '+' event looks up its referenced a-record's size and trace. Requested bytes are before frees; this is whole-profile allocation accounting.",
+  "header_version": [
+    "10500",
+    "3"
+  ],
+  "ip_definitions": 2061,
+  "label": "baseline-medium",
+  "outputs": {
+    "size_aggregates": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/baseline-medium/size-aggregates.tsv",
+    "trace_aggregates": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/baseline-medium/trace-aggregates.jsonl",
+    "trace_size_aggregates": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/baseline-medium/trace-size-aggregates.tsv"
+  },
+  "plus_without_metadata": 0,
+  "profile": {
+    "bytes": 543462,
+    "path": "/home/zhuhe/litchi-performance-0949/capture-v1/children/h00-baseline-primary-percent-medium/heaptrack.data.gz.zst",
+    "sha256": "e1ad7f64f151c2e26a11bde455074e0eaec8f01587535c7df6914a4d4aac4feb"
+  },
+  "raw_marker_counts": {
+    "#": 2,
+    "+": 979147,
+    "-": 979146,
+    "I": 1,
+    "R": 101,
+    "X": 1,
+    "a": 22064,
+    "c": 101,
+    "i": 2061,
+    "s": 2865,
+    "t": 44847,
+    "v": 1
+  },
+  "requested_bytes_total": 475804603,
+  "schema": "litchi.performance.0949.heaptrack-raw-decode.v1",
+  "status": "completed",
+  "string_definitions": 2865,
+  "string_length_errors": [],
+  "trace_definitions": 44847,
+  "unique_trace_ids": 14759,
+  "unknown_any_frame": {
+    "calls": 1,
+    "requested_bytes": 73728,
+    "trace_count": 1
+  },
+  "unknown_leaf_frame": {
+    "calls": 1,
+    "requested_bytes": 73728,
+    "trace_count": 1
+  },
+  "unresolved_trace_definitions": 0,
+  "zstd": {
+    "path": "/usr/bin/zstd",
+    "version": "*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "actual_bytes": 717132537,
+  "actual_files": 202,
+  "archive": "/home/zhuhe/litchi-performance-0949-archive/archive-0949-v1.tar.zst",
+  "expected_bytes": 717132537,
+  "expected_files": 202,
+  "manifest_sha256": "58070fbcc5ee8f2da8f7edf3a8d369f386ef3715b349c3710e59b3019c7b1b56",
+  "mismatches": [],
+  "missing": [],
+  "packet_root": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007",
+  "schema": "litchi.performance.0949.archive-extraction-verification.v1",
+  "status": "pass",
+  "symlinks": [],
+  "unexpected": []
+}

@@ -1,0 +1,461 @@
+{
+  "artifact_index": {
+    "bytes": 6335,
+    "path": "/home/zhuhe/litchi-performance-0949/receipts/capture-artifact-index-v1.json",
+    "sha256": "45a0959f1139be348d0cd3c70d709c100d1c5d833d014e1c5535a17b2dc28a27"
+  },
+  "attribution_config": {
+    "bytes": 2924,
+    "path": "/home/zhuhe/litchi-performance-0949/tools/attribution-config-root-v1.json",
+    "sha256": "bfa0f2558f03e41eed7af59f75ba11a6ca115b6248db731cd741e172753f8723"
+  },
+  "attribution_profiles": [
+    {
+      "config": {
+        "bytes": 2924,
+        "path": "/home/zhuhe/litchi-performance-0949/tools/attribution-config-root-v1.json",
+        "sha256": "bfa0f2558f03e41eed7af59f75ba11a6ca115b6248db731cd741e172753f8723"
+      },
+      "conservation": {
+        "all_exact": true,
+        "decoder_allocation_events": 2596848,
+        "decoder_requested_bytes": 667496174,
+        "external_heaptrack_histogram": {
+          "decoder_calls": 2596848,
+          "heaptrack_print_calls": 2596848,
+          "mismatch_count": 0,
+          "mismatches": [],
+          "status": "pass"
+        },
+        "size_aggregate_calls": 2596848,
+        "size_aggregate_requested_bytes": 667496174,
+        "trace_aggregate_count": 14785,
+        "trace_size_aggregate_calls": 2596848,
+        "trace_size_aggregate_requested_bytes": 667496174
+      },
+      "exact_decoder_and_histogram_reconciliation": true,
+      "label": "baseline-dense",
+      "profile": {
+        "calls": 2596848,
+        "requested_bytes": 667496174,
+        "trace_count": 14785
+      }
+    },
+    {
+      "config": {
+        "bytes": 2924,
+        "path": "/home/zhuhe/litchi-performance-0949/tools/attribution-config-root-v1.json",
+        "sha256": "bfa0f2558f03e41eed7af59f75ba11a6ca115b6248db731cd741e172753f8723"
+      },
+      "conservation": {
+        "all_exact": true,
+        "decoder_allocation_events": 979147,
+        "decoder_requested_bytes": 475804603,
+        "external_heaptrack_histogram": {
+          "decoder_calls": 979147,
+          "heaptrack_print_calls": 979147,
+          "mismatch_count": 0,
+          "mismatches": [],
+          "status": "pass"
+        },
+        "size_aggregate_calls": 979147,
+        "size_aggregate_requested_bytes": 475804603,
+        "trace_aggregate_count": 14759,
+        "trace_size_aggregate_calls": 979147,
+        "trace_size_aggregate_requested_bytes": 475804603
+      },
+      "exact_decoder_and_histogram_reconciliation": true,
+      "label": "baseline-medium",
+      "profile": {
+        "calls": 979147,
+        "requested_bytes": 475804603,
+        "trace_count": 14759
+      }
+    },
+    {
+      "config": {
+        "bytes": 2924,
+        "path": "/home/zhuhe/litchi-performance-0949/tools/attribution-config-root-v1.json",
+        "sha256": "bfa0f2558f03e41eed7af59f75ba11a6ca115b6248db731cd741e172753f8723"
+      },
+      "conservation": {
+        "all_exact": true,
+        "decoder_allocation_events": 2597386,
+        "decoder_requested_bytes": 667935103,
+        "external_heaptrack_histogram": {
+          "decoder_calls": 2597386,
+          "heaptrack_print_calls": 2597386,
+          "mismatch_count": 0,
+          "mismatches": [],
+          "status": "pass"
+        },
+        "size_aggregate_calls": 2597386,
+        "size_aggregate_requested_bytes": 667935103,
+        "trace_aggregate_count": 14802,
+        "trace_size_aggregate_calls": 2597386,
+        "trace_size_aggregate_requested_bytes": 667935103
+      },
+      "exact_decoder_and_histogram_reconciliation": true,
+      "label": "candidate-dense",
+      "profile": {
+        "calls": 2597386,
+        "requested_bytes": 667935103,
+        "trace_count": 14802
+      }
+    },
+    {
+      "config": {
+        "bytes": 2924,
+        "path": "/home/zhuhe/litchi-performance-0949/tools/attribution-config-root-v1.json",
+        "sha256": "bfa0f2558f03e41eed7af59f75ba11a6ca115b6248db731cd741e172753f8723"
+      },
+      "conservation": {
+        "all_exact": true,
+        "decoder_allocation_events": 979434,
+        "decoder_requested_bytes": 476010899,
+        "external_heaptrack_histogram": {
+          "decoder_calls": 979434,
+          "heaptrack_print_calls": 979434,
+          "mismatch_count": 0,
+          "mismatches": [],
+          "status": "pass"
+        },
+        "size_aggregate_calls": 979434,
+        "size_aggregate_requested_bytes": 476010899,
+        "trace_aggregate_count": 14773,
+        "trace_size_aggregate_calls": 979434,
+        "trace_size_aggregate_requested_bytes": 476010899
+      },
+      "exact_decoder_and_histogram_reconciliation": true,
+      "label": "candidate-medium",
+      "profile": {
+        "calls": 979434,
+        "requested_bytes": 476010899,
+        "trace_count": 14773
+      }
+    }
+  ],
+  "attribution_root": "/home/zhuhe/litchi-performance-0949/attribution-final-v1",
+  "attribution_seal": {
+    "bytes": 1367,
+    "path": "/home/zhuhe/litchi-performance-0949/receipts/root-offline-attribution-seal-v1.json",
+    "sha256": "1a68bd895951644ecc085565e4c0d9e0d280ada7f655568dc80c0bc4fd752f4c"
+  },
+  "attribution_terminal": {
+    "bytes": 23866,
+    "path": "/home/zhuhe/litchi-performance-0949/attribution-final-v1/attribution-terminal.json",
+    "sha256": "a20e1cc065150dfadd981767d9ac93c3ddf7c3270419b33c43c7e244359e5d80"
+  },
+  "attribution_tool": {
+    "bytes": 30671,
+    "path": "/home/zhuhe/litchi-performance-0949/tools/attribute_heaptrack_0949_v1.py",
+    "sha256": "19a19687d138ddcb47b9b4bd1f383ffd2a88396de91d7fd523a73c0e77a68637"
+  },
+  "checks": {
+    "artifact_index_full_sha_size_census": true,
+    "corpus_sink_output_semantic_identity": true,
+    "exact_0948_publication_counter_projection": true,
+    "raw_decoder_size_trace_trace_size_conservation": true,
+    "report_binary_source_case_identity": true,
+    "terminal_first_and_no_retry": true,
+    "unknown_and_deallocation_retained": true
+  },
+  "child_count": 4,
+  "created_utc": "2026-10-07T06:00:28.917947+00:00",
+  "decoder": [
+    {
+      "allocation_events": 979147,
+      "allocation_minus_deallocation": 1,
+      "deallocation_events": 979146,
+      "exact_disjoint_conservation": true,
+      "label": "baseline-medium",
+      "requested_bytes_total": 475804603,
+      "size_rows": 457,
+      "summary": {
+        "bytes": 2049,
+        "path": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/baseline-medium/summary.json",
+        "sha256": "6a02219a6f19f42371e9f5d96fb576a0469c02096fbfd405ba7d20497b84727d"
+      },
+      "trace_rows": 14759,
+      "unknown_any_frame": {
+        "calls": 1,
+        "requested_bytes": 73728,
+        "trace_count": 1
+      },
+      "unknown_leaf_frame": {
+        "calls": 1,
+        "requested_bytes": 73728,
+        "trace_count": 1
+      }
+    },
+    {
+      "allocation_events": 979434,
+      "allocation_minus_deallocation": 1,
+      "deallocation_events": 979433,
+      "exact_disjoint_conservation": true,
+      "label": "candidate-medium",
+      "requested_bytes_total": 476010899,
+      "size_rows": 462,
+      "summary": {
+        "bytes": 2083,
+        "path": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/candidate-medium/summary.json",
+        "sha256": "1f80566be5d84693278b0c3f6b9fccba6e4cb4ec54ba00b2b8d2d47fbae9bf3c"
+      },
+      "trace_rows": 14773,
+      "unknown_any_frame": {
+        "calls": 1,
+        "requested_bytes": 73728,
+        "trace_count": 1
+      },
+      "unknown_leaf_frame": {
+        "calls": 1,
+        "requested_bytes": 73728,
+        "trace_count": 1
+      }
+    },
+    {
+      "allocation_events": 2596848,
+      "allocation_minus_deallocation": 1,
+      "deallocation_events": 2596847,
+      "exact_disjoint_conservation": true,
+      "label": "baseline-dense",
+      "requested_bytes_total": 667496174,
+      "size_rows": 567,
+      "summary": {
+        "bytes": 2055,
+        "path": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/baseline-dense/summary.json",
+        "sha256": "454126dbabf90d25ee68c5a96f4bdeea362b748f4def2c70d5a6094094ab21ec"
+      },
+      "trace_rows": 14785,
+      "unknown_any_frame": {
+        "calls": 1,
+        "requested_bytes": 73728,
+        "trace_count": 1
+      },
+      "unknown_leaf_frame": {
+        "calls": 1,
+        "requested_bytes": 73728,
+        "trace_count": 1
+      }
+    },
+    {
+      "allocation_events": 2597386,
+      "allocation_minus_deallocation": 1,
+      "deallocation_events": 2597385,
+      "exact_disjoint_conservation": true,
+      "label": "candidate-dense",
+      "requested_bytes_total": 667935103,
+      "size_rows": 575,
+      "summary": {
+        "bytes": 2091,
+        "path": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/candidate-dense/summary.json",
+        "sha256": "f817c0962c9ee0a00da5a7d9bdfa09d64b057d72731c99fe3c0a3ce56c5d529a"
+      },
+      "trace_rows": 14802,
+      "unknown_any_frame": {
+        "calls": 1,
+        "requested_bytes": 73728,
+        "trace_count": 1
+      },
+      "unknown_leaf_frame": {
+        "calls": 1,
+        "requested_bytes": 73728,
+        "trace_count": 1
+      }
+    }
+  ],
+  "decoder_terminal": {
+    "bytes": 9645,
+    "path": "/home/zhuhe/litchi-performance-0949/raw-decoder-v1/decoder-terminal.json",
+    "sha256": "d09c494491bf860c536e6bd3b690a310b6c228eccaf44aa27924d350b2b0a525"
+  },
+  "heaptrack_print_reconciliation": {
+    "scope": "This audit does not invoke heaptrack_print; the later owner must compare histogram/footer calls and weighted bytes to decoder totals and retain unknown/unattributed buckets.",
+    "status": "pending_separate_export"
+  },
+  "plan": {
+    "bytes": 18513,
+    "path": "/home/zhuhe/litchi-performance-0949/heaptrack-plan-v3.json",
+    "sha256": "b570304cecc9f2fb888b44b7921d0a595dbed35873c044e8adff743d64906af8"
+  },
+  "reports": [
+    {
+      "corpus_archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+      "id": "h00-baseline-primary-percent-medium",
+      "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+      "publication_counters": {
+        "allocated_bytes": 2495613,
+        "allocation_calls": 406,
+        "deallocated_bytes": 2511475,
+        "deallocation_calls": 533,
+        "failed_allocation_calls": 0,
+        "reallocation_calls": 50
+      },
+      "publication_ns": 7690638,
+      "report": {
+        "bytes": 24074,
+        "path": "/home/zhuhe/litchi-performance-0949/capture-v1/children/h00-baseline-primary-percent-medium/report.json",
+        "sha256": "dc7f58348562e3a0d4b72635d4915a8fbdf23ab1ea8151d453341aef7afb4e08"
+      },
+      "retained_0948_report": {
+        "bytes": 44036,
+        "path": "/home/zhuhe/litchi-performance-0948/allocator/r00-baseline-primary-percent-medium/report.json",
+        "sha256": "d8117cd4b1d797c17033a5bdf370947674b6553247fe09dc84e75e6b1e66a984"
+      },
+      "role": "baseline",
+      "shape": "medium",
+      "sink": {
+        "accepted_bytes": 4226788,
+        "largest_write": 65536,
+        "write_calls": 143,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 64,
+          "bytes_1_to_512": 75,
+          "bytes_4097_to_16384": 4,
+          "bytes_513_to_4096": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "whole_process_report_scope": "application report operation/publication counters; not heaptrack interval"
+    },
+    {
+      "corpus_archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+      "id": "h01-candidate-primary-percent-medium",
+      "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+      "publication_counters": {
+        "allocated_bytes": 2677821,
+        "allocation_calls": 681,
+        "deallocated_bytes": 2693683,
+        "deallocation_calls": 804,
+        "failed_allocation_calls": 0,
+        "reallocation_calls": 54
+      },
+      "publication_ns": 7332446,
+      "report": {
+        "bytes": 24105,
+        "path": "/home/zhuhe/litchi-performance-0949/capture-v1/children/h01-candidate-primary-percent-medium/report.json",
+        "sha256": "ce5da6bdcf3996117f56438ab1265e727189cd8ce97731233da2c734168f9d1b"
+      },
+      "retained_0948_report": {
+        "bytes": 44072,
+        "path": "/home/zhuhe/litchi-performance-0948/allocator/r00-candidate-primary-percent-medium/report.json",
+        "sha256": "4b96ec6644a87c628d5d6d0a7c7b3c1887de58678bfc43cbf95224231172cda5"
+      },
+      "role": "candidate",
+      "shape": "medium",
+      "sink": {
+        "accepted_bytes": 4226788,
+        "largest_write": 65536,
+        "write_calls": 143,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 64,
+          "bytes_1_to_512": 75,
+          "bytes_4097_to_16384": 4,
+          "bytes_513_to_4096": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "whole_process_report_scope": "application report operation/publication counters; not heaptrack interval"
+    },
+    {
+      "corpus_archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+      "id": "h02-baseline-primary-percent-dense-sparse",
+      "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+      "publication_counters": {
+        "allocated_bytes": 2765840,
+        "allocation_calls": 406,
+        "deallocated_bytes": 2781702,
+        "deallocation_calls": 534,
+        "failed_allocation_calls": 0,
+        "reallocation_calls": 49
+      },
+      "publication_ns": 14282960,
+      "report": {
+        "bytes": 24102,
+        "path": "/home/zhuhe/litchi-performance-0949/capture-v1/children/h02-baseline-primary-percent-dense-sparse/report.json",
+        "sha256": "94c517601ed6a9583305634e874cbc05a9e6a4753e1902a4faf63ec24c82d129"
+      },
+      "retained_0948_report": {
+        "bytes": 44086,
+        "path": "/home/zhuhe/litchi-performance-0948/allocator/r00-baseline-primary-percent-dense-sparse/report.json",
+        "sha256": "2d8fe08425270c4d73920a57ac86ff4d30e5c75eb0d832fad4b5a3f66c6daea6"
+      },
+      "role": "baseline",
+      "shape": "dense-sparse",
+      "sink": {
+        "accepted_bytes": 4252436,
+        "largest_write": 65536,
+        "write_calls": 143,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 65,
+          "bytes_1_to_512": 75,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 3,
+          "bytes_over_65536": 0
+        }
+      },
+      "whole_process_report_scope": "application report operation/publication counters; not heaptrack interval"
+    },
+    {
+      "corpus_archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+      "id": "h03-candidate-primary-percent-dense-sparse",
+      "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+      "publication_counters": {
+        "allocated_bytes": 3172336,
+        "allocation_calls": 931,
+        "deallocated_bytes": 3188198,
+        "deallocation_calls": 1058,
+        "failed_allocation_calls": 0,
+        "reallocation_calls": 50
+      },
+      "publication_ns": 13222645,
+      "report": {
+        "bytes": 24133,
+        "path": "/home/zhuhe/litchi-performance-0949/capture-v1/children/h03-candidate-primary-percent-dense-sparse/report.json",
+        "sha256": "261037461dc22be3064f1794317ec533a250d3ea264714ba0bd500eb5172f5bb"
+      },
+      "retained_0948_report": {
+        "bytes": 44126,
+        "path": "/home/zhuhe/litchi-performance-0948/allocator/r00-candidate-primary-percent-dense-sparse/report.json",
+        "sha256": "2db1a91efbccb3a48e43368876fe296c1d889eafbbc0b2de261b07e25b80ff9f"
+      },
+      "role": "candidate",
+      "shape": "dense-sparse",
+      "sink": {
+        "accepted_bytes": 4252436,
+        "largest_write": 65536,
+        "write_calls": 143,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 65,
+          "bytes_1_to_512": 75,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 3,
+          "bytes_over_65536": 0
+        }
+      },
+      "whole_process_report_scope": "application report operation/publication counters; not heaptrack interval"
+    }
+  ],
+  "runner": {
+    "bytes": 28023,
+    "path": "/home/zhuhe/litchi-performance-0949/tooling/run_heaptrack_0949_v3.py",
+    "sha256": "6ee66f92a6b93431af11227ac886efe555ddb49af32804dd020efc5b89721f4c"
+  },
+  "runner_terminal": {
+    "bytes": 1413,
+    "path": "/home/zhuhe/litchi-performance-0949/capture-v1/runner-terminal.json",
+    "sha256": "c598fce228d4fa841f0f7379fdcf2061639d5efd2d9fa99e5ca4aaffbb7d6901"
+  },
+  "schema": "litchi.performance.0949.independent-report-admission.v2",
+  "scope": {
+    "heaptrack": "Whole-process raw requested allocations before frees; decoder totals are not publication-interval totals.",
+    "no_claim": "No latency, speedup, adoption, or publication-only heaptrack attribution claim.",
+    "report_counters": "Exact deterministic 0948 publication operation counters (calls, deallocations, reallocations, failed calls, allocated and deallocated bytes) plus corpus/sink/output identities; one-sample publication timing and live gauges are descriptive only."
+  },
+  "status": "pass",
+  "workload_launched": false
+}

@@ -1,0 +1,715 @@
+{
+  "attribution_terminal": {
+    "bytes": 24638,
+    "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/attribution-replay-v1/attribution-terminal.json",
+    "sha256": "42299e9f760db63941b12901acc7c2a23d986578a9eec52120bb5ca3ddb25ce0"
+  },
+  "binary_launched": false,
+  "decoder_terminal": {
+    "bytes": 10163,
+    "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/raw-decoder-replay-v1/decoder-terminal.json",
+    "sha256": "63d103f73d30bc77387f2c68394c3295ea4f88e995c6043e07950e74582e7755"
+  },
+  "dependency_binding": {
+    "bytes": 2363,
+    "path": "/home/zhuhe/litchi-performance-0949-archive/dependency-0949-v1.json",
+    "sha256": "a8764a72fd8683290491c387d8d4d23418ff5a292b85d005dd9059eaaf6dd392"
+  },
+  "exact_comparisons": [
+    {
+      "exact_equal": true,
+      "kind": "fresh_decoder_aggregate",
+      "original": {
+        "bytes": 6238,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/raw-decoder-v1/baseline-medium/size-aggregates.tsv",
+        "sha256": "9ff6f76d9d8fc612fbc53b1354ce49db4b201d4089753ad353bbe90413d75780"
+      },
+      "replay": {
+        "bytes": 6238,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/raw-decoder-replay-v1/baseline-medium/size-aggregates.tsv",
+        "sha256": "9ff6f76d9d8fc612fbc53b1354ce49db4b201d4089753ad353bbe90413d75780"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "fresh_decoder_aggregate",
+      "original": {
+        "bytes": 134268023,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/raw-decoder-v1/baseline-medium/trace-aggregates.jsonl",
+        "sha256": "09e597cf15591461e90d3fb03b8c92d13ff95c61336206cf3617672d1aaacffa"
+      },
+      "replay": {
+        "bytes": 134268023,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/raw-decoder-replay-v1/baseline-medium/trace-aggregates.jsonl",
+        "sha256": "09e597cf15591461e90d3fb03b8c92d13ff95c61336206cf3617672d1aaacffa"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "fresh_decoder_aggregate",
+      "original": {
+        "bytes": 304101,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/raw-decoder-v1/baseline-medium/trace-size-aggregates.tsv",
+        "sha256": "d9418ec9bbb2f74aced5cdb0a21dcc48f07726a626bf560148f4edd7313f6070"
+      },
+      "replay": {
+        "bytes": 304101,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/raw-decoder-replay-v1/baseline-medium/trace-size-aggregates.tsv",
+        "sha256": "d9418ec9bbb2f74aced5cdb0a21dcc48f07726a626bf560148f4edd7313f6070"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "attribution_output",
+      "original": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/attribution-final-v1/baseline-medium/window-traces.jsonl",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "replay": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/attribution-replay-v1/baseline-medium/window-traces.jsonl",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "attribution_output",
+      "original": {
+        "bytes": 17,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/attribution-final-v1/baseline-medium/window-physical-size.histogram",
+        "sha256": "c2db0d33931cb0a9d7cb676a28945d7337442a3c106ae36299793cb4c6768525"
+      },
+      "replay": {
+        "bytes": 17,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/attribution-replay-v1/baseline-medium/window-physical-size.histogram",
+        "sha256": "c2db0d33931cb0a9d7cb676a28945d7337442a3c106ae36299793cb4c6768525"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "attribution_output",
+      "original": {
+        "bytes": 17,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/attribution-final-v1/baseline-medium/window-inline-size.histogram",
+        "sha256": "c2db0d33931cb0a9d7cb676a28945d7337442a3c106ae36299793cb4c6768525"
+      },
+      "replay": {
+        "bytes": 17,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/attribution-replay-v1/baseline-medium/window-inline-size.histogram",
+        "sha256": "c2db0d33931cb0a9d7cb676a28945d7337442a3c106ae36299793cb4c6768525"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "attribution_output",
+      "original": {
+        "bytes": 28,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/attribution-final-v1/baseline-medium/window-physical-stacks.folded",
+        "sha256": "ceb5d354feb3063775ff20365a07a4f9a06d87a7dc8ae5bcc8dabccaa5eaaafc"
+      },
+      "replay": {
+        "bytes": 28,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/attribution-replay-v1/baseline-medium/window-physical-stacks.folded",
+        "sha256": "ceb5d354feb3063775ff20365a07a4f9a06d87a7dc8ae5bcc8dabccaa5eaaafc"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "attribution_output",
+      "original": {
+        "bytes": 28,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/attribution-final-v1/baseline-medium/window-inline-stacks.folded",
+        "sha256": "ceb5d354feb3063775ff20365a07a4f9a06d87a7dc8ae5bcc8dabccaa5eaaafc"
+      },
+      "replay": {
+        "bytes": 28,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/attribution-replay-v1/baseline-medium/window-inline-stacks.folded",
+        "sha256": "ceb5d354feb3063775ff20365a07a4f9a06d87a7dc8ae5bcc8dabccaa5eaaafc"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "attribution_output",
+      "original": {
+        "bytes": 1726,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/attribution-final-v1/baseline-medium/publication-symbol-scoped.json",
+        "sha256": "8ed88c448a9a27429215423529fde1a710a9c188a10797eda8ec3dbc1c46c34c"
+      },
+      "replay": {
+        "bytes": 1726,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/attribution-replay-v1/baseline-medium/publication-symbol-scoped.json",
+        "sha256": "8ed88c448a9a27429215423529fde1a710a9c188a10797eda8ec3dbc1c46c34c"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "fresh_decoder_aggregate",
+      "original": {
+        "bytes": 6305,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/raw-decoder-v1/candidate-medium/size-aggregates.tsv",
+        "sha256": "39b5d1b621ace0b3d04fe5dec501748b1e39e019699665e5539d44c331a41bef"
+      },
+      "replay": {
+        "bytes": 6305,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/raw-decoder-replay-v1/candidate-medium/size-aggregates.tsv",
+        "sha256": "39b5d1b621ace0b3d04fe5dec501748b1e39e019699665e5539d44c331a41bef"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "fresh_decoder_aggregate",
+      "original": {
+        "bytes": 140640174,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/raw-decoder-v1/candidate-medium/trace-aggregates.jsonl",
+        "sha256": "647da9fd09cc486ea1c2325674f2b62fe392a1a1118a5a2ec114f756704066fd"
+      },
+      "replay": {
+        "bytes": 140640174,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/raw-decoder-replay-v1/candidate-medium/trace-aggregates.jsonl",
+        "sha256": "647da9fd09cc486ea1c2325674f2b62fe392a1a1118a5a2ec114f756704066fd"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "fresh_decoder_aggregate",
+      "original": {
+        "bytes": 304224,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/raw-decoder-v1/candidate-medium/trace-size-aggregates.tsv",
+        "sha256": "73e38b6755d8754334f963f75dd8aa7c41e6383b15293ef280f742fdf8610b87"
+      },
+      "replay": {
+        "bytes": 304224,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/raw-decoder-replay-v1/candidate-medium/trace-size-aggregates.tsv",
+        "sha256": "73e38b6755d8754334f963f75dd8aa7c41e6383b15293ef280f742fdf8610b87"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "attribution_output",
+      "original": {
+        "bytes": 220414,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/attribution-final-v1/candidate-medium/window-traces.jsonl",
+        "sha256": "8ede55a124cffa744dc7374223b5a6314f5973c2f450b5ca061b2ee515921a7f"
+      },
+      "replay": {
+        "bytes": 220414,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/attribution-replay-v1/candidate-medium/window-traces.jsonl",
+        "sha256": "8ede55a124cffa744dc7374223b5a6314f5973c2f450b5ca061b2ee515921a7f"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "attribution_output",
+      "original": {
+        "bytes": 66,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/attribution-final-v1/candidate-medium/window-physical-size.histogram",
+        "sha256": "289a3dbc4391bd5afa270d6354aeb4a81be67ee807339a8927d0fd77fbf47d82"
+      },
+      "replay": {
+        "bytes": 66,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/attribution-replay-v1/candidate-medium/window-physical-size.histogram",
+        "sha256": "289a3dbc4391bd5afa270d6354aeb4a81be67ee807339a8927d0fd77fbf47d82"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "attribution_output",
+      "original": {
+        "bytes": 47,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/attribution-final-v1/candidate-medium/window-inline-size.histogram",
+        "sha256": "19cf72e5c76257c497b3af7fbe2b2748907ec548b810001d0c1a7593efa244dc"
+      },
+      "replay": {
+        "bytes": 47,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/attribution-replay-v1/candidate-medium/window-inline-size.histogram",
+        "sha256": "19cf72e5c76257c497b3af7fbe2b2748907ec548b810001d0c1a7593efa244dc"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "attribution_output",
+      "original": {
+        "bytes": 17385,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/attribution-final-v1/candidate-medium/window-physical-stacks.folded",
+        "sha256": "aa35d590b84d61d2342ebf20082202471745cfa9081db2abc07919309db4a0ae"
+      },
+      "replay": {
+        "bytes": 17385,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/attribution-replay-v1/candidate-medium/window-physical-stacks.folded",
+        "sha256": "aa35d590b84d61d2342ebf20082202471745cfa9081db2abc07919309db4a0ae"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "attribution_output",
+      "original": {
+        "bytes": 4193,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/attribution-final-v1/candidate-medium/window-inline-stacks.folded",
+        "sha256": "b36f9801558832aa3fdc6dbe9d6a52f12df138ae6c957c7b14bd9da0180d78ca"
+      },
+      "replay": {
+        "bytes": 4193,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/attribution-replay-v1/candidate-medium/window-inline-stacks.folded",
+        "sha256": "b36f9801558832aa3fdc6dbe9d6a52f12df138ae6c957c7b14bd9da0180d78ca"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "attribution_output",
+      "original": {
+        "bytes": 1888,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/attribution-final-v1/candidate-medium/publication-symbol-scoped.json",
+        "sha256": "fa677d26c4866c3f08ed5d68720e8a1084610bf17dccaca943d7e2e9c5afd8fe"
+      },
+      "replay": {
+        "bytes": 1888,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/attribution-replay-v1/candidate-medium/publication-symbol-scoped.json",
+        "sha256": "fa677d26c4866c3f08ed5d68720e8a1084610bf17dccaca943d7e2e9c5afd8fe"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "fresh_decoder_aggregate",
+      "original": {
+        "bytes": 7791,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/raw-decoder-v1/baseline-dense/size-aggregates.tsv",
+        "sha256": "08f08e9fa54466ea0474a4e55f1fa2e02374e233bd70308fec9661077e6e5637"
+      },
+      "replay": {
+        "bytes": 7791,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/raw-decoder-replay-v1/baseline-dense/size-aggregates.tsv",
+        "sha256": "08f08e9fa54466ea0474a4e55f1fa2e02374e233bd70308fec9661077e6e5637"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "fresh_decoder_aggregate",
+      "original": {
+        "bytes": 134563133,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/raw-decoder-v1/baseline-dense/trace-aggregates.jsonl",
+        "sha256": "015d95303b5eea46eb22b15fff5e40d08720e6b486062c061dea2a53829f7bfc"
+      },
+      "replay": {
+        "bytes": 134563133,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/raw-decoder-replay-v1/baseline-dense/trace-aggregates.jsonl",
+        "sha256": "015d95303b5eea46eb22b15fff5e40d08720e6b486062c061dea2a53829f7bfc"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "fresh_decoder_aggregate",
+      "original": {
+        "bytes": 313074,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/raw-decoder-v1/baseline-dense/trace-size-aggregates.tsv",
+        "sha256": "d79a7f2cba82c212041eba5da9f15391ddb213a8f392ba559e849acb9f8e5ee4"
+      },
+      "replay": {
+        "bytes": 313074,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/raw-decoder-replay-v1/baseline-dense/trace-size-aggregates.tsv",
+        "sha256": "d79a7f2cba82c212041eba5da9f15391ddb213a8f392ba559e849acb9f8e5ee4"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "attribution_output",
+      "original": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/attribution-final-v1/baseline-dense/window-traces.jsonl",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "replay": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/attribution-replay-v1/baseline-dense/window-traces.jsonl",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "attribution_output",
+      "original": {
+        "bytes": 17,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/attribution-final-v1/baseline-dense/window-physical-size.histogram",
+        "sha256": "c2db0d33931cb0a9d7cb676a28945d7337442a3c106ae36299793cb4c6768525"
+      },
+      "replay": {
+        "bytes": 17,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/attribution-replay-v1/baseline-dense/window-physical-size.histogram",
+        "sha256": "c2db0d33931cb0a9d7cb676a28945d7337442a3c106ae36299793cb4c6768525"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "attribution_output",
+      "original": {
+        "bytes": 17,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/attribution-final-v1/baseline-dense/window-inline-size.histogram",
+        "sha256": "c2db0d33931cb0a9d7cb676a28945d7337442a3c106ae36299793cb4c6768525"
+      },
+      "replay": {
+        "bytes": 17,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/attribution-replay-v1/baseline-dense/window-inline-size.histogram",
+        "sha256": "c2db0d33931cb0a9d7cb676a28945d7337442a3c106ae36299793cb4c6768525"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "attribution_output",
+      "original": {
+        "bytes": 28,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/attribution-final-v1/baseline-dense/window-physical-stacks.folded",
+        "sha256": "ceb5d354feb3063775ff20365a07a4f9a06d87a7dc8ae5bcc8dabccaa5eaaafc"
+      },
+      "replay": {
+        "bytes": 28,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/attribution-replay-v1/baseline-dense/window-physical-stacks.folded",
+        "sha256": "ceb5d354feb3063775ff20365a07a4f9a06d87a7dc8ae5bcc8dabccaa5eaaafc"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "attribution_output",
+      "original": {
+        "bytes": 28,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/attribution-final-v1/baseline-dense/window-inline-stacks.folded",
+        "sha256": "ceb5d354feb3063775ff20365a07a4f9a06d87a7dc8ae5bcc8dabccaa5eaaafc"
+      },
+      "replay": {
+        "bytes": 28,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/attribution-replay-v1/baseline-dense/window-inline-stacks.folded",
+        "sha256": "ceb5d354feb3063775ff20365a07a4f9a06d87a7dc8ae5bcc8dabccaa5eaaafc"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "attribution_output",
+      "original": {
+        "bytes": 1726,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/attribution-final-v1/baseline-dense/publication-symbol-scoped.json",
+        "sha256": "134243a794b8c5608f53e88b926124c4bbfb7d96d0293375e7407efc8b78bf3f"
+      },
+      "replay": {
+        "bytes": 1726,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/attribution-replay-v1/baseline-dense/publication-symbol-scoped.json",
+        "sha256": "134243a794b8c5608f53e88b926124c4bbfb7d96d0293375e7407efc8b78bf3f"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "fresh_decoder_aggregate",
+      "original": {
+        "bytes": 7890,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/raw-decoder-v1/candidate-dense/size-aggregates.tsv",
+        "sha256": "dc1eb11c2ce11874c073c1671dd01748a9b78787c0cc1a84f8ce8f326d6f097b"
+      },
+      "replay": {
+        "bytes": 7890,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/raw-decoder-replay-v1/candidate-dense/size-aggregates.tsv",
+        "sha256": "dc1eb11c2ce11874c073c1671dd01748a9b78787c0cc1a84f8ce8f326d6f097b"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "fresh_decoder_aggregate",
+      "original": {
+        "bytes": 140975378,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/raw-decoder-v1/candidate-dense/trace-aggregates.jsonl",
+        "sha256": "feffa736dc609e6e29f8b44ab3f69dffb3e21248c7b9f26a4368531d424df635"
+      },
+      "replay": {
+        "bytes": 140975378,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/raw-decoder-replay-v1/candidate-dense/trace-aggregates.jsonl",
+        "sha256": "feffa736dc609e6e29f8b44ab3f69dffb3e21248c7b9f26a4368531d424df635"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "fresh_decoder_aggregate",
+      "original": {
+        "bytes": 313413,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/raw-decoder-v1/candidate-dense/trace-size-aggregates.tsv",
+        "sha256": "1d41948613b4c47ff8b33ddeddda426fe8cd1652a989f9a5f9819934b6f7c824"
+      },
+      "replay": {
+        "bytes": 313413,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/raw-decoder-replay-v1/candidate-dense/trace-size-aggregates.tsv",
+        "sha256": "1d41948613b4c47ff8b33ddeddda426fe8cd1652a989f9a5f9819934b6f7c824"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "attribution_output",
+      "original": {
+        "bytes": 276625,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/attribution-final-v1/candidate-dense/window-traces.jsonl",
+        "sha256": "30720119043b4ea516895f8488d889e562c5b05a7e078967ced4bd17a7943991"
+      },
+      "replay": {
+        "bytes": 276625,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/attribution-replay-v1/candidate-dense/window-traces.jsonl",
+        "sha256": "30720119043b4ea516895f8488d889e562c5b05a7e078967ced4bd17a7943991"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "attribution_output",
+      "original": {
+        "bytes": 66,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/attribution-final-v1/candidate-dense/window-physical-size.histogram",
+        "sha256": "ba5d70dc2403a485f75eab3924a39c01be9ad81d37885c54c5242e882bd68436"
+      },
+      "replay": {
+        "bytes": 66,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/attribution-replay-v1/candidate-dense/window-physical-size.histogram",
+        "sha256": "ba5d70dc2403a485f75eab3924a39c01be9ad81d37885c54c5242e882bd68436"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "attribution_output",
+      "original": {
+        "bytes": 72,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/attribution-final-v1/candidate-dense/window-inline-size.histogram",
+        "sha256": "64155d8069729d56c9b57bbaf604ea81ae12cedd74eb07ef487d5c9beec3bc78"
+      },
+      "replay": {
+        "bytes": 72,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/attribution-replay-v1/candidate-dense/window-inline-size.histogram",
+        "sha256": "64155d8069729d56c9b57bbaf604ea81ae12cedd74eb07ef487d5c9beec3bc78"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "attribution_output",
+      "original": {
+        "bytes": 22641,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/attribution-final-v1/candidate-dense/window-physical-stacks.folded",
+        "sha256": "cadbd5243c206135a67c2d40f603b5b68437aa783df1faec8bd4e1e0769e5b01"
+      },
+      "replay": {
+        "bytes": 22641,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/attribution-replay-v1/candidate-dense/window-physical-stacks.folded",
+        "sha256": "cadbd5243c206135a67c2d40f603b5b68437aa783df1faec8bd4e1e0769e5b01"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "attribution_output",
+      "original": {
+        "bytes": 4191,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/attribution-final-v1/candidate-dense/window-inline-stacks.folded",
+        "sha256": "2174d7cdb083ef118e60a28d2b124bf995f0fe2aa64b28c058937edaa2184e8c"
+      },
+      "replay": {
+        "bytes": 4191,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/attribution-replay-v1/candidate-dense/window-inline-stacks.folded",
+        "sha256": "2174d7cdb083ef118e60a28d2b124bf995f0fe2aa64b28c058937edaa2184e8c"
+      }
+    },
+    {
+      "exact_equal": true,
+      "kind": "attribution_output",
+      "original": {
+        "bytes": 1890,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/attribution-final-v1/candidate-dense/publication-symbol-scoped.json",
+        "sha256": "e26dfc5d6cdc4949f24c146629926b7c658b2e6b380c448cf643c0759a1a4676"
+      },
+      "replay": {
+        "bytes": 1890,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/attribution-replay-v1/candidate-dense/publication-symbol-scoped.json",
+        "sha256": "e26dfc5d6cdc4949f24c146629926b7c658b2e6b380c448cf643c0759a1a4676"
+      }
+    }
+  ],
+  "fresh_decoder_hardlink_checks": [
+    {
+      "label": "baseline-medium",
+      "name": "size-aggregates.tsv",
+      "samefile": true
+    },
+    {
+      "label": "baseline-medium",
+      "name": "trace-aggregates.jsonl",
+      "samefile": true
+    },
+    {
+      "label": "baseline-medium",
+      "name": "trace-size-aggregates.tsv",
+      "samefile": true
+    },
+    {
+      "label": "candidate-medium",
+      "name": "size-aggregates.tsv",
+      "samefile": true
+    },
+    {
+      "label": "candidate-medium",
+      "name": "trace-aggregates.jsonl",
+      "samefile": true
+    },
+    {
+      "label": "candidate-medium",
+      "name": "trace-size-aggregates.tsv",
+      "samefile": true
+    },
+    {
+      "label": "baseline-dense",
+      "name": "size-aggregates.tsv",
+      "samefile": true
+    },
+    {
+      "label": "baseline-dense",
+      "name": "trace-aggregates.jsonl",
+      "samefile": true
+    },
+    {
+      "label": "baseline-dense",
+      "name": "trace-size-aggregates.tsv",
+      "samefile": true
+    },
+    {
+      "label": "candidate-dense",
+      "name": "size-aggregates.tsv",
+      "samefile": true
+    },
+    {
+      "label": "candidate-dense",
+      "name": "trace-aggregates.jsonl",
+      "samefile": true
+    },
+    {
+      "label": "candidate-dense",
+      "name": "trace-size-aggregates.tsv",
+      "samefile": true
+    }
+  ],
+  "output_root": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007",
+  "packet_root": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007",
+  "profiler_launched": false,
+  "reconciliation_input": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/reconciliation-input",
+  "reconciliation_used_fresh_decoder_output": true,
+  "recorded_utc": "2026-10-07T06:10:17.954238+00:00",
+  "rerun_workload": false,
+  "schema": "litchi.performance.0949.offline-relocated-replay-validation.v2",
+  "semantic_comparisons": [
+    {
+      "normalized_equal": true,
+      "original": {
+        "bytes": 2049,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/raw-decoder-v1/baseline-medium/summary.json",
+        "sha256": "6a02219a6f19f42371e9f5d96fb576a0469c02096fbfd405ba7d20497b84727d"
+      },
+      "replay": {
+        "bytes": 2170,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/raw-decoder-replay-v1/baseline-medium/summary.json",
+        "sha256": "4d2695378c32c121a327ccbc2e9cb1fa735388bd96e3e4a86de2e28946c12e0a"
+      }
+    },
+    {
+      "normalized_equal": true,
+      "original": {
+        "bytes": 5058,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/attribution-final-v1/baseline-medium/summary.json",
+        "sha256": "c5ca2da1ee612b489327310abb28fdaedd0a1dc680c832e7f5b7581f15cc2b51"
+      },
+      "replay": {
+        "bytes": 5251,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/attribution-replay-v1/baseline-medium/summary.json",
+        "sha256": "6657b1ea2ed6134f0e97e62d31e4a9350d6b924f14f8402b73a8b669c363e2fc"
+      }
+    },
+    {
+      "normalized_equal": true,
+      "original": {
+        "bytes": 2083,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/raw-decoder-v1/candidate-medium/summary.json",
+        "sha256": "1f80566be5d84693278b0c3f6b9fccba6e4cb4ec54ba00b2b8d2d47fbae9bf3c"
+      },
+      "replay": {
+        "bytes": 2204,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/raw-decoder-replay-v1/candidate-medium/summary.json",
+        "sha256": "e6876a62f4716c72ed82bd8fa06c5d5a7548f52296bf4e006677a7e450ac27a9"
+      }
+    },
+    {
+      "normalized_equal": true,
+      "original": {
+        "bytes": 5302,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/attribution-final-v1/candidate-medium/summary.json",
+        "sha256": "e3630021683f394eda24604b4f1b8a3326ef6443f4224a89bcb8283c4de28990"
+      },
+      "replay": {
+        "bytes": 5495,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/attribution-replay-v1/candidate-medium/summary.json",
+        "sha256": "405acbd6f2b595e7defb7bdb279123959c2b0fadace6446bbfc4b8f2db5f96b6"
+      }
+    },
+    {
+      "normalized_equal": true,
+      "original": {
+        "bytes": 2055,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/raw-decoder-v1/baseline-dense/summary.json",
+        "sha256": "454126dbabf90d25ee68c5a96f4bdeea362b748f4def2c70d5a6094094ab21ec"
+      },
+      "replay": {
+        "bytes": 2176,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/raw-decoder-replay-v1/baseline-dense/summary.json",
+        "sha256": "28adc66a805e47598ef1b80534a3aa600760fe4b64991ae7c2731071ed348a45"
+      }
+    },
+    {
+      "normalized_equal": true,
+      "original": {
+        "bytes": 5062,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/attribution-final-v1/baseline-dense/summary.json",
+        "sha256": "94997befca89f67334d4eb8eb4ec9c7e543cd1f63b38434304ad60cc5cf0d608"
+      },
+      "replay": {
+        "bytes": 5255,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/attribution-replay-v1/baseline-dense/summary.json",
+        "sha256": "c8cbcd9b15f3b28cd64d62d0b232551c831e7d9983fe928b740131b06a0c93f4"
+      }
+    },
+    {
+      "normalized_equal": true,
+      "original": {
+        "bytes": 2091,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/raw-decoder-v1/candidate-dense/summary.json",
+        "sha256": "f817c0962c9ee0a00da5a7d9bdfa09d64b057d72731c99fe3c0a3ce56c5d529a"
+      },
+      "replay": {
+        "bytes": 2212,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/raw-decoder-replay-v1/candidate-dense/summary.json",
+        "sha256": "eff1eb8e0638e01d1900bd95ebb53eb0244cf2dde379529c164ffaf975cd0e3d"
+      }
+    },
+    {
+      "normalized_equal": true,
+      "original": {
+        "bytes": 5308,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/attribution-final-v1/candidate-dense/summary.json",
+        "sha256": "7c4f124e306e3e1cfc5a7631f20c6b2496157434c5ce4bce365cdac686d3733a"
+      },
+      "replay": {
+        "bytes": 5501,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/attribution-replay-v1/candidate-dense/summary.json",
+        "sha256": "8d4cef7ddd31ab976ecc94237072a218589c3380bcbf5fd78ec8f2ea60b20583"
+      }
+    },
+    {
+      "normalized_equal": true,
+      "original": {
+        "bytes": 16987,
+        "path": "/home/zhuhe/litchi-performance-0949-replay-v1-20261007/review/xml-multiwindow-source-profile-reconciliation-v2.json",
+        "sha256": "18f27ae921871a9321069f6fe4f72919b140d873aac35100f1f88dc7d5813d84"
+      },
+      "replay": {
+        "bytes": 17514,
+        "path": "/home/zhuhe/litchi-performance-0949-offline-replay-v1-20261007/xml-multiwindow-reconciliation-v2.json",
+        "sha256": "4407fc5003654cffe747d170e99eb20a695d1c4711d16a65593db460d372f8c7"
+      }
+    }
+  ],
+  "status": "pass",
+  "workload_launched": false
+}

@@ -1,0 +1,11 @@
+{
+  "schema": "litchi.performance.0949.profile-name-control.v1",
+  "status": "pass",
+  "runner_sha256": "6ee66f92a6b93431af11227ac886efe555ddb49af32804dd020efc5b89721f4c",
+  "controls": [
+    "unexpected suffix excluded",
+    "zst actual name accepted",
+    "both valid names reported as multiple"
+  ],
+  "workload_launched": false
+}

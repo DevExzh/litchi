@@ -1,0 +1,116 @@
+{
+  "binaries": {
+    "baseline": {
+      "allocator": {
+        "binary": {
+          "bytes": 269016128,
+          "executable": true,
+          "mode": 509,
+          "path": "binaries/baseline-allocator",
+          "sha256": "c19971a7e923accd822e9744382aa757d0a67d9d7ba4e47e27354e05767de713"
+        },
+        "build_receipt": {
+          "bytes": 4678,
+          "executable": false,
+          "mode": 436,
+          "path": "receipts/baseline-reuse-v2.json",
+          "sha256": "a05ddc9f28879df314e0dc583d9871c60a82b2a78938c03b0a4389c252bef1bc"
+        }
+      },
+      "native": {
+        "binary": {
+          "bytes": 265669200,
+          "executable": true,
+          "mode": 509,
+          "path": "binaries/baseline-native",
+          "sha256": "087aec962f5251d1255e7a54dc188e53f9b8a722c5da95eaa1c69439caa138c8"
+        },
+        "build_receipt": {
+          "bytes": 4678,
+          "executable": false,
+          "mode": 436,
+          "path": "receipts/baseline-reuse-v2.json",
+          "sha256": "a05ddc9f28879df314e0dc583d9871c60a82b2a78938c03b0a4389c252bef1bc"
+        }
+      }
+    },
+    "candidate": {
+      "allocator": {
+        "binary": {
+          "bytes": 269145952,
+          "executable": true,
+          "mode": 509,
+          "path": "binaries/candidate-v3-preserved/litchi-perf-baseline-alloc",
+          "sha256": "7f7c1a0c0148dd283db27ec7b0cb2870572d94cc4d8de1920c4f7de302f3590e"
+        },
+        "build_receipt": {
+          "bytes": 8666,
+          "executable": false,
+          "mode": 436,
+          "path": "builds/candidate-allocator-v3/terminal.json",
+          "sha256": "5a467ced86b26a7fd091261de8b2a65089eeb72e55a2651db5186c2103dc0b00"
+        }
+      },
+      "native": {
+        "binary": {
+          "bytes": 265836208,
+          "executable": true,
+          "mode": 509,
+          "path": "binaries/candidate-v3-preserved/litchi-perf-baseline",
+          "sha256": "c9e3b3122b1ac5f64fdf0fc8b4aabea9c53d80598b80e702f39eb8424b1063e2"
+        },
+        "build_receipt": {
+          "bytes": 8566,
+          "executable": false,
+          "mode": 436,
+          "path": "builds/candidate-native-v3/terminal.json",
+          "sha256": "eaea1250b7776116a3dc1f860a09480ffe8ef174f4688dec92a929331b184ed6"
+        }
+      }
+    }
+  },
+  "created_utc": "2026-10-07T05:46:26.162265+00:00",
+  "current_head": "6c609fb58429bf2333bcdeafd317e8c174773700",
+  "prior_reducer_sha256": "f960a94cad1544ac7f64c8a5006eb172bf5db849735b576fba58a6338a5b1d17",
+  "schema": "litchi.performance.0949.prior-reuse-reverified.v1",
+  "scope": "full retained role source census and strict prior build/binary custody; current committed selected runtime paths unchanged; untracked files excluded",
+  "source": {
+    "baseline_manifest": {
+      "bytes": 2033638,
+      "executable": false,
+      "mode": 436,
+      "path": "baseline-source-manifest-v1.json",
+      "sha256": "dd66b044540d185c448cae78b16e9aa61556a10f01252e27f2075f48aa5121c2"
+    },
+    "candidate_files": [
+      "crates/litchi-opc/src/lib.rs",
+      "crates/litchi-opc/src/source_backed.rs",
+      "crates/litchi-xlsx/src/cell_values/facts_oracle_tests.rs",
+      "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+      "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs",
+      "crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs",
+      "crates/litchi-xlsx/src/raw/worksheet/edit/package.rs",
+      "crates/litchi-xlsx/src/raw/worksheet/edit/tests.rs",
+      "crates/xml-minifier/src/audit.rs",
+      "crates/xml-minifier/src/audit/namespaces.rs",
+      "crates/xml-minifier/tests/source_replacement.rs"
+    ],
+    "candidate_manifest": {
+      "bytes": 2296969,
+      "executable": false,
+      "mode": 436,
+      "path": "candidate-build-manifest-v3.json",
+      "sha256": "f565a52b36e8657453448d1f097179002b8fd7c95b4417996f62e1cbf6a4b992"
+    },
+    "file_count": 10789,
+    "hashed_entries": 21578,
+    "role_roots": {
+      "baseline": "baseline-source",
+      "candidate": "candidate-build-v3"
+    },
+    "root_worktree": ".",
+    "source_commit": "b6c5c80ffbcb60736d6c4c2f3b590838640008a9"
+  },
+  "status": "pass",
+  "tracked_selected_source_diff": ""
+}
