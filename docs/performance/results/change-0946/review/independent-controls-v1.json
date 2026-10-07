@@ -1,0 +1,206 @@
+{
+  "bindings": {
+    "author_output_bytes": 353314,
+    "author_output_sha256": "e0ca6ecd41879a1bdfcb0530d76dfae8a92cfe7b87365e91cf7e5ea64dd27a4b",
+    "helper_sha256": "9fb08db7c5ece8f3c466829651c727b8599a26cca8ae1fcff4a36ac3d7fda6de",
+    "independent_output_bytes": 353314,
+    "independent_output_sha256": "e0ca6ecd41879a1bdfcb0530d76dfae8a92cfe7b87365e91cf7e5ea64dd27a4b",
+    "original_moved_byte_equal": true,
+    "original_moved_sha256": "e0ca6ecd41879a1bdfcb0530d76dfae8a92cfe7b87365e91cf7e5ea64dd27a4b",
+    "plan_sha256": "9c9700f1798369244bee67b074410c92abfbeb31cfcd163ba52fac94d372dfc9"
+  },
+  "command": "PYTHONDONTWRITEBYTECODE=1 python3 -B review/independent-controls-v1.py --base review/original-input-copy --moved review/moved-input-copy --original-output review/reduction-original-independent-v1.json --moved-output review/reduction-moved-independent-v1.json --author-output attribution-summary-v2.json --output review/independent-controls-v1.json",
+  "negative_controls": {
+    "descriptor_corruption": {
+      "rejected": true,
+      "returncode": 2
+    },
+    "duplicate_schedule_index": {
+      "rejected": true,
+      "returncode": 2
+    },
+    "hash_mismatch": {
+      "rejected": true,
+      "returncode": 2
+    },
+    "output_overwrite": {
+      "rejected": true,
+      "returncode": 2
+    },
+    "path_traversal": {
+      "rejected": true,
+      "returncode": 2
+    },
+    "symlink_input": {
+      "rejected": true,
+      "returncode": 2
+    }
+  },
+  "negative_details": {
+    "descriptor_corruption": {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/litchi-performance-0946/review/control-cases-v1/descriptor-corruption/tools/reduce.py",
+        "--output",
+        "/home/zhuhe/litchi-performance-0946/review/control-cases-v1/descriptor-corruption/negative-output.json"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0946/review/control-cases-v1/descriptor-corruption",
+      "output": "/home/zhuhe/litchi-performance-0946/review/control-cases-v1/descriptor-corruption/negative-output.json",
+      "output_exists": false,
+      "returncode": 2,
+      "stderr": "reduce.py: error: input hash differs: /home/zhuhe/litchi-performance-0946/review/control-cases-v1/descriptor-corruption/inputs/reader_v2.py\n",
+      "stdout": ""
+    },
+    "duplicate_schedule_index": {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/litchi-performance-0946/review/control-cases-v1/duplicate-index/tools/reduce.py",
+        "--output",
+        "/home/zhuhe/litchi-performance-0946/review/control-cases-v1/duplicate-index/negative-output.json"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0946/review/control-cases-v1/duplicate-index",
+      "output": "/home/zhuhe/litchi-performance-0946/review/control-cases-v1/duplicate-index/negative-output.json",
+      "output_exists": false,
+      "returncode": 2,
+      "stderr": "reduce.py: error: capture indices are not the exact frozen schedule\n",
+      "stdout": ""
+    },
+    "hash_mismatch": {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/litchi-performance-0946/review/control-cases-v1/hash-mismatch/tools/reduce.py",
+        "--output",
+        "/home/zhuhe/litchi-performance-0946/review/control-cases-v1/hash-mismatch/negative-output.json"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0946/review/control-cases-v1/hash-mismatch",
+      "output": "/home/zhuhe/litchi-performance-0946/review/control-cases-v1/hash-mismatch/negative-output.json",
+      "output_exists": false,
+      "returncode": 2,
+      "stderr": "reduce.py: error: capture byte count differs: /home/zhuhe/litchi-performance-0946/review/control-cases-v1/hash-mismatch/inputs/callgrind/00-medium-r0.out.6\n",
+      "stdout": ""
+    },
+    "output_overwrite": {
+      "first": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "/home/zhuhe/litchi-performance-0946/review/control-cases-v1/overwrite-output/tools/reduce.py",
+          "--output",
+          "/home/zhuhe/litchi-performance-0946/review/control-cases-v1/overwrite-output/same-output.json"
+        ],
+        "cwd": "/home/zhuhe/litchi-performance-0946/review/control-cases-v1/overwrite-output",
+        "output": "/home/zhuhe/litchi-performance-0946/review/control-cases-v1/overwrite-output/same-output.json",
+        "output_exists": true,
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "0946 bounded attribution passed: /home/zhuhe/litchi-performance-0946/review/control-cases-v1/overwrite-output/same-output.json (4 captures)\n"
+      },
+      "second": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "/home/zhuhe/litchi-performance-0946/review/control-cases-v1/overwrite-output/tools/reduce.py",
+          "--output",
+          "/home/zhuhe/litchi-performance-0946/review/control-cases-v1/overwrite-output/same-output.json"
+        ],
+        "cwd": "/home/zhuhe/litchi-performance-0946/review/control-cases-v1/overwrite-output",
+        "output": "/home/zhuhe/litchi-performance-0946/review/control-cases-v1/overwrite-output/same-output.json",
+        "output_exists": true,
+        "returncode": 2,
+        "stderr": "reduce.py: error: refusing to overwrite output: /home/zhuhe/litchi-performance-0946/review/control-cases-v1/overwrite-output/same-output.json\n",
+        "stdout": ""
+      }
+    },
+    "path_traversal": {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/litchi-performance-0946/review/control-cases-v1/path-traversal/tools/reduce.py",
+        "--output",
+        "/home/zhuhe/litchi-performance-0946/review/control-cases-v1/path-traversal/negative-output.json"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0946/review/control-cases-v1/path-traversal",
+      "output": "/home/zhuhe/litchi-performance-0946/review/control-cases-v1/path-traversal/negative-output.json",
+      "output_exists": false,
+      "returncode": 2,
+      "stderr": "reduce.py: error: packet path is not a strict relative path: '../outside.out'\n",
+      "stdout": ""
+    },
+    "symlink_input": {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/litchi-performance-0946/review/control-cases-v1/symlink-input/tools/reduce.py",
+        "--output",
+        "/home/zhuhe/litchi-performance-0946/review/control-cases-v1/symlink-input/negative-output.json"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0946/review/control-cases-v1/symlink-input",
+      "output": "/home/zhuhe/litchi-performance-0946/review/control-cases-v1/symlink-input/negative-output.json",
+      "output_exists": false,
+      "returncode": 2,
+      "stderr": "reduce.py: error: packet path contains symlink: 'inputs/callgrind/link.out.6'\n",
+      "stdout": ""
+    }
+  },
+  "positive": {
+    "moved": {
+      "author_output_match": null,
+      "capture_count": 4,
+      "helper_sha256": "9fb08db7c5ece8f3c466829651c727b8599a26cca8ae1fcff4a36ac3d7fda6de",
+      "output_bytes": 353314,
+      "output_sha256": "e0ca6ecd41879a1bdfcb0530d76dfae8a92cfe7b87365e91cf7e5ea64dd27a4b",
+      "plan_sha256": "9c9700f1798369244bee67b074410c92abfbeb31cfcd163ba52fac94d372dfc9",
+      "source_ids": {
+        "focused_source_hashes_sha256": "b1c6a16c0d9ff10c00bd2d1a59f869734d22c366e07dfd6c629788906cc7a3a2",
+        "source_binding_keys": [
+          "audit_namespaces_rs",
+          "audit_rs",
+          "audit_wellformed_rs",
+          "current_checkout_audit_namespaces_rs",
+          "current_checkout_audit_rs",
+          "current_checkout_audit_wellformed_rs",
+          "quick_xml_reader_mod_rs",
+          "quick_xml_reader_state_rs"
+        ]
+      },
+      "target_count": 12
+    },
+    "original": {
+      "author_output_match": {
+        "byte_equal": true,
+        "path": "/home/zhuhe/litchi-performance-0946/attribution-summary-v2.json",
+        "sha256": "e0ca6ecd41879a1bdfcb0530d76dfae8a92cfe7b87365e91cf7e5ea64dd27a4b"
+      },
+      "capture_count": 4,
+      "helper_sha256": "9fb08db7c5ece8f3c466829651c727b8599a26cca8ae1fcff4a36ac3d7fda6de",
+      "output_bytes": 353314,
+      "output_sha256": "e0ca6ecd41879a1bdfcb0530d76dfae8a92cfe7b87365e91cf7e5ea64dd27a4b",
+      "plan_sha256": "9c9700f1798369244bee67b074410c92abfbeb31cfcd163ba52fac94d372dfc9",
+      "source_ids": {
+        "focused_source_hashes_sha256": "b1c6a16c0d9ff10c00bd2d1a59f869734d22c366e07dfd6c629788906cc7a3a2",
+        "source_binding_keys": [
+          "audit_namespaces_rs",
+          "audit_rs",
+          "audit_wellformed_rs",
+          "current_checkout_audit_namespaces_rs",
+          "current_checkout_audit_rs",
+          "current_checkout_audit_wellformed_rs",
+          "quick_xml_reader_mod_rs",
+          "quick_xml_reader_state_rs"
+        ]
+      },
+      "target_count": 12
+    }
+  },
+  "retained_history": {
+    "draft_output_v1_preserved": true,
+    "draft_output_v1_sha256": "fbb1cf5308e9ce98acd77eb594790c01dda774fda33bb3357cbb3a2248c460e5",
+    "raw_json_replay": "not performed; this review binds the retained part-6 Callgrind descriptors and prior bounded totals, per final scope"
+  },
+  "schema": "litchi.xlsx-publication-attribution-0946.independent-controls.v1",
+  "scope": "Offline validation of the frozen reducer and copied retained Callgrind inputs; no workload, build, or profiler was run.",
+  "status": "pass"
+}

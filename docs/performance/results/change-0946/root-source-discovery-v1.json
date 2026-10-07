@@ -1,0 +1,69 @@
+{
+  "schema": "litchi.performance.0946.root-source-discovery.v1",
+  "utc": "2026-10-07T03:16:02.993487+00:00",
+  "current_commit": "deccd87f3efdfd88ea5474550406ed65e7e5670c",
+  "unchanged_audit_sources": [
+    {
+      "relative_path": "crates/xml-minifier/src/audit.rs",
+      "current": {
+        "path": "/home/zhuhe/code/litchi/crates/xml-minifier/src/audit.rs",
+        "bytes": 126817,
+        "sha256": "eddc437156c976c55ce36b0bf8f0ef47cc4943d296735a1ac8d6ef120b8754e7"
+      },
+      "profile_source": {
+        "path": "/home/zhuhe/litchi-performance-0944/source-build/crates/xml-minifier/src/audit.rs",
+        "bytes": 126817,
+        "sha256": "eddc437156c976c55ce36b0bf8f0ef47cc4943d296735a1ac8d6ef120b8754e7"
+      },
+      "byte_identical": true
+    },
+    {
+      "relative_path": "crates/xml-minifier/src/audit/wellformed.rs",
+      "current": {
+        "path": "/home/zhuhe/code/litchi/crates/xml-minifier/src/audit/wellformed.rs",
+        "bytes": 29072,
+        "sha256": "ed354a0272284b26300346f7cfde5c7190fcfa3c30a7efb349b18a1e3a32f7be"
+      },
+      "profile_source": {
+        "path": "/home/zhuhe/litchi-performance-0944/source-build/crates/xml-minifier/src/audit/wellformed.rs",
+        "bytes": 29072,
+        "sha256": "ed354a0272284b26300346f7cfde5c7190fcfa3c30a7efb349b18a1e3a32f7be"
+      },
+      "byte_identical": true
+    },
+    {
+      "relative_path": "crates/xml-minifier/src/audit/namespaces.rs",
+      "current": {
+        "path": "/home/zhuhe/code/litchi/crates/xml-minifier/src/audit/namespaces.rs",
+        "bytes": 31260,
+        "sha256": "688027bc2d9652395c7385087995cc52084d6d7ff8a57c6a16bee0f582b83296"
+      },
+      "profile_source": {
+        "path": "/home/zhuhe/litchi-performance-0944/source-build/crates/xml-minifier/src/audit/namespaces.rs",
+        "bytes": 31260,
+        "sha256": "688027bc2d9652395c7385087995cc52084d6d7ff8a57c6a16bee0f582b83296"
+      },
+      "byte_identical": true
+    }
+  ],
+  "quick_xml_package": {
+    "path": "/home/zhuhe/.cargo/registry/cache/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0.crate",
+    "bytes": 231661,
+    "sha256": "e660451e55124f798a69a5af3f49ccfbefbd41910eefd25caf2393e1f3473ec1"
+  },
+  "quick_xml_lock_checksum_verified": true,
+  "quick_xml_sources": [
+    {
+      "path": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/state.rs",
+      "bytes": 17047,
+      "sha256": "74942da1414ad772fd8edff43a6ada6863c4d4aa0b9ba69740025c9db82f6072"
+    },
+    {
+      "path": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs",
+      "bytes": 94936,
+      "sha256": "6d0162e7d841d6156d0b452351078399b929c435346bcfcd6493138c04ba9399"
+    }
+  ],
+  "scope": "Source interpretation only; retained0944 instruction profiles predate0945 payload sharing. No current native timing claim.",
+  "no_build_or_workload": true
+}

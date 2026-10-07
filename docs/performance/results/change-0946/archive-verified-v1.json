@@ -1,0 +1,59 @@
+{
+  "archive": {
+    "bytes": 402597,
+    "path": "/home/zhuhe/litchi-performance-0946-archive/litchi-performance-0946-v1.tar.gz",
+    "sha256": "447b116dabb7576e25a452a3d33059c01dbfe34af9ba6a05ba190a65203f3b9b"
+  },
+  "archive_command": [
+    "/usr/bin/tar",
+    "--create",
+    "--gzip",
+    "--format=posix",
+    "--numeric-owner",
+    "--owner=0",
+    "--group=0",
+    "--mtime=@0",
+    "--pax-option=delete=atime,delete=ctime",
+    "--no-recursion",
+    "--null",
+    "--verbatim-files-from",
+    "--directory",
+    "/home/zhuhe",
+    "--files-from",
+    "/home/zhuhe/litchi-performance-0946-archive/members-v1.list",
+    "--file",
+    "/home/zhuhe/litchi-performance-0946-archive/litchi-performance-0946-v1.tar.gz"
+  ],
+  "exact_extracted_file_set_and_hashes": true,
+  "extract_command": [
+    "/usr/bin/tar",
+    "--extract",
+    "--gzip",
+    "--file",
+    "/home/zhuhe/litchi-performance-0946-archive/litchi-performance-0946-v1.tar.gz",
+    "--directory",
+    "/home/zhuhe/litchi-performance-0946-archive/verified-extraction",
+    "--no-same-owner"
+  ],
+  "extraction": "/home/zhuhe/litchi-performance-0946-archive/verified-extraction",
+  "files": 33,
+  "inventory": {
+    "bytes": 5566,
+    "path": "/home/zhuhe/litchi-performance-0946-archive/inventory-v1.json",
+    "sha256": "7505dc7467db03976722c3ef2da695e7f4c2c160948346af636d36c8e2c18acb"
+  },
+  "packet": "/home/zhuhe/litchi-performance-0946",
+  "regeneration": [
+    "python3",
+    "-B",
+    "/home/zhuhe/litchi-performance-0946-archive/archive_packet.py",
+    "--packet",
+    "/home/zhuhe/litchi-performance-0946",
+    "--destination",
+    "FRESH_EXTERNAL_DIRECTORY"
+  ],
+  "schema": "litchi.performance.0946.archive.v1",
+  "script_sha256": "a8acf37baa8ba79ff30c083ff3fddbe545e9cda8677c3704f359258b42376c65",
+  "status": "pass",
+  "uncompressed_bytes": 2906838
+}

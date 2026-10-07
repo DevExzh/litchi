@@ -1,0 +1,499 @@
+{
+  "reason": "Remove owned disposable replay and negative-control trees after retaining results. Archive initially refused intentional negative-control symlink; no archive had been written.",
+  "removed_roots": [
+    "control-cases-v1",
+    "original-input-copy",
+    "moved-input-copy"
+  ],
+  "members": [
+    {
+      "path": "control-cases-v1/descriptor-corruption/inputs/callgrind/00-medium-r0.out.6",
+      "bytes": 225590,
+      "sha256": "edd5b4e8f10feaf254af83d2d710533526d3c3ddfdfd92dbb4574f209be6a23a"
+    },
+    {
+      "path": "control-cases-v1/descriptor-corruption/inputs/callgrind/01-dense-sparse-r0.out.6",
+      "bytes": 230034,
+      "sha256": "ed09be8ac4eed0e46f91aeae550dc067bf569ab1bccc30b281f8c913e561e43e"
+    },
+    {
+      "path": "control-cases-v1/descriptor-corruption/inputs/callgrind/02-dense-sparse-r1.out.6",
+      "bytes": 230635,
+      "sha256": "44bb161e068d431bb99b2e7a414ce1ab1b2d1963fdd19452b4b842a27fe7480d"
+    },
+    {
+      "path": "control-cases-v1/descriptor-corruption/inputs/callgrind/03-medium-r1.out.6",
+      "bytes": 225453,
+      "sha256": "eb01296abeab491bb0f54da047a190230dbbe7ed1d0241152c8ae4c26182f622"
+    },
+    {
+      "path": "control-cases-v1/descriptor-corruption/inputs/focused-source-hashes.json",
+      "bytes": 1511,
+      "sha256": "b1c6a16c0d9ff10c00bd2d1a59f869734d22c366e07dfd6c629788906cc7a3a2"
+    },
+    {
+      "path": "control-cases-v1/descriptor-corruption/inputs/plan.json",
+      "bytes": 20217,
+      "sha256": "bccc817e1ac7c8c2d3b6c0e1eb061b3deae380d67c68c95c5e266e6646e0f9da"
+    },
+    {
+      "path": "control-cases-v1/descriptor-corruption/inputs/reader_v2.py",
+      "bytes": 63017,
+      "sha256": "e15eda1de0a4e8afbf2941e048526febce27e126e4c1e2ce928c723e0c989b67"
+    },
+    {
+      "path": "control-cases-v1/descriptor-corruption/inputs/root-reduction-v1.json",
+      "bytes": 52227,
+      "sha256": "7156b72d6b36e310d13f0365a154de9a1fa16bd413f4db27f32fd523f2f3ddea"
+    },
+    {
+      "path": "control-cases-v1/descriptor-corruption/inputs/source-build-manifest.sha256",
+      "bytes": 93,
+      "sha256": "4d5431884d86f472d749d7a3a63720feaafa6cf61d4adf4f3459ad55094fc653"
+    },
+    {
+      "path": "control-cases-v1/descriptor-corruption/inputs/source-manifest.sha256",
+      "bytes": 87,
+      "sha256": "f7ffc1aa2d4627f7cd925a75c3708ea73bb7487d825f42f89e74ef88df9d81d1"
+    },
+    {
+      "path": "control-cases-v1/descriptor-corruption/plan-v2.json",
+      "bytes": 8463,
+      "sha256": "9c9700f1798369244bee67b074410c92abfbeb31cfcd163ba52fac94d372dfc9"
+    },
+    {
+      "path": "control-cases-v1/descriptor-corruption/tools/reduce.py",
+      "bytes": 17273,
+      "sha256": "9fb08db7c5ece8f3c466829651c727b8599a26cca8ae1fcff4a36ac3d7fda6de"
+    },
+    {
+      "path": "control-cases-v1/duplicate-index/inputs/callgrind/00-medium-r0.out.6",
+      "bytes": 225590,
+      "sha256": "edd5b4e8f10feaf254af83d2d710533526d3c3ddfdfd92dbb4574f209be6a23a"
+    },
+    {
+      "path": "control-cases-v1/duplicate-index/inputs/callgrind/01-dense-sparse-r0.out.6",
+      "bytes": 230034,
+      "sha256": "ed09be8ac4eed0e46f91aeae550dc067bf569ab1bccc30b281f8c913e561e43e"
+    },
+    {
+      "path": "control-cases-v1/duplicate-index/inputs/callgrind/02-dense-sparse-r1.out.6",
+      "bytes": 230635,
+      "sha256": "44bb161e068d431bb99b2e7a414ce1ab1b2d1963fdd19452b4b842a27fe7480d"
+    },
+    {
+      "path": "control-cases-v1/duplicate-index/inputs/callgrind/03-medium-r1.out.6",
+      "bytes": 225453,
+      "sha256": "eb01296abeab491bb0f54da047a190230dbbe7ed1d0241152c8ae4c26182f622"
+    },
+    {
+      "path": "control-cases-v1/duplicate-index/inputs/focused-source-hashes.json",
+      "bytes": 1511,
+      "sha256": "b1c6a16c0d9ff10c00bd2d1a59f869734d22c366e07dfd6c629788906cc7a3a2"
+    },
+    {
+      "path": "control-cases-v1/duplicate-index/inputs/plan.json",
+      "bytes": 20217,
+      "sha256": "bccc817e1ac7c8c2d3b6c0e1eb061b3deae380d67c68c95c5e266e6646e0f9da"
+    },
+    {
+      "path": "control-cases-v1/duplicate-index/inputs/reader_v2.py",
+      "bytes": 63017,
+      "sha256": "8a2f2fd71d7f0e67643793d9673805aacd0142be666928f4abb5e12cf57a2203"
+    },
+    {
+      "path": "control-cases-v1/duplicate-index/inputs/root-reduction-v1.json",
+      "bytes": 52227,
+      "sha256": "7156b72d6b36e310d13f0365a154de9a1fa16bd413f4db27f32fd523f2f3ddea"
+    },
+    {
+      "path": "control-cases-v1/duplicate-index/inputs/source-build-manifest.sha256",
+      "bytes": 93,
+      "sha256": "4d5431884d86f472d749d7a3a63720feaafa6cf61d4adf4f3459ad55094fc653"
+    },
+    {
+      "path": "control-cases-v1/duplicate-index/inputs/source-manifest.sha256",
+      "bytes": 87,
+      "sha256": "f7ffc1aa2d4627f7cd925a75c3708ea73bb7487d825f42f89e74ef88df9d81d1"
+    },
+    {
+      "path": "control-cases-v1/duplicate-index/plan-v2.json",
+      "bytes": 8463,
+      "sha256": "1eb6e306bf91ee5464f61ad6d2d27c2d623279e63a281d96e8af661a69a5684e"
+    },
+    {
+      "path": "control-cases-v1/duplicate-index/tools/reduce.py",
+      "bytes": 17273,
+      "sha256": "9fb08db7c5ece8f3c466829651c727b8599a26cca8ae1fcff4a36ac3d7fda6de"
+    },
+    {
+      "path": "control-cases-v1/hash-mismatch/inputs/callgrind/00-medium-r0.out.6",
+      "bytes": 225591,
+      "sha256": "2e2c73a54b82e0c61011cc4a30e913a4e793e4c0c76a6f4d98dd3c27186d766c"
+    },
+    {
+      "path": "control-cases-v1/hash-mismatch/inputs/callgrind/01-dense-sparse-r0.out.6",
+      "bytes": 230034,
+      "sha256": "ed09be8ac4eed0e46f91aeae550dc067bf569ab1bccc30b281f8c913e561e43e"
+    },
+    {
+      "path": "control-cases-v1/hash-mismatch/inputs/callgrind/02-dense-sparse-r1.out.6",
+      "bytes": 230635,
+      "sha256": "44bb161e068d431bb99b2e7a414ce1ab1b2d1963fdd19452b4b842a27fe7480d"
+    },
+    {
+      "path": "control-cases-v1/hash-mismatch/inputs/callgrind/03-medium-r1.out.6",
+      "bytes": 225453,
+      "sha256": "eb01296abeab491bb0f54da047a190230dbbe7ed1d0241152c8ae4c26182f622"
+    },
+    {
+      "path": "control-cases-v1/hash-mismatch/inputs/focused-source-hashes.json",
+      "bytes": 1511,
+      "sha256": "b1c6a16c0d9ff10c00bd2d1a59f869734d22c366e07dfd6c629788906cc7a3a2"
+    },
+    {
+      "path": "control-cases-v1/hash-mismatch/inputs/plan.json",
+      "bytes": 20217,
+      "sha256": "bccc817e1ac7c8c2d3b6c0e1eb061b3deae380d67c68c95c5e266e6646e0f9da"
+    },
+    {
+      "path": "control-cases-v1/hash-mismatch/inputs/reader_v2.py",
+      "bytes": 63017,
+      "sha256": "8a2f2fd71d7f0e67643793d9673805aacd0142be666928f4abb5e12cf57a2203"
+    },
+    {
+      "path": "control-cases-v1/hash-mismatch/inputs/root-reduction-v1.json",
+      "bytes": 52227,
+      "sha256": "7156b72d6b36e310d13f0365a154de9a1fa16bd413f4db27f32fd523f2f3ddea"
+    },
+    {
+      "path": "control-cases-v1/hash-mismatch/inputs/source-build-manifest.sha256",
+      "bytes": 93,
+      "sha256": "4d5431884d86f472d749d7a3a63720feaafa6cf61d4adf4f3459ad55094fc653"
+    },
+    {
+      "path": "control-cases-v1/hash-mismatch/inputs/source-manifest.sha256",
+      "bytes": 87,
+      "sha256": "f7ffc1aa2d4627f7cd925a75c3708ea73bb7487d825f42f89e74ef88df9d81d1"
+    },
+    {
+      "path": "control-cases-v1/hash-mismatch/plan-v2.json",
+      "bytes": 8463,
+      "sha256": "9c9700f1798369244bee67b074410c92abfbeb31cfcd163ba52fac94d372dfc9"
+    },
+    {
+      "path": "control-cases-v1/hash-mismatch/tools/reduce.py",
+      "bytes": 17273,
+      "sha256": "9fb08db7c5ece8f3c466829651c727b8599a26cca8ae1fcff4a36ac3d7fda6de"
+    },
+    {
+      "path": "control-cases-v1/overwrite-output/inputs/callgrind/00-medium-r0.out.6",
+      "bytes": 225590,
+      "sha256": "edd5b4e8f10feaf254af83d2d710533526d3c3ddfdfd92dbb4574f209be6a23a"
+    },
+    {
+      "path": "control-cases-v1/overwrite-output/inputs/callgrind/01-dense-sparse-r0.out.6",
+      "bytes": 230034,
+      "sha256": "ed09be8ac4eed0e46f91aeae550dc067bf569ab1bccc30b281f8c913e561e43e"
+    },
+    {
+      "path": "control-cases-v1/overwrite-output/inputs/callgrind/02-dense-sparse-r1.out.6",
+      "bytes": 230635,
+      "sha256": "44bb161e068d431bb99b2e7a414ce1ab1b2d1963fdd19452b4b842a27fe7480d"
+    },
+    {
+      "path": "control-cases-v1/overwrite-output/inputs/callgrind/03-medium-r1.out.6",
+      "bytes": 225453,
+      "sha256": "eb01296abeab491bb0f54da047a190230dbbe7ed1d0241152c8ae4c26182f622"
+    },
+    {
+      "path": "control-cases-v1/overwrite-output/inputs/focused-source-hashes.json",
+      "bytes": 1511,
+      "sha256": "b1c6a16c0d9ff10c00bd2d1a59f869734d22c366e07dfd6c629788906cc7a3a2"
+    },
+    {
+      "path": "control-cases-v1/overwrite-output/inputs/plan.json",
+      "bytes": 20217,
+      "sha256": "bccc817e1ac7c8c2d3b6c0e1eb061b3deae380d67c68c95c5e266e6646e0f9da"
+    },
+    {
+      "path": "control-cases-v1/overwrite-output/inputs/reader_v2.py",
+      "bytes": 63017,
+      "sha256": "8a2f2fd71d7f0e67643793d9673805aacd0142be666928f4abb5e12cf57a2203"
+    },
+    {
+      "path": "control-cases-v1/overwrite-output/inputs/root-reduction-v1.json",
+      "bytes": 52227,
+      "sha256": "7156b72d6b36e310d13f0365a154de9a1fa16bd413f4db27f32fd523f2f3ddea"
+    },
+    {
+      "path": "control-cases-v1/overwrite-output/inputs/source-build-manifest.sha256",
+      "bytes": 93,
+      "sha256": "4d5431884d86f472d749d7a3a63720feaafa6cf61d4adf4f3459ad55094fc653"
+    },
+    {
+      "path": "control-cases-v1/overwrite-output/inputs/source-manifest.sha256",
+      "bytes": 87,
+      "sha256": "f7ffc1aa2d4627f7cd925a75c3708ea73bb7487d825f42f89e74ef88df9d81d1"
+    },
+    {
+      "path": "control-cases-v1/overwrite-output/plan-v2.json",
+      "bytes": 8463,
+      "sha256": "9c9700f1798369244bee67b074410c92abfbeb31cfcd163ba52fac94d372dfc9"
+    },
+    {
+      "path": "control-cases-v1/overwrite-output/same-output.json",
+      "bytes": 353314,
+      "sha256": "e0ca6ecd41879a1bdfcb0530d76dfae8a92cfe7b87365e91cf7e5ea64dd27a4b"
+    },
+    {
+      "path": "control-cases-v1/overwrite-output/tools/reduce.py",
+      "bytes": 17273,
+      "sha256": "9fb08db7c5ece8f3c466829651c727b8599a26cca8ae1fcff4a36ac3d7fda6de"
+    },
+    {
+      "path": "control-cases-v1/path-traversal/inputs/callgrind/00-medium-r0.out.6",
+      "bytes": 225590,
+      "sha256": "edd5b4e8f10feaf254af83d2d710533526d3c3ddfdfd92dbb4574f209be6a23a"
+    },
+    {
+      "path": "control-cases-v1/path-traversal/inputs/callgrind/01-dense-sparse-r0.out.6",
+      "bytes": 230034,
+      "sha256": "ed09be8ac4eed0e46f91aeae550dc067bf569ab1bccc30b281f8c913e561e43e"
+    },
+    {
+      "path": "control-cases-v1/path-traversal/inputs/callgrind/02-dense-sparse-r1.out.6",
+      "bytes": 230635,
+      "sha256": "44bb161e068d431bb99b2e7a414ce1ab1b2d1963fdd19452b4b842a27fe7480d"
+    },
+    {
+      "path": "control-cases-v1/path-traversal/inputs/callgrind/03-medium-r1.out.6",
+      "bytes": 225453,
+      "sha256": "eb01296abeab491bb0f54da047a190230dbbe7ed1d0241152c8ae4c26182f622"
+    },
+    {
+      "path": "control-cases-v1/path-traversal/inputs/focused-source-hashes.json",
+      "bytes": 1511,
+      "sha256": "b1c6a16c0d9ff10c00bd2d1a59f869734d22c366e07dfd6c629788906cc7a3a2"
+    },
+    {
+      "path": "control-cases-v1/path-traversal/inputs/plan.json",
+      "bytes": 20217,
+      "sha256": "bccc817e1ac7c8c2d3b6c0e1eb061b3deae380d67c68c95c5e266e6646e0f9da"
+    },
+    {
+      "path": "control-cases-v1/path-traversal/inputs/reader_v2.py",
+      "bytes": 63017,
+      "sha256": "8a2f2fd71d7f0e67643793d9673805aacd0142be666928f4abb5e12cf57a2203"
+    },
+    {
+      "path": "control-cases-v1/path-traversal/inputs/root-reduction-v1.json",
+      "bytes": 52227,
+      "sha256": "7156b72d6b36e310d13f0365a154de9a1fa16bd413f4db27f32fd523f2f3ddea"
+    },
+    {
+      "path": "control-cases-v1/path-traversal/inputs/source-build-manifest.sha256",
+      "bytes": 93,
+      "sha256": "4d5431884d86f472d749d7a3a63720feaafa6cf61d4adf4f3459ad55094fc653"
+    },
+    {
+      "path": "control-cases-v1/path-traversal/inputs/source-manifest.sha256",
+      "bytes": 87,
+      "sha256": "f7ffc1aa2d4627f7cd925a75c3708ea73bb7487d825f42f89e74ef88df9d81d1"
+    },
+    {
+      "path": "control-cases-v1/path-traversal/plan-v2.json",
+      "bytes": 8442,
+      "sha256": "aaab8042211bfe79ed653c1f1a104262a58683da3b1c8bcbeee12b6b013e2846"
+    },
+    {
+      "path": "control-cases-v1/path-traversal/tools/reduce.py",
+      "bytes": 17273,
+      "sha256": "9fb08db7c5ece8f3c466829651c727b8599a26cca8ae1fcff4a36ac3d7fda6de"
+    },
+    {
+      "path": "control-cases-v1/symlink-input/inputs/callgrind/00-medium-r0.out.6",
+      "bytes": 225590,
+      "sha256": "edd5b4e8f10feaf254af83d2d710533526d3c3ddfdfd92dbb4574f209be6a23a"
+    },
+    {
+      "path": "control-cases-v1/symlink-input/inputs/callgrind/01-dense-sparse-r0.out.6",
+      "bytes": 230034,
+      "sha256": "ed09be8ac4eed0e46f91aeae550dc067bf569ab1bccc30b281f8c913e561e43e"
+    },
+    {
+      "path": "control-cases-v1/symlink-input/inputs/callgrind/02-dense-sparse-r1.out.6",
+      "bytes": 230635,
+      "sha256": "44bb161e068d431bb99b2e7a414ce1ab1b2d1963fdd19452b4b842a27fe7480d"
+    },
+    {
+      "path": "control-cases-v1/symlink-input/inputs/callgrind/03-medium-r1.out.6",
+      "bytes": 225453,
+      "sha256": "eb01296abeab491bb0f54da047a190230dbbe7ed1d0241152c8ae4c26182f622"
+    },
+    {
+      "path": "control-cases-v1/symlink-input/inputs/callgrind/link.out.6",
+      "symlink": "00-medium-r0.out.6"
+    },
+    {
+      "path": "control-cases-v1/symlink-input/inputs/focused-source-hashes.json",
+      "bytes": 1511,
+      "sha256": "b1c6a16c0d9ff10c00bd2d1a59f869734d22c366e07dfd6c629788906cc7a3a2"
+    },
+    {
+      "path": "control-cases-v1/symlink-input/inputs/plan.json",
+      "bytes": 20217,
+      "sha256": "bccc817e1ac7c8c2d3b6c0e1eb061b3deae380d67c68c95c5e266e6646e0f9da"
+    },
+    {
+      "path": "control-cases-v1/symlink-input/inputs/reader_v2.py",
+      "bytes": 63017,
+      "sha256": "8a2f2fd71d7f0e67643793d9673805aacd0142be666928f4abb5e12cf57a2203"
+    },
+    {
+      "path": "control-cases-v1/symlink-input/inputs/root-reduction-v1.json",
+      "bytes": 52227,
+      "sha256": "7156b72d6b36e310d13f0365a154de9a1fa16bd413f4db27f32fd523f2f3ddea"
+    },
+    {
+      "path": "control-cases-v1/symlink-input/inputs/source-build-manifest.sha256",
+      "bytes": 93,
+      "sha256": "4d5431884d86f472d749d7a3a63720feaafa6cf61d4adf4f3459ad55094fc653"
+    },
+    {
+      "path": "control-cases-v1/symlink-input/inputs/source-manifest.sha256",
+      "bytes": 87,
+      "sha256": "f7ffc1aa2d4627f7cd925a75c3708ea73bb7487d825f42f89e74ef88df9d81d1"
+    },
+    {
+      "path": "control-cases-v1/symlink-input/plan-v2.json",
+      "bytes": 8455,
+      "sha256": "f8e2fd48c232cb0f3401404ffd9331942b1050c6a46562ef022386c91b405711"
+    },
+    {
+      "path": "control-cases-v1/symlink-input/tools/reduce.py",
+      "bytes": 17273,
+      "sha256": "9fb08db7c5ece8f3c466829651c727b8599a26cca8ae1fcff4a36ac3d7fda6de"
+    },
+    {
+      "path": "original-input-copy/inputs/callgrind/00-medium-r0.out.6",
+      "bytes": 225590,
+      "sha256": "edd5b4e8f10feaf254af83d2d710533526d3c3ddfdfd92dbb4574f209be6a23a"
+    },
+    {
+      "path": "original-input-copy/inputs/callgrind/01-dense-sparse-r0.out.6",
+      "bytes": 230034,
+      "sha256": "ed09be8ac4eed0e46f91aeae550dc067bf569ab1bccc30b281f8c913e561e43e"
+    },
+    {
+      "path": "original-input-copy/inputs/callgrind/02-dense-sparse-r1.out.6",
+      "bytes": 230635,
+      "sha256": "44bb161e068d431bb99b2e7a414ce1ab1b2d1963fdd19452b4b842a27fe7480d"
+    },
+    {
+      "path": "original-input-copy/inputs/callgrind/03-medium-r1.out.6",
+      "bytes": 225453,
+      "sha256": "eb01296abeab491bb0f54da047a190230dbbe7ed1d0241152c8ae4c26182f622"
+    },
+    {
+      "path": "original-input-copy/inputs/focused-source-hashes.json",
+      "bytes": 1511,
+      "sha256": "b1c6a16c0d9ff10c00bd2d1a59f869734d22c366e07dfd6c629788906cc7a3a2"
+    },
+    {
+      "path": "original-input-copy/inputs/plan.json",
+      "bytes": 20217,
+      "sha256": "bccc817e1ac7c8c2d3b6c0e1eb061b3deae380d67c68c95c5e266e6646e0f9da"
+    },
+    {
+      "path": "original-input-copy/inputs/reader_v2.py",
+      "bytes": 63017,
+      "sha256": "8a2f2fd71d7f0e67643793d9673805aacd0142be666928f4abb5e12cf57a2203"
+    },
+    {
+      "path": "original-input-copy/inputs/root-reduction-v1.json",
+      "bytes": 52227,
+      "sha256": "7156b72d6b36e310d13f0365a154de9a1fa16bd413f4db27f32fd523f2f3ddea"
+    },
+    {
+      "path": "original-input-copy/inputs/source-build-manifest.sha256",
+      "bytes": 93,
+      "sha256": "4d5431884d86f472d749d7a3a63720feaafa6cf61d4adf4f3459ad55094fc653"
+    },
+    {
+      "path": "original-input-copy/inputs/source-manifest.sha256",
+      "bytes": 87,
+      "sha256": "f7ffc1aa2d4627f7cd925a75c3708ea73bb7487d825f42f89e74ef88df9d81d1"
+    },
+    {
+      "path": "original-input-copy/plan-v2.json",
+      "bytes": 8463,
+      "sha256": "9c9700f1798369244bee67b074410c92abfbeb31cfcd163ba52fac94d372dfc9"
+    },
+    {
+      "path": "original-input-copy/tools/reduce.py",
+      "bytes": 17273,
+      "sha256": "9fb08db7c5ece8f3c466829651c727b8599a26cca8ae1fcff4a36ac3d7fda6de"
+    },
+    {
+      "path": "moved-input-copy/inputs/callgrind/00-medium-r0.out.6",
+      "bytes": 225590,
+      "sha256": "edd5b4e8f10feaf254af83d2d710533526d3c3ddfdfd92dbb4574f209be6a23a"
+    },
+    {
+      "path": "moved-input-copy/inputs/callgrind/01-dense-sparse-r0.out.6",
+      "bytes": 230034,
+      "sha256": "ed09be8ac4eed0e46f91aeae550dc067bf569ab1bccc30b281f8c913e561e43e"
+    },
+    {
+      "path": "moved-input-copy/inputs/callgrind/02-dense-sparse-r1.out.6",
+      "bytes": 230635,
+      "sha256": "44bb161e068d431bb99b2e7a414ce1ab1b2d1963fdd19452b4b842a27fe7480d"
+    },
+    {
+      "path": "moved-input-copy/inputs/callgrind/03-medium-r1.out.6",
+      "bytes": 225453,
+      "sha256": "eb01296abeab491bb0f54da047a190230dbbe7ed1d0241152c8ae4c26182f622"
+    },
+    {
+      "path": "moved-input-copy/inputs/focused-source-hashes.json",
+      "bytes": 1511,
+      "sha256": "b1c6a16c0d9ff10c00bd2d1a59f869734d22c366e07dfd6c629788906cc7a3a2"
+    },
+    {
+      "path": "moved-input-copy/inputs/plan.json",
+      "bytes": 20217,
+      "sha256": "bccc817e1ac7c8c2d3b6c0e1eb061b3deae380d67c68c95c5e266e6646e0f9da"
+    },
+    {
+      "path": "moved-input-copy/inputs/reader_v2.py",
+      "bytes": 63017,
+      "sha256": "8a2f2fd71d7f0e67643793d9673805aacd0142be666928f4abb5e12cf57a2203"
+    },
+    {
+      "path": "moved-input-copy/inputs/root-reduction-v1.json",
+      "bytes": 52227,
+      "sha256": "7156b72d6b36e310d13f0365a154de9a1fa16bd413f4db27f32fd523f2f3ddea"
+    },
+    {
+      "path": "moved-input-copy/inputs/source-build-manifest.sha256",
+      "bytes": 93,
+      "sha256": "4d5431884d86f472d749d7a3a63720feaafa6cf61d4adf4f3459ad55094fc653"
+    },
+    {
+      "path": "moved-input-copy/inputs/source-manifest.sha256",
+      "bytes": 87,
+      "sha256": "f7ffc1aa2d4627f7cd925a75c3708ea73bb7487d825f42f89e74ef88df9d81d1"
+    },
+    {
+      "path": "moved-input-copy/plan-v2.json",
+      "bytes": 8463,
+      "sha256": "9c9700f1798369244bee67b074410c92abfbeb31cfcd163ba52fac94d372dfc9"
+    },
+    {
+      "path": "moved-input-copy/tools/reduce.py",
+      "bytes": 17273,
+      "sha256": "9fb08db7c5ece8f3c466829651c727b8599a26cca8ae1fcff4a36ac3d7fda6de"
+    }
+  ]
+}

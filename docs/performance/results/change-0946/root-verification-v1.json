@@ -1,0 +1,16 @@
+{
+  "status": "pass",
+  "replay_command": [
+    "python3",
+    "-B",
+    "/home/zhuhe/litchi-performance-0946-archive/verified-extraction/litchi-performance-0946/tools/reduce.py",
+    "--output",
+    "/home/zhuhe/litchi-performance-0946-archive/extracted-replay-v1.json"
+  ],
+  "byte_identical_to_final_v2": true,
+  "bytes": 353314,
+  "sha256": "e0ca6ecd41879a1bdfcb0530d76dfae8a92cfe7b87365e91cf7e5ea64dd27a4b",
+  "archive_verification": "All 33 extracted regular files match exact inventory paths, sizes and SHA-256.",
+  "cleanup_removed": "/home/zhuhe/litchi-performance-0946-archive/verified-extraction",
+  "cleanup_scope": "Only owned archive verification extraction; external packet and archive retained."
+}

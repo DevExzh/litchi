@@ -1,0 +1,52 @@
+{
+  "final_replay": {
+    "checks": [
+      "input descriptors",
+      "duplicate JSON keys",
+      "strict packet-relative paths",
+      "exact four-row M,D,D,M schedule",
+      "raw bytes and SHA-256",
+      "all parsed exclusive self conservation",
+      "selected node self+direct=incoming conservation",
+      "exclusive output creation"
+    ],
+    "command": "python3 tools/reduce.py --output attribution-summary-v2.json",
+    "status": "pass"
+  },
+  "final_reproducer": {
+    "bytes": 17273,
+    "path": "tools/reduce.py",
+    "sha256": "9fb08db7c5ece8f3c466829651c727b8599a26cca8ae1fcff4a36ac3d7fda6de"
+  },
+  "history_limitations": [
+    "The draft helper recorded by attribution-summary-v1.json as SHA256 026e9acabe17db66939713c1bd5b0e927aa8b69b6e51a95d231fedb912fe63da was not retained in the shared packet and cannot be independently rehashed now.",
+    "A provisional plan-v2 draft recorded by the reviewer with SHA-256 prefix 2c6cc (full hash unavailable) was not retained; the final plan-v2 SHA above is the independently bound plan used by the final reducer.",
+    "The v1 output is retained for historical comparison and is not claimed reproducible by the final helper; v2 is the custody-fixed replay result."
+  ],
+  "plans": {
+    "plan-v1.json": {
+      "bytes": 7069,
+      "path": "plan-v1.json",
+      "sha256": "b8f56a54ba893fde0fbd82b2009b2710ad1b32aa363ea8df62f9d1496f02a01c"
+    },
+    "plan-v2.json": {
+      "bytes": 8463,
+      "path": "plan-v2.json",
+      "sha256": "9c9700f1798369244bee67b074410c92abfbeb31cfcd163ba52fac94d372dfc9"
+    }
+  },
+  "retained_outputs": {
+    "attribution-summary-v1.json": {
+      "bytes": 353314,
+      "path": "attribution-summary-v1.json",
+      "sha256": "fbb1cf5308e9ce98acd77eb594790c01dda774fda33bb3357cbb3a2248c460e5"
+    },
+    "attribution-summary-v2.json": {
+      "bytes": 353314,
+      "path": "attribution-summary-v2.json",
+      "sha256": "e0ca6ecd41879a1bdfcb0530d76dfae8a92cfe7b87365e91cf7e5ea64dd27a4b"
+    }
+  },
+  "schema": "litchi.xlsx-publication-attribution-0946.preparation-history.v1",
+  "scope": "Custody notes for the offline reducer packet; no workload, build, or archive was run."
+}

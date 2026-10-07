@@ -1,0 +1,214 @@
+{
+  "binary": {
+    "bytes": 265794648,
+    "executable": true,
+    "mode_bits": 509,
+    "path": "docs/performance/results/change-0944/binaries/profile-native",
+    "sha256": "63cbffd8c17299a4e2d1096e4ffa2a2d34a549cc452dfdf8ba5691b8ab7e75a3"
+  },
+  "captures": [
+    {
+      "bytes": 225590,
+      "folder": "00-medium",
+      "index": 0,
+      "input_path": "inputs/callgrind/00-medium-r0.out.6",
+      "repeat": 0,
+      "sha256": "edd5b4e8f10feaf254af83d2d710533526d3c3ddfdfd92dbb4574f209be6a23a",
+      "shape": "medium"
+    },
+    {
+      "bytes": 230034,
+      "folder": "01-dense-sparse",
+      "index": 1,
+      "input_path": "inputs/callgrind/01-dense-sparse-r0.out.6",
+      "repeat": 0,
+      "sha256": "ed09be8ac4eed0e46f91aeae550dc067bf569ab1bccc30b281f8c913e561e43e",
+      "shape": "dense-sparse"
+    },
+    {
+      "bytes": 230635,
+      "folder": "02-dense-sparse",
+      "index": 2,
+      "input_path": "inputs/callgrind/02-dense-sparse-r1.out.6",
+      "repeat": 1,
+      "sha256": "44bb161e068d431bb99b2e7a414ce1ab1b2d1963fdd19452b4b842a27fe7480d",
+      "shape": "dense-sparse"
+    },
+    {
+      "bytes": 225453,
+      "folder": "03-medium",
+      "index": 3,
+      "input_path": "inputs/callgrind/03-medium-r1.out.6",
+      "repeat": 1,
+      "sha256": "eb01296abeab491bb0f54da047a190230dbbe7ed1d0241152c8ae4c26182f622",
+      "shape": "medium"
+    }
+  ],
+  "inputs": {
+    "descriptors": {
+      "inputs/focused-source-hashes.json": {
+        "bytes": 1511,
+        "path": "inputs/focused-source-hashes.json",
+        "sha256": "b1c6a16c0d9ff10c00bd2d1a59f869734d22c366e07dfd6c629788906cc7a3a2"
+      },
+      "inputs/plan.json": {
+        "bytes": 20217,
+        "path": "inputs/plan.json",
+        "sha256": "bccc817e1ac7c8c2d3b6c0e1eb061b3deae380d67c68c95c5e266e6646e0f9da"
+      },
+      "inputs/reader_v2.py": {
+        "bytes": 63017,
+        "path": "inputs/reader_v2.py",
+        "sha256": "8a2f2fd71d7f0e67643793d9673805aacd0142be666928f4abb5e12cf57a2203"
+      },
+      "inputs/root-reduction-v1.json": {
+        "bytes": 52227,
+        "path": "inputs/root-reduction-v1.json",
+        "sha256": "7156b72d6b36e310d13f0365a154de9a1fa16bd413f4db27f32fd523f2f3ddea"
+      },
+      "inputs/source-build-manifest.sha256": {
+        "bytes": 93,
+        "path": "inputs/source-build-manifest.sha256",
+        "sha256": "4d5431884d86f472d749d7a3a63720feaafa6cf61d4adf4f3459ad55094fc653"
+      },
+      "inputs/source-manifest.sha256": {
+        "bytes": 87,
+        "path": "inputs/source-manifest.sha256",
+        "sha256": "f7ffc1aa2d4627f7cd925a75c3708ea73bb7487d825f42f89e74ef88df9d81d1"
+      }
+    },
+    "prior_plan": "inputs/plan.json",
+    "prior_reduction": "inputs/root-reduction-v1.json",
+    "retained_reader": "inputs/reader_v2.py",
+    "source_hashes": [
+      "inputs/source-build-manifest.sha256",
+      "inputs/source-manifest.sha256",
+      "inputs/focused-source-hashes.json"
+    ]
+  },
+  "plan_parent": {
+    "bytes": 7069,
+    "file": "plan-v1.json",
+    "sha256": "b8f56a54ba893fde0fbd82b2009b2710ad1b32aa363ea8df62f9d1496f02a01c"
+  },
+  "prior_capture_totals": [
+    {
+      "index": 0,
+      "measured_file": "docs/performance/results/change-0944/capture/00-medium/callgrind.out.6",
+      "nested_xml_ir": 49735942,
+      "other_publication_ir": 288508,
+      "preparation_ir": 50025084,
+      "publication_ir": 92990939,
+      "raw_json_sha256": "6de412ea46924d337311677e8167da256b7b1a8fc1978235b5749392b9ef3583",
+      "repeat": 0,
+      "shape": "medium",
+      "writer_ir": 42677347
+    },
+    {
+      "index": 1,
+      "measured_file": "docs/performance/results/change-0944/capture/01-dense-sparse/callgrind.out.6",
+      "nested_xml_ir": 95298865,
+      "other_publication_ir": 514988,
+      "preparation_ir": 95587073,
+      "publication_ir": 167532948,
+      "raw_json_sha256": "ed81fdf806589e9c8b31c1d3286fa8eb6d3bdbfd213ba1771de37d345ee1ac4b",
+      "repeat": 0,
+      "shape": "dense-sparse",
+      "writer_ir": 71430887
+    },
+    {
+      "index": 2,
+      "measured_file": "docs/performance/results/change-0944/capture/02-dense-sparse/callgrind.out.6",
+      "nested_xml_ir": 95298831,
+      "other_publication_ir": 514655,
+      "preparation_ir": 95587667,
+      "publication_ir": 167533924,
+      "raw_json_sha256": "4094bbdcbc82746a6ccf23cb306ae44a5e4fb24b3139a39016bf595b65b9ca5f",
+      "repeat": 1,
+      "shape": "dense-sparse",
+      "writer_ir": 71431602
+    },
+    {
+      "index": 3,
+      "measured_file": "docs/performance/results/change-0944/capture/03-medium/callgrind.out.6",
+      "nested_xml_ir": 49735426,
+      "other_publication_ir": 288278,
+      "preparation_ir": 50023578,
+      "publication_ir": 92989937,
+      "raw_json_sha256": "35f39851996542fbc5aabc140cc09d56d8c8ffa4823796bf16e20217a2aba944",
+      "repeat": 1,
+      "shape": "medium",
+      "writer_ir": 42678081
+    }
+  ],
+  "purpose": "Offline decomposition of retained 0944 Callgrind XML-audit child/self attribution.",
+  "schema": "litchi.xlsx-publication-attribution-0946.plan.v2",
+  "scope": {
+    "binary_generation": "0944 profile-native only; no current-native or 0945-sharing claim",
+    "call_count_policy": "call counts are retained as provenance only; no cost normalization by calls",
+    "measured_parent": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+    "nested_policy": "nested diagnostics overlap and are never summed as a partition",
+    "owner": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+    "publication_denominator": "selected measured owner incoming Ir / Callgrind summary Ir",
+    "topology_owner": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+  },
+  "source_bindings": {
+    "audit_namespaces_rs": {
+      "label": "0944 source-build/crates/xml-minifier/src/audit/namespaces.rs",
+      "sha256": "688027bc2d9652395c7385087995cc52084d6d7ff8a57c6a16bee0f582b83296"
+    },
+    "audit_rs": {
+      "label": "0944 source-build/crates/xml-minifier/src/audit.rs",
+      "sha256": "eddc437156c976c55ce36b0bf8f0ef47cc4943d296735a1ac8d6ef120b8754e7"
+    },
+    "audit_wellformed_rs": {
+      "label": "0944 source-build/crates/xml-minifier/src/audit/wellformed.rs",
+      "sha256": "ed354a0272284b26300346f7cfde5c7190fcfa3c30a7efb349b18a1e3a32f7be"
+    },
+    "current_checkout_audit_namespaces_rs": {
+      "label": "current checkout crates/xml-minifier/src/audit/namespaces.rs",
+      "sha256": "688027bc2d9652395c7385087995cc52084d6d7ff8a57c6a16bee0f582b83296"
+    },
+    "current_checkout_audit_rs": {
+      "label": "current checkout crates/xml-minifier/src/audit.rs",
+      "sha256": "eddc437156c976c55ce36b0bf8f0ef47cc4943d296735a1ac8d6ef120b8754e7"
+    },
+    "current_checkout_audit_wellformed_rs": {
+      "label": "current checkout crates/xml-minifier/src/audit/wellformed.rs",
+      "sha256": "ed354a0272284b26300346f7cfde5c7190fcfa3c30a7efb349b18a1e3a32f7be"
+    },
+    "quick_xml_reader_mod_rs": {
+      "label": "registry quick-xml-0.41.0/src/reader/mod.rs",
+      "sha256": "6d0162e7d841d6156d0b452351078399b929c435346bcfcd6493138c04ba9399"
+    },
+    "quick_xml_reader_state_rs": {
+      "label": "registry quick-xml-0.41.0/src/reader/state.rs",
+      "sha256": "74942da1414ad772fd8edff43a6ada6863c4d4aa0b9ba69740025c9db82f6072"
+    }
+  },
+  "status": "frozen",
+  "targets": [
+    "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+    "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream",
+    "litchi_opc::source_backed::validate_source_part_replacement_xml",
+    "xml_minifier::audit::verify_source_replacement",
+    "xml_minifier::audit::verify_with_policy",
+    "xml_minifier::audit::check_start",
+    "xml_minifier::audit::inspect_attributes",
+    "xml_minifier::audit::check_end",
+    "xml_minifier::audit::wellformed::scan_qname",
+    "quick_xml::reader::Reader<R>::read_event_impl",
+    "quick_xml::reader::state::ReaderState::emit_start",
+    "quick_xml::reader::state::ReaderState::emit_end"
+  ],
+  "validation": {
+    "four_capture_matrix": true,
+    "owner_incoming_equals_callgrind_summary": true,
+    "owner_summary_equals_prior_publication_ir": true,
+    "portable_input_paths": true,
+    "preserve_all_direct_edges_including_zero_cost": true,
+    "preserve_all_incoming_edges_including_zero_cost": true,
+    "target_self_plus_direct_equals_incoming": true,
+    "wrapper_incoming_equals_prior_nested_xml_ir": true
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "audit_namespaces_rs": {
+    "label": "0944 source-build/crates/xml-minifier/src/audit/namespaces.rs",
+    "sha256": "688027bc2d9652395c7385087995cc52084d6d7ff8a57c6a16bee0f582b83296"
+  },
+  "audit_rs": {
+    "label": "0944 source-build/crates/xml-minifier/src/audit.rs",
+    "sha256": "eddc437156c976c55ce36b0bf8f0ef47cc4943d296735a1ac8d6ef120b8754e7"
+  },
+  "audit_wellformed_rs": {
+    "label": "0944 source-build/crates/xml-minifier/src/audit/wellformed.rs",
+    "sha256": "ed354a0272284b26300346f7cfde5c7190fcfa3c30a7efb349b18a1e3a32f7be"
+  },
+  "current_checkout_audit_namespaces_rs": {
+    "label": "current checkout crates/xml-minifier/src/audit/namespaces.rs",
+    "sha256": "688027bc2d9652395c7385087995cc52084d6d7ff8a57c6a16bee0f582b83296"
+  },
+  "current_checkout_audit_rs": {
+    "label": "current checkout crates/xml-minifier/src/audit.rs",
+    "sha256": "eddc437156c976c55ce36b0bf8f0ef47cc4943d296735a1ac8d6ef120b8754e7"
+  },
+  "current_checkout_audit_wellformed_rs": {
+    "label": "current checkout crates/xml-minifier/src/audit/wellformed.rs",
+    "sha256": "ed354a0272284b26300346f7cfde5c7190fcfa3c30a7efb349b18a1e3a32f7be"
+  },
+  "quick_xml_reader_mod_rs": {
+    "label": "registry quick-xml-0.41.0/src/reader/mod.rs",
+    "sha256": "6d0162e7d841d6156d0b452351078399b929c435346bcfcd6493138c04ba9399"
+  },
+  "quick_xml_reader_state_rs": {
+    "label": "registry quick-xml-0.41.0/src/reader/state.rs",
+    "sha256": "74942da1414ad772fd8edff43a6ada6863c4d4aa0b9ba69740025c9db82f6072"
+  }
+}

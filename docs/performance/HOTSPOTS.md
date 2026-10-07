@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0946 — remaining XML cost is concentrated in token reading
+
+[0946](0946-xml-reader-attribution.md) decomposes all four retained 0944
+publication profiles after 0905. Reader inclusive work is 28.92–30.73% of
+publication Ir, about 54% of the nested XML audit; its immediate scanner and
+tag-emission costs are reconciled without adding overlapping function rows.
+These profiles predate 0945 and establish no current native-time fraction.
+Next qualify per-part original/replacement proof paths and balanced changed-span
+coverage before attempting the deferred multi-window replacement proof. Keep
+the complete original audit and canonical full-audit fallback; do not disable
+parser checks or revive the rejected stopped-observer shortcut.
+
 ## 0945 — share owned XLSX replacement payloads
 
 [0945](0945-xlsx-shared-replacement-payloads.md) adopts ordinary shared OPC

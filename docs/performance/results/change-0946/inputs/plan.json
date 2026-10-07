@@ -1,0 +1,588 @@
+{
+  "accepted_0905": {
+    "commit": "8267929233736e3f4f4612eee94e47016a74685e",
+    "path": "source-build/crates/xml-minifier/src/audit.rs",
+    "sha256": "eddc437156c976c55ce36b0bf8f0ef47cc4943d296735a1ac8d6ef120b8754e7"
+  },
+  "audit_control_results": {
+    "bytes": 2289,
+    "path": "controls/audit-controls-v2.json",
+    "sha256": "d0391e0fd5f8c977dc188be34218a614e14e0ea5959568ea3151b858bf2cc118"
+  },
+  "audit_controls": {
+    "bytes": 5112,
+    "path": "tools/audit_controls_v2.py",
+    "sha256": "98f184f841ae1d0aa9605bf293234c483a08bb6d6e08a098c8399a572d125e59"
+  },
+  "binary": {
+    "bytes": 265794648,
+    "executable": true,
+    "mode_bits": 509,
+    "path": "docs/performance/results/change-0944/binaries/profile-native",
+    "sha256": "63cbffd8c17299a4e2d1096e4ffa2a2d34a549cc452dfdf8ba5691b8ab7e75a3"
+  },
+  "build": {
+    "bytes": 820,
+    "path": "build/native-build-terminal.json",
+    "sha256": "5b0c8cde3292d6577e0b3a544a877954907052c379852040005e9f05d4e0df3a"
+  },
+  "build_process_group_audit": {
+    "bytes": 475,
+    "path": "build/build-process-group-audit.json",
+    "sha256": "55652ae8edf4d82d3d0282aeb0883577b7c10d296964e950438b29bca1a83a00"
+  },
+  "build_runner": {
+    "bytes": 5419,
+    "path": "tools/build_native.py",
+    "sha256": "b133f0d3884b61e0a8d85f7630cb9b5ebe8a1407522df899d5dde9cfc9c58b36"
+  },
+  "build_start": {
+    "bytes": 2492,
+    "path": "build/native-build-start.json",
+    "sha256": "58a5a58383d76f24908d0dda39a6a9600e120d5b760903cc277f7a1301b9eae3"
+  },
+  "capture_runner": {
+    "bytes": 9058,
+    "path": "tools/capture_v2.py",
+    "sha256": "c707aa7fa51c980a6ab4317a5f6147c5d79ae30158fe31ca642a5186e6600db6"
+  },
+  "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+  "cpu": 12,
+  "created_utc": "2026-10-07T00:35:51.201914+00:00",
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "RUST_BACKTRACE": "0",
+    "TZ": "UTC"
+  },
+  "expected": {
+    "dense-sparse": {
+      "constants": {
+        "budget_objects_used_after_handles_drop": 0,
+        "budget_used_after_handles_drop": 0,
+        "budget_used_after_package_drop": 0,
+        "cache_allocation_bypasses": 0,
+        "cache_budget_managed": false,
+        "cache_budget_memory_limit": null,
+        "cache_budget_memory_used": 0,
+        "cache_budget_reservation_failures": 0,
+        "cache_budget_reserved_bytes": 0,
+        "cache_bypasses": 0,
+        "cache_cold_loads": 6,
+        "cache_evictions": 0,
+        "cache_failed_loads": 0,
+        "cache_hits": 0,
+        "cache_in_flight_loads": 0,
+        "cache_mode": "unmanaged-control",
+        "cache_oversized_bypasses": 0,
+        "cache_retained_bytes": 509460,
+        "cache_retained_entries": 6,
+        "cache_successful_loads": 6,
+        "cache_waiter_joins": 0,
+        "implementation": "source-backed",
+        "output_budget_refusal": {
+          "accepted_output_bytes": 0,
+          "first_output_request_bytes": 0,
+          "one_under_output_limit": 0,
+          "output_bytes_used": 0,
+          "source_identity_preserved": false,
+          "source_read_bytes": 0,
+          "source_read_calls": 0,
+          "successful_output_ceiling": 0,
+          "typed_output_resource_refusal": false,
+          "zero_output_verified": false
+        },
+        "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+        "payload_materializations": 6,
+        "payload_memory_limit": null,
+        "post_publication_budget": {
+          "cache_reserved_objects": null,
+          "catalog_reserved_objects": null,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "pre_publication_budget": {
+          "cache_reserved_objects": 0,
+          "catalog_reserved_objects": 0,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "publication_planning_memory_headroom": null,
+        "selected_worksheet_count": 4,
+        "selected_worksheet_read_bytes": 52580,
+        "selected_worksheet_read_calls": 4,
+        "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+        "source_read_bytes": 4258604,
+        "source_read_calls": 183,
+        "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+        "unselected_worksheet_read_bytes": 0,
+        "unselected_worksheet_read_calls": 0,
+        "untouched_member_count": 12,
+        "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+        "update_count": 178,
+        "workbook_read_bytes": 226,
+        "workbook_read_calls": 1
+      },
+      "corpus": {
+        "archive_bytes": 4251863,
+        "archive_member_count": 17,
+        "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 17792,
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "name": "xlsx-cell-values-dense-sparse",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "shape": "dense-sparse",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 4265472,
+        "xlsx": {
+          "columns_per_sheet": 128,
+          "one_percent_update_count": 178,
+          "rows_per_sheet": 128,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "phases": {
+        "commit_ns": {
+          "max": 6951652,
+          "mean": 6666442.44,
+          "min": 6545170,
+          "p50": 6659751,
+          "p95": 6754982,
+          "p99": 6899112
+        },
+        "open_ns": {
+          "max": 148800,
+          "mean": 101427.33,
+          "min": 88340,
+          "p50": 99075,
+          "p95": 115590,
+          "p99": 145171
+        },
+        "plan_ns": {
+          "max": 10992202,
+          "mean": 10798062.76,
+          "min": 10659970,
+          "p50": 10780970,
+          "p95": 10945861,
+          "p99": 10992181
+        },
+        "publication_ns": {
+          "max": 15791924,
+          "mean": 15458405.52,
+          "min": 15241342,
+          "p50": 15431897,
+          "p95": 15674633,
+          "p99": 15755283
+        },
+        "reopen_ns": {
+          "max": 30902134,
+          "mean": 29185012.65,
+          "min": 28313272,
+          "p50": 29063765,
+          "p95": 30284291,
+          "p99": 30892844
+        }
+      },
+      "sink": {
+        "accepted_bytes": 4252436,
+        "largest_write": 65536,
+        "write_calls": 143,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 65,
+          "bytes_1_to_512": 75,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 3,
+          "bytes_over_65536": 0
+        }
+      },
+      "total": {
+        "max": 33651677,
+        "mean": 33024338.05,
+        "min": 32693193,
+        "p50": 33000488,
+        "p95": 33371725,
+        "p99": 33591737
+      }
+    },
+    "medium": {
+      "constants": {
+        "budget_objects_used_after_handles_drop": 0,
+        "budget_used_after_handles_drop": 0,
+        "budget_used_after_package_drop": 0,
+        "cache_allocation_bypasses": 0,
+        "cache_budget_managed": false,
+        "cache_budget_memory_limit": null,
+        "cache_budget_memory_used": 0,
+        "cache_budget_reservation_failures": 0,
+        "cache_budget_reserved_bytes": 0,
+        "cache_bypasses": 0,
+        "cache_cold_loads": 6,
+        "cache_evictions": 0,
+        "cache_failed_loads": 0,
+        "cache_hits": 0,
+        "cache_in_flight_loads": 0,
+        "cache_mode": "unmanaged-control",
+        "cache_oversized_bypasses": 0,
+        "cache_retained_bytes": 269785,
+        "cache_retained_entries": 6,
+        "cache_successful_loads": 6,
+        "cache_waiter_joins": 0,
+        "implementation": "source-backed",
+        "output_budget_refusal": {
+          "accepted_output_bytes": 0,
+          "first_output_request_bytes": 0,
+          "one_under_output_limit": 0,
+          "output_bytes_used": 0,
+          "source_identity_preserved": false,
+          "source_read_bytes": 0,
+          "source_read_calls": 0,
+          "successful_output_ceiling": 0,
+          "typed_output_resource_refusal": false,
+          "zero_output_verified": false
+        },
+        "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+        "payload_materializations": 6,
+        "payload_memory_limit": null,
+        "post_publication_budget": {
+          "cache_reserved_objects": null,
+          "catalog_reserved_objects": null,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "pre_publication_budget": {
+          "cache_reserved_objects": 0,
+          "catalog_reserved_objects": 0,
+          "input_bytes_limit": null,
+          "input_bytes_used": 0,
+          "objects_limit": null,
+          "objects_used": 0,
+          "output_bytes_limit": null,
+          "output_bytes_used": 0,
+          "work_limit": null,
+          "work_used": 0
+        },
+        "publication_planning_memory_headroom": null,
+        "selected_worksheet_count": 4,
+        "selected_worksheet_read_bytes": 27146,
+        "selected_worksheet_read_calls": 4,
+        "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+        "source_read_bytes": 4233170,
+        "source_read_calls": 183,
+        "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+        "unselected_worksheet_read_bytes": 0,
+        "unselected_worksheet_read_calls": 0,
+        "untouched_member_count": 12,
+        "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+        "update_count": 93,
+        "workbook_read_bytes": 226,
+        "workbook_read_calls": 1
+      },
+      "corpus": {
+        "archive_bytes": 4226429,
+        "archive_member_count": 17,
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 9216,
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "name": "xlsx-cell-values-medium",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 4231168,
+        "xlsx": {
+          "columns_per_sheet": 48,
+          "one_percent_update_count": 93,
+          "rows_per_sheet": 48,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "phases": {
+        "commit_ns": {
+          "max": 3625947,
+          "mean": 3506505.43,
+          "min": 3471097,
+          "p50": 3505026,
+          "p95": 3533826,
+          "p99": 3600187
+        },
+        "open_ns": {
+          "max": 114781,
+          "mean": 91032.09,
+          "min": 79041,
+          "p50": 89085,
+          "p95": 101701,
+          "p99": 108051
+        },
+        "plan_ns": {
+          "max": 5832187,
+          "mean": 5727062.88,
+          "min": 5663207,
+          "p50": 5727751,
+          "p95": 5764666,
+          "p99": 5813797
+        },
+        "publication_ns": {
+          "max": 7525955,
+          "mean": 7386633.43,
+          "min": 7325095,
+          "p50": 7382634,
+          "p95": 7440975,
+          "p99": 7460545
+        },
+        "reopen_ns": {
+          "max": 27054256,
+          "mean": 26064206.37,
+          "min": 25546869,
+          "p50": 25992351,
+          "p95": 26548314,
+          "p99": 26909465
+        }
+      },
+      "sink": {
+        "accepted_bytes": 4226788,
+        "largest_write": 65536,
+        "write_calls": 143,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 64,
+          "bytes_1_to_512": 75,
+          "bytes_4097_to_16384": 4,
+          "bytes_513_to_4096": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "total": {
+        "max": 17033460,
+        "mean": 16711233.83,
+        "min": 16616998,
+        "p50": 16704893,
+        "p95": 16803009,
+        "p99": 16905679
+      }
+    }
+  },
+  "expected_measured_calls": 1,
+  "expected_retained_context": {
+    "bytes": 92879,
+    "path": "references/native-context-0900.json",
+    "sha256": "d07726feea9d991d87d1c1b7a4bc74e5da61f0328ad054ed02bfd5bb2c52f12a"
+  },
+  "first_child_admission": "Capture index 0 then require raw Callgrind owner/lifecycle and semantic/reopen/preservation admission before index 1; no retries or replacement rows.",
+  "full_source_manifest": {
+    "bytes": 186013860,
+    "path": "source-manifest.json",
+    "sha256": "5227e2831e0136e315bfe0f80e1128a5673bbf8cfd08f627ed82bce0cd9eb395"
+  },
+  "head": "933ee45cbb5d2ef9dc29583f7ec890ad234e04fb",
+  "historical_expected_lifecycle_calls": 5,
+  "lifecycle_parent": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+  "measured_parent": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+  "native_context": {
+    "bytes": 92879,
+    "path": "references/native-context-0900.json",
+    "sha256": "d07726feea9d991d87d1c1b7a4bc74e5da61f0328ad054ed02bfd5bb2c52f12a"
+  },
+  "options": [
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+    "--zero-before=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+    "--dump-after=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+  ],
+  "origin_root": "/home/zhuhe/litchi-performance-0944",
+  "owner": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+  "plan_generator": {
+    "bytes": 6522,
+    "path": "tools/prepare_plan.py",
+    "sha256": "386e9340f73e05211f3a4ee9b45e2d18a91a14d84a7d559803af86c7119faadd"
+  },
+  "prior_semantic_validator": {
+    "bytes": 33177,
+    "path": "docs/performance/results/change-0944/helpers/retained-0705-semantic-analyze.py",
+    "sha256": "567c7ad1eecc4c93d51615076088809b38c5498a4f29ac929a1661bf9fd265dc"
+  },
+  "raw_adapter": {
+    "bytes": 34984,
+    "path": "docs/performance/results/change-0944/analyze_v2_adapter.py",
+    "sha256": "e04ff0ef1a00556ae34b0d1c2b55ae13945773eaff016970815b499ec52a5f04"
+  },
+  "raw_analyzer": {
+    "bytes": 6654,
+    "path": "tools/raw_analyzer_v2.py",
+    "sha256": "3990fa66aa5f3d3985ee48785cbe23ad5f2be31c351f28dbb3b19c3ea599991f"
+  },
+  "reader": {
+    "bytes": 63017,
+    "path": "docs/performance/results/change-0845/reader_v2.py",
+    "sha256": "8a2f2fd71d7f0e67643793d9673805aacd0142be666928f4abb5e12cf57a2203"
+  },
+  "repeats": 2,
+  "replay_root_policy": "All packet custody paths are relative; absolute start/Callgrind command paths retain this origin root for replay validation.",
+  "retained_helpers": {
+    "bytes": 1865,
+    "path": "docs/performance/results/change-0944/retained-helper-custody.json",
+    "sha256": "1cb02d45683c0d083707f000d69e97ed610324b3c7d5c5e7ca5ace8f82a90fb5"
+  },
+  "samples": 1,
+  "schedule": [
+    {
+      "index": 0,
+      "repeat": 0,
+      "shape": "medium"
+    },
+    {
+      "index": 1,
+      "repeat": 0,
+      "shape": "dense-sparse"
+    },
+    {
+      "index": 2,
+      "repeat": 1,
+      "shape": "dense-sparse"
+    },
+    {
+      "index": 3,
+      "repeat": 1,
+      "shape": "medium"
+    }
+  ],
+  "schema": "litchi.xlsx-publication-profile-0944.v2",
+  "scope": "Callgrind Ir attribution for the publish_multi_commit_to_stream owner only. Returned snapshot destruction is outside the owner scope and remains a native-timer-only context. No native latency, cycles, allocation, RSS, or speedup conclusion.",
+  "semantic_validator": {
+    "bytes": 6372,
+    "path": "tools/semantic_v2.py",
+    "sha256": "ce7779125acefcab91ad1f8b900a5257bc7b9db365ca91bdf72e7a05e43ca8e7"
+  },
+  "shapes": [
+    "medium",
+    "dense-sparse"
+  ],
+  "source_checker": {
+    "bytes": 11672,
+    "path": "tools/source_check_v2.py",
+    "sha256": "3610a0b837c1496052cd0b108a8856322e0b164bb11541740088e194c6cc5d8d"
+  },
+  "source_closure": {
+    "file_count": 10788,
+    "included_prefixes": [
+      ".cargo/",
+      "crates/",
+      "test-data/",
+      "tools/perf-baseline/"
+    ],
+    "included_root_files": [
+      "Cargo.toml",
+      "README.md",
+      "clippy.toml",
+      "deny.toml",
+      "rust-toolchain.toml",
+      "rustfmt.toml"
+    ],
+    "tracked_3rdparty_entries": 0
+  },
+  "source_manifest": {
+    "bytes": 3674260,
+    "path": "source-build-manifest.json",
+    "sha256": "b63113ce5251218be817ba29c466b0ace535c546a416b97413ae8a73f0caea64"
+  },
+  "source_root": "source-build",
+  "source_scope": {
+    "expected_shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+    "reopen_and_preservation": "Harness reopens output and validates updated values, semantic output identity, OPC part/relationship identity, untouched member digests, sink bound, and source/cache counters outside timed phases."
+  },
+  "tools": {
+    "callgrind_annotate": {
+      "bytes": 44669,
+      "path": "/usr/bin/callgrind_annotate",
+      "sha256": "7f6c574f2df13fc35bbf238c6a69444e2ba88cf30a795c493c6d304ebf4ffc6a"
+    },
+    "callgrind_backend": {
+      "bytes": 2700304,
+      "path": "/usr/libexec/valgrind/callgrind-amd64-linux",
+      "sha256": "0b411771104cca10984c00a6c6c76bc54ebc989ae7e7a8c2f5e1ba4fec0e427d"
+    },
+    "taskset": {
+      "bytes": 31184,
+      "path": "/usr/bin/taskset",
+      "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2"
+    },
+    "valgrind": {
+      "bytes": 528,
+      "path": "/usr/bin/valgrind",
+      "sha256": "4652774bd116cb49951ef74115ad4237cad5021b2bd4d80002f09d986ec438b9"
+    },
+    "valgrind_bin": {
+      "bytes": 22768,
+      "path": "/usr/bin/valgrind.bin",
+      "sha256": "77e5c5156e579bfe7d5692fd29accc6a7062917b21145d940fb2330d70ce13f4"
+    },
+    "x86_64-linux-gnu-nm": {
+      "bytes": 48712,
+      "path": "/usr/bin/x86_64-linux-gnu-nm",
+      "sha256": "c3a5fca37dc196786df9917a59290e8be1322748453218b0e4690daa9ae43009"
+    },
+    "x86_64-linux-gnu-objdump": {
+      "bytes": 415760,
+      "path": "/usr/bin/x86_64-linux-gnu-objdump",
+      "sha256": "6e8454a1edb913e86e4274a48bb8a836622ef80d147a1413c21369a2e5dc1cbc"
+    }
+  },
+  "topology_owner": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream",
+  "tree": "8b571b08a83c530c50fdbcb16345a9aa75883794",
+  "warmup": 0
+}
