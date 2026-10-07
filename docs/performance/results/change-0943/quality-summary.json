@@ -1,0 +1,147 @@
+{
+  "schema": "litchi.performance.0943.quality-summary.v1",
+  "created_utc": "2026-10-06T23:54:17.057570+00:00",
+  "candidate_source": {
+    "path": "/home/zhuhe/litchi-performance-0943/candidate-source-v4.json",
+    "bytes": 981,
+    "sha256": "0b190a2e398c1c1f0d1084ba00e520640334c8b88bd2ca835b765b19cfe96381"
+  },
+  "candidate_file": {
+    "path": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/crates/litchi-doc/src/tracked_revision/package.rs",
+    "bytes": 154854,
+    "sha256": "ce3db3822fcfb7ed88120ee6b761445f1b06a1f3ce25950c055295e1ee38b863"
+  },
+  "checks": {
+    "baseline-rustdoc-private-v1": {
+      "exit_code": 101,
+      "terminal": {
+        "path": "/home/zhuhe/litchi-performance-0943/checks/baseline-rustdoc-private-v1/terminal.json",
+        "bytes": 2422,
+        "sha256": "cd10c6d755249697e9a8500ae81f61248457dfa479e99d1404ca02147b163a66"
+      }
+    },
+    "baseline-rustdoc-public-v1": {
+      "exit_code": 101,
+      "terminal": {
+        "path": "/home/zhuhe/litchi-performance-0943/checks/baseline-rustdoc-public-v1/terminal.json",
+        "bytes": 2388,
+        "sha256": "3dfef2d78af51074eeda3a82fce27b4fc4ff82101260b77a07dd8d7cfbd3d0a3"
+      }
+    },
+    "doc-all-features-v4": {
+      "exit_code": 0,
+      "terminal": {
+        "path": "/home/zhuhe/litchi-performance-0943/checks/doc-all-features-v4/terminal.json",
+        "bytes": 2328,
+        "sha256": "b0f5ba6593b1b901daea32ede641c6eb985fed2039bcc1df0f5413c75d5f363a"
+      },
+      "test_counts": {
+        "suites": 48,
+        "passed": 1383,
+        "failed": 0,
+        "ignored": 14
+      }
+    },
+    "doc-clippy-v4": {
+      "exit_code": 0,
+      "terminal": {
+        "path": "/home/zhuhe/litchi-performance-0943/checks/doc-clippy-v4/terminal.json",
+        "bytes": 2370,
+        "sha256": "1fd4c324262d25196e60318c8282048ec506c99e2e7e6092ea4bb32569f0a74b"
+      }
+    },
+    "doc-default-v1": {
+      "exit_code": 101,
+      "terminal": {
+        "path": "/home/zhuhe/litchi-performance-0943/checks/doc-default-v1/terminal.json",
+        "bytes": 2293,
+        "sha256": "d8487a83cd5b6b687ee4c29b31fc419c1b4226ab881ad1d04038145bf5aa9e85"
+      },
+      "test_counts": {
+        "suites": 0,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    "doc-default-v2": {
+      "exit_code": 101,
+      "terminal": {
+        "path": "/home/zhuhe/litchi-performance-0943/checks/doc-default-v2/terminal.json",
+        "bytes": 2296,
+        "sha256": "976229955ae2cb60f89276beab32f961b449d6a09d46cc1764c58a17203ac786"
+      },
+      "test_counts": {
+        "suites": 1,
+        "passed": 1123,
+        "failed": 2,
+        "ignored": 2
+      }
+    },
+    "doc-default-v3": {
+      "exit_code": 101,
+      "terminal": {
+        "path": "/home/zhuhe/litchi-performance-0943/checks/doc-default-v3/terminal.json",
+        "bytes": 2296,
+        "sha256": "5af34d104cd0dcd9d24252ff953f6d94921542c570f7bc21fdd6a39ca47b4b4b"
+      },
+      "test_counts": {
+        "suites": 1,
+        "passed": 1122,
+        "failed": 3,
+        "ignored": 2
+      }
+    },
+    "doc-default-v4": {
+      "exit_code": 0,
+      "terminal": {
+        "path": "/home/zhuhe/litchi-performance-0943/checks/doc-default-v4/terminal.json",
+        "bytes": 2296,
+        "sha256": "044b0b15e34d8fd103d86e0a1e383fd70fabe85b91385766408d17da3ff04163"
+      },
+      "test_counts": {
+        "suites": 48,
+        "passed": 1365,
+        "failed": 0,
+        "ignored": 13
+      }
+    },
+    "doc-fmt-v4": {
+      "exit_code": 0,
+      "terminal": {
+        "path": "/home/zhuhe/litchi-performance-0943/checks/doc-fmt-v4/terminal.json",
+        "bytes": 2452,
+        "sha256": "1da54ee865061969fb74847ce33e0ca3ef75fd2696878606eee6aeb604925e41"
+      }
+    },
+    "doc-rustdoc-private-v4": {
+      "exit_code": 101,
+      "terminal": {
+        "path": "/home/zhuhe/litchi-performance-0943/checks/doc-rustdoc-private-v4/terminal.json",
+        "bytes": 2414,
+        "sha256": "67595018e25309a08c9471faa75cffa6df4bc9f59694dd986ee6bdf6bc3b93bd"
+      }
+    },
+    "doc-rustdoc-v4": {
+      "exit_code": 101,
+      "terminal": {
+        "path": "/home/zhuhe/litchi-performance-0943/checks/doc-rustdoc-v4/terminal.json",
+        "bytes": 2366,
+        "sha256": "603a042590e8ff84bbdfc6fe3ee5603b033a7506ee7eed032a11845c8aaac44f"
+      }
+    }
+  },
+  "rustdoc_public_baseline": {
+    "path": "/home/zhuhe/litchi-performance-0943/checks/rustdoc-baseline-comparison.json",
+    "bytes": 1748,
+    "sha256": "c28eb3488a35ce978e54f917ac2cb635f2a181138deadfe7b6ba676edc27f6bd"
+  },
+  "rustdoc_private_baseline": {
+    "path": "/home/zhuhe/litchi-performance-0943/checks/rustdoc-private-baseline-comparison.json",
+    "bytes": 3451,
+    "sha256": "1ea679bf60c7f494a9ebbd0a7535cfbbe60a4011d6fa996676134643a04230eb"
+  },
+  "performance_measurements_run": false,
+  "production_adopted": false,
+  "checkout_modified": false
+}

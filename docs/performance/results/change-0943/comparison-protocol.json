@@ -1,0 +1,177 @@
+{
+  "schema": "litchi.performance.0943.doc-comparison.protocol.v1",
+  "status": "prospective",
+  "change": "0943",
+  "created_utc": "2026-10-06T00:00:00Z",
+  "baseline_source_revision": "13562481317d3d219c6fcd93babd9377e84ea834",
+  "candidate_source_revision": null,
+  "candidate_source_root": null,
+  "source": {
+    "root": "/home/zhuhe/litchi-performance-0943/baseline-source-v1",
+    "receipt": {
+      "path": "/home/zhuhe/litchi-performance-0943/baseline-source-v2.json",
+      "bytes": 682,
+      "sha256": "3d4cc656f40da02f7736f1ed7744149dd98bd5ad46a30c16ee1bc84e8e84e804"
+    },
+    "listing": {
+      "path": "/home/zhuhe/litchi-performance-0943/baseline-source-manifest-v2.jsonl",
+      "bytes": 1722211,
+      "sha256": "bd485793d1495013faff2ee8ab3053796c7df867a0d08c2eb32d187f13d0e693"
+    },
+    "file_count": 10798,
+    "bytes": 260303451
+  },
+  "fixtures": [
+    {
+      "case": "docnohf",
+      "relative_path": "test-data/ole/doc/NoHeadFoot.doc",
+      "bytes": 26112,
+      "sha256": "45e5df073f34314da6f39d2dad119fb2ef23470878fd2df67f632864cd92ea48"
+    },
+    {
+      "case": "docfloat",
+      "relative_path": "test-data/ole/doc/FloatingPictures.doc",
+      "bytes": 335360,
+      "sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d"
+    }
+  ],
+  "edits": [1, 2, 8, 32],
+  "retention_routes": ["zero", "default", "release"],
+  "native": {
+    "cpu": 14,
+    "rounds": 12,
+    "retention": "default",
+    "warmups_per_child": 5,
+    "samples_per_child": 50,
+    "children": 192,
+    "paired_cells": 96,
+    "cell_order": "odd rounds docnohf/docfloat × edits 1/2/8/32; even rounds reverse both; versions baseline,candidate on odd rounds and candidate,baseline on even rounds",
+    "route_order": "default"
+  },
+  "allocator": {
+    "cpu": 14,
+    "repetitions": 2,
+    "warmups_per_child": 0,
+    "samples_per_child": 1,
+    "children": 96,
+    "paired_cells": 48,
+    "cell_order": "repetition one forward cells and routes zero/default/release; repetition two reverses all cells and routes; versions baseline,candidate on repetition one and candidate,baseline on repetition two"
+  },
+  "combined_capture": {
+    "children": 288,
+    "order": "native schedule followed by allocator schedule in one serial evidence root",
+    "required_cli_lane": "all"
+  },
+  "qualification": {
+    "children": 64,
+    "native_children": 16,
+    "allocator_children": 48,
+    "native_warmups_per_child": 0,
+    "native_samples_per_child": 1,
+    "allocator_warmups_per_child": 0,
+    "allocator_samples_per_child": 1,
+    "claim_scope": "actual binary custody and correctness preflight only; no timing, allocation, RSS, or adoption claim",
+    "separate_root_before_formal": true
+  },
+  "bootstrap": {
+    "draws": 10000,
+    "seed": 943,
+    "statistic": "median of the 12 paired-round baseline-p50/candidate-p50 ratios for each native fixture/edit cell",
+    "interval": "nearest-rank 2.5th/97.5th percentiles",
+    "minimum_lower_ratio": 0.9523809523809523,
+    "primary_latency_gate": "every one of the 8 native cells has bootstrap lower bound >= 1/1.05"
+  },
+  "review_flags": {
+    "p50_increase_fraction": 0.05,
+    "p95_increase_fraction": 0.05,
+    "p99_increase_fraction": 0.05,
+    "rss_increase_fraction": 0.05,
+    "allocator_gross_requested_increase_fraction": 0.01,
+    "allocator_peak_live_increase_fraction": 0.05,
+    "automatic_waiver": false
+  },
+  "adoption_gates": {
+    "latency": "all 8 native cells pass the paired bootstrap lower-bound gate",
+    "allocation_target": "at least one fixture at 32 edits/default has candidate allocated_bytes <= baseline * 0.95",
+    "allocation_safety": "every allocator pair has candidate allocated_bytes <= baseline * 1.01 and peak_live_bytes <= baseline * 1.05",
+    "exact_output": "all paired reports have exact output digest and byte identity",
+    "exact_capacity": "all explicit route/stage/output capacities and retained bytes match baseline",
+    "exact_semantics": "all correctness gates and oracle fields match",
+    "memory_review": "p50, p95, p99, and RSS increases above 5 percent remain explicit review flags"
+  },
+  "custody": {
+    "child_deadline_seconds": 900,
+    "retry": false,
+    "serial": true,
+    "terminal_written_before_report_parse": true,
+    "process_group_isolation": true,
+    "max_rss": {
+      "argv": ["/usr/bin/time", "-f", "%M", "-o", "<capture-root>/children/<label>/max-rss-kib.txt"],
+      "unit": "KiB",
+      "parse": "only after the terminal receipt is durably written",
+      "raw_sidecar_required": true
+    },
+    "child_cwd": "bound immutable source root for the selected version; packet artifacts are outside cwd",
+    "packet_paths": "child artifact descriptors are relative to the selected capture root; the executed RSS argv is absolute and normalized through recorded capture_origin; binary, source, and fixture identities remain absolute bound descriptors",
+    "clean_environment": {
+      "PATH": "/usr/bin:/bin",
+      "LC_ALL": "C",
+      "LANG": "C",
+      "TZ": "UTC",
+      "RUST_BACKTRACE": "0"
+    },
+    "max_report_bytes": 1048576,
+    "failed_children_retained": true,
+    "no_absolute_gauges_summing": true
+  },
+  "preflight": {
+    "claim_scope": "synthetic custody and report-contract validation only; no build, workload, timing, allocation, RSS, or adoption claim",
+    "native_positive_children": 16,
+    "allocator_positive_children": 48,
+    "positive_children": 64,
+    "negative_controls": [
+      "wrong fixture digest",
+      "wrong edit count",
+      "wrong retention route",
+      "wrong output digest",
+      "wrong warmup/sample count",
+      "duplicate JSON key",
+      "malformed report",
+      "wrong binary descriptor",
+      "wrong source descriptor",
+      "RSS sidecar malformed"
+    ]
+  },
+  "scripts": {
+    "runner": "/home/zhuhe/litchi-performance-0943/tooling/comparison-runner.py",
+    "validator": "/home/zhuhe/code/litchi/docs/performance/results/change-0917/capture.py"
+  },
+  "baseline_builds": {
+    "native": {
+      "binary_identity": "doc_retention_probe",
+      "binary": {
+        "path": "/home/zhuhe/litchi-performance-0943/target-baseline-v1/release/doc_retention_probe",
+        "bytes": 50601376,
+        "sha256": "7763ab3f323e3b7de8b4fe8f45dcb363dfcf483aa60ddb8428c9e31f5fef06dc"
+      },
+      "binary_receipt": "/home/zhuhe/litchi-performance-0943/builds/baseline-native-v1/binary.json",
+      "start_receipt": "/home/zhuhe/litchi-performance-0943/builds/baseline-native-v1/start.json",
+      "terminal_receipt": "/home/zhuhe/litchi-performance-0943/builds/baseline-native-v1/terminal.json"
+    },
+    "allocator": {
+      "binary_identity": "doc_retention_probe_alloc",
+      "binary": {
+        "path": "/home/zhuhe/litchi-performance-0943/target-baseline-v1/release/doc_retention_probe_alloc",
+        "bytes": 50605064,
+        "sha256": "ce19bd6a2f923b57271ded2ad02b0aa635295a9432d1e4a324d133d92a148f91"
+      },
+      "binary_receipt": "/home/zhuhe/litchi-performance-0943/builds/baseline-allocator-v1/binary.json",
+      "start_receipt": "/home/zhuhe/litchi-performance-0943/builds/baseline-allocator-v1/start.json",
+      "terminal_receipt": "/home/zhuhe/litchi-performance-0943/builds/baseline-allocator-v1/terminal.json"
+    }
+  },
+  "candidate_builds": {
+    "native": null,
+    "allocator": null
+  }
+}

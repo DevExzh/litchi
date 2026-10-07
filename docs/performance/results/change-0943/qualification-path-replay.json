@@ -1,0 +1,416 @@
+{
+  "adapter": {
+    "bytes": 1975,
+    "path": "/home/zhuhe/litchi-performance-0943/qualify-path-replay-v1.py",
+    "sha256": "a17f1635bcccdc5649f08a60a14c94b22e87f585c55ad127ebab6e057ad84a74"
+  },
+  "children": 64,
+  "claim_scope": "correctness/custody qualification only; no performance/adoption claim",
+  "manifest": {
+    "bytes": 8722,
+    "path": "/home/zhuhe/litchi-performance-0943/qualification-authorized-v3.json",
+    "sha256": "ef3fbb68ee51ddaff20333ebd698e302e1f0a7636c2cc3db4677de6093cb73d1"
+  },
+  "original_outer_exit_code": 2,
+  "outer_terminal": {
+    "bytes": 1749,
+    "path": "/home/zhuhe/litchi-performance-0943/runs/qualification-v1/terminal.json",
+    "sha256": "aa0435fe2854d530bdf512ce4fe29dd80683600b9791789b536058fff70378f6"
+  },
+  "pairs": 32,
+  "reason": "Only independently validated input location differs between immutable source roots. Normalize this provenance field; preserve source digest/size and every semantic/capacity field.",
+  "results": [
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/NoHeadFoot.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/NoHeadFoot.doc",
+      "capacities_equal": true,
+      "cell": [
+        "native",
+        "docnohf",
+        1,
+        "default"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/NoHeadFoot.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/NoHeadFoot.doc",
+      "capacities_equal": true,
+      "cell": [
+        "native",
+        "docnohf",
+        2,
+        "default"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/NoHeadFoot.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/NoHeadFoot.doc",
+      "capacities_equal": true,
+      "cell": [
+        "native",
+        "docnohf",
+        8,
+        "default"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/NoHeadFoot.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/NoHeadFoot.doc",
+      "capacities_equal": true,
+      "cell": [
+        "native",
+        "docnohf",
+        32,
+        "default"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/FloatingPictures.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/FloatingPictures.doc",
+      "capacities_equal": true,
+      "cell": [
+        "native",
+        "docfloat",
+        1,
+        "default"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/FloatingPictures.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/FloatingPictures.doc",
+      "capacities_equal": true,
+      "cell": [
+        "native",
+        "docfloat",
+        2,
+        "default"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/FloatingPictures.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/FloatingPictures.doc",
+      "capacities_equal": true,
+      "cell": [
+        "native",
+        "docfloat",
+        8,
+        "default"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/FloatingPictures.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/FloatingPictures.doc",
+      "capacities_equal": true,
+      "cell": [
+        "native",
+        "docfloat",
+        32,
+        "default"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/NoHeadFoot.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/NoHeadFoot.doc",
+      "capacities_equal": true,
+      "cell": [
+        "allocator",
+        "docnohf",
+        1,
+        "zero"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/NoHeadFoot.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/NoHeadFoot.doc",
+      "capacities_equal": true,
+      "cell": [
+        "allocator",
+        "docnohf",
+        1,
+        "default"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/NoHeadFoot.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/NoHeadFoot.doc",
+      "capacities_equal": true,
+      "cell": [
+        "allocator",
+        "docnohf",
+        1,
+        "release"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/NoHeadFoot.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/NoHeadFoot.doc",
+      "capacities_equal": true,
+      "cell": [
+        "allocator",
+        "docnohf",
+        2,
+        "zero"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/NoHeadFoot.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/NoHeadFoot.doc",
+      "capacities_equal": true,
+      "cell": [
+        "allocator",
+        "docnohf",
+        2,
+        "default"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/NoHeadFoot.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/NoHeadFoot.doc",
+      "capacities_equal": true,
+      "cell": [
+        "allocator",
+        "docnohf",
+        2,
+        "release"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/NoHeadFoot.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/NoHeadFoot.doc",
+      "capacities_equal": true,
+      "cell": [
+        "allocator",
+        "docnohf",
+        8,
+        "zero"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/NoHeadFoot.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/NoHeadFoot.doc",
+      "capacities_equal": true,
+      "cell": [
+        "allocator",
+        "docnohf",
+        8,
+        "default"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/NoHeadFoot.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/NoHeadFoot.doc",
+      "capacities_equal": true,
+      "cell": [
+        "allocator",
+        "docnohf",
+        8,
+        "release"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/NoHeadFoot.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/NoHeadFoot.doc",
+      "capacities_equal": true,
+      "cell": [
+        "allocator",
+        "docnohf",
+        32,
+        "zero"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/NoHeadFoot.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/NoHeadFoot.doc",
+      "capacities_equal": true,
+      "cell": [
+        "allocator",
+        "docnohf",
+        32,
+        "default"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/NoHeadFoot.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/NoHeadFoot.doc",
+      "capacities_equal": true,
+      "cell": [
+        "allocator",
+        "docnohf",
+        32,
+        "release"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/FloatingPictures.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/FloatingPictures.doc",
+      "capacities_equal": true,
+      "cell": [
+        "allocator",
+        "docfloat",
+        1,
+        "zero"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/FloatingPictures.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/FloatingPictures.doc",
+      "capacities_equal": true,
+      "cell": [
+        "allocator",
+        "docfloat",
+        1,
+        "default"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/FloatingPictures.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/FloatingPictures.doc",
+      "capacities_equal": true,
+      "cell": [
+        "allocator",
+        "docfloat",
+        1,
+        "release"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/FloatingPictures.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/FloatingPictures.doc",
+      "capacities_equal": true,
+      "cell": [
+        "allocator",
+        "docfloat",
+        2,
+        "zero"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/FloatingPictures.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/FloatingPictures.doc",
+      "capacities_equal": true,
+      "cell": [
+        "allocator",
+        "docfloat",
+        2,
+        "default"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/FloatingPictures.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/FloatingPictures.doc",
+      "capacities_equal": true,
+      "cell": [
+        "allocator",
+        "docfloat",
+        2,
+        "release"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/FloatingPictures.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/FloatingPictures.doc",
+      "capacities_equal": true,
+      "cell": [
+        "allocator",
+        "docfloat",
+        8,
+        "zero"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/FloatingPictures.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/FloatingPictures.doc",
+      "capacities_equal": true,
+      "cell": [
+        "allocator",
+        "docfloat",
+        8,
+        "default"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/FloatingPictures.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/FloatingPictures.doc",
+      "capacities_equal": true,
+      "cell": [
+        "allocator",
+        "docfloat",
+        8,
+        "release"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/FloatingPictures.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/FloatingPictures.doc",
+      "capacities_equal": true,
+      "cell": [
+        "allocator",
+        "docfloat",
+        32,
+        "zero"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/FloatingPictures.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/FloatingPictures.doc",
+      "capacities_equal": true,
+      "cell": [
+        "allocator",
+        "docfloat",
+        32,
+        "default"
+      ],
+      "other_semantics_equal": true
+    },
+    {
+      "baseline_input": "/home/zhuhe/litchi-performance-0943/baseline-source-v1/test-data/ole/doc/FloatingPictures.doc",
+      "candidate_input": "/home/zhuhe/litchi-performance-0943/candidate-source-v4/test-data/ole/doc/FloatingPictures.doc",
+      "capacities_equal": true,
+      "cell": [
+        "allocator",
+        "docfloat",
+        32,
+        "release"
+      ],
+      "other_semantics_equal": true
+    }
+  ],
+  "runner": {
+    "bytes": 96044,
+    "path": "/home/zhuhe/litchi-performance-0943/tooling/comparison-runner.py",
+    "sha256": "5804b6da387f1828f87a684bfa7f4b81e1eead52fd2c8e222f2d928cf71ae997"
+  },
+  "schema": "litchi.performance.0943.qualification-path-replay.v1",
+  "status": "passed",
+  "workload_retried": false
+}

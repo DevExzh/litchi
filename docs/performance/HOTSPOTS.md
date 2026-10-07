@@ -1,5 +1,16 @@
 # Performance hotspot inventory
 
+## 0943 — unchanged DOC Data sharing misses allocation and latency gates
+
+[0943](0943-doc-data-sharing-rejection.md) qualifies private `Arc<Vec<u8>>`
+sharing of unchanged revision-editor Data. FloatingPictures at 32 edits reduces
+gross requested bytes by 4.974452%, below the frozen 5% gate; the two-edit
+paired latency confidence bound also fails. Correctness, capacity identity,
+and allocator safety pass across 288 formal children. The candidate is rejected,
+with no production change and no rerun or threshold relaxation. The 0942 copy
+and parsing attribution remains useful for distinct, prospectively qualified
+mechanisms; this cohort establishes no RSS or physical-copy saving.
+
 ## 0942 — DOC lifecycle marker separates observed CPU samples
 
 [0942](0942-doc-cfb-operation-profile.md) profiles the restored repeated-edit

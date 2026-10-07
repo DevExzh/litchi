@@ -1,0 +1,30 @@
+{
+  "all_reduction_fields_equal": true,
+  "children": 288,
+  "manifest": {
+    "bytes": 9873,
+    "path": "/home/zhuhe/litchi-performance-0943/formal-authorized-v1.json",
+    "sha256": "c44ec4658a63bb0d6e40663e0718d51566e61d0e94aafdbe0e0e219568235cfb"
+  },
+  "original_reduction": {
+    "bytes": 426727,
+    "path": "/home/zhuhe/litchi-performance-0943/reductions/formal-v1.json",
+    "sha256": "645b8a13a696c41430ed2f92b81c273f3b8d9b0a545531bab0b0520d0f4a0f17"
+  },
+  "original_unavailable_during_replay": true,
+  "packet_bytes": 46323941,
+  "packet_files": 1730,
+  "replay_script": {
+    "bytes": 1488,
+    "path": "/home/zhuhe/litchi-performance-0943/replay-formal-v1.py",
+    "sha256": "a7c6bd04695d5f73cd93119b5224856446cf59dc89a2d9dea5e9d9a18195fb79"
+  },
+  "runner": {
+    "bytes": 96228,
+    "path": "/home/zhuhe/litchi-performance-0943/tooling/comparison-runner.py",
+    "sha256": "6d93f743a067e5a3394537c6cf4d62714451d1aa8ca5553c351f1ab0fcf23c36"
+  },
+  "schema": "litchi.performance.0943.formal-moved-replay.v1",
+  "status": "passed",
+  "temporary_copy_removed_after_verification": true
+}

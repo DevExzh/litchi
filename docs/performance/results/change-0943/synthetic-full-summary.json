@@ -1,0 +1,26 @@
+{
+  "allocator_children": 96,
+  "artifact_root": "/home/zhuhe/litchi-performance-0943/synthetic-full-root-v3",
+  "children": 288,
+  "claim_scope": "synthetic custody/load/reduction only; no workload or adoption claim",
+  "native_children": 192,
+  "protocol": {
+    "bytes": 7315,
+    "path": "/home/zhuhe/litchi-performance-0943/tooling/comparison-protocol.json",
+    "sha256": "c071f252e05e3e8ad28caaad34aa035a5ad5eaa6d901b331e046f37415d2f795"
+  },
+  "reduction": {
+    "bytes": 392838,
+    "path": "/home/zhuhe/litchi-performance-0943/synthetic-full-root-v3/synthetic-reduction.json",
+    "sha256": "f254c1885e4796cb03d08247a5778089165c94510b4293d815d1232dda19379e"
+  },
+  "runner": {
+    "bytes": 96228,
+    "path": "/home/zhuhe/litchi-performance-0943/tooling/comparison-runner.py",
+    "sha256": "6d93f743a067e5a3394537c6cf4d62714451d1aa8ca5553c351f1ab0fcf23c36"
+  },
+  "schedule_sha256": "fc650a1b08891779ed27034813ccadba12b6b04915c2f70160835ac9b5d6ecd2",
+  "schema": "litchi.performance.0943.synthetic-full.v1",
+  "status": "passed",
+  "terminal_written_before_report_parse": true
+}

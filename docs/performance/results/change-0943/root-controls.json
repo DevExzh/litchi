@@ -1,0 +1,77 @@
+{
+  "claim_scope": "synthetic controls only; no Office workload or performance claim",
+  "controls": [
+    {
+      "error": "native-r01-docnohf-e01-baseline: unclean terminal state",
+      "name": "exit-status",
+      "status": "rejected"
+    },
+    {
+      "error": "native-r01-docnohf-e01-baseline: unclean terminal state",
+      "name": "deadline",
+      "status": "rejected"
+    },
+    {
+      "error": "native-r01-docnohf-e01-baseline: unclean terminal state",
+      "name": "runner-error",
+      "status": "rejected"
+    },
+    {
+      "error": "native-r01-docnohf-e01-baseline: unclean terminal state",
+      "name": "unclosed-group",
+      "status": "rejected"
+    },
+    {
+      "error": "native-r01-docnohf-e01-baseline: unclean terminal state",
+      "name": "forced-cleanup",
+      "status": "rejected"
+    },
+    {
+      "error": "native-r01-docnohf-e01-baseline: child environment changed",
+      "name": "environment",
+      "status": "rejected"
+    },
+    {
+      "error": "native-r01-docnohf-e01-baseline: child source identity changed",
+      "name": "source",
+      "status": "rejected"
+    },
+    {
+      "error": "native-r01-docnohf-e01-baseline: child binary identity changed",
+      "name": "binary",
+      "status": "rejected"
+    },
+    {
+      "error": "native-r01-docnohf-e01-baseline: executed argv differs from schedule",
+      "name": "scheduled-argv",
+      "status": "rejected"
+    },
+    {
+      "name": "all-gates-positive",
+      "status": "passed"
+    },
+    {
+      "name": "one-latency-gate-false",
+      "status": "rejected"
+    },
+    {
+      "name": "duplicate-custody-json",
+      "status": "rejected"
+    }
+  ],
+  "full_reduction_equal": true,
+  "moved_full_children": 288,
+  "original_packet_unavailable_during_replay": true,
+  "protocol": {
+    "bytes": 7315,
+    "path": "/home/zhuhe/litchi-performance-0943/tooling/comparison-protocol.json",
+    "sha256": "c071f252e05e3e8ad28caaad34aa035a5ad5eaa6d901b331e046f37415d2f795"
+  },
+  "runner": {
+    "bytes": 96228,
+    "path": "/home/zhuhe/litchi-performance-0943/tooling/comparison-runner.py",
+    "sha256": "6d93f743a067e5a3394537c6cf4d62714451d1aa8ca5553c351f1ab0fcf23c36"
+  },
+  "schema": "litchi.performance.0943.root-controls.v1",
+  "status": "passed"
+}

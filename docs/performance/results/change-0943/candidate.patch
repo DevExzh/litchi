@@ -1,0 +1,269 @@
+--- /home/zhuhe/litchi-performance-0943/baseline-source-v1/crates/litchi-doc/src/tracked_revision/package.rs	2026-10-03 21:38:57.823728413 +0000
++++ /home/zhuhe/litchi-performance-0943/candidate-source-v4/crates/litchi-doc/src/tracked_revision/package.rs	2026-10-06 23:49:39.876936253 +0000
+@@ -917,7 +917,7 @@
+     data_path: Vec<String>,
+     word: Vec<u8>,
+     table: Vec<u8>,
+-    data: Vec<u8>,
++    data: Arc<Vec<u8>>,
+     pieces: Vec<RawPiece>,
+     chpx: Vec<FcRun>,
+     papx: Vec<PapxRun>,
+@@ -1022,9 +1022,11 @@
+             .ok_or_else(|| corrupted("selected Table stream is missing"))?
+             .to_vec();
+         let data_path = vec!["Data".to_string()];
+-        let data = package
+-            .stream(&data_path)
+-            .map_or_else(Vec::new, <[u8]>::to_vec);
++        let data = Arc::new(
++            package
++                .stream(&data_path)
++                .map_or_else(Vec::new, <[u8]>::to_vec),
++        );
+         let signed = package_has_binary_signature(ole) || word_vba_signature_state(&word, &table);
+         let fib = FileInformationBlock::parse(&word)?;
+         let protection = crate::parts::protection::classify(&fib, &table)?;
+@@ -2057,7 +2059,7 @@
+         let mut candidate = self.clone();
+         let picture_offset = u32::try_from(candidate.data.len())
+             .map_err(|error| corrupted(format!("Data stream exceeds u32: {error}")))?;
+-        candidate.data.extend_from_slice(&graph.picture_block);
++        Arc::make_mut(&mut candidate.data).extend_from_slice(&graph.picture_block);
+         candidate.data_changed = true;
+         let removed = end - start;
+         delete_piece_range(&mut candidate.pieces, start, end)?;
+@@ -2196,7 +2198,7 @@
+         }
+
+         let mut candidate = self.clone();
+-        candidate.data.truncate(data_start);
++        Arc::make_mut(&mut candidate.data).truncate(data_start);
+         candidate.data_changed = true;
+         delete_piece_range(&mut candidate.pieces, start, end)?;
+         let fc = align2(candidate.word.len())?;
+@@ -3037,11 +3039,11 @@
+             if self.package.stream(&self.data_path).is_some() {
+                 replacements.push((
+                     self.data_path.as_slice(),
+-                    Arc::<[u8]>::from(self.data.clone()),
++                    Arc::<[u8]>::from(self.data.as_ref().clone()),
+                 ));
+             } else {
+                 self.package
+-                    .add_stream(self.data_path.clone(), self.data.clone())
++                    .add_stream(self.data_path.clone(), self.data.as_ref().clone())
+                     .map_err(PackageError::from)?;
+             }
+         }
+@@ -3406,6 +3408,38 @@
+     }
+
+     #[test]
++    fn clone_first_text_edit_shares_unchanged_data_stream() {
++        let source = RevisionEditor::open(
++            std::fs::read(
++                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
++                    .join("../../test-data/ole/doc/NoHeadFoot.doc"),
++            )
++            .expect("NoHeadFoot fixture should be readable"),
++            Limits::default(),
++        )
++        .expect("NoHeadFoot fixture should open");
++        assert_eq!(source.data.len(), 4_096);
++        let source_text = source
++            .main_story_text()
++            .expect("NoHeadFoot text should decode");
++        assert!(source_text.starts_with("This is a sample word document."));
++        let source_data = Arc::clone(&source.data);
++        let source_capacity = source.data.capacity();
++        let mut candidate = source.clone();
++        assert!(Arc::ptr_eq(&source.data, &candidate.data));
++
++        candidate
++            .replace_plain_text(0, 1, "x")
++            .expect("same-length text edit should succeed");
++
++        assert_eq!(source.main_story_text().unwrap(), source_text);
++        assert_ne!(candidate.main_story_text().unwrap(), source_text);
++        assert!(Arc::ptr_eq(&source_data, &candidate.data));
++        assert_eq!(candidate.data.as_slice(), source_data.as_slice());
++        assert_eq!(candidate.data.capacity(), source_capacity);
++    }
++
++    #[test]
+     fn editor_table_queries_preserve_absent_state_and_malformed_open_errors() {
+         let mut editor = RevisionEditor::open(doc_with_table_state(false), Limits::default())
+             .expect("non-table fixture should open");
+@@ -3486,6 +3520,66 @@
+         package.finish().unwrap()
+     }
+
++    fn no_head_foot_data() -> Vec<u8> {
++        let package = ObjectEditor::open(
++            std::fs::read(
++                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
++                    .join("../../test-data/ole/doc/NoHeadFoot.doc"),
++            )
++            .unwrap(),
++            Targets::default(),
++            Limits::default(),
++        )
++        .unwrap();
++        package.stream(&["Data".to_owned()]).unwrap().to_vec()
++    }
++
++    fn floating_graph_and_receiver() -> (RevisionEditor, PictureGraph) {
++        use crate::writer::{CharacterFormatting, FloatingPosition, ParagraphFormatting, Writer};
++        use std::io::Cursor;
++
++        let bytes = std::fs::read(
++            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
++                .join("../../test-data/images/png/lena.png"),
++        )
++        .unwrap();
++        let picture = crate::writer::Picture::new(bytes).unwrap();
++        let mut donor_writer = Writer::new();
++        donor_writer
++            .insert_floating_picture(picture, FloatingPosition::new(1440, 720))
++            .unwrap();
++        let mut donor_bytes = Cursor::new(Vec::new());
++        donor_writer.write_to(&mut donor_bytes).unwrap();
++        let donor = RevisionEditor::open(
++            normalize_word2002_dop(donor_bytes.into_inner()),
++            Limits::default(),
++        )
++        .unwrap();
++        let graph = donor.picture_graph_at_cp(0, true).unwrap();
++
++        let mut receiver_writer = Writer::new();
++        receiver_writer
++            .add_paragraph_runs(
++                vec![("placeholder".to_owned(), CharacterFormatting::default())],
++                ParagraphFormatting::default(),
++            )
++            .unwrap();
++        let mut receiver_bytes = Cursor::new(Vec::new());
++        receiver_writer.write_to(&mut receiver_bytes).unwrap();
++        let mut receiver_package = ObjectEditor::open(
++            normalize_word2002_dop(receiver_bytes.into_inner()),
++            Targets::default(),
++            Limits::default(),
++        )
++        .unwrap();
++        receiver_package
++            .put_stream(&["Data".to_owned()], no_head_foot_data())
++            .unwrap();
++        let receiver =
++            RevisionEditor::open(receiver_package.finish().unwrap(), Limits::default()).unwrap();
++        (receiver, graph)
++    }
++
+     fn record(version: u16, instance: u16, kind: u16, payload: &[u8]) -> Vec<u8> {
+         let mut output = Vec::new();
+         crate::writer::images::write_record_header(
+@@ -3580,6 +3674,104 @@
+     }
+
+     #[test]
++    fn picture_install_and_restore_detach_only_the_mutated_data_snapshot() {
++        let (receiver, graph) = floating_graph_and_receiver();
++        let source_text = receiver.main_story_text().unwrap();
++        assert_eq!(source_text, "placeholder\r");
++        assert_eq!(receiver.data.len(), 4_096);
++        let source_bytes = receiver.data.as_slice().to_vec();
++        let source_data = Arc::clone(&receiver.data);
++        let mut candidate = receiver.clone();
++
++        let installed = candidate
++            .replace_with_picture_graph(0, 11, &graph)
++            .unwrap()
++            .expect("picture graph should install");
++        assert!(!Arc::ptr_eq(&source_data, &candidate.data));
++        assert_eq!(receiver.data.as_slice(), source_bytes.as_slice());
++        assert_eq!(
++            &candidate.data[..source_bytes.len()],
++            source_bytes.as_slice()
++        );
++        assert_eq!(
++            &candidate.data[source_bytes.len()..],
++            installed.picture_block.as_slice()
++        );
++        let installed_data = Arc::clone(&candidate.data);
++        let installed_bytes = installed_data.as_ref().clone();
++
++        candidate
++            .replace_picture_graph_with_text(0, 1, &installed, "placeholder")
++            .unwrap();
++        assert!(!Arc::ptr_eq(&installed_data, &candidate.data));
++        assert_eq!(installed_data.as_slice(), installed_bytes.as_slice());
++        assert_eq!(candidate.data.as_slice(), source_bytes.as_slice());
++        assert_eq!(receiver.data.as_slice(), source_bytes.as_slice());
++        assert_eq!(candidate.main_story_text().unwrap(), source_text);
++        assert_eq!(receiver.main_story_text().unwrap(), source_text);
++    }
++
++    #[test]
++    fn invalid_picture_graph_refusal_keeps_shared_data_snapshot() {
++        let (receiver, graph) = floating_graph_and_receiver();
++        let source_data = Arc::clone(&receiver.data);
++        let mut candidate = receiver.clone();
++        let before = candidate.data.as_slice().to_vec();
++        let mut invalid = graph;
++        invalid.dgg_info.clear();
++
++        assert!(
++            candidate
++                .replace_with_picture_graph(0, 11, &invalid)
++                .is_err()
++        );
++        assert!(Arc::ptr_eq(&source_data, &candidate.data));
++        assert_eq!(candidate.data.as_slice(), before.as_slice());
++    }
++
++    #[test]
++    fn picture_stream_limit_refusal_is_typed_and_atomic_after_data_append() {
++        let (admitted, graph) = floating_graph_and_receiver();
++        assert_eq!(admitted.data.len(), 4_096);
++        let max_stream_size = u64::try_from(admitted.data.len())
++            .unwrap()
++            .checked_add(u64::try_from(graph.picture_block.len()).unwrap())
++            .and_then(|size| size.checked_sub(1))
++            .unwrap();
++        assert!(u64::try_from(admitted.word.len()).unwrap() < max_stream_size);
++        assert!(u64::try_from(admitted.table.len()).unwrap() < max_stream_size);
++
++        let mut limits = Limits::default();
++        limits.max_stream_size = max_stream_size;
++        let source = RevisionEditor::open(admitted.source.as_ref().clone(), limits).unwrap();
++        let source_data = Arc::clone(&source.data);
++        let source_data_bytes = source.data.as_ref().clone();
++        let source_word = source.word.clone();
++        let source_table = source.table.clone();
++        let source_bytes = source.source.as_ref().clone();
++        let mut candidate = source.clone();
++
++        let error = candidate
++            .replace_with_picture_graph(0, 1, &graph)
++            .unwrap_err();
++        let error_text = error.to_string();
++        assert!(
++            matches!(
++                error,
++                PackageError::Ole(litchi_cfb::OleError::InvalidFormat(message))
++                    if message.contains("stream exceeds size limit")
++            ),
++            "unexpected late limit refusal: {error_text}"
++        );
++        assert!(Arc::ptr_eq(&source_data, &candidate.data));
++        assert_eq!(candidate.data.as_slice(), source_data_bytes.as_slice());
++        assert_eq!(candidate.word, source_word);
++        assert_eq!(candidate.table, source_table);
++        assert_eq!(candidate.source.as_ref(), source_bytes.as_slice());
++        assert_eq!(source.data.as_slice(), source_data_bytes.as_slice());
++    }
++
++    #[test]
+     fn nested_image_group_transfers_through_the_body_transaction() {
+         use crate::body_text::{Projection, Snapshot as BodySnapshot, TextTarget};
+         use crate::writer::{CharacterFormatting, FloatingPosition, ParagraphFormatting, Writer};
