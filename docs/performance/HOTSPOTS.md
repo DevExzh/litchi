@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0952 — native compression ranking remains unproven
+
+[0952](0952-xlsx-native-publication-unwind-rejection.md) finds no duplicate
+changed-member compression in source review. Its first native capture passes
+semantics but fails owner admission: the decoded callchains contain zero
+publication-owner frames. Recorded mappings and ELF CFI expose a local
+one-page unwind-address mismatch. Retain the failed capture and qualify a
+separate frame-pointer profile before choosing native compression work.
+0951 remains guest-instruction evidence. The existing explicit managed write
+wave is a candidate only after a changed-member size/balance census and fresh
+native/allocation qualification; preservation policy remains unchanged.
+
 ## 0951 — preservation writing leads current publication instructions
 
 [0951](0951-xlsx-post-multi-window-publication-profile.md) refreshes attribution

@@ -1,5 +1,14 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0952 — native publication profile fails owner admission
+
+[0952](0952-xlsx-native-publication-unwind-rejection.md) retains one medium
+200-sample capture with passing semantics, but zero admissible publication
+owner frames among 8,879 sampled events. The frozen minimum is 100, so the
+remaining three planned captures were not run. Offline decoding exposes a
+local ELF/load-bias mismatch in DWARF unwinding. No native phase fractions or
+baseline changes are claimed; next qualify a separate frame-pointer build.
+
 ## 0951 — current XLSX publication instruction profile
 
 [0951](0951-xlsx-post-multi-window-publication-profile.md) reuses the verified

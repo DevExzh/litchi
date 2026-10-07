@@ -1,0 +1,188 @@
+{
+  "command": {
+    "argv": [
+      "python3",
+      "-B",
+      "/home/zhuhe/litchi-performance-0952/tools/analyze_0952_v3.py",
+      "--index",
+      "0",
+      "--sample-export",
+      "/home/zhuhe/litchi-performance-0952/analysis/samples/00-medium",
+      "--mmap-export",
+      "/home/zhuhe/litchi-performance-0952/analysis/mmap/00-medium",
+      "--output",
+      "/home/zhuhe/litchi-performance-0952/analysis/native-admission-v3-00c.json"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "returncode": 2,
+    "stderr": "",
+    "stdout": "{\"output\": \"/home/zhuhe/litchi-performance-0952/analysis/native-admission-v3-00c.json\", \"sha256\": \"24c6f18f3c4d48278d877dc74a0ac200e8c798da7131eb4e051f7fbf926defdc\", \"status\": \"fail\"}"
+  },
+  "controls": {
+    "bytes": 5295,
+    "path": "/home/zhuhe/litchi-performance-0952/receipts/native-analyzer-v3-controls-v3.json",
+    "sha256": "e99a8d912c0fea817142301442fd9eaf56bb62ecefe47ec94a3b5caedf33dd2e"
+  },
+  "created_utc": "2026-10-07T08:51:12.900070+00:00",
+  "final_output": {
+    "bytes": 19038,
+    "path": "/home/zhuhe/litchi-performance-0952/analysis/native-admission-v3-00c.json",
+    "sha256": "24c6f18f3c4d48278d877dc74a0ac200e8c798da7131eb4e051f7fbf926defdc"
+  },
+  "mmap_binding": {
+    "ambiguous_bound_mappings": 2,
+    "bound_build_ids": [
+      "12c119744b5f1bfcf9fe74422e5155da8e5dd20f"
+    ],
+    "bound_pids": [
+      2799045
+    ],
+    "build_id": "12c119744b5f1bfcf9fe74422e5155da8e5dd20f",
+    "line_count": 14492,
+    "target_path": "/home/zhuhe/litchi-performance-0950/target-candidate-native-v1/release/litchi-perf-baseline",
+    "unsupported": 0
+  },
+  "negative_controls": [
+    "wrong parent DSO: parse succeeds but owner qualification is zero",
+    "outside executable IP: parse succeeds but owner qualification is zero",
+    "wrong PID: parse succeeds but owner qualification is zero",
+    "wrong build-id: mmap parser rejects",
+    "wrong perf event: sample parser rejects"
+  ],
+  "owner_gate": {
+    "fully_resolved_owner_samples_min": false,
+    "lost_records_zero": true,
+    "owner_period_min": false
+  },
+  "packet": {
+    "binary": {
+      "bytes": 266090728,
+      "executable": true,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0950/target-candidate-native-v1/release/litchi-perf-baseline",
+      "sha256": "198c2e87471a088cf054a23785e4068eaf7f205ffb1fb25cad5ba0b7a6db5bec"
+    },
+    "mmap_export": {
+      "bytes": 2233948,
+      "path": "/home/zhuhe/litchi-performance-0952/analysis/mmap/00-medium/events.txt",
+      "sha256": "ea31f400aa251b3926cc5dd9e33d5a7d47b31f7c6858901f4f22e36d6ecda380"
+    },
+    "plan": {
+      "bytes": 19488,
+      "path": "/home/zhuhe/litchi-performance-0952/plan-0952-v1.json",
+      "sha256": "7846288a54c6c5eebb97f958631d9e5fe4345ab08dd1c7527e94e4a0d751beed"
+    },
+    "sample_export": {
+      "bytes": 2203611,
+      "path": "/home/zhuhe/litchi-performance-0952/analysis/samples/00-medium/events.txt",
+      "sha256": "2eb3bc3df2fd4322f3b55c07238810eeea95428803eeb96aa990db6fb2fe95c8"
+    }
+  },
+  "preserved_attempts": [
+    {
+      "label": "v3 before non-executable overlay handling",
+      "output": {
+        "bytes": 219,
+        "path": "/home/zhuhe/litchi-performance-0952/analysis/native-admission-v3-00.json",
+        "sha256": "dd3a793b8276f6e8bff6c4434c80c9af68e22bb8b1c6362de57a85ae5289ba0b"
+      },
+      "reason": "mapping permissions do not bind PT_LOAD at 0x2f1a000",
+      "status": "error"
+    },
+    {
+      "label": "v3 subset-permission run before final-named rerun",
+      "output": {
+        "bytes": 19038,
+        "path": "/home/zhuhe/litchi-performance-0952/analysis/native-admission-v3-00b.json",
+        "sha256": "24c6f18f3c4d48278d877dc74a0ac200e8c798da7131eb4e051f7fbf926defdc"
+      },
+      "same_bytes_as_final_output": true,
+      "status": "fail"
+    }
+  ],
+  "profile": {
+    "admitted": false,
+    "all": {
+      "period": 34521187678,
+      "samples": 8879
+    },
+    "classification_reasons": {
+      "owner_not_observed": 5303,
+      "unresolved_or_truncated": 3576
+    },
+    "exclusive_leaf_ranking": [],
+    "frame_length_counts": {
+      "0": 1682,
+      "1": 3296,
+      "2": 3360,
+      "3": 249,
+      "4": 273,
+      "5": 15,
+      "6": 1,
+      "7": 2,
+      "8": 1
+    },
+    "gate": {
+      "fully_resolved_owner_samples_min": false,
+      "lost_records_zero": true,
+      "owner_period_min": false
+    },
+    "lost_records": 0,
+    "nested_compression_xml_rows": [],
+    "nested_rows_overlap": true,
+    "owner_qualified": {
+      "period": 0,
+      "samples": 0
+    },
+    "unknown_or_unqualified": {
+      "period": 34521187678,
+      "samples": 8879
+    },
+    "unresolved_period": 13607531756
+  },
+  "qualification": {
+    "actual_profile_period": 34521187678,
+    "actual_profile_samples": 8879,
+    "admission_not_granted": true,
+    "controls_passed": true,
+    "owner_qualified_period": 0,
+    "owner_qualified_samples": 0
+  },
+  "schema": "litchi.performance.0952.native-admission.v3-rejection.v1",
+  "scope": "Read-only offline attribution validation; no workload, build, perf capture, or admission.",
+  "source": {
+    "v2": {
+      "bytes": 28022,
+      "path": "/home/zhuhe/litchi-performance-0952/tools/analyze_0952_v2.py",
+      "sha256": "17fcafd0bbaeae5194a3d38d37f6a86762ad9a085b6731d3157c4daba127d697"
+    },
+    "v3": {
+      "bytes": 28604,
+      "path": "/home/zhuhe/litchi-performance-0952/tools/analyze_0952_v3.py",
+      "sha256": "321e415fd3092b3002c76114e7cb147f7382d231c697dbd2878d7bc9c9ddc08e"
+    },
+    "v3_controls": {
+      "bytes": 9256,
+      "path": "/home/zhuhe/litchi-performance-0952/tools/analyze_0952_v3_controls.py",
+      "sha256": "a247d13139273938aa264b258a518ec7145b428846c3d0969c03340bbb90c53e"
+    },
+    "v3_diff_summary": [
+      "PT_LOAD selection uses mmap-required flags as a subset of PT_LOAD flags; no incompatible fallback.",
+      "Executable mappings must select exactly one compatible PT_LOAD; non-executable ambiguity/no-bind remains in the map but is never owner-eligible.",
+      "static_ip rejects missing, ambiguous, non-executable, and biasless mappings before static ownership.",
+      "v3 schema/error labels are distinct from retained v2; --packet remains compatibility-only for the fixed packet."
+    ]
+  },
+  "status": "rejected_owner_gate",
+  "v2_comparison": {
+    "all_equal": true,
+    "owner_qualified_equal": true,
+    "retained_output": {
+      "bytes": 19038,
+      "path": "/home/zhuhe/litchi-performance-0952/analysis/native-admission-v2-00e.json",
+      "sha256": "1b3ed0a25f692d8b9fe6b9ac29e96873006858a8d5c65e78b3ed364a1760927e"
+    },
+    "v3_owner_period": 0,
+    "v3_owner_samples": 0
+  }
+}

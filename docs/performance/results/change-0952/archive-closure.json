@@ -1,0 +1,187 @@
+{
+  "analysis": {
+    "controls_receipt_sha256": "e99a8d912c0fea817142301442fd9eaf56bb62ecefe47ec94a3b5caedf33dd2e",
+    "controls_source_sha256": "a247d13139273938aa264b258a518ec7145b428846c3d0969c03340bbb90c53e",
+    "final_packet_member": "analysis/native-admission-v3-00b.json",
+    "final_result_bytes": 19038,
+    "final_result_sha256": "24c6f18f3c4d48278d877dc74a0ac200e8c798da7131eb4e051f7fbf926defdc"
+  },
+  "archive": {
+    "compressed": {
+      "bytes": 10936839,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0952-archive/archive-0952-v1.tar.zst",
+      "sha256": "e6fe78b8fa765a3c5247411641cca881f1c3fbf1a85666aac717413cf77f90db"
+    },
+    "helper": {
+      "bytes": 6893,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0952-archive/archive-0952-v1.py",
+      "sha256": "2289a07b96a5fce818df1f948ad2f2df78b3f1b7b0bfedb8b62c77286312d52d"
+    },
+    "manifest": {
+      "bytes": 15288,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0952-archive/manifest-v1.json",
+      "sha256": "30954f383d26c91cbea811fa86f74a70d200cfd062a28feea14da771ddd1a4ef"
+    },
+    "receipt": {
+      "bytes": 2059,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0952-archive/archive-receipt-v1.json",
+      "sha256": "fad9de4f25251dccdf9dadfb2806ce84e64b8e2f38eab35c94e8797d3e6d1aec"
+    },
+    "regeneration": "archive_rebuild=$(mktemp -d /home/zhuhe/litchi-performance-0952-archive-rebuild.XXXXXX) && python3 -B /home/zhuhe/litchi-performance-0952-archive/archive-0952-v1.py --packet /home/zhuhe/litchi-performance-0952 --archive-root \"$archive_rebuild\" --seal --go",
+    "regeneration_fresh_root": "archive_rebuild=$(mktemp -d /home/zhuhe/litchi-performance-0952-archive-rebuild.XXXXXX) && python3 -B /home/zhuhe/litchi-performance-0952-archive/archive-0952-v1.py --packet /home/zhuhe/litchi-performance-0952 --archive-root \"$archive_rebuild\" --seal --go",
+    "regeneration_note": "The sealed helper refuses an existing manifest; use a fresh archive-root and compare the new manifest census/hashes. Pax metadata is not claimed byte-identical.",
+    "selection": {
+      "bytes": 2336,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0952-archive/selection-v1.list",
+      "sha256": "fe5a4882cbdb37b9595f53f45c73a4cf5e9abaa4d9d982acdd00a0bca4db0f24"
+    }
+  },
+  "cleanup": {
+    "canonical_raw_preserved": true,
+    "receipt": {
+      "bytes": 771,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0952-archive/cleanup-receipt-v1.json",
+      "sha256": "3462eee471201214f56a93598e77533767ec2178657e586454c1142399f9935f"
+    },
+    "removed_bytecode_files": 1,
+    "removed_replay_files": 68,
+    "removed_replay_logical_bytes": 312086172
+  },
+  "decision": "descriptive_recovery_audited_frozen_owner_gate_failed",
+  "dependencies": {
+    "0942": {
+      "copied": false,
+      "path": "/home/zhuhe/litchi-performance-0942"
+    },
+    "0950": {
+      "copied": false,
+      "path": "/home/zhuhe/litchi-performance-0950"
+    },
+    "0951": {
+      "copied": false,
+      "path": "/home/zhuhe/litchi-performance-0951"
+    }
+  },
+  "extraction_command": "mkdir -p /home/zhuhe/litchi-performance-0952-replay-v1 && tar --extract --same-permissions --no-same-owner --file /home/zhuhe/litchi-performance-0952-archive/archive-0952-v1.tar.zst --directory /home/zhuhe/litchi-performance-0952-replay-v1",
+  "final_reader": {
+    "sha256": "321e415fd3092b3002c76114e7cb147f7382d231c697dbd2878d7bc9c9ddc08e",
+    "tool": {
+      "bytes": 28604,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0952-archive/replay-inputs/analyze_0952_v3.py",
+      "sha256": "321e415fd3092b3002c76114e7cb147f7382d231c697dbd2878d7bc9c9ddc08e"
+    }
+  },
+  "interpretation": "The one executed child was retained and independently replayed. Its raw capture and semantic validation passed, but the native owner-quality gate failed with zero qualified owner samples; indices 1-3 were not executed. No admission, speedup, or adoption claim follows.",
+  "large_artifacts": [
+    {
+      "bytes": 2233948,
+      "member": "analysis/mmap/00-medium/events.txt",
+      "sha256": "ea31f400aa251b3926cc5dd9e33d5a7d47b31f7c6858901f4f22e36d6ecda380"
+    },
+    {
+      "bytes": 2203611,
+      "member": "analysis/samples/00-medium/events.txt",
+      "sha256": "2eb3bc3df2fd4322f3b55c07238810eeea95428803eeb96aa990db6fb2fe95c8"
+    },
+    {
+      "bytes": 2176974,
+      "member": "analysis/unwind-debug-v1/samples.txt",
+      "sha256": "b326e55ea84ac37a88445616f2b7a77873d743e3d66965955856478a23dd6b22"
+    },
+    {
+      "bytes": 9833562,
+      "member": "analysis/unwind-debug-v1/stderr.txt",
+      "sha256": "70900f2b44a1bbc934ae371f1fc1c459d0596e32c8f2dbb93c22679f3111c919"
+    },
+    {
+      "bytes": 294638376,
+      "member": "capture/00-medium/perf.data",
+      "sha256": "aed02b16e9572fde24c190f37323c89b1fa5c2e69f0eb40bc5145b05d4020a8f"
+    }
+  ],
+  "packet_census": {
+    "entries": 68,
+    "excluded": [
+      "tools/__pycache__/"
+    ],
+    "logical_bytes": 312086172,
+    "symlinks": []
+  },
+  "parent_closure_v1": {
+    "bytes": 6098,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0952-archive/archive-closure-v1.json",
+    "sha256": "0d4f49c31734b92550574c5b34073a84a6b48ea3c06543eb19e3125962ca71ff"
+  },
+  "raw_artifact_extraction": {
+    "command": "mkdir -p /home/zhuhe/litchi-performance-0952-replay-v1 && tar --extract --same-permissions --no-same-owner --file /home/zhuhe/litchi-performance-0952-archive/archive-0952-v1.tar.zst --directory /home/zhuhe/litchi-performance-0952-replay-v1",
+    "members": [
+      "analysis/mmap/00-medium/events.txt",
+      "analysis/samples/00-medium/events.txt",
+      "analysis/unwind-debug-v1/samples.txt",
+      "analysis/unwind-debug-v1/stderr.txt",
+      "capture/00-medium/perf.data"
+    ],
+    "verification": "Compare each extracted member against manifest-v1.json bytes, SHA-256 and mode before running any parser."
+  },
+  "replay": {
+    "expected_replay_returncode": 2,
+    "manifest_controls": {
+      "bytes": 1499,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0952-archive/replay-results/manifest-controls-v1.json",
+      "sha256": "d6f59967d4639f9d50f781c072629912a4a734155358bfba83d9d109ce586837"
+    },
+    "original_packet_open_count": 0,
+    "receipt": {
+      "bytes": 5277,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0952-archive/replay-receipt-v2.json",
+      "sha256": "85d571cfa0984803c411ef2fff89d37c10e3c0f254c4bc34ff810f34f4fe5a98"
+    },
+    "relocated_result": {
+      "bytes": 19038,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0952-archive/replay-results/native-admission-v3-relocated.json",
+      "sha256": "24c6f18f3c4d48278d877dc74a0ac200e8c798da7131eb4e051f7fbf926defdc"
+    },
+    "result_byte_identical": true,
+    "trace": {
+      "bytes": 196472,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0952-archive/replay-traces/replay-v1-strace.log",
+      "sha256": "5c64f9a002ea442b8618cca0f3e4f9ee92b916345eb9c6840ff701808b1cf61a"
+    }
+  },
+  "repository_copy_note": "Root changed only regeneration commands to allocate a fresh directory without deleting any existing output; source_closure binds the external receipt.",
+  "retained_limitations": [
+    "native-analyzer-custody-limit-v1.json records unavailable bytes for earlier v2 helper revisions; no unsupported bytes were reconstructed.",
+    "The mmap/sample forensic exports and unwind diagnostics remain descriptive evidence; the archive preserves their exact bytes and hashes."
+  ],
+  "schema": "litchi.performance.0952.external-archive-closure.v2",
+  "source_closure": {
+    "bytes": 7983,
+    "path": "/home/zhuhe/litchi-performance-0952-archive/archive-closure-v2.json",
+    "sha256": "bffce778a9183918f0311a9e0a1046945e5b908a4b27fd828182af9b04e2da18"
+  },
+  "status": "pass"
+}

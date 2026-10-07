@@ -1,0 +1,29 @@
+{
+  "schema": "litchi.performance.0952.external-archive-extraction-verification.v1",
+  "status": "pass",
+  "archive": {
+    "path": "/home/zhuhe/litchi-performance-0952-archive/archive-0952-v1.tar.zst",
+    "sha256": "e6fe78b8fa765a3c5247411641cca881f1c3fbf1a85666aac717413cf77f90db",
+    "bytes": 10936839
+  },
+  "manifest": {
+    "path": "/home/zhuhe/litchi-performance-0952-archive/manifest-v1.json",
+    "sha256": "30954f383d26c91cbea811fa86f74a70d200cfd062a28feea14da771ddd1a4ef"
+  },
+  "selection": {
+    "path": "/home/zhuhe/litchi-performance-0952-archive/selection-v1.list",
+    "sha256": "fe5a4882cbdb37b9595f53f45c73a4cf5e9abaa4d9d982acdd00a0bca4db0f24"
+  },
+  "extraction_root": "/home/zhuhe/litchi-performance-0952-replay-v1",
+  "command": "tar --extract --same-permissions --no-same-owner --file /home/zhuhe/litchi-performance-0952-archive/archive-0952-v1.tar.zst --directory /home/zhuhe/litchi-performance-0952-replay-v1",
+  "expected_entries": 68,
+  "actual_entries": 68,
+  "expected_logical_bytes": 312086172,
+  "actual_logical_bytes": 312086172,
+  "exact_relative_file_set": true,
+  "exact_bytes_and_sha256": true,
+  "exact_modes": true,
+  "symlink_count": 0,
+  "unexpected_symlinks": [],
+  "verified_before_replay": true
+}

@@ -1,0 +1,54 @@
+{
+  "all_rejected": true,
+  "controls": [
+    {
+      "name": "missing-file",
+      "reason": "file set differs: missing=['analysis/mmap/00-medium/events.txt'] extra=[]",
+      "rejected": true
+    },
+    {
+      "name": "extra-file",
+      "reason": "file set differs: missing=[] extra=['unexpected-extra.bin']",
+      "rejected": true
+    },
+    {
+      "name": "symlink-file",
+      "reason": "symlink present in extracted root",
+      "rejected": true
+    },
+    {
+      "name": "symlink-directory",
+      "reason": "symlink present in extracted root",
+      "rejected": true
+    },
+    {
+      "name": "wrong-sha",
+      "reason": "descriptor differs: analysis/mmap/00-medium/events.txt",
+      "rejected": true
+    },
+    {
+      "name": "wrong-mode",
+      "reason": "descriptor differs: analysis/mmap/00-medium/events.txt",
+      "rejected": true
+    },
+    {
+      "name": "duplicate-entry",
+      "reason": "duplicate entry: analysis/mmap/00-medium/events.txt",
+      "rejected": true
+    },
+    {
+      "name": "path-escape",
+      "reason": "manifest path escapes root",
+      "rejected": true
+    }
+  ],
+  "extraction": "/home/zhuhe/litchi-performance-0952-replay-v1",
+  "manifest": "/home/zhuhe/litchi-performance-0952-archive/manifest-v1.json",
+  "positive": {
+    "entries": 68,
+    "logical_bytes": 312086172
+  },
+  "schema": "litchi.performance.0952.relocated-manifest-controls.v1",
+  "scope": "Manifest custody controls only; no workload or perf operation.",
+  "status": "pass"
+}

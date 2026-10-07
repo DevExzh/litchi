@@ -1,0 +1,112 @@
+{
+  "final_invocation": {
+    "all_period": 34521187678,
+    "all_samples": 8879,
+    "argv": [
+      "python3",
+      "-B",
+      "/home/zhuhe/litchi-performance-0952/tools/analyze_0952_v2.py",
+      "--packet",
+      "/home/zhuhe/litchi-performance-0952",
+      "--index",
+      "0",
+      "--sample-export",
+      "/home/zhuhe/litchi-performance-0952/analysis/samples/00-medium",
+      "--mmap-export",
+      "/home/zhuhe/litchi-performance-0952/analysis/mmap/00-medium",
+      "--output",
+      "/home/zhuhe/litchi-performance-0952/analysis/native-admission-v2-00e.json"
+    ],
+    "lost_records": 0,
+    "minimum_owner_period": 100000,
+    "minimum_owner_samples": 100,
+    "owner_period": 0,
+    "owner_samples": 0,
+    "returncode": 2,
+    "status": "rejected_owner_gate"
+  },
+  "final_reader": {
+    "bytes": 28022,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0952/tools/analyze_0952_v2.py",
+    "sha256": "17fcafd0bbaeae5194a3d38d37f6a86762ad9a085b6731d3157c4daba127d697"
+  },
+  "final_result": {
+    "bytes": 19038,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0952/analysis/native-admission-v2-00e.json",
+    "sha256": "1b3ed0a25f692d8b9fe6b9ac29e96873006858a8d5c65e78b3ed364a1760927e"
+  },
+  "intermediate_outputs_preserved": [
+    {
+      "bytes": 198,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0952/analysis/native-admission-v2-00.json",
+      "sha256": "8e466860ad845d11a6e89edbc0756f9a2aa1c9cc332db112b468e080c9790bf2"
+    },
+    {
+      "bytes": 229,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0952/analysis/native-admission-v2-00b.json",
+      "sha256": "59d038bf73cbbd2fb370607e846f616764384a08d8a9d1da54f9fc31de2aea6c"
+    },
+    {
+      "bytes": 194,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0952/analysis/native-admission-v2-00c.json",
+      "sha256": "43dc6963b2b2534cb35a7d002a6e041d99c1d9ef41c7616ddc4bf6f5f0ebce95"
+    },
+    {
+      "bytes": 19038,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0952/analysis/native-admission-v2-00d.json",
+      "sha256": "1b3ed0a25f692d8b9fe6b9ac29e96873006858a8d5c65e78b3ed364a1760927e"
+    },
+    {
+      "bytes": 19038,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0952/analysis/native-admission-v2-00e.json",
+      "sha256": "1b3ed0a25f692d8b9fe6b9ac29e96873006858a8d5c65e78b3ed364a1760927e"
+    }
+  ],
+  "intermediate_reader_bytes": {
+    "final_00e_only": "Output 00e is the final-reader result bound by this receipt; 00d has identical result bytes but its intermediate helper revision is unavailable.",
+    "retained": false,
+    "statement": "The helper bytes used for outputs 00, 00b, 00c, and 00d were not retained as separate files. Their revisions are not retroactively reproducible from the final helper and are not claimed to be fully reproducible."
+  },
+  "no_claims": [
+    "No native phase fraction was admitted after zero owner samples.",
+    "No intermediate reader revision is represented as a retained/reproducible artifact."
+  ],
+  "schema": "litchi.performance.0952.native-analyzer-custody-limit.v1",
+  "scope": "Custody limit for offline reader revisions; no workload/capture/export rerun.",
+  "status": "final_reader_bound_intermediate_bytes_unavailable",
+  "superseded_receipt": {
+    "note": "Preserved v1 receipt binds the earlier native-admission-v2-00 error output; this receipt binds the final 00e rejected-owner result.",
+    "path": "/home/zhuhe/litchi-performance-0952/receipts/native-admission-00-rejection-v1.json",
+    "sha256": "f7390a0fd508cbe597a5ae23eaf22497be136269c855282fe9324da9515d1a77"
+  },
+  "writer_attribution": {
+    "output": {
+      "bytes": 93246,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0952/attribution-0952-v1.json",
+      "sha256": "9c8b0489cb032b79395fd0886aeb025370ddc7b4346b07b4b19d5c315c42d2e7"
+    },
+    "script": {
+      "bytes": 21521,
+      "executable": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0952/attribute_0952_v1.py",
+      "sha256": "29d4876931b7dd6dfcc3f7ca3da7693b1d71a02173f55f95c0a7aa9142bb18a1"
+    }
+  }
+}

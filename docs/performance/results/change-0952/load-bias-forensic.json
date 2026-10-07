@@ -1,0 +1,191 @@
+{
+  "address_arithmetic": {
+    "difference": "0x1000",
+    "formula": "runtime_map_start - align_down(PT_LOAD.p_vaddr)",
+    "page_size": "0x1000",
+    "pgoff_only_bias_used_by_observed_wrong_decode": "0x5b8f9d94e000",
+    "pt_load_aware_bias": "0x5b8f9d94d000",
+    "why": "The mapping file offset page 0x8a6000 overlaps the first R PT_LOAD page and the RX PT_LOAD page; the RX segment maps to virtual page 0x8a7000."
+  },
+  "artifacts": {
+    "binary": {
+      "bytes": 266090728,
+      "path": "/home/zhuhe/litchi-performance-0950/target-candidate-native-v1/release/litchi-perf-baseline",
+      "sha256": "198c2e87471a088cf054a23785e4068eaf7f205ffb1fb25cad5ba0b7a6db5bec"
+    },
+    "capture_receipt": {
+      "bytes": 5123,
+      "path": "/home/zhuhe/litchi-performance-0952/capture/00-medium/receipt.json",
+      "sha256": "3e95e8dde4c7168146c276035b508ef78cf3ac4966b0c4db378626ac732e284e"
+    },
+    "mmap_decoder": {
+      "bytes": 27417,
+      "path": "/home/zhuhe/litchi-performance-0952/tools/analyze_0952_v2.py",
+      "sha256": "16605745ecd28cd585c27fe343c2b90644db0eb95e3f4e26a4ca31e6e39f9b80"
+    },
+    "mmap_events": {
+      "bytes": 2233948,
+      "path": "/home/zhuhe/litchi-performance-0952/analysis/mmap/00-medium/events.txt",
+      "sha256": "ea31f400aa251b3926cc5dd9e33d5a7d47b31f7c6858901f4f22e36d6ecda380"
+    },
+    "mmap_receipt": {
+      "bytes": 1497,
+      "path": "/home/zhuhe/litchi-performance-0952/analysis/mmap/00-medium/receipt.json",
+      "sha256": "b8dcf710b1d2cd3aba86d3274d2044012ebb94d95d8f20b828e76ac0915c8121"
+    },
+    "mmap_terminal": {
+      "bytes": 746,
+      "path": "/home/zhuhe/litchi-performance-0952/analysis/mmap/00-medium/terminal.json",
+      "sha256": "c578a06d5786e454a8ae723bc971857f2da14a4b5ad9189139aeeb4a6a8831b7"
+    },
+    "plan": {
+      "bytes": 19488,
+      "path": "/home/zhuhe/litchi-performance-0952/plan-0952-v1.json",
+      "sha256": "7846288a54c6c5eebb97f958631d9e5fe4345ab08dd1c7527e94e4a0d751beed"
+    },
+    "sample_events": {
+      "bytes": 2203611,
+      "path": "/home/zhuhe/litchi-performance-0952/analysis/samples/00-medium/events.txt",
+      "sha256": "2eb3bc3df2fd4322f3b55c07238810eeea95428803eeb96aa990db6fb2fe95c8"
+    },
+    "unwind_samples": {
+      "bytes": 2176974,
+      "path": "/home/zhuhe/litchi-performance-0952/analysis/unwind-debug-v1/samples.txt",
+      "sha256": "b326e55ea84ac37a88445616f2b7a77873d743e3d66965955856478a23dd6b22"
+    },
+    "unwind_stderr": {
+      "bytes": 9833562,
+      "path": "/home/zhuhe/litchi-performance-0952/analysis/unwind-debug-v1/stderr.txt",
+      "sha256": "70900f2b44a1bbc934ae371f1fc1c459d0596e32c8f2dbb93c22679f3111c919"
+    }
+  },
+  "cfi_checks": {
+    "actual_cfi_row": "readelf --debug-dump=frames-interp: 0x2f11ebe..0x2f121cd has CFA rsp+160, saved rbx/rbp/r12/r13/r14/r15 at c-56/c-16/c-48/c-40/c-32/c-24 and return address c-8.",
+    "actual_fde": "pc=0x2f11eb0..0x2f12281",
+    "actual_samples_inside_fde": [
+      "0x2f12058",
+      "0x2f12075"
+    ],
+    "debug_stream_examples": [
+      {
+        "note": "The verbose stream shows wrong one-page-low longest_match addresses and a later ip=0x0 in the same decode region; perf debug output does not carry an explicit sample-record delimiter here, so this is supporting evidence rather than a one-to-one causal pairing.",
+        "wrong_static_lines": "analysis/unwind-debug-v1/stderr.txt:6647-6678",
+        "zero_return_line": "analysis/unwind-debug-v1/stderr.txt:6687"
+      },
+      {
+        "note": "Same local pattern; not used as a workload-wide failure count.",
+        "wrong_static_lines": "analysis/unwind-debug-v1/stderr.txt:8618-8648",
+        "zero_return_line": "analysis/unwind-debug-v1/stderr.txt:8702"
+      }
+    ],
+    "interpretation": "The observed one-page-low address selects a different function/FDE and can explain bogus return/unwind continuation; it is an address-binding problem before any claim about absent owner execution.",
+    "wrong_address_inside_wrong_fde": "0x2f11058 uses the prior function FDE; its row begins at 0x2f10fc1 with CFA rsp+240.",
+    "wrong_fde": "pc=0x2f10fb0..0x2f11eaf"
+  },
+  "commands": [
+    [
+      "readelf",
+      "-lW",
+      "/home/zhuhe/litchi-performance-0950/target-candidate-native-v1/release/litchi-perf-baseline"
+    ],
+    [
+      "readelf",
+      "--debug-dump=frames-interp",
+      "/home/zhuhe/litchi-performance-0950/target-candidate-native-v1/release/litchi-perf-baseline"
+    ],
+    [
+      "readelf",
+      "-n",
+      "/home/zhuhe/litchi-performance-0950/target-candidate-native-v1/release/litchi-perf-baseline"
+    ],
+    [
+      "nm",
+      "-an",
+      "--defined-only",
+      "/home/zhuhe/litchi-performance-0950/target-candidate-native-v1/release/litchi-perf-baseline"
+    ],
+    [
+      "addr2line",
+      "-e",
+      "/home/zhuhe/litchi-performance-0950/target-candidate-native-v1/release/litchi-perf-baseline",
+      "-f",
+      "-C",
+      "-i",
+      "0x2f12058",
+      "0x2f12075",
+      "0x2f11058"
+    ]
+  ],
+  "elf_rx_pt_load": {
+    "align": "0x1000",
+    "filesz": "0x2673730",
+    "flags": "R E",
+    "memsz": "0x2673730",
+    "offset": "0x8a6df0",
+    "page_offset": "0x8a6000",
+    "page_vaddr": "0x8a7000",
+    "source": "readelf -lW output",
+    "vaddr": "0x8a7df0"
+  },
+  "limitations": [
+    "Only child 00-medium and a few zlib sample addresses were checked.",
+    "No workload rerun, build, or comparative ranking was performed.",
+    "This confirms a local load-bias/CFI failure mode; it does not establish that every zero-owner frame has this cause or that perf/libdw is universally defective."
+  ],
+  "mmap_record": {
+    "build_id": "12c119744b5f1bfcf9fe74422e5155da8e5dd20f",
+    "dso": "/home/zhuhe/litchi-performance-0950/target-candidate-native-v1/release/litchi-perf-baseline",
+    "end": "0x5b8fa0869000",
+    "file_offset": "0x8a6000",
+    "permissions": "r-xp",
+    "pid": 2799045,
+    "size": "0x2675000",
+    "source": "analysis/mmap/00-medium/events.txt:6",
+    "start": "0x5b8f9e1f4000",
+    "tid": 2799045,
+    "time": "227717.950971742"
+  },
+  "reader_boundary": {
+    "observed_v2_failure": {
+      "error": "mapping file offset 0x8a6000 does not bind uniquely to PT_LOAD",
+      "meaning": "The decoder correctly failed closed on the overlapping page; it must use mapping permissions/segment correspondence to select the RX PT_LOAD, then retain ambiguity as unknown.",
+      "path": "/home/zhuhe/litchi-performance-0952/analysis/native-admission-v2-00b.json"
+    },
+    "required_before_admission": [
+      "Use PT_LOAD-aware page virtual address, not runtime_start minus raw mmap file-offset page.",
+      "Bind map PID/time/permissions/build-id and DSO to the executable.",
+      "Keep unresolved/ambiguous rows outside the qualified denominator and preserve total samples/periods.",
+      "Recheck owner and physical parent after corrected static-IP mapping; this receipt does not perform whole-capture admission."
+    ]
+  },
+  "reviewed_utc": "2026-10-07T08:41:32Z",
+  "sample_checks": [
+    {
+      "debug_unwind_report": "analysis/unwind-debug-v1/stderr.txt:800,808,816,824,1713",
+      "reported_symbol": "zlib_rs::deflate::longest_match::longest_match+0x1a8",
+      "runtime_ip": "0x5b8fa085f058",
+      "source": "analysis/samples/00-medium/events.txt:96",
+      "static_resolution": "longest_match::longest_match (nm start 0x2f11eb0; +0x1a8)",
+      "static_with_pgoff_only_bias": "0x2f11058",
+      "static_with_pt_load_bias": "0x2f12058"
+    },
+    {
+      "debug_unwind_report": "analysis/unwind-debug-v1/stderr.txt:832,4272,5583",
+      "reported_symbol": "zlib_rs::deflate::longest_match::longest_match+0x1c5",
+      "runtime_ip": "0x5b8fa085f075",
+      "source": "analysis/samples/00-medium/events.txt:108",
+      "static_resolution": "longest_match::longest_match",
+      "static_with_pgoff_only_bias": "0x2f11075",
+      "static_with_pt_load_bias": "0x2f12075"
+    }
+  ],
+  "schema": "litchi.performance.0952.load-bias-forensic.v1",
+  "scope": {
+    "child": "00-medium",
+    "owner_admission": "not_admitted",
+    "pid": 2799045,
+    "purpose": "Verify the reported one-page static-IP mismatch on a few first-child samples; no whole-workload rank or owner admission.",
+    "zero_owner_observation": "Current native reader reported no qualified owner frames; this receipt only establishes a local address/unwind cause for sampled zlib frames."
+  },
+  "status": "confirmed_local_mapping_cfi_mismatch"
+}

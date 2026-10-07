@@ -1,0 +1,38 @@
+{
+  "schema": "litchi.performance.0952.source-binary-continuity.v1",
+  "status": "pass",
+  "head": "2d6833be51615486ef3c2a83d4791fd2a3f223c4",
+  "prior_adopted_head": "ce6f1fbea9902d533b97f6830994d4bc3fd497a1",
+  "head_delta_paths": [
+    "docs/performance/0951-xlsx-post-multi-window-publication-profile.md",
+    "docs/performance/BASELINE.md",
+    "docs/performance/HOTSPOTS.md",
+    "docs/performance/results/change-0951/archive-0951-v1.py",
+    "docs/performance/results/change-0951/archive-closure.json",
+    "docs/performance/results/change-0951/archive-receipt.json",
+    "docs/performance/results/change-0951/independent-review.json",
+    "docs/performance/results/change-0951/reduce.py",
+    "docs/performance/results/change-0951/replay-negative-controls.json",
+    "docs/performance/results/change-0951/replay_0951_v4.py",
+    "docs/performance/results/change-0951/replay_0951_v5.py",
+    "docs/performance/results/change-0951/source-binary-reuse.json",
+    "docs/performance/results/change-0951/summary.json"
+  ],
+  "production_delta": [],
+  "reuse_receipt": {
+    "path": "/home/zhuhe/litchi-performance-0951/receipts/source-binary-reuse-v1.json",
+    "bytes": 7914,
+    "sha256": "cfbdab576801388fb19c208e90d3a1f272cae5b1dd9df902c6c9dcbb1e16cf91"
+  },
+  "binary": {
+    "path": "/home/zhuhe/litchi-performance-0950/target-candidate-native-v1/release/litchi-perf-baseline",
+    "bytes": 266090728,
+    "sha256": "198c2e87471a088cf054a23785e4068eaf7f205ffb1fb25cad5ba0b7a6db5bec"
+  },
+  "claim": "Retained0950 candidate built from frozenbase plus12-filedelta;0951verified10789Gitobjects plusdeclaredignoredrootlock. CurrentHEAD differsfrom0951adoptedHEAD onlybyprofilingdocs/evidence. NotcompiledatcurrentHEAD.",
+  "worktree_edits_excluded": [
+    " M tools/check_iwork_leaf_public_api.py",
+    "?? crates/litchi/examples/bench_word_parse.rs",
+    "?? docs/UNIFIED_OPS_API_DESIGN.md"
+  ]
+}

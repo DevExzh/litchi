@@ -1,0 +1,20 @@
+{
+  "canonical_packet_preserved": true,
+  "command": "python3 -B cleanup owned extracted replay root and archive __pycache__ only",
+  "no_workload_or_build": true,
+  "postseal_preserved": [
+    "replay-inputs/analyze_0952_v3.py",
+    "replay-results/native-admission-v3-relocated.json",
+    "replay-results/manifest-controls-v1.json",
+    "replay-traces/replay-v1-strace.log"
+  ],
+  "removed_archive_bytecode_bytes": 13872,
+  "removed_archive_bytecode_files": 1,
+  "removed_replay_files": 68,
+  "removed_replay_logical_bytes": 312086172,
+  "removed_replay_root": "/home/zhuhe/litchi-performance-0952-replay-v1",
+  "replay_root_exists_after": false,
+  "schema": "litchi.performance.0952.replay-cleanup-receipt.v1",
+  "sealed_archive_preserved": true,
+  "status": "pass"
+}

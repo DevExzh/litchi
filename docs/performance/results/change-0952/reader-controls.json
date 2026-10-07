@@ -1,0 +1,187 @@
+{
+  "binary": {
+    "build_id": "12c119744b5f1bfcf9fe74422e5155da8e5dd20f",
+    "path": "/home/zhuhe/litchi-performance-0950/target-candidate-native-v1/release/litchi-perf-baseline",
+    "sha256": "198c2e87471a088cf054a23785e4068eaf7f205ffb1fb25cad5ba0b7a6db5bec"
+  },
+  "controls": {
+    "outside_executable_ip": {
+      "profile": {
+        "admitted": false,
+        "all": {
+          "period": 7,
+          "samples": 1
+        },
+        "classification_reasons": {
+          "owner_not_observed": 1
+        },
+        "exclusive_leaf_ranking": [],
+        "frame_length_counts": {
+          "2": 1
+        },
+        "gate": {
+          "fully_resolved_owner_samples_min": false,
+          "lost_records_zero": true,
+          "owner_period_min": false
+        },
+        "lost_records": 0,
+        "nested_compression_xml_rows": [],
+        "nested_rows_overlap": true,
+        "owner_qualified": {
+          "period": 0,
+          "samples": 0
+        },
+        "unknown_or_unqualified": {
+          "period": 7,
+          "samples": 1
+        },
+        "unresolved_period": 0
+      },
+      "status": "rejected_for_qualification"
+    },
+    "positive_owner_parent_real_map": {
+      "load_bias": "0x5b8f9d94d000",
+      "owner_static": "0x181e120",
+      "parent_static": "0x1901f10",
+      "pid": 2799045,
+      "profile": {
+        "admitted": false,
+        "all": {
+          "period": 7,
+          "samples": 1
+        },
+        "classification_reasons": {
+          "owner_parent_bound": 1
+        },
+        "exclusive_leaf_ranking": [
+          {
+            "period": 7,
+            "symbol": "owner"
+          }
+        ],
+        "frame_length_counts": {
+          "2": 1
+        },
+        "gate": {
+          "fully_resolved_owner_samples_min": false,
+          "lost_records_zero": true,
+          "owner_period_min": false
+        },
+        "lost_records": 0,
+        "nested_compression_xml_rows": [],
+        "nested_rows_overlap": true,
+        "owner_qualified": {
+          "period": 7,
+          "samples": 1
+        },
+        "unknown_or_unqualified": {
+          "period": 0,
+          "samples": 0
+        },
+        "unresolved_period": 0
+      },
+      "runtime_owner": "0x5b8f9f16b120",
+      "runtime_parent": "0x5b8f9f24ef10",
+      "status": "qualified"
+    },
+    "wrong_build_id": {
+      "error": "bound DSO build-id differs at mmap line 5",
+      "error_type": "AdmissionError",
+      "status": "rejected"
+    },
+    "wrong_event": {
+      "error": "unexpected perf event instructions:u at line 1",
+      "error_type": "AdmissionError",
+      "status": "rejected"
+    },
+    "wrong_parent_dso": {
+      "profile": {
+        "admitted": false,
+        "all": {
+          "period": 7,
+          "samples": 1
+        },
+        "classification_reasons": {
+          "wrong_or_missing_parent": 1
+        },
+        "exclusive_leaf_ranking": [],
+        "frame_length_counts": {
+          "2": 1
+        },
+        "gate": {
+          "fully_resolved_owner_samples_min": false,
+          "lost_records_zero": true,
+          "owner_period_min": false
+        },
+        "lost_records": 0,
+        "nested_compression_xml_rows": [],
+        "nested_rows_overlap": true,
+        "owner_qualified": {
+          "period": 0,
+          "samples": 0
+        },
+        "unknown_or_unqualified": {
+          "period": 7,
+          "samples": 1
+        },
+        "unresolved_period": 0
+      },
+      "status": "rejected_for_qualification"
+    },
+    "wrong_pid": {
+      "profile": {
+        "admitted": false,
+        "all": {
+          "period": 7,
+          "samples": 1
+        },
+        "classification_reasons": {
+          "owner_not_observed": 1
+        },
+        "exclusive_leaf_ranking": [],
+        "frame_length_counts": {
+          "2": 1
+        },
+        "gate": {
+          "fully_resolved_owner_samples_min": false,
+          "lost_records_zero": true,
+          "owner_period_min": false
+        },
+        "lost_records": 0,
+        "nested_compression_xml_rows": [],
+        "nested_rows_overlap": true,
+        "owner_qualified": {
+          "period": 0,
+          "samples": 0
+        },
+        "unknown_or_unqualified": {
+          "period": 7,
+          "samples": 1
+        },
+        "unresolved_period": 0
+      },
+      "status": "rejected_for_qualification"
+    }
+  },
+  "created_utc": "2026-10-07T08:50:25.804754+00:00",
+  "mmap_events": {
+    "ambiguous_bound_mappings": 2,
+    "bound_pid": 2799045,
+    "executable_maps": 1,
+    "path": "/home/zhuhe/litchi-performance-0952/analysis/mmap/00-medium/events.txt",
+    "sha256": "ea31f400aa251b3926cc5dd9e33d5a7d47b31f7c6858901f4f22e36d6ecda380"
+  },
+  "plan": {
+    "path": "/home/zhuhe/litchi-performance-0952/plan-0952-v1.json",
+    "sha256": "7846288a54c6c5eebb97f958631d9e5fe4345ab08dd1c7527e94e4a0d751beed"
+  },
+  "reader": {
+    "path": "/home/zhuhe/litchi-performance-0952/tools/analyze_0952_v3.py",
+    "schema": "litchi.performance.0952.native-admission.v3",
+    "sha256": "321e415fd3092b3002c76114e7cb147f7382d231c697dbd2878d7bc9c9ddc08e"
+  },
+  "schema": "litchi.performance.0952.native-admission.v3-controls.v1",
+  "scope": "Standalone parser and map-binding controls only; no workload or perf capture.",
+  "status": "pass",
+  "temporary_inputs_removed": true
+}
