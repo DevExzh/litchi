@@ -1,0 +1,7 @@
+{
+  "schema": "litchi.performance.0966.doc_sprm_census_go.v1",
+  "status": "authorized",
+  "plan_sha256": "18b2915f692567cd830edf9254326431767cb9b0faf79da9eaad1bc9cf0be79b",
+  "source_tree_sha256": "ab9934b960d60efe8e4720e00dec42d54f1a21acdd14b4e29a9d750f1d90a29f",
+  "executable_sha256": "d257020c302f92096c34d8bc821f0a88878900ab270f52a189b4e2889eaaf375"
+}

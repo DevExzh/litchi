@@ -1,0 +1,250 @@
+{
+  "binary": {
+    "build_id_sha1": "bb0e4bb2f8514bb0350165006209a694e6aaa54b",
+    "bytes": 125930408,
+    "file": "ELF 64-bit LSB pie executable, x86-64, dynamically linked, with debug_info, not stripped",
+    "path": "/home/zhuhe/litchi-performance-0966/target-0966-census/release/doc_sprm_census_0966",
+    "sha256": "d257020c302f92096c34d8bc821f0a88878900ab270f52a189b4e2889eaaf375"
+  },
+  "formal_workload_invoked": false,
+  "records": [
+    {
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=2 CARGO_TERM_COLOR=never RUSTFLAGS= cargo +1.95.0 check --offline --locked -j2 --bin doc_sprm_census_0966 --manifest-path tools/perf-cfb-profile/Cargo.toml --target-dir /home/zhuhe/litchi-performance-0966/target-0966-census",
+      "cwd": "/home/zhuhe/litchi-performance-0966/source-head-v1",
+      "exit_code": 101,
+      "name": "cargo-check-initial",
+      "stderr": {
+        "bytes": 8110,
+        "path": "/home/zhuhe/litchi-performance-0966/build-0966/check.stderr.log",
+        "sha256": "cdb3ca03a716e875450b34bc9da02934f8c6b8df19953bffff2b39e0897f6ced"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0966/build-0966/check.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=2 CARGO_TERM_COLOR=never RUSTFLAGS= cargo +1.95.0 check --offline --locked -j2 --bin doc_sprm_census_0966 --manifest-path tools/perf-cfb-profile/Cargo.toml --target-dir /home/zhuhe/litchi-performance-0966/target-0966-census",
+      "cwd": "/home/zhuhe/litchi-performance-0966/source-head-v1",
+      "exit_code": 101,
+      "name": "cargo-check-borrow-fix",
+      "stderr": {
+        "bytes": 1177,
+        "path": "/home/zhuhe/litchi-performance-0966/build-0966/check-v2.stderr.log",
+        "sha256": "d49c2f27f3157f312bdea2919f084aef819b46a356777d274d3bab6ce7efa5a4"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0966/build-0966/check-v2.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=2 CARGO_TERM_COLOR=never RUSTFLAGS= cargo +1.95.0 check --offline --locked -j2 --bin doc_sprm_census_0966 --manifest-path tools/perf-cfb-profile/Cargo.toml --target-dir /home/zhuhe/litchi-performance-0966/target-0966-census",
+      "cwd": "/home/zhuhe/litchi-performance-0966/source-head-v1",
+      "exit_code": 0,
+      "name": "cargo-check-parser-fix",
+      "stderr": {
+        "bytes": 205,
+        "path": "/home/zhuhe/litchi-performance-0966/build-0966/check-v3.stderr.log",
+        "sha256": "29f93efc2c6735e936b6a92cf6d290e5fcd6f896c6d752234690abc50a486c39"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0966/build-0966/check-v3.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=2 CARGO_TERM_COLOR=never RUSTFLAGS= cargo +1.95.0 check --offline --locked -j2 --bin doc_sprm_census_0966 --manifest-path tools/perf-cfb-profile/Cargo.toml --target-dir /home/zhuhe/litchi-performance-0966/target-0966-census",
+      "cwd": "/home/zhuhe/litchi-performance-0966/source-head-v1",
+      "exit_code": 0,
+      "name": "cargo-check-final-capacity-schema",
+      "stderr": {
+        "bytes": 307,
+        "path": "/home/zhuhe/litchi-performance-0966/build-0966/check-v4.stderr.log",
+        "sha256": "21c50245b8b6bc0e87c5a94181d93016a5ca6177600350a0ee199662dd2b8e60"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0966/build-0966/check-v4.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=2 CARGO_TERM_COLOR=never RUSTFLAGS= cargo +1.95.0 build --offline --locked -j2 --release --bin doc_sprm_census_0966 --manifest-path tools/perf-cfb-profile/Cargo.toml --target-dir /home/zhuhe/litchi-performance-0966/target-0966-census",
+      "cwd": "/home/zhuhe/litchi-performance-0966/source-head-v1",
+      "exit_code": 0,
+      "name": "cargo-build-pre-capacity-rename",
+      "stderr": {
+        "bytes": 4322,
+        "path": "/home/zhuhe/litchi-performance-0966/build-0966/build-v1.stderr.log",
+        "sha256": "984bbe359d77f2bdf2508a58bea16b260ff0c95525c67bffaf474a3d1239a7d6"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0966/build-0966/build-v1.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=2 CARGO_TERM_COLOR=never RUSTFLAGS= cargo +1.95.0 build --offline --locked -j2 --release --bin doc_sprm_census_0966 --manifest-path tools/perf-cfb-profile/Cargo.toml --target-dir /home/zhuhe/litchi-performance-0966/target-0966-census",
+      "cwd": "/home/zhuhe/litchi-performance-0966/source-head-v1",
+      "exit_code": 0,
+      "name": "cargo-build-capacity-rename",
+      "stderr": {
+        "bytes": 310,
+        "path": "/home/zhuhe/litchi-performance-0966/build-0966/build-v2.stderr.log",
+        "sha256": "0b0224daf9c493c2ecaa493df581434cd1e3045fdbad9bbef99dd5d35eacbe7b"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0966/build-0966/build-v2.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "command": "CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=2 CARGO_TERM_COLOR=never RUSTFLAGS= cargo +1.95.0 build --offline --locked -j2 --release --bin doc_sprm_census_0966 --manifest-path tools/perf-cfb-profile/Cargo.toml --target-dir /home/zhuhe/litchi-performance-0966/target-0966-census",
+      "cwd": "/home/zhuhe/litchi-performance-0966/source-head-v1",
+      "exit_code": 0,
+      "name": "cargo-build-final",
+      "stderr": {
+        "bytes": 310,
+        "path": "/home/zhuhe/litchi-performance-0966/build-0966/build-v3.stderr.log",
+        "sha256": "6e8d7e74c72299a2e3efec9d8911f2826345825d27cf0edffd1b969f2fecf8e9"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0966/build-0966/build-v3.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "command": "CARGO_INCREMENTAL=0 CARGO_TERM_COLOR=never RUSTFLAGS= cargo +1.95.0 test --offline --locked -j2 -p litchi-doc --features performance-diagnostics --lib --target-dir /home/zhuhe/litchi-performance-0966/target-0966-census",
+      "cwd": "/home/zhuhe/litchi-performance-0966/source-head-v1",
+      "exit_code": 101,
+      "name": "cargo-test-broad-incomplete-overlay",
+      "stderr": {
+        "bytes": 4131,
+        "path": "/home/zhuhe/litchi-performance-0966/build-0966/unit-litchi-doc.stderr.log",
+        "sha256": "6a9e01ea0758ec9a89334d268e6b96aeb0d4264f3b08ce84680d6dfe4e9cd581"
+      },
+      "stdout": {
+        "bytes": 98221,
+        "path": "/home/zhuhe/litchi-performance-0966/build-0966/unit-litchi-doc.stdout.log",
+        "sha256": "2cd139096d54cb2a7593a8e1da6a50492173ced8ec48f7707ddc3c4ad2cc16a8"
+      }
+    },
+    {
+      "command": "CARGO_INCREMENTAL=0 CARGO_TERM_COLOR=never RUSTFLAGS= cargo +1.95.0 test --offline --locked -j2 -p litchi-doc --features performance-diagnostics --lib --target-dir /home/zhuhe/litchi-performance-0966/target-0966-census",
+      "cwd": "/home/zhuhe/litchi-performance-0966/source-head-v1",
+      "exit_code": 101,
+      "name": "cargo-test-broad-overlay-v1",
+      "stderr": {
+        "bytes": 259,
+        "path": "/home/zhuhe/litchi-performance-0966/build-0966/unit-litchi-doc-v2.stderr.log",
+        "sha256": "a5bd2722413ff9f44542affafcfc04c001cb463f1713ca0b58ee929c74b5b3cc"
+      },
+      "stdout": {
+        "bytes": 93394,
+        "path": "/home/zhuhe/litchi-performance-0966/build-0966/unit-litchi-doc-v2.stdout.log",
+        "sha256": "6bdc63e4e652545ef28f0c5231eed0a2a677af6d3f56005e2e489788f287deea"
+      }
+    },
+    {
+      "command": "CARGO_INCREMENTAL=0 CARGO_TERM_COLOR=never RUSTFLAGS= cargo +1.95.0 test --offline --locked -j2 -p litchi-doc --features performance-diagnostics --lib --target-dir /home/zhuhe/litchi-performance-0966/target-0966-census",
+      "cwd": "/home/zhuhe/litchi-performance-0966/source-head-v1",
+      "exit_code": 0,
+      "name": "cargo-test-broad-final",
+      "stderr": {
+        "bytes": 203,
+        "path": "/home/zhuhe/litchi-performance-0966/build-0966/unit-litchi-doc-v3.stderr.log",
+        "sha256": "c5d36bd08a3598706fa4cb280e1e25bb94fa30055f28ca326932a8c825078b8d"
+      },
+      "stdout": {
+        "bytes": 92829,
+        "path": "/home/zhuhe/litchi-performance-0966/build-0966/unit-litchi-doc-v3.stdout.log",
+        "sha256": "c2ea723236411af67f54263bcb3e6eda7ba154549b11d1accd4c3eebecbf2fb2"
+      }
+    },
+    {
+      "command": "CARGO_INCREMENTAL=0 CARGO_TERM_COLOR=never RUSTFLAGS= cargo +1.95.0 test --offline --locked -j2 -p litchi-doc --features performance-diagnostics --lib sprm::tests --target-dir /home/zhuhe/litchi-performance-0966/target-0966-census",
+      "cwd": "/home/zhuhe/litchi-performance-0966/source-head-v1",
+      "exit_code": 0,
+      "name": "cargo-test-sprm-parser",
+      "stderr": {
+        "bytes": 203,
+        "path": "/home/zhuhe/litchi-performance-0966/build-0966/unit-sprm.stderr.log",
+        "sha256": "c5d36bd08a3598706fa4cb280e1e25bb94fa30055f28ca326932a8c825078b8d"
+      },
+      "stdout": {
+        "bytes": 1610,
+        "path": "/home/zhuhe/litchi-performance-0966/build-0966/unit-sprm.stdout.log",
+        "sha256": "f6973015f8a358ace4d7bb076b3c49a75bd0665791cb45f532ec062ec4768ac8"
+      }
+    },
+    {
+      "command": "CARGO_INCREMENTAL=0 CARGO_TERM_COLOR=never RUSTFLAGS= cargo +1.95.0 test --offline --locked -j2 -p litchi-doc --features performance-diagnostics --lib sprm::census::tests --target-dir /home/zhuhe/litchi-performance-0966/target-0966-census",
+      "cwd": "/home/zhuhe/litchi-performance-0966/source-head-v1",
+      "exit_code": 0,
+      "name": "cargo-test-census-controls",
+      "stderr": {
+        "bytes": 306,
+        "path": "/home/zhuhe/litchi-performance-0966/build-0966/unit-census-controls.stderr.log",
+        "sha256": "038ff0b08765486c4162b686afab3e4614e5e037c28d321cb817b8bfd5339296"
+      },
+      "stdout": {
+        "bytes": 306,
+        "path": "/home/zhuhe/litchi-performance-0966/build-0966/unit-census-controls.stdout.log",
+        "sha256": "7dc09734bfa30a1b4629ccbe53effe0baf68990e87db3ace37a85d91d4605ca9"
+      }
+    },
+    {
+      "command": "CARGO_INCREMENTAL=0 CARGO_TERM_COLOR=never RUSTFLAGS= cargo +1.95.0 test --offline --locked -j2 --manifest-path tools/perf-cfb-profile/Cargo.toml --bin doc_sprm_census_0966 --no-run --target-dir /home/zhuhe/litchi-performance-0966/target-0966-census",
+      "cwd": "/home/zhuhe/litchi-performance-0966/source-head-v1",
+      "exit_code": 0,
+      "name": "cargo-test-harness-no-run",
+      "stderr": {
+        "bytes": 3041,
+        "path": "/home/zhuhe/litchi-performance-0966/build-0966/unit-harness-no-run.stderr.log",
+        "sha256": "ebf72ca5f2f8059a3ed751192bcd86bbf07a0a0977f17490a067f49fa69cbae2"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0966/build-0966/unit-harness-no-run.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "command": "CARGO_INCREMENTAL=0 CARGO_TERM_COLOR=never RUSTFLAGS= cargo +1.95.0 check --offline --locked -j2 -p litchi-doc --no-default-features --target-dir /home/zhuhe/litchi-performance-0966/target-0966-census",
+      "cwd": "/home/zhuhe/litchi-performance-0966/source-head-v1",
+      "exit_code": 0,
+      "name": "cargo-check-ordinary-no-feature",
+      "stderr": {
+        "bytes": 2640,
+        "path": "/home/zhuhe/litchi-performance-0966/build-0966/check-ordinary-no-feature.stderr.log",
+        "sha256": "8be9e81d681eca3a752cca47b870f3a4243a9c5ac1b48b0b098f0644a1f4dee7"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0966/build-0966/check-ordinary-no-feature.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ],
+  "rustc": [
+    "rustc 1.95.0 (59807616e 2026-04-14)",
+    "binary: rustc",
+    "commit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860",
+    "commit-date: 2026-04-14",
+    "host: x86_64-unknown-linux-gnu",
+    "release: 1.95.0",
+    "LLVM version: 22.1.2"
+  ],
+  "schema": "litchi.performance.0966.doc_sprm_census.receipts.v1",
+  "source_commit": "a499d34f5119a034bc92abde1e1dfcf529159b8d",
+  "source_root": "/home/zhuhe/litchi-performance-0966/source-head-v1",
+  "target_dir": "/home/zhuhe/litchi-performance-0966/target-0966-census",
+  "toolchain": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
+}

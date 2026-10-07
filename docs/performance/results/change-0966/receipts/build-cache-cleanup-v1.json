@@ -1,0 +1,151 @@
+{
+  "schema": "litchi.performance.0966.build-cache-cleanup.v1",
+  "status": "completed",
+  "recorded_utc": "2026-10-07T23:03:35Z",
+  "scope": {
+    "external_root": "/home/zhuhe/litchi-performance-0966",
+    "target_cache": "/home/zhuhe/litchi-performance-0966/target-0966-census",
+    "tools_pycache": "/home/zhuhe/litchi-performance-0966/tools/__pycache__",
+    "preserved_source_root": "/home/zhuhe/litchi-performance-0966/source-head-v1",
+    "preserved_bound_executable": "/home/zhuhe/litchi-performance-0966/target-0966-census/release/doc_sprm_census_0966",
+    "target_deletion_policy": "Delete every target entry except the release directory and its bound executable; remove the release/deps hardlink copy.",
+    "tools_deletion_policy": "Delete only tools/__pycache__; preserve the external-root __pycache__.",
+    "source_head_mutated": false
+  },
+  "preflight": {
+    "process_check": {
+      "command": "Python 3 /proc scan using exact build tools (cargo, rustc, perf, heaptrack, criterion, hyperfine), the 0966 executable, and the named 0966 helper markers; exclude this process and its ancestors.",
+      "matched_processes": 0,
+      "matches": []
+    },
+    "open_file_check": {
+      "target_command": "lsof +D /home/zhuhe/litchi-performance-0966/target-0966-census",
+      "target_records": [],
+      "tools_pycache_command": "lsof +D /home/zhuhe/litchi-performance-0966/tools/__pycache__",
+      "tools_pycache_records": []
+    },
+    "target_cache": {
+      "disk_bytes": 2134605824,
+      "apparent_bytes": 2120044162,
+      "regular_files": 3789,
+      "directories": 735,
+      "symlinks": 0
+    },
+    "tools_pycache": {
+      "disk_bytes": 143360,
+      "apparent_bytes": 131853,
+      "regular_files": 3,
+      "directories": 0,
+      "symlinks": 0
+    },
+    "bound_executable": {
+      "path": "/home/zhuhe/litchi-performance-0966/target-0966-census/release/doc_sprm_census_0966",
+      "bytes": 125930408,
+      "mode_decimal": 509,
+      "mode_octal": "0775",
+      "inode": 7596762,
+      "hard_links": 2,
+      "sha256": "d257020c302f92096c34d8bc821f0a88878900ab270f52a189b4e2889eaaf375"
+    },
+    "source_binding": {
+      "source_commit": "a499d34f5119a034bc92abde1e1dfcf529159b8d",
+      "source_root": "/home/zhuhe/litchi-performance-0966/source-head-v1",
+      "file_count": 9993,
+      "bytes": 192299951,
+      "tree_sha256": "ab9934b960d60efe8e4720e00dec42d54f1a21acdd14b4e29a9d750f1d90a29f"
+    }
+  },
+  "deletion": {
+    "commands": [
+      "python3: validate target-0966-census has no symlinks, unlink all files except release/doc_sprm_census_0966, and remove all directories except target-0966-census and release",
+      "python3: shutil.rmtree('/home/zhuhe/litchi-performance-0966/tools/__pycache__') after the clean process/open-file checks"
+    ],
+    "exit_code": 0,
+    "target_removed_entries": 4522,
+    "target_removed_hardlink": "/home/zhuhe/litchi-performance-0966/target-0966-census/release/deps/doc_sprm_census_0966-64fcd83f5a49a321",
+    "tools_pycache_removed_entries": 4,
+    "target_disk_bytes_freed": 2008666112,
+    "target_apparent_bytes_freed": 1994113754,
+    "tools_pycache_disk_bytes_freed": 143360,
+    "tools_pycache_apparent_bytes_freed": 131853,
+    "total_disk_bytes_freed": 2008809472,
+    "total_apparent_bytes_freed": 1994245607
+  },
+  "postflight": {
+    "target_contents": [
+      "release",
+      "release/doc_sprm_census_0966"
+    ],
+    "target": {
+      "disk_bytes": 125939712,
+      "apparent_bytes": 125930408,
+      "regular_files": 1,
+      "directories": 1,
+      "symlinks": 0
+    },
+    "bound_executable": {
+      "path": "/home/zhuhe/litchi-performance-0966/target-0966-census/release/doc_sprm_census_0966",
+      "bytes": 125930408,
+      "mode_decimal": 509,
+      "mode_octal": "0775",
+      "inode": 7596762,
+      "hard_links": 1,
+      "sha256": "d257020c302f92096c34d8bc821f0a88878900ab270f52a189b4e2889eaaf375",
+      "same_path_inode_size_mode_sha_as_preflight": true
+    },
+    "process_observations": [
+      {
+        "stage": "after_delete_during_concurrent_capture_launch",
+        "matched_processes": 1,
+        "pid": 3342111,
+        "command": "/home/zhuhe/litchi-performance-0966/tools/run_doc_sprm_census_0966_v1.py --plan /home/zhuhe/litchi-performance-0966/protocol/plan-doc-sprm-census-0966-v1.json --capture --go /home/zhuhe/litchi-performance-0966/protocol/root-go-v1.json",
+        "note": "This capture launched concurrently after the clean preflight/deletion; the receipt does not claim process absence at this observation. The coordinator reported rc=0, all 48 children, and reduction PASS."
+      },
+      {
+        "stage": "after_capture_completion",
+        "matched_processes": 0,
+        "matches": []
+      }
+    ],
+    "open_file_check_after_capture": {
+      "target_command": "lsof +D /home/zhuhe/litchi-performance-0966/target-0966-census",
+      "target_records": [],
+      "tools_pycache_absent": true
+    },
+    "source_binding_after": {
+      "source_commit": "a499d34f5119a034bc92abde1e1dfcf529159b8d",
+      "file_count": 9993,
+      "bytes": 192299951,
+      "tree_sha256": "ab9934b960d60efe8e4720e00dec42d54f1a21acdd14b4e29a9d750f1d90a29f",
+      "matches_preflight": true
+    },
+    "preserved_external_root_pycache": {
+      "path": "/home/zhuhe/litchi-performance-0966/__pycache__",
+      "exists": true,
+      "disk_bytes": 24576,
+      "apparent_bytes": 18662
+    },
+    "retained_control_and_evidence": [
+      {
+        "path": "/home/zhuhe/litchi-performance-0966/source-provenance-v1.json",
+        "bytes": 3264,
+        "sha256": "27a465972f4885a668b45e8c80834e626e0757018f04d20a45e15aeefdeb82a7"
+      },
+      {
+        "path": "/home/zhuhe/litchi-performance-0966/build-0966/exit-receipts-v1.json",
+        "bytes": 13151,
+        "sha256": "06b42b165c389b3138bed1cc305cc9d170b6aab18343e9fd4d97395f62349c74"
+      },
+      {
+        "path": "/home/zhuhe/litchi-performance-0966/doc-sprm-census-review-receipt-v1.json",
+        "bytes": 3206,
+        "sha256": "653beac50c00dc2e5892f006d424f2ebcae72a1365b252466c2cdc17eacba532"
+      },
+      {
+        "path": "/home/zhuhe/litchi-performance-0966/repro/reproduction-v1.json",
+        "bytes": 1788,
+        "sha256": "c600bdc47c1d47f5f28ccff075ff8e9d5fcbc75ff1542a4d7c5f6e6a4ac20caf"
+      }
+    ]
+  }
+}

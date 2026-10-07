@@ -1,0 +1,681 @@
+--- a/crates/litchi-doc/src/sprm.rs
++++ b/crates/litchi-doc/src/sprm.rs
+@@ -7,6 +7,366 @@
+ use litchi_core::binary::{read_i16_le, read_u16_le, read_u32_le};
+ use smallvec::SmallVec;
+ 
++/// Fixed-size counters used only by the external 0966 diagnostic build.
++///
++/// This module intentionally records aggregate shape, never source bytes,
++/// offsets, opcodes, or parsed vectors. It is enabled by the existing
++/// `performance-diagnostics` harness feature and is not part of the ordinary
++/// production build.
++#[cfg(feature = "performance-diagnostics")]
++pub mod census {
++    use super::{Error, Result, Sprm};
++    use std::cell::{Cell, RefCell};
++    use std::mem::size_of;
++
++    /// Number of fixed logarithmic input/output histogram buckets.
++    pub const HISTOGRAM_BUCKETS: usize = 10;
++
++    /// Lifecycle bucket selected by the harness before each public operation.
++    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
++    pub enum Phase {
++        /// Snapshot opening and its validation.
++        SnapshotOpen,
++        /// Opening the mutable edit view from the immutable snapshot.
++        EditOpen,
++        /// One or more paragraph replacement stages.
++        StagedReplacement,
++        /// Commit and candidate reopen/validation.
++        FinalCommit,
++        /// Copying the committed output bytes.
++        OutputCopy,
++        /// Work that does not have a lifecycle phase marker.
++        Other,
++    }
++
++    /// Aggregate counters for one phase or for the complete measured scope.
++    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
++    pub struct Bucket {
++        pub calls: u64,
++        pub successes: u64,
++        pub errors: u64,
++        pub input_empty: u64,
++        pub input_nonempty: u64,
++        pub input_bytes_total: u64,
++        pub input_bytes_min: u64,
++        pub input_bytes_max: u64,
++        pub input_length_histogram: [u64; HISTOGRAM_BUCKETS],
++        pub output_count_total: u64,
++        pub output_count_histogram: [u64; HISTOGRAM_BUCKETS],
++        pub output_capacity_total: u64,
++        pub output_capacity_min: u64,
++        pub output_capacity_max: u64,
++        pub logical_vec_capacity_bytes: u64,
++        pub errors_by_kind: [u64; 5],
++    }
++
++    impl Bucket {
++        const fn empty() -> Self {
++            Self {
++                calls: 0,
++                successes: 0,
++                errors: 0,
++                input_empty: 0,
++                input_nonempty: 0,
++                input_bytes_total: 0,
++                input_bytes_min: 0,
++                input_bytes_max: 0,
++                input_length_histogram: [0; HISTOGRAM_BUCKETS],
++                output_count_total: 0,
++                output_count_histogram: [0; HISTOGRAM_BUCKETS],
++                output_capacity_total: 0,
++                output_capacity_min: 0,
++                output_capacity_max: 0,
++                logical_vec_capacity_bytes: 0,
++                errors_by_kind: [0; 5],
++            }
++        }
++
++        fn record(&mut self, input_len: usize, result: &Result<Vec<Sprm>>, saturated: &mut bool) {
++            add(&mut self.calls, 1, saturated);
++            let input_len = input_len as u64;
++            if input_len == 0 {
++                add(&mut self.input_empty, 1, saturated);
++            } else {
++                add(&mut self.input_nonempty, 1, saturated);
++            }
++            add(&mut self.input_bytes_total, input_len, saturated);
++            if self.calls == 1 {
++                self.input_bytes_min = input_len;
++                self.input_bytes_max = input_len;
++            } else {
++                self.input_bytes_min = self.input_bytes_min.min(input_len);
++                self.input_bytes_max = self.input_bytes_max.max(input_len);
++            }
++            add(
++                &mut self.input_length_histogram[input_bucket(input_len)],
++                1,
++                saturated,
++            );
++
++            match result {
++                Ok(output) => {
++                    add(&mut self.successes, 1, saturated);
++                    let output_count = output.len() as u64;
++                    add(&mut self.output_count_total, output_count, saturated);
++                    add(
++                        &mut self.output_count_histogram[output_bucket(output_count)],
++                        1,
++                        saturated,
++                    );
++                    let capacity = output.capacity() as u64;
++                    add(&mut self.output_capacity_total, capacity, saturated);
++                    add(
++                        &mut self.logical_vec_capacity_bytes,
++                        capacity.saturating_mul(size_of::<Sprm>() as u64),
++                        saturated,
++                    );
++                    if self.successes == 1 {
++                        self.output_capacity_min = capacity;
++                        self.output_capacity_max = capacity;
++                    } else {
++                        self.output_capacity_min = self.output_capacity_min.min(capacity);
++                        self.output_capacity_max = self.output_capacity_max.max(capacity);
++                    }
++                }
++                Err(error) => {
++                    add(&mut self.errors, 1, saturated);
++                    add(&mut self.errors_by_kind[error_bucket(error)], 1, saturated);
++                }
++            }
++        }
++    }
++
++    /// Completed counters returned by one measured wrapper invocation.
++    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
++    pub struct Census {
++        pub sprm_size_bytes: usize,
++        pub saturated: bool,
++        pub total: Bucket,
++        pub snapshot_open: Bucket,
++        pub edit_open: Bucket,
++        pub staged_replacement: Bucket,
++        pub final_commit: Bucket,
++        pub output_copy: Bucket,
++        pub other: Bucket,
++    }
++
++    #[derive(Clone, Copy)]
++    struct State {
++        total: Bucket,
++        snapshot_open: Bucket,
++        edit_open: Bucket,
++        staged_replacement: Bucket,
++        final_commit: Bucket,
++        output_copy: Bucket,
++        other: Bucket,
++        phase: Phase,
++        saturated: bool,
++    }
++
++    impl State {
++        const fn empty() -> Self {
++            Self {
++                total: Bucket::empty(),
++                snapshot_open: Bucket::empty(),
++                edit_open: Bucket::empty(),
++                staged_replacement: Bucket::empty(),
++                final_commit: Bucket::empty(),
++                output_copy: Bucket::empty(),
++                other: Bucket::empty(),
++                phase: Phase::Other,
++                saturated: false,
++            }
++        }
++
++        fn census(self) -> Census {
++            Census {
++                sprm_size_bytes: size_of::<Sprm>(),
++                saturated: self.saturated,
++                total: self.total,
++                snapshot_open: self.snapshot_open,
++                edit_open: self.edit_open,
++                staged_replacement: self.staged_replacement,
++                final_commit: self.final_commit,
++                output_copy: self.output_copy,
++                other: self.other,
++            }
++        }
++    }
++
++    thread_local! {
++        static ACTIVE: Cell<bool> = const { Cell::new(false) };
++        static STATE: RefCell<State> = const { RefCell::new(State::empty()) };
++    }
++
++    /// Scope that enables counters for exactly one measured lifecycle.
++    pub struct Guard {
++        previous_active: bool,
++        finished: bool,
++    }
++
++    /// Enable and clear the current thread's counters.
++    pub fn begin() -> Guard {
++        let previous_active = ACTIVE.with(|active| active.replace(true));
++        STATE.with(|state| *state.borrow_mut() = State::empty());
++        Guard {
++            previous_active,
++            finished: false,
++        }
++    }
++
++    impl Guard {
++        /// Return the fixed counters and restore the previous active state.
++        pub fn finish(mut self) -> Census {
++            self.finished = true;
++            let census = STATE.with(|state| state.borrow().census());
++            ACTIVE.with(|active| active.set(self.previous_active));
++            census
++        }
++    }
++
++    impl Drop for Guard {
++        fn drop(&mut self) {
++            if !self.finished {
++                ACTIVE.with(|active| active.set(self.previous_active));
++            }
++        }
++    }
++
++    /// Change the fixed phase bucket used by subsequent calls.
++    pub fn set_phase(phase: Phase) {
++        ACTIVE.with(|active| {
++            if active.get() {
++                STATE.with(|state| state.borrow_mut().phase = phase);
++            }
++        });
++    }
++
++    pub(super) fn record(input_len: usize, result: &Result<Vec<Sprm>>) {
++        ACTIVE.with(|active| {
++            if !active.get() {
++                return;
++            }
++            STATE.with(|state| {
++                let mut state = state.borrow_mut();
++                let phase = state.phase;
++                let mut saturated = state.saturated;
++                state.total.record(input_len, result, &mut saturated);
++                match phase {
++                    Phase::SnapshotOpen => {
++                        state.snapshot_open.record(input_len, result, &mut saturated);
++                    }
++                    Phase::EditOpen => state.edit_open.record(input_len, result, &mut saturated),
++                    Phase::StagedReplacement => {
++                        state.staged_replacement.record(input_len, result, &mut saturated);
++                    }
++                    Phase::FinalCommit => {
++                        state.final_commit.record(input_len, result, &mut saturated);
++                    }
++                    Phase::OutputCopy => {
++                        state.output_copy.record(input_len, result, &mut saturated);
++                    }
++                    Phase::Other => state.other.record(input_len, result, &mut saturated),
++                }
++                state.saturated = saturated;
++            });
++        });
++    }
++
++    fn add(value: &mut u64, amount: u64, saturated: &mut bool) {
++        let next = value.saturating_add(amount);
++        *saturated |= next == u64::MAX && *value != u64::MAX;
++        *value = next;
++    }
++
++    fn input_bucket(value: u64) -> usize {
++        match value {
++            0 => 0,
++            1 => 1,
++            2..=3 => 2,
++            4..=7 => 3,
++            8..=15 => 4,
++            16..=31 => 5,
++            32..=63 => 6,
++            64..=127 => 7,
++            128..=255 => 8,
++            _ => 9,
++        }
++    }
++
++    fn output_bucket(value: u64) -> usize {
++        input_bucket(value)
++    }
++
++    fn error_bucket(error: &Error) -> usize {
++        match error {
++            Error::Opcode { .. } => 0,
++            Error::Length { .. } => 1,
++            Error::ZeroLength { .. } => 2,
++            Error::Overflow { .. } => 3,
++            Error::Operand { .. } => 4,
++        }
++    }
++
++    #[cfg(test)]
++    mod tests {
++        use super::*;
++
++        #[test]
++        fn guard_scopes_phase_counters_and_resets_between_lifecycles() {
++            let first = {
++                let guard = begin();
++                set_phase(Phase::StagedReplacement);
++                assert!(super::super::parse_sprms(&[]).is_ok());
++                set_phase(Phase::OutputCopy);
++                assert!(super::super::parse_sprms(&[0x35, 0x08, 0x01]).is_ok());
++                guard.finish()
++            };
++            assert_eq!(first.total.calls, 2);
++            assert_eq!(first.total.successes, 2);
++            assert_eq!(first.staged_replacement.calls, 1);
++            assert_eq!(first.output_copy.calls, 1);
++            assert_eq!(first.other.calls, 0);
++
++            let second = {
++                let guard = begin();
++                guard.finish()
++            };
++            assert_eq!(second.total.calls, 0);
++            assert_eq!(second.total.successes, 0);
++            assert_eq!(second.total.errors, 0);
++
++            // Recording is disabled after finish, so this call cannot leak
++            // into the next lifecycle's reset state.
++            assert!(super::super::parse_sprms(&[]).is_ok());
++            let third = {
++                let guard = begin();
++                guard.finish()
++            };
++            assert_eq!(third.total.calls, 0);
++        }
++
++        #[test]
++        fn guard_counts_reachable_parser_error_kinds_without_input_retention() {
++            let census = {
++                let guard = begin();
++                set_phase(Phase::FinalCommit);
++                assert!(super::super::parse_sprms(&[0x43]).is_err());
++                assert!(super::super::parse_sprms(&[0x08, 0xD6, 0x00]).is_err());
++                assert!(super::super::parse_sprms(&[0x08, 0xD6, 0x00, 0x00]).is_err());
++                assert!(super::super::parse_sprms(&[0x43, 0x4A, 0x18]).is_err());
++                guard.finish()
++            };
++            assert_eq!(census.total.calls, 4);
++            assert_eq!(census.total.successes, 0);
++            assert_eq!(census.total.errors, 4);
++            assert_eq!(census.total.errors_by_kind, [1, 1, 1, 0, 1]);
++            assert_eq!(census.final_commit.errors_by_kind, [1, 1, 1, 0, 1]);
++            assert_eq!(census.other.calls, 0);
++        }
++    }
++}
++
+ /// Error returned when a `grpprl` is not an exact sequence of SPRMs.
+ #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+ pub enum Error {
+@@ -170,7 +530,10 @@
+ /// A vector containing the exact parsed sequence, or a typed error at the
+ /// first malformed record. Valid prefixes are never returned as success.
+ pub fn parse_sprms(grpprl: &[u8]) -> Result<Vec<Sprm>> {
+-    parse_sprms_two_byte(grpprl)
++    let result = parse_sprms_two_byte(grpprl);
++    #[cfg(feature = "performance-diagnostics")]
++    census::record(grpprl.len(), &result);
++    result
+ }
+ 
+ /// Parse SPRMs using 2-byte opcodes (Word 97+).
+--- a/tools/perf-cfb-profile/Cargo.toml
++++ b/tools/perf-cfb-profile/Cargo.toml
+@@ -7,7 +7,7 @@
+ [workspace]
+ 
+ [[bin]]
+-name = "doc_retention_probe_0942_cfb_profile"
++name = "doc_sprm_census_0966"
+ path = "src/main.rs"
+ 
+ [[bin]]
+@@ -17,7 +17,7 @@
+ [dependencies]
+ litchi-cfb = { path = "../../crates/litchi-cfb" }
+ litchi-core = { path = "../../crates/litchi-core" }
+-litchi-doc = { path = "../../crates/litchi-doc" }
++litchi-doc = { path = "../../crates/litchi-doc", features = ["performance-diagnostics"] }
+ serde = { version = "1", features = ["derive"] }
+ serde_json = "1"
+ sha2 = "0.11"
+--- a/tools/perf-cfb-profile/src/lib.rs
++++ b/tools/perf-cfb-profile/src/lib.rs
+@@ -15,11 +15,11 @@
+ use std::io::Cursor;
+ use std::path::PathBuf;
+ use std::sync::Arc;
+-use std::time::Instant;
+ 
+ use litchi_core::Position;
+ use litchi_doc::Package;
+ use litchi_doc::body_text::{Error as BodyError, Projection, Refusal, Snapshot, TransactionLimits};
++use litchi_doc::sprm::census as sprm_census;
+ use litchi_doc::tracked_revision::Limits;
+ use serde::Serialize;
+ use sha2::{Digest, Sha256};
+@@ -281,6 +281,7 @@
+     semantic_change_count: usize,
+     stages: [StageObservation; MAX_EDIT_STAGES],
+     final_retained_before_commit: Option<usize>,
++    census: Option<sprm_census::Census>,
+ }
+ 
+ fn transaction_limits(retention: Retention) -> TransactionLimits {
+@@ -288,14 +289,17 @@
+ }
+ 
+ fn run_case(source: &[u8], args: &Args, retention: Retention) -> Result<CaseResult, BoxError> {
++    sprm_census::set_phase(sprm_census::Phase::SnapshotOpen);
+     let snapshot = Snapshot::open_bounded(
+         source.to_vec(),
+         Limits::default(),
+         transaction_limits(retention),
+     )?;
++    sprm_census::set_phase(sprm_census::Phase::EditOpen);
+     let mut edit = snapshot.edit()?;
+     let mut stages = [StageObservation::empty(); MAX_EDIT_STAGES];
+     for (stage, observation) in stages.iter_mut().enumerate().take(args.edits.count()) {
++        sprm_census::set_phase(sprm_census::Phase::StagedReplacement);
+         let requested_text = stage_text(stage);
+         let before = edit.retained_render_bytes();
+         edit.replace_paragraph(Position::new(0), requested_text)?;
+@@ -315,8 +319,10 @@
+         };
+     }
+     let final_retained_before_commit = edit.retained_render_bytes();
++    sprm_census::set_phase(sprm_census::Phase::FinalCommit);
+     let commit = edit.commit()?;
+     let semantic_change_count = commit.patch().changes().len();
++    sprm_census::set_phase(sprm_census::Phase::OutputCopy);
+     let output = commit.snapshot().bytes().to_vec();
+     let output_capacity = output.capacity();
+     black_box(output.len());
+@@ -326,6 +332,7 @@
+         semantic_change_count,
+         stages,
+         final_retained_before_commit,
++        census: None,
+     })
+ }
+ 
+@@ -340,24 +347,15 @@
+     args: &Args,
+     retention: Retention,
+ ) -> Result<CaseResult, BoxError> {
+-    let result = run_case(source, args, retention)?;
++    let guard = sprm_census::begin();
++    let result = run_case(source, args, retention);
++    let census = guard.finish();
++    let mut result = result?;
++    result.census = Some(census);
+     black_box(result.output_capacity);
+     Ok(result)
+ }
+ 
+-struct TimedResult {
+-    result: CaseResult,
+-    elapsed_ns: u128,
+-}
+-
+-fn timed_case(source: &[u8], args: &Args) -> Result<TimedResult, BoxError> {
+-    let start = Instant::now();
+-    let result = profiled_measured_case(source, args, args.retention)?;
+-    let elapsed_ns = start.elapsed().as_nanos();
+-    black_box(result.output.len());
+-    Ok(TimedResult { result, elapsed_ns })
+-}
+-
+ #[derive(Clone, Copy, Debug, Serialize)]
+ struct AllocationReport {
+     allocated_bytes: u64,
+@@ -385,30 +383,100 @@
+     allocation: Option<AllocationReport>,
+ }
+ 
+-fn measure_one(source: &[u8], args: &Args) -> Result<MeasuredResult, BoxError> {
+-    if alloc_metrics::instrumented() {
+-        let mut result = None;
+-        let region = alloc_metrics::region(|| {
+-            result = Some(profiled_measured_case(source, args, args.retention)?);
+-            Ok::<(), BoxError>(())
+-        })?;
+-        let result = result
+-            .ok_or_else(|| Box::new(ProbeError("missing measured result".into())) as BoxError)?;
+-        Ok(MeasuredResult {
+-            result,
+-            elapsed_ns: None,
+-            allocation: Some(region.into()),
+-        })
+-    } else {
+-        let timed = timed_case(source, args)?;
+-        Ok(MeasuredResult {
+-            result: timed.result,
+-            elapsed_ns: Some(timed.elapsed_ns),
+-            allocation: None,
+-        })
++const SPRM_HISTOGRAM_LABELS: [&str; sprm_census::HISTOGRAM_BUCKETS] = [
++    "0",
++    "1",
++    "2-3",
++    "4-7",
++    "8-15",
++    "16-31",
++    "32-63",
++    "64-127",
++    "128-255",
++    "256+",
++];
++
++#[derive(Clone, Debug, Serialize)]
++struct SprmBucketReport {
++    calls: u64,
++    successes: u64,
++    errors: u64,
++    input_empty: u64,
++    input_nonempty: u64,
++    input_bytes_total: u64,
++    input_bytes_min: u64,
++    input_bytes_max: u64,
++    input_length_histogram: [u64; sprm_census::HISTOGRAM_BUCKETS],
++    output_count_total: u64,
++    output_count_histogram: [u64; sprm_census::HISTOGRAM_BUCKETS],
++    output_capacity_total: u64,
++    output_capacity_min: u64,
++    output_capacity_max: u64,
++    logical_vec_capacity_bytes: u64,
++    errors_by_kind: [u64; 5],
++}
++
++fn sprm_bucket_report(bucket: sprm_census::Bucket) -> SprmBucketReport {
++    SprmBucketReport {
++        calls: bucket.calls,
++        successes: bucket.successes,
++        errors: bucket.errors,
++        input_empty: bucket.input_empty,
++        input_nonempty: bucket.input_nonempty,
++        input_bytes_total: bucket.input_bytes_total,
++        input_bytes_min: bucket.input_bytes_min,
++        input_bytes_max: bucket.input_bytes_max,
++        input_length_histogram: bucket.input_length_histogram,
++        output_count_total: bucket.output_count_total,
++        output_count_histogram: bucket.output_count_histogram,
++        output_capacity_total: bucket.output_capacity_total,
++        output_capacity_min: bucket.output_capacity_min,
++        output_capacity_max: bucket.output_capacity_max,
++        logical_vec_capacity_bytes: bucket.logical_vec_capacity_bytes,
++        errors_by_kind: bucket.errors_by_kind,
++    }
++}
++
++#[derive(Clone, Debug, Serialize)]
++struct SprmCensusReport {
++    schema_version: u32,
++    sprm_size_bytes: usize,
++    saturated: bool,
++    histogram_labels: [&'static str; sprm_census::HISTOGRAM_BUCKETS],
++    total: SprmBucketReport,
++    snapshot_open: SprmBucketReport,
++    edit_open: SprmBucketReport,
++    staged_replacement: SprmBucketReport,
++    final_commit: SprmBucketReport,
++    output_copy: SprmBucketReport,
++    other: SprmBucketReport,
++}
++
++fn sprm_census_report(census: sprm_census::Census) -> SprmCensusReport {
++    SprmCensusReport {
++        schema_version: 1,
++        sprm_size_bytes: census.sprm_size_bytes,
++        saturated: census.saturated,
++        histogram_labels: SPRM_HISTOGRAM_LABELS,
++        total: sprm_bucket_report(census.total),
++        snapshot_open: sprm_bucket_report(census.snapshot_open),
++        edit_open: sprm_bucket_report(census.edit_open),
++        staged_replacement: sprm_bucket_report(census.staged_replacement),
++        final_commit: sprm_bucket_report(census.final_commit),
++        output_copy: sprm_bucket_report(census.output_copy),
++        other: sprm_bucket_report(census.other),
+     }
+ }
+ 
++fn measure_one(source: &[u8], args: &Args) -> Result<MeasuredResult, BoxError> {
++    let result = profiled_measured_case(source, args, args.retention)?;
++    Ok(MeasuredResult {
++        result,
++        elapsed_ns: None,
++        allocation: None,
++    })
++}
++
+ #[derive(Clone, Debug, Serialize)]
+ struct RouteReport {
+     retention: &'static str,
+@@ -826,15 +894,23 @@
+     oracle: oracle_0730::Check,
+     stages: [StageObservation; MAX_EDIT_STAGES],
+     allocation: Option<AllocationReport>,
++    sprm_census: SprmCensusReport,
+ }
+ 
+ fn sample_report_with_source(
+     source: &[u8],
+     index: usize,
+-    measured: MeasuredResult,
++    mut measured: MeasuredResult,
+     args: &Args,
+     prepared: &Prepared,
+ ) -> Result<SampleReport, BoxError> {
++    let census = measured
++        .result
++        .census
++        .take()
++        .ok_or_else(|| {
++            Box::new(ProbeError("measured result has no SPRM census".to_owned())) as BoxError
++        })?;
+     let expected = &prepared.routes[0].result.output;
+     let exact_output_equal_reference = measured.result.output == *expected;
+     let final_paragraph_semantic_readback = final_paragraph_matches(&measured.result, args.edits)?;
+@@ -883,6 +959,7 @@
+         oracle,
+         stages: route.result.stages,
+         allocation: measured.allocation,
++        sprm_census: sprm_census_report(census),
+     })
+ }
+ 
+@@ -936,8 +1013,8 @@
+ 
+ pub fn run(_allocator_lane: bool) -> Result<(), BoxError> {
+     let args = parse_args()?;
+-    if alloc_metrics::instrumented() && (args.warmup != 0 || args.samples != 1) {
+-        return failure("allocator lane requires --warmup 0 --samples 1");
++    if args.warmup != 0 || args.samples != 1 {
++        return failure("SPRM census requires --warmup 0 --samples 1");
+     }
+     let source = std::fs::read(&args.input)?;
+     verify_fixture(&args, &source)?;
+@@ -985,8 +1062,8 @@
+     ];
+     let output = ProbeOutput {
+         schema_version: 1,
+-        schema: "litchi.performance.0917.doc_retention.v1",
+-        change: "0917",
++        schema: "litchi.performance.0966.doc_sprm_census.v1",
++        change: "0966",
+         case: args.case.name(),
+         input: args.input.display().to_string(),
+         source_sha256,
+@@ -996,10 +1073,10 @@
+         alternating_texts: [FIRST_TEXT, SECOND_TEXT],
+         retention: args.retention.name(),
+         retention_ceiling_bytes: args.retention.ceiling(),
+-        timing_claim: !alloc_metrics::instrumented(),
++        timing_claim: false,
+         allocator_instrumented: alloc_metrics::instrumented(),
+         allocator_timing_claim: false,
+-        region_definition: "public Snapshot::open_bounded source clone, one Edit with all paragraph-0 replacements and retention releases, commit, output Vec copy, and local snapshot/edit/commit destruction; source file read, references, correctness checks, hashing and JSON excluded",
++        region_definition: "one fresh measured wrapper enables fixed SPRM counters around public Snapshot::open_bounded, paragraph-0 replacements, commit, output Vec copy, and local destruction; preparation, all route/oracle checks, hashes, JSON, warmups, and source loading are outside; no timing qualification",
+         warmups: args.warmup,
+         samples_requested: args.samples,
+         output_sha256,

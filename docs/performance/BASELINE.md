@@ -1,5 +1,31 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0966 — DOC SPRM census completes; short non-empty inputs dominate
+
+[0966](0966-doc-sprm-census.md) completes the bounded current-source DOC SPRM
+census: 48/48 fresh children, 24/24 cells, exact repeat identity, zero parser
+errors, counter conservation, and all existing correctness gates pass. Each
+table entry is one representative cell; all three retention routes have the
+same counts and logical `Vec` capacity. The values are descriptive parser
+counters, not CPU, allocator traffic, RSS, removable work, or timing.
+
+| Fixture | 1 edit | 2 edits | 8 edits | 32 edits |
+| --- | ---: | ---: | ---: | ---: |
+| `NoHeadFoot.doc` calls / empty / logical bytes | 170 / 31 / 68,544 | 187 / 34 / 75,072 | 310 / 52 / 122,304 | 1,162 / 124 / 449,472 |
+| `FloatingPictures.doc` calls / empty / logical bytes | 4,742 / 220 / 1,985,136 | 5,220 / 240 / 2,180,832 | 8,109 / 360 / 3,363,072 | 20,025 / 840 / 8,230,272 |
+
+At 32 edits, the phase counts (`calls / empty`) are NoHeadFoot
+`63/11`, `28/6`, `944/96`, `127/11` and FloatingPictures `1,657/80`,
+`950/40`, `15,696/640`, `1,722/80` for snapshot open, edit open, staged
+replacement, and final commit; output-copy and unclassified phases are zero.
+Empty groups are a minority. The 4–7-byte non-empty bucket contains 974
+NoHeadFoot and 12,203 FloatingPictures calls at 32 edits. The 0919 numbers are
+allocation-event counts within an inclusive parser subtree and are not
+numerically comparable with these logical census calls. The empty-only
+candidate is not adopted; the next review is bounded short-input parsing and
+result-consumer behavior. The per-cell supplement and independent post-capture
+audit pass, and production remains unchanged.
+
 ## 0965 — ingress-tail diagnostic is mixed; 0964 rejection preserved
 
 [0965](0965-xlsx-ingress-tail-diagnostic.md) completes the native-only matched

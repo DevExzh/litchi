@@ -1,0 +1,8 @@
+{
+  "children": 48,
+  "ended_utc": "2026-10-07T23:02:58.337303Z",
+  "failures": [],
+  "retries": 0,
+  "schema": "litchi.performance.0966.run_terminal.v1",
+  "status": "completed"
+}

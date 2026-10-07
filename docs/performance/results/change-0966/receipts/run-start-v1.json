@@ -1,0 +1,22 @@
+{
+  "children": 48,
+  "executable": {
+    "bytes": 125930408,
+    "path": "/home/zhuhe/litchi-performance-0966/target-0966-census/release/doc_sprm_census_0966",
+    "sha256": "d257020c302f92096c34d8bc821f0a88878900ab270f52a189b4e2889eaaf375"
+  },
+  "go": {
+    "bytes": 358,
+    "path": "/home/zhuhe/litchi-performance-0966/protocol/root-go-v1.json",
+    "sha256": "383fcf328f43ef2b9345dffdf8bd3229e9662ba512d17aa406672451695f47a4"
+  },
+  "plan": {
+    "bytes": 23187,
+    "path": "/home/zhuhe/litchi-performance-0966/protocol/plan-doc-sprm-census-0966-v1.json",
+    "sha256": "18b2915f692567cd830edf9254326431767cb9b0faf79da9eaad1bc9cf0be79b"
+  },
+  "schema": "litchi.performance.0966.run_start.v1",
+  "source_tree_sha256": "ab9934b960d60efe8e4720e00dec42d54f1a21acdd14b4e29a9d750f1d90a29f",
+  "started_utc": "2026-10-07T23:02:56.016418Z",
+  "status": "started"
+}

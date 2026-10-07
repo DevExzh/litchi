@@ -1,5 +1,29 @@
 # Performance hotspot inventory
 
+## 0966 — DOC short SPRM inputs are the next bounded review
+
+[0966](0966-doc-sprm-census.md) completes a diagnostic-only census of the
+current DOC lifecycle. All 48 fresh children and 24 cells pass exact repeat,
+zero-error, conservation, and correctness checks. Per-cell calls / empty
+groups / logical `Vec` capacity bytes are:
+
+| Fixture | 1 edit | 2 edits | 8 edits | 32 edits |
+| --- | ---: | ---: | ---: | ---: |
+| `NoHeadFoot.doc` | 170 / 31 / 68,544 | 187 / 34 / 75,072 | 310 / 52 / 122,304 | 1,162 / 124 / 449,472 |
+| `FloatingPictures.doc` | 4,742 / 220 / 1,985,136 | 5,220 / 240 / 2,180,832 | 8,109 / 360 / 3,363,072 | 20,025 / 840 / 8,230,272 |
+
+At 32 edits, snapshot open/edit open/staged replacement/final commit are
+NoHeadFoot `63/11`, `28/6`, `944/96`, `127/11` and FloatingPictures
+`1,657/80`, `950/40`, `15,696/640`, `1,722/80` (`calls / empty`); output-copy
+and `other` are zero. Empty groups are a minority, while the 4–7-byte
+non-empty bucket contains 974 and 12,203 calls respectively. These are logical
+parser counters and modeled capacity, not CPU or allocator-traffic ownership.
+The 0919 allocation-event figures use a different inclusive counting method
+and must not be compared numerically with 0966. No empty-only production
+candidate or late-CFB deferral follows. Review bounded short-input parsing and
+result consumers next; the per-cell supplement and independent post-capture
+audit pass, and production remains unchanged.
+
 ## 0965 — matched ingress-tail controls remain unresolved
 
 [0965](0965-xlsx-ingress-tail-diagnostic.md) runs the accepted 24-child native

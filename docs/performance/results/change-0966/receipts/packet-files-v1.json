@@ -1,0 +1,151 @@
+{
+  "change": "0966",
+  "exclusions": [
+    "external raw capture reports, stdout, stderr, and full command logs",
+    "external compiled executable and build cache",
+    "this manifest itself (self-referential hash intentionally omitted)"
+  ],
+  "file_count": 27,
+  "files": [
+    {
+      "bytes": 13653,
+      "path": "README.md",
+      "sha256": "f2ebb8f0c681d0efbed1c4539fc87a6e0f32a489af3ed452d2747f1dbfbea05f"
+    },
+    {
+      "bytes": 83816,
+      "path": "analysis/census-cell-details-v1.json",
+      "sha256": "6b45e9a2ddce1f5edde696619dea9edb8dcd7be772f129ef25179cfef9d56c1b"
+    },
+    {
+      "bytes": 11652,
+      "path": "analysis/census-summary-v1.json",
+      "sha256": "53339c9a9c9e22af0f1773fdd2621351948ef0b207263ac3744a04f63d4121d5"
+    },
+    {
+      "bytes": 35266,
+      "path": "analysis/child-terminal-report-manifest-v1.json",
+      "sha256": "b23f755a37fe7d5edb06130647ea8b3d16b91e4cf411a3e5bc02c6ff5a0dd96f"
+    },
+    {
+      "bytes": 9825,
+      "path": "analysis/source-design-v2.md",
+      "sha256": "525524a7d907324cb46454d875db93c98c3ced94658cd314e7a4218e50af3a5a"
+    },
+    {
+      "bytes": 8704,
+      "path": "protocol/doc-sprm-census-plan-v1.md",
+      "sha256": "61297febde4d6b9ae86621fabc5417fecdfb6d017c5494813454fa2dfcd08503"
+    },
+    {
+      "bytes": 23187,
+      "path": "protocol/plan-doc-sprm-census-0966-v1.json",
+      "sha256": "18b2915f692567cd830edf9254326431767cb9b0faf79da9eaad1bc9cf0be79b"
+    },
+    {
+      "bytes": 358,
+      "path": "protocol/root-go-v1.json",
+      "sha256": "383fcf328f43ef2b9345dffdf8bd3229e9662ba512d17aa406672451695f47a4"
+    },
+    {
+      "bytes": 3584,
+      "path": "provenance/adr-sha256-v1.txt",
+      "sha256": "25fc1d3085b40b5851ae4a3b12d27a80988784f2997834ede8731fc977fd7c57"
+    },
+    {
+      "bytes": 3264,
+      "path": "provenance/source-provenance-v1.json",
+      "sha256": "27a465972f4885a668b45e8c80834e626e0757018f04d20a45e15aeefdeb82a7"
+    },
+    {
+      "bytes": 6309,
+      "path": "receipts/build-cache-cleanup-v1.json",
+      "sha256": "50b8474d3b35678f7ae4d42b01bffd36617b15436c9728fd4a048e3a7a2ef1d9"
+    },
+    {
+      "bytes": 13151,
+      "path": "receipts/build-exit-v1.json",
+      "sha256": "06b42b165c389b3138bed1cc305cc9d170b6aab18343e9fd4d97395f62349c74"
+    },
+    {
+      "bytes": 1003,
+      "path": "receipts/checker-receipt-v1.json",
+      "sha256": "3b6ccb9e5f88a9c4f119f91b5ee2ea605957a8a1711c6da8a3d381efb9d28910"
+    },
+    {
+      "bytes": 1788,
+      "path": "receipts/reproduction-v1.json",
+      "sha256": "c600bdc47c1d47f5f28ccff075ff8e9d5fcbc75ff1542a4d7c5f6e6a4ac20caf"
+    },
+    {
+      "bytes": 4047,
+      "path": "receipts/reproduction-v2.json",
+      "sha256": "7c0f92b9b0c0fdb1fab62f4635df357678211a499f418aaededaf5f764204987"
+    },
+    {
+      "bytes": 865,
+      "path": "receipts/run-start-v1.json",
+      "sha256": "dacb4e037a8f1ffe26f4ed38f9a037a357f7362143c586fb100e006e9f24f357"
+    },
+    {
+      "bytes": 181,
+      "path": "receipts/run-terminal-v1.json",
+      "sha256": "0385b9ed31b8ebaae84fb822e50b869114d8e051f38d193f681c520036ab5133"
+    },
+    {
+      "bytes": 24773,
+      "path": "repro/diagnostic-combined.patch",
+      "sha256": "ce5407f309d2495139401d0e0998a4bfd1456a816819e6c6bf1ece963a067142"
+    },
+    {
+      "bytes": 138443,
+      "path": "repro/root-Cargo.lock",
+      "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+    },
+    {
+      "bytes": 3206,
+      "path": "review/doc-sprm-census-review-receipt-v1.json",
+      "sha256": "653beac50c00dc2e5892f006d424f2ebcae72a1365b252466c2cdc17eacba532"
+    },
+    {
+      "bytes": 10630,
+      "path": "review/postcapture-audit-v1.json",
+      "sha256": "f6fe42f9896e9895e9d9669bd36daae95ba87dc4d59691871357cbec15ffe293"
+    },
+    {
+      "bytes": 10949,
+      "path": "review/pre-capture-review-v1.md",
+      "sha256": "d0470fa7fdf4537058c23bc19791cf605d8cb2bf1d0340062bca5b331c72cacb"
+    },
+    {
+      "bytes": 11159,
+      "path": "tools/check_sprm_census_0966.py",
+      "sha256": "fc338c49dd66cf0f77370da8a6036945975390bfd03ed861eb4df1757e8c9d87"
+    },
+    {
+      "bytes": 11165,
+      "path": "tools/prepare_doc_sprm_census_0966_v1.py",
+      "sha256": "6654fcf0e5451790144309f6e7ba40fb96c3f86199e23b8874d7662cede1c949"
+    },
+    {
+      "bytes": 36107,
+      "path": "tools/reduce_doc_sprm_census_0966_v1.py",
+      "sha256": "36e003a5276ebe5a9e2a7c02d0763d6aebe6d6d88c92a4e2448470a5df019304"
+    },
+    {
+      "bytes": 32961,
+      "path": "tools/run_doc_sprm_census_0966_v1.py",
+      "sha256": "c66e636c30432e4cf08ca4f3133f1f6944af3158140c7c5d04b21e61e3a9e434"
+    },
+    {
+      "bytes": 14542,
+      "path": "tools/supplement_doc_sprm_census_0966_v1.py",
+      "sha256": "5271004dc1dbbd92126c81ea466816019ab86bba1440f42c790109a898018f91"
+    }
+  ],
+  "packet_root": "/home/zhuhe/code/litchi/docs/performance/results/change-0966",
+  "schema": "litchi.performance.0966.packet_files.v1",
+  "size_policy": "Every listed repository file is below 1 MiB; no executable is listed.",
+  "source_commit": "a499d34f5119a034bc92abde1e1dfcf529159b8d",
+  "status": "sealed_bounded_packet"
+}

@@ -1,0 +1,26 @@
+{
+  "capture_root": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1",
+  "checker": {
+    "bytes": 11159,
+    "path": "/home/zhuhe/litchi-performance-0966/check_sprm_census_0966.py",
+    "sha256": "fc338c49dd66cf0f77370da8a6036945975390bfd03ed861eb4df1757e8c9d87"
+  },
+  "command": "PYTHONDONTWRITEBYTECODE=1 python3 check_sprm_census_0966.py <temporary-directory-of-48-report.json-files> --expected-count 48",
+  "plan": {
+    "bytes": 23187,
+    "path": "/home/zhuhe/litchi-performance-0966/protocol/plan-doc-sprm-census-0966-v1.json",
+    "sha256": "18b2915f692567cd830edf9254326431767cb9b0faf79da9eaad1bc9cf0be79b"
+  },
+  "raw_stdout_stderr_retained_external": true,
+  "report_bytes_total": 1721162,
+  "reports": 48,
+  "schema": "litchi.performance.0966.checker_receipt.v1",
+  "status": "passed",
+  "summary": {
+    "cells": 24,
+    "repeat_equal": true,
+    "reports": 48,
+    "schema": "litchi.performance.0966.doc_sprm_census.v1"
+  },
+  "temporary_report_directory_removed": true
+}

@@ -1,0 +1,2881 @@
+{
+  "allocator_total_claim": false,
+  "capture_root": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1",
+  "cell_rows": [
+    {
+      "case": "docfloat",
+      "census": {
+        "histogram_labels": [
+          "0",
+          "1",
+          "2-3",
+          "4-7",
+          "8-15",
+          "16-31",
+          "32-63",
+          "64-127",
+          "128-255",
+          "256+"
+        ],
+        "phase_totals": {
+          "edit_open": {
+            "calls": 950,
+            "errors": 0,
+            "input_empty_calls": 40,
+            "input_nonempty_calls": 910,
+            "logical_vec_capacity_bytes_model": 389088,
+            "successes": 950
+          },
+          "final_commit": {
+            "calls": 1660,
+            "errors": 0,
+            "input_empty_calls": 80,
+            "input_nonempty_calls": 1580,
+            "logical_vec_capacity_bytes_model": 701328,
+            "successes": 1660
+          },
+          "other": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "output_copy": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "snapshot_open": {
+            "calls": 1657,
+            "errors": 0,
+            "input_empty_calls": 80,
+            "input_nonempty_calls": 1577,
+            "logical_vec_capacity_bytes_model": 700176,
+            "successes": 1657
+          },
+          "staged_replacement": {
+            "calls": 475,
+            "errors": 0,
+            "input_empty_calls": 20,
+            "input_nonempty_calls": 455,
+            "logical_vec_capacity_bytes_model": 194544,
+            "successes": 475
+          }
+        },
+        "sprm_size_bytes": 48,
+        "total": {
+          "calls": 4742,
+          "errors": 0,
+          "input_empty_calls": 220,
+          "input_length_histogram": [
+            220,
+            0,
+            7,
+            2841,
+            1034,
+            511,
+            53,
+            32,
+            0,
+            44
+          ],
+          "input_nonempty_calls": 4522,
+          "logical_vec_capacity_bytes_model": 1985136,
+          "output_capacity_total_elements": 41357,
+          "output_count_histogram": [
+            220,
+            2854,
+            1075,
+            495,
+            30,
+            68,
+            0,
+            0,
+            0,
+            0
+          ],
+          "successes": 4742
+        }
+      },
+      "children": [
+        "sprm-r01-docfloat-e01-default_8mib",
+        "sprm-r02-docfloat-e01-default_8mib"
+      ],
+      "edits": 1,
+      "interpretation_boundary": "Logical Vec capacity model only; model bytes are not allocator traffic, RSS, elapsed time, or removable-work evidence.",
+      "r1_report": {
+        "bytes": 34061,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e01-default_8mib/report.json",
+        "sha256": "e4a9655dd173f831a369aa85008dfd2760a9a8ee860c65a64276f2056b7a64a4"
+      },
+      "r2_report": {
+        "bytes": 34061,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e01-default_8mib/report.json",
+        "sha256": "e4a9655dd173f831a369aa85008dfd2760a9a8ee860c65a64276f2056b7a64a4"
+      },
+      "repeat_equal_verified_by_reduction": true,
+      "retention": "default_8mib"
+    },
+    {
+      "case": "docfloat",
+      "census": {
+        "histogram_labels": [
+          "0",
+          "1",
+          "2-3",
+          "4-7",
+          "8-15",
+          "16-31",
+          "32-63",
+          "64-127",
+          "128-255",
+          "256+"
+        ],
+        "phase_totals": {
+          "edit_open": {
+            "calls": 950,
+            "errors": 0,
+            "input_empty_calls": 40,
+            "input_nonempty_calls": 910,
+            "logical_vec_capacity_bytes_model": 389088,
+            "successes": 950
+          },
+          "final_commit": {
+            "calls": 1660,
+            "errors": 0,
+            "input_empty_calls": 80,
+            "input_nonempty_calls": 1580,
+            "logical_vec_capacity_bytes_model": 701328,
+            "successes": 1660
+          },
+          "other": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "output_copy": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "snapshot_open": {
+            "calls": 1657,
+            "errors": 0,
+            "input_empty_calls": 80,
+            "input_nonempty_calls": 1577,
+            "logical_vec_capacity_bytes_model": 700176,
+            "successes": 1657
+          },
+          "staged_replacement": {
+            "calls": 475,
+            "errors": 0,
+            "input_empty_calls": 20,
+            "input_nonempty_calls": 455,
+            "logical_vec_capacity_bytes_model": 194544,
+            "successes": 475
+          }
+        },
+        "sprm_size_bytes": 48,
+        "total": {
+          "calls": 4742,
+          "errors": 0,
+          "input_empty_calls": 220,
+          "input_length_histogram": [
+            220,
+            0,
+            7,
+            2841,
+            1034,
+            511,
+            53,
+            32,
+            0,
+            44
+          ],
+          "input_nonempty_calls": 4522,
+          "logical_vec_capacity_bytes_model": 1985136,
+          "output_capacity_total_elements": 41357,
+          "output_count_histogram": [
+            220,
+            2854,
+            1075,
+            495,
+            30,
+            68,
+            0,
+            0,
+            0,
+            0
+          ],
+          "successes": 4742
+        }
+      },
+      "children": [
+        "sprm-r01-docfloat-e01-release_8mib",
+        "sprm-r02-docfloat-e01-release_8mib"
+      ],
+      "edits": 1,
+      "interpretation_boundary": "Logical Vec capacity model only; model bytes are not allocator traffic, RSS, elapsed time, or removable-work evidence.",
+      "r1_report": {
+        "bytes": 34061,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e01-release_8mib/report.json",
+        "sha256": "41fb638060bb8bea94c81c4234f2b8ebe79451834af953865a247c0ceed2b864"
+      },
+      "r2_report": {
+        "bytes": 34061,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e01-release_8mib/report.json",
+        "sha256": "41fb638060bb8bea94c81c4234f2b8ebe79451834af953865a247c0ceed2b864"
+      },
+      "repeat_equal_verified_by_reduction": true,
+      "retention": "release_8mib"
+    },
+    {
+      "case": "docfloat",
+      "census": {
+        "histogram_labels": [
+          "0",
+          "1",
+          "2-3",
+          "4-7",
+          "8-15",
+          "16-31",
+          "32-63",
+          "64-127",
+          "128-255",
+          "256+"
+        ],
+        "phase_totals": {
+          "edit_open": {
+            "calls": 950,
+            "errors": 0,
+            "input_empty_calls": 40,
+            "input_nonempty_calls": 910,
+            "logical_vec_capacity_bytes_model": 389088,
+            "successes": 950
+          },
+          "final_commit": {
+            "calls": 1660,
+            "errors": 0,
+            "input_empty_calls": 80,
+            "input_nonempty_calls": 1580,
+            "logical_vec_capacity_bytes_model": 701328,
+            "successes": 1660
+          },
+          "other": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "output_copy": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "snapshot_open": {
+            "calls": 1657,
+            "errors": 0,
+            "input_empty_calls": 80,
+            "input_nonempty_calls": 1577,
+            "logical_vec_capacity_bytes_model": 700176,
+            "successes": 1657
+          },
+          "staged_replacement": {
+            "calls": 475,
+            "errors": 0,
+            "input_empty_calls": 20,
+            "input_nonempty_calls": 455,
+            "logical_vec_capacity_bytes_model": 194544,
+            "successes": 475
+          }
+        },
+        "sprm_size_bytes": 48,
+        "total": {
+          "calls": 4742,
+          "errors": 0,
+          "input_empty_calls": 220,
+          "input_length_histogram": [
+            220,
+            0,
+            7,
+            2841,
+            1034,
+            511,
+            53,
+            32,
+            0,
+            44
+          ],
+          "input_nonempty_calls": 4522,
+          "logical_vec_capacity_bytes_model": 1985136,
+          "output_capacity_total_elements": 41357,
+          "output_count_histogram": [
+            220,
+            2854,
+            1075,
+            495,
+            30,
+            68,
+            0,
+            0,
+            0,
+            0
+          ],
+          "successes": 4742
+        }
+      },
+      "children": [
+        "sprm-r01-docfloat-e01-zero",
+        "sprm-r02-docfloat-e01-zero"
+      ],
+      "edits": 1,
+      "interpretation_boundary": "Logical Vec capacity model only; model bytes are not allocator traffic, RSS, elapsed time, or removable-work evidence.",
+      "r1_report": {
+        "bytes": 34045,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e01-zero/report.json",
+        "sha256": "30825a74c1873f92bfd710dc1cc1ab473ea3cdd1bbbc30f7c64e994b64d61b69"
+      },
+      "r2_report": {
+        "bytes": 34045,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e01-zero/report.json",
+        "sha256": "30825a74c1873f92bfd710dc1cc1ab473ea3cdd1bbbc30f7c64e994b64d61b69"
+      },
+      "repeat_equal_verified_by_reduction": true,
+      "retention": "zero"
+    },
+    {
+      "case": "docfloat",
+      "census": {
+        "histogram_labels": [
+          "0",
+          "1",
+          "2-3",
+          "4-7",
+          "8-15",
+          "16-31",
+          "32-63",
+          "64-127",
+          "128-255",
+          "256+"
+        ],
+        "phase_totals": {
+          "edit_open": {
+            "calls": 950,
+            "errors": 0,
+            "input_empty_calls": 40,
+            "input_nonempty_calls": 910,
+            "logical_vec_capacity_bytes_model": 389088,
+            "successes": 950
+          },
+          "final_commit": {
+            "calls": 1662,
+            "errors": 0,
+            "input_empty_calls": 80,
+            "input_nonempty_calls": 1582,
+            "logical_vec_capacity_bytes_model": 702096,
+            "successes": 1662
+          },
+          "other": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "output_copy": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "snapshot_open": {
+            "calls": 1657,
+            "errors": 0,
+            "input_empty_calls": 80,
+            "input_nonempty_calls": 1577,
+            "logical_vec_capacity_bytes_model": 700176,
+            "successes": 1657
+          },
+          "staged_replacement": {
+            "calls": 951,
+            "errors": 0,
+            "input_empty_calls": 40,
+            "input_nonempty_calls": 911,
+            "logical_vec_capacity_bytes_model": 389472,
+            "successes": 951
+          }
+        },
+        "sprm_size_bytes": 48,
+        "total": {
+          "calls": 5220,
+          "errors": 0,
+          "input_empty_calls": 240,
+          "input_length_histogram": [
+            240,
+            0,
+            8,
+            3128,
+            1142,
+            564,
+            58,
+            32,
+            0,
+            48
+          ],
+          "input_nonempty_calls": 4980,
+          "logical_vec_capacity_bytes_model": 2180832,
+          "output_capacity_total_elements": 45434,
+          "output_count_histogram": [
+            240,
+            3142,
+            1190,
+            544,
+            32,
+            72,
+            0,
+            0,
+            0,
+            0
+          ],
+          "successes": 5220
+        }
+      },
+      "children": [
+        "sprm-r01-docfloat-e02-default_8mib",
+        "sprm-r02-docfloat-e02-default_8mib"
+      ],
+      "edits": 2,
+      "interpretation_boundary": "Logical Vec capacity model only; model bytes are not allocator traffic, RSS, elapsed time, or removable-work evidence.",
+      "r1_report": {
+        "bytes": 34259,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e02-default_8mib/report.json",
+        "sha256": "7a4765c0b784e8527fc931c0d7adc2f7307b9f840b48c611baed6ee431eef91a"
+      },
+      "r2_report": {
+        "bytes": 34259,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e02-default_8mib/report.json",
+        "sha256": "7a4765c0b784e8527fc931c0d7adc2f7307b9f840b48c611baed6ee431eef91a"
+      },
+      "repeat_equal_verified_by_reduction": true,
+      "retention": "default_8mib"
+    },
+    {
+      "case": "docfloat",
+      "census": {
+        "histogram_labels": [
+          "0",
+          "1",
+          "2-3",
+          "4-7",
+          "8-15",
+          "16-31",
+          "32-63",
+          "64-127",
+          "128-255",
+          "256+"
+        ],
+        "phase_totals": {
+          "edit_open": {
+            "calls": 950,
+            "errors": 0,
+            "input_empty_calls": 40,
+            "input_nonempty_calls": 910,
+            "logical_vec_capacity_bytes_model": 389088,
+            "successes": 950
+          },
+          "final_commit": {
+            "calls": 1662,
+            "errors": 0,
+            "input_empty_calls": 80,
+            "input_nonempty_calls": 1582,
+            "logical_vec_capacity_bytes_model": 702096,
+            "successes": 1662
+          },
+          "other": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "output_copy": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "snapshot_open": {
+            "calls": 1657,
+            "errors": 0,
+            "input_empty_calls": 80,
+            "input_nonempty_calls": 1577,
+            "logical_vec_capacity_bytes_model": 700176,
+            "successes": 1657
+          },
+          "staged_replacement": {
+            "calls": 951,
+            "errors": 0,
+            "input_empty_calls": 40,
+            "input_nonempty_calls": 911,
+            "logical_vec_capacity_bytes_model": 389472,
+            "successes": 951
+          }
+        },
+        "sprm_size_bytes": 48,
+        "total": {
+          "calls": 5220,
+          "errors": 0,
+          "input_empty_calls": 240,
+          "input_length_histogram": [
+            240,
+            0,
+            8,
+            3128,
+            1142,
+            564,
+            58,
+            32,
+            0,
+            48
+          ],
+          "input_nonempty_calls": 4980,
+          "logical_vec_capacity_bytes_model": 2180832,
+          "output_capacity_total_elements": 45434,
+          "output_count_histogram": [
+            240,
+            3142,
+            1190,
+            544,
+            32,
+            72,
+            0,
+            0,
+            0,
+            0
+          ],
+          "successes": 5220
+        }
+      },
+      "children": [
+        "sprm-r01-docfloat-e02-release_8mib",
+        "sprm-r02-docfloat-e02-release_8mib"
+      ],
+      "edits": 2,
+      "interpretation_boundary": "Logical Vec capacity model only; model bytes are not allocator traffic, RSS, elapsed time, or removable-work evidence.",
+      "r1_report": {
+        "bytes": 34257,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e02-release_8mib/report.json",
+        "sha256": "5c7e572ff8615603a106c822a876082f92166fdde1c9a1877b04446f4fc6369d"
+      },
+      "r2_report": {
+        "bytes": 34257,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e02-release_8mib/report.json",
+        "sha256": "5c7e572ff8615603a106c822a876082f92166fdde1c9a1877b04446f4fc6369d"
+      },
+      "repeat_equal_verified_by_reduction": true,
+      "retention": "release_8mib"
+    },
+    {
+      "case": "docfloat",
+      "census": {
+        "histogram_labels": [
+          "0",
+          "1",
+          "2-3",
+          "4-7",
+          "8-15",
+          "16-31",
+          "32-63",
+          "64-127",
+          "128-255",
+          "256+"
+        ],
+        "phase_totals": {
+          "edit_open": {
+            "calls": 950,
+            "errors": 0,
+            "input_empty_calls": 40,
+            "input_nonempty_calls": 910,
+            "logical_vec_capacity_bytes_model": 389088,
+            "successes": 950
+          },
+          "final_commit": {
+            "calls": 1662,
+            "errors": 0,
+            "input_empty_calls": 80,
+            "input_nonempty_calls": 1582,
+            "logical_vec_capacity_bytes_model": 702096,
+            "successes": 1662
+          },
+          "other": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "output_copy": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "snapshot_open": {
+            "calls": 1657,
+            "errors": 0,
+            "input_empty_calls": 80,
+            "input_nonempty_calls": 1577,
+            "logical_vec_capacity_bytes_model": 700176,
+            "successes": 1657
+          },
+          "staged_replacement": {
+            "calls": 951,
+            "errors": 0,
+            "input_empty_calls": 40,
+            "input_nonempty_calls": 911,
+            "logical_vec_capacity_bytes_model": 389472,
+            "successes": 951
+          }
+        },
+        "sprm_size_bytes": 48,
+        "total": {
+          "calls": 5220,
+          "errors": 0,
+          "input_empty_calls": 240,
+          "input_length_histogram": [
+            240,
+            0,
+            8,
+            3128,
+            1142,
+            564,
+            58,
+            32,
+            0,
+            48
+          ],
+          "input_nonempty_calls": 4980,
+          "logical_vec_capacity_bytes_model": 2180832,
+          "output_capacity_total_elements": 45434,
+          "output_count_histogram": [
+            240,
+            3142,
+            1190,
+            544,
+            32,
+            72,
+            0,
+            0,
+            0,
+            0
+          ],
+          "successes": 5220
+        }
+      },
+      "children": [
+        "sprm-r01-docfloat-e02-zero",
+        "sprm-r02-docfloat-e02-zero"
+      ],
+      "edits": 2,
+      "interpretation_boundary": "Logical Vec capacity model only; model bytes are not allocator traffic, RSS, elapsed time, or removable-work evidence.",
+      "r1_report": {
+        "bytes": 34239,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e02-zero/report.json",
+        "sha256": "c3e6315a2c322627dbc41e8cbd14cd730b0518d0072bc957bfa4213ef52bdba7"
+      },
+      "r2_report": {
+        "bytes": 34239,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e02-zero/report.json",
+        "sha256": "c3e6315a2c322627dbc41e8cbd14cd730b0518d0072bc957bfa4213ef52bdba7"
+      },
+      "repeat_equal_verified_by_reduction": true,
+      "retention": "zero"
+    },
+    {
+      "case": "docfloat",
+      "census": {
+        "histogram_labels": [
+          "0",
+          "1",
+          "2-3",
+          "4-7",
+          "8-15",
+          "16-31",
+          "32-63",
+          "64-127",
+          "128-255",
+          "256+"
+        ],
+        "phase_totals": {
+          "edit_open": {
+            "calls": 950,
+            "errors": 0,
+            "input_empty_calls": 40,
+            "input_nonempty_calls": 910,
+            "logical_vec_capacity_bytes_model": 389088,
+            "successes": 950
+          },
+          "final_commit": {
+            "calls": 1674,
+            "errors": 0,
+            "input_empty_calls": 80,
+            "input_nonempty_calls": 1594,
+            "logical_vec_capacity_bytes_model": 706704,
+            "successes": 1674
+          },
+          "other": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "output_copy": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "snapshot_open": {
+            "calls": 1657,
+            "errors": 0,
+            "input_empty_calls": 80,
+            "input_nonempty_calls": 1577,
+            "logical_vec_capacity_bytes_model": 700176,
+            "successes": 1657
+          },
+          "staged_replacement": {
+            "calls": 3828,
+            "errors": 0,
+            "input_empty_calls": 160,
+            "input_nonempty_calls": 3668,
+            "logical_vec_capacity_bytes_model": 1567104,
+            "successes": 3828
+          }
+        },
+        "sprm_size_bytes": 48,
+        "total": {
+          "calls": 8109,
+          "errors": 0,
+          "input_empty_calls": 360,
+          "input_length_histogram": [
+            360,
+            0,
+            14,
+            4871,
+            1790,
+            882,
+            88,
+            32,
+            0,
+            72
+          ],
+          "input_nonempty_calls": 7749,
+          "logical_vec_capacity_bytes_model": 3363072,
+          "output_capacity_total_elements": 70064,
+          "output_count_histogram": [
+            360,
+            4891,
+            1880,
+            838,
+            44,
+            96,
+            0,
+            0,
+            0,
+            0
+          ],
+          "successes": 8109
+        }
+      },
+      "children": [
+        "sprm-r01-docfloat-e08-default_8mib",
+        "sprm-r02-docfloat-e08-default_8mib"
+      ],
+      "edits": 8,
+      "interpretation_boundary": "Logical Vec capacity model only; model bytes are not allocator traffic, RSS, elapsed time, or removable-work evidence.",
+      "r1_report": {
+        "bytes": 35428,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e08-default_8mib/report.json",
+        "sha256": "37501fa558fc71aefc77a1c72ed68a58a334b347c349c15aedfdd253044ae06f"
+      },
+      "r2_report": {
+        "bytes": 35428,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e08-default_8mib/report.json",
+        "sha256": "37501fa558fc71aefc77a1c72ed68a58a334b347c349c15aedfdd253044ae06f"
+      },
+      "repeat_equal_verified_by_reduction": true,
+      "retention": "default_8mib"
+    },
+    {
+      "case": "docfloat",
+      "census": {
+        "histogram_labels": [
+          "0",
+          "1",
+          "2-3",
+          "4-7",
+          "8-15",
+          "16-31",
+          "32-63",
+          "64-127",
+          "128-255",
+          "256+"
+        ],
+        "phase_totals": {
+          "edit_open": {
+            "calls": 950,
+            "errors": 0,
+            "input_empty_calls": 40,
+            "input_nonempty_calls": 910,
+            "logical_vec_capacity_bytes_model": 389088,
+            "successes": 950
+          },
+          "final_commit": {
+            "calls": 1674,
+            "errors": 0,
+            "input_empty_calls": 80,
+            "input_nonempty_calls": 1594,
+            "logical_vec_capacity_bytes_model": 706704,
+            "successes": 1674
+          },
+          "other": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "output_copy": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "snapshot_open": {
+            "calls": 1657,
+            "errors": 0,
+            "input_empty_calls": 80,
+            "input_nonempty_calls": 1577,
+            "logical_vec_capacity_bytes_model": 700176,
+            "successes": 1657
+          },
+          "staged_replacement": {
+            "calls": 3828,
+            "errors": 0,
+            "input_empty_calls": 160,
+            "input_nonempty_calls": 3668,
+            "logical_vec_capacity_bytes_model": 1567104,
+            "successes": 3828
+          }
+        },
+        "sprm_size_bytes": 48,
+        "total": {
+          "calls": 8109,
+          "errors": 0,
+          "input_empty_calls": 360,
+          "input_length_histogram": [
+            360,
+            0,
+            14,
+            4871,
+            1790,
+            882,
+            88,
+            32,
+            0,
+            72
+          ],
+          "input_nonempty_calls": 7749,
+          "logical_vec_capacity_bytes_model": 3363072,
+          "output_capacity_total_elements": 70064,
+          "output_count_histogram": [
+            360,
+            4891,
+            1880,
+            838,
+            44,
+            96,
+            0,
+            0,
+            0,
+            0
+          ],
+          "successes": 8109
+        }
+      },
+      "children": [
+        "sprm-r01-docfloat-e08-release_8mib",
+        "sprm-r02-docfloat-e08-release_8mib"
+      ],
+      "edits": 8,
+      "interpretation_boundary": "Logical Vec capacity model only; model bytes are not allocator traffic, RSS, elapsed time, or removable-work evidence.",
+      "r1_report": {
+        "bytes": 35414,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e08-release_8mib/report.json",
+        "sha256": "16a8c8172f75147bd2aacd8e34c69f84d3b2c7730ec227a9cce39703cc391418"
+      },
+      "r2_report": {
+        "bytes": 35414,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e08-release_8mib/report.json",
+        "sha256": "16a8c8172f75147bd2aacd8e34c69f84d3b2c7730ec227a9cce39703cc391418"
+      },
+      "repeat_equal_verified_by_reduction": true,
+      "retention": "release_8mib"
+    },
+    {
+      "case": "docfloat",
+      "census": {
+        "histogram_labels": [
+          "0",
+          "1",
+          "2-3",
+          "4-7",
+          "8-15",
+          "16-31",
+          "32-63",
+          "64-127",
+          "128-255",
+          "256+"
+        ],
+        "phase_totals": {
+          "edit_open": {
+            "calls": 950,
+            "errors": 0,
+            "input_empty_calls": 40,
+            "input_nonempty_calls": 910,
+            "logical_vec_capacity_bytes_model": 389088,
+            "successes": 950
+          },
+          "final_commit": {
+            "calls": 1674,
+            "errors": 0,
+            "input_empty_calls": 80,
+            "input_nonempty_calls": 1594,
+            "logical_vec_capacity_bytes_model": 706704,
+            "successes": 1674
+          },
+          "other": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "output_copy": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "snapshot_open": {
+            "calls": 1657,
+            "errors": 0,
+            "input_empty_calls": 80,
+            "input_nonempty_calls": 1577,
+            "logical_vec_capacity_bytes_model": 700176,
+            "successes": 1657
+          },
+          "staged_replacement": {
+            "calls": 3828,
+            "errors": 0,
+            "input_empty_calls": 160,
+            "input_nonempty_calls": 3668,
+            "logical_vec_capacity_bytes_model": 1567104,
+            "successes": 3828
+          }
+        },
+        "sprm_size_bytes": 48,
+        "total": {
+          "calls": 8109,
+          "errors": 0,
+          "input_empty_calls": 360,
+          "input_length_histogram": [
+            360,
+            0,
+            14,
+            4871,
+            1790,
+            882,
+            88,
+            32,
+            0,
+            72
+          ],
+          "input_nonempty_calls": 7749,
+          "logical_vec_capacity_bytes_model": 3363072,
+          "output_capacity_total_elements": 70064,
+          "output_count_histogram": [
+            360,
+            4891,
+            1880,
+            838,
+            44,
+            96,
+            0,
+            0,
+            0,
+            0
+          ],
+          "successes": 8109
+        }
+      },
+      "children": [
+        "sprm-r01-docfloat-e08-zero",
+        "sprm-r02-docfloat-e08-zero"
+      ],
+      "edits": 8,
+      "interpretation_boundary": "Logical Vec capacity model only; model bytes are not allocator traffic, RSS, elapsed time, or removable-work evidence.",
+      "r1_report": {
+        "bytes": 35384,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e08-zero/report.json",
+        "sha256": "03f837c3f30e13f4fc41a480284ec7ac50ecb7aa0109364ba9708d56bfb38529"
+      },
+      "r2_report": {
+        "bytes": 35384,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e08-zero/report.json",
+        "sha256": "03f837c3f30e13f4fc41a480284ec7ac50ecb7aa0109364ba9708d56bfb38529"
+      },
+      "repeat_equal_verified_by_reduction": true,
+      "retention": "zero"
+    },
+    {
+      "case": "docfloat",
+      "census": {
+        "histogram_labels": [
+          "0",
+          "1",
+          "2-3",
+          "4-7",
+          "8-15",
+          "16-31",
+          "32-63",
+          "64-127",
+          "128-255",
+          "256+"
+        ],
+        "phase_totals": {
+          "edit_open": {
+            "calls": 950,
+            "errors": 0,
+            "input_empty_calls": 40,
+            "input_nonempty_calls": 910,
+            "logical_vec_capacity_bytes_model": 389088,
+            "successes": 950
+          },
+          "final_commit": {
+            "calls": 1722,
+            "errors": 0,
+            "input_empty_calls": 80,
+            "input_nonempty_calls": 1642,
+            "logical_vec_capacity_bytes_model": 725136,
+            "successes": 1722
+          },
+          "other": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "output_copy": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "snapshot_open": {
+            "calls": 1657,
+            "errors": 0,
+            "input_empty_calls": 80,
+            "input_nonempty_calls": 1577,
+            "logical_vec_capacity_bytes_model": 700176,
+            "successes": 1657
+          },
+          "staged_replacement": {
+            "calls": 15696,
+            "errors": 0,
+            "input_empty_calls": 640,
+            "input_nonempty_calls": 15056,
+            "logical_vec_capacity_bytes_model": 6415872,
+            "successes": 15696
+          }
+        },
+        "sprm_size_bytes": 48,
+        "total": {
+          "calls": 20025,
+          "errors": 0,
+          "input_empty_calls": 840,
+          "input_length_histogram": [
+            840,
+            0,
+            38,
+            12203,
+            4382,
+            2154,
+            208,
+            32,
+            0,
+            168
+          ],
+          "input_nonempty_calls": 19185,
+          "logical_vec_capacity_bytes_model": 8230272,
+          "output_capacity_total_elements": 171464,
+          "output_count_histogram": [
+            840,
+            12247,
+            4640,
+            2014,
+            92,
+            192,
+            0,
+            0,
+            0,
+            0
+          ],
+          "successes": 20025
+        }
+      },
+      "children": [
+        "sprm-r01-docfloat-e32-default_8mib",
+        "sprm-r02-docfloat-e32-default_8mib"
+      ],
+      "edits": 32,
+      "interpretation_boundary": "Logical Vec capacity model only; model bytes are not allocator traffic, RSS, elapsed time, or removable-work evidence.",
+      "r1_report": {
+        "bytes": 40202,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e32-default_8mib/report.json",
+        "sha256": "27bbe1ce86617e342e225cd4471a4f37924bfe51c7f9a9b6d2e64f310c2053a3"
+      },
+      "r2_report": {
+        "bytes": 40202,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e32-default_8mib/report.json",
+        "sha256": "27bbe1ce86617e342e225cd4471a4f37924bfe51c7f9a9b6d2e64f310c2053a3"
+      },
+      "repeat_equal_verified_by_reduction": true,
+      "retention": "default_8mib"
+    },
+    {
+      "case": "docfloat",
+      "census": {
+        "histogram_labels": [
+          "0",
+          "1",
+          "2-3",
+          "4-7",
+          "8-15",
+          "16-31",
+          "32-63",
+          "64-127",
+          "128-255",
+          "256+"
+        ],
+        "phase_totals": {
+          "edit_open": {
+            "calls": 950,
+            "errors": 0,
+            "input_empty_calls": 40,
+            "input_nonempty_calls": 910,
+            "logical_vec_capacity_bytes_model": 389088,
+            "successes": 950
+          },
+          "final_commit": {
+            "calls": 1722,
+            "errors": 0,
+            "input_empty_calls": 80,
+            "input_nonempty_calls": 1642,
+            "logical_vec_capacity_bytes_model": 725136,
+            "successes": 1722
+          },
+          "other": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "output_copy": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "snapshot_open": {
+            "calls": 1657,
+            "errors": 0,
+            "input_empty_calls": 80,
+            "input_nonempty_calls": 1577,
+            "logical_vec_capacity_bytes_model": 700176,
+            "successes": 1657
+          },
+          "staged_replacement": {
+            "calls": 15696,
+            "errors": 0,
+            "input_empty_calls": 640,
+            "input_nonempty_calls": 15056,
+            "logical_vec_capacity_bytes_model": 6415872,
+            "successes": 15696
+          }
+        },
+        "sprm_size_bytes": 48,
+        "total": {
+          "calls": 20025,
+          "errors": 0,
+          "input_empty_calls": 840,
+          "input_length_histogram": [
+            840,
+            0,
+            38,
+            12203,
+            4382,
+            2154,
+            208,
+            32,
+            0,
+            168
+          ],
+          "input_nonempty_calls": 19185,
+          "logical_vec_capacity_bytes_model": 8230272,
+          "output_capacity_total_elements": 171464,
+          "output_count_histogram": [
+            840,
+            12247,
+            4640,
+            2014,
+            92,
+            192,
+            0,
+            0,
+            0,
+            0
+          ],
+          "successes": 20025
+        }
+      },
+      "children": [
+        "sprm-r01-docfloat-e32-release_8mib",
+        "sprm-r02-docfloat-e32-release_8mib"
+      ],
+      "edits": 32,
+      "interpretation_boundary": "Logical Vec capacity model only; model bytes are not allocator traffic, RSS, elapsed time, or removable-work evidence.",
+      "r1_report": {
+        "bytes": 40132,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e32-release_8mib/report.json",
+        "sha256": "f4db847d6d7315522facf386af4f6bda5b9535ca2b35532d484dadfe07c5de7d"
+      },
+      "r2_report": {
+        "bytes": 40132,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e32-release_8mib/report.json",
+        "sha256": "f4db847d6d7315522facf386af4f6bda5b9535ca2b35532d484dadfe07c5de7d"
+      },
+      "repeat_equal_verified_by_reduction": true,
+      "retention": "release_8mib"
+    },
+    {
+      "case": "docfloat",
+      "census": {
+        "histogram_labels": [
+          "0",
+          "1",
+          "2-3",
+          "4-7",
+          "8-15",
+          "16-31",
+          "32-63",
+          "64-127",
+          "128-255",
+          "256+"
+        ],
+        "phase_totals": {
+          "edit_open": {
+            "calls": 950,
+            "errors": 0,
+            "input_empty_calls": 40,
+            "input_nonempty_calls": 910,
+            "logical_vec_capacity_bytes_model": 389088,
+            "successes": 950
+          },
+          "final_commit": {
+            "calls": 1722,
+            "errors": 0,
+            "input_empty_calls": 80,
+            "input_nonempty_calls": 1642,
+            "logical_vec_capacity_bytes_model": 725136,
+            "successes": 1722
+          },
+          "other": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "output_copy": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "snapshot_open": {
+            "calls": 1657,
+            "errors": 0,
+            "input_empty_calls": 80,
+            "input_nonempty_calls": 1577,
+            "logical_vec_capacity_bytes_model": 700176,
+            "successes": 1657
+          },
+          "staged_replacement": {
+            "calls": 15696,
+            "errors": 0,
+            "input_empty_calls": 640,
+            "input_nonempty_calls": 15056,
+            "logical_vec_capacity_bytes_model": 6415872,
+            "successes": 15696
+          }
+        },
+        "sprm_size_bytes": 48,
+        "total": {
+          "calls": 20025,
+          "errors": 0,
+          "input_empty_calls": 840,
+          "input_length_histogram": [
+            840,
+            0,
+            38,
+            12203,
+            4382,
+            2154,
+            208,
+            32,
+            0,
+            168
+          ],
+          "input_nonempty_calls": 19185,
+          "logical_vec_capacity_bytes_model": 8230272,
+          "output_capacity_total_elements": 171464,
+          "output_count_histogram": [
+            840,
+            12247,
+            4640,
+            2014,
+            92,
+            192,
+            0,
+            0,
+            0,
+            0
+          ],
+          "successes": 20025
+        }
+      },
+      "children": [
+        "sprm-r01-docfloat-e32-zero",
+        "sprm-r02-docfloat-e32-zero"
+      ],
+      "edits": 32,
+      "interpretation_boundary": "Logical Vec capacity model only; model bytes are not allocator traffic, RSS, elapsed time, or removable-work evidence.",
+      "r1_report": {
+        "bytes": 40045,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e32-zero/report.json",
+        "sha256": "0720e0334d5432c56038571aeebe3556a9991ecf079460e1e5a58678008d9d8e"
+      },
+      "r2_report": {
+        "bytes": 40045,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e32-zero/report.json",
+        "sha256": "0720e0334d5432c56038571aeebe3556a9991ecf079460e1e5a58678008d9d8e"
+      },
+      "repeat_equal_verified_by_reduction": true,
+      "retention": "zero"
+    },
+    {
+      "case": "docnohf",
+      "census": {
+        "histogram_labels": [
+          "0",
+          "1",
+          "2-3",
+          "4-7",
+          "8-15",
+          "16-31",
+          "32-63",
+          "64-127",
+          "128-255",
+          "256+"
+        ],
+        "phase_totals": {
+          "edit_open": {
+            "calls": 28,
+            "errors": 0,
+            "input_empty_calls": 6,
+            "input_nonempty_calls": 22,
+            "logical_vec_capacity_bytes_model": 10752,
+            "successes": 28
+          },
+          "final_commit": {
+            "calls": 65,
+            "errors": 0,
+            "input_empty_calls": 11,
+            "input_nonempty_calls": 54,
+            "logical_vec_capacity_bytes_model": 26592,
+            "successes": 65
+          },
+          "other": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "output_copy": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "snapshot_open": {
+            "calls": 63,
+            "errors": 0,
+            "input_empty_calls": 11,
+            "input_nonempty_calls": 52,
+            "logical_vec_capacity_bytes_model": 25824,
+            "successes": 63
+          },
+          "staged_replacement": {
+            "calls": 14,
+            "errors": 0,
+            "input_empty_calls": 3,
+            "input_nonempty_calls": 11,
+            "logical_vec_capacity_bytes_model": 5376,
+            "successes": 14
+          }
+        },
+        "sprm_size_bytes": 48,
+        "total": {
+          "calls": 170,
+          "errors": 0,
+          "input_empty_calls": 31,
+          "input_length_histogram": [
+            31,
+            0,
+            0,
+            106,
+            15,
+            10,
+            8,
+            0,
+            0,
+            0
+          ],
+          "input_nonempty_calls": 139,
+          "logical_vec_capacity_bytes_model": 68544,
+          "output_capacity_total_elements": 1428,
+          "output_count_histogram": [
+            31,
+            106,
+            15,
+            10,
+            8,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "successes": 170
+        }
+      },
+      "children": [
+        "sprm-r01-docnohf-e01-default_8mib",
+        "sprm-r02-docnohf-e01-default_8mib"
+      ],
+      "edits": 1,
+      "interpretation_boundary": "Logical Vec capacity model only; model bytes are not allocator traffic, RSS, elapsed time, or removable-work evidence.",
+      "r1_report": {
+        "bytes": 33909,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e01-default_8mib/report.json",
+        "sha256": "7c8af4aef93113fb1458db1b9d3c660e7ceb7f2238d3b4921ba2f6cf5c69637f"
+      },
+      "r2_report": {
+        "bytes": 33909,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e01-default_8mib/report.json",
+        "sha256": "7c8af4aef93113fb1458db1b9d3c660e7ceb7f2238d3b4921ba2f6cf5c69637f"
+      },
+      "repeat_equal_verified_by_reduction": true,
+      "retention": "default_8mib"
+    },
+    {
+      "case": "docnohf",
+      "census": {
+        "histogram_labels": [
+          "0",
+          "1",
+          "2-3",
+          "4-7",
+          "8-15",
+          "16-31",
+          "32-63",
+          "64-127",
+          "128-255",
+          "256+"
+        ],
+        "phase_totals": {
+          "edit_open": {
+            "calls": 28,
+            "errors": 0,
+            "input_empty_calls": 6,
+            "input_nonempty_calls": 22,
+            "logical_vec_capacity_bytes_model": 10752,
+            "successes": 28
+          },
+          "final_commit": {
+            "calls": 65,
+            "errors": 0,
+            "input_empty_calls": 11,
+            "input_nonempty_calls": 54,
+            "logical_vec_capacity_bytes_model": 26592,
+            "successes": 65
+          },
+          "other": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "output_copy": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "snapshot_open": {
+            "calls": 63,
+            "errors": 0,
+            "input_empty_calls": 11,
+            "input_nonempty_calls": 52,
+            "logical_vec_capacity_bytes_model": 25824,
+            "successes": 63
+          },
+          "staged_replacement": {
+            "calls": 14,
+            "errors": 0,
+            "input_empty_calls": 3,
+            "input_nonempty_calls": 11,
+            "logical_vec_capacity_bytes_model": 5376,
+            "successes": 14
+          }
+        },
+        "sprm_size_bytes": 48,
+        "total": {
+          "calls": 170,
+          "errors": 0,
+          "input_empty_calls": 31,
+          "input_length_histogram": [
+            31,
+            0,
+            0,
+            106,
+            15,
+            10,
+            8,
+            0,
+            0,
+            0
+          ],
+          "input_nonempty_calls": 139,
+          "logical_vec_capacity_bytes_model": 68544,
+          "output_capacity_total_elements": 1428,
+          "output_count_histogram": [
+            31,
+            106,
+            15,
+            10,
+            8,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "successes": 170
+        }
+      },
+      "children": [
+        "sprm-r01-docnohf-e01-release_8mib",
+        "sprm-r02-docnohf-e01-release_8mib"
+      ],
+      "edits": 1,
+      "interpretation_boundary": "Logical Vec capacity model only; model bytes are not allocator traffic, RSS, elapsed time, or removable-work evidence.",
+      "r1_report": {
+        "bytes": 33909,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e01-release_8mib/report.json",
+        "sha256": "481068e8ab2366585957302d0ea2e7b5acd1be32674377816719eb41f68205c3"
+      },
+      "r2_report": {
+        "bytes": 33909,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e01-release_8mib/report.json",
+        "sha256": "481068e8ab2366585957302d0ea2e7b5acd1be32674377816719eb41f68205c3"
+      },
+      "repeat_equal_verified_by_reduction": true,
+      "retention": "release_8mib"
+    },
+    {
+      "case": "docnohf",
+      "census": {
+        "histogram_labels": [
+          "0",
+          "1",
+          "2-3",
+          "4-7",
+          "8-15",
+          "16-31",
+          "32-63",
+          "64-127",
+          "128-255",
+          "256+"
+        ],
+        "phase_totals": {
+          "edit_open": {
+            "calls": 28,
+            "errors": 0,
+            "input_empty_calls": 6,
+            "input_nonempty_calls": 22,
+            "logical_vec_capacity_bytes_model": 10752,
+            "successes": 28
+          },
+          "final_commit": {
+            "calls": 65,
+            "errors": 0,
+            "input_empty_calls": 11,
+            "input_nonempty_calls": 54,
+            "logical_vec_capacity_bytes_model": 26592,
+            "successes": 65
+          },
+          "other": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "output_copy": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "snapshot_open": {
+            "calls": 63,
+            "errors": 0,
+            "input_empty_calls": 11,
+            "input_nonempty_calls": 52,
+            "logical_vec_capacity_bytes_model": 25824,
+            "successes": 63
+          },
+          "staged_replacement": {
+            "calls": 14,
+            "errors": 0,
+            "input_empty_calls": 3,
+            "input_nonempty_calls": 11,
+            "logical_vec_capacity_bytes_model": 5376,
+            "successes": 14
+          }
+        },
+        "sprm_size_bytes": 48,
+        "total": {
+          "calls": 170,
+          "errors": 0,
+          "input_empty_calls": 31,
+          "input_length_histogram": [
+            31,
+            0,
+            0,
+            106,
+            15,
+            10,
+            8,
+            0,
+            0,
+            0
+          ],
+          "input_nonempty_calls": 139,
+          "logical_vec_capacity_bytes_model": 68544,
+          "output_capacity_total_elements": 1428,
+          "output_count_histogram": [
+            31,
+            106,
+            15,
+            10,
+            8,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "successes": 170
+        }
+      },
+      "children": [
+        "sprm-r01-docnohf-e01-zero",
+        "sprm-r02-docnohf-e01-zero"
+      ],
+      "edits": 1,
+      "interpretation_boundary": "Logical Vec capacity model only; model bytes are not allocator traffic, RSS, elapsed time, or removable-work evidence.",
+      "r1_report": {
+        "bytes": 33894,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e01-zero/report.json",
+        "sha256": "db5a39413d1a76043a5c0b632f4aa165cdb44cc6a3a291bb10806126fb14f110"
+      },
+      "r2_report": {
+        "bytes": 33894,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e01-zero/report.json",
+        "sha256": "db5a39413d1a76043a5c0b632f4aa165cdb44cc6a3a291bb10806126fb14f110"
+      },
+      "repeat_equal_verified_by_reduction": true,
+      "retention": "zero"
+    },
+    {
+      "case": "docnohf",
+      "census": {
+        "histogram_labels": [
+          "0",
+          "1",
+          "2-3",
+          "4-7",
+          "8-15",
+          "16-31",
+          "32-63",
+          "64-127",
+          "128-255",
+          "256+"
+        ],
+        "phase_totals": {
+          "edit_open": {
+            "calls": 28,
+            "errors": 0,
+            "input_empty_calls": 6,
+            "input_nonempty_calls": 22,
+            "logical_vec_capacity_bytes_model": 10752,
+            "successes": 28
+          },
+          "final_commit": {
+            "calls": 67,
+            "errors": 0,
+            "input_empty_calls": 11,
+            "input_nonempty_calls": 56,
+            "logical_vec_capacity_bytes_model": 27360,
+            "successes": 67
+          },
+          "other": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "output_copy": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "snapshot_open": {
+            "calls": 63,
+            "errors": 0,
+            "input_empty_calls": 11,
+            "input_nonempty_calls": 52,
+            "logical_vec_capacity_bytes_model": 25824,
+            "successes": 63
+          },
+          "staged_replacement": {
+            "calls": 29,
+            "errors": 0,
+            "input_empty_calls": 6,
+            "input_nonempty_calls": 23,
+            "logical_vec_capacity_bytes_model": 11136,
+            "successes": 29
+          }
+        },
+        "sprm_size_bytes": 48,
+        "total": {
+          "calls": 187,
+          "errors": 0,
+          "input_empty_calls": 34,
+          "input_length_histogram": [
+            34,
+            0,
+            0,
+            119,
+            16,
+            10,
+            8,
+            0,
+            0,
+            0
+          ],
+          "input_nonempty_calls": 153,
+          "logical_vec_capacity_bytes_model": 75072,
+          "output_capacity_total_elements": 1564,
+          "output_count_histogram": [
+            34,
+            119,
+            16,
+            10,
+            8,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "successes": 187
+        }
+      },
+      "children": [
+        "sprm-r01-docnohf-e02-default_8mib",
+        "sprm-r02-docnohf-e02-default_8mib"
+      ],
+      "edits": 2,
+      "interpretation_boundary": "Logical Vec capacity model only; model bytes are not allocator traffic, RSS, elapsed time, or removable-work evidence.",
+      "r1_report": {
+        "bytes": 34100,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e02-default_8mib/report.json",
+        "sha256": "28acb0c46de1426ab2fbb69cd645bc8b1b9721609c8d9295be9b5eaeeb6d3126"
+      },
+      "r2_report": {
+        "bytes": 34100,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e02-default_8mib/report.json",
+        "sha256": "28acb0c46de1426ab2fbb69cd645bc8b1b9721609c8d9295be9b5eaeeb6d3126"
+      },
+      "repeat_equal_verified_by_reduction": true,
+      "retention": "default_8mib"
+    },
+    {
+      "case": "docnohf",
+      "census": {
+        "histogram_labels": [
+          "0",
+          "1",
+          "2-3",
+          "4-7",
+          "8-15",
+          "16-31",
+          "32-63",
+          "64-127",
+          "128-255",
+          "256+"
+        ],
+        "phase_totals": {
+          "edit_open": {
+            "calls": 28,
+            "errors": 0,
+            "input_empty_calls": 6,
+            "input_nonempty_calls": 22,
+            "logical_vec_capacity_bytes_model": 10752,
+            "successes": 28
+          },
+          "final_commit": {
+            "calls": 67,
+            "errors": 0,
+            "input_empty_calls": 11,
+            "input_nonempty_calls": 56,
+            "logical_vec_capacity_bytes_model": 27360,
+            "successes": 67
+          },
+          "other": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "output_copy": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "snapshot_open": {
+            "calls": 63,
+            "errors": 0,
+            "input_empty_calls": 11,
+            "input_nonempty_calls": 52,
+            "logical_vec_capacity_bytes_model": 25824,
+            "successes": 63
+          },
+          "staged_replacement": {
+            "calls": 29,
+            "errors": 0,
+            "input_empty_calls": 6,
+            "input_nonempty_calls": 23,
+            "logical_vec_capacity_bytes_model": 11136,
+            "successes": 29
+          }
+        },
+        "sprm_size_bytes": 48,
+        "total": {
+          "calls": 187,
+          "errors": 0,
+          "input_empty_calls": 34,
+          "input_length_histogram": [
+            34,
+            0,
+            0,
+            119,
+            16,
+            10,
+            8,
+            0,
+            0,
+            0
+          ],
+          "input_nonempty_calls": 153,
+          "logical_vec_capacity_bytes_model": 75072,
+          "output_capacity_total_elements": 1564,
+          "output_count_histogram": [
+            34,
+            119,
+            16,
+            10,
+            8,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "successes": 187
+        }
+      },
+      "children": [
+        "sprm-r01-docnohf-e02-release_8mib",
+        "sprm-r02-docnohf-e02-release_8mib"
+      ],
+      "edits": 2,
+      "interpretation_boundary": "Logical Vec capacity model only; model bytes are not allocator traffic, RSS, elapsed time, or removable-work evidence.",
+      "r1_report": {
+        "bytes": 34099,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e02-release_8mib/report.json",
+        "sha256": "a480782a19da9d7e4414413a1a04191016a2f664a050a55a360396af44cb006f"
+      },
+      "r2_report": {
+        "bytes": 34099,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e02-release_8mib/report.json",
+        "sha256": "a480782a19da9d7e4414413a1a04191016a2f664a050a55a360396af44cb006f"
+      },
+      "repeat_equal_verified_by_reduction": true,
+      "retention": "release_8mib"
+    },
+    {
+      "case": "docnohf",
+      "census": {
+        "histogram_labels": [
+          "0",
+          "1",
+          "2-3",
+          "4-7",
+          "8-15",
+          "16-31",
+          "32-63",
+          "64-127",
+          "128-255",
+          "256+"
+        ],
+        "phase_totals": {
+          "edit_open": {
+            "calls": 28,
+            "errors": 0,
+            "input_empty_calls": 6,
+            "input_nonempty_calls": 22,
+            "logical_vec_capacity_bytes_model": 10752,
+            "successes": 28
+          },
+          "final_commit": {
+            "calls": 67,
+            "errors": 0,
+            "input_empty_calls": 11,
+            "input_nonempty_calls": 56,
+            "logical_vec_capacity_bytes_model": 27360,
+            "successes": 67
+          },
+          "other": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "output_copy": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "snapshot_open": {
+            "calls": 63,
+            "errors": 0,
+            "input_empty_calls": 11,
+            "input_nonempty_calls": 52,
+            "logical_vec_capacity_bytes_model": 25824,
+            "successes": 63
+          },
+          "staged_replacement": {
+            "calls": 29,
+            "errors": 0,
+            "input_empty_calls": 6,
+            "input_nonempty_calls": 23,
+            "logical_vec_capacity_bytes_model": 11136,
+            "successes": 29
+          }
+        },
+        "sprm_size_bytes": 48,
+        "total": {
+          "calls": 187,
+          "errors": 0,
+          "input_empty_calls": 34,
+          "input_length_histogram": [
+            34,
+            0,
+            0,
+            119,
+            16,
+            10,
+            8,
+            0,
+            0,
+            0
+          ],
+          "input_nonempty_calls": 153,
+          "logical_vec_capacity_bytes_model": 75072,
+          "output_capacity_total_elements": 1564,
+          "output_count_histogram": [
+            34,
+            119,
+            16,
+            10,
+            8,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "successes": 187
+        }
+      },
+      "children": [
+        "sprm-r01-docnohf-e02-zero",
+        "sprm-r02-docnohf-e02-zero"
+      ],
+      "edits": 2,
+      "interpretation_boundary": "Logical Vec capacity model only; model bytes are not allocator traffic, RSS, elapsed time, or removable-work evidence.",
+      "r1_report": {
+        "bytes": 34083,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e02-zero/report.json",
+        "sha256": "a07c81f2ed3f8f6abb59b58b333b7b2cd1d053c4d4f0c3d08c0c9faa886dc978"
+      },
+      "r2_report": {
+        "bytes": 34083,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e02-zero/report.json",
+        "sha256": "a07c81f2ed3f8f6abb59b58b333b7b2cd1d053c4d4f0c3d08c0c9faa886dc978"
+      },
+      "repeat_equal_verified_by_reduction": true,
+      "retention": "zero"
+    },
+    {
+      "case": "docnohf",
+      "census": {
+        "histogram_labels": [
+          "0",
+          "1",
+          "2-3",
+          "4-7",
+          "8-15",
+          "16-31",
+          "32-63",
+          "64-127",
+          "128-255",
+          "256+"
+        ],
+        "phase_totals": {
+          "edit_open": {
+            "calls": 28,
+            "errors": 0,
+            "input_empty_calls": 6,
+            "input_nonempty_calls": 22,
+            "logical_vec_capacity_bytes_model": 10752,
+            "successes": 28
+          },
+          "final_commit": {
+            "calls": 79,
+            "errors": 0,
+            "input_empty_calls": 11,
+            "input_nonempty_calls": 68,
+            "logical_vec_capacity_bytes_model": 31968,
+            "successes": 79
+          },
+          "other": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "output_copy": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "snapshot_open": {
+            "calls": 63,
+            "errors": 0,
+            "input_empty_calls": 11,
+            "input_nonempty_calls": 52,
+            "logical_vec_capacity_bytes_model": 25824,
+            "successes": 63
+          },
+          "staged_replacement": {
+            "calls": 140,
+            "errors": 0,
+            "input_empty_calls": 24,
+            "input_nonempty_calls": 116,
+            "logical_vec_capacity_bytes_model": 53760,
+            "successes": 140
+          }
+        },
+        "sprm_size_bytes": 48,
+        "total": {
+          "calls": 310,
+          "errors": 0,
+          "input_empty_calls": 52,
+          "input_length_histogram": [
+            52,
+            0,
+            0,
+            218,
+            22,
+            10,
+            8,
+            0,
+            0,
+            0
+          ],
+          "input_nonempty_calls": 258,
+          "logical_vec_capacity_bytes_model": 122304,
+          "output_capacity_total_elements": 2548,
+          "output_count_histogram": [
+            52,
+            218,
+            22,
+            10,
+            8,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "successes": 310
+        }
+      },
+      "children": [
+        "sprm-r01-docnohf-e08-default_8mib",
+        "sprm-r02-docnohf-e08-default_8mib"
+      ],
+      "edits": 8,
+      "interpretation_boundary": "Logical Vec capacity model only; model bytes are not allocator traffic, RSS, elapsed time, or removable-work evidence.",
+      "r1_report": {
+        "bytes": 35233,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e08-default_8mib/report.json",
+        "sha256": "b8805830e337e97b460a60a0c9548c210faf7d33e47d4a616baca8439c4bf99a"
+      },
+      "r2_report": {
+        "bytes": 35233,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e08-default_8mib/report.json",
+        "sha256": "b8805830e337e97b460a60a0c9548c210faf7d33e47d4a616baca8439c4bf99a"
+      },
+      "repeat_equal_verified_by_reduction": true,
+      "retention": "default_8mib"
+    },
+    {
+      "case": "docnohf",
+      "census": {
+        "histogram_labels": [
+          "0",
+          "1",
+          "2-3",
+          "4-7",
+          "8-15",
+          "16-31",
+          "32-63",
+          "64-127",
+          "128-255",
+          "256+"
+        ],
+        "phase_totals": {
+          "edit_open": {
+            "calls": 28,
+            "errors": 0,
+            "input_empty_calls": 6,
+            "input_nonempty_calls": 22,
+            "logical_vec_capacity_bytes_model": 10752,
+            "successes": 28
+          },
+          "final_commit": {
+            "calls": 79,
+            "errors": 0,
+            "input_empty_calls": 11,
+            "input_nonempty_calls": 68,
+            "logical_vec_capacity_bytes_model": 31968,
+            "successes": 79
+          },
+          "other": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "output_copy": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "snapshot_open": {
+            "calls": 63,
+            "errors": 0,
+            "input_empty_calls": 11,
+            "input_nonempty_calls": 52,
+            "logical_vec_capacity_bytes_model": 25824,
+            "successes": 63
+          },
+          "staged_replacement": {
+            "calls": 140,
+            "errors": 0,
+            "input_empty_calls": 24,
+            "input_nonempty_calls": 116,
+            "logical_vec_capacity_bytes_model": 53760,
+            "successes": 140
+          }
+        },
+        "sprm_size_bytes": 48,
+        "total": {
+          "calls": 310,
+          "errors": 0,
+          "input_empty_calls": 52,
+          "input_length_histogram": [
+            52,
+            0,
+            0,
+            218,
+            22,
+            10,
+            8,
+            0,
+            0,
+            0
+          ],
+          "input_nonempty_calls": 258,
+          "logical_vec_capacity_bytes_model": 122304,
+          "output_capacity_total_elements": 2548,
+          "output_count_histogram": [
+            52,
+            218,
+            22,
+            10,
+            8,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "successes": 310
+        }
+      },
+      "children": [
+        "sprm-r01-docnohf-e08-release_8mib",
+        "sprm-r02-docnohf-e08-release_8mib"
+      ],
+      "edits": 8,
+      "interpretation_boundary": "Logical Vec capacity model only; model bytes are not allocator traffic, RSS, elapsed time, or removable-work evidence.",
+      "r1_report": {
+        "bytes": 35226,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e08-release_8mib/report.json",
+        "sha256": "ede13eaee6246c55be094d861480142de6170fe65aba1af8964c8f44252436e2"
+      },
+      "r2_report": {
+        "bytes": 35226,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e08-release_8mib/report.json",
+        "sha256": "ede13eaee6246c55be094d861480142de6170fe65aba1af8964c8f44252436e2"
+      },
+      "repeat_equal_verified_by_reduction": true,
+      "retention": "release_8mib"
+    },
+    {
+      "case": "docnohf",
+      "census": {
+        "histogram_labels": [
+          "0",
+          "1",
+          "2-3",
+          "4-7",
+          "8-15",
+          "16-31",
+          "32-63",
+          "64-127",
+          "128-255",
+          "256+"
+        ],
+        "phase_totals": {
+          "edit_open": {
+            "calls": 28,
+            "errors": 0,
+            "input_empty_calls": 6,
+            "input_nonempty_calls": 22,
+            "logical_vec_capacity_bytes_model": 10752,
+            "successes": 28
+          },
+          "final_commit": {
+            "calls": 79,
+            "errors": 0,
+            "input_empty_calls": 11,
+            "input_nonempty_calls": 68,
+            "logical_vec_capacity_bytes_model": 31968,
+            "successes": 79
+          },
+          "other": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "output_copy": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "snapshot_open": {
+            "calls": 63,
+            "errors": 0,
+            "input_empty_calls": 11,
+            "input_nonempty_calls": 52,
+            "logical_vec_capacity_bytes_model": 25824,
+            "successes": 63
+          },
+          "staged_replacement": {
+            "calls": 140,
+            "errors": 0,
+            "input_empty_calls": 24,
+            "input_nonempty_calls": 116,
+            "logical_vec_capacity_bytes_model": 53760,
+            "successes": 140
+          }
+        },
+        "sprm_size_bytes": 48,
+        "total": {
+          "calls": 310,
+          "errors": 0,
+          "input_empty_calls": 52,
+          "input_length_histogram": [
+            52,
+            0,
+            0,
+            218,
+            22,
+            10,
+            8,
+            0,
+            0,
+            0
+          ],
+          "input_nonempty_calls": 258,
+          "logical_vec_capacity_bytes_model": 122304,
+          "output_capacity_total_elements": 2548,
+          "output_count_histogram": [
+            52,
+            218,
+            22,
+            10,
+            8,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "successes": 310
+        }
+      },
+      "children": [
+        "sprm-r01-docnohf-e08-zero",
+        "sprm-r02-docnohf-e08-zero"
+      ],
+      "edits": 8,
+      "interpretation_boundary": "Logical Vec capacity model only; model bytes are not allocator traffic, RSS, elapsed time, or removable-work evidence.",
+      "r1_report": {
+        "bytes": 35204,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e08-zero/report.json",
+        "sha256": "6e3c5929df8eccf22f0e0ff6bd3414f57a46be8252311aea2311645f43e18785"
+      },
+      "r2_report": {
+        "bytes": 35204,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e08-zero/report.json",
+        "sha256": "6e3c5929df8eccf22f0e0ff6bd3414f57a46be8252311aea2311645f43e18785"
+      },
+      "repeat_equal_verified_by_reduction": true,
+      "retention": "zero"
+    },
+    {
+      "case": "docnohf",
+      "census": {
+        "histogram_labels": [
+          "0",
+          "1",
+          "2-3",
+          "4-7",
+          "8-15",
+          "16-31",
+          "32-63",
+          "64-127",
+          "128-255",
+          "256+"
+        ],
+        "phase_totals": {
+          "edit_open": {
+            "calls": 28,
+            "errors": 0,
+            "input_empty_calls": 6,
+            "input_nonempty_calls": 22,
+            "logical_vec_capacity_bytes_model": 10752,
+            "successes": 28
+          },
+          "final_commit": {
+            "calls": 127,
+            "errors": 0,
+            "input_empty_calls": 11,
+            "input_nonempty_calls": 116,
+            "logical_vec_capacity_bytes_model": 50400,
+            "successes": 127
+          },
+          "other": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "output_copy": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "snapshot_open": {
+            "calls": 63,
+            "errors": 0,
+            "input_empty_calls": 11,
+            "input_nonempty_calls": 52,
+            "logical_vec_capacity_bytes_model": 25824,
+            "successes": 63
+          },
+          "staged_replacement": {
+            "calls": 944,
+            "errors": 0,
+            "input_empty_calls": 96,
+            "input_nonempty_calls": 848,
+            "logical_vec_capacity_bytes_model": 362496,
+            "successes": 944
+          }
+        },
+        "sprm_size_bytes": 48,
+        "total": {
+          "calls": 1162,
+          "errors": 0,
+          "input_empty_calls": 124,
+          "input_length_histogram": [
+            124,
+            0,
+            0,
+            974,
+            46,
+            10,
+            8,
+            0,
+            0,
+            0
+          ],
+          "input_nonempty_calls": 1038,
+          "logical_vec_capacity_bytes_model": 449472,
+          "output_capacity_total_elements": 9364,
+          "output_count_histogram": [
+            124,
+            974,
+            46,
+            10,
+            8,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "successes": 1162
+        }
+      },
+      "children": [
+        "sprm-r01-docnohf-e32-default_8mib",
+        "sprm-r02-docnohf-e32-default_8mib"
+      ],
+      "edits": 32,
+      "interpretation_boundary": "Logical Vec capacity model only; model bytes are not allocator traffic, RSS, elapsed time, or removable-work evidence.",
+      "r1_report": {
+        "bytes": 39835,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e32-default_8mib/report.json",
+        "sha256": "798c3e6678d9b5e00572509ee135010d349be2484b75692c86c8dc0de19b4829"
+      },
+      "r2_report": {
+        "bytes": 39835,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e32-default_8mib/report.json",
+        "sha256": "798c3e6678d9b5e00572509ee135010d349be2484b75692c86c8dc0de19b4829"
+      },
+      "repeat_equal_verified_by_reduction": true,
+      "retention": "default_8mib"
+    },
+    {
+      "case": "docnohf",
+      "census": {
+        "histogram_labels": [
+          "0",
+          "1",
+          "2-3",
+          "4-7",
+          "8-15",
+          "16-31",
+          "32-63",
+          "64-127",
+          "128-255",
+          "256+"
+        ],
+        "phase_totals": {
+          "edit_open": {
+            "calls": 28,
+            "errors": 0,
+            "input_empty_calls": 6,
+            "input_nonempty_calls": 22,
+            "logical_vec_capacity_bytes_model": 10752,
+            "successes": 28
+          },
+          "final_commit": {
+            "calls": 127,
+            "errors": 0,
+            "input_empty_calls": 11,
+            "input_nonempty_calls": 116,
+            "logical_vec_capacity_bytes_model": 50400,
+            "successes": 127
+          },
+          "other": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "output_copy": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "snapshot_open": {
+            "calls": 63,
+            "errors": 0,
+            "input_empty_calls": 11,
+            "input_nonempty_calls": 52,
+            "logical_vec_capacity_bytes_model": 25824,
+            "successes": 63
+          },
+          "staged_replacement": {
+            "calls": 944,
+            "errors": 0,
+            "input_empty_calls": 96,
+            "input_nonempty_calls": 848,
+            "logical_vec_capacity_bytes_model": 362496,
+            "successes": 944
+          }
+        },
+        "sprm_size_bytes": 48,
+        "total": {
+          "calls": 1162,
+          "errors": 0,
+          "input_empty_calls": 124,
+          "input_length_histogram": [
+            124,
+            0,
+            0,
+            974,
+            46,
+            10,
+            8,
+            0,
+            0,
+            0
+          ],
+          "input_nonempty_calls": 1038,
+          "logical_vec_capacity_bytes_model": 449472,
+          "output_capacity_total_elements": 9364,
+          "output_count_histogram": [
+            124,
+            974,
+            46,
+            10,
+            8,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "successes": 1162
+        }
+      },
+      "children": [
+        "sprm-r01-docnohf-e32-release_8mib",
+        "sprm-r02-docnohf-e32-release_8mib"
+      ],
+      "edits": 32,
+      "interpretation_boundary": "Logical Vec capacity model only; model bytes are not allocator traffic, RSS, elapsed time, or removable-work evidence.",
+      "r1_report": {
+        "bytes": 39804,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e32-release_8mib/report.json",
+        "sha256": "adaff005bf635b54c2c28ae1f9858ad9a847bd38a8ecb380b51bd219e4fae379"
+      },
+      "r2_report": {
+        "bytes": 39804,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e32-release_8mib/report.json",
+        "sha256": "adaff005bf635b54c2c28ae1f9858ad9a847bd38a8ecb380b51bd219e4fae379"
+      },
+      "repeat_equal_verified_by_reduction": true,
+      "retention": "release_8mib"
+    },
+    {
+      "case": "docnohf",
+      "census": {
+        "histogram_labels": [
+          "0",
+          "1",
+          "2-3",
+          "4-7",
+          "8-15",
+          "16-31",
+          "32-63",
+          "64-127",
+          "128-255",
+          "256+"
+        ],
+        "phase_totals": {
+          "edit_open": {
+            "calls": 28,
+            "errors": 0,
+            "input_empty_calls": 6,
+            "input_nonempty_calls": 22,
+            "logical_vec_capacity_bytes_model": 10752,
+            "successes": 28
+          },
+          "final_commit": {
+            "calls": 127,
+            "errors": 0,
+            "input_empty_calls": 11,
+            "input_nonempty_calls": 116,
+            "logical_vec_capacity_bytes_model": 50400,
+            "successes": 127
+          },
+          "other": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "output_copy": {
+            "calls": 0,
+            "errors": 0,
+            "input_empty_calls": 0,
+            "input_nonempty_calls": 0,
+            "logical_vec_capacity_bytes_model": 0,
+            "successes": 0
+          },
+          "snapshot_open": {
+            "calls": 63,
+            "errors": 0,
+            "input_empty_calls": 11,
+            "input_nonempty_calls": 52,
+            "logical_vec_capacity_bytes_model": 25824,
+            "successes": 63
+          },
+          "staged_replacement": {
+            "calls": 944,
+            "errors": 0,
+            "input_empty_calls": 96,
+            "input_nonempty_calls": 848,
+            "logical_vec_capacity_bytes_model": 362496,
+            "successes": 944
+          }
+        },
+        "sprm_size_bytes": 48,
+        "total": {
+          "calls": 1162,
+          "errors": 0,
+          "input_empty_calls": 124,
+          "input_length_histogram": [
+            124,
+            0,
+            0,
+            974,
+            46,
+            10,
+            8,
+            0,
+            0,
+            0
+          ],
+          "input_nonempty_calls": 1038,
+          "logical_vec_capacity_bytes_model": 449472,
+          "output_capacity_total_elements": 9364,
+          "output_count_histogram": [
+            124,
+            974,
+            46,
+            10,
+            8,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "successes": 1162
+        }
+      },
+      "children": [
+        "sprm-r01-docnohf-e32-zero",
+        "sprm-r02-docnohf-e32-zero"
+      ],
+      "edits": 32,
+      "interpretation_boundary": "Logical Vec capacity model only; model bytes are not allocator traffic, RSS, elapsed time, or removable-work evidence.",
+      "r1_report": {
+        "bytes": 39758,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e32-zero/report.json",
+        "sha256": "5d6c5d7c848f76300dd5050bace434f1ee90dd9ac63ea044d31a9d07df47907d"
+      },
+      "r2_report": {
+        "bytes": 39758,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e32-zero/report.json",
+        "sha256": "5d6c5d7c848f76300dd5050bace434f1ee90dd9ac63ea044d31a9d07df47907d"
+      },
+      "repeat_equal_verified_by_reduction": true,
+      "retention": "zero"
+    }
+  ],
+  "cells": 24,
+  "change": "0966",
+  "fresh_children": 48,
+  "interpretation_boundary": "Logical Vec capacity model only; model bytes are not allocator traffic, RSS, elapsed time, or removable-work evidence.",
+  "plan": {
+    "bytes": 23187,
+    "path": "/home/zhuhe/litchi-performance-0966/protocol/plan-doc-sprm-census-0966-v1.json",
+    "sha256": "18b2915f692567cd830edf9254326431767cb9b0faf79da9eaad1bc9cf0be79b"
+  },
+  "reduction": {
+    "bytes": 11652,
+    "path": "/home/zhuhe/litchi-performance-0966/analysis/doc-sprm-census-reduction-v1.json",
+    "sha256": "53339c9a9c9e22af0f1773fdd2621351948ef0b207263ac3744a04f63d4121d5"
+  },
+  "repeat_equal": true,
+  "schema": "litchi.performance.0966.doc_sprm_census_cell_details.v1",
+  "schema_version": 1,
+  "status": "derived_from_completed_pass",
+  "timing_claim": false
+}

@@ -1,0 +1,374 @@
+{
+  "schema": "litchi.performance.0966.doc_sprm_census.postcapture_audit.v1",
+  "schema_version": 1,
+  "status": "pass",
+  "reviewer": "doc_census_review",
+  "scope": "independent raw packet, custody, repeat, and counter audit; no Office workload invoked",
+  "bindings": {
+    "plan": {
+      "path": "/home/zhuhe/litchi-performance-0966/protocol/plan-doc-sprm-census-0966-v1.json",
+      "sha256": "18b2915f692567cd830edf9254326431767cb9b0faf79da9eaad1bc9cf0be79b"
+    },
+    "go": {
+      "path": "/home/zhuhe/litchi-performance-0966/protocol/root-go-v1.json",
+      "sha256": "383fcf328f43ef2b9345dffdf8bd3229e9662ba512d17aa406672451695f47a4"
+    },
+    "run_start": {
+      "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/run-start.json",
+      "sha256": "dacb4e037a8f1ffe26f4ed38f9a037a357f7362143c586fb100e006e9f24f357"
+    },
+    "run_terminal": {
+      "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/run-terminal.json",
+      "sha256": "0385b9ed31b8ebaae84fb822e50b869114d8e051f38d193f681c520036ab5133"
+    },
+    "capture_manifest": {
+      "files": 290,
+      "bytes": 2842199,
+      "sha256": "9a5ef1c8d36e5b76d0f222cb58c769b4f0c4c5b7d3bfbc8c9d0f753102dbeb4e"
+    },
+    "source_tree_sha256": "ab9934b960d60efe8e4720e00dec42d54f1a21acdd14b4e29a9d750f1d90a29f",
+    "executable_sha256": "d257020c302f92096c34d8bc821f0a88878900ab270f52a189b4e2889eaaf375"
+  },
+  "custody": {
+    "terminal_status": "completed",
+    "children": 48,
+    "failures": [],
+    "retries": 0,
+    "returncode_zero": true,
+    "timeouts": 0,
+    "launch_errors": 0,
+    "stderr_nonempty": 0,
+    "reports": 48,
+    "report_bytes": 1721162,
+    "stdout_bytes": 984650,
+    "stderr_bytes": 0,
+    "raw_stdout_matches_report_json": true,
+    "terminal_and_parse_receipts_bind_raw_files": true,
+    "child_file_sets_exact": true,
+    "author_checker": {
+      "status": "passed",
+      "reports": 48,
+      "cells": 24,
+      "repeat_equal": true,
+      "checker_sha256": "fc338c49dd66cf0f77370da8a6036945975390bfd03ed861eb4df1757e8c9d87",
+      "receipt_sha256": "3b6ccb9e5f88a9c4f119f91b5ee2ea605957a8a1711c6da8a3d381efb9d28910"
+    },
+    "supplemental_custody_crosscheck": {
+      "helper_sha256": "5271004dc1dbbd92126c81ea466816019ab86bba1440f42c790109a898018f91",
+      "cell_details_sha256": "6b45e9a2ddce1f5edde696619dea9edb8dcd7be772f129ef25179cfef9d56c1b",
+      "child_manifest_sha256": "b23f755a37fe7d5edb06130647ea8b3d16b91e4cf411a3e5bc02c6ff5a0dd96f",
+      "details_rows_match_raw_reports": true,
+      "manifest_descriptors_match_raw_files": true,
+      "children_checked": 48,
+      "cells_checked": 24
+    }
+  },
+  "counter_audit": {
+    "reports_checked_independently": 48,
+    "cells_checked": 24,
+    "full_report_repeat_equal": true,
+    "histogram_labels_exact": true,
+    "saturated_reports": 0,
+    "error_reports": 0,
+    "error_calls": 0,
+    "unclassified_phase_calls": 0,
+    "counter_conservation_all_reports": true,
+    "phase_conservation_all_reports": true,
+    "logical_capacity_equation_all_reports": true,
+    "correctness_gates_all_true": true,
+    "timing_claims_false": true,
+    "allocator_instrumented_false": true,
+    "allocation_payloads_null": true
+  },
+  "default_retention_counts_per_representative_child": [
+    {
+      "case": "docnohf",
+      "edits": 1,
+      "total_calls": 170,
+      "empty_success_calls": 31,
+      "errors": 0,
+      "phase_calls": {
+        "snapshot_open": 63,
+        "edit_open": 28,
+        "staged_replacement": 14,
+        "final_commit": 65,
+        "output_copy": 0,
+        "other": 0
+      },
+      "phase_empty_success_calls": {
+        "snapshot_open": 11,
+        "edit_open": 6,
+        "staged_replacement": 3,
+        "final_commit": 11,
+        "output_copy": 0,
+        "other": 0
+      }
+    },
+    {
+      "case": "docnohf",
+      "edits": 2,
+      "total_calls": 187,
+      "empty_success_calls": 34,
+      "errors": 0,
+      "phase_calls": {
+        "snapshot_open": 63,
+        "edit_open": 28,
+        "staged_replacement": 29,
+        "final_commit": 67,
+        "output_copy": 0,
+        "other": 0
+      },
+      "phase_empty_success_calls": {
+        "snapshot_open": 11,
+        "edit_open": 6,
+        "staged_replacement": 6,
+        "final_commit": 11,
+        "output_copy": 0,
+        "other": 0
+      }
+    },
+    {
+      "case": "docnohf",
+      "edits": 8,
+      "total_calls": 310,
+      "empty_success_calls": 52,
+      "errors": 0,
+      "phase_calls": {
+        "snapshot_open": 63,
+        "edit_open": 28,
+        "staged_replacement": 140,
+        "final_commit": 79,
+        "output_copy": 0,
+        "other": 0
+      },
+      "phase_empty_success_calls": {
+        "snapshot_open": 11,
+        "edit_open": 6,
+        "staged_replacement": 24,
+        "final_commit": 11,
+        "output_copy": 0,
+        "other": 0
+      }
+    },
+    {
+      "case": "docnohf",
+      "edits": 32,
+      "total_calls": 1162,
+      "empty_success_calls": 124,
+      "errors": 0,
+      "phase_calls": {
+        "snapshot_open": 63,
+        "edit_open": 28,
+        "staged_replacement": 944,
+        "final_commit": 127,
+        "output_copy": 0,
+        "other": 0
+      },
+      "phase_empty_success_calls": {
+        "snapshot_open": 11,
+        "edit_open": 6,
+        "staged_replacement": 96,
+        "final_commit": 11,
+        "output_copy": 0,
+        "other": 0
+      }
+    },
+    {
+      "case": "docfloat",
+      "edits": 1,
+      "total_calls": 4742,
+      "empty_success_calls": 220,
+      "errors": 0,
+      "phase_calls": {
+        "snapshot_open": 1657,
+        "edit_open": 950,
+        "staged_replacement": 475,
+        "final_commit": 1660,
+        "output_copy": 0,
+        "other": 0
+      },
+      "phase_empty_success_calls": {
+        "snapshot_open": 80,
+        "edit_open": 40,
+        "staged_replacement": 20,
+        "final_commit": 80,
+        "output_copy": 0,
+        "other": 0
+      }
+    },
+    {
+      "case": "docfloat",
+      "edits": 2,
+      "total_calls": 5220,
+      "empty_success_calls": 240,
+      "errors": 0,
+      "phase_calls": {
+        "snapshot_open": 1657,
+        "edit_open": 950,
+        "staged_replacement": 951,
+        "final_commit": 1662,
+        "output_copy": 0,
+        "other": 0
+      },
+      "phase_empty_success_calls": {
+        "snapshot_open": 80,
+        "edit_open": 40,
+        "staged_replacement": 40,
+        "final_commit": 80,
+        "output_copy": 0,
+        "other": 0
+      }
+    },
+    {
+      "case": "docfloat",
+      "edits": 8,
+      "total_calls": 8109,
+      "empty_success_calls": 360,
+      "errors": 0,
+      "phase_calls": {
+        "snapshot_open": 1657,
+        "edit_open": 950,
+        "staged_replacement": 3828,
+        "final_commit": 1674,
+        "output_copy": 0,
+        "other": 0
+      },
+      "phase_empty_success_calls": {
+        "snapshot_open": 80,
+        "edit_open": 40,
+        "staged_replacement": 160,
+        "final_commit": 80,
+        "output_copy": 0,
+        "other": 0
+      }
+    },
+    {
+      "case": "docfloat",
+      "edits": 32,
+      "total_calls": 20025,
+      "empty_success_calls": 840,
+      "errors": 0,
+      "phase_calls": {
+        "snapshot_open": 1657,
+        "edit_open": 950,
+        "staged_replacement": 15696,
+        "final_commit": 1722,
+        "output_copy": 0,
+        "other": 0
+      },
+      "phase_empty_success_calls": {
+        "snapshot_open": 80,
+        "edit_open": 40,
+        "staged_replacement": 640,
+        "final_commit": 80,
+        "output_copy": 0,
+        "other": 0
+      }
+    }
+  ],
+  "representative_phase_totals": {
+    "snapshot_open": {
+      "calls": 20640,
+      "successes": 20640,
+      "errors": 0,
+      "input_empty": 1092,
+      "logical_vec_capacity_bytes": 8712000
+    },
+    "edit_open": {
+      "calls": 11736,
+      "successes": 11736,
+      "errors": 0,
+      "input_empty": 552,
+      "logical_vec_capacity_bytes": 4798080
+    },
+    "staged_replacement": {
+      "calls": 66231,
+      "successes": 66231,
+      "errors": 0,
+      "input_empty": 2967,
+      "logical_vec_capacity_bytes": 26999280
+    },
+    "final_commit": {
+      "calls": 21168,
+      "successes": 21168,
+      "errors": 0,
+      "input_empty": 1092,
+      "logical_vec_capacity_bytes": 8914752
+    },
+    "output_copy": {
+      "calls": 0,
+      "successes": 0,
+      "errors": 0,
+      "input_empty": 0,
+      "logical_vec_capacity_bytes": 0
+    },
+    "other": {
+      "calls": 0,
+      "successes": 0,
+      "errors": 0,
+      "input_empty": 0,
+      "logical_vec_capacity_bytes": 0
+    }
+  },
+  "raw_48_phase_totals": {
+    "snapshot_open": {
+      "calls": 41280,
+      "successes": 41280,
+      "errors": 0,
+      "input_empty": 2184,
+      "logical_vec_capacity_bytes": 17424000
+    },
+    "edit_open": {
+      "calls": 23472,
+      "successes": 23472,
+      "errors": 0,
+      "input_empty": 1104,
+      "logical_vec_capacity_bytes": 9596160
+    },
+    "staged_replacement": {
+      "calls": 132462,
+      "successes": 132462,
+      "errors": 0,
+      "input_empty": 5934,
+      "logical_vec_capacity_bytes": 53998560
+    },
+    "final_commit": {
+      "calls": 42336,
+      "successes": 42336,
+      "errors": 0,
+      "input_empty": 2184,
+      "logical_vec_capacity_bytes": 17829504
+    },
+    "output_copy": {
+      "calls": 0,
+      "successes": 0,
+      "errors": 0,
+      "input_empty": 0,
+      "logical_vec_capacity_bytes": 0
+    },
+    "other": {
+      "calls": 0,
+      "successes": 0,
+      "errors": 0,
+      "input_empty": 0,
+      "logical_vec_capacity_bytes": 0
+    }
+  },
+  "summary_binding": {
+    "summary_path": "/home/zhuhe/litchi-performance-0966/analysis/census-summary-v1.json",
+    "summary_sha256": "53339c9a9c9e22af0f1773fdd2621351948ef0b207263ac3744a04f63d4121d5",
+    "reduction_path": "/home/zhuhe/litchi-performance-0966/analysis/doc-sprm-census-reduction-v1.json",
+    "reduction_sha256": "53339c9a9c9e22af0f1773fdd2621351948ef0b207263ac3744a04f63d4121d5",
+    "summary_and_reduction_byte_equal": true,
+    "summary_matches_raw_representatives": true,
+    "raw_all_48_is_two_representative_totals": true
+  },
+  "interpretation": {
+    "diagnostic_only": true,
+    "timing_claim": false,
+    "allocator_total_claim": false,
+    "removable_work_claim": false,
+    "capacity_definition": "logical returned Vec capacity model only; not allocator traffic, RSS, elapsed time, or removable work",
+    "legacy_0919_comparison_guard": "The historical 0919 value 21213 is an allocation-event count, not a logical parser-call count; it was not compared with the current logical census total."
+  }
+}

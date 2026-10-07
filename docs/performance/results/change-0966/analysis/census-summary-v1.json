@@ -1,0 +1,439 @@
+{
+  "aggregation": "one representative per repeat-equal cell",
+  "allocator_total_claim": false,
+  "cell_summaries": [
+    {
+      "calls": 4742,
+      "canonical_sha256": "ebc2f4876c2b9f044afc3fafd5deb73aaab5ad633f674789e1c92ddd4f7fa581",
+      "case": "docfloat",
+      "children": [
+        "sprm-r01-docfloat-e01-default_8mib",
+        "sprm-r02-docfloat-e01-default_8mib"
+      ],
+      "edits": 1,
+      "errors": 0,
+      "retention": "default_8mib",
+      "successes": 4742
+    },
+    {
+      "calls": 4742,
+      "canonical_sha256": "c558793cb5a18b3d9c1d63ec1954e5729fea65cab52f2867484fdf908832838e",
+      "case": "docfloat",
+      "children": [
+        "sprm-r01-docfloat-e01-release_8mib",
+        "sprm-r02-docfloat-e01-release_8mib"
+      ],
+      "edits": 1,
+      "errors": 0,
+      "retention": "release_8mib",
+      "successes": 4742
+    },
+    {
+      "calls": 4742,
+      "canonical_sha256": "6be44643689dd721e1d6d424aa6a017e10ef33f209a820603996144e239f5af3",
+      "case": "docfloat",
+      "children": [
+        "sprm-r01-docfloat-e01-zero",
+        "sprm-r02-docfloat-e01-zero"
+      ],
+      "edits": 1,
+      "errors": 0,
+      "retention": "zero",
+      "successes": 4742
+    },
+    {
+      "calls": 5220,
+      "canonical_sha256": "ffeebeca7ef30a49d602beab2b2796e0649962ebd085d1079c06800fc8229304",
+      "case": "docfloat",
+      "children": [
+        "sprm-r01-docfloat-e02-default_8mib",
+        "sprm-r02-docfloat-e02-default_8mib"
+      ],
+      "edits": 2,
+      "errors": 0,
+      "retention": "default_8mib",
+      "successes": 5220
+    },
+    {
+      "calls": 5220,
+      "canonical_sha256": "498aa08ba04a400db494e5a5b94dfc7d3a60b60b52aa652d3d4c6c447f9ff193",
+      "case": "docfloat",
+      "children": [
+        "sprm-r01-docfloat-e02-release_8mib",
+        "sprm-r02-docfloat-e02-release_8mib"
+      ],
+      "edits": 2,
+      "errors": 0,
+      "retention": "release_8mib",
+      "successes": 5220
+    },
+    {
+      "calls": 5220,
+      "canonical_sha256": "7f1e05d703d228e944bea37a7518593b4a68bead3862fd883e96973732f73623",
+      "case": "docfloat",
+      "children": [
+        "sprm-r01-docfloat-e02-zero",
+        "sprm-r02-docfloat-e02-zero"
+      ],
+      "edits": 2,
+      "errors": 0,
+      "retention": "zero",
+      "successes": 5220
+    },
+    {
+      "calls": 8109,
+      "canonical_sha256": "42806f69927e9f33bd163bb0fb913b2d57c043c95d549f16e2098ec977727e06",
+      "case": "docfloat",
+      "children": [
+        "sprm-r01-docfloat-e08-default_8mib",
+        "sprm-r02-docfloat-e08-default_8mib"
+      ],
+      "edits": 8,
+      "errors": 0,
+      "retention": "default_8mib",
+      "successes": 8109
+    },
+    {
+      "calls": 8109,
+      "canonical_sha256": "a31ad6c9dd4ef7f6430a4e80ff4a0a13904ffa80e95b5139ca6cbc8e1a7de827",
+      "case": "docfloat",
+      "children": [
+        "sprm-r01-docfloat-e08-release_8mib",
+        "sprm-r02-docfloat-e08-release_8mib"
+      ],
+      "edits": 8,
+      "errors": 0,
+      "retention": "release_8mib",
+      "successes": 8109
+    },
+    {
+      "calls": 8109,
+      "canonical_sha256": "abf1477f4cdc8d2f6adc1f59a3d5c89b903939bb03a7c36ae7829596a47c4835",
+      "case": "docfloat",
+      "children": [
+        "sprm-r01-docfloat-e08-zero",
+        "sprm-r02-docfloat-e08-zero"
+      ],
+      "edits": 8,
+      "errors": 0,
+      "retention": "zero",
+      "successes": 8109
+    },
+    {
+      "calls": 20025,
+      "canonical_sha256": "8c05771739814aa2e61d2da9176d4b3488f8d9192d774ced31234a730c19692c",
+      "case": "docfloat",
+      "children": [
+        "sprm-r01-docfloat-e32-default_8mib",
+        "sprm-r02-docfloat-e32-default_8mib"
+      ],
+      "edits": 32,
+      "errors": 0,
+      "retention": "default_8mib",
+      "successes": 20025
+    },
+    {
+      "calls": 20025,
+      "canonical_sha256": "af7596587112188d311b9786437bbdb6d2a380bb9a2942cce7ed5c2b03ca0d06",
+      "case": "docfloat",
+      "children": [
+        "sprm-r01-docfloat-e32-release_8mib",
+        "sprm-r02-docfloat-e32-release_8mib"
+      ],
+      "edits": 32,
+      "errors": 0,
+      "retention": "release_8mib",
+      "successes": 20025
+    },
+    {
+      "calls": 20025,
+      "canonical_sha256": "debdf6eea2be3ecc221a290acd9b3d1fb33cffd6b7e225d64cf381e7ff00cd43",
+      "case": "docfloat",
+      "children": [
+        "sprm-r01-docfloat-e32-zero",
+        "sprm-r02-docfloat-e32-zero"
+      ],
+      "edits": 32,
+      "errors": 0,
+      "retention": "zero",
+      "successes": 20025
+    },
+    {
+      "calls": 170,
+      "canonical_sha256": "b8eae408a848ad8c6dc93037d79d033197515e6fdf6fc54e4541cb30dbf036b2",
+      "case": "docnohf",
+      "children": [
+        "sprm-r01-docnohf-e01-default_8mib",
+        "sprm-r02-docnohf-e01-default_8mib"
+      ],
+      "edits": 1,
+      "errors": 0,
+      "retention": "default_8mib",
+      "successes": 170
+    },
+    {
+      "calls": 170,
+      "canonical_sha256": "4b3ab6e064860d0f244e8796dae0aca5f48882161aa2ee7e18d2404f0d27e749",
+      "case": "docnohf",
+      "children": [
+        "sprm-r01-docnohf-e01-release_8mib",
+        "sprm-r02-docnohf-e01-release_8mib"
+      ],
+      "edits": 1,
+      "errors": 0,
+      "retention": "release_8mib",
+      "successes": 170
+    },
+    {
+      "calls": 170,
+      "canonical_sha256": "2041ff7c08d35478bc8c456af5af45e0ee40bbaf7a5314279f221dd0a090dcb6",
+      "case": "docnohf",
+      "children": [
+        "sprm-r01-docnohf-e01-zero",
+        "sprm-r02-docnohf-e01-zero"
+      ],
+      "edits": 1,
+      "errors": 0,
+      "retention": "zero",
+      "successes": 170
+    },
+    {
+      "calls": 187,
+      "canonical_sha256": "4ab94d907310b28eb68bddc7dfb65bed39dbc61af3a98d990f74cd60f81c4310",
+      "case": "docnohf",
+      "children": [
+        "sprm-r01-docnohf-e02-default_8mib",
+        "sprm-r02-docnohf-e02-default_8mib"
+      ],
+      "edits": 2,
+      "errors": 0,
+      "retention": "default_8mib",
+      "successes": 187
+    },
+    {
+      "calls": 187,
+      "canonical_sha256": "49f9d74222f9b43f28c4499432fb3f8e9c4779029f1035fc33d1c6a2d243784f",
+      "case": "docnohf",
+      "children": [
+        "sprm-r01-docnohf-e02-release_8mib",
+        "sprm-r02-docnohf-e02-release_8mib"
+      ],
+      "edits": 2,
+      "errors": 0,
+      "retention": "release_8mib",
+      "successes": 187
+    },
+    {
+      "calls": 187,
+      "canonical_sha256": "9cf041512eb9197d5e3365d5b11af5f4b1893e65c4ca66cba6dc91e6880155d5",
+      "case": "docnohf",
+      "children": [
+        "sprm-r01-docnohf-e02-zero",
+        "sprm-r02-docnohf-e02-zero"
+      ],
+      "edits": 2,
+      "errors": 0,
+      "retention": "zero",
+      "successes": 187
+    },
+    {
+      "calls": 310,
+      "canonical_sha256": "ae8498834a615f2af9c5a4592c51188a1b9f40431003f2c7f446e2855bd97120",
+      "case": "docnohf",
+      "children": [
+        "sprm-r01-docnohf-e08-default_8mib",
+        "sprm-r02-docnohf-e08-default_8mib"
+      ],
+      "edits": 8,
+      "errors": 0,
+      "retention": "default_8mib",
+      "successes": 310
+    },
+    {
+      "calls": 310,
+      "canonical_sha256": "4803eb8f028ae7a9e68d8fd5e23b13e7323e2edf28395b52ac9d1a943566397e",
+      "case": "docnohf",
+      "children": [
+        "sprm-r01-docnohf-e08-release_8mib",
+        "sprm-r02-docnohf-e08-release_8mib"
+      ],
+      "edits": 8,
+      "errors": 0,
+      "retention": "release_8mib",
+      "successes": 310
+    },
+    {
+      "calls": 310,
+      "canonical_sha256": "60fd554944b4108656dc15e7fcbf0f0065a647caa1721232c92df6b87c586b2a",
+      "case": "docnohf",
+      "children": [
+        "sprm-r01-docnohf-e08-zero",
+        "sprm-r02-docnohf-e08-zero"
+      ],
+      "edits": 8,
+      "errors": 0,
+      "retention": "zero",
+      "successes": 310
+    },
+    {
+      "calls": 1162,
+      "canonical_sha256": "1b3ed0087075c0c5d0ade45b68f87c7efaf7f4e0bf85825e36cfdb6947601ce0",
+      "case": "docnohf",
+      "children": [
+        "sprm-r01-docnohf-e32-default_8mib",
+        "sprm-r02-docnohf-e32-default_8mib"
+      ],
+      "edits": 32,
+      "errors": 0,
+      "retention": "default_8mib",
+      "successes": 1162
+    },
+    {
+      "calls": 1162,
+      "canonical_sha256": "91e26fe3af1e60cffea24be5ec0bb563baf6b01da20668480ad124e2f719c30a",
+      "case": "docnohf",
+      "children": [
+        "sprm-r01-docnohf-e32-release_8mib",
+        "sprm-r02-docnohf-e32-release_8mib"
+      ],
+      "edits": 32,
+      "errors": 0,
+      "retention": "release_8mib",
+      "successes": 1162
+    },
+    {
+      "calls": 1162,
+      "canonical_sha256": "583e9892e6f90fb03ab232ca8f171fcb48b1228a8a51d302ca793200869d7afc",
+      "case": "docnohf",
+      "children": [
+        "sprm-r01-docnohf-e32-zero",
+        "sprm-r02-docnohf-e32-zero"
+      ],
+      "edits": 32,
+      "errors": 0,
+      "retention": "zero",
+      "successes": 1162
+    }
+  ],
+  "cells": 24,
+  "change": "0966",
+  "children": 48,
+  "conservation": true,
+  "correctness_gates_all_true": true,
+  "diagnostic_only": true,
+  "elapsed_time_claim": false,
+  "interpretation_boundary": "Logical parser census only; capacity fields are Vec capacity bytes, not allocator bytes, RSS, elapsed time, or removable-work evidence.",
+  "phase_totals": {
+    "edit_open": {
+      "calls": 11736,
+      "empty_success_calls": 552,
+      "errors": 0,
+      "logical_vec_capacity_bytes": 4798080,
+      "successes": 11736
+    },
+    "final_commit": {
+      "calls": 21168,
+      "empty_success_calls": 1092,
+      "errors": 0,
+      "logical_vec_capacity_bytes": 8914752,
+      "successes": 21168
+    },
+    "other": {
+      "calls": 0,
+      "empty_success_calls": 0,
+      "errors": 0,
+      "logical_vec_capacity_bytes": 0,
+      "successes": 0
+    },
+    "output_copy": {
+      "calls": 0,
+      "empty_success_calls": 0,
+      "errors": 0,
+      "logical_vec_capacity_bytes": 0,
+      "successes": 0
+    },
+    "snapshot_open": {
+      "calls": 20640,
+      "empty_success_calls": 1092,
+      "errors": 0,
+      "logical_vec_capacity_bytes": 8712000,
+      "successes": 20640
+    },
+    "staged_replacement": {
+      "calls": 66231,
+      "empty_success_calls": 2967,
+      "errors": 0,
+      "logical_vec_capacity_bytes": 26999280,
+      "successes": 66231
+    }
+  },
+  "plan": {
+    "bytes": 23187,
+    "path": "/home/zhuhe/litchi-performance-0966/protocol/plan-doc-sprm-census-0966-v1.json",
+    "sha256": "18b2915f692567cd830edf9254326431767cb9b0faf79da9eaad1bc9cf0be79b"
+  },
+  "rankings": {
+    "empty_success_calls_by_phase": [
+      {
+        "calls": 2967,
+        "phase": "staged_replacement"
+      },
+      {
+        "calls": 1092,
+        "phase": "snapshot_open"
+      },
+      {
+        "calls": 1092,
+        "phase": "final_commit"
+      },
+      {
+        "calls": 552,
+        "phase": "edit_open"
+      },
+      {
+        "calls": 0,
+        "phase": "output_copy"
+      },
+      {
+        "calls": 0,
+        "phase": "other"
+      }
+    ],
+    "logical_vec_capacity_bytes_by_phase": [
+      {
+        "bytes": 26999280,
+        "phase": "staged_replacement"
+      },
+      {
+        "bytes": 8914752,
+        "phase": "final_commit"
+      },
+      {
+        "bytes": 8712000,
+        "phase": "snapshot_open"
+      },
+      {
+        "bytes": 4798080,
+        "phase": "edit_open"
+      },
+      {
+        "bytes": 0,
+        "phase": "output_copy"
+      },
+      {
+        "bytes": 0,
+        "phase": "other"
+      }
+    ]
+  },
+  "removable_work_claim": false,
+  "repeat_equal": true,
+  "run": {
+    "children": 48,
+    "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1"
+  },
+  "schema": "litchi.performance.0966.doc_sprm_census_reduction.v1",
+  "schema_version": 1,
+  "status": "diagnostic_only_pass",
+  "timing_claim": false
+}

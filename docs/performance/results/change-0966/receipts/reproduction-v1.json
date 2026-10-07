@@ -1,0 +1,47 @@
+{
+  "actual_patch_deltas": [
+    "crates/litchi-doc/src/sprm.rs",
+    "tools/perf-cfb-profile/Cargo.toml",
+    "tools/perf-cfb-profile/src/lib.rs"
+  ],
+  "matched_files": [
+    {
+      "bytes": 32251,
+      "path": "crates/litchi-doc/src/sprm.rs",
+      "sha256": "66cacbd9a4f10bdead0405094ac5adacd42e523af220acf5990ae2bc335be680"
+    },
+    {
+      "bytes": 584,
+      "path": "tools/perf-cfb-profile/Cargo.toml",
+      "sha256": "8f440b06101df67672296b5fbf7dd9e857b435efa17adfcaf95d730e077022ef"
+    },
+    {
+      "bytes": 38210,
+      "path": "tools/perf-cfb-profile/src/lib.rs",
+      "sha256": "b6547fb048820b6898443908bc4b81f9895c058ee6091126fe1ee2450e75cc79"
+    },
+    {
+      "bytes": 3721,
+      "path": "tools/perf-cfb-profile/README.md",
+      "sha256": "ca2206b276a0c84a840945c61853108a23addfe376aebe5c06d27695e1f20ad5"
+    }
+  ],
+  "method": {
+    "apply": "git apply /home/zhuhe/litchi-performance-0966/diagnostic-combined.patch",
+    "archive": "git archive HEAD -- crates/litchi-doc/src/sprm.rs tools/perf-cfb-profile/Cargo.toml tools/perf-cfb-profile/src/lib.rs tools/perf-cfb-profile/README.md",
+    "build_invoked": false,
+    "check": "git apply --check /home/zhuhe/litchi-performance-0966/diagnostic-combined.patch",
+    "comparison": "byte-compare all four archived files with source-head-v1",
+    "workload_invoked": false
+  },
+  "patch": {
+    "bytes": 24773,
+    "path": "/home/zhuhe/litchi-performance-0966/diagnostic-combined.patch",
+    "sha256": "ce5407f309d2495139401d0e0998a4bfd1456a816819e6c6bf1ece963a067142"
+  },
+  "schema": "litchi.performance.0966.reproduction.v1",
+  "scratch_removed": true,
+  "source_commit": "a499d34f5119a034bc92abde1e1dfcf529159b8d",
+  "source_root": "/home/zhuhe/litchi-performance-0966/source-head-v1",
+  "status": "passed"
+}

@@ -1,0 +1,895 @@
+{
+  "change": "0966",
+  "children": [
+    {
+      "case": "docnohf",
+      "direction": "forward",
+      "edits": 1,
+      "id": "sprm-r01-docnohf-e01-zero",
+      "repeat": 1,
+      "report": {
+        "bytes": 33894,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e01-zero/report.json",
+        "sha256": "db5a39413d1a76043a5c0b632f4aa165cdb44cc6a3a291bb10806126fb14f110"
+      },
+      "retention": "zero",
+      "terminal": {
+        "bytes": 704,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e01-zero/terminal.json",
+        "sha256": "35ec28afe73392d690fd09be9e049203b0128aa217aa7bc3c55079eaca16d106"
+      }
+    },
+    {
+      "case": "docnohf",
+      "direction": "forward",
+      "edits": 1,
+      "id": "sprm-r01-docnohf-e01-default_8mib",
+      "repeat": 1,
+      "report": {
+        "bytes": 33909,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e01-default_8mib/report.json",
+        "sha256": "7c8af4aef93113fb1458db1b9d3c660e7ceb7f2238d3b4921ba2f6cf5c69637f"
+      },
+      "retention": "default_8mib",
+      "terminal": {
+        "bytes": 728,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e01-default_8mib/terminal.json",
+        "sha256": "cfc3bf230ad1b9ba6c9e45e706400d7201033e4c4c29c494ba637c6168960ce3"
+      }
+    },
+    {
+      "case": "docnohf",
+      "direction": "forward",
+      "edits": 1,
+      "id": "sprm-r01-docnohf-e01-release_8mib",
+      "repeat": 1,
+      "report": {
+        "bytes": 33909,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e01-release_8mib/report.json",
+        "sha256": "481068e8ab2366585957302d0ea2e7b5acd1be32674377816719eb41f68205c3"
+      },
+      "retention": "release_8mib",
+      "terminal": {
+        "bytes": 728,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e01-release_8mib/terminal.json",
+        "sha256": "d6fbe5731c36078bd06979f72acb9f86d7faab8dfff5afc3f918474eac9f7f49"
+      }
+    },
+    {
+      "case": "docnohf",
+      "direction": "forward",
+      "edits": 2,
+      "id": "sprm-r01-docnohf-e02-zero",
+      "repeat": 1,
+      "report": {
+        "bytes": 34083,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e02-zero/report.json",
+        "sha256": "a07c81f2ed3f8f6abb59b58b333b7b2cd1d053c4d4f0c3d08c0c9faa886dc978"
+      },
+      "retention": "zero",
+      "terminal": {
+        "bytes": 704,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e02-zero/terminal.json",
+        "sha256": "e69a9f5d59a8633a27e4e2569c2d4d3627818a5966ed7d094bd0dab077670b5f"
+      }
+    },
+    {
+      "case": "docnohf",
+      "direction": "forward",
+      "edits": 2,
+      "id": "sprm-r01-docnohf-e02-default_8mib",
+      "repeat": 1,
+      "report": {
+        "bytes": 34100,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e02-default_8mib/report.json",
+        "sha256": "28acb0c46de1426ab2fbb69cd645bc8b1b9721609c8d9295be9b5eaeeb6d3126"
+      },
+      "retention": "default_8mib",
+      "terminal": {
+        "bytes": 728,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e02-default_8mib/terminal.json",
+        "sha256": "41e60c8868e65c0d249898f312a67daa5e8aea695bccce9e51d91cfe7cbf9f18"
+      }
+    },
+    {
+      "case": "docnohf",
+      "direction": "forward",
+      "edits": 2,
+      "id": "sprm-r01-docnohf-e02-release_8mib",
+      "repeat": 1,
+      "report": {
+        "bytes": 34099,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e02-release_8mib/report.json",
+        "sha256": "a480782a19da9d7e4414413a1a04191016a2f664a050a55a360396af44cb006f"
+      },
+      "retention": "release_8mib",
+      "terminal": {
+        "bytes": 728,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e02-release_8mib/terminal.json",
+        "sha256": "1feef4c1112f4286ec42a598d8ccd27aa468037443fbc79aa4d7df7f0b1f56d3"
+      }
+    },
+    {
+      "case": "docnohf",
+      "direction": "forward",
+      "edits": 8,
+      "id": "sprm-r01-docnohf-e08-zero",
+      "repeat": 1,
+      "report": {
+        "bytes": 35204,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e08-zero/report.json",
+        "sha256": "6e3c5929df8eccf22f0e0ff6bd3414f57a46be8252311aea2311645f43e18785"
+      },
+      "retention": "zero",
+      "terminal": {
+        "bytes": 704,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e08-zero/terminal.json",
+        "sha256": "e624938813638e719fdf138f596f43afe6a82f15341f3f02847a99efc9f0fe7b"
+      }
+    },
+    {
+      "case": "docnohf",
+      "direction": "forward",
+      "edits": 8,
+      "id": "sprm-r01-docnohf-e08-default_8mib",
+      "repeat": 1,
+      "report": {
+        "bytes": 35233,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e08-default_8mib/report.json",
+        "sha256": "b8805830e337e97b460a60a0c9548c210faf7d33e47d4a616baca8439c4bf99a"
+      },
+      "retention": "default_8mib",
+      "terminal": {
+        "bytes": 728,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e08-default_8mib/terminal.json",
+        "sha256": "140cc112b1b99276763c54b5a546da67c8a9ec2c55429155667cfe3f5c7b422a"
+      }
+    },
+    {
+      "case": "docnohf",
+      "direction": "forward",
+      "edits": 8,
+      "id": "sprm-r01-docnohf-e08-release_8mib",
+      "repeat": 1,
+      "report": {
+        "bytes": 35226,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e08-release_8mib/report.json",
+        "sha256": "ede13eaee6246c55be094d861480142de6170fe65aba1af8964c8f44252436e2"
+      },
+      "retention": "release_8mib",
+      "terminal": {
+        "bytes": 728,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e08-release_8mib/terminal.json",
+        "sha256": "4d59a8c5c0309023d348c46b0fc53d13ba9ece3f3e9487d7850ccc6aa788781c"
+      }
+    },
+    {
+      "case": "docnohf",
+      "direction": "forward",
+      "edits": 32,
+      "id": "sprm-r01-docnohf-e32-zero",
+      "repeat": 1,
+      "report": {
+        "bytes": 39758,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e32-zero/report.json",
+        "sha256": "5d6c5d7c848f76300dd5050bace434f1ee90dd9ac63ea044d31a9d07df47907d"
+      },
+      "retention": "zero",
+      "terminal": {
+        "bytes": 704,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e32-zero/terminal.json",
+        "sha256": "ee3301053cebeef6aaf65e3c32c29c4fa03dfe0b74c1e8715f862ed53a12502b"
+      }
+    },
+    {
+      "case": "docnohf",
+      "direction": "forward",
+      "edits": 32,
+      "id": "sprm-r01-docnohf-e32-default_8mib",
+      "repeat": 1,
+      "report": {
+        "bytes": 39835,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e32-default_8mib/report.json",
+        "sha256": "798c3e6678d9b5e00572509ee135010d349be2484b75692c86c8dc0de19b4829"
+      },
+      "retention": "default_8mib",
+      "terminal": {
+        "bytes": 728,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e32-default_8mib/terminal.json",
+        "sha256": "af32a3df9344eac998840b443d362e9cce078bc4de5d1996a3e9d187128c90ee"
+      }
+    },
+    {
+      "case": "docnohf",
+      "direction": "forward",
+      "edits": 32,
+      "id": "sprm-r01-docnohf-e32-release_8mib",
+      "repeat": 1,
+      "report": {
+        "bytes": 39804,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e32-release_8mib/report.json",
+        "sha256": "adaff005bf635b54c2c28ae1f9858ad9a847bd38a8ecb380b51bd219e4fae379"
+      },
+      "retention": "release_8mib",
+      "terminal": {
+        "bytes": 728,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docnohf-e32-release_8mib/terminal.json",
+        "sha256": "63319fe441fd0fd52485a3277383c9febd2e3415a2f56b9b93f2e552dc0cbeac"
+      }
+    },
+    {
+      "case": "docfloat",
+      "direction": "forward",
+      "edits": 1,
+      "id": "sprm-r01-docfloat-e01-zero",
+      "repeat": 1,
+      "report": {
+        "bytes": 34045,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e01-zero/report.json",
+        "sha256": "30825a74c1873f92bfd710dc1cc1ab473ea3cdd1bbbc30f7c64e994b64d61b69"
+      },
+      "retention": "zero",
+      "terminal": {
+        "bytes": 707,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e01-zero/terminal.json",
+        "sha256": "11cb3a7149b9bf2746044f3afc1b535cd57410e4f8eb081a0eca7732ba40bae2"
+      }
+    },
+    {
+      "case": "docfloat",
+      "direction": "forward",
+      "edits": 1,
+      "id": "sprm-r01-docfloat-e01-default_8mib",
+      "repeat": 1,
+      "report": {
+        "bytes": 34061,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e01-default_8mib/report.json",
+        "sha256": "e4a9655dd173f831a369aa85008dfd2760a9a8ee860c65a64276f2056b7a64a4"
+      },
+      "retention": "default_8mib",
+      "terminal": {
+        "bytes": 731,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e01-default_8mib/terminal.json",
+        "sha256": "12a44ac604260743cfb5f53d7b68e42bb06f88ad1a279ef8f6eaf791dccecfdf"
+      }
+    },
+    {
+      "case": "docfloat",
+      "direction": "forward",
+      "edits": 1,
+      "id": "sprm-r01-docfloat-e01-release_8mib",
+      "repeat": 1,
+      "report": {
+        "bytes": 34061,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e01-release_8mib/report.json",
+        "sha256": "41fb638060bb8bea94c81c4234f2b8ebe79451834af953865a247c0ceed2b864"
+      },
+      "retention": "release_8mib",
+      "terminal": {
+        "bytes": 731,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e01-release_8mib/terminal.json",
+        "sha256": "90bb7fcb6ea48bacdc2c5e2a1ced28690ad9430a3d13ab760650cf098f4cd5ab"
+      }
+    },
+    {
+      "case": "docfloat",
+      "direction": "forward",
+      "edits": 2,
+      "id": "sprm-r01-docfloat-e02-zero",
+      "repeat": 1,
+      "report": {
+        "bytes": 34239,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e02-zero/report.json",
+        "sha256": "c3e6315a2c322627dbc41e8cbd14cd730b0518d0072bc957bfa4213ef52bdba7"
+      },
+      "retention": "zero",
+      "terminal": {
+        "bytes": 707,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e02-zero/terminal.json",
+        "sha256": "2fa5fe86b16cea5288e0c50ba2290dd3bf053eaf435ea8162af4cd5e927eda6e"
+      }
+    },
+    {
+      "case": "docfloat",
+      "direction": "forward",
+      "edits": 2,
+      "id": "sprm-r01-docfloat-e02-default_8mib",
+      "repeat": 1,
+      "report": {
+        "bytes": 34259,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e02-default_8mib/report.json",
+        "sha256": "7a4765c0b784e8527fc931c0d7adc2f7307b9f840b48c611baed6ee431eef91a"
+      },
+      "retention": "default_8mib",
+      "terminal": {
+        "bytes": 731,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e02-default_8mib/terminal.json",
+        "sha256": "bb088c706d69ac3cadc46d0ce3311802218e85832d4298b56ff8bcf110d1d8a9"
+      }
+    },
+    {
+      "case": "docfloat",
+      "direction": "forward",
+      "edits": 2,
+      "id": "sprm-r01-docfloat-e02-release_8mib",
+      "repeat": 1,
+      "report": {
+        "bytes": 34257,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e02-release_8mib/report.json",
+        "sha256": "5c7e572ff8615603a106c822a876082f92166fdde1c9a1877b04446f4fc6369d"
+      },
+      "retention": "release_8mib",
+      "terminal": {
+        "bytes": 731,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e02-release_8mib/terminal.json",
+        "sha256": "907eab4aeb6a42f32e8cd7a15dac2236acf398e921c761e03b45146bd6ec1ee1"
+      }
+    },
+    {
+      "case": "docfloat",
+      "direction": "forward",
+      "edits": 8,
+      "id": "sprm-r01-docfloat-e08-zero",
+      "repeat": 1,
+      "report": {
+        "bytes": 35384,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e08-zero/report.json",
+        "sha256": "03f837c3f30e13f4fc41a480284ec7ac50ecb7aa0109364ba9708d56bfb38529"
+      },
+      "retention": "zero",
+      "terminal": {
+        "bytes": 707,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e08-zero/terminal.json",
+        "sha256": "dc9fcb7361918258b5348d7b77fcc7bea80aaaefd9e012cceffdb779c1c50047"
+      }
+    },
+    {
+      "case": "docfloat",
+      "direction": "forward",
+      "edits": 8,
+      "id": "sprm-r01-docfloat-e08-default_8mib",
+      "repeat": 1,
+      "report": {
+        "bytes": 35428,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e08-default_8mib/report.json",
+        "sha256": "37501fa558fc71aefc77a1c72ed68a58a334b347c349c15aedfdd253044ae06f"
+      },
+      "retention": "default_8mib",
+      "terminal": {
+        "bytes": 731,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e08-default_8mib/terminal.json",
+        "sha256": "657813c0d2e52ab0723d5269c00cede375a3526301b05a6f982ac1a2515a63b1"
+      }
+    },
+    {
+      "case": "docfloat",
+      "direction": "forward",
+      "edits": 8,
+      "id": "sprm-r01-docfloat-e08-release_8mib",
+      "repeat": 1,
+      "report": {
+        "bytes": 35414,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e08-release_8mib/report.json",
+        "sha256": "16a8c8172f75147bd2aacd8e34c69f84d3b2c7730ec227a9cce39703cc391418"
+      },
+      "retention": "release_8mib",
+      "terminal": {
+        "bytes": 731,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e08-release_8mib/terminal.json",
+        "sha256": "a4db3c78fe8bc54e088ccd61e24c5d44894e8c08ad14bd25da4a1101cbcaf046"
+      }
+    },
+    {
+      "case": "docfloat",
+      "direction": "forward",
+      "edits": 32,
+      "id": "sprm-r01-docfloat-e32-zero",
+      "repeat": 1,
+      "report": {
+        "bytes": 40045,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e32-zero/report.json",
+        "sha256": "0720e0334d5432c56038571aeebe3556a9991ecf079460e1e5a58678008d9d8e"
+      },
+      "retention": "zero",
+      "terminal": {
+        "bytes": 707,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e32-zero/terminal.json",
+        "sha256": "777ed77905e2fd7423f7b22557c043d64d0152d5f1a0dc3f08a8a25c8c192b8e"
+      }
+    },
+    {
+      "case": "docfloat",
+      "direction": "forward",
+      "edits": 32,
+      "id": "sprm-r01-docfloat-e32-default_8mib",
+      "repeat": 1,
+      "report": {
+        "bytes": 40202,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e32-default_8mib/report.json",
+        "sha256": "27bbe1ce86617e342e225cd4471a4f37924bfe51c7f9a9b6d2e64f310c2053a3"
+      },
+      "retention": "default_8mib",
+      "terminal": {
+        "bytes": 731,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e32-default_8mib/terminal.json",
+        "sha256": "bb96609de4bc713e47ad04b7571923b9f0c6ddb9c3bb506d52bb78fefe2c7b4b"
+      }
+    },
+    {
+      "case": "docfloat",
+      "direction": "forward",
+      "edits": 32,
+      "id": "sprm-r01-docfloat-e32-release_8mib",
+      "repeat": 1,
+      "report": {
+        "bytes": 40132,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e32-release_8mib/report.json",
+        "sha256": "f4db847d6d7315522facf386af4f6bda5b9535ca2b35532d484dadfe07c5de7d"
+      },
+      "retention": "release_8mib",
+      "terminal": {
+        "bytes": 731,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r01-docfloat-e32-release_8mib/terminal.json",
+        "sha256": "8b8f6b6e2f9dbde2abce9b45156227ec59105b21a2724b65209aef2520448c2b"
+      }
+    },
+    {
+      "case": "docfloat",
+      "direction": "reverse",
+      "edits": 32,
+      "id": "sprm-r02-docfloat-e32-release_8mib",
+      "repeat": 2,
+      "report": {
+        "bytes": 40132,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e32-release_8mib/report.json",
+        "sha256": "f4db847d6d7315522facf386af4f6bda5b9535ca2b35532d484dadfe07c5de7d"
+      },
+      "retention": "release_8mib",
+      "terminal": {
+        "bytes": 731,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e32-release_8mib/terminal.json",
+        "sha256": "cc0bb6693cd0a123444252eb68b864dc57feaebb3d72e9d329c06c15d7894ea6"
+      }
+    },
+    {
+      "case": "docfloat",
+      "direction": "reverse",
+      "edits": 32,
+      "id": "sprm-r02-docfloat-e32-default_8mib",
+      "repeat": 2,
+      "report": {
+        "bytes": 40202,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e32-default_8mib/report.json",
+        "sha256": "27bbe1ce86617e342e225cd4471a4f37924bfe51c7f9a9b6d2e64f310c2053a3"
+      },
+      "retention": "default_8mib",
+      "terminal": {
+        "bytes": 731,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e32-default_8mib/terminal.json",
+        "sha256": "8c440a334b42951d47000fcf98455d164877dd4e9f8248d175872bb8c14f0c2d"
+      }
+    },
+    {
+      "case": "docfloat",
+      "direction": "reverse",
+      "edits": 32,
+      "id": "sprm-r02-docfloat-e32-zero",
+      "repeat": 2,
+      "report": {
+        "bytes": 40045,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e32-zero/report.json",
+        "sha256": "0720e0334d5432c56038571aeebe3556a9991ecf079460e1e5a58678008d9d8e"
+      },
+      "retention": "zero",
+      "terminal": {
+        "bytes": 707,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e32-zero/terminal.json",
+        "sha256": "7b2d212fa38c392bf92e4f0ec32613b6ae36e38ad4d753567b2532f99b22735b"
+      }
+    },
+    {
+      "case": "docfloat",
+      "direction": "reverse",
+      "edits": 8,
+      "id": "sprm-r02-docfloat-e08-release_8mib",
+      "repeat": 2,
+      "report": {
+        "bytes": 35414,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e08-release_8mib/report.json",
+        "sha256": "16a8c8172f75147bd2aacd8e34c69f84d3b2c7730ec227a9cce39703cc391418"
+      },
+      "retention": "release_8mib",
+      "terminal": {
+        "bytes": 731,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e08-release_8mib/terminal.json",
+        "sha256": "6b3fd90bea1ff1b829e1961dfc7b4e8a7912b3d794c81afb9fda0873bff8afb8"
+      }
+    },
+    {
+      "case": "docfloat",
+      "direction": "reverse",
+      "edits": 8,
+      "id": "sprm-r02-docfloat-e08-default_8mib",
+      "repeat": 2,
+      "report": {
+        "bytes": 35428,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e08-default_8mib/report.json",
+        "sha256": "37501fa558fc71aefc77a1c72ed68a58a334b347c349c15aedfdd253044ae06f"
+      },
+      "retention": "default_8mib",
+      "terminal": {
+        "bytes": 731,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e08-default_8mib/terminal.json",
+        "sha256": "b57610e99387299c8351da23257b2d0a86d996d9fc9210bc3b3626514b0bdb93"
+      }
+    },
+    {
+      "case": "docfloat",
+      "direction": "reverse",
+      "edits": 8,
+      "id": "sprm-r02-docfloat-e08-zero",
+      "repeat": 2,
+      "report": {
+        "bytes": 35384,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e08-zero/report.json",
+        "sha256": "03f837c3f30e13f4fc41a480284ec7ac50ecb7aa0109364ba9708d56bfb38529"
+      },
+      "retention": "zero",
+      "terminal": {
+        "bytes": 707,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e08-zero/terminal.json",
+        "sha256": "cb6fe670172ee59218957b22aaf0478a6d8d2b5c42dbea675eb0abc2d55f3a64"
+      }
+    },
+    {
+      "case": "docfloat",
+      "direction": "reverse",
+      "edits": 2,
+      "id": "sprm-r02-docfloat-e02-release_8mib",
+      "repeat": 2,
+      "report": {
+        "bytes": 34257,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e02-release_8mib/report.json",
+        "sha256": "5c7e572ff8615603a106c822a876082f92166fdde1c9a1877b04446f4fc6369d"
+      },
+      "retention": "release_8mib",
+      "terminal": {
+        "bytes": 731,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e02-release_8mib/terminal.json",
+        "sha256": "edf068a97804813e1e845beba595f7871bf8b59d70ad4378a34ea9f712e984cd"
+      }
+    },
+    {
+      "case": "docfloat",
+      "direction": "reverse",
+      "edits": 2,
+      "id": "sprm-r02-docfloat-e02-default_8mib",
+      "repeat": 2,
+      "report": {
+        "bytes": 34259,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e02-default_8mib/report.json",
+        "sha256": "7a4765c0b784e8527fc931c0d7adc2f7307b9f840b48c611baed6ee431eef91a"
+      },
+      "retention": "default_8mib",
+      "terminal": {
+        "bytes": 731,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e02-default_8mib/terminal.json",
+        "sha256": "48b397a55fde48fa09e49c881434c980ef37ddecdaaef527074d44b7625dc05b"
+      }
+    },
+    {
+      "case": "docfloat",
+      "direction": "reverse",
+      "edits": 2,
+      "id": "sprm-r02-docfloat-e02-zero",
+      "repeat": 2,
+      "report": {
+        "bytes": 34239,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e02-zero/report.json",
+        "sha256": "c3e6315a2c322627dbc41e8cbd14cd730b0518d0072bc957bfa4213ef52bdba7"
+      },
+      "retention": "zero",
+      "terminal": {
+        "bytes": 707,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e02-zero/terminal.json",
+        "sha256": "c24041410f8f675e57fb9e15ab2c66cb5f83ac1c02542b0793c8cca59f521d73"
+      }
+    },
+    {
+      "case": "docfloat",
+      "direction": "reverse",
+      "edits": 1,
+      "id": "sprm-r02-docfloat-e01-release_8mib",
+      "repeat": 2,
+      "report": {
+        "bytes": 34061,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e01-release_8mib/report.json",
+        "sha256": "41fb638060bb8bea94c81c4234f2b8ebe79451834af953865a247c0ceed2b864"
+      },
+      "retention": "release_8mib",
+      "terminal": {
+        "bytes": 731,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e01-release_8mib/terminal.json",
+        "sha256": "62997b51e92ceefb43de7d392667af31408099d8738d4c88cd78b1cb7be5e8fa"
+      }
+    },
+    {
+      "case": "docfloat",
+      "direction": "reverse",
+      "edits": 1,
+      "id": "sprm-r02-docfloat-e01-default_8mib",
+      "repeat": 2,
+      "report": {
+        "bytes": 34061,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e01-default_8mib/report.json",
+        "sha256": "e4a9655dd173f831a369aa85008dfd2760a9a8ee860c65a64276f2056b7a64a4"
+      },
+      "retention": "default_8mib",
+      "terminal": {
+        "bytes": 731,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e01-default_8mib/terminal.json",
+        "sha256": "d9ac682b9afca34b1ac09bcd205fe0c1f77d4ebaba9fae8fcaaa718c2811cffa"
+      }
+    },
+    {
+      "case": "docfloat",
+      "direction": "reverse",
+      "edits": 1,
+      "id": "sprm-r02-docfloat-e01-zero",
+      "repeat": 2,
+      "report": {
+        "bytes": 34045,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e01-zero/report.json",
+        "sha256": "30825a74c1873f92bfd710dc1cc1ab473ea3cdd1bbbc30f7c64e994b64d61b69"
+      },
+      "retention": "zero",
+      "terminal": {
+        "bytes": 707,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docfloat-e01-zero/terminal.json",
+        "sha256": "abc686a6dffe29309d3baf026d3de8a21a2f4a47442883233b7d5a1b307c2a53"
+      }
+    },
+    {
+      "case": "docnohf",
+      "direction": "reverse",
+      "edits": 32,
+      "id": "sprm-r02-docnohf-e32-release_8mib",
+      "repeat": 2,
+      "report": {
+        "bytes": 39804,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e32-release_8mib/report.json",
+        "sha256": "adaff005bf635b54c2c28ae1f9858ad9a847bd38a8ecb380b51bd219e4fae379"
+      },
+      "retention": "release_8mib",
+      "terminal": {
+        "bytes": 728,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e32-release_8mib/terminal.json",
+        "sha256": "6f0177c713a35c0d18d4570d14896968497cb895c695aef3baa6bd388425e85f"
+      }
+    },
+    {
+      "case": "docnohf",
+      "direction": "reverse",
+      "edits": 32,
+      "id": "sprm-r02-docnohf-e32-default_8mib",
+      "repeat": 2,
+      "report": {
+        "bytes": 39835,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e32-default_8mib/report.json",
+        "sha256": "798c3e6678d9b5e00572509ee135010d349be2484b75692c86c8dc0de19b4829"
+      },
+      "retention": "default_8mib",
+      "terminal": {
+        "bytes": 728,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e32-default_8mib/terminal.json",
+        "sha256": "f9c4cc51bbda3a8a801d1827c6240a515174fc3416cdd5954ffee99f5bcf3c14"
+      }
+    },
+    {
+      "case": "docnohf",
+      "direction": "reverse",
+      "edits": 32,
+      "id": "sprm-r02-docnohf-e32-zero",
+      "repeat": 2,
+      "report": {
+        "bytes": 39758,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e32-zero/report.json",
+        "sha256": "5d6c5d7c848f76300dd5050bace434f1ee90dd9ac63ea044d31a9d07df47907d"
+      },
+      "retention": "zero",
+      "terminal": {
+        "bytes": 704,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e32-zero/terminal.json",
+        "sha256": "1554b47e4a9f4f314cf6d1ff94e81f65db87125689ac78523cefe9974f063d2c"
+      }
+    },
+    {
+      "case": "docnohf",
+      "direction": "reverse",
+      "edits": 8,
+      "id": "sprm-r02-docnohf-e08-release_8mib",
+      "repeat": 2,
+      "report": {
+        "bytes": 35226,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e08-release_8mib/report.json",
+        "sha256": "ede13eaee6246c55be094d861480142de6170fe65aba1af8964c8f44252436e2"
+      },
+      "retention": "release_8mib",
+      "terminal": {
+        "bytes": 728,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e08-release_8mib/terminal.json",
+        "sha256": "4b63c4eb3f419c4b43065558d2c06e96f040ecbf3ea7f22b65858d9ce796bdb2"
+      }
+    },
+    {
+      "case": "docnohf",
+      "direction": "reverse",
+      "edits": 8,
+      "id": "sprm-r02-docnohf-e08-default_8mib",
+      "repeat": 2,
+      "report": {
+        "bytes": 35233,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e08-default_8mib/report.json",
+        "sha256": "b8805830e337e97b460a60a0c9548c210faf7d33e47d4a616baca8439c4bf99a"
+      },
+      "retention": "default_8mib",
+      "terminal": {
+        "bytes": 728,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e08-default_8mib/terminal.json",
+        "sha256": "b11c30b77620fdb139ca6baa5d9b6209e52111adc2bb520660ad7601c43b7676"
+      }
+    },
+    {
+      "case": "docnohf",
+      "direction": "reverse",
+      "edits": 8,
+      "id": "sprm-r02-docnohf-e08-zero",
+      "repeat": 2,
+      "report": {
+        "bytes": 35204,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e08-zero/report.json",
+        "sha256": "6e3c5929df8eccf22f0e0ff6bd3414f57a46be8252311aea2311645f43e18785"
+      },
+      "retention": "zero",
+      "terminal": {
+        "bytes": 704,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e08-zero/terminal.json",
+        "sha256": "532a8971c2c5d45b52f4a4e27e1b477cf3fd3398e47f7e2ed73283a9db89ef36"
+      }
+    },
+    {
+      "case": "docnohf",
+      "direction": "reverse",
+      "edits": 2,
+      "id": "sprm-r02-docnohf-e02-release_8mib",
+      "repeat": 2,
+      "report": {
+        "bytes": 34099,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e02-release_8mib/report.json",
+        "sha256": "a480782a19da9d7e4414413a1a04191016a2f664a050a55a360396af44cb006f"
+      },
+      "retention": "release_8mib",
+      "terminal": {
+        "bytes": 728,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e02-release_8mib/terminal.json",
+        "sha256": "9a4daabc0c252b394a3367b3ae7330a2d01f9c9f1cf416272ca033914bca2095"
+      }
+    },
+    {
+      "case": "docnohf",
+      "direction": "reverse",
+      "edits": 2,
+      "id": "sprm-r02-docnohf-e02-default_8mib",
+      "repeat": 2,
+      "report": {
+        "bytes": 34100,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e02-default_8mib/report.json",
+        "sha256": "28acb0c46de1426ab2fbb69cd645bc8b1b9721609c8d9295be9b5eaeeb6d3126"
+      },
+      "retention": "default_8mib",
+      "terminal": {
+        "bytes": 728,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e02-default_8mib/terminal.json",
+        "sha256": "410fb789c87b05207577312368c20cc794f58ad91168e4fd6a5272db139dda74"
+      }
+    },
+    {
+      "case": "docnohf",
+      "direction": "reverse",
+      "edits": 2,
+      "id": "sprm-r02-docnohf-e02-zero",
+      "repeat": 2,
+      "report": {
+        "bytes": 34083,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e02-zero/report.json",
+        "sha256": "a07c81f2ed3f8f6abb59b58b333b7b2cd1d053c4d4f0c3d08c0c9faa886dc978"
+      },
+      "retention": "zero",
+      "terminal": {
+        "bytes": 704,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e02-zero/terminal.json",
+        "sha256": "fabc22cc18219aca736b79a33670a69f7ee9c30018463d6ab30637bb261d35d2"
+      }
+    },
+    {
+      "case": "docnohf",
+      "direction": "reverse",
+      "edits": 1,
+      "id": "sprm-r02-docnohf-e01-release_8mib",
+      "repeat": 2,
+      "report": {
+        "bytes": 33909,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e01-release_8mib/report.json",
+        "sha256": "481068e8ab2366585957302d0ea2e7b5acd1be32674377816719eb41f68205c3"
+      },
+      "retention": "release_8mib",
+      "terminal": {
+        "bytes": 728,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e01-release_8mib/terminal.json",
+        "sha256": "2234f5252784f7c3aecfb69e2e5d830fd45dae52835bdb2274bfb0f8474301ff"
+      }
+    },
+    {
+      "case": "docnohf",
+      "direction": "reverse",
+      "edits": 1,
+      "id": "sprm-r02-docnohf-e01-default_8mib",
+      "repeat": 2,
+      "report": {
+        "bytes": 33909,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e01-default_8mib/report.json",
+        "sha256": "7c8af4aef93113fb1458db1b9d3c660e7ceb7f2238d3b4921ba2f6cf5c69637f"
+      },
+      "retention": "default_8mib",
+      "terminal": {
+        "bytes": 728,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e01-default_8mib/terminal.json",
+        "sha256": "415dfcdd25c9c9a33c3bf79e4ccfb8265e05a4a2bea35ff3a03f8f6d0eb623cb"
+      }
+    },
+    {
+      "case": "docnohf",
+      "direction": "reverse",
+      "edits": 1,
+      "id": "sprm-r02-docnohf-e01-zero",
+      "repeat": 2,
+      "report": {
+        "bytes": 33894,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e01-zero/report.json",
+        "sha256": "db5a39413d1a76043a5c0b632f4aa165cdb44cc6a3a291bb10806126fb14f110"
+      },
+      "retention": "zero",
+      "terminal": {
+        "bytes": 704,
+        "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/sprm-r02-docnohf-e01-zero/terminal.json",
+        "sha256": "e8a8038cd8187361d7142ed8b65be2df721af0fdab8957c0fdf1585d48f16eb6"
+      }
+    }
+  ],
+  "children_count": 48,
+  "interpretation_boundary": "Custody hashes only; no timing or allocator claim.",
+  "plan": {
+    "bytes": 23187,
+    "path": "/home/zhuhe/litchi-performance-0966/protocol/plan-doc-sprm-census-0966-v1.json",
+    "sha256": "18b2915f692567cd830edf9254326431767cb9b0faf79da9eaad1bc9cf0be79b"
+  },
+  "reduction": {
+    "bytes": 11652,
+    "path": "/home/zhuhe/litchi-performance-0966/analysis/doc-sprm-census-reduction-v1.json",
+    "sha256": "53339c9a9c9e22af0f1773fdd2621351948ef0b207263ac3744a04f63d4121d5"
+  },
+  "repeat_equal_verified_by_reduction": true,
+  "run_start": {
+    "bytes": 865,
+    "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/run-start.json",
+    "sha256": "dacb4e037a8f1ffe26f4ed38f9a037a357f7362143c586fb100e006e9f24f357"
+  },
+  "run_terminal": {
+    "bytes": 181,
+    "path": "/home/zhuhe/litchi-performance-0966/capture/doc-sprm-census-v1/run-terminal.json",
+    "sha256": "0385b9ed31b8ebaae84fb822e50b869114d8e051f38d193f681c520036ab5133"
+  },
+  "schema": "litchi.performance.0966.doc_sprm_census_child_manifest.v1",
+  "schema_version": 1,
+  "status": "custody_manifest_for_completed_pass"
+}

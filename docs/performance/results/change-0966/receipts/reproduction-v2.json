@@ -1,0 +1,94 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "/usr/bin/patch",
+        "--dry-run",
+        "--batch",
+        "--forward",
+        "--fuzz=0",
+        "-p1",
+        "--directory",
+        "/tmp/litchi-0966-repro-v2-f8981uvi"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "checking file crates/litchi-doc/src/sprm.rs\nchecking file tools/perf-cfb-profile/Cargo.toml\nchecking file tools/perf-cfb-profile/src/lib.rs\n"
+    },
+    {
+      "argv": [
+        "/usr/bin/patch",
+        "--batch",
+        "--forward",
+        "--fuzz=0",
+        "-p1",
+        "--directory",
+        "/tmp/litchi-0966-repro-v2-f8981uvi"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "patching file crates/litchi-doc/src/sprm.rs\npatching file tools/perf-cfb-profile/Cargo.toml\npatching file tools/perf-cfb-profile/src/lib.rs\n"
+    }
+  ],
+  "failure_investigation": {
+    "git_dir_environment_present": false,
+    "interpretation": "The earlier reproduction attempt used the main checkout as the apply cwd while the temporary archive remained unchanged; the exact shell command is not retained in shell history. This v2 receipt uses explicit patch directory isolation.",
+    "leftover_scratch_created_utc": "2026-10-07T22:59:30.153267753Z",
+    "leftover_scratch_observed": "/tmp/litchi-0966-repro.pXDxyD",
+    "leftover_scratch_source_files_were_original_head": true,
+    "main_diagnostic_file_mtime_utc_observed": "2026-10-07T22:59:30.164940380Z",
+    "resolved_git": "/usr/bin/git"
+  },
+  "main_checkout_after_sha256": {
+    "crates/litchi-doc/src/sprm.rs": "f7a5499cbfb7b97a493c551f4fc33c1518c64beaaf47010f07e3644b4b1baaa0",
+    "tools/perf-cfb-profile/Cargo.toml": "41dee12e4eb7d1e3853a33a7743afdf6b5d6519d5e7456e61ce4978aa9177945",
+    "tools/perf-cfb-profile/src/lib.rs": "b4893321ac9a9321a9055823a7f05ecb35e59319531913affc49342b8ccd73dc"
+  },
+  "main_checkout_before_sha256": {
+    "crates/litchi-doc/src/sprm.rs": "f7a5499cbfb7b97a493c551f4fc33c1518c64beaaf47010f07e3644b4b1baaa0",
+    "tools/perf-cfb-profile/Cargo.toml": "41dee12e4eb7d1e3853a33a7743afdf6b5d6519d5e7456e61ce4978aa9177945",
+    "tools/perf-cfb-profile/src/lib.rs": "b4893321ac9a9321a9055823a7f05ecb35e59319531913affc49342b8ccd73dc"
+  },
+  "main_checkout_unchanged": true,
+  "matched_files": [
+    {
+      "bytes": 32251,
+      "path": "crates/litchi-doc/src/sprm.rs",
+      "sha256": "66cacbd9a4f10bdead0405094ac5adacd42e523af220acf5990ae2bc335be680"
+    },
+    {
+      "bytes": 584,
+      "path": "tools/perf-cfb-profile/Cargo.toml",
+      "sha256": "8f440b06101df67672296b5fbf7dd9e857b435efa17adfcaf95d730e077022ef"
+    },
+    {
+      "bytes": 38210,
+      "path": "tools/perf-cfb-profile/src/lib.rs",
+      "sha256": "b6547fb048820b6898443908bc4b81f9895c058ee6091126fe1ee2450e75cc79"
+    },
+    {
+      "bytes": 3721,
+      "path": "tools/perf-cfb-profile/README.md",
+      "sha256": "ca2206b276a0c84a840945c61853108a23addfe376aebe5c06d27695e1f20ad5"
+    }
+  ],
+  "method": {
+    "application": "/usr/bin/patch --dry-run/then apply --batch --forward --fuzz=0 -p1 --directory <temporary-scratch>",
+    "archive": "/usr/bin/git archive HEAD -- crates/litchi-doc/src/sprm.rs tools/perf-cfb-profile/Cargo.toml tools/perf-cfb-profile/src/lib.rs tools/perf-cfb-profile/README.md",
+    "build_invoked": false,
+    "cwd": "/home/zhuhe/code/litchi",
+    "target_isolation": "patch --directory points explicitly at temporary scratch; main checkout hashes checked before and after",
+    "workload_invoked": false
+  },
+  "original_receipt_preserved": "/home/zhuhe/litchi-performance-0966/repro/reproduction-v1.json",
+  "patch": {
+    "bytes": 24773,
+    "path": "/home/zhuhe/litchi-performance-0966/diagnostic-combined.patch",
+    "sha256": "ce5407f309d2495139401d0e0998a4bfd1456a816819e6c6bf1ece963a067142"
+  },
+  "schema": "litchi.performance.0966.reproduction.v2",
+  "scratch_removed": true,
+  "source_commit": "a499d34f5119a034bc92abde1e1dfcf529159b8d",
+  "source_root": "/home/zhuhe/litchi-performance-0966/source-head-v1",
+  "status": "passed"
+}
