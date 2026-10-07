@@ -1,0 +1,6 @@
+   Compiling memchr v2.8.3
+    Checking quick-xml v0.41.0
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/litchi-performance-0947/source-v1/crates/xml-minifier-macros)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/litchi-performance-0947/source-v1/crates/xml-minifier)
+    Checking litchi-proof-diagnostic v0.1.0 (/home/zhuhe/litchi-performance-0947/probe-v2)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.86s

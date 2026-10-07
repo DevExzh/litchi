@@ -1,0 +1,184 @@
+{
+  "all_byte_identical": true,
+  "files": [
+    {
+      "byte_identical": true,
+      "root": "crates/xml-minifier/Cargo.toml",
+      "root_sha256": "7cdf4fac21a50ce8c39fc20d0af89c3ca24f869b74d95c6cd449249f0e28b797",
+      "snapshot": "source-v1/crates/xml-minifier/Cargo.toml",
+      "snapshot_sha256": "7cdf4fac21a50ce8c39fc20d0af89c3ca24f869b74d95c6cd449249f0e28b797"
+    },
+    {
+      "byte_identical": true,
+      "root": "crates/xml-minifier/README.md",
+      "root_sha256": "13a7466deba26441678ffd061cb86cad8c10110e23e3672685e7b2ebe0343f71",
+      "snapshot": "source-v1/crates/xml-minifier/README.md",
+      "snapshot_sha256": "13a7466deba26441678ffd061cb86cad8c10110e23e3672685e7b2ebe0343f71"
+    },
+    {
+      "byte_identical": true,
+      "root": "crates/xml-minifier/examples/attribute_summary_parity.rs",
+      "root_sha256": "173f8ef878104334968970090135966f7f5b077c11c0c451a9ba2a65c0d977d8",
+      "snapshot": "source-v1/crates/xml-minifier/examples/attribute_summary_parity.rs",
+      "snapshot_sha256": "173f8ef878104334968970090135966f7f5b077c11c0c451a9ba2a65c0d977d8"
+    },
+    {
+      "byte_identical": true,
+      "root": "crates/xml-minifier/examples/attribute_summary_probe.rs",
+      "root_sha256": "87538425d322172a590b99fcf46005b27748f34d6c7b21bac8de290660c16e1a",
+      "snapshot": "source-v1/crates/xml-minifier/examples/attribute_summary_probe.rs",
+      "snapshot_sha256": "87538425d322172a590b99fcf46005b27748f34d6c7b21bac8de290660c16e1a"
+    },
+    {
+      "byte_identical": true,
+      "root": "crates/xml-minifier/examples/minify_file.rs",
+      "root_sha256": "d2d0838542f7986ef9ea668957b5529a83cff76beaa123d005a486e279543260",
+      "snapshot": "source-v1/crates/xml-minifier/examples/minify_file.rs",
+      "snapshot_sha256": "d2d0838542f7986ef9ea668957b5529a83cff76beaa123d005a486e279543260"
+    },
+    {
+      "byte_identical": true,
+      "root": "crates/xml-minifier/examples/minify_inline.rs",
+      "root_sha256": "138e30486cfbd7f91807c7474f9f588d21b6c204d626b13bfad708e0de52503d",
+      "snapshot": "source-v1/crates/xml-minifier/examples/minify_inline.rs",
+      "snapshot_sha256": "138e30486cfbd7f91807c7474f9f588d21b6c204d626b13bfad708e0de52503d"
+    },
+    {
+      "byte_identical": true,
+      "root": "crates/xml-minifier/examples/sample.xml",
+      "root_sha256": "4a8efe4202e6970e0531b788a2a4e596c57e3cfb964e7a649c372bff8f592302",
+      "snapshot": "source-v1/crates/xml-minifier/examples/sample.xml",
+      "snapshot_sha256": "4a8efe4202e6970e0531b788a2a4e596c57e3cfb964e7a649c372bff8f592302"
+    },
+    {
+      "byte_identical": true,
+      "root": "crates/xml-minifier/fuzz/.gitignore",
+      "root_sha256": "a24ed50fc1f28dcafa5d4f9eac712faf4b1ffd7910177f5ce30289197a7a2484",
+      "snapshot": "source-v1/crates/xml-minifier/fuzz/.gitignore",
+      "snapshot_sha256": "a24ed50fc1f28dcafa5d4f9eac712faf4b1ffd7910177f5ce30289197a7a2484"
+    },
+    {
+      "byte_identical": true,
+      "root": "crates/xml-minifier/fuzz/Cargo.toml",
+      "root_sha256": "b840cbd0177486bb8873a09eca743a3e0f507289849fdd870582990e4f590e0c",
+      "snapshot": "source-v1/crates/xml-minifier/fuzz/Cargo.toml",
+      "snapshot_sha256": "b840cbd0177486bb8873a09eca743a3e0f507289849fdd870582990e4f590e0c"
+    },
+    {
+      "byte_identical": true,
+      "root": "crates/xml-minifier/fuzz/fuzz_targets/minify_xml.rs",
+      "root_sha256": "503a38c889d671228538588f25a88d88209ed50efa4cf3f88cf385aa2c6ac262",
+      "snapshot": "source-v1/crates/xml-minifier/fuzz/fuzz_targets/minify_xml.rs",
+      "snapshot_sha256": "503a38c889d671228538588f25a88d88209ed50efa4cf3f88cf385aa2c6ac262"
+    },
+    {
+      "byte_identical": true,
+      "root": "crates/xml-minifier/src/audit/namespaces.rs",
+      "root_sha256": "688027bc2d9652395c7385087995cc52084d6d7ff8a57c6a16bee0f582b83296",
+      "snapshot": "source-v1/crates/xml-minifier/src/audit/namespaces.rs",
+      "snapshot_sha256": "688027bc2d9652395c7385087995cc52084d6d7ff8a57c6a16bee0f582b83296"
+    },
+    {
+      "byte_identical": true,
+      "root": "crates/xml-minifier/src/audit/wellformed.rs",
+      "root_sha256": "ed354a0272284b26300346f7cfde5c7190fcfa3c30a7efb349b18a1e3a32f7be",
+      "snapshot": "source-v1/crates/xml-minifier/src/audit/wellformed.rs",
+      "snapshot_sha256": "ed354a0272284b26300346f7cfde5c7190fcfa3c30a7efb349b18a1e3a32f7be"
+    },
+    {
+      "byte_identical": true,
+      "root": "crates/xml-minifier/src/audit.rs",
+      "root_sha256": "eddc437156c976c55ce36b0bf8f0ef47cc4943d296735a1ac8d6ef120b8754e7",
+      "snapshot": "source-v1/crates/xml-minifier/src/audit.rs",
+      "snapshot_sha256": "eddc437156c976c55ce36b0bf8f0ef47cc4943d296735a1ac8d6ef120b8754e7"
+    },
+    {
+      "byte_identical": true,
+      "root": "crates/xml-minifier/src/lib.rs",
+      "root_sha256": "13d54b30425eb19937f8f8dd5ace2356e69cb230f5b91b3a93defdbaab437578",
+      "snapshot": "source-v1/crates/xml-minifier/src/lib.rs",
+      "snapshot_sha256": "13d54b30425eb19937f8f8dd5ace2356e69cb230f5b91b3a93defdbaab437578"
+    },
+    {
+      "byte_identical": true,
+      "root": "crates/xml-minifier/src/xml_attributes.rs",
+      "root_sha256": "7e389b5a474c1856673a98fb7954cebd84685d691390dbfd7d3dbafde28a42de",
+      "snapshot": "source-v1/crates/xml-minifier/src/xml_attributes.rs",
+      "snapshot_sha256": "7e389b5a474c1856673a98fb7954cebd84685d691390dbfd7d3dbafde28a42de"
+    },
+    {
+      "byte_identical": true,
+      "root": "crates/xml-minifier/tests/attribute_cardinality.rs",
+      "root_sha256": "71e978b4082daa054351f2252e0c3e7a4ece0076ca39ee5ecb5f049317e8f76a",
+      "snapshot": "source-v1/crates/xml-minifier/tests/attribute_cardinality.rs",
+      "snapshot_sha256": "71e978b4082daa054351f2252e0c3e7a4ece0076ca39ee5ecb5f049317e8f76a"
+    },
+    {
+      "byte_identical": true,
+      "root": "crates/xml-minifier/tests/audit.rs",
+      "root_sha256": "291373df2666df6ac932bf152501d2dc7b72be8b2b0502bb3d635683002c6ee6",
+      "snapshot": "source-v1/crates/xml-minifier/tests/audit.rs",
+      "snapshot_sha256": "291373df2666df6ac932bf152501d2dc7b72be8b2b0502bb3d635683002c6ee6"
+    },
+    {
+      "byte_identical": true,
+      "root": "crates/xml-minifier/tests/element_attribute_limit.rs",
+      "root_sha256": "b780566059baefafa47a5c9b5c57190cd71ffb885e875e8ef934c88b1471eeb4",
+      "snapshot": "source-v1/crates/xml-minifier/tests/element_attribute_limit.rs",
+      "snapshot_sha256": "b780566059baefafa47a5c9b5c57190cd71ffb885e875e8ef934c88b1471eeb4"
+    },
+    {
+      "byte_identical": true,
+      "root": "crates/xml-minifier/tests/ooxml_assets.rs",
+      "root_sha256": "3929fdd532af024f0e1f2b1c0a2638ab16889211837c94bdc0043054684781f8",
+      "snapshot": "source-v1/crates/xml-minifier/tests/ooxml_assets.rs",
+      "snapshot_sha256": "3929fdd532af024f0e1f2b1c0a2638ab16889211837c94bdc0043054684781f8"
+    },
+    {
+      "byte_identical": true,
+      "root": "crates/xml-minifier/tests/source_replacement.rs",
+      "root_sha256": "e22e4f6b690e34b6f073fb69278d9eec536b646409da3259c11df57f4a8319a0",
+      "snapshot": "source-v1/crates/xml-minifier/tests/source_replacement.rs",
+      "snapshot_sha256": "e22e4f6b690e34b6f073fb69278d9eec536b646409da3259c11df57f4a8319a0"
+    },
+    {
+      "byte_identical": true,
+      "root": "crates/xml-minifier/tests/stream_audit.rs",
+      "root_sha256": "143f0d193361c356a43df2da4e188b2e0b57bd32c344920855f51cde54939145",
+      "snapshot": "source-v1/crates/xml-minifier/tests/stream_audit.rs",
+      "snapshot_sha256": "143f0d193361c356a43df2da4e188b2e0b57bd32c344920855f51cde54939145"
+    },
+    {
+      "byte_identical": true,
+      "root": "crates/xml-minifier/tests/verified_source.rs",
+      "root_sha256": "3ac5c451bc55b5a0e94444569c4f6abbfe0788d2ee8fc33a0fcdf74891d36054",
+      "snapshot": "source-v1/crates/xml-minifier/tests/verified_source.rs",
+      "snapshot_sha256": "3ac5c451bc55b5a0e94444569c4f6abbfe0788d2ee8fc33a0fcdf74891d36054"
+    },
+    {
+      "byte_identical": true,
+      "root": "crates/xml-minifier/tests/well_formedness.rs",
+      "root_sha256": "f030ace89f0ce3aaf9e9ba66e7df04a8b2d614e6119841f15e341f2b1d386de8",
+      "snapshot": "source-v1/crates/xml-minifier/tests/well_formedness.rs",
+      "snapshot_sha256": "f030ace89f0ce3aaf9e9ba66e7df04a8b2d614e6119841f15e341f2b1d386de8"
+    },
+    {
+      "byte_identical": true,
+      "root": "crates/xml-minifier-macros/Cargo.toml",
+      "root_sha256": "950c387592a3652d0587568dda66e824d1c21ee2f23d3212ed302befa3a3e4cc",
+      "snapshot": "source-v1/crates/xml-minifier-macros/Cargo.toml",
+      "snapshot_sha256": "950c387592a3652d0587568dda66e824d1c21ee2f23d3212ed302befa3a3e4cc"
+    },
+    {
+      "byte_identical": true,
+      "root": "crates/xml-minifier-macros/src/lib.rs",
+      "root_sha256": "2cf8344eadfdd434c5887dfd5931713dbce5897bd613665e0aa15fdccc1c60b2",
+      "snapshot": "source-v1/crates/xml-minifier-macros/src/lib.rs",
+      "snapshot_sha256": "2cf8344eadfdd434c5887dfd5931713dbce5897bd613665e0aa15fdccc1c60b2"
+    }
+  ],
+  "root_checkout": "/home/zhuhe/code/litchi",
+  "schema": "litchi.xlsx-proof-diagnostic-source-bindings.v1",
+  "snapshot": "source-v1",
+  "tracked_crate_file_count": 25
+}

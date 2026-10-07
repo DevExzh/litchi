@@ -1,0 +1,7 @@
+{
+  "failed_script": "verify_fixture_identity_v1.py",
+  "sha256": "2a3a1336b5bc017b3ed2d8a1edec3eece451d3cf594cb0cc046f5fde14130a6f",
+  "exit_code": 1,
+  "reason": "FileNotFoundError: incomplete worksheet sheet_data.rs source path; corrected to raw/worksheet/edit/codec/snapshot/write/sheet_data.rs. First run wrote no output.",
+  "changed_inputs": false
+}

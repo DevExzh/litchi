@@ -1,0 +1,20 @@
+{
+  "status": "pass",
+  "removed_owned_verification_scratch": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0947-archive/verified-extraction",
+      "files": 150,
+      "bytes": 46244466
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0947-archive/rebuild-target",
+      "files": 369,
+      "bytes": 87116299
+    }
+  ],
+  "retained": [
+    "/home/zhuhe/litchi-performance-0947",
+    "/home/zhuhe/litchi-performance-0947-archive/litchi-performance-0947-v1.tar.gz"
+  ],
+  "replay_receipt_sha256": "dabd71a44e147b9ff6d1ad02e4d88648301a525b28b1f216bd4bd4755f4a46f4"
+}

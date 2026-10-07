@@ -1,0 +1,345 @@
+{
+  "cases": [
+    {
+      "binary_identity": {
+        "binary_bytes": 265669200,
+        "binary_sha256": "087aec962f5251d1255e7a54dc188e53f9b8a722c5da95eaa1c69439caa138c8",
+        "executable": true,
+        "mode_bits": 509,
+        "path": "/home/zhuhe/litchi-performance-0945/target-candidate-native-v2/release/litchi-perf-baseline",
+        "profile": "release"
+      },
+      "changed_members": [
+        "xl/workbook.xml",
+        "xl/worksheets/sheet1.xml",
+        "xl/worksheets/sheet2.xml",
+        "xl/worksheets/sheet3.xml",
+        "xl/worksheets/sheet4.xml"
+      ],
+      "id": "medium-one-percent",
+      "output": {
+        "bytes": 4226788,
+        "path": "medium/one-percent/output.zip",
+        "sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c"
+      },
+      "parts": [
+        {
+          "member": "xl/workbook.xml",
+          "original": {
+            "bytes": 424,
+            "path": "medium/one-percent/original/xl/workbook.xml",
+            "sha256": "45f26cce199b97bbf6d9b38ace51c792fc11591f51f5172196ee5dcdcc4afded"
+          },
+          "replacement": {
+            "bytes": 527,
+            "path": "medium/one-percent/replacement/xl/workbook.xml",
+            "sha256": "8c3344a56da551b6a987331cec7c4e672ffef2150bf27c5f0f2aaa9cb366bf88"
+          }
+        },
+        {
+          "member": "xl/worksheets/sheet1.xml",
+          "original": {
+            "bytes": 63294,
+            "path": "medium/one-percent/original/xl/worksheets/sheet1.xml",
+            "sha256": "7409a3eb4e6b1acbd42615f413b13572a06a73f1e0c2d02a85dad51c51eb968e"
+          },
+          "replacement": {
+            "bytes": 63294,
+            "path": "medium/one-percent/replacement/xl/worksheets/sheet1.xml",
+            "sha256": "e12f687e5e1a0456338694a505134d53ccd1417cb17e51b12dff85429d6f1220"
+          }
+        },
+        {
+          "member": "xl/worksheets/sheet2.xml",
+          "original": {
+            "bytes": 68488,
+            "path": "medium/one-percent/original/xl/worksheets/sheet2.xml",
+            "sha256": "fae0309386f910eda0caf18ea98f578ce5c719438e7de8b696cdd8089cf8c326"
+          },
+          "replacement": {
+            "bytes": 68488,
+            "path": "medium/one-percent/replacement/xl/worksheets/sheet2.xml",
+            "sha256": "6e530b0c405315eb4fb29b87da91d29faf3ec346c1e1e3b4c9b29c7fa21fbafa"
+          }
+        },
+        {
+          "member": "xl/worksheets/sheet3.xml",
+          "original": {
+            "bytes": 68488,
+            "path": "medium/one-percent/original/xl/worksheets/sheet3.xml",
+            "sha256": "c105ecf49b0b3a0f35c71f8dfa2d049aac677c95d2c21150f93afe3f871c8edf"
+          },
+          "replacement": {
+            "bytes": 68488,
+            "path": "medium/one-percent/replacement/xl/worksheets/sheet3.xml",
+            "sha256": "34a604ebbe87e62535b215bfd648061c0686c45ae6795f43e856088247938811"
+          }
+        },
+        {
+          "member": "xl/worksheets/sheet4.xml",
+          "original": {
+            "bytes": 68488,
+            "path": "medium/one-percent/original/xl/worksheets/sheet4.xml",
+            "sha256": "8c34fd06ab17b99f9260ee7719c60785dabab53faeec829d2576fbcc42ae1f9c"
+          },
+          "replacement": {
+            "bytes": 68488,
+            "path": "medium/one-percent/replacement/xl/worksheets/sheet4.xml",
+            "sha256": "dc18d296070fce4d64434d03ac400df00e1df53a1d534a9104aaddc4123baf79"
+          }
+        }
+      ],
+      "report": {
+        "bytes": 273516,
+        "path": "native/b00-candidate-primary-percent-medium/report.json",
+        "sha256": "9e1b5c191fc893bf35f76ec3086e37e419b86ea6e6f2b74d3bbd1226b857a055"
+      },
+      "source": {
+        "bytes": 4226429,
+        "path": "medium/source.zip",
+        "sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      }
+    },
+    {
+      "binary_identity": {
+        "binary_bytes": 265669200,
+        "binary_sha256": "087aec962f5251d1255e7a54dc188e53f9b8a722c5da95eaa1c69439caa138c8",
+        "executable": true,
+        "mode_bits": 509,
+        "path": "/home/zhuhe/litchi-performance-0945/target-candidate-native-v2/release/litchi-perf-baseline",
+        "profile": "release"
+      },
+      "changed_members": [
+        "xl/workbook.xml",
+        "xl/worksheets/sheet1.xml"
+      ],
+      "id": "medium-one-edit",
+      "output": {
+        "bytes": 4226480,
+        "path": "medium/one-edit/output.zip",
+        "sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1"
+      },
+      "parts": [
+        {
+          "member": "xl/workbook.xml",
+          "original": {
+            "bytes": 424,
+            "path": "medium/one-edit/original/xl/workbook.xml",
+            "sha256": "45f26cce199b97bbf6d9b38ace51c792fc11591f51f5172196ee5dcdcc4afded"
+          },
+          "replacement": {
+            "bytes": 527,
+            "path": "medium/one-edit/replacement/xl/workbook.xml",
+            "sha256": "8c3344a56da551b6a987331cec7c4e672ffef2150bf27c5f0f2aaa9cb366bf88"
+          }
+        },
+        {
+          "member": "xl/worksheets/sheet1.xml",
+          "original": {
+            "bytes": 63294,
+            "path": "medium/one-edit/original/xl/worksheets/sheet1.xml",
+            "sha256": "7409a3eb4e6b1acbd42615f413b13572a06a73f1e0c2d02a85dad51c51eb968e"
+          },
+          "replacement": {
+            "bytes": 63294,
+            "path": "medium/one-edit/replacement/xl/worksheets/sheet1.xml",
+            "sha256": "fa4f801f0361d957aafaf00bc645ee845477216f8dd572a927350eafdca383b2"
+          }
+        }
+      ],
+      "report": {
+        "bytes": 273478,
+        "path": "native/b00-candidate-control-xlsx-one-edit-medium/report.json",
+        "sha256": "08217a1441b5753f1ac5b9ed484c859492c2059da4a61ae28fd5e0f43a015eff"
+      },
+      "source": {
+        "bytes": 4226429,
+        "path": "medium/source.zip",
+        "sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      }
+    },
+    {
+      "binary_identity": {
+        "binary_bytes": 265669200,
+        "binary_sha256": "087aec962f5251d1255e7a54dc188e53f9b8a722c5da95eaa1c69439caa138c8",
+        "executable": true,
+        "mode_bits": 509,
+        "path": "/home/zhuhe/litchi-performance-0945/target-candidate-native-v2/release/litchi-perf-baseline",
+        "profile": "release"
+      },
+      "changed_members": [
+        "xl/workbook.xml",
+        "xl/worksheets/sheet1.xml",
+        "xl/worksheets/sheet2.xml",
+        "xl/worksheets/sheet3.xml",
+        "xl/worksheets/sheet4.xml"
+      ],
+      "id": "dense-sparse-one-percent",
+      "output": {
+        "bytes": 4252436,
+        "path": "dense-sparse/one-percent/output.zip",
+        "sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d"
+      },
+      "parts": [
+        {
+          "member": "xl/workbook.xml",
+          "original": {
+            "bytes": 424,
+            "path": "dense-sparse/one-percent/original/xl/workbook.xml",
+            "sha256": "45f26cce199b97bbf6d9b38ace51c792fc11591f51f5172196ee5dcdcc4afded"
+          },
+          "replacement": {
+            "bytes": 527,
+            "path": "dense-sparse/one-percent/replacement/xl/workbook.xml",
+            "sha256": "8c3344a56da551b6a987331cec7c4e672ffef2150bf27c5f0f2aaa9cb366bf88"
+          }
+        },
+        {
+          "member": "xl/worksheets/sheet1.xml",
+          "original": {
+            "bytes": 462568,
+            "path": "dense-sparse/one-percent/original/xl/worksheets/sheet1.xml",
+            "sha256": "2366585fd004d6516a7ea33c2943b38993ffd234fe2e3b3070aaa0a593ab66e7"
+          },
+          "replacement": {
+            "bytes": 462569,
+            "path": "dense-sparse/one-percent/replacement/xl/worksheets/sheet1.xml",
+            "sha256": "d079bcce4b785b6de82528458bc8b2ccfd1e8844e25b95bc386dd93f42bf6972"
+          }
+        },
+        {
+          "member": "xl/worksheets/sheet2.xml",
+          "original": {
+            "bytes": 31398,
+            "path": "dense-sparse/one-percent/original/xl/worksheets/sheet2.xml",
+            "sha256": "e02fa30324c5436458d8cffcfd71c29bd5c9b7537693eedbedd5cbb79406dc64"
+          },
+          "replacement": {
+            "bytes": 31398,
+            "path": "dense-sparse/one-percent/replacement/xl/worksheets/sheet2.xml",
+            "sha256": "a7e008e774b9f9a97e396bc8879435a3cc6ef09a44ae0cdbd4a2605dce47ddf5"
+          }
+        },
+        {
+          "member": "xl/worksheets/sheet3.xml",
+          "original": {
+            "bytes": 8115,
+            "path": "dense-sparse/one-percent/original/xl/worksheets/sheet3.xml",
+            "sha256": "c2ab626116c4b3f11e087c5ca685338ea1a756f1b59f97b715c913c62f802a9a"
+          },
+          "replacement": {
+            "bytes": 8115,
+            "path": "dense-sparse/one-percent/replacement/xl/worksheets/sheet3.xml",
+            "sha256": "f47c01b58d76b06ccfe243349cfb39cdb1d880dbfd1bb3f5e57dbe9086b01166"
+          }
+        },
+        {
+          "member": "xl/worksheets/sheet4.xml",
+          "original": {
+            "bytes": 6352,
+            "path": "dense-sparse/one-percent/original/xl/worksheets/sheet4.xml",
+            "sha256": "89dbdef2f41a633923338a399ea1a82729bad5e2e28db3e8e9796a4ce03b0dd9"
+          },
+          "replacement": {
+            "bytes": 6352,
+            "path": "dense-sparse/one-percent/replacement/xl/worksheets/sheet4.xml",
+            "sha256": "ccaa730a58e12521cb441b63e5abebf492bb41e279a346bc84301dea797b0198"
+          }
+        }
+      ],
+      "report": {
+        "bytes": 273738,
+        "path": "native/b00-candidate-primary-percent-dense-sparse/report.json",
+        "sha256": "d258aa8eb6c97cb26b60706966005a8f3df1f8a4b100d58f68ce25dede7daede"
+      },
+      "source": {
+        "bytes": 4251863,
+        "path": "dense-sparse/source.zip",
+        "sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a"
+      }
+    }
+  ],
+  "command": [
+    "python3",
+    "-B",
+    "identity/verify_fixture_identity.py",
+    "--repo",
+    "/home/zhuhe/code/litchi",
+    "--fixtures",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0904/artifacts",
+    "--prior",
+    "/home/zhuhe/litchi-performance-0945",
+    "--output",
+    "/home/zhuhe/litchi-performance-0947/identity/verified-v1.json"
+  ],
+  "head": "a6aca5c5f064c3fecc3edbf532c9637ee788e134",
+  "manifest": {
+    "bytes": 17221,
+    "sha256": "24fcadfb50c88d1edbddb98e863c2be1e61498803b303985aa1ab5cbbeafd931"
+  },
+  "schema": "litchi.performance.0947.fixture-identity.v1",
+  "scope": "Byte identity of retained0904fixtures with adopted0945candidate report outputs; focused current source equivalence. No new benchmark run or timing claim.",
+  "sources": [
+    {
+      "bytes": 126817,
+      "matches_adopted_0945_source": true,
+      "path": "crates/xml-minifier/src/audit.rs",
+      "sha256": "eddc437156c976c55ce36b0bf8f0ef47cc4943d296735a1ac8d6ef120b8754e7"
+    },
+    {
+      "bytes": 29072,
+      "matches_adopted_0945_source": true,
+      "path": "crates/xml-minifier/src/audit/wellformed.rs",
+      "sha256": "ed354a0272284b26300346f7cfde5c7190fcfa3c30a7efb349b18a1e3a32f7be"
+    },
+    {
+      "bytes": 31260,
+      "matches_adopted_0945_source": true,
+      "path": "crates/xml-minifier/src/audit/namespaces.rs",
+      "sha256": "688027bc2d9652395c7385087995cc52084d6d7ff8a57c6a16bee0f582b83296"
+    },
+    {
+      "bytes": 942148,
+      "matches_adopted_0945_source": true,
+      "path": "crates/litchi-opc/src/source_backed.rs",
+      "sha256": "5e0cf3451e70784ff76896b0b2dc93b4409b15db9ef7c88535cc6a20885f8c43"
+    },
+    {
+      "bytes": 134510,
+      "matches_adopted_0945_source": true,
+      "path": "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+      "sha256": "fff0da0fd3fe86824ba6a84531ad81d8499ebff0e73c824e4c16bf53d77129a5"
+    },
+    {
+      "bytes": 3076502,
+      "matches_adopted_0945_source": true,
+      "path": "tools/perf-baseline/src/lib.rs",
+      "sha256": "0d8d00f265157083af4d1e31f035dadd0a624969f43ef8f1b5ca97f350f2535d"
+    },
+    {
+      "bytes": 14154,
+      "matches_adopted_0945_source": true,
+      "path": "tools/perf-baseline/src/xlsx_attribute_fixtures.rs",
+      "sha256": "b26fcc0257431a08a2ee4f0d5cc4e8fc11780ce0d15693b6cd198ea33594a841"
+    },
+    {
+      "bytes": 56289,
+      "matches_adopted_0945_source": true,
+      "path": "tools/perf-baseline/Cargo.lock",
+      "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+    },
+    {
+      "bytes": 27039,
+      "matches_adopted_0945_source": true,
+      "path": "crates/litchi-xlsx/src/raw/worksheet/edit/package.rs",
+      "sha256": "c6d5c29fecac0b67415014cad92e7c4fa08bfe88eeee8145d9ab59777543a202"
+    },
+    {
+      "bytes": 33049,
+      "matches_adopted_0945_source": true,
+      "path": "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs",
+      "sha256": "b462dc62df4cd24f6964464a4166eab3c1a78715e9a2d0004ef21b182a807da4"
+    }
+  ],
+  "status": "pass"
+}

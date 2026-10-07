@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## 0947 — changed-cell spans make multiple replacement windows worth qualifying
+
+[0947](0947-xlsx-replacement-window-coverage.md) binds retained XML to the
+adopted XLSX outputs and verifies exact source/output cell spans independently.
+The primary cases change 93 / 178 cells covering 2,665 / 5,021 replacement
+bytes; every corresponding worksheet gap is byte-identical. Seven of eight
+primary worksheets nevertheless use complete replacement audits. Retaining
+the workbook audit and existing small windows, a hypothetical full-cell proof
+selects 3,192 / 5,532 replacement bytes instead of 269,285 / 502,623.
+This is coverage evidence, not a semantic proof or speedup. Next implement and
+prospectively qualify bounded range metadata and multiple replacement windows,
+keeping the full original audit, aggregate limits, and canonical error fallback.
+
 ## 0946 — remaining XML cost is concentrated in token reading
 
 [0946](0946-xml-reader-attribution.md) decomposes all four retained 0944

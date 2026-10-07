@@ -1,0 +1,8 @@
+[package]
+name = "litchi-proof-diagnostic"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+xml-minifier = { path = "../source-v1/crates/xml-minifier" }

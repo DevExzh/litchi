@@ -1,0 +1,178 @@
+{
+  "cases": [
+    {
+      "current_selected_replacement_bytes": 269285,
+      "hypothetical_selected_replacement_bytes": 3192,
+      "hypothetically_omitted_fraction": 0.9881463876562007,
+      "hypothetically_omitted_replacement_bytes": 266093,
+      "id": "medium-one-percent",
+      "original_bytes": 269182,
+      "parts": [
+        {
+          "changed_cell_original_bytes": 0,
+          "changed_cell_replacement_bytes": 0,
+          "changed_cells": 0,
+          "current_proof": "Complete",
+          "current_selected_replacement_bytes": 527,
+          "hypothetical_full_cell_substitution": false,
+          "hypothetical_selected_replacement_bytes": 527,
+          "member": "xl/workbook.xml",
+          "original_bytes": 424
+        },
+        {
+          "changed_cell_original_bytes": 642,
+          "changed_cell_replacement_bytes": 642,
+          "changed_cells": 24,
+          "current_proof": "Complete",
+          "current_selected_replacement_bytes": 63294,
+          "hypothetical_full_cell_substitution": true,
+          "hypothetical_selected_replacement_bytes": 642,
+          "member": "xl/worksheets/sheet1.xml",
+          "original_bytes": 63294
+        },
+        {
+          "changed_cell_original_bytes": 677,
+          "changed_cell_replacement_bytes": 677,
+          "changed_cells": 23,
+          "current_proof": "Complete",
+          "current_selected_replacement_bytes": 68488,
+          "hypothetical_full_cell_substitution": true,
+          "hypothetical_selected_replacement_bytes": 677,
+          "member": "xl/worksheets/sheet2.xml",
+          "original_bytes": 68488
+        },
+        {
+          "changed_cell_original_bytes": 670,
+          "changed_cell_replacement_bytes": 670,
+          "changed_cells": 23,
+          "current_proof": "Complete",
+          "current_selected_replacement_bytes": 68488,
+          "hypothetical_full_cell_substitution": true,
+          "hypothetical_selected_replacement_bytes": 670,
+          "member": "xl/worksheets/sheet3.xml",
+          "original_bytes": 68488
+        },
+        {
+          "changed_cell_original_bytes": 676,
+          "changed_cell_replacement_bytes": 676,
+          "changed_cells": 23,
+          "current_proof": "Complete",
+          "current_selected_replacement_bytes": 68488,
+          "hypothetical_full_cell_substitution": true,
+          "hypothetical_selected_replacement_bytes": 676,
+          "member": "xl/worksheets/sheet4.xml",
+          "original_bytes": 68488
+        }
+      ]
+    },
+    {
+      "current_selected_replacement_bytes": 535,
+      "hypothetical_selected_replacement_bytes": 535,
+      "hypothetically_omitted_fraction": 0.0,
+      "hypothetically_omitted_replacement_bytes": 0,
+      "id": "medium-one-edit",
+      "original_bytes": 63718,
+      "parts": [
+        {
+          "changed_cell_original_bytes": 0,
+          "changed_cell_replacement_bytes": 0,
+          "changed_cells": 0,
+          "current_proof": "Complete",
+          "current_selected_replacement_bytes": 527,
+          "hypothetical_full_cell_substitution": false,
+          "hypothetical_selected_replacement_bytes": 527,
+          "member": "xl/workbook.xml",
+          "original_bytes": 424
+        },
+        {
+          "changed_cell_original_bytes": 22,
+          "changed_cell_replacement_bytes": 22,
+          "changed_cells": 1,
+          "current_proof": "Window,190..198,190..198",
+          "current_selected_replacement_bytes": 8,
+          "hypothetical_full_cell_substitution": false,
+          "hypothetical_selected_replacement_bytes": 8,
+          "member": "xl/worksheets/sheet1.xml",
+          "original_bytes": 63294
+        }
+      ]
+    },
+    {
+      "current_selected_replacement_bytes": 502623,
+      "hypothetical_selected_replacement_bytes": 5532,
+      "hypothetically_omitted_fraction": 0.9889937388460138,
+      "hypothetically_omitted_replacement_bytes": 497091,
+      "id": "dense-sparse-one-percent",
+      "original_bytes": 508857,
+      "parts": [
+        {
+          "changed_cell_original_bytes": 0,
+          "changed_cell_replacement_bytes": 0,
+          "changed_cells": 0,
+          "current_proof": "Complete",
+          "current_selected_replacement_bytes": 527,
+          "hypothetical_full_cell_substitution": false,
+          "hypothetical_selected_replacement_bytes": 527,
+          "member": "xl/workbook.xml",
+          "original_bytes": 424
+        },
+        {
+          "changed_cell_original_bytes": 4600,
+          "changed_cell_replacement_bytes": 4601,
+          "changed_cells": 164,
+          "current_proof": "Complete",
+          "current_selected_replacement_bytes": 462569,
+          "hypothetical_full_cell_substitution": true,
+          "hypothetical_selected_replacement_bytes": 4601,
+          "member": "xl/worksheets/sheet1.xml",
+          "original_bytes": 462568
+        },
+        {
+          "changed_cell_original_bytes": 330,
+          "changed_cell_replacement_bytes": 330,
+          "changed_cells": 11,
+          "current_proof": "Complete",
+          "current_selected_replacement_bytes": 31398,
+          "hypothetical_full_cell_substitution": true,
+          "hypothetical_selected_replacement_bytes": 330,
+          "member": "xl/worksheets/sheet2.xml",
+          "original_bytes": 31398
+        },
+        {
+          "changed_cell_original_bytes": 60,
+          "changed_cell_replacement_bytes": 60,
+          "changed_cells": 2,
+          "current_proof": "Complete",
+          "current_selected_replacement_bytes": 8115,
+          "hypothetical_full_cell_substitution": true,
+          "hypothetical_selected_replacement_bytes": 60,
+          "member": "xl/worksheets/sheet3.xml",
+          "original_bytes": 8115
+        },
+        {
+          "changed_cell_original_bytes": 30,
+          "changed_cell_replacement_bytes": 30,
+          "changed_cells": 1,
+          "current_proof": "Window,1494..1508,1494..1508",
+          "current_selected_replacement_bytes": 14,
+          "hypothetical_full_cell_substitution": false,
+          "hypothetical_selected_replacement_bytes": 14,
+          "member": "xl/worksheets/sheet4.xml",
+          "original_bytes": 6352
+        }
+      ]
+    }
+  ],
+  "inputs": {
+    "proof": {
+      "bytes": 2551,
+      "sha256": "749aa44a7f395a996a9e9552b431d625e8152bef23e8133c90e0b0533ab8d73e"
+    },
+    "spans": {
+      "bytes": 320715,
+      "sha256": "94f350341ae4bc922c234a0fb7b31d7dfd587ce6d72499e49ecc0d7116d4dbeb"
+    }
+  },
+  "schema": "litchi.performance.0947.coverage-model.v1",
+  "scope": "Hypothetical full-cell range coverage on Complete worksheets only. Current workbook audit and existing Window paths retained. Original audit always retained. Debug probe runs extra full audits: these counts are not its executed bytes, scanner passes, allocations, latency or a validated multi-window proof."
+}

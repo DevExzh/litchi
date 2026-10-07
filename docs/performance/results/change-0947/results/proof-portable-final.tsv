@@ -1,0 +1,13 @@
+case	member	original_bytes	replacement_bytes	original_report	replacement_report	proof
+medium-one-percent	xl/workbook.xml	424	527	ok,attributes=14,bytes=424,events=10,max_depth=3,text_bytes=0	ok,attributes=19,bytes=527,events=11,max_depth=3,text_bytes=0	Complete
+medium-one-percent	xl/worksheets/sheet1.xml	63294	63294	ok,attributes=2354,bytes=63294,events=11623,max_depth=5,text_bytes=10934	ok,attributes=2354,bytes=63294,events=11623,max_depth=5,text_bytes=10934	Complete
+medium-one-percent	xl/worksheets/sheet2.xml	68488	68488	ok,attributes=2354,bytes=68488,events=11623,max_depth=5,text_bytes=16128	ok,attributes=2354,bytes=68488,events=11623,max_depth=5,text_bytes=16128	Complete
+medium-one-percent	xl/worksheets/sheet3.xml	68488	68488	ok,attributes=2354,bytes=68488,events=11623,max_depth=5,text_bytes=16128	ok,attributes=2354,bytes=68488,events=11623,max_depth=5,text_bytes=16128	Complete
+medium-one-percent	xl/worksheets/sheet4.xml	68488	68488	ok,attributes=2354,bytes=68488,events=11623,max_depth=5,text_bytes=16128	ok,attributes=2354,bytes=68488,events=11623,max_depth=5,text_bytes=16128	Complete
+medium-one-edit	xl/workbook.xml	424	527	ok,attributes=14,bytes=424,events=10,max_depth=3,text_bytes=0	ok,attributes=19,bytes=527,events=11,max_depth=3,text_bytes=0	Complete
+medium-one-edit	xl/worksheets/sheet1.xml	63294	63294	ok,attributes=2354,bytes=63294,events=11623,max_depth=5,text_bytes=10934	ok,attributes=2354,bytes=63294,events=11623,max_depth=5,text_bytes=10934	Window,190..198,190..198
+dense-sparse-one-percent	xl/workbook.xml	424	527	ok,attributes=14,bytes=424,events=10,max_depth=3,text_bytes=0	ok,attributes=19,bytes=527,events=11,max_depth=3,text_bytes=0	Complete
+dense-sparse-one-percent	xl/worksheets/sheet1.xml	462568	462569	ok,attributes=16514,bytes=462568,events=82183,max_depth=5,text_bytes=83986	ok,attributes=16514,bytes=462569,events=82183,max_depth=5,text_bytes=83987	Complete
+dense-sparse-one-percent	xl/worksheets/sheet2.xml	31398	31398	ok,attributes=1058,bytes=31398,events=5191,max_depth=5,text_bytes=7168	ok,attributes=1058,bytes=31398,events=5191,max_depth=5,text_bytes=7168	Complete
+dense-sparse-one-percent	xl/worksheets/sheet3.xml	8115	8115	ok,attributes=274,bytes=8115,events=1319,max_depth=5,text_bytes=1792	ok,attributes=274,bytes=8115,events=1319,max_depth=5,text_bytes=1792	Complete
+dense-sparse-one-percent	xl/worksheets/sheet4.xml	6352	6352	ok,attributes=258,bytes=6352,events=903,max_depth=5,text_bytes=896	ok,attributes=258,bytes=6352,events=903,max_depth=5,text_bytes=896	Window,1494..1508,1494..1508

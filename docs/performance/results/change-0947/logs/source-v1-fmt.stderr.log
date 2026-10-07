@@ -1,0 +1,7 @@
+error: couldn't read `/home/zhuhe/litchi-performance-0947/source-v1/crates/xml-minifier/src/../../litchi-opc/src/xml_attributes/tests.rs`: No such file or directory (os error 2)
+   --> /home/zhuhe/litchi-performance-0947/source-v1/crates/xml-minifier/src/xml_attributes.rs:295:1
+    |
+295 | mod tests;
+    | ^^^^^^^^^^
+
+Error writing files: failed to resolve mod `tests`: /home/zhuhe/litchi-performance-0947/source-v1/crates/xml-minifier/src/../../litchi-opc/src/xml_attributes/tests.rs does not exist

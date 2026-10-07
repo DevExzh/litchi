@@ -1,0 +1,43 @@
+{
+  "status": "pass",
+  "retained_binaries": [
+    {
+      "original": "probe/target/debug/litchi-proof-diagnostic",
+      "retained": "binaries/probe-v1",
+      "bytes": 7913672,
+      "sha256": "6a48e978d0821b82e85354461f9e51a6512c94f5660165b9e572d48680d9c488"
+    },
+    {
+      "original": "probe-v2/target/debug/litchi-proof-diagnostic",
+      "retained": "binaries/probe-v2",
+      "bytes": 7916440,
+      "sha256": "5623a3784cb0dbe5e1b2e27372a49b36bcf771e6c276ca5f53471a69396d6105"
+    }
+  ],
+  "removed_owned_scratch": [
+    {
+      "path": "probe/target",
+      "regular_files": 406,
+      "bytes": 88900335
+    },
+    {
+      "path": "probe-v2/target",
+      "regular_files": 535,
+      "bytes": 112504872
+    },
+    {
+      "path": "analysis/__pycache__",
+      "regular_files": 1,
+      "bytes": 41743
+    },
+    {
+      "path": ".keep",
+      "bytes": 0
+    }
+  ],
+  "review_cleanup_confirmed": [
+    "review/replay-controls-work-v1",
+    "review/replay-controls-run.log",
+    "review/__pycache__"
+  ]
+}

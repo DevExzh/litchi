@@ -1,0 +1,98 @@
+{
+  "status": "pass",
+  "scope": "Actual relocated locked offline probe rebuild and byte-identical TSV, analyzer, and model replay; overwrite refusal preserves output. All extracted files remain unchanged.",
+  "commands": [
+    {
+      "name": "moved-build",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "build",
+        "--manifest-path",
+        "probe-v2/Cargo.toml",
+        "--locked",
+        "--offline"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0947-archive/verified-extraction/litchi-performance-0947",
+      "returncode": 0,
+      "expected_returncode": 0
+    },
+    {
+      "name": "moved-proof",
+      "argv": [
+        "/home/zhuhe/litchi-performance-0947-archive/rebuild-target/debug/litchi-proof-diagnostic",
+        "inputs/artifacts",
+        "/home/zhuhe/litchi-performance-0947-archive/replayed-proof.tsv"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0947-archive/verified-extraction/litchi-performance-0947",
+      "returncode": 0,
+      "expected_returncode": 0
+    },
+    {
+      "name": "moved-analysis",
+      "argv": [
+        "python3",
+        "-B",
+        "analysis/analyze.py",
+        "--artifacts",
+        "inputs/artifacts",
+        "--manifest",
+        "inputs/artifacts/manifest.json",
+        "--probe",
+        "/home/zhuhe/litchi-performance-0947-archive/replayed-proof.tsv",
+        "--output",
+        "/home/zhuhe/litchi-performance-0947-archive/replayed-diagnostic.json"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0947-archive/verified-extraction/litchi-performance-0947",
+      "returncode": 0,
+      "expected_returncode": 0
+    },
+    {
+      "name": "moved-model",
+      "argv": [
+        "python3",
+        "-B",
+        "identity/coverage_model.py",
+        "--spans",
+        "review/changed-cell-span-review-v4.json",
+        "--proof",
+        "/home/zhuhe/litchi-performance-0947-archive/replayed-proof.tsv",
+        "--output",
+        "/home/zhuhe/litchi-performance-0947-archive/replayed-model.json"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0947-archive/verified-extraction/litchi-performance-0947",
+      "returncode": 0,
+      "expected_returncode": 0
+    },
+    {
+      "name": "probe-overwrite-control",
+      "argv": [
+        "/home/zhuhe/litchi-performance-0947-archive/rebuild-target/debug/litchi-proof-diagnostic",
+        "inputs/artifacts",
+        "/home/zhuhe/litchi-performance-0947-archive/replayed-proof.tsv"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0947-archive/verified-extraction/litchi-performance-0947",
+      "returncode": 1,
+      "expected_returncode": 1
+    }
+  ],
+  "rebuilt_binary": {
+    "bytes": 7922848,
+    "sha256": "3c4de167633a40f4c1d42cd8e3c9172f018145b97c0de2c13e87bca66e94db5e"
+  },
+  "outputs": {
+    "replayed-proof.tsv": {
+      "bytes": 2551,
+      "sha256": "749aa44a7f395a996a9e9552b431d625e8152bef23e8133c90e0b0533ab8d73e"
+    },
+    "replayed-diagnostic.json": {
+      "bytes": 594327,
+      "sha256": "af40d5a8dc95e4cfa6a922431c7da98e746f966e5548626acb1cfc4815cedd93"
+    },
+    "replayed-model.json": {
+      "bytes": 6837,
+      "sha256": "339b8d1e3b44096b72427da720cd8ee547ac19223946101437824855c48d0af8"
+    }
+  },
+  "replay_script_sha256": "d9801ffcd8d0a63cb7ce51c15d0c8c8a5e5c5d0d4b7f350c44297b5f01d0a4f7"
+}

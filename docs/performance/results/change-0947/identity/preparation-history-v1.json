@@ -1,0 +1,17 @@
+{
+  "scope": "Exploratory preparation; no optimization or prospectively frozen workload experiment.",
+  "limitations": [
+    "Intermediate analyzer sources were edited during exploration and not all historical revisions were retained. The historical diagnostic JSON files are not claimed reproducible with the final analyzer.",
+    "Initial probe builds were exploratory. The final portable v2 has explicit build/replay logs and before/after source identities.",
+    "The first byte-level SequenceMatcher attempt was stopped; it is not a measurement.",
+    "The final analyzer remains a lexer for bound valid fixtures, not a general XML safety or publication proof. Independent namespace-aware exact-gap evidence supplies the locality check."
+  ],
+  "authoritative_files": [
+    "receipt-portable-v2.json",
+    "results/proof-portable-final.tsv",
+    "results/diagnostic-portable-final.json",
+    "review/changed-cell-span-review-v4.json",
+    "identity/coverage-model-v1.json"
+  ],
+  "historical_inputs_retained": true
+}

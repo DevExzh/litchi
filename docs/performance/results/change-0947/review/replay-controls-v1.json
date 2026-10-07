@@ -1,0 +1,203 @@
+{
+  "command": "PYTHONDONTWRITEBYTECODE=1 python3 -B replay-controls-v1.py --repo /home/zhuhe/code/litchi --identity /home/zhuhe/litchi-performance-0947/identity/verified-v1.json --tool /home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py --review-root /home/zhuhe/litchi-performance-0947/review --output /home/zhuhe/litchi-performance-0947/review/replay-controls-v1.json",
+  "identity": {
+    "bytes": 12972,
+    "path": "/home/zhuhe/litchi-performance-0947/identity/verified-v1.json",
+    "sha256": "ea3035582b607269903d238ba73ede858d51db0811cfed03844a5c1a2f0880a6"
+  },
+  "negative_controls": {
+    "corrupt_input_descriptor": {
+      "rejected": true,
+      "returncode": 1
+    },
+    "duplicate_cell_key": {
+      "rejected": true,
+      "returncode": 1
+    },
+    "missing_member": {
+      "rejected": true,
+      "returncode": 1
+    },
+    "output_overwrite": {
+      "rejected": true,
+      "returncode": 1
+    },
+    "wrong_identity_hash": {
+      "rejected": true,
+      "returncode": 1
+    }
+  },
+  "negative_details": {
+    "corrupt_input_descriptor": {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py",
+        "--repo",
+        "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/corrupt-input",
+        "--identity",
+        "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/corrupt-input/identity/verified-v1.json",
+        "--output",
+        "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/corrupt-input/output.json"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/corrupt-input",
+      "output": "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/corrupt-input/output.json",
+      "output_exists": false,
+      "returncode": 1,
+      "stderr": "Traceback (most recent call last):\n  File \"/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py\", line 351, in <module>\n    raise SystemExit(main())\n                     ~~~~^^\n  File \"/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py\", line 324, in main\n    result = compare_member(original, replacement, part)\n  File \"/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py\", line 201, in compare_member\n    require(original[\"sha256\"] == expected[\"original\"][\"sha256\"], f\"original hash mismatch {original_path}\")\n    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py\", line 46, in require\n    raise AssertionError(message)\nAssertionError: original hash mismatch /home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/corrupt-input/docs/performance/results/change-0904/artifacts/medium/one-percent/original/xl/worksheets/sheet1.xml\n",
+      "stdout": ""
+    },
+    "duplicate_cell_key": {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py",
+        "--repo",
+        "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/duplicate-cell-key",
+        "--identity",
+        "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/duplicate-cell-key/identity/verified-v1.json",
+        "--output",
+        "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/duplicate-cell-key/output.json"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/duplicate-cell-key",
+      "output": "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/duplicate-cell-key/output.json",
+      "output_exists": false,
+      "returncode": 1,
+      "stderr": "Traceback (most recent call last):\n  File \"/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py\", line 153, in parse_xml\n    parser.Parse(data, True)\n    ~~~~~~~~~~~~^^^^^^^^^^^^\n  File \"../Modules/pyexpat.c\", line 490, in StartElement\n  File \"/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py\", line 126, in start\n    require(key not in cells, f\"duplicate cell {key!r} in {path}\")\n    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py\", line 46, in require\n    raise AssertionError(message)\nAssertionError: duplicate cell ('1', 'A1') in /home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/duplicate-cell-key/docs/performance/results/change-0904/artifacts/medium/one-percent/original/xl/worksheets/sheet1.xml\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py\", line 351, in <module>\n    raise SystemExit(main())\n                     ~~~~^^\n  File \"/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py\", line 324, in main\n    result = compare_member(original, replacement, part)\n  File \"/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py\", line 199, in compare_member\n    original = parse_xml(original_path)\n  File \"/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py\", line 155, in parse_xml\n    raise ValueError(f\"XML parse failed for {path}: {error}\") from error\nValueError: XML parse failed for /home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/duplicate-cell-key/docs/performance/results/change-0904/artifacts/medium/one-percent/original/xl/worksheets/sheet1.xml: duplicate cell ('1', 'A1') in /home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/duplicate-cell-key/docs/performance/results/change-0904/artifacts/medium/one-percent/original/xl/worksheets/sheet1.xml\n",
+      "stdout": ""
+    },
+    "missing_member": {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py",
+        "--repo",
+        "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/missing-member",
+        "--identity",
+        "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/missing-member/identity/verified-v1.json",
+        "--output",
+        "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/missing-member/output.json"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/missing-member",
+      "output": "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/missing-member/output.json",
+      "output_exists": false,
+      "returncode": 1,
+      "stderr": "Traceback (most recent call last):\n  File \"/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py\", line 351, in <module>\n    raise SystemExit(main())\n                     ~~~~^^\n  File \"/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py\", line 324, in main\n    result = compare_member(original, replacement, part)\n  File \"/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py\", line 200, in compare_member\n    replacement = parse_xml(replacement_path)\n  File \"/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py\", line 90, in parse_xml\n    data = path.read_bytes()\n  File \"/usr/lib/python3.14/pathlib/__init__.py\", line 778, in read_bytes\n    with self.open(mode='rb', buffering=0) as f:\n         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib/python3.14/pathlib/__init__.py\", line 772, in open\n    return io.open(self, mode, buffering, encoding, errors, newline)\n           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: '/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/missing-member/docs/performance/results/change-0904/artifacts/medium/one-percent/replacement/xl/worksheets/sheet4.xml'\n",
+      "stdout": ""
+    },
+    "output_overwrite": {
+      "first": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py",
+          "--repo",
+          "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/overwrite",
+          "--identity",
+          "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/overwrite/identity/verified-v1.json",
+          "--output",
+          "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/overwrite/output.json"
+        ],
+        "cwd": "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/overwrite",
+        "output": "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/overwrite/output.json",
+        "output_exists": true,
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "{\"cases\": [{\"id\": \"medium-one-percent\", \"totals\": {\"changed_cell_original_bytes\": 2665, \"changed_cell_pair_count\": 93, \"changed_cell_replacement_bytes\": 2665, \"changed_member_count\": 5, \"members_with_changed_cells\": 4, \"outside_cell_span_checks_passed\": 4, \"outside_cell_span_checks_total\": 5}}, {\"id\": \"medium-one-edit\", \"totals\": {\"changed_cell_original_bytes\": 22, \"changed_cell_pair_count\": 1, \"changed_cell_replacement_bytes\": 22, \"changed_member_count\": 2, \"members_with_changed_cells\": 1, \"outside_cell_span_checks_passed\": 1, \"outside_cell_span_checks_total\": 2}}, {\"id\": \"dense-sparse-one-percent\", \"totals\": {\"changed_cell_original_bytes\": 5020, \"changed_cell_pair_count\": 178, \"changed_cell_replacement_bytes\": 5021, \"changed_member_count\": 5, \"members_with_changed_cells\": 4, \"outside_cell_span_checks_passed\": 4, \"outside_cell_span_checks_total\": 5}}], \"output\": \"/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/overwrite/output.json\", \"output_bytes\": 320756, \"output_sha256\": \"6e76f99169235c7e2d4d897a1b72d61553f0265572e0c6b383cc67d45261780f\", \"status\": \"pass\"}\n"
+      },
+      "second": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py",
+          "--repo",
+          "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/overwrite",
+          "--identity",
+          "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/overwrite/identity/verified-v1.json",
+          "--output",
+          "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/overwrite/output.json"
+        ],
+        "cwd": "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/overwrite",
+        "output": "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/overwrite/output.json",
+        "output_exists": true,
+        "returncode": 1,
+        "stderr": "Traceback (most recent call last):\n  File \"/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py\", line 351, in <module>\n    raise SystemExit(main())\n                     ~~~~^^\n  File \"/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py\", line 341, in main\n    require(not args.output.exists(), f\"refusing existing output {args.output}\")\n    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py\", line 46, in require\n    raise AssertionError(message)\nAssertionError: refusing existing output /home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/overwrite/output.json\n",
+        "stdout": ""
+      }
+    },
+    "wrong_identity_hash": {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py",
+        "--repo",
+        "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/wrong-identity-binding",
+        "--identity",
+        "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/wrong-identity-binding/identity/verified-v1.json",
+        "--output",
+        "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/wrong-identity-binding/output.json"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/wrong-identity-binding",
+      "output": "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/wrong-identity-binding/output.json",
+      "output_exists": false,
+      "returncode": 1,
+      "stderr": "Traceback (most recent call last):\n  File \"/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py\", line 351, in <module>\n    raise SystemExit(main())\n                     ~~~~^^\n  File \"/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py\", line 324, in main\n    result = compare_member(original, replacement, part)\n  File \"/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py\", line 201, in compare_member\n    require(original[\"sha256\"] == expected[\"original\"][\"sha256\"], f\"original hash mismatch {original_path}\")\n    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py\", line 46, in require\n    raise AssertionError(message)\nAssertionError: original hash mismatch /home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/wrong-identity-binding/docs/performance/results/change-0904/artifacts/medium/one-percent/original/xl/workbook.xml\n",
+      "stdout": ""
+    }
+  },
+  "positive_replay": {
+    "identity_path_normalization": "only identity_receipt.path is normalized; raw output differs solely because that field is absolute",
+    "input_tree_byte_manifest_equal": true,
+    "moved": {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py",
+        "--repo",
+        "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/moved-inputs",
+        "--identity",
+        "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/moved-inputs/identity/verified-v1.json",
+        "--output",
+        "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/moved-replay.json"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/moved-inputs",
+      "output": "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/moved-replay.json",
+      "output_exists": true,
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "{\"cases\": [{\"id\": \"medium-one-percent\", \"totals\": {\"changed_cell_original_bytes\": 2665, \"changed_cell_pair_count\": 93, \"changed_cell_replacement_bytes\": 2665, \"changed_member_count\": 5, \"members_with_changed_cells\": 4, \"outside_cell_span_checks_passed\": 4, \"outside_cell_span_checks_total\": 5}}, {\"id\": \"medium-one-edit\", \"totals\": {\"changed_cell_original_bytes\": 22, \"changed_cell_pair_count\": 1, \"changed_cell_replacement_bytes\": 22, \"changed_member_count\": 2, \"members_with_changed_cells\": 1, \"outside_cell_span_checks_passed\": 1, \"outside_cell_span_checks_total\": 2}}, {\"id\": \"dense-sparse-one-percent\", \"totals\": {\"changed_cell_original_bytes\": 5020, \"changed_cell_pair_count\": 178, \"changed_cell_replacement_bytes\": 5021, \"changed_member_count\": 5, \"members_with_changed_cells\": 4, \"outside_cell_span_checks_passed\": 4, \"outside_cell_span_checks_total\": 5}}], \"output\": \"/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/moved-replay.json\", \"output_bytes\": 320759, \"output_sha256\": \"0527e64d9a2a73ae067ce391412a05af54895bd33103b259f5c9dc0b14c6ea1e\", \"status\": \"pass\"}\n"
+    },
+    "moved_output_bytes": 320759,
+    "original": {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py",
+        "--repo",
+        "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/original-inputs",
+        "--identity",
+        "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/original-inputs/identity/verified-v1.json",
+        "--output",
+        "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/original-replay.json"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/original-inputs",
+      "output": "/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/original-replay.json",
+      "output_exists": true,
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "{\"cases\": [{\"id\": \"medium-one-percent\", \"totals\": {\"changed_cell_original_bytes\": 2665, \"changed_cell_pair_count\": 93, \"changed_cell_replacement_bytes\": 2665, \"changed_member_count\": 5, \"members_with_changed_cells\": 4, \"outside_cell_span_checks_passed\": 4, \"outside_cell_span_checks_total\": 5}}, {\"id\": \"medium-one-edit\", \"totals\": {\"changed_cell_original_bytes\": 22, \"changed_cell_pair_count\": 1, \"changed_cell_replacement_bytes\": 22, \"changed_member_count\": 2, \"members_with_changed_cells\": 1, \"outside_cell_span_checks_passed\": 1, \"outside_cell_span_checks_total\": 2}}, {\"id\": \"dense-sparse-one-percent\", \"totals\": {\"changed_cell_original_bytes\": 5020, \"changed_cell_pair_count\": 178, \"changed_cell_replacement_bytes\": 5021, \"changed_member_count\": 5, \"members_with_changed_cells\": 4, \"outside_cell_span_checks_passed\": 4, \"outside_cell_span_checks_total\": 5}}], \"output\": \"/home/zhuhe/litchi-performance-0947/review/replay-controls-work-v1/original-replay.json\", \"output_bytes\": 320762, \"output_sha256\": \"8b934951edd148ffc042f6773041aac070f0284558f6903d4b47c5636ca9c97f\", \"status\": \"pass\"}\n"
+    },
+    "original_output_bytes": 320762,
+    "raw_output_byte_equal": false,
+    "semantic_projection_equal": true
+  },
+  "schema": "litchi.xlsx-changed-cell-span-replay-controls-0947.v1",
+  "scope": "Moved copied-input replay and offline rejection controls for frozen v4; no workload/build/Rust/native measurement.",
+  "scope_note": "The v4 tool does not consume or validate artifacts/manifest.json; this control binds the identity receipt and each listed XML member only, and makes no manifest-validation claim.",
+  "status": "pass",
+  "tool": {
+    "bytes": 17554,
+    "path": "/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.py",
+    "sha256": "d8dbc469e504f16aab022d2e3115dda2b3746f10a1300d0f2996ddb6cea93bb5"
+  }
+}

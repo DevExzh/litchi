@@ -1,0 +1,100 @@
+{
+  "checked_records": [
+    {
+      "case": "medium-one-percent",
+      "changed_cell_count": 0,
+      "member": "xl/workbook.xml",
+      "proof": "Complete"
+    },
+    {
+      "case": "medium-one-percent",
+      "changed_cell_count": 24,
+      "member": "xl/worksheets/sheet1.xml",
+      "proof": "Complete"
+    },
+    {
+      "case": "medium-one-percent",
+      "changed_cell_count": 23,
+      "member": "xl/worksheets/sheet2.xml",
+      "proof": "Complete"
+    },
+    {
+      "case": "medium-one-percent",
+      "changed_cell_count": 23,
+      "member": "xl/worksheets/sheet3.xml",
+      "proof": "Complete"
+    },
+    {
+      "case": "medium-one-percent",
+      "changed_cell_count": 23,
+      "member": "xl/worksheets/sheet4.xml",
+      "proof": "Complete"
+    },
+    {
+      "case": "medium-one-edit",
+      "changed_cell_count": 0,
+      "member": "xl/workbook.xml",
+      "proof": "Complete"
+    },
+    {
+      "case": "medium-one-edit",
+      "changed_cell_count": 1,
+      "member": "xl/worksheets/sheet1.xml",
+      "proof": "Window"
+    },
+    {
+      "case": "dense-sparse-one-percent",
+      "changed_cell_count": 0,
+      "member": "xl/workbook.xml",
+      "proof": "Complete"
+    },
+    {
+      "case": "dense-sparse-one-percent",
+      "changed_cell_count": 164,
+      "member": "xl/worksheets/sheet1.xml",
+      "proof": "Complete"
+    },
+    {
+      "case": "dense-sparse-one-percent",
+      "changed_cell_count": 11,
+      "member": "xl/worksheets/sheet2.xml",
+      "proof": "Complete"
+    },
+    {
+      "case": "dense-sparse-one-percent",
+      "changed_cell_count": 2,
+      "member": "xl/worksheets/sheet3.xml",
+      "proof": "Complete"
+    },
+    {
+      "case": "dense-sparse-one-percent",
+      "changed_cell_count": 1,
+      "member": "xl/worksheets/sheet4.xml",
+      "proof": "Window"
+    }
+  ],
+  "inputs": {
+    "author_diagnostic": {
+      "bytes": 594327,
+      "path": "/home/zhuhe/litchi-performance-0947/results/diagnostic-portable-final.json",
+      "sha256": "af40d5a8dc95e4cfa6a922431c7da98e746f966e5548626acb1cfc4815cedd93"
+    },
+    "independent_v4": {
+      "bytes": 320715,
+      "path": "/home/zhuhe/litchi-performance-0947/review/changed-cell-span-review-v4.json",
+      "sha256": "94f350341ae4bc922c234a0fb7b31d7dfd587ce6d72499e49ecc0d7116d4dbeb"
+    }
+  },
+  "schema": "litchi.xlsx-author-span-crosscheck-0947.v1",
+  "scope": "Independent v4 cell spans and per-gap bindings cross-checked against diagnostic-final.json; no workload/build/native measurement.",
+  "status": "pass",
+  "totals": {
+    "author_aggregate_changed_groups": 275,
+    "changed_cell_pairs": 272,
+    "changed_cell_replacement_bytes": 7708,
+    "changed_cell_source_bytes": 7707,
+    "complete_parts": 10,
+    "window_parts": 2,
+    "workbook_metadata_differences": 3
+  }
+}

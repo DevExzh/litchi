@@ -1,0 +1,543 @@
+{
+  "analyzer": {
+    "bytes": 30598,
+    "path": "analysis/analyze.py",
+    "sha256": "e94fd451881680e1237ff2744aa8638be3fda27eccc746df7f46cf4b62be5221",
+    "unchanged_final_source": true
+  },
+  "authority": {
+    "production_proof": "Rust xml_minifier::audit::verify_source_replacement from the copied current source snapshot.",
+    "span_analysis": "Python analyzer is diagnostic only and does not establish a publication proof or replacement eligibility."
+  },
+  "commands": [
+    {
+      "command": "cargo +1.95.0 fmt --manifest-path probe-v2/Cargo.toml -- --check",
+      "cwd": ".",
+      "exit_code": 0,
+      "id": "probe-v2-fmt-final",
+      "logs": {
+        "command": {
+          "bytes": 65,
+          "path": "logs/probe-v2-fmt-final.command.txt",
+          "sha256": "2db9d5122471417d096911b8f6be6659d4980a2c0b48e78e8d395880ac142b42"
+        },
+        "exit": {
+          "bytes": 2,
+          "path": "logs/probe-v2-fmt-final.exit",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+        },
+        "stderr": {
+          "bytes": 0,
+          "path": "logs/probe-v2-fmt-final.stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 0,
+          "path": "logs/probe-v2-fmt-final.stdout.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0947/probe-v2/target cargo +1.95.0 build --manifest-path /home/zhuhe/litchi-performance-0947/probe-v2/Cargo.toml --locked --offline",
+      "cwd": ".",
+      "exit_code": 0,
+      "id": "probe-v2-build-final",
+      "logs": {
+        "command": {
+          "bytes": 180,
+          "path": "logs/probe-v2-build-final.command.txt",
+          "sha256": "260b3cc2d6961bb8f48bb0974476fc910d5b841ed641d312187f55afaaf5d54f"
+        },
+        "exit": {
+          "bytes": 2,
+          "path": "logs/probe-v2-build-final.exit",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+        },
+        "stderr": {
+          "bytes": 559,
+          "path": "logs/probe-v2-build-final.stderr.log",
+          "sha256": "ef82db155f53d91d7882694fbea252ce5112457a8ca4b8504a604e6fda332b0e"
+        },
+        "stdout": {
+          "bytes": 0,
+          "path": "logs/probe-v2-build-final.stdout.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0947/probe-v2/target cargo +1.95.0 clippy --manifest-path /home/zhuhe/litchi-performance-0947/probe-v2/Cargo.toml --locked --offline -- -D warnings",
+      "cwd": ".",
+      "exit_code": 0,
+      "id": "probe-v2-clippy-final",
+      "logs": {
+        "command": {
+          "bytes": 196,
+          "path": "logs/probe-v2-clippy-final.command.txt",
+          "sha256": "b1a46a7cd7e0356deffb8151bb7d967a3b5648ecad10cbad715a394d7de99400"
+        },
+        "exit": {
+          "bytes": 2,
+          "path": "logs/probe-v2-clippy-final.exit",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+        },
+        "stderr": {
+          "bytes": 437,
+          "path": "logs/probe-v2-clippy-final.stderr.log",
+          "sha256": "443346190107c2cf75c344837906d13ea5332a5fbfbd34fe55d4f4749eb80c5f"
+        },
+        "stdout": {
+          "bytes": 0,
+          "path": "logs/probe-v2-clippy-final.stdout.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "command": "/home/zhuhe/litchi-performance-0947/probe-v2/target/debug/litchi-proof-diagnostic /home/zhuhe/litchi-performance-0947/inputs/artifacts /home/zhuhe/litchi-performance-0947/results/proof-portable-final.tsv",
+      "cwd": ".",
+      "exit_code": 0,
+      "id": "probe-v2-replay-final",
+      "logs": {
+        "command": {
+          "bytes": 204,
+          "path": "logs/probe-v2-replay-final.command.txt",
+          "sha256": "14cce2304e1fe92a308ff0e7381b5174006fe78a9f325ce1f2a48f28e2c95294"
+        },
+        "exit": {
+          "bytes": 2,
+          "path": "logs/probe-v2-replay-final.exit",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+        },
+        "stderr": {
+          "bytes": 0,
+          "path": "logs/probe-v2-replay-final.stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 0,
+          "path": "logs/probe-v2-replay-final.stdout.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "command": "python3 -B analysis/analyze.py --artifacts inputs/artifacts --manifest inputs/artifacts/manifest.json --probe results/proof-portable-final.tsv --output results/diagnostic-portable-final.json",
+      "cwd": ".",
+      "exit_code": 0,
+      "id": "analyzer-portable-final",
+      "logs": {
+        "command": {
+          "bytes": 191,
+          "path": "logs/analyzer-portable-final.command.txt",
+          "sha256": "3d2f37eae74982ed8c67fdf7646b8ae16699d1d3fda0f8f7ff33089254572788"
+        },
+        "exit": {
+          "bytes": 2,
+          "path": "logs/analyzer-portable-final.exit",
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+        },
+        "stderr": {
+          "bytes": 0,
+          "path": "logs/analyzer-portable-final.stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 0,
+          "path": "logs/analyzer-portable-final.stdout.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    }
+  ],
+  "diagnostic_summary": {
+    "actual_window_events": 6,
+    "actual_window_parts": 2,
+    "actual_window_replacement_bytes": 22,
+    "cell_candidate_replacement_bytes": 7708,
+    "cell_candidate_source_bytes": 7707,
+    "changed_groups": 275,
+    "full_replacement_bytes": 842067,
+    "lexical_candidate_replacement_bytes": 3436,
+    "lexical_candidate_source_bytes": 3435,
+    "lexically_eligible_groups": 272,
+    "lexically_ineligible_groups": 3,
+    "parts": 12,
+    "proof_kinds": {
+      "Complete": 10,
+      "Error": 0,
+      "Identical": 0,
+      "Window": 2
+    },
+    "replacement_changed_bytes": 605,
+    "source_changed_bytes": 295
+  },
+  "generated_utc": "2026-10-07T03:39:52.308701+00:00",
+  "inputs": {
+    "fixture_root": "inputs/artifacts",
+    "identity_receipt": {
+      "bytes": 5636,
+      "path": "identity/fixture-copy-v1.json",
+      "sha256": "b233eb346975f456fa01a610319360d24c6a470ee474514bbea279ef40595989"
+    },
+    "manifest": {
+      "bytes": 17221,
+      "path": "inputs/artifacts/manifest.json",
+      "sha256": "24fcadfb50c88d1edbddb98e863c2be1e61498803b303985aa1ab5cbbeafd931"
+    },
+    "manifest_sha256": "24fcadfb50c88d1edbddb98e863c2be1e61498803b303985aa1ab5cbbeafd931",
+    "source_output_workload": "retained 0904 source/replacement XML pairs copied into inputs/artifacts; no native publication workload rerun"
+  },
+  "limitations": [
+    "Candidate span coverage is lexical/local and heuristic; replacement_bytes_avoided_if_all_candidates_proved is intentionally unavailable without exact per-gap identity and semantic multi-window proof.",
+    "The copied xml-minifier source retains its cfg(test) path to litchi-opc/src/xml_attributes/tests.rs, which is outside this two-crate snapshot. A source-v1 cargo fmt check was attempted and could not resolve that test-only path; the final required fmt check passed for probe-v2, and the locked probe build and clippy check passed.",
+    "The minimal source-v1 workspace manifest reproduces the two production crates and locked dependency graph; it is not a full-workspace/native publication build.",
+    "The debug binary hash is tied to this snapshot path and toolchain; reproduction should compare source bindings, proof TSV, and diagnostic records rather than require identical debug-path bytes.",
+    "The analyzer output is intentionally a relative-path report rooted at this evidence directory; it does not record a native release byte-cost or runtime measurement."
+  ],
+  "locked_dependencies": {
+    "lockfile": {
+      "bytes": 1747,
+      "path": "probe-v2/Cargo.lock",
+      "sha256": "243415ba6e3b6b8793ff8cd2eb4097242006b869262ba0520e6435dadff89f38"
+    },
+    "packages": [
+      {
+        "name": "litchi-proof-diagnostic",
+        "version": "0.1.0"
+      },
+      {
+        "checksum": "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98",
+        "name": "memchr",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "version": "2.8.3"
+      },
+      {
+        "checksum": "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9",
+        "name": "proc-macro2",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "version": "1.0.107"
+      },
+      {
+        "checksum": "e660451e55124f798a69a5af3f49ccfbefbd41910eefd25caf2393e1f3473ec1",
+        "name": "quick-xml",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "version": "0.41.0"
+      },
+      {
+        "checksum": "1fbf4db142a473a8d80c26bbf18454ed458bf8d26c8219c331daecfdbd079001",
+        "name": "quote",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "version": "1.0.47"
+      },
+      {
+        "checksum": "872831b642d1a07999a962a351ed35b955ea2cfc8f3862091e2a240a84f17297",
+        "name": "syn",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "version": "2.0.119"
+      },
+      {
+        "checksum": "d245f478577f809a851594d02313b640fb437e0bb33866753cff937863096954",
+        "name": "unicode-ident",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "version": "1.0.26"
+      },
+      {
+        "name": "xml-minifier",
+        "version": "0.1.0"
+      },
+      {
+        "name": "xml-minifier-macros",
+        "version": "0.1.0"
+      }
+    ]
+  },
+  "outputs": {
+    "diagnostic_json": {
+      "bytes": 594327,
+      "path": "results/diagnostic-portable-final.json",
+      "sha256": "af40d5a8dc95e4cfa6a922431c7da98e746f966e5548626acb1cfc4815cedd93"
+    },
+    "proof_tsv": {
+      "bytes": 2551,
+      "path": "results/proof-portable-final.tsv",
+      "sha256": "749aa44a7f395a996a9e9552b431d625e8152bef23e8133c90e0b0533ab8d73e"
+    }
+  },
+  "per_part_choices": [
+    {
+      "case": "medium-one-percent",
+      "cell_candidate_replacement_bytes": 0,
+      "lexical_candidate_replacement_bytes": 0,
+      "member": "xl/workbook.xml",
+      "proof_kind": "Complete"
+    },
+    {
+      "case": "medium-one-percent",
+      "cell_candidate_replacement_bytes": 642,
+      "lexical_candidate_replacement_bytes": 280,
+      "member": "xl/worksheets/sheet1.xml",
+      "proof_kind": "Complete"
+    },
+    {
+      "case": "medium-one-percent",
+      "cell_candidate_replacement_bytes": 677,
+      "lexical_candidate_replacement_bytes": 322,
+      "member": "xl/worksheets/sheet2.xml",
+      "proof_kind": "Complete"
+    },
+    {
+      "case": "medium-one-percent",
+      "cell_candidate_replacement_bytes": 670,
+      "lexical_candidate_replacement_bytes": 322,
+      "member": "xl/worksheets/sheet3.xml",
+      "proof_kind": "Complete"
+    },
+    {
+      "case": "medium-one-percent",
+      "cell_candidate_replacement_bytes": 676,
+      "lexical_candidate_replacement_bytes": 322,
+      "member": "xl/worksheets/sheet4.xml",
+      "proof_kind": "Complete"
+    },
+    {
+      "case": "medium-one-edit",
+      "cell_candidate_replacement_bytes": 0,
+      "lexical_candidate_replacement_bytes": 0,
+      "member": "xl/workbook.xml",
+      "proof_kind": "Complete"
+    },
+    {
+      "case": "medium-one-edit",
+      "cell_candidate_replacement_bytes": 22,
+      "lexical_candidate_replacement_bytes": 8,
+      "member": "xl/worksheets/sheet1.xml",
+      "proof_kind": "Window",
+      "replacement_bytes_avoided": 63286,
+      "replacement_window": {
+        "bytes": 8,
+        "end": 198,
+        "start": 190
+      },
+      "source_window": {
+        "bytes": 8,
+        "end": 198,
+        "start": 190
+      }
+    },
+    {
+      "case": "dense-sparse-one-percent",
+      "cell_candidate_replacement_bytes": 0,
+      "lexical_candidate_replacement_bytes": 0,
+      "member": "xl/workbook.xml",
+      "proof_kind": "Complete"
+    },
+    {
+      "case": "dense-sparse-one-percent",
+      "cell_candidate_replacement_bytes": 4601,
+      "lexical_candidate_replacement_bytes": 1986,
+      "member": "xl/worksheets/sheet1.xml",
+      "proof_kind": "Complete"
+    },
+    {
+      "case": "dense-sparse-one-percent",
+      "cell_candidate_replacement_bytes": 330,
+      "lexical_candidate_replacement_bytes": 154,
+      "member": "xl/worksheets/sheet2.xml",
+      "proof_kind": "Complete"
+    },
+    {
+      "case": "dense-sparse-one-percent",
+      "cell_candidate_replacement_bytes": 60,
+      "lexical_candidate_replacement_bytes": 28,
+      "member": "xl/worksheets/sheet3.xml",
+      "proof_kind": "Complete"
+    },
+    {
+      "case": "dense-sparse-one-percent",
+      "cell_candidate_replacement_bytes": 30,
+      "lexical_candidate_replacement_bytes": 14,
+      "member": "xl/worksheets/sheet4.xml",
+      "proof_kind": "Window",
+      "replacement_bytes_avoided": 6338,
+      "replacement_window": {
+        "bytes": 14,
+        "end": 1508,
+        "start": 1494
+      },
+      "source_window": {
+        "bytes": 14,
+        "end": 1508,
+        "start": 1494
+      }
+    }
+  ],
+  "probe": {
+    "binary": {
+      "bytes": 7916440,
+      "path": "probe-v2/target/debug/litchi-proof-diagnostic",
+      "sha256": "5623a3784cb0dbe5e1b2e27372a49b36bcf771e6c276ca5f53471a69396d6105"
+    },
+    "file_manifest_after_build": {
+      "bytes": 259,
+      "path": "metadata/probe-v2-source-after-build.sha256",
+      "sha256": "7aa6cf65db584cc1cbc9fcb629eb51476ecd51524b3dc812e71d5bf20b58b9d6"
+    },
+    "file_manifest_before_build": {
+      "bytes": 259,
+      "path": "metadata/probe-v2-source-before-build.sha256",
+      "sha256": "7aa6cf65db584cc1cbc9fcb629eb51476ecd51524b3dc812e71d5bf20b58b9d6"
+    },
+    "path": "probe-v2",
+    "source_manifest": [
+      {
+        "path": "probe-v2/Cargo.lock",
+        "sha256": "243415ba6e3b6b8793ff8cd2eb4097242006b869262ba0520e6435dadff89f38"
+      },
+      {
+        "path": "probe-v2/Cargo.toml",
+        "sha256": "60672608bdb8a29b73c44f80f6881bc76e892d338d1510728912bdec6ec44285"
+      },
+      {
+        "path": "probe-v2/src/main.rs",
+        "sha256": "183329db9a570c70b70715cfd66c0cd76053a8c7a2528ea337f7250b4338a9a9"
+      }
+    ],
+    "source_unchanged_during_build_and_replay": true
+  },
+  "purpose": "Untimed diagnostic of current XML publication proof choices and changed-span coverage over retained, source-bound XLSX fixtures.",
+  "schema": "litchi.xlsx-proof-diagnostic-portable-receipt.v1",
+  "source_snapshot": {
+    "file_manifest_after_build": {
+      "bytes": 3046,
+      "path": "metadata/source-v1-files-after-build.sha256",
+      "sha256": "1f93404a18043a8ff8c7d6867ac17e305ef21b9a572d2704847558f8c8de2ae6"
+    },
+    "file_manifest_before_build": {
+      "bytes": 3046,
+      "path": "metadata/source-v1-files-before-build.sha256",
+      "sha256": "1f93404a18043a8ff8c7d6867ac17e305ef21b9a572d2704847558f8c8de2ae6"
+    },
+    "path": "source-v1",
+    "root_binding_manifest": {
+      "bytes": 9138,
+      "path": "metadata/source-v1-root-bindings-v1.json",
+      "sha256": "a9cab8817d0396f40fe57ca73debe79a6d4f98658529ce8dc37fb155913a593e"
+    },
+    "source_unchanged_during_build_and_replay": true,
+    "tracked_crate_file_count": 25,
+    "tracked_crate_files": [
+      {
+        "path": "source-v1/crates/xml-minifier-macros/Cargo.toml",
+        "sha256": "950c387592a3652d0587568dda66e824d1c21ee2f23d3212ed302befa3a3e4cc"
+      },
+      {
+        "path": "source-v1/crates/xml-minifier-macros/src/lib.rs",
+        "sha256": "2cf8344eadfdd434c5887dfd5931713dbce5897bd613665e0aa15fdccc1c60b2"
+      },
+      {
+        "path": "source-v1/crates/xml-minifier/Cargo.toml",
+        "sha256": "7cdf4fac21a50ce8c39fc20d0af89c3ca24f869b74d95c6cd449249f0e28b797"
+      },
+      {
+        "path": "source-v1/crates/xml-minifier/README.md",
+        "sha256": "13a7466deba26441678ffd061cb86cad8c10110e23e3672685e7b2ebe0343f71"
+      },
+      {
+        "path": "source-v1/crates/xml-minifier/examples/attribute_summary_parity.rs",
+        "sha256": "173f8ef878104334968970090135966f7f5b077c11c0c451a9ba2a65c0d977d8"
+      },
+      {
+        "path": "source-v1/crates/xml-minifier/examples/attribute_summary_probe.rs",
+        "sha256": "87538425d322172a590b99fcf46005b27748f34d6c7b21bac8de290660c16e1a"
+      },
+      {
+        "path": "source-v1/crates/xml-minifier/examples/minify_file.rs",
+        "sha256": "d2d0838542f7986ef9ea668957b5529a83cff76beaa123d005a486e279543260"
+      },
+      {
+        "path": "source-v1/crates/xml-minifier/examples/minify_inline.rs",
+        "sha256": "138e30486cfbd7f91807c7474f9f588d21b6c204d626b13bfad708e0de52503d"
+      },
+      {
+        "path": "source-v1/crates/xml-minifier/examples/sample.xml",
+        "sha256": "4a8efe4202e6970e0531b788a2a4e596c57e3cfb964e7a649c372bff8f592302"
+      },
+      {
+        "path": "source-v1/crates/xml-minifier/fuzz/.gitignore",
+        "sha256": "a24ed50fc1f28dcafa5d4f9eac712faf4b1ffd7910177f5ce30289197a7a2484"
+      },
+      {
+        "path": "source-v1/crates/xml-minifier/fuzz/Cargo.toml",
+        "sha256": "b840cbd0177486bb8873a09eca743a3e0f507289849fdd870582990e4f590e0c"
+      },
+      {
+        "path": "source-v1/crates/xml-minifier/fuzz/fuzz_targets/minify_xml.rs",
+        "sha256": "503a38c889d671228538588f25a88d88209ed50efa4cf3f88cf385aa2c6ac262"
+      },
+      {
+        "path": "source-v1/crates/xml-minifier/src/audit.rs",
+        "sha256": "eddc437156c976c55ce36b0bf8f0ef47cc4943d296735a1ac8d6ef120b8754e7"
+      },
+      {
+        "path": "source-v1/crates/xml-minifier/src/audit/namespaces.rs",
+        "sha256": "688027bc2d9652395c7385087995cc52084d6d7ff8a57c6a16bee0f582b83296"
+      },
+      {
+        "path": "source-v1/crates/xml-minifier/src/audit/wellformed.rs",
+        "sha256": "ed354a0272284b26300346f7cfde5c7190fcfa3c30a7efb349b18a1e3a32f7be"
+      },
+      {
+        "path": "source-v1/crates/xml-minifier/src/lib.rs",
+        "sha256": "13d54b30425eb19937f8f8dd5ace2356e69cb230f5b91b3a93defdbaab437578"
+      },
+      {
+        "path": "source-v1/crates/xml-minifier/src/xml_attributes.rs",
+        "sha256": "7e389b5a474c1856673a98fb7954cebd84685d691390dbfd7d3dbafde28a42de"
+      },
+      {
+        "path": "source-v1/crates/xml-minifier/tests/attribute_cardinality.rs",
+        "sha256": "71e978b4082daa054351f2252e0c3e7a4ece0076ca39ee5ecb5f049317e8f76a"
+      },
+      {
+        "path": "source-v1/crates/xml-minifier/tests/audit.rs",
+        "sha256": "291373df2666df6ac932bf152501d2dc7b72be8b2b0502bb3d635683002c6ee6"
+      },
+      {
+        "path": "source-v1/crates/xml-minifier/tests/element_attribute_limit.rs",
+        "sha256": "b780566059baefafa47a5c9b5c57190cd71ffb885e875e8ef934c88b1471eeb4"
+      },
+      {
+        "path": "source-v1/crates/xml-minifier/tests/ooxml_assets.rs",
+        "sha256": "3929fdd532af024f0e1f2b1c0a2638ab16889211837c94bdc0043054684781f8"
+      },
+      {
+        "path": "source-v1/crates/xml-minifier/tests/source_replacement.rs",
+        "sha256": "e22e4f6b690e34b6f073fb69278d9eec536b646409da3259c11df57f4a8319a0"
+      },
+      {
+        "path": "source-v1/crates/xml-minifier/tests/stream_audit.rs",
+        "sha256": "143f0d193361c356a43df2da4e188b2e0b57bd32c344920855f51cde54939145"
+      },
+      {
+        "path": "source-v1/crates/xml-minifier/tests/verified_source.rs",
+        "sha256": "3ac5c451bc55b5a0e94444569c4f6abbfe0788d2ee8fc33a0fcdf74891d36054"
+      },
+      {
+        "path": "source-v1/crates/xml-minifier/tests/well_formedness.rs",
+        "sha256": "f030ace89f0ce3aaf9e9ba66e7df04a8b2d614e6119841f15e341f2b1d386de8"
+      }
+    ],
+    "workspace_manifest": {
+      "bytes": 1544,
+      "path": "source-v1/Cargo.toml",
+      "sha256": "9a536b24fd62aa8bcc6c7acf773bf0688226232eeadc25f08ed9c89484b54898"
+    }
+  },
+  "toolchain": {
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "python": "python3 -B",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)"
+  }
+}

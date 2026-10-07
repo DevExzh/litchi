@@ -1,0 +1,1 @@
+python3 -B analysis/analyze.py --artifacts inputs/artifacts --manifest inputs/artifacts/manifest.json --probe results/proof-portable-final.tsv --output results/diagnostic-portable-final.json

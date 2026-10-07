@@ -1,0 +1,10 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.26
+   Compiling quote v1.0.47
+   Compiling memchr v2.8.3
+   Compiling quick-xml v0.41.0
+   Compiling syn v2.0.119
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/litchi-performance-0947/source-v1/crates/xml-minifier-macros)
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/litchi-performance-0947/source-v1/crates/xml-minifier)
+   Compiling litchi-proof-diagnostic v0.1.0 (/home/zhuhe/litchi-performance-0947/probe-v2)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.59s
