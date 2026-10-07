@@ -1,0 +1,44 @@
+{
+  "capture": {
+    "children": 6,
+    "first_admission": "sealed by capture owner before offline analysis",
+    "manifest": "/home/zhuhe/litchi-performance-0958/capture-manifest-v1.json",
+    "sha256": "bd30035f2c7926ec579fea58ecd1e5c5fe34da6b2ae129473bee033630e5c465",
+    "workloads_started_by_this_tool": false
+  },
+  "checks": [
+    {
+      "checks": [
+        "owner-pair",
+        "unknown-retained",
+        "exclusive-clone-priority"
+      ],
+      "command": "python3 /home/zhuhe/litchi-performance-0958/tools/attribute_0958_v1.py --self-test",
+      "status": "pass"
+    },
+    {
+      "command": "python3 -m py_compile /home/zhuhe/litchi-performance-0958/tools/attribute_0958_v1.py",
+      "status": "pass"
+    }
+  ],
+  "contract": {
+    "bytes": 2864,
+    "path": "/home/zhuhe/litchi-performance-0958/tooling/attribute-contract-v1.json",
+    "sha256": "4cfb4492b13585409e9f855bcb35ff48f1d0cb43a59bd1077025f4eebdec5e5f"
+  },
+  "historical_failures": [
+    {
+      "output": "/home/zhuhe/litchi-performance-0958/analysis-v1/attribute-v1.json",
+      "reason": "v1 parser accepted only tab-delimited folded rows; actual heaptrack_print uses whitespace separator",
+      "sha256": "6ee76c5be5cd3dfd409349afeca25a188f8eafab5d86df8eb3573d7955abe5b1",
+      "status": "fail"
+    }
+  ],
+  "schema": "litchi.performance.0958.attribute-tooling-receipt.v1",
+  "status": "pass",
+  "tool": {
+    "bytes": 34504,
+    "path": "/home/zhuhe/litchi-performance-0958/tools/attribute_0958_v1.py",
+    "sha256": "a221039412fe103a7c373ff167f9d65cab2fe2599d6c0b4f3fa1afc85c45aa3f"
+  }
+}

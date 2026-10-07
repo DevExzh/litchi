@@ -1,0 +1,111 @@
+{
+  "analysis": {
+    "bytes": 102361,
+    "path": "/home/zhuhe/litchi-performance-0958/analysis-v1/attribute-v3.json",
+    "sha256": "9fb5ae3b1b484e2fc8294c66d4712d8f818c1aed60a974fbe51bcd03173cf983"
+  },
+  "analyzer": {
+    "bytes": 34603,
+    "path": "/home/zhuhe/litchi-performance-0958/tools/attribute_0958_v1.py",
+    "sha256": "1bb7584076762eefadc409016abf50684157e9350a76386255c5763e47d7cffd"
+  },
+  "binary": {
+    "path": "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+    "sha256": "5886b0f86a697bae757994d5a757cffae4a7e8d61a2769ff1c967029cd1912c3"
+  },
+  "capture_manifest": {
+    "bytes": 10965,
+    "path": "/home/zhuhe/litchi-performance-0958/capture-manifest-v1.json",
+    "sha256": "bd30035f2c7926ec579fea58ecd1e5c5fe34da6b2ae129473bee033630e5c465"
+  },
+  "compact_summary": {
+    "bytes": 35870,
+    "path": "/home/zhuhe/litchi-performance-0958/analysis-v1/summary-compact-v1.json",
+    "sha256": "60651f3f1495bd167b4a38d042b6d5201527ceae10403a0c6a7610e14ce61197"
+  },
+  "contract": {
+    "bytes": 3779,
+    "path": "/home/zhuhe/litchi-performance-0958/tooling/attribute-contract-v2.json",
+    "sha256": "9818ca39217c7fd363f5abe04e5a2feecde1450bfc8e4596c0e9fc362ef546e5"
+  },
+  "controls_receipt": {
+    "bytes": 1446,
+    "path": "/home/zhuhe/litchi-performance-0958/review/attribute-controls-receipt-v2.json",
+    "sha256": "5e623409ec7337aed8dea6a5db47c02c55f0b39196a815d32e4d2f9253832d68"
+  },
+  "decoder_tool": {
+    "bytes": 16649,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0949/tools/decode_heaptrack_0949_v1.py",
+    "sha256": "c87e7089774f0eac24ffde262b7fe27b1f1ff4586798683bcc44fa68049bc7bf"
+  },
+  "export_tool": {
+    "bytes": 5043,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0958/tools/export_heaptrack_0958_v1.py",
+    "sha256": "50914d8f0bb6d35b39ef5222473e529174098cab3b9f0e61cf5144d71be7eb95"
+  },
+  "input_manifest": {
+    "bytes": 16403,
+    "path": "/home/zhuhe/litchi-performance-0958/analysis-input-manifest-v1.json",
+    "sha256": "0dc7a9a4757d73a05d9fc289581a8ec6add494565f039b94e7addf8d18629495"
+  },
+  "plan": {
+    "bytes": 12919,
+    "path": "/home/zhuhe/litchi-performance-0958/plan-v5.json",
+    "sha256": "5bd826e1f93913b5be2fc5878be0c5270e323789222fffcf0e97121dcbc37695"
+  },
+  "runs": [
+    {
+      "artifact_bytes": 211454126,
+      "artifact_count": 8,
+      "artifacts_bound_by_input_manifest": true,
+      "id": "h00-medium-percent-r1"
+    },
+    {
+      "artifact_bytes": 212163290,
+      "artifact_count": 8,
+      "artifacts_bound_by_input_manifest": true,
+      "id": "h01-dense-percent-r1"
+    },
+    {
+      "artifact_bytes": 210470457,
+      "artifact_count": 8,
+      "artifacts_bound_by_input_manifest": true,
+      "id": "h02-medium-one-edit-r1"
+    },
+    {
+      "artifact_bytes": 210468549,
+      "artifact_count": 8,
+      "artifacts_bound_by_input_manifest": true,
+      "id": "h03-medium-one-edit-r2"
+    },
+    {
+      "artifact_bytes": 212165059,
+      "artifact_count": 8,
+      "artifacts_bound_by_input_manifest": true,
+      "id": "h04-dense-percent-r2"
+    },
+    {
+      "artifact_bytes": 211446327,
+      "artifact_count": 8,
+      "artifacts_bound_by_input_manifest": true,
+      "id": "h05-medium-percent-r2"
+    }
+  ],
+  "schema": "litchi.performance.0958.heaptrack-attribution-artifact-manifest.v1",
+  "scope": "The input manifest below is the authoritative per-run artifact manifest; this compact derivative binds the final offline analyzer and summaries without duplicating raw paths or data.",
+  "source_trace": {
+    "bytes": 16803,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0958/review/number-ownership-trace-v2.md",
+    "sha256": "3de25114247d354cf6b512db9599aac5ce921149a06fb13351dd048382cd75d2"
+  },
+  "status": "sealed",
+  "tooling_receipt": {
+    "bytes": 5254,
+    "path": "/home/zhuhe/litchi-performance-0958/review/attribute-tooling-receipt-v2.json",
+    "sha256": "7f6573f7cfe8532d81a77ce40f252f5660648571885220d6d7907701a9c4d03a"
+  },
+  "workloads_started_by_analyzer": false
+}

@@ -1,5 +1,37 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0958 — current serial edit/commit allocation attribution
+
+[0958](0958-xlsx-edit-commit-allocation-attribution.md) records six heaptrack
+captures, all passing the three-sample semantic/resource checks. Combined
+exact-stage and nested commit-core selected stacks match the 0957 serial
+edit/commit counters in every capture; the subset boundary remains explicit.
+Omitted numeric clones contribute 9,123 / 17,614 / 2,303 calls and
+58,723 / 92,907 / 10,933 requested bytes per medium-percent / dense-percent /
+one-edit iteration. Whole-process decoder, histogram and folded call counts
+reconcile; folded requested bytes are unavailable. This is allocation
+attribution, not native timing, RSS, an adopted change or a new baseline.
+
+
+## 0954–0957 — explicit managed compression qualification
+
+The [task census](0954-xlsx-replacement-task-census.md) and
+[0955 qualification](0955-xlsx-managed-compression-qualification.md) lead to
+separate native and allocator measurements of the existing cold managed route.
+These do not replace the ordinary source-backed baseline or adopt new runtime
+behavior. [0956](0956-xlsx-managed-compression-native-widths.md) records 144
+native children: medium width-two/four publication p50 ratios are 0.663/0.608
+and total p50 ratios 0.888/0.867 against width one. Width-four RSS rises 6.06%;
+medium commit-drop p50 rises 73.8%/85.1%. All individual tail/phase flags remain
+in that report. Dense-sparse and one-edit cases retain serial admission.
+
+[0957](0957-xlsx-managed-compression-allocations.md) records 27 allocator
+children and 270 measured rows. Medium width-two/four drained-core allocated
+bytes rise 0.110%/0.201%, while the setup-plus-drained-core observer peak rises
+2.35%/6.23–7.00%. This peak is not RSS. A separate drain interval captures
+asynchronous worker cleanup; pool handle destruction does not join workers.
+The width-four memory flag and earlier ordinary one-edit p99 flag remain open.
+
 ## 0953 — frame-pointer publication attribution passes
 
 [0953](0953-xlsx-frame-pointer-publication-attribution.md) qualifies a separate

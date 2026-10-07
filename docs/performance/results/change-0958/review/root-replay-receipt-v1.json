@@ -1,0 +1,10 @@
+{
+  "status": "pass",
+  "command": "python3 /home/zhuhe/litchi-performance-0958/tools/attribute_0958_v1.py --manifest /home/zhuhe/litchi-performance-0958/analysis-input-manifest-v1.json --output /home/zhuhe/litchi-performance-0958/review/root-replay-v1.json",
+  "comparison": "All fields exactly equal attribute-v3 except created_utc",
+  "output": {
+    "path": "/home/zhuhe/litchi-performance-0958/review/root-replay-v1.json",
+    "bytes": 102361,
+    "sha256": "ca5c4459752146dc6219ea5a3bdf092daa9db4ebcc94d564317ea925b322f4ed"
+  }
+}

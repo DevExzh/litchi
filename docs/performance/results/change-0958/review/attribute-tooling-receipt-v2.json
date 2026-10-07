@@ -1,0 +1,99 @@
+{
+  "analysis": {
+    "bytes": 102361,
+    "path": "/home/zhuhe/litchi-performance-0958/analysis-v1/attribute-v3.json",
+    "sha256": "9fb5ae3b1b484e2fc8294c66d4712d8f818c1aed60a974fbe51bcd03173cf983",
+    "status": "pass"
+  },
+  "capture": {
+    "children": 6,
+    "first_admission": "sealed by capture owner before offline analysis",
+    "manifest": "/home/zhuhe/litchi-performance-0958/capture-manifest-v1.json",
+    "sha256": "bd30035f2c7926ec579fea58ecd1e5c5fe34da6b2ae129473bee033630e5c465",
+    "workloads_started_by_this_tool": false
+  },
+  "checks": [
+    {
+      "checks": [
+        "owner-pair",
+        "unknown-retained",
+        "exclusive-clone-priority"
+      ],
+      "command": "python3 /home/zhuhe/litchi-performance-0958/tools/attribute_0958_v1.py --self-test",
+      "status": "pass"
+    },
+    {
+      "command": "python3 -m py_compile /home/zhuhe/litchi-performance-0958/tools/attribute_0958_v1.py",
+      "status": "pass"
+    },
+    {
+      "command": "python3 /home/zhuhe/litchi-performance-0958/tools/attribute_0958_v1.py --manifest /home/zhuhe/litchi-performance-0958/review/attribute-controls-v1/manifest.json --output /home/zhuhe/litchi-performance-0958/review/attribute-controls-v1/positive-final.json",
+      "status": "pass"
+    },
+    {
+      "command": "python3 /home/zhuhe/litchi-performance-0958/tools/attribute_0958_v1.py --manifest /home/zhuhe/litchi-performance-0958/review/attribute-controls-v1/manifest-bad.json --output /home/zhuhe/litchi-performance-0958/review/attribute-controls-v1/negative-histogram-final.json",
+      "expected_error": "artifact descriptor SHA mismatch",
+      "status": "fail-closed"
+    }
+  ],
+  "contract": {
+    "bytes": 3779,
+    "path": "/home/zhuhe/litchi-performance-0958/tooling/attribute-contract-v2.json",
+    "sha256": "9818ca39217c7fd363f5abe04e5a2feecde1450bfc8e4596c0e9fc362ef546e5"
+  },
+  "controls": {
+    "negative_histogram": {
+      "manifest": "/home/zhuhe/litchi-performance-0958/review/attribute-controls-v1/manifest-bad.json",
+      "status": "fail-closed",
+      "stderr": "/home/zhuhe/litchi-performance-0958/review/attribute-controls-v1/negative-histogram-final.stderr",
+      "stderr_sha256": "91069642683aac1f608e25fcdd2c97246f72b6dc999eb48eafa248b77d03557f"
+    },
+    "positive": {
+      "manifest": "/home/zhuhe/litchi-performance-0958/review/attribute-controls-v1/manifest.json",
+      "output": "/home/zhuhe/litchi-performance-0958/review/attribute-controls-v1/positive-final.json",
+      "sha256": "d9f11ac1f4d857cf5772f3691d869ed99edefb617cf54d864a2507b3fd9a7fc2",
+      "status": "pass"
+    }
+  },
+  "historical_failures": [
+    {
+      "output": "/home/zhuhe/litchi-performance-0958/analysis-v1/attribute-v1.json",
+      "reason": "initial parser accepted only tab-delimited folded rows; actual heaptrack_print uses whitespace separators",
+      "sha256": "6ee76c5be5cd3dfd409349afeca25a188f8eafab5d86df8eb3573d7955abe5b1",
+      "status": "fail"
+    },
+    {
+      "output": "/home/zhuhe/litchi-performance-0958/analysis-v1/attribute-v2.json",
+      "reason": "used an overbroad generic clone rule; retained for history, excluded from final interpretation",
+      "sha256": "35134d757fd85250cacdffd1fea9f1c5236c611fcff4dc938b25d8bfc5775077",
+      "status": "pass-but-superseded"
+    }
+  ],
+  "inputs": {
+    "capture_manifest": "/home/zhuhe/litchi-performance-0958/capture-manifest-v1.json",
+    "capture_manifest_sha256": "bd30035f2c7926ec579fea58ecd1e5c5fe34da6b2ae129473bee033630e5c465",
+    "decoder": "/home/zhuhe/litchi-performance-0949/tools/decode_heaptrack_0949_v1.py",
+    "decoder_sha256": "c87e7089774f0eac24ffde262b7fe27b1f1ff4586798683bcc44fa68049bc7bf",
+    "exporter": "/home/zhuhe/litchi-performance-0958/tools/export_heaptrack_0958_v1.py",
+    "exporter_sha256": "50914d8f0bb6d35b39ef5222473e529174098cab3b9f0e61cf5144d71be7eb95",
+    "input_manifest": "/home/zhuhe/litchi-performance-0958/analysis-input-manifest-v1.json",
+    "input_manifest_sha256": "0dc7a9a4757d73a05d9fc289581a8ec6add494565f039b94e7addf8d18629495",
+    "plan": "/home/zhuhe/litchi-performance-0958/plan-v5.json",
+    "plan_sha256": "5bd826e1f93913b5be2fc5878be0c5270e323789222fffcf0e97121dcbc37695",
+    "source_trace": "/home/zhuhe/litchi-performance-0958/review/number-ownership-trace-v2.md",
+    "source_trace_sha256": "3de25114247d354cf6b512db9599aac5ce921149a06fb13351dd048382cd75d2"
+  },
+  "schema": "litchi.performance.0958.attribute-tooling-receipt.v2",
+  "scope_notes": [
+    "No workload or capture was launched by offline decoder/export/analyzer.",
+    "Exact stage_timed_commit and timed_iteration rows are admitted where resolved; MultiSourceEdit::commit rows are separately labelled commit-core surrogate rows.",
+    "Requested bytes are conserved against the raw decoder and heaptrack histogram; standard folded output has no byte column, so folded byte conservation is not claimed.",
+    "Source tags/intersections are nonadditive diagnostics; no speed, adoption, or phase-only allocation claim follows from this output."
+  ],
+  "status": "pass",
+  "tool": {
+    "bytes": 34603,
+    "path": "/home/zhuhe/litchi-performance-0958/tools/attribute_0958_v1.py",
+    "sha256": "1bb7584076762eefadc409016abf50684157e9350a76386255c5763e47d7cffd"
+  }
+}

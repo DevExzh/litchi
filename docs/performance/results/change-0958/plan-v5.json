@@ -1,0 +1,318 @@
+{
+  "admission_root": "/home/zhuhe/litchi-performance-0958/admission-v1",
+  "analysis_root": "/home/zhuhe/litchi-performance-0958/analysis-v1",
+  "artifact_contract": {
+    "admission_artifacts": "first-child/terminal.json is the durable heaptrack_print process terminal written before symbol parsing; first-child/result.json is the later symbol admission result.",
+    "child_packet": "start.json is durable before launch; terminal.json is durable after process-group reap/clear and before report/profile parsing; stdout.log, stderr.log, time.txt, workload/report.json, and exactly one profile named heaptrack.data.gz or heaptrack.data.gz.zst are retained.",
+    "profile_accepted": [
+      "heaptrack.data.gz",
+      "heaptrack.data.gz.zst"
+    ],
+    "profile_requested": "heaptrack.data.gz",
+    "raw_external": "all capture and heaptrack files remain outside the repository",
+    "report_oracle": "Every child report is parsed only after its process terminal; report-oracle.json binds exact fixture source/output/semantic hashes and bytes, CPU/context/output/resource/sink fields before the next child.",
+    "terminal_custody": "no naked Popen; new session/process group; deadline 900 seconds; no retries; launch failures retain terminal records"
+  },
+  "binary": {
+    "binary": {
+      "bytes": 43259328,
+      "executable": true,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+      "sha256": "5886b0f86a697bae757994d5a757cffae4a7e8d61a2769ff1c967029cd1912c3"
+    },
+    "build_receipt": {
+      "bytes": 5312,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0957/receipts/allocator-integration-v2.json",
+      "sha256": "aa3e2f58287b8fffec7e73d68c447983058173f30168372a022e611c6d9c5d14"
+    },
+    "instrumentation": "retained uninstrumented benchmark example; no allocation_metrics counting wrapper and no allocator adoption claim",
+    "retention_receipt": {
+      "bytes": 1951,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0957/receipts/executable-retention-v2.json",
+      "sha256": "b4e0957f648cc5a436015b7963610eee5b58c0c85cf1785998939f662b96a76f"
+    },
+    "role": "retained_uninstrumented_benchmark_example",
+    "source_postquality": {
+      "bytes": 1922,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0957/receipts/source-postquality-v2.json",
+      "sha256": "a039a9a723d8d87d919c1d13f808aa61f23b57cef59c43a3a3fa10e0dbb4e157"
+    },
+    "target": "example xlsx_managed_compression_benchmark"
+  },
+  "build_started_by_this_plan": false,
+  "capture_authorization": "root_GO_required",
+  "capture_root": "/home/zhuhe/litchi-performance-0958/capture-v1",
+  "claim_scope": {
+    "adoption_or_acceptance_claim": false,
+    "first_child_symbol_gate": "Feasibility/admission only; a found symbol does not establish complete phase coverage or a publication-only allocation total.",
+    "heaptrack_interval": "heaptrack wrapper from process start through report and teardown; allocation profile is not a publication-only interval",
+    "native_latency_or_rss_claims": false,
+    "one_edit_control": "diagnostic control for clone behavior; cannot retire or waive prior ordinary-tail evidence",
+    "phase_attribution": "do not infer phase allocation from aggregate totals; only symbolized stack ownership or a separately validated phase marker can support descriptive attribution",
+    "whole_process_only": true
+  },
+  "committed_0949_doc": {
+    "bytes": 6634,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/docs/performance/0949-xlsx-multi-window-allocation-attribution.md",
+    "sha256": "78a81c574f9fc87198bc34e84afaaaec9e68ff66a4529643ece6e2544f18968a"
+  },
+  "created_utc": "2026-10-07T13:37:44.098189+00:00",
+  "diagnostic_goal": "Locate whole-process allocation owner stacks for the retained uninstrumented XLSX managed-compression benchmark, with a first-child symbol admission and fixed repeated controls; use the profile to guide a future measured candidate without making an adoption or latency claim.",
+  "environment": {
+    "cwd": "/home/zhuhe/litchi-performance-0957/source-v1",
+    "fixed": {
+      "LANG": "C",
+      "LC_ALL": "C",
+      "PATH": "/usr/bin:/bin",
+      "RUST_BACKTRACE": "0",
+      "TZ": "UTC"
+    },
+    "inheritance": "child and heaptrack_print probes receive exactly fixed environment; no caller environment is inherited"
+  },
+  "first_child_admission": {
+    "after_child_terminal_and_report_oracle": true,
+    "child": "h00-medium-percent-r1",
+    "deadline_seconds": 900,
+    "failure_action": "retain the first child and its admission artifacts, write terminal evidence, and stop without retry or later children",
+    "heaptrack_print": "post-terminal -f profile -m 1 -n 1000 -s 1000 -a -p -T -l --disable-builtin-suppressions --disable-embedded-suppressions -H allocation-size.histogram -F allocation-stacks.folded --flamegraph-cost-type allocations",
+    "meaning": "Admission requires at least one symbolized benchmark/commit/merge frame in heaptrack_print output. It does not claim that all work is represented, and Number/Box<str>::clone may be inlined.",
+    "number_or_box_clone_required": false,
+    "process_terminal_precedes_symbol_parse": true,
+    "process_terminal_then_result": true,
+    "report_oracle_before_admission": true,
+    "report_oracle_before_next_child": true,
+    "required_any_symbol": [
+      "litchi_xlsx::cell::Store::merge_omitted_cells",
+      "litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit",
+      "litchi_perf_baseline::xlsx_managed_compression::run_case",
+      "stage_timed_commit"
+    ]
+  },
+  "fixture_oracle": {
+    "bytes": 11346,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0957/review/fixture-oracles-from-0956-v1.json",
+    "sha256": "f38576c1e6af27cd909c77635bab198fc011eeab8b360d0ed47268be9d01f795"
+  },
+  "matrix": {
+    "children": 6,
+    "cpu": 12,
+    "deadline_seconds": 900,
+    "jobs": [
+      {
+        "cpu": 12,
+        "name": "h00-medium-percent-r1",
+        "samples": 3,
+        "shape": "medium",
+        "warmup": 0,
+        "workers": 1,
+        "workload": "one-percent"
+      },
+      {
+        "cpu": 12,
+        "name": "h01-dense-percent-r1",
+        "samples": 3,
+        "shape": "dense-sparse",
+        "warmup": 0,
+        "workers": 1,
+        "workload": "one-percent"
+      },
+      {
+        "cpu": 12,
+        "name": "h02-medium-one-edit-r1",
+        "samples": 3,
+        "shape": "medium",
+        "warmup": 0,
+        "workers": 1,
+        "workload": "one-edit"
+      },
+      {
+        "cpu": 12,
+        "name": "h03-medium-one-edit-r2",
+        "samples": 3,
+        "shape": "medium",
+        "warmup": 0,
+        "workers": 1,
+        "workload": "one-edit"
+      },
+      {
+        "cpu": 12,
+        "name": "h04-dense-percent-r2",
+        "samples": 3,
+        "shape": "dense-sparse",
+        "warmup": 0,
+        "workers": 1,
+        "workload": "one-percent"
+      },
+      {
+        "cpu": 12,
+        "name": "h05-medium-percent-r2",
+        "samples": 3,
+        "shape": "medium",
+        "warmup": 0,
+        "workers": 1,
+        "workload": "one-percent"
+      }
+    ],
+    "no_retry": true,
+    "order": "medium one-percent, dense-sparse one-percent, medium one-edit, medium one-edit, dense-sparse one-percent, medium one-percent",
+    "samples": 3,
+    "schedule_freeze": "All six children are fixed before capture; no reordering, retry, adaptive sample increase, or omission after observed data.",
+    "serial": true,
+    "warmup": 0,
+    "workers": 1
+  },
+  "measurements_started": false,
+  "oracle_contract": {
+    "fixture_inverse_restored_exact_source": true,
+    "measured_samples": 3,
+    "performance_claim": "none; raw phase timings describe this explicit in-memory harness and do not claim OS thread counts, speedup, allocation behavior, or physical I/O",
+    "preflight_actual_commit_inverse_verified": true,
+    "report_schema": "litchi.xlsx-managed-compression-benchmark.v1",
+    "status": "completed",
+    "warmup_iterations": 0,
+    "workers": 1
+  },
+  "plan_id": "0958",
+  "plan_revision": "v5",
+  "postprocessing": {
+    "commands": [
+      "heaptrack_print -f <profile> -m 1 -n 1000 -s 1000 -a -p -T -l --disable-builtin-suppressions --disable-embedded-suppressions -H <histogram> -F <folded> --flamegraph-cost-type allocations"
+    ],
+    "outputs": "analysis-v1/current-child summaries, top allocation stacks, flamegraph folded stacks, and bounded reducer summary; all external and hash-bound",
+    "raw_input": "selected capture-v1 root and first admission packet only after terminal custody",
+    "status": "capture_then_offline"
+  },
+  "protocol_revision": 1,
+  "report_oracle_contract": {
+    "before_next_child": true,
+    "every_child": true,
+    "exact_case_fields": [
+      "update_count",
+      "source_bytes",
+      "source_sha256",
+      "output_bytes",
+      "output_sha256",
+      "semantic_sha256",
+      "expected_cpu_tasks",
+      "context_limits",
+      "sink_capacity_bytes",
+      "sink_max_write_bytes",
+      "admission_expected_worker_permits",
+      "admission_observed_worker_permits",
+      "admission_cpu_tasks_used"
+    ],
+    "exact_sample_fields": [
+      "sample",
+      "output_bytes",
+      "output_bytes_used",
+      "cpu_tasks_used",
+      "output_sha256",
+      "semantic_sha256",
+      "resources_after_drop",
+      "sink_largest_write",
+      "fixture_inverse_restored_exact_source"
+    ],
+    "fixture": {
+      "bytes": 11346,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0957/review/fixture-oracles-from-0956-v1.json",
+      "sha256": "f38576c1e6af27cd909c77635bab198fc011eeab8b360d0ed47268be9d01f795"
+    }
+  },
+  "revision_note": "Reject any recorded launch/interrupt error even when child returncode is zero; protocol and schedule unchanged.",
+  "runner": {
+    "bytes": 32546,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0958/tooling/capture_0958_v5.py",
+    "sha256": "15c09dffefed8bf6084ec0c54ddf7d19f2f69a3c70f4e2bf41a7442a40000f6c"
+  },
+  "schema": "litchi.performance.0958.heaptrack-allocation-attribution.v3",
+  "scope": {
+    "capture_only": "heaptrack allocation attribution; no build, source edit, benchmark, latency, RSS, or adoption action in preparation",
+    "excluded": "iWork",
+    "format": "XLSX managed compression"
+  },
+  "source": {
+    "base_commit": "02449f394529766d76794332204c27c4022931fc",
+    "integration_freeze": {
+      "bytes": 6186,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0957/receipts/integration-freeze-v2.json",
+      "sha256": "e13c984db9a91cb4360bac1b06827da6c2df28840f5359ae24e4e3e5dd9cb794"
+    },
+    "manifest": {
+      "bytes": 2267268,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0957/source-manifest-v2.json",
+      "sha256": "f5fd1ee75b734bb7efaa1882be0397defea98c76c835be0bdf1f565c573ef617"
+    },
+    "postquality_receipt": {
+      "bytes": 1922,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0957/receipts/source-postquality-v2.json",
+      "sha256": "a039a9a723d8d87d919c1d13f808aa61f23b57cef59c43a3a3fa10e0dbb4e157"
+    },
+    "root": "/home/zhuhe/litchi-performance-0957/source-v1",
+    "root_start": {
+      "bytes": 6539,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0958/root-start.json",
+      "sha256": "e1ed8ec0b1fb0a3068f24e9cd979003bdca57fc1a2b55ff476ece5d4b67afc5c"
+    },
+    "source_role": "0957 retained uninstrumented benchmark source-v1; no source mutation permitted"
+  },
+  "status": "prospective_no_capture",
+  "tool_versions": {
+    "heaptrack": "heaptrack 1.5.0",
+    "heaptrack_print": "heaptrack_print 1.5.0",
+    "taskset": "util-linux 2.41.3",
+    "time": "GNU Time"
+  },
+  "tools": {
+    "heaptrack": {
+      "bytes": 12702,
+      "executable": true,
+      "mode": 493,
+      "path": "/usr/bin/heaptrack",
+      "sha256": "11ef8b89a93d43b63e4dec187f4c7dca2644f10254c5639e55a563fb5465b574"
+    },
+    "heaptrack_print": {
+      "bytes": 346488,
+      "executable": true,
+      "mode": 493,
+      "path": "/usr/bin/heaptrack_print",
+      "sha256": "aaef3e0ba4df8ce202f5418c4289e36504a5154b1a806e177d46384ac93ae01d"
+    },
+    "taskset": {
+      "bytes": 31184,
+      "executable": true,
+      "mode": 493,
+      "path": "/usr/bin/taskset",
+      "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2"
+    },
+    "time": {
+      "bytes": 27232,
+      "executable": true,
+      "mode": 493,
+      "path": "/usr/bin/time",
+      "sha256": "919efdcc04c1dbc7a1479c2f3310d491c95f028e1762a84c47810ac0ec1c0d88"
+    }
+  }
+}

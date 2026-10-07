@@ -1,0 +1,134 @@
+{
+  "schema": "litchi.performance.0958.input-provenance.v1",
+  "status": "pre_capture_input_provenance_only",
+  "scope": "0958 source, build, binary, and prior-batch input references; no active runner or workload binding",
+  "root_start": {
+    "packet_path": "review/root-start-v1.json",
+    "external_path": "/home/zhuhe/litchi-performance-0958/root-start.json",
+    "bytes": 6539,
+    "sha256": "e1ed8ec0b1fb0a3068f24e9cd979003bdca57fc1a2b55ff476ece5d4b67afc5c",
+    "head": "e29699f49af54e435145cb6051668f6929e7e16f",
+    "normative_input_count": 35,
+    "normative_inputs_unchanged": true,
+    "scope": "OLE2/OOXML performance; iWork excluded; no push"
+  },
+  "ownership_trace": {
+    "packet_path": "review/number-ownership-trace-v2.md",
+    "external_path": "/home/zhuhe/litchi-performance-0958/review/number-ownership-trace-v2.md",
+    "bytes": 16803,
+    "sha256": "3de25114247d354cf6b512db9599aac5ce921149a06fb13351dd048382cd75d2",
+    "role": "current read-only numeric ownership trace",
+    "historical_v1_external": {
+      "path": "/home/zhuhe/litchi-performance-0958/review/number-ownership-trace.md",
+      "bytes": 16123,
+      "sha256": "cd16724b96440ff47ccc94f17e23a4df51b9d931b54ec4f6797c7a0bf912ab5c"
+    }
+  },
+  "prior_0957_source_and_build": {
+    "root": "/home/zhuhe/litchi-performance-0957",
+    "source": {
+      "root": "/home/zhuhe/litchi-performance-0957/source-v1",
+      "base_commit": "02449f394529766d76794332204c27c4022931fc",
+      "file_count": 10932,
+      "source_bytes": 273429543,
+      "manifest": {
+        "path": "/home/zhuhe/litchi-performance-0957/source-manifest-v2.json",
+        "bytes": 2267268,
+        "sha256": "f5fd1ee75b734bb7efaa1882be0397defea98c76c835be0bdf1f565c573ef617"
+      },
+      "base_manifest": {
+        "path": "/home/zhuhe/litchi-performance-0957/source-manifest-v1.json",
+        "bytes": 2265692,
+        "sha256": "4876f0048bef76cd65919e239a4c1cd3eafe559b2d363518002588d453e68aec"
+      },
+      "integration_freeze_receipt": {
+        "path": "/home/zhuhe/litchi-performance-0957/receipts/integration-freeze-v2.json",
+        "bytes": 6186,
+        "sha256": "e13c984db9a91cb4360bac1b06827da6c2df28840f5359ae24e4e3e5dd9cb794"
+      },
+      "postquality_receipt": {
+        "path": "/home/zhuhe/litchi-performance-0957/receipts/source-postquality-v2.json",
+        "bytes": 1922,
+        "sha256": "a039a9a723d8d87d919c1d13f808aa61f23b57cef59c43a3a3fa10e0dbb4e157"
+      }
+    },
+    "build_receipt": {
+      "path": "/home/zhuhe/litchi-performance-0957/receipts/allocator-integration-v2.json",
+      "bytes": 5312,
+      "sha256": "aa3e2f58287b8fffec7e73d68c447983058173f30168372a022e611c6d9c5d14",
+      "status": "passed",
+      "no_workload_launched": true,
+      "returncode": 0,
+      "build_argv": [
+        "/home/zhuhe/.cargo/bin/cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--offline",
+        "--manifest-path",
+        "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--bin",
+        "xlsx_managed_compression_alloc",
+        "--example",
+        "xlsx_managed_compression_benchmark",
+        "-j2"
+      ],
+      "environment_unset": [
+        "CARGO_BUILD_RUSTC_WRAPPER",
+        "CARGO_ENCODED_RUSTFLAGS",
+        "RUSTC_WRAPPER",
+        "RUSTFLAGS"
+      ]
+    },
+    "retention_receipt": {
+      "path": "/home/zhuhe/litchi-performance-0957/receipts/executable-retention-v2.json",
+      "bytes": 1951,
+      "sha256": "b4e0957f648cc5a436015b7963610eee5b58c0c85cf1785998939f662b96a76f"
+    },
+    "benchmark_binary": {
+      "path": "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+      "role": "retained uninstrumented benchmark example",
+      "bytes": 43259328,
+      "sha256": "5886b0f86a697bae757994d5a757cffae4a7e8d61a2769ff1c967029cd1912c3"
+    },
+    "allocator_binary_not_used_by_0958_plan": {
+      "path": "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_alloc.v2",
+      "bytes": 43676872,
+      "sha256": "9ba37a6b9796ad0e316e7571ebe117ba7a5f97bcf5d29153c7cb3d74c485e9a5"
+    }
+  },
+  "manifest_regeneration": {
+    "helper": {
+      "repo_path": "docs/performance/results/change-0957/tools/reproduce_source_manifest_0957_v1.py",
+      "external_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0957/tools/reproduce_source_manifest_0957_v1.py",
+      "bytes": 5029,
+      "sha256": "7314f1e3069a62926e964da770240f6c5c15a435deb92d4601e9b1d53e1a2321"
+    },
+    "fresh_destination_guard": "REPLAY_ROOT=/home/zhuhe/litchi-performance-0958-manifest-replay-20261007; test ! -e \"$REPLAY_ROOT\" && mkdir \"$REPLAY_ROOT\"",
+    "command": "cd /home/zhuhe/code/litchi && python3 -B docs/performance/results/change-0957/tools/reproduce_source_manifest_0957_v1.py --source-root /home/zhuhe/litchi-performance-0957/source-v1 --base-manifest /home/zhuhe/litchi-performance-0957/source-manifest-v1.json --output /home/zhuhe/litchi-performance-0958-manifest-replay-20261007/source-manifest-v2-regenerated.json --created-utc 2026-10-07T12:50:31.412232+00:00",
+    "comparison": "cmp /home/zhuhe/litchi-performance-0958-manifest-replay-20261007/source-manifest-v2-regenerated.json /home/zhuhe/litchi-performance-0957/source-manifest-v2.json",
+    "expected_output": {
+      "bytes": 2267268,
+      "sha256": "f5fd1ee75b734bb7efaa1882be0397defea98c76c835be0bdf1f565c573ef617",
+      "file_count": 10932,
+      "source_bytes": 273429543
+    }
+  },
+  "source_reconstruction": {
+    "fresh_root_guard": "REBUILD=/home/zhuhe/litchi-performance-0958-source-rebuild; test ! -e \"$REBUILD\" && mkdir \"$REBUILD\"; do not remove an existing tree",
+    "git_archive_command": "git -C /home/zhuhe/code/litchi archive --format=tar 02449f394529766d76794332204c27c4022931fc -- . ':(exclude)docs/performance/**' ':(exclude)docs/report/**' | tar -xf - -C \"$REBUILD\"",
+    "overlay_command": "for rel in tools/perf-baseline/Cargo.toml tools/perf-baseline/README.md tools/perf-baseline/src/lib.rs tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs tools/perf-baseline/src/xlsx_managed_compression_allocation.rs tools/perf-baseline/src/bin/xlsx_managed_compression_alloc.rs; do mkdir -p \"$REBUILD/$(dirname \"$rel\")\"; cp --preserve=mode,timestamps /home/zhuhe/litchi-performance-0957/source-v1/\"$rel\" \"$REBUILD/$rel\"; done"
+  },
+  "active_0958_excluded": {
+    "reason": "The v2 runner failed prelaunch validation and the v3 runner was still under correction; no active runner, plan, capture, profile, or analysis is bound by this input packet.",
+    "external_v2_runner": "/home/zhuhe/litchi-performance-0958/tooling/capture_0958_v2.py",
+    "external_v3_runner": "/home/zhuhe/litchi-performance-0958/tooling/capture_0958_v3.py"
+  },
+  "limitations": [
+    "No 0958 workload or capture was launched for this packet.",
+    "The prior 0957 source manifest, build output, and benchmark executable remain external and are referenced by descriptor only.",
+    "The 0958 plan and active tooling are not reproduced or authorized here; root owns later runner correction, capture, results, and report."
+  ]
+}

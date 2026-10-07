@@ -1,0 +1,77 @@
+{
+  "capture_status_at_creation": "all six 0958 children and first admission sealed; no analyzer workload or capture is launched by this tool",
+  "commands": {
+    "analysis": "python3 /home/zhuhe/litchi-performance-0958/tools/attribute_0958_v1.py --manifest <sealed-input-manifest.json> --output <new-output.json>",
+    "self_test": "python3 /home/zhuhe/litchi-performance-0958/tools/attribute_0958_v1.py --self-test"
+  },
+  "decoder_contract": {
+    "accounting": "trace rows and trace-size rows must equal decoder allocation_events and requested_bytes_total",
+    "required_integrity": {
+      "a_plus_adjacency_mismatches": 0,
+      "plus_without_metadata": 0,
+      "string_length_errors": [],
+      "unresolved_trace_definitions": 0
+    },
+    "schema": "litchi.performance.0949.heaptrack-raw-decode.v1"
+  },
+  "heaptrack_print_contract": {
+    "folded": "stack calls, with optional third requested_bytes column; calls must equal raw totals and bytes are checked when present",
+    "histogram": "size calls, with optional third requested_bytes column; size buckets and calls must equal decoder size aggregates"
+  },
+  "limitations": {
+    "folded_bytes": "The standard heaptrack_print folded export contains calls but no requested-byte column; calls are conserved and requested bytes are checked independently against raw decoder and histogram.",
+    "stage_scope": "Selected rows are whole-process rows whose stack resolves the timed owner pair; they are not a phase-only allocation measurement.",
+    "tags": "Source tags and intersections overlap and are descriptive; only exclusive_leaf_partition is additive."
+  },
+  "manifest_requirements": {
+    "descriptor_policy": "absolute regular non-symlink files; bytes, mode and SHA-256 are checked before reading; artifact paths are unique",
+    "per_run_descriptors": [
+      "profile",
+      "report",
+      "decoder_summary",
+      "size_aggregates",
+      "trace_size_aggregates",
+      "trace_aggregates",
+      "heaptrack_histogram",
+      "heaptrack_folded"
+    ],
+    "runs": "exact six plan-v2 children in frozen order, with id, shape, workload, repeat, workers=1, warmup=0, samples=3",
+    "status": "sealed"
+  },
+  "owner_selection": {
+    "inlined_stage_surrogate": "MultiSourceEdit::commit is retained as an explicitly labelled commit-core surrogate only when stage_timed_commit is inlined/unresolved; its rows are bucketed separately from exact stage_timed_commit rows",
+    "required_callsites": [
+      "timed_iteration",
+      "stage_timed_commit"
+    ],
+    "scope": "whole-process allocation events selected by resolved timed_iteration and stage_timed_commit; stage resolution is attribution scope only and does not establish phase allocation totals",
+    "unknown_policy": "decoder unknown_any_frame or unknown_leaf_frame keeps the row unqualified"
+  },
+  "revision": "final-v2",
+  "schema": "litchi.performance.0958.heaptrack-attribution-input.v2",
+  "source_tags": {
+    "additive_partition": "exclusive_leaf_partition",
+    "additivity": "tags overlap and are diagnostics only",
+    "clone_rule": "Clone diagnostics use litchi_xlsx cell Number/Stored/Value/Cell clone symbols/source lines; generic allocator Box::clone rows are not promoted to source clone tags",
+    "merge_total": "selected-owner merge-tagged rows, reported separately from exclusive leaves",
+    "required_intersections": [
+      "number_clone",
+      "stored_clone",
+      "merge_clone"
+    ],
+    "tags": [
+      "number",
+      "stored",
+      "clone",
+      "merge",
+      "copy",
+      "realloc"
+    ]
+  },
+  "status": "sealed",
+  "tool": {
+    "bytes": 34603,
+    "path": "/home/zhuhe/litchi-performance-0958/tools/attribute_0958_v1.py",
+    "sha256": "1bb7584076762eefadc409016abf50684157e9350a76386255c5763e47d7cffd"
+  }
+}

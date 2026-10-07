@@ -1,5 +1,43 @@
 # Performance hotspot inventory
 
+## 0958 — omitted numeric clones are confirmed, with bounded impact
+
+[0958](0958-xlsx-edit-commit-allocation-attribution.md) confirms the source
+census of omitted numeric-cell clones: 8.28–8.43% of selected edit/commit
+allocation calls, but only 0.28–0.38% of requested bytes. Numeric ownership is
+a bounded work-elimination candidate; compare shared versus inline storage
+only with actual object layouts and constructor costs, then ordinary native
+and allocator qualification. No storage choice is adopted. Growth and merge
+backing allocations dominate requested bytes and need concrete ownership
+attribution before redesign. Additive leaf mechanisms are not timing rankings.
+
+Exact timed-stage and nested commit-core subsets remain separate in the report;
+their union matches independent phase counters. Historical singleton attribute
+shortcuts remain rejected without new end-to-end evidence (0797/0806). All
+0956/0957 memory and ordinary one-edit tail flags remain open.
+
+
+## 0957 — managed scaling has a memory cost; serial edit allocations remain
+
+[0956](0956-xlsx-managed-compression-native-widths.md) establishes a useful
+publication/total latency reduction for the existing medium managed route at
+widths two and four, alongside unresolved commit-drop and width-four RSS
+regressions. [0957](0957-xlsx-managed-compression-allocations.md) adds the
+width-four observer-peak regression of 6.23–7.00%. Width two is the narrower
+candidate, not an adopted production change. Asynchronous worker cleanup
+prevents attributing the native commit-drop penalty solely to commit ownership.
+
+The serial edit/commit phase makes 110,124 allocation calls for medium
+one-percent, 209,418 for dense-sparse one-percent, and 27,327 for medium
+one-edit. These are phase totals, not a source attribution. Revisit the
+historical XLSX-4 unchanged-cell clone/rebuild opportunity using current
+resolved allocation stacks before choosing a storage change. Number values
+still own `Box<str>` while text already shares `Arc<str>`; eliminating numeric
+clones is a hypothesis whose impact and layout tradeoff remain unmeasured.
+The old sorted-merge pilot stopped for baseline instability in 0557, and the
+broader overlay design has not been qualified. Preserve these distinctions
+rather than treating either as an accepted optimization.
+
 ## 0953 — compression dominates admitted publication samples
 
 [0953](0953-xlsx-frame-pointer-publication-attribution.md) observes longest-match

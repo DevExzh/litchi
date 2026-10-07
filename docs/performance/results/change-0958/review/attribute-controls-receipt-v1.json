@@ -1,0 +1,28 @@
+{
+  "commands": [
+    "python3 attribute_0958_v1.py --self-test",
+    "python3 attribute_0958_v1.py --manifest manifest.json --output positive.json",
+    "python3 attribute_0958_v1.py --manifest manifest-bad.json --output negative-histogram.json"
+  ],
+  "negative_histogram": {
+    "expected_error": "heaptrack histogram totals differ",
+    "manifest": "/home/zhuhe/litchi-performance-0958/review/attribute-controls-v1/manifest-bad.json",
+    "output": "/home/zhuhe/litchi-performance-0958/review/attribute-controls-v1/negative-histogram.json",
+    "sha256": "702a1acf66e5cb5367a08a626bef3672854af0460ae3968b7aa81efa1bb64b51",
+    "status": "fail"
+  },
+  "positive": {
+    "manifest": "/home/zhuhe/litchi-performance-0958/review/attribute-controls-v1/manifest.json",
+    "output": "/home/zhuhe/litchi-performance-0958/review/attribute-controls-v1/positive.json",
+    "sha256": "2791725bf133f78ccec40822f8f0cde87f806a63e1120cde566b870879a2b1fd",
+    "status": "pass"
+  },
+  "schema": "litchi.performance.0958.attribute-controls-receipt.v1",
+  "status": "pass",
+  "tool": {
+    "bytes": 34041,
+    "path": "/home/zhuhe/litchi-performance-0958/tools/attribute_0958_v1.py",
+    "sha256": "4248ffada8f891af670232a6a001b6cb535295ff21534310d61fb0df0d04f2a5"
+  },
+  "workload_started": false
+}

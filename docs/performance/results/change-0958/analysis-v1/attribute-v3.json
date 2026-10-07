@@ -1,0 +1,2472 @@
+{
+  "aggregate": {
+    "owner_admission": "at least one selected row",
+    "raw_whole_process": {
+      "calls": 13032599,
+      "requested_bytes": 3406101409,
+      "trace_count": 6
+    },
+    "selected_timed_owner": {
+      "calls": 2081214,
+      "requested_bytes": 274320408,
+      "trace_count": 6
+    }
+  },
+  "created_utc": "2026-10-07T13:57:02.317474+00:00",
+  "manifest": {
+    "bytes": 16403,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0958/analysis-input-manifest-v1.json",
+    "sha256": "0dc7a9a4757d73a05d9fc289581a8ec6add494565f039b94e7addf8d18629495"
+  },
+  "runs": [
+    {
+      "conservation": {
+        "decoder_size": {
+          "calls": 1858480,
+          "requested_bytes": 549846107,
+          "trace_count": 0
+        },
+        "folded_bytes_comparable": false,
+        "heaptrack_folded": {
+          "calls": 1858480,
+          "requested_bytes": null,
+          "trace_count": 0
+        },
+        "heaptrack_histogram": {
+          "calls": 1858480,
+          "requested_bytes": 549846107,
+          "trace_count": 0
+        },
+        "raw_trace": {
+          "calls": 1858480,
+          "requested_bytes": 549846107,
+          "trace_count": 0
+        },
+        "status": "pass"
+      },
+      "decoder": {
+        "integrity": {
+          "a_plus_adjacency_mismatches": 0,
+          "allocation_events": 1858480,
+          "plus_without_metadata": 0,
+          "requested_bytes_total": 549846107,
+          "unresolved_trace_definitions": 0
+        },
+        "size_aggregates": {
+          "bytes": 5815,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h00-medium-percent-r1/size-aggregates.tsv",
+          "sha256": "2a8ded6963763ffd1669a59b7bc7e8bc600d6b9e7ab72d004a01ba48e6434b2b"
+        },
+        "summary": {
+          "bytes": 2085,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h00-medium-percent-r1/summary.json",
+          "sha256": "c35811c2b413a3a3099eee7bf9eaf9d42055cf32ae1b210125d412351f886ead"
+        },
+        "trace_aggregates": {
+          "bytes": 160480698,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h00-medium-percent-r1/trace-aggregates.jsonl",
+          "sha256": "a09748aa7941f3ed17eea07f4d36310ef4c01aed728326ef6cc1dab1da7767a4"
+        },
+        "trace_size_aggregates": {
+          "bytes": 350697,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h00-medium-percent-r1/trace-size-aggregates.tsv",
+          "sha256": "bc920f4507b1b9983c2f66bcf2ec1620000dad4fd1165d21bc04ee811e2d8486"
+        }
+      },
+      "exclusive_leaf_partition": {
+        "clone": {
+          "calls": 29115,
+          "requested_bytes": 220908,
+          "trace_count": 20
+        },
+        "copy": {
+          "calls": 142794,
+          "requested_bytes": 271449,
+          "trace_count": 200
+        },
+        "merge": {
+          "calls": 12,
+          "requested_bytes": 5087232,
+          "trace_count": 2
+        },
+        "number": {
+          "calls": 27927,
+          "requested_bytes": 179739,
+          "trace_count": 4
+        },
+        "realloc": {
+          "calls": 127683,
+          "requested_bytes": 36972759,
+          "trace_count": 422
+        },
+        "selected_owner_other": {
+          "calls": 2841,
+          "requested_bytes": 8767953,
+          "trace_count": 220
+        }
+      },
+      "heaptrack_print": {
+        "folded": {
+          "bytes": 50012889,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/heaptrack-exports-v1/h00-medium-percent-r1/allocation-stacks.folded",
+          "sha256": "cedc6860e33c872c09c70bb8c636e4a09bd09bf3041b207ff4d2f74f92b49515"
+        },
+        "folded_bytes_present": false,
+        "folded_rows": 16892,
+        "histogram": {
+          "bytes": 3207,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/heaptrack-exports-v1/h00-medium-percent-r1/allocation-size.histogram",
+          "sha256": "26bac1c25a5eb8fc7accc90175689d041802183ed60b49771e38db0a8dbaad95"
+        }
+      },
+      "id": "h00-medium-percent-r1",
+      "nonadditive_source_tags": {
+        "clone": {
+          "calls": 29115,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 220908,
+          "trace_count": 20
+        },
+        "copy": {
+          "calls": 142794,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 271449,
+          "trace_count": 200
+        },
+        "merge": {
+          "calls": 27453,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 5296425,
+          "trace_count": 10
+        },
+        "number": {
+          "calls": 56412,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 363048,
+          "trace_count": 14
+        },
+        "realloc": {
+          "calls": 128034,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 37007568,
+          "trace_count": 430
+        },
+        "stored": {
+          "calls": 27369,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 176169,
+          "trace_count": 2
+        }
+      },
+      "owner_selection": {
+        "reason_trace_counts": {
+          "decoder_unknown_frame": 1,
+          "missing_stage_timed_commit": 15586,
+          "missing_timed_iteration": 15452
+        },
+        "scope": "whole-process rows requiring both resolved timed callsites and no unknown-frame marker",
+        "selected_owner": {
+          "calls": 330372,
+          "requested_bytes": 51500040,
+          "trace_count": 868
+        },
+        "stage_resolution_totals": {
+          "MultiSourceEdit::commit": {
+            "calls": 125736,
+            "requested_bytes": 9375417,
+            "trace_count": 438
+          },
+          "stage_timed_commit": {
+            "calls": 204636,
+            "requested_bytes": 42124623,
+            "trace_count": 430
+          }
+        },
+        "status": "admitted",
+        "unknown_any_frame": {
+          "calls": 1,
+          "requested_bytes": 73728,
+          "trace_count": 1
+        },
+        "unknown_leaf_frame": {
+          "calls": 1,
+          "requested_bytes": 73728,
+          "trace_count": 1
+        },
+        "unqualified": {
+          "calls": 1528108,
+          "requested_bytes": 498346067,
+          "trace_count": 16024
+        }
+      },
+      "profile": {
+        "bytes": 593290,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/capture-v1/children/h00-medium-percent-r1/heaptrack.data.gz.zst",
+        "sha256": "f7469631770c686435c6b330d3a1aef90fe17332040d5d00b4ceb285bb18c338"
+      },
+      "repeat": 1,
+      "report": {
+        "descriptor": {
+          "bytes": 5445,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/capture-v1/children/h00-medium-percent-r1/workload/report.json",
+          "sha256": "4ee431a6c7379fdb3895df6fd92a9ea80e11e008ea2c12d92f1edd42725dd57d"
+        },
+        "identity": {
+          "measured_samples": 3,
+          "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+          "performance_claim": "none; raw phase timings describe this explicit in-memory harness and do not claim OS thread counts, speedup, allocation behavior, or physical I/O",
+          "phase_scope": "ingress_ns is the direct SourceBackedEditor constructor; edit_commit_ns is selector staging, cell sets, and MultiCommit::commit; publication_ns is publish_multi_commit_to_stream plus returned MultiSnapshot drop; commit_drop_ns is MultiCommit drop; total_ns starts at the constructor and ends after commit teardown",
+          "sample_phase_totals": {
+            "commit_drop_ns": 4858801,
+            "edit_commit_ns": 120034298,
+            "ingress_ns": 2149759,
+            "publication_ns": 20221971,
+            "total_ns": 147266819
+          },
+          "schema": "litchi.xlsx-managed-compression-benchmark.v1",
+          "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+          "shape": "medium",
+          "source_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+          "status": "completed",
+          "timing_scope": "with fresh finite managed context prepared outside the clock, the timer begins at SourceBackedEditor construction and covers edit/commit, source-backed publication, returned snapshot drop, and commit/package worker-pool teardown; precomputed source/cache/context setup and bounded sink allocation are outside",
+          "warmup_iterations": 0,
+          "workers": 1,
+          "workload": "one-percent"
+        }
+      },
+      "shape": "medium",
+      "source_callsite_top": [
+        {
+          "calls": 1278,
+          "callsite": "_RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc7realloc|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs|54",
+          "requested_bytes": 24410883,
+          "trace_count": 158
+        },
+        {
+          "calls": 2793,
+          "callsite": "_RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs|14",
+          "requested_bytes": 7313073,
+          "trace_count": 206
+        },
+        {
+          "calls": 98160,
+          "callsite": "alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h3412f40961f23531|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs|527",
+          "requested_bytes": 6251502,
+          "trace_count": 186
+        },
+        {
+          "calls": 543,
+          "callsite": "alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::hb177b32ffd8c5a78|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs|527",
+          "requested_bytes": 6087498,
+          "trace_count": 58
+        },
+        {
+          "calls": 12,
+          "callsite": "litchi_xlsx::cell::Store::merge_omitted_cells::h9412643c4b1fb603|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|915",
+          "requested_bytes": 5087232,
+          "trace_count": 2
+        },
+        {
+          "calls": 18,
+          "callsite": "_RNvNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unix14aligned_malloc|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs|83",
+          "requested_bytes": 855936,
+          "trace_count": 6
+        },
+        {
+          "calls": 18,
+          "callsite": "_RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc12alloc_zeroed|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs|36",
+          "requested_bytes": 589824,
+          "trace_count": 6
+        },
+        {
+          "calls": 140646,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h95115cc81dec1d87|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|448",
+          "requested_bytes": 229917,
+          "trace_count": 64
+        },
+        {
+          "calls": 27648,
+          "callsite": "_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner14grow_amortizedB7_|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs|527",
+          "requested_bytes": 221184,
+          "trace_count": 2
+        },
+        {
+          "calls": 27927,
+          "callsite": "litchi_xlsx::cell::Number::new::h4c4b46fd42225550|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|395",
+          "requested_bytes": 179739,
+          "trace_count": 4
+        },
+        {
+          "calls": 27648,
+          "callsite": "_$LT$litchi_xlsx..cell..Number$u20$as$u20$core..clone..Clone$GT$::clone::h27676f8f11531a72|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|389",
+          "requested_bytes": 177954,
+          "trace_count": 4
+        },
+        {
+          "calls": 72,
+          "callsite": "litchi_xlsx::cell::Store::merge_omitted_cells::h9412643c4b1fb603|src/cell.rs|936",
+          "requested_bytes": 33024,
+          "trace_count": 6
+        },
+        {
+          "calls": 90,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h3d19a7bb153a14ad|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|425",
+          "requested_bytes": 10368,
+          "trace_count": 6
+        },
+        {
+          "calls": 3,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h5905f60c608e9b1f|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|425",
+          "requested_bytes": 9312,
+          "trace_count": 2
+        },
+        {
+          "calls": 12,
+          "callsite": "_RNvNtCslNYArtu3iFV_5alloc5alloc5alloc|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs|95",
+          "requested_bytes": 9120,
+          "trace_count": 2
+        },
+        {
+          "calls": 177,
+          "callsite": "litchi_xlsx::cell_values::snapshot::copy_boxed::h09de8fe09dc59f4a|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs|2632",
+          "requested_bytes": 6600,
+          "trace_count": 40
+        },
+        {
+          "calls": 837,
+          "callsite": "_$LT$litchi_xlsx..cell..Number$u20$as$u20$core..clone..Clone$GT$::clone::h27676f8f11531a72|src/cell.rs|389",
+          "requested_bytes": 5355,
+          "trace_count": 6
+        },
+        {
+          "calls": 558,
+          "callsite": "_$LT$litchi_xlsx..cell..Value$u20$as$u20$core..convert..From$LT$i32$GT$$GT$::from::hce901bfb65432b11|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|327",
+          "requested_bytes": 4575,
+          "trace_count": 4
+        },
+        {
+          "calls": 108,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h5905f60c608e9b1f|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|432",
+          "requested_bytes": 4281,
+          "trace_count": 18
+        },
+        {
+          "calls": 81,
+          "callsite": "quick_xml::events::Event::into_owned::h29193e76a83cd368|src/events/mod.rs|0",
+          "requested_bytes": 3582,
+          "trace_count": 12
+        },
+        {
+          "calls": 174,
+          "callsite": "_RINvXs_NvMNtCslNYArtu3iFV_5alloc5sliceSp9to_vec_inhNtB5_10ConvertVec6to_vecNtNtBa_5alloc6GlobalEBa_|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|448",
+          "requested_bytes": 3135,
+          "trace_count": 32
+        },
+        {
+          "calls": 1215,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::hb537c1197c82da8a|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|448",
+          "requested_bytes": 2400,
+          "trace_count": 16
+        },
+        {
+          "calls": 18,
+          "callsite": "alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h93bbba9602968571|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs|527",
+          "requested_bytes": 1152,
+          "trace_count": 6
+        },
+        {
+          "calls": 3,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h1a9cd32aac048f75|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|425",
+          "requested_bytes": 960,
+          "trace_count": 2
+        },
+        {
+          "calls": 279,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::hf51442510921c2e7|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|448",
+          "requested_bytes": 504,
+          "trace_count": 2
+        }
+      ],
+      "source_tag_intersections": {
+        "merge_clone": {
+          "calls": 27441,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 209193,
+          "trace_count": 8
+        },
+        "number_clone": {
+          "calls": 28485,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 183309,
+          "trace_count": 10
+        },
+        "stored_clone": {
+          "calls": 27369,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 176169,
+          "trace_count": 2
+        }
+      },
+      "source_tag_scope": {
+        "merge_total": "merge-tagged selected-owner rows; separate from exclusive buckets",
+        "number_clone": "intersection of Number and clone tags; nonadditive",
+        "stored_clone": "intersection of Stored and clone tags; nonadditive",
+        "unknown_unqualified": "never source-tagged"
+      },
+      "status": "pass",
+      "workload": "one-percent"
+    },
+    {
+      "conservation": {
+        "decoder_size": {
+          "calls": 3475099,
+          "requested_bytes": 704324249,
+          "trace_count": 0
+        },
+        "folded_bytes_comparable": false,
+        "heaptrack_folded": {
+          "calls": 3475099,
+          "requested_bytes": null,
+          "trace_count": 0
+        },
+        "heaptrack_histogram": {
+          "calls": 3475099,
+          "requested_bytes": 704324249,
+          "trace_count": 0
+        },
+        "raw_trace": {
+          "calls": 3475099,
+          "requested_bytes": 704324249,
+          "trace_count": 0
+        },
+        "status": "pass"
+      },
+      "decoder": {
+        "integrity": {
+          "a_plus_adjacency_mismatches": 0,
+          "allocation_events": 3475099,
+          "plus_without_metadata": 0,
+          "requested_bytes_total": 704324249,
+          "unresolved_trace_definitions": 0
+        },
+        "size_aggregates": {
+          "bytes": 7421,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h01-dense-percent-r1/size-aggregates.tsv",
+          "sha256": "1bd464fe8d4220290754ff03cc253916450a1f292b0723d355d38bc83093c678"
+        },
+        "summary": {
+          "bytes": 2080,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h01-dense-percent-r1/summary.json",
+          "sha256": "0f0eec905c128b30194735c5cb95363bc8d13b2a9b00e14ac7018f1a46e33790"
+        },
+        "trace_aggregates": {
+          "bytes": 160968104,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h01-dense-percent-r1/trace-aggregates.jsonl",
+          "sha256": "5e879aa5354f3b7b08fa8eed369a485c1d4dc52e6284c23c44ef6f0dd86e0b50"
+        },
+        "trace_size_aggregates": {
+          "bytes": 369550,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h01-dense-percent-r1/trace-size-aggregates.tsv",
+          "sha256": "6b68dfec6b325c1264f673585c5b67c2d96bbe4aa7ca597886c6a808f088ad0d"
+        }
+      },
+      "exclusive_leaf_partition": {
+        "clone": {
+          "calls": 56103,
+          "requested_bytes": 326517,
+          "trace_count": 18
+        },
+        "copy": {
+          "calls": 273798,
+          "requested_bytes": 501672,
+          "trace_count": 200
+        },
+        "merge": {
+          "calls": 12,
+          "requested_bytes": 9821184,
+          "trace_count": 2
+        },
+        "number": {
+          "calls": 53910,
+          "requested_bytes": 284334,
+          "trace_count": 4
+        },
+        "realloc": {
+          "calls": 239799,
+          "requested_bytes": 49966872,
+          "trace_count": 420
+        },
+        "selected_owner_other": {
+          "calls": 4632,
+          "requested_bytes": 12911640,
+          "trace_count": 226
+        }
+      },
+      "heaptrack_print": {
+        "folded": {
+          "bytes": 50171502,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/heaptrack-exports-v1/h01-dense-percent-r1/allocation-stacks.folded",
+          "sha256": "9bd2ab004e1130cd27df29ccdac4246a96f2e011cce022a250949e2a698b3ea0"
+        },
+        "folded_bytes_present": false,
+        "folded_rows": 16939,
+        "histogram": {
+          "bytes": 4100,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/heaptrack-exports-v1/h01-dense-percent-r1/allocation-size.histogram",
+          "sha256": "6653673609989a7bc9068d85c4bedf8bde6092dbe5714c4105ff31b78d322ddb"
+        }
+      },
+      "id": "h01-dense-percent-r1",
+      "nonadditive_source_tags": {
+        "clone": {
+          "calls": 56103,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 326517,
+          "trace_count": 18
+        },
+        "copy": {
+          "calls": 273798,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 501672,
+          "trace_count": 200
+        },
+        "merge": {
+          "calls": 52911,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 10128321,
+          "trace_count": 8
+        },
+        "number": {
+          "calls": 108888,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 574287,
+          "trace_count": 14
+        },
+        "realloc": {
+          "calls": 240390,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 49998096,
+          "trace_count": 426
+        },
+        "stored": {
+          "calls": 52842,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 278721,
+          "trace_count": 2
+        }
+      },
+      "owner_selection": {
+        "reason_trace_counts": {
+          "decoder_unknown_frame": 1,
+          "missing_stage_timed_commit": 15621,
+          "missing_timed_iteration": 15487
+        },
+        "scope": "whole-process rows requiring both resolved timed callsites and no unknown-frame marker",
+        "selected_owner": {
+          "calls": 628254,
+          "requested_bytes": 73812219,
+          "trace_count": 870
+        },
+        "stage_resolution_totals": {
+          "MultiSourceEdit::commit": {
+            "calls": 237912,
+            "requested_bytes": 17503743,
+            "trace_count": 448
+          },
+          "stage_timed_commit": {
+            "calls": 390342,
+            "requested_bytes": 56308476,
+            "trace_count": 422
+          }
+        },
+        "status": "admitted",
+        "unknown_any_frame": {
+          "calls": 1,
+          "requested_bytes": 73728,
+          "trace_count": 1
+        },
+        "unknown_leaf_frame": {
+          "calls": 1,
+          "requested_bytes": 73728,
+          "trace_count": 1
+        },
+        "unqualified": {
+          "calls": 2846845,
+          "requested_bytes": 630512030,
+          "trace_count": 16069
+        }
+      },
+      "profile": {
+        "bytes": 635066,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/capture-v1/children/h01-dense-percent-r1/heaptrack.data.gz.zst",
+        "sha256": "28934e5382945aaef5852ad416c9bce1824f9a397c4db28e7935f1827afaea63"
+      },
+      "repeat": 1,
+      "report": {
+        "descriptor": {
+          "bytes": 5467,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/capture-v1/children/h01-dense-percent-r1/workload/report.json",
+          "sha256": "464bd8ec111f69ec1bd7ead70f99691ed5790082d4a2ded03de5a4f374b43324"
+        },
+        "identity": {
+          "measured_samples": 3,
+          "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+          "performance_claim": "none; raw phase timings describe this explicit in-memory harness and do not claim OS thread counts, speedup, allocation behavior, or physical I/O",
+          "phase_scope": "ingress_ns is the direct SourceBackedEditor constructor; edit_commit_ns is selector staging, cell sets, and MultiCommit::commit; publication_ns is publish_multi_commit_to_stream plus returned MultiSnapshot drop; commit_drop_ns is MultiCommit drop; total_ns starts at the constructor and ends after commit teardown",
+          "sample_phase_totals": {
+            "commit_drop_ns": 9389917,
+            "edit_commit_ns": 225497605,
+            "ingress_ns": 2183449,
+            "publication_ns": 40233633,
+            "total_ns": 277306154
+          },
+          "schema": "litchi.xlsx-managed-compression-benchmark.v1",
+          "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+          "shape": "dense-sparse",
+          "source_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+          "status": "completed",
+          "timing_scope": "with fresh finite managed context prepared outside the clock, the timer begins at SourceBackedEditor construction and covers edit/commit, source-backed publication, returned snapshot drop, and commit/package worker-pool teardown; precomputed source/cache/context setup and bounded sink allocation are outside",
+          "warmup_iterations": 0,
+          "workers": 1,
+          "workload": "one-percent"
+        }
+      },
+      "shape": "dense-sparse",
+      "source_callsite_top": [
+        {
+          "calls": 1401,
+          "callsite": "_RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc7realloc|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs|54",
+          "requested_bytes": 26130027,
+          "trace_count": 156
+        },
+        {
+          "calls": 184173,
+          "callsite": "alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h3412f40961f23531|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs|527",
+          "requested_bytes": 11733894,
+          "trace_count": 186
+        },
+        {
+          "calls": 795,
+          "callsite": "alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::hb177b32ffd8c5a78|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs|527",
+          "requested_bytes": 11674251,
+          "trace_count": 58
+        },
+        {
+          "calls": 4587,
+          "callsite": "_RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs|14",
+          "requested_bytes": 11448744,
+          "trace_count": 212
+        },
+        {
+          "calls": 12,
+          "callsite": "litchi_xlsx::cell::Store::merge_omitted_cells::h9412643c4b1fb603|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|915",
+          "requested_bytes": 9821184,
+          "trace_count": 2
+        },
+        {
+          "calls": 18,
+          "callsite": "_RNvNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unix14aligned_malloc|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs|83",
+          "requested_bytes": 855936,
+          "trace_count": 6
+        },
+        {
+          "calls": 18,
+          "callsite": "_RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc12alloc_zeroed|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs|36",
+          "requested_bytes": 589824,
+          "trace_count": 6
+        },
+        {
+          "calls": 270723,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h95115cc81dec1d87|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|448",
+          "requested_bytes": 457641,
+          "trace_count": 64
+        },
+        {
+          "calls": 53376,
+          "callsite": "_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner14grow_amortizedB7_|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs|527",
+          "requested_bytes": 427008,
+          "trace_count": 2
+        },
+        {
+          "calls": 53910,
+          "callsite": "litchi_xlsx::cell::Number::new::h4c4b46fd42225550|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|395",
+          "requested_bytes": 284334,
+          "trace_count": 4
+        },
+        {
+          "calls": 53376,
+          "callsite": "_$LT$litchi_xlsx..cell..Number$u20$as$u20$core..clone..Clone$GT$::clone::h27676f8f11531a72|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|389",
+          "requested_bytes": 281529,
+          "trace_count": 4
+        },
+        {
+          "calls": 57,
+          "callsite": "litchi_xlsx::cell::Store::merge_omitted_cells::h9412643c4b1fb603|src/cell.rs|936",
+          "requested_bytes": 28416,
+          "trace_count": 4
+        },
+        {
+          "calls": 9,
+          "callsite": "_RNvNtCslNYArtu3iFV_5alloc5alloc5alloc|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs|95",
+          "requested_bytes": 17136,
+          "trace_count": 2
+        },
+        {
+          "calls": 90,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h3d19a7bb153a14ad|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|425",
+          "requested_bytes": 10368,
+          "trace_count": 6
+        },
+        {
+          "calls": 3,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h5905f60c608e9b1f|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|425",
+          "requested_bytes": 9312,
+          "trace_count": 2
+        },
+        {
+          "calls": 1602,
+          "callsite": "_$LT$litchi_xlsx..cell..Number$u20$as$u20$core..clone..Clone$GT$::clone::h27676f8f11531a72|src/cell.rs|389",
+          "requested_bytes": 8424,
+          "trace_count": 6
+        },
+        {
+          "calls": 1068,
+          "callsite": "_$LT$litchi_xlsx..cell..Value$u20$as$u20$core..convert..From$LT$i32$GT$$GT$::from::hce901bfb65432b11|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|327",
+          "requested_bytes": 8148,
+          "trace_count": 4
+        },
+        {
+          "calls": 177,
+          "callsite": "litchi_xlsx::cell_values::snapshot::copy_boxed::h09de8fe09dc59f4a|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs|2632",
+          "requested_bytes": 6600,
+          "trace_count": 40
+        },
+        {
+          "calls": 108,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h5905f60c608e9b1f|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|432",
+          "requested_bytes": 4281,
+          "trace_count": 18
+        },
+        {
+          "calls": 1887,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::hb537c1197c82da8a|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|448",
+          "requested_bytes": 4254,
+          "trace_count": 16
+        },
+        {
+          "calls": 81,
+          "callsite": "quick_xml::events::Event::into_owned::h29193e76a83cd368|src/events/mod.rs|0",
+          "requested_bytes": 3582,
+          "trace_count": 12
+        },
+        {
+          "calls": 174,
+          "callsite": "_RINvXs_NvMNtCslNYArtu3iFV_5alloc5sliceSp9to_vec_inhNtB5_10ConvertVec6to_vecNtNtBa_5alloc6GlobalEBa_|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|448",
+          "requested_bytes": 3135,
+          "trace_count": 32
+        },
+        {
+          "calls": 18,
+          "callsite": "alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h93bbba9602968571|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs|527",
+          "requested_bytes": 1152,
+          "trace_count": 6
+        },
+        {
+          "calls": 534,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::hf51442510921c2e7|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|448",
+          "requested_bytes": 1149,
+          "trace_count": 2
+        },
+        {
+          "calls": 3,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h1a9cd32aac048f75|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|425",
+          "requested_bytes": 960,
+          "trace_count": 2
+        }
+      ],
+      "source_tag_intersections": {
+        "merge_clone": {
+          "calls": 52899,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 307137,
+          "trace_count": 6
+        },
+        "number_clone": {
+          "calls": 54978,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 289953,
+          "trace_count": 10
+        },
+        "stored_clone": {
+          "calls": 52842,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 278721,
+          "trace_count": 2
+        }
+      },
+      "source_tag_scope": {
+        "merge_total": "merge-tagged selected-owner rows; separate from exclusive buckets",
+        "number_clone": "intersection of Number and clone tags; nonadditive",
+        "stored_clone": "intersection of Stored and clone tags; nonadditive",
+        "unknown_unqualified": "never source-tagged"
+      },
+      "status": "pass",
+      "workload": "one-percent"
+    },
+    {
+      "conservation": {
+        "decoder_size": {
+          "calls": 1182718,
+          "requested_bytes": 448880297,
+          "trace_count": 0
+        },
+        "folded_bytes_comparable": false,
+        "heaptrack_folded": {
+          "calls": 1182718,
+          "requested_bytes": null,
+          "trace_count": 0
+        },
+        "heaptrack_histogram": {
+          "calls": 1182718,
+          "requested_bytes": 448880297,
+          "trace_count": 0
+        },
+        "raw_trace": {
+          "calls": 1182718,
+          "requested_bytes": 448880297,
+          "trace_count": 0
+        },
+        "status": "pass"
+      },
+      "decoder": {
+        "integrity": {
+          "a_plus_adjacency_mismatches": 0,
+          "allocation_events": 1182718,
+          "plus_without_metadata": 0,
+          "requested_bytes_total": 448880297,
+          "unresolved_trace_definitions": 0
+        },
+        "size_aggregates": {
+          "bytes": 4116,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h02-medium-one-edit-r1/size-aggregates.tsv",
+          "sha256": "cc719738df54b26105e7abfc8e1c6aa975c50ea8cd67520fb3b8c236f32e5e00"
+        },
+        "summary": {
+          "bytes": 2088,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h02-medium-one-edit-r1/summary.json",
+          "sha256": "302f587c4faa87508591c3eddb8c34b17379e50ca1525f8b2bebc7beacf1a27d"
+        },
+        "trace_aggregates": {
+          "bytes": 159780171,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h02-medium-one-edit-r1/trace-aggregates.jsonl",
+          "sha256": "71d8272cddc1ac197cd149887896e83bf5ff90f86b359ad4283a375709942187"
+        },
+        "trace_size_aggregates": {
+          "bytes": 336681,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h02-medium-one-edit-r1/trace-size-aggregates.tsv",
+          "sha256": "69cc90d1314a798591850beec04fa4c9bb730227eb9f80984763ff00797acefd"
+        }
+      },
+      "exclusive_leaf_partition": {
+        "clone": {
+          "calls": 6945,
+          "requested_bytes": 41100,
+          "trace_count": 20
+        },
+        "copy": {
+          "calls": 35940,
+          "requested_bytes": 97491,
+          "trace_count": 200
+        },
+        "merge": {
+          "calls": 3,
+          "requested_bytes": 1271808,
+          "trace_count": 2
+        },
+        "number": {
+          "calls": 6915,
+          "requested_bytes": 32805,
+          "trace_count": 4
+        },
+        "realloc": {
+          "calls": 31851,
+          "requested_bytes": 9185382,
+          "trace_count": 412
+        },
+        "selected_owner_other": {
+          "calls": 327,
+          "requested_bytes": 1219359,
+          "trace_count": 204
+        }
+      },
+      "heaptrack_print": {
+        "folded": {
+          "bytes": 49781405,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/heaptrack-exports-v1/h02-medium-one-edit-r1/allocation-stacks.folded",
+          "sha256": "bba227c32c1eae570900ec64a2c3163daed1749cb524fdcbb4797d645c2ef648"
+        },
+        "folded_bytes_present": false,
+        "folded_rows": 16812,
+        "histogram": {
+          "bytes": 2269,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/heaptrack-exports-v1/h02-medium-one-edit-r1/allocation-size.histogram",
+          "sha256": "03c2968489fd6603f0990a73543df14c2e3861071afaf64b6db0e268afc29af7"
+        }
+      },
+      "id": "h02-medium-one-edit-r1",
+      "nonadditive_source_tags": {
+        "clone": {
+          "calls": 6945,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 41100,
+          "trace_count": 20
+        },
+        "copy": {
+          "calls": 35940,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 97491,
+          "trace_count": 200
+        },
+        "merge": {
+          "calls": 6930,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 1312863,
+          "trace_count": 10
+        },
+        "number": {
+          "calls": 13836,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 65616,
+          "trace_count": 14
+        },
+        "realloc": {
+          "calls": 31872,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 9193641,
+          "trace_count": 420
+        },
+        "stored": {
+          "calls": 6909,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 32799,
+          "trace_count": 2
+        }
+      },
+      "owner_selection": {
+        "reason_trace_counts": {
+          "decoder_unknown_frame": 1,
+          "missing_stage_timed_commit": 15554,
+          "missing_timed_iteration": 15408
+        },
+        "scope": "whole-process rows requiring both resolved timed callsites and no unknown-frame marker",
+        "selected_owner": {
+          "calls": 81981,
+          "requested_bytes": 11847945,
+          "trace_count": 842
+        },
+        "stage_resolution_totals": {
+          "MultiSourceEdit::commit": {
+            "calls": 30525,
+            "requested_bytes": 2173233,
+            "trace_count": 416
+          },
+          "stage_timed_commit": {
+            "calls": 51456,
+            "requested_bytes": 9674712,
+            "trace_count": 426
+          }
+        },
+        "status": "admitted",
+        "unknown_any_frame": {
+          "calls": 1,
+          "requested_bytes": 73728,
+          "trace_count": 1
+        },
+        "unknown_leaf_frame": {
+          "calls": 1,
+          "requested_bytes": 73728,
+          "trace_count": 1
+        },
+        "unqualified": {
+          "calls": 1100737,
+          "requested_bytes": 437032352,
+          "trace_count": 15970
+        }
+      },
+      "profile": {
+        "bytes": 558297,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/capture-v1/children/h02-medium-one-edit-r1/heaptrack.data.gz.zst",
+        "sha256": "2b859567650ac640949660fc72cbb1d28c20440ad998246ca852226836fa34fa"
+      },
+      "repeat": 1,
+      "report": {
+        "descriptor": {
+          "bytes": 5430,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/capture-v1/children/h02-medium-one-edit-r1/workload/report.json",
+          "sha256": "3511dfd67512e88c94b8a1eb6707ca168460a0ab5ef56bd376416f0328e88a84"
+        },
+        "identity": {
+          "measured_samples": 3,
+          "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+          "performance_claim": "none; raw phase timings describe this explicit in-memory harness and do not claim OS thread counts, speedup, allocation behavior, or physical I/O",
+          "phase_scope": "ingress_ns is the direct SourceBackedEditor constructor; edit_commit_ns is selector staging, cell sets, and MultiCommit::commit; publication_ns is publish_multi_commit_to_stream plus returned MultiSnapshot drop; commit_drop_ns is MultiCommit drop; total_ns starts at the constructor and ends after commit teardown",
+          "sample_phase_totals": {
+            "commit_drop_ns": 1015095,
+            "edit_commit_ns": 30877725,
+            "ingress_ns": 1592236,
+            "publication_ns": 7844461,
+            "total_ns": 41331237
+          },
+          "schema": "litchi.xlsx-managed-compression-benchmark.v1",
+          "semantic_sha256": "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+          "shape": "medium",
+          "source_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+          "status": "completed",
+          "timing_scope": "with fresh finite managed context prepared outside the clock, the timer begins at SourceBackedEditor construction and covers edit/commit, source-backed publication, returned snapshot drop, and commit/package worker-pool teardown; precomputed source/cache/context setup and bounded sink allocation are outside",
+          "warmup_iterations": 0,
+          "workers": 1,
+          "workload": "one-edit"
+        }
+      },
+      "shape": "medium",
+      "source_callsite_top": [
+        {
+          "calls": 324,
+          "callsite": "_RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc7realloc|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs|54",
+          "requested_bytes": 6073038,
+          "trace_count": 150
+        },
+        {
+          "calls": 24468,
+          "callsite": "alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h3412f40961f23531|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs|527",
+          "requested_bytes": 1563066,
+          "trace_count": 186
+        },
+        {
+          "calls": 93,
+          "callsite": "alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::hb177b32ffd8c5a78|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs|527",
+          "requested_bytes": 1492290,
+          "trace_count": 56
+        },
+        {
+          "calls": 3,
+          "callsite": "litchi_xlsx::cell::Store::merge_omitted_cells::h9412643c4b1fb603|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|915",
+          "requested_bytes": 1271808,
+          "trace_count": 2
+        },
+        {
+          "calls": 309,
+          "callsite": "_RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs|14",
+          "requested_bytes": 496479,
+          "trace_count": 192
+        },
+        {
+          "calls": 9,
+          "callsite": "_RNvNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unix14aligned_malloc|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs|83",
+          "requested_bytes": 427968,
+          "trace_count": 6
+        },
+        {
+          "calls": 9,
+          "callsite": "_RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc12alloc_zeroed|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs|36",
+          "requested_bytes": 294912,
+          "trace_count": 6
+        },
+        {
+          "calls": 35130,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h95115cc81dec1d87|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|448",
+          "requested_bytes": 71211,
+          "trace_count": 64
+        },
+        {
+          "calls": 6912,
+          "callsite": "_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner14grow_amortizedB7_|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs|527",
+          "requested_bytes": 55296,
+          "trace_count": 2
+        },
+        {
+          "calls": 6915,
+          "callsite": "litchi_xlsx::cell::Number::new::h4c4b46fd42225550|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|395",
+          "requested_bytes": 32805,
+          "trace_count": 4
+        },
+        {
+          "calls": 6912,
+          "callsite": "_$LT$litchi_xlsx..cell..Number$u20$as$u20$core..clone..Clone$GT$::clone::h27676f8f11531a72|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|389",
+          "requested_bytes": 32802,
+          "trace_count": 4
+        },
+        {
+          "calls": 90,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h3d19a7bb153a14ad|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|425",
+          "requested_bytes": 10368,
+          "trace_count": 6
+        },
+        {
+          "calls": 18,
+          "callsite": "litchi_xlsx::cell::Store::merge_omitted_cells::h9412643c4b1fb603|src/cell.rs|936",
+          "requested_bytes": 8256,
+          "trace_count": 6
+        },
+        {
+          "calls": 150,
+          "callsite": "litchi_xlsx::cell_values::snapshot::copy_boxed::h09de8fe09dc59f4a|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs|2632",
+          "requested_bytes": 5214,
+          "trace_count": 40
+        },
+        {
+          "calls": 81,
+          "callsite": "quick_xml::events::Event::into_owned::h29193e76a83cd368|src/events/mod.rs|0",
+          "requested_bytes": 3582,
+          "trace_count": 12
+        },
+        {
+          "calls": 3,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h5905f60c608e9b1f|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|425",
+          "requested_bytes": 2328,
+          "trace_count": 2
+        },
+        {
+          "calls": 102,
+          "callsite": "_RINvXs_NvMNtCslNYArtu3iFV_5alloc5sliceSp9to_vec_inhNtB5_10ConvertVec6to_vecNtNtBa_5alloc6GlobalEBa_|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|448",
+          "requested_bytes": 1659,
+          "trace_count": 32
+        },
+        {
+          "calls": 18,
+          "callsite": "alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h93bbba9602968571|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs|527",
+          "requested_bytes": 1152,
+          "trace_count": 6
+        },
+        {
+          "calls": 27,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h5905f60c608e9b1f|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|432",
+          "requested_bytes": 1068,
+          "trace_count": 18
+        },
+        {
+          "calls": 3,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h1a9cd32aac048f75|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|425",
+          "requested_bytes": 960,
+          "trace_count": 2
+        },
+        {
+          "calls": 333,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::hb537c1197c82da8a|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|448",
+          "requested_bytes": 708,
+          "trace_count": 16
+        },
+        {
+          "calls": 18,
+          "callsite": "_RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc7realloc|library/std/src/sys/alloc/unix.rs|54",
+          "requested_bytes": 396,
+          "trace_count": 6
+        },
+        {
+          "calls": 18,
+          "callsite": "alloc::str::join_generic_copy::hced8d7af36386685|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/str.rs|157",
+          "requested_bytes": 390,
+          "trace_count": 6
+        },
+        {
+          "calls": 18,
+          "callsite": "_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner14grow_amortizedB7_|library/alloc/src/raw_vec/mod.rs|527",
+          "requested_bytes": 144,
+          "trace_count": 6
+        },
+        {
+          "calls": 6,
+          "callsite": "_$LT$litchi_xlsx..cell..Value$u20$as$u20$core..convert..From$LT$i32$GT$$GT$::from::hce901bfb65432b11|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|327",
+          "requested_bytes": 33,
+          "trace_count": 4
+        }
+      ],
+      "source_tag_intersections": {
+        "merge_clone": {
+          "calls": 6927,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 41055,
+          "trace_count": 8
+        },
+        "number_clone": {
+          "calls": 6921,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 32811,
+          "trace_count": 10
+        },
+        "stored_clone": {
+          "calls": 6909,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 32799,
+          "trace_count": 2
+        }
+      },
+      "source_tag_scope": {
+        "merge_total": "merge-tagged selected-owner rows; separate from exclusive buckets",
+        "number_clone": "intersection of Number and clone tags; nonadditive",
+        "stored_clone": "intersection of Stored and clone tags; nonadditive",
+        "unknown_unqualified": "never source-tagged"
+      },
+      "status": "pass",
+      "workload": "one-edit"
+    },
+    {
+      "conservation": {
+        "decoder_size": {
+          "calls": 1182722,
+          "requested_bytes": 448880388,
+          "trace_count": 0
+        },
+        "folded_bytes_comparable": false,
+        "heaptrack_folded": {
+          "calls": 1182722,
+          "requested_bytes": null,
+          "trace_count": 0
+        },
+        "heaptrack_histogram": {
+          "calls": 1182722,
+          "requested_bytes": 448880388,
+          "trace_count": 0
+        },
+        "raw_trace": {
+          "calls": 1182722,
+          "requested_bytes": 448880388,
+          "trace_count": 0
+        },
+        "status": "pass"
+      },
+      "decoder": {
+        "integrity": {
+          "a_plus_adjacency_mismatches": 0,
+          "allocation_events": 1182722,
+          "plus_without_metadata": 0,
+          "requested_bytes_total": 448880388,
+          "unresolved_trace_definitions": 0
+        },
+        "size_aggregates": {
+          "bytes": 4116,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h03-medium-one-edit-r2/size-aggregates.tsv",
+          "sha256": "22c1a5037763d1e55551b66e8e245b64f9ad682a9923a34a8253c12ed4dcac82"
+        },
+        "summary": {
+          "bytes": 2088,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h03-medium-one-edit-r2/summary.json",
+          "sha256": "814075d1a278c1155efec75e6765135fdcc8600b20c1711530f27e714c62e4df"
+        },
+        "trace_aggregates": {
+          "bytes": 159780172,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h03-medium-one-edit-r2/trace-aggregates.jsonl",
+          "sha256": "608b32d607bca65dce01de68f879e8bcfd122c438e781168ee2acfc5dc0255eb"
+        },
+        "trace_size_aggregates": {
+          "bytes": 336824,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h03-medium-one-edit-r2/trace-size-aggregates.tsv",
+          "sha256": "f4b7b43b2fe2f88ca25e2a1b9718e53cde98c944780dee6da19d54dd6372b204"
+        }
+      },
+      "exclusive_leaf_partition": {
+        "clone": {
+          "calls": 6945,
+          "requested_bytes": 41100,
+          "trace_count": 20
+        },
+        "copy": {
+          "calls": 35940,
+          "requested_bytes": 97491,
+          "trace_count": 200
+        },
+        "merge": {
+          "calls": 3,
+          "requested_bytes": 1271808,
+          "trace_count": 2
+        },
+        "number": {
+          "calls": 6915,
+          "requested_bytes": 32805,
+          "trace_count": 4
+        },
+        "realloc": {
+          "calls": 31851,
+          "requested_bytes": 9185382,
+          "trace_count": 412
+        },
+        "selected_owner_other": {
+          "calls": 327,
+          "requested_bytes": 1219359,
+          "trace_count": 204
+        }
+      },
+      "heaptrack_print": {
+        "folded": {
+          "bytes": 49781405,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/heaptrack-exports-v1/h03-medium-one-edit-r2/allocation-stacks.folded",
+          "sha256": "f0ff6a7bd260bd3d36df803c5f24f7a41b3399aa9f4fa7c9a9f101110cf0a806"
+        },
+        "folded_bytes_present": false,
+        "folded_rows": 16812,
+        "histogram": {
+          "bytes": 2269,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/heaptrack-exports-v1/h03-medium-one-edit-r2/allocation-size.histogram",
+          "sha256": "ef93eb5b3e0ca018ae7ab375d2229e2b37481d2c9761d57637a78bcd46ccc2e5"
+        }
+      },
+      "id": "h03-medium-one-edit-r2",
+      "nonadditive_source_tags": {
+        "clone": {
+          "calls": 6945,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 41100,
+          "trace_count": 20
+        },
+        "copy": {
+          "calls": 35940,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 97491,
+          "trace_count": 200
+        },
+        "merge": {
+          "calls": 6930,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 1312863,
+          "trace_count": 10
+        },
+        "number": {
+          "calls": 13836,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 65616,
+          "trace_count": 14
+        },
+        "realloc": {
+          "calls": 31872,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 9193641,
+          "trace_count": 420
+        },
+        "stored": {
+          "calls": 6909,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 32799,
+          "trace_count": 2
+        }
+      },
+      "owner_selection": {
+        "reason_trace_counts": {
+          "decoder_unknown_frame": 1,
+          "missing_stage_timed_commit": 15554,
+          "missing_timed_iteration": 15408
+        },
+        "scope": "whole-process rows requiring both resolved timed callsites and no unknown-frame marker",
+        "selected_owner": {
+          "calls": 81981,
+          "requested_bytes": 11847945,
+          "trace_count": 842
+        },
+        "stage_resolution_totals": {
+          "MultiSourceEdit::commit": {
+            "calls": 30525,
+            "requested_bytes": 2173233,
+            "trace_count": 416
+          },
+          "stage_timed_commit": {
+            "calls": 51456,
+            "requested_bytes": 9674712,
+            "trace_count": 426
+          }
+        },
+        "status": "admitted",
+        "unknown_any_frame": {
+          "calls": 1,
+          "requested_bytes": 73728,
+          "trace_count": 1
+        },
+        "unknown_leaf_frame": {
+          "calls": 1,
+          "requested_bytes": 73728,
+          "trace_count": 1
+        },
+        "unqualified": {
+          "calls": 1100741,
+          "requested_bytes": 437032443,
+          "trace_count": 15970
+        }
+      },
+      "profile": {
+        "bytes": 556244,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/capture-v1/children/h03-medium-one-edit-r2/heaptrack.data.gz.zst",
+        "sha256": "bad7f3c459c3a7cccd417e92e919e9a4f3efa42f52b1b1ad17890fc873339d5e"
+      },
+      "repeat": 2,
+      "report": {
+        "descriptor": {
+          "bytes": 5431,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/capture-v1/children/h03-medium-one-edit-r2/workload/report.json",
+          "sha256": "4512d1efb7f8b356e7c7ab103bd4456cc35fb1c469bc563a081f36842c76052e"
+        },
+        "identity": {
+          "measured_samples": 3,
+          "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+          "performance_claim": "none; raw phase timings describe this explicit in-memory harness and do not claim OS thread counts, speedup, allocation behavior, or physical I/O",
+          "phase_scope": "ingress_ns is the direct SourceBackedEditor constructor; edit_commit_ns is selector staging, cell sets, and MultiCommit::commit; publication_ns is publish_multi_commit_to_stream plus returned MultiSnapshot drop; commit_drop_ns is MultiCommit drop; total_ns starts at the constructor and ends after commit teardown",
+          "sample_phase_totals": {
+            "commit_drop_ns": 875753,
+            "edit_commit_ns": 30174612,
+            "ingress_ns": 2015548,
+            "publication_ns": 7035909,
+            "total_ns": 40103412
+          },
+          "schema": "litchi.xlsx-managed-compression-benchmark.v1",
+          "semantic_sha256": "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+          "shape": "medium",
+          "source_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+          "status": "completed",
+          "timing_scope": "with fresh finite managed context prepared outside the clock, the timer begins at SourceBackedEditor construction and covers edit/commit, source-backed publication, returned snapshot drop, and commit/package worker-pool teardown; precomputed source/cache/context setup and bounded sink allocation are outside",
+          "warmup_iterations": 0,
+          "workers": 1,
+          "workload": "one-edit"
+        }
+      },
+      "shape": "medium",
+      "source_callsite_top": [
+        {
+          "calls": 324,
+          "callsite": "_RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc7realloc|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs|54",
+          "requested_bytes": 6073038,
+          "trace_count": 150
+        },
+        {
+          "calls": 24468,
+          "callsite": "alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h3412f40961f23531|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs|527",
+          "requested_bytes": 1563066,
+          "trace_count": 186
+        },
+        {
+          "calls": 93,
+          "callsite": "alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::hb177b32ffd8c5a78|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs|527",
+          "requested_bytes": 1492290,
+          "trace_count": 56
+        },
+        {
+          "calls": 3,
+          "callsite": "litchi_xlsx::cell::Store::merge_omitted_cells::h9412643c4b1fb603|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|915",
+          "requested_bytes": 1271808,
+          "trace_count": 2
+        },
+        {
+          "calls": 309,
+          "callsite": "_RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs|14",
+          "requested_bytes": 496479,
+          "trace_count": 192
+        },
+        {
+          "calls": 9,
+          "callsite": "_RNvNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unix14aligned_malloc|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs|83",
+          "requested_bytes": 427968,
+          "trace_count": 6
+        },
+        {
+          "calls": 9,
+          "callsite": "_RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc12alloc_zeroed|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs|36",
+          "requested_bytes": 294912,
+          "trace_count": 6
+        },
+        {
+          "calls": 35130,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h95115cc81dec1d87|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|448",
+          "requested_bytes": 71211,
+          "trace_count": 64
+        },
+        {
+          "calls": 6912,
+          "callsite": "_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner14grow_amortizedB7_|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs|527",
+          "requested_bytes": 55296,
+          "trace_count": 2
+        },
+        {
+          "calls": 6915,
+          "callsite": "litchi_xlsx::cell::Number::new::h4c4b46fd42225550|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|395",
+          "requested_bytes": 32805,
+          "trace_count": 4
+        },
+        {
+          "calls": 6912,
+          "callsite": "_$LT$litchi_xlsx..cell..Number$u20$as$u20$core..clone..Clone$GT$::clone::h27676f8f11531a72|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|389",
+          "requested_bytes": 32802,
+          "trace_count": 4
+        },
+        {
+          "calls": 90,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h3d19a7bb153a14ad|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|425",
+          "requested_bytes": 10368,
+          "trace_count": 6
+        },
+        {
+          "calls": 18,
+          "callsite": "litchi_xlsx::cell::Store::merge_omitted_cells::h9412643c4b1fb603|src/cell.rs|936",
+          "requested_bytes": 8256,
+          "trace_count": 6
+        },
+        {
+          "calls": 150,
+          "callsite": "litchi_xlsx::cell_values::snapshot::copy_boxed::h09de8fe09dc59f4a|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs|2632",
+          "requested_bytes": 5214,
+          "trace_count": 40
+        },
+        {
+          "calls": 81,
+          "callsite": "quick_xml::events::Event::into_owned::h29193e76a83cd368|src/events/mod.rs|0",
+          "requested_bytes": 3582,
+          "trace_count": 12
+        },
+        {
+          "calls": 3,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h5905f60c608e9b1f|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|425",
+          "requested_bytes": 2328,
+          "trace_count": 2
+        },
+        {
+          "calls": 102,
+          "callsite": "_RINvXs_NvMNtCslNYArtu3iFV_5alloc5sliceSp9to_vec_inhNtB5_10ConvertVec6to_vecNtNtBa_5alloc6GlobalEBa_|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|448",
+          "requested_bytes": 1659,
+          "trace_count": 32
+        },
+        {
+          "calls": 18,
+          "callsite": "alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h93bbba9602968571|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs|527",
+          "requested_bytes": 1152,
+          "trace_count": 6
+        },
+        {
+          "calls": 27,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h5905f60c608e9b1f|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|432",
+          "requested_bytes": 1068,
+          "trace_count": 18
+        },
+        {
+          "calls": 3,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h1a9cd32aac048f75|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|425",
+          "requested_bytes": 960,
+          "trace_count": 2
+        },
+        {
+          "calls": 333,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::hb537c1197c82da8a|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|448",
+          "requested_bytes": 708,
+          "trace_count": 16
+        },
+        {
+          "calls": 18,
+          "callsite": "_RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc7realloc|library/std/src/sys/alloc/unix.rs|54",
+          "requested_bytes": 396,
+          "trace_count": 6
+        },
+        {
+          "calls": 18,
+          "callsite": "alloc::str::join_generic_copy::hced8d7af36386685|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/str.rs|157",
+          "requested_bytes": 390,
+          "trace_count": 6
+        },
+        {
+          "calls": 18,
+          "callsite": "_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner14grow_amortizedB7_|library/alloc/src/raw_vec/mod.rs|527",
+          "requested_bytes": 144,
+          "trace_count": 6
+        },
+        {
+          "calls": 6,
+          "callsite": "_$LT$litchi_xlsx..cell..Value$u20$as$u20$core..convert..From$LT$i32$GT$$GT$::from::hce901bfb65432b11|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|327",
+          "requested_bytes": 33,
+          "trace_count": 4
+        }
+      ],
+      "source_tag_intersections": {
+        "merge_clone": {
+          "calls": 6927,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 41055,
+          "trace_count": 8
+        },
+        "number_clone": {
+          "calls": 6921,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 32811,
+          "trace_count": 10
+        },
+        "stored_clone": {
+          "calls": 6909,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 32799,
+          "trace_count": 2
+        }
+      },
+      "source_tag_scope": {
+        "merge_total": "merge-tagged selected-owner rows; separate from exclusive buckets",
+        "number_clone": "intersection of Number and clone tags; nonadditive",
+        "stored_clone": "intersection of Stored and clone tags; nonadditive",
+        "unknown_unqualified": "never source-tagged"
+      },
+      "status": "pass",
+      "workload": "one-edit"
+    },
+    {
+      "conservation": {
+        "decoder_size": {
+          "calls": 3475099,
+          "requested_bytes": 704324238,
+          "trace_count": 0
+        },
+        "folded_bytes_comparable": false,
+        "heaptrack_folded": {
+          "calls": 3475099,
+          "requested_bytes": null,
+          "trace_count": 0
+        },
+        "heaptrack_histogram": {
+          "calls": 3475099,
+          "requested_bytes": 704324238,
+          "trace_count": 0
+        },
+        "raw_trace": {
+          "calls": 3475099,
+          "requested_bytes": 704324238,
+          "trace_count": 0
+        },
+        "status": "pass"
+      },
+      "decoder": {
+        "integrity": {
+          "a_plus_adjacency_mismatches": 0,
+          "allocation_events": 3475099,
+          "plus_without_metadata": 0,
+          "requested_bytes_total": 704324238,
+          "unresolved_trace_definitions": 0
+        },
+        "size_aggregates": {
+          "bytes": 7421,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h04-dense-percent-r2/size-aggregates.tsv",
+          "sha256": "9bcc9d608ea963021eee6f96bddcad75ab367bf184fe1528d32fd9becf92dfd9"
+        },
+        "summary": {
+          "bytes": 2080,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h04-dense-percent-r2/summary.json",
+          "sha256": "9d59442c6d485f8016d9430a38f82d3fb9dd7541f24cb319fc2fc0b9a5b41e3f"
+        },
+        "trace_aggregates": {
+          "bytes": 160968104,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h04-dense-percent-r2/trace-aggregates.jsonl",
+          "sha256": "bd910d0c94c74e3169d9b6cd8e8e13b97c2953bbd60f3b43352b79fe10c86381"
+        },
+        "trace_size_aggregates": {
+          "bytes": 369591,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h04-dense-percent-r2/trace-size-aggregates.tsv",
+          "sha256": "198a236f0f8d260c4a0ff43d14166976b703583d858fc7db73b63e6a6fb40ce9"
+        }
+      },
+      "exclusive_leaf_partition": {
+        "clone": {
+          "calls": 56103,
+          "requested_bytes": 326517,
+          "trace_count": 18
+        },
+        "copy": {
+          "calls": 273798,
+          "requested_bytes": 501672,
+          "trace_count": 200
+        },
+        "merge": {
+          "calls": 12,
+          "requested_bytes": 9821184,
+          "trace_count": 2
+        },
+        "number": {
+          "calls": 53910,
+          "requested_bytes": 284334,
+          "trace_count": 4
+        },
+        "realloc": {
+          "calls": 239799,
+          "requested_bytes": 49966872,
+          "trace_count": 420
+        },
+        "selected_owner_other": {
+          "calls": 4632,
+          "requested_bytes": 12911640,
+          "trace_count": 226
+        }
+      },
+      "heaptrack_print": {
+        "folded": {
+          "bytes": 50171502,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/heaptrack-exports-v1/h04-dense-percent-r2/allocation-stacks.folded",
+          "sha256": "2083b14378c13bb4868e99d4ca639c935a83cc170396c7d0359635e391d78a16"
+        },
+        "folded_bytes_present": false,
+        "folded_rows": 16939,
+        "histogram": {
+          "bytes": 4100,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/heaptrack-exports-v1/h04-dense-percent-r2/allocation-size.histogram",
+          "sha256": "af97d9d54bd2cab54a723b1a6107df6478dbc750ffb46875c76e1a5d0305a8cd"
+        }
+      },
+      "id": "h04-dense-percent-r2",
+      "nonadditive_source_tags": {
+        "clone": {
+          "calls": 56103,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 326517,
+          "trace_count": 18
+        },
+        "copy": {
+          "calls": 273798,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 501672,
+          "trace_count": 200
+        },
+        "merge": {
+          "calls": 52911,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 10128321,
+          "trace_count": 8
+        },
+        "number": {
+          "calls": 108888,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 574287,
+          "trace_count": 14
+        },
+        "realloc": {
+          "calls": 240390,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 49998096,
+          "trace_count": 426
+        },
+        "stored": {
+          "calls": 52842,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 278721,
+          "trace_count": 2
+        }
+      },
+      "owner_selection": {
+        "reason_trace_counts": {
+          "decoder_unknown_frame": 1,
+          "missing_stage_timed_commit": 15621,
+          "missing_timed_iteration": 15487
+        },
+        "scope": "whole-process rows requiring both resolved timed callsites and no unknown-frame marker",
+        "selected_owner": {
+          "calls": 628254,
+          "requested_bytes": 73812219,
+          "trace_count": 870
+        },
+        "stage_resolution_totals": {
+          "MultiSourceEdit::commit": {
+            "calls": 237912,
+            "requested_bytes": 17503743,
+            "trace_count": 448
+          },
+          "stage_timed_commit": {
+            "calls": 390342,
+            "requested_bytes": 56308476,
+            "trace_count": 422
+          }
+        },
+        "status": "admitted",
+        "unknown_any_frame": {
+          "calls": 1,
+          "requested_bytes": 73728,
+          "trace_count": 1
+        },
+        "unknown_leaf_frame": {
+          "calls": 1,
+          "requested_bytes": 73728,
+          "trace_count": 1
+        },
+        "unqualified": {
+          "calls": 2846845,
+          "requested_bytes": 630512019,
+          "trace_count": 16069
+        }
+      },
+      "profile": {
+        "bytes": 636794,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/capture-v1/children/h04-dense-percent-r2/heaptrack.data.gz.zst",
+        "sha256": "2687b137e1180d08a53779e1456012f843c0fb865d55c0a5b8e9dd6b5850c3da"
+      },
+      "repeat": 2,
+      "report": {
+        "descriptor": {
+          "bytes": 5467,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/capture-v1/children/h04-dense-percent-r2/workload/report.json",
+          "sha256": "79af26fdc8c608f6719ad08e4133eb9bb0b7f52149b02b275e0ee986e342812d"
+        },
+        "identity": {
+          "measured_samples": 3,
+          "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+          "performance_claim": "none; raw phase timings describe this explicit in-memory harness and do not claim OS thread counts, speedup, allocation behavior, or physical I/O",
+          "phase_scope": "ingress_ns is the direct SourceBackedEditor constructor; edit_commit_ns is selector staging, cell sets, and MultiCommit::commit; publication_ns is publish_multi_commit_to_stream plus returned MultiSnapshot drop; commit_drop_ns is MultiCommit drop; total_ns starts at the constructor and ends after commit teardown",
+          "sample_phase_totals": {
+            "commit_drop_ns": 9247347,
+            "edit_commit_ns": 225599010,
+            "ingress_ns": 1912058,
+            "publication_ns": 40649264,
+            "total_ns": 277409369
+          },
+          "schema": "litchi.xlsx-managed-compression-benchmark.v1",
+          "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+          "shape": "dense-sparse",
+          "source_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+          "status": "completed",
+          "timing_scope": "with fresh finite managed context prepared outside the clock, the timer begins at SourceBackedEditor construction and covers edit/commit, source-backed publication, returned snapshot drop, and commit/package worker-pool teardown; precomputed source/cache/context setup and bounded sink allocation are outside",
+          "warmup_iterations": 0,
+          "workers": 1,
+          "workload": "one-percent"
+        }
+      },
+      "shape": "dense-sparse",
+      "source_callsite_top": [
+        {
+          "calls": 1401,
+          "callsite": "_RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc7realloc|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs|54",
+          "requested_bytes": 26130027,
+          "trace_count": 156
+        },
+        {
+          "calls": 184173,
+          "callsite": "alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h3412f40961f23531|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs|527",
+          "requested_bytes": 11733894,
+          "trace_count": 186
+        },
+        {
+          "calls": 795,
+          "callsite": "alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::hb177b32ffd8c5a78|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs|527",
+          "requested_bytes": 11674251,
+          "trace_count": 58
+        },
+        {
+          "calls": 4587,
+          "callsite": "_RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs|14",
+          "requested_bytes": 11448744,
+          "trace_count": 212
+        },
+        {
+          "calls": 12,
+          "callsite": "litchi_xlsx::cell::Store::merge_omitted_cells::h9412643c4b1fb603|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|915",
+          "requested_bytes": 9821184,
+          "trace_count": 2
+        },
+        {
+          "calls": 18,
+          "callsite": "_RNvNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unix14aligned_malloc|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs|83",
+          "requested_bytes": 855936,
+          "trace_count": 6
+        },
+        {
+          "calls": 18,
+          "callsite": "_RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc12alloc_zeroed|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs|36",
+          "requested_bytes": 589824,
+          "trace_count": 6
+        },
+        {
+          "calls": 270723,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h95115cc81dec1d87|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|448",
+          "requested_bytes": 457641,
+          "trace_count": 64
+        },
+        {
+          "calls": 53376,
+          "callsite": "_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner14grow_amortizedB7_|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs|527",
+          "requested_bytes": 427008,
+          "trace_count": 2
+        },
+        {
+          "calls": 53910,
+          "callsite": "litchi_xlsx::cell::Number::new::h4c4b46fd42225550|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|395",
+          "requested_bytes": 284334,
+          "trace_count": 4
+        },
+        {
+          "calls": 53376,
+          "callsite": "_$LT$litchi_xlsx..cell..Number$u20$as$u20$core..clone..Clone$GT$::clone::h27676f8f11531a72|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|389",
+          "requested_bytes": 281529,
+          "trace_count": 4
+        },
+        {
+          "calls": 57,
+          "callsite": "litchi_xlsx::cell::Store::merge_omitted_cells::h9412643c4b1fb603|src/cell.rs|936",
+          "requested_bytes": 28416,
+          "trace_count": 4
+        },
+        {
+          "calls": 9,
+          "callsite": "_RNvNtCslNYArtu3iFV_5alloc5alloc5alloc|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs|95",
+          "requested_bytes": 17136,
+          "trace_count": 2
+        },
+        {
+          "calls": 90,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h3d19a7bb153a14ad|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|425",
+          "requested_bytes": 10368,
+          "trace_count": 6
+        },
+        {
+          "calls": 3,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h5905f60c608e9b1f|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|425",
+          "requested_bytes": 9312,
+          "trace_count": 2
+        },
+        {
+          "calls": 1602,
+          "callsite": "_$LT$litchi_xlsx..cell..Number$u20$as$u20$core..clone..Clone$GT$::clone::h27676f8f11531a72|src/cell.rs|389",
+          "requested_bytes": 8424,
+          "trace_count": 6
+        },
+        {
+          "calls": 1068,
+          "callsite": "_$LT$litchi_xlsx..cell..Value$u20$as$u20$core..convert..From$LT$i32$GT$$GT$::from::hce901bfb65432b11|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|327",
+          "requested_bytes": 8148,
+          "trace_count": 4
+        },
+        {
+          "calls": 177,
+          "callsite": "litchi_xlsx::cell_values::snapshot::copy_boxed::h09de8fe09dc59f4a|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs|2632",
+          "requested_bytes": 6600,
+          "trace_count": 40
+        },
+        {
+          "calls": 108,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h5905f60c608e9b1f|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|432",
+          "requested_bytes": 4281,
+          "trace_count": 18
+        },
+        {
+          "calls": 1887,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::hb537c1197c82da8a|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|448",
+          "requested_bytes": 4254,
+          "trace_count": 16
+        },
+        {
+          "calls": 81,
+          "callsite": "quick_xml::events::Event::into_owned::h29193e76a83cd368|src/events/mod.rs|0",
+          "requested_bytes": 3582,
+          "trace_count": 12
+        },
+        {
+          "calls": 174,
+          "callsite": "_RINvXs_NvMNtCslNYArtu3iFV_5alloc5sliceSp9to_vec_inhNtB5_10ConvertVec6to_vecNtNtBa_5alloc6GlobalEBa_|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|448",
+          "requested_bytes": 3135,
+          "trace_count": 32
+        },
+        {
+          "calls": 18,
+          "callsite": "alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h93bbba9602968571|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs|527",
+          "requested_bytes": 1152,
+          "trace_count": 6
+        },
+        {
+          "calls": 534,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::hf51442510921c2e7|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|448",
+          "requested_bytes": 1149,
+          "trace_count": 2
+        },
+        {
+          "calls": 3,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h1a9cd32aac048f75|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|425",
+          "requested_bytes": 960,
+          "trace_count": 2
+        }
+      ],
+      "source_tag_intersections": {
+        "merge_clone": {
+          "calls": 52899,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 307137,
+          "trace_count": 6
+        },
+        "number_clone": {
+          "calls": 54978,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 289953,
+          "trace_count": 10
+        },
+        "stored_clone": {
+          "calls": 52842,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 278721,
+          "trace_count": 2
+        }
+      },
+      "source_tag_scope": {
+        "merge_total": "merge-tagged selected-owner rows; separate from exclusive buckets",
+        "number_clone": "intersection of Number and clone tags; nonadditive",
+        "stored_clone": "intersection of Stored and clone tags; nonadditive",
+        "unknown_unqualified": "never source-tagged"
+      },
+      "status": "pass",
+      "workload": "one-percent"
+    },
+    {
+      "conservation": {
+        "decoder_size": {
+          "calls": 1858481,
+          "requested_bytes": 549846130,
+          "trace_count": 0
+        },
+        "folded_bytes_comparable": false,
+        "heaptrack_folded": {
+          "calls": 1858481,
+          "requested_bytes": null,
+          "trace_count": 0
+        },
+        "heaptrack_histogram": {
+          "calls": 1858481,
+          "requested_bytes": 549846130,
+          "trace_count": 0
+        },
+        "raw_trace": {
+          "calls": 1858481,
+          "requested_bytes": 549846130,
+          "trace_count": 0
+        },
+        "status": "pass"
+      },
+      "decoder": {
+        "integrity": {
+          "a_plus_adjacency_mismatches": 0,
+          "allocation_events": 1858481,
+          "plus_without_metadata": 0,
+          "requested_bytes_total": 549846130,
+          "unresolved_trace_definitions": 0
+        },
+        "size_aggregates": {
+          "bytes": 5815,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h05-medium-percent-r2/size-aggregates.tsv",
+          "sha256": "60da601754bb3f5e414f6dcc4abe912ddb15d510e89add2f87e1618c14bf9184"
+        },
+        "summary": {
+          "bytes": 2085,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h05-medium-percent-r2/summary.json",
+          "sha256": "79d13ce779fcb76017e86ad8a8d6b34414711c581f6e233408029ffdc82efd5a"
+        },
+        "trace_aggregates": {
+          "bytes": 160480698,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h05-medium-percent-r2/trace-aggregates.jsonl",
+          "sha256": "3965694a55722e96fc4b81c89982bfb5150324df1a299612b1b439896e39b8c3"
+        },
+        "trace_size_aggregates": {
+          "bytes": 350716,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h05-medium-percent-r2/trace-size-aggregates.tsv",
+          "sha256": "cc7722f033491523d8ef644d1aa47bfeff1b4434a6439852bedb59138354ddab"
+        }
+      },
+      "exclusive_leaf_partition": {
+        "clone": {
+          "calls": 29115,
+          "requested_bytes": 220908,
+          "trace_count": 20
+        },
+        "copy": {
+          "calls": 142794,
+          "requested_bytes": 271449,
+          "trace_count": 200
+        },
+        "merge": {
+          "calls": 12,
+          "requested_bytes": 5087232,
+          "trace_count": 2
+        },
+        "number": {
+          "calls": 27927,
+          "requested_bytes": 179739,
+          "trace_count": 4
+        },
+        "realloc": {
+          "calls": 127683,
+          "requested_bytes": 36972759,
+          "trace_count": 422
+        },
+        "selected_owner_other": {
+          "calls": 2841,
+          "requested_bytes": 8767953,
+          "trace_count": 220
+        }
+      },
+      "heaptrack_print": {
+        "folded": {
+          "bytes": 50012889,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/heaptrack-exports-v1/h05-medium-percent-r2/allocation-stacks.folded",
+          "sha256": "273982341c647ac95672991019c1c371e622b47a3ffadb4a2ec05eb4510ecc39"
+        },
+        "folded_bytes_present": false,
+        "folded_rows": 16892,
+        "histogram": {
+          "bytes": 3207,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/heaptrack-exports-v1/h05-medium-percent-r2/allocation-size.histogram",
+          "sha256": "aed9cdb87a3aa6579b1ac0010efcc971cfbbfb43fabff08d8a09f05444343300"
+        }
+      },
+      "id": "h05-medium-percent-r2",
+      "nonadditive_source_tags": {
+        "clone": {
+          "calls": 29115,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 220908,
+          "trace_count": 20
+        },
+        "copy": {
+          "calls": 142794,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 271449,
+          "trace_count": 200
+        },
+        "merge": {
+          "calls": 27453,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 5296425,
+          "trace_count": 10
+        },
+        "number": {
+          "calls": 56412,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 363048,
+          "trace_count": 14
+        },
+        "realloc": {
+          "calls": 128034,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 37007568,
+          "trace_count": 430
+        },
+        "stored": {
+          "calls": 27369,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 176169,
+          "trace_count": 2
+        }
+      },
+      "owner_selection": {
+        "reason_trace_counts": {
+          "decoder_unknown_frame": 1,
+          "missing_stage_timed_commit": 15586,
+          "missing_timed_iteration": 15452
+        },
+        "scope": "whole-process rows requiring both resolved timed callsites and no unknown-frame marker",
+        "selected_owner": {
+          "calls": 330372,
+          "requested_bytes": 51500040,
+          "trace_count": 868
+        },
+        "stage_resolution_totals": {
+          "MultiSourceEdit::commit": {
+            "calls": 125736,
+            "requested_bytes": 9375417,
+            "trace_count": 438
+          },
+          "stage_timed_commit": {
+            "calls": 204636,
+            "requested_bytes": 42124623,
+            "trace_count": 430
+          }
+        },
+        "status": "admitted",
+        "unknown_any_frame": {
+          "calls": 1,
+          "requested_bytes": 73728,
+          "trace_count": 1
+        },
+        "unknown_leaf_frame": {
+          "calls": 1,
+          "requested_bytes": 73728,
+          "trace_count": 1
+        },
+        "unqualified": {
+          "calls": 1528109,
+          "requested_bytes": 498346090,
+          "trace_count": 16024
+        }
+      },
+      "profile": {
+        "bytes": 585473,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/capture-v1/children/h05-medium-percent-r2/heaptrack.data.gz.zst",
+        "sha256": "4857e8f2cbba1bbed7e8579a4ae04e7cff97aa7b6b2e72029f3a2faada55d86a"
+      },
+      "repeat": 2,
+      "report": {
+        "descriptor": {
+          "bytes": 5444,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0958/capture-v1/children/h05-medium-percent-r2/workload/report.json",
+          "sha256": "8ee86a8415951ff31f9219a236cd19be8a035e6f6b4202a25defc37115ed4821"
+        },
+        "identity": {
+          "measured_samples": 3,
+          "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+          "performance_claim": "none; raw phase timings describe this explicit in-memory harness and do not claim OS thread counts, speedup, allocation behavior, or physical I/O",
+          "phase_scope": "ingress_ns is the direct SourceBackedEditor constructor; edit_commit_ns is selector staging, cell sets, and MultiCommit::commit; publication_ns is publish_multi_commit_to_stream plus returned MultiSnapshot drop; commit_drop_ns is MultiCommit drop; total_ns starts at the constructor and ends after commit teardown",
+          "sample_phase_totals": {
+            "commit_drop_ns": 4630419,
+            "edit_commit_ns": 120742217,
+            "ingress_ns": 1409227,
+            "publication_ns": 19780739,
+            "total_ns": 146564142
+          },
+          "schema": "litchi.xlsx-managed-compression-benchmark.v1",
+          "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+          "shape": "medium",
+          "source_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+          "status": "completed",
+          "timing_scope": "with fresh finite managed context prepared outside the clock, the timer begins at SourceBackedEditor construction and covers edit/commit, source-backed publication, returned snapshot drop, and commit/package worker-pool teardown; precomputed source/cache/context setup and bounded sink allocation are outside",
+          "warmup_iterations": 0,
+          "workers": 1,
+          "workload": "one-percent"
+        }
+      },
+      "shape": "medium",
+      "source_callsite_top": [
+        {
+          "calls": 1278,
+          "callsite": "_RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc7realloc|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs|54",
+          "requested_bytes": 24410883,
+          "trace_count": 158
+        },
+        {
+          "calls": 2793,
+          "callsite": "_RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs|14",
+          "requested_bytes": 7313073,
+          "trace_count": 206
+        },
+        {
+          "calls": 98160,
+          "callsite": "alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h3412f40961f23531|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs|527",
+          "requested_bytes": 6251502,
+          "trace_count": 186
+        },
+        {
+          "calls": 543,
+          "callsite": "alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::hb177b32ffd8c5a78|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs|527",
+          "requested_bytes": 6087498,
+          "trace_count": 58
+        },
+        {
+          "calls": 12,
+          "callsite": "litchi_xlsx::cell::Store::merge_omitted_cells::h9412643c4b1fb603|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|915",
+          "requested_bytes": 5087232,
+          "trace_count": 2
+        },
+        {
+          "calls": 18,
+          "callsite": "_RNvNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unix14aligned_malloc|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs|83",
+          "requested_bytes": 855936,
+          "trace_count": 6
+        },
+        {
+          "calls": 18,
+          "callsite": "_RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc12alloc_zeroed|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs|36",
+          "requested_bytes": 589824,
+          "trace_count": 6
+        },
+        {
+          "calls": 140646,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h95115cc81dec1d87|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|448",
+          "requested_bytes": 229917,
+          "trace_count": 64
+        },
+        {
+          "calls": 27648,
+          "callsite": "_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner14grow_amortizedB7_|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs|527",
+          "requested_bytes": 221184,
+          "trace_count": 2
+        },
+        {
+          "calls": 27927,
+          "callsite": "litchi_xlsx::cell::Number::new::h4c4b46fd42225550|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|395",
+          "requested_bytes": 179739,
+          "trace_count": 4
+        },
+        {
+          "calls": 27648,
+          "callsite": "_$LT$litchi_xlsx..cell..Number$u20$as$u20$core..clone..Clone$GT$::clone::h27676f8f11531a72|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|389",
+          "requested_bytes": 177954,
+          "trace_count": 4
+        },
+        {
+          "calls": 72,
+          "callsite": "litchi_xlsx::cell::Store::merge_omitted_cells::h9412643c4b1fb603|src/cell.rs|936",
+          "requested_bytes": 33024,
+          "trace_count": 6
+        },
+        {
+          "calls": 90,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h3d19a7bb153a14ad|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|425",
+          "requested_bytes": 10368,
+          "trace_count": 6
+        },
+        {
+          "calls": 3,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h5905f60c608e9b1f|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|425",
+          "requested_bytes": 9312,
+          "trace_count": 2
+        },
+        {
+          "calls": 12,
+          "callsite": "_RNvNtCslNYArtu3iFV_5alloc5alloc5alloc|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs|95",
+          "requested_bytes": 9120,
+          "trace_count": 2
+        },
+        {
+          "calls": 177,
+          "callsite": "litchi_xlsx::cell_values::snapshot::copy_boxed::h09de8fe09dc59f4a|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs|2632",
+          "requested_bytes": 6600,
+          "trace_count": 40
+        },
+        {
+          "calls": 837,
+          "callsite": "_$LT$litchi_xlsx..cell..Number$u20$as$u20$core..clone..Clone$GT$::clone::h27676f8f11531a72|src/cell.rs|389",
+          "requested_bytes": 5355,
+          "trace_count": 6
+        },
+        {
+          "calls": 558,
+          "callsite": "_$LT$litchi_xlsx..cell..Value$u20$as$u20$core..convert..From$LT$i32$GT$$GT$::from::hce901bfb65432b11|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|327",
+          "requested_bytes": 4575,
+          "trace_count": 4
+        },
+        {
+          "calls": 108,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h5905f60c608e9b1f|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|432",
+          "requested_bytes": 4281,
+          "trace_count": 18
+        },
+        {
+          "calls": 81,
+          "callsite": "quick_xml::events::Event::into_owned::h29193e76a83cd368|src/events/mod.rs|0",
+          "requested_bytes": 3582,
+          "trace_count": 12
+        },
+        {
+          "calls": 174,
+          "callsite": "_RINvXs_NvMNtCslNYArtu3iFV_5alloc5sliceSp9to_vec_inhNtB5_10ConvertVec6to_vecNtNtBa_5alloc6GlobalEBa_|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|448",
+          "requested_bytes": 3135,
+          "trace_count": 32
+        },
+        {
+          "calls": 1215,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::hb537c1197c82da8a|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|448",
+          "requested_bytes": 2400,
+          "trace_count": 16
+        },
+        {
+          "calls": 18,
+          "callsite": "alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h93bbba9602968571|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs|527",
+          "requested_bytes": 1152,
+          "trace_count": 6
+        },
+        {
+          "calls": 3,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::h1a9cd32aac048f75|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|425",
+          "requested_bytes": 960,
+          "trace_count": 2
+        },
+        {
+          "calls": 279,
+          "callsite": "_$LT$T$u20$as$u20$alloc..slice..$LT$impl$u20$$u5b$T$u5d$$GT$..to_vec_in..ConvertVec$GT$::to_vec::hf51442510921c2e7|/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs|448",
+          "requested_bytes": 504,
+          "trace_count": 2
+        }
+      ],
+      "source_tag_intersections": {
+        "merge_clone": {
+          "calls": 27441,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 209193,
+          "trace_count": 8
+        },
+        "number_clone": {
+          "calls": 28485,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 183309,
+          "trace_count": 10
+        },
+        "stored_clone": {
+          "calls": 27369,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 176169,
+          "trace_count": 2
+        }
+      },
+      "source_tag_scope": {
+        "merge_total": "merge-tagged selected-owner rows; separate from exclusive buckets",
+        "number_clone": "intersection of Number and clone tags; nonadditive",
+        "stored_clone": "intersection of Stored and clone tags; nonadditive",
+        "unknown_unqualified": "never source-tagged"
+      },
+      "status": "pass",
+      "workload": "one-percent"
+    }
+  ],
+  "schema": "litchi.performance.0958.heaptrack-attribution.v1",
+  "scope": {
+    "exclusive_leaf_partition_additive": true,
+    "owner_requirements": [
+      "timed_iteration",
+      "stage_timed_commit_or_reviewed_MultiSourceEdit_commit_owner"
+    ],
+    "phase_allocation_inference": false,
+    "source_tags_additive": false,
+    "stage_resolution_scope": {
+      "MultiSourceEdit::commit": "commit-core subset only; does not imply complete edit_commit phase",
+      "stage_timed_commit": "full stage callsite when symbolized"
+    },
+    "unknown_unqualified_retained": true,
+    "whole_process": true
+  },
+  "status": "pass",
+  "tool_version": "attribute_0958_v1"
+}

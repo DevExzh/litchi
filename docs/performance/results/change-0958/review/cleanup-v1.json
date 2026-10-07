@@ -1,0 +1,358 @@
+{
+  "created_utc": "2026-10-07T14:02:46.688444+00:00",
+  "no_checkout_or_0957_mutation": true,
+  "post_cleanup_process_probe": [],
+  "receipt_path": "/home/zhuhe/litchi-performance-0958/review/cleanup-v1.json",
+  "remaining_0958_pycache": [],
+  "removed_empty_directories": [
+    "/home/zhuhe/litchi-performance-0958/tools/__pycache__"
+  ],
+  "removed_file_bytes": 104612,
+  "removed_file_count": 5,
+  "removed_files": [
+    {
+      "bytes": 58925,
+      "executable": false,
+      "mode": 420,
+      "path": "/home/zhuhe/litchi-performance-0958/tools/__pycache__/attribute_0958_v1.cpython-314.pyc",
+      "sha256": "1c062ff33247fa33a6f7beebb6ae102c24378f8560d15767e87bb6efc7bc5547"
+    },
+    {
+      "bytes": 11655,
+      "executable": false,
+      "mode": 420,
+      "path": "/home/zhuhe/litchi-performance-0958/tools/__pycache__/export_heaptrack_0958_v1.cpython-314.pyc",
+      "sha256": "013d713178bde8642c27ec4f6e1ad01ebfc8b7351fe3f7a98f84c49c080dda6e"
+    },
+    {
+      "bytes": 7683,
+      "executable": false,
+      "mode": 436,
+      "path": "/tmp/make_plan_0958.py",
+      "sha256": "63b3e387c0dbe6feacca4cb8e43a482b030d8165717c3828c9c9a925f2430119"
+    },
+    {
+      "bytes": 2433,
+      "executable": false,
+      "mode": 436,
+      "path": "/tmp/make_plan_0958_v3.py",
+      "sha256": "6b450e0206dd38f3817dbf0db01fd279438e646b81ca196592a39ca892353231"
+    },
+    {
+      "bytes": 23916,
+      "executable": false,
+      "mode": 436,
+      "path": "/tmp/list0958.before",
+      "sha256": "22e9efd14350a5c1b5acd006657325b867bfbf7a6d0390b838ab5691e87e39e1"
+    }
+  ],
+  "retained_canonical_files": [
+    {
+      "bytes": 6539,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0958/root-start.json",
+      "sha256": "e1ed8ec0b1fb0a3068f24e9cd979003bdca57fc1a2b55ff476ece5d4b67afc5c"
+    },
+    {
+      "bytes": 175,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0958/capture-freeze-v1.json",
+      "sha256": "adcede1e6a20a397bb2f459a7bda81cbbfbc732bc8139f36e69ba866478efdab"
+    },
+    {
+      "bytes": 10965,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0958/capture-manifest-v1.json",
+      "sha256": "bd30035f2c7926ec579fea58ecd1e5c5fe34da6b2ae129473bee033630e5c465"
+    },
+    {
+      "bytes": 10717,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0958/plan-v2.json",
+      "sha256": "aa0223486c08a59ad1fcfa6e78d98c880ae4051e54e16b46b86925c034da1335"
+    },
+    {
+      "bytes": 12785,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0958/plan-v3.json",
+      "sha256": "c6895889d3ebb92c8a78e8d7c3f240d8af39840bed7ed336308b546632388219"
+    },
+    {
+      "bytes": 12919,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0958/plan-v4.json",
+      "sha256": "1a75281af74511755bcb8adac226c1e0c5e66ee63412f31730fadf0529e413e3"
+    },
+    {
+      "bytes": 12919,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0958/plan-v5.json",
+      "sha256": "5bd826e1f93913b5be2fc5878be0c5270e323789222fffcf0e97121dcbc37695"
+    },
+    {
+      "bytes": 25427,
+      "executable": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0958/tooling/capture_0958_v2.py",
+      "sha256": "93d7a2bc6353af27a524c69f9de8d4977eebd6ba7667cc2d33e4e2be9b88e8dc"
+    },
+    {
+      "bytes": 32482,
+      "executable": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0958/tooling/capture_0958_v3.py",
+      "sha256": "2c2c79377042a616fb777e5f8c5b51956d1346afdd3285f8412018e983368e8e"
+    },
+    {
+      "bytes": 32546,
+      "executable": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0958/tooling/capture_0958_v4.py",
+      "sha256": "bc6f4d0de3709b7dcc9020ccce114cd256db285807945ac65a573e57fbb16e6d"
+    },
+    {
+      "bytes": 32546,
+      "executable": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0958/tooling/capture_0958_v5.py",
+      "sha256": "15c09dffefed8bf6084ec0c54ddf7d19f2f69a3c70f4e2bf41a7442a40000f6c"
+    },
+    {
+      "bytes": 34603,
+      "executable": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0958/tools/attribute_0958_v1.py",
+      "sha256": "1bb7584076762eefadc409016abf50684157e9350a76386255c5763e47d7cffd"
+    },
+    {
+      "bytes": 5043,
+      "executable": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0958/tools/export_heaptrack_0958_v1.py",
+      "sha256": "50914d8f0bb6d35b39ef5222473e529174098cab3b9f0e61cf5144d71be7eb95"
+    },
+    {
+      "bytes": 35784,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0958/analysis-v1/summary-compact-v1.json",
+      "sha256": "75942e11db0c8423fd41481c0f12b0754e6da5b36ea7cd61d024bce7ccd88ef3"
+    },
+    {
+      "bytes": 102361,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0958/analysis-v1/attribute-v3.json",
+      "sha256": "9fb5ae3b1b484e2fc8294c66d4712d8f818c1aed60a974fbe51bcd03173cf983"
+    },
+    {
+      "bytes": 14371,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/decoder-terminal.json",
+      "sha256": "1bc079e204eda23ab3d8e6c5190760f565fd8d4639d03ac4230e8866b78e6f8b"
+    },
+    {
+      "bytes": 3590,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0958/review/control-receipt-v5.json",
+      "sha256": "dedf65c6b2751c096a329d300d8c17fe8b4fce074b0989d10bf18eb2bc74309c"
+    },
+    {
+      "bytes": 5254,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0958/review/attribute-tooling-receipt-v2.json",
+      "sha256": "7f6573f7cfe8532d81a77ce40f252f5660648571885220d6d7907701a9c4d03a"
+    }
+  ],
+  "retained_canonical_roots": [
+    "/home/zhuhe/litchi-performance-0958/capture-v1",
+    "/home/zhuhe/litchi-performance-0958/admission-v1",
+    "/home/zhuhe/litchi-performance-0958/heaptrack-exports-v1",
+    "/home/zhuhe/litchi-performance-0958/raw-decoder-v1",
+    "/home/zhuhe/litchi-performance-0958/analysis-v1",
+    "/home/zhuhe/litchi-performance-0958/review",
+    "/home/zhuhe/litchi-performance-0958/tooling",
+    "/home/zhuhe/litchi-performance-0958/tools"
+  ],
+  "retained_root_census_before_receipt_write": {
+    "/home/zhuhe/litchi-performance-0958/admission-v1": {
+      "bytes": 88790383,
+      "files": 7,
+      "first_paths": [
+        "first-child/allocation-size.histogram",
+        "first-child/allocation-stacks.folded",
+        "first-child/result.json",
+        "first-child/start.json",
+        "first-child/stderr.log",
+        "first-child/stdout.log",
+        "first-child/terminal.json"
+      ],
+      "last_paths": [
+        "first-child/allocation-size.histogram",
+        "first-child/allocation-stacks.folded",
+        "first-child/result.json",
+        "first-child/start.json",
+        "first-child/stderr.log",
+        "first-child/stdout.log",
+        "first-child/terminal.json"
+      ]
+    },
+    "/home/zhuhe/litchi-performance-0958/analysis-v1": {
+      "bytes": 239903,
+      "files": 4,
+      "first_paths": [
+        "attribute-v1.json",
+        "attribute-v2.json",
+        "attribute-v3.json",
+        "summary-compact-v1.json"
+      ],
+      "last_paths": [
+        "attribute-v1.json",
+        "attribute-v2.json",
+        "attribute-v3.json",
+        "summary-compact-v1.json"
+      ]
+    },
+    "/home/zhuhe/litchi-performance-0958/capture-v1": {
+      "bytes": 3676145,
+      "files": 50,
+      "first_paths": [
+        "runner-start.json",
+        "runner-terminal.json",
+        "children/h00-medium-percent-r1/heaptrack.data.gz.zst",
+        "children/h00-medium-percent-r1/report-oracle.json",
+        "children/h00-medium-percent-r1/start.json",
+        "children/h00-medium-percent-r1/stderr.log",
+        "children/h00-medium-percent-r1/stdout.log",
+        "children/h00-medium-percent-r1/terminal.json"
+      ],
+      "last_paths": [
+        "children/h05-medium-percent-r2/heaptrack.data.gz.zst",
+        "children/h05-medium-percent-r2/report-oracle.json",
+        "children/h05-medium-percent-r2/start.json",
+        "children/h05-medium-percent-r2/stderr.log",
+        "children/h05-medium-percent-r2/stdout.log",
+        "children/h05-medium-percent-r2/terminal.json",
+        "children/h05-medium-percent-r2/time.txt",
+        "children/h05-medium-percent-r2/workload/report.json"
+      ]
+    },
+    "/home/zhuhe/litchi-performance-0958/heaptrack-exports-v1": {
+      "bytes": 533353972,
+      "files": 37,
+      "first_paths": [
+        "exports.json",
+        "h00-medium-percent-r1/allocation-size.histogram",
+        "h00-medium-percent-r1/allocation-stacks.folded",
+        "h00-medium-percent-r1/start.json",
+        "h00-medium-percent-r1/stderr.txt",
+        "h00-medium-percent-r1/stdout.txt",
+        "h00-medium-percent-r1/terminal.json",
+        "h01-dense-percent-r1/allocation-size.histogram"
+      ],
+      "last_paths": [
+        "h04-dense-percent-r2/stdout.txt",
+        "h04-dense-percent-r2/terminal.json",
+        "h05-medium-percent-r2/allocation-size.histogram",
+        "h05-medium-percent-r2/allocation-stacks.folded",
+        "h05-medium-percent-r2/start.json",
+        "h05-medium-percent-r2/stderr.txt",
+        "h05-medium-percent-r2/stdout.txt",
+        "h05-medium-percent-r2/terminal.json"
+      ]
+    },
+    "/home/zhuhe/litchi-performance-0958/raw-decoder-v1": {
+      "bytes": 964633587,
+      "files": 25,
+      "first_paths": [
+        "decoder-terminal.json",
+        "h00-medium-percent-r1/size-aggregates.tsv",
+        "h00-medium-percent-r1/summary.json",
+        "h00-medium-percent-r1/trace-aggregates.jsonl",
+        "h00-medium-percent-r1/trace-size-aggregates.tsv",
+        "h01-dense-percent-r1/size-aggregates.tsv",
+        "h01-dense-percent-r1/summary.json",
+        "h01-dense-percent-r1/trace-aggregates.jsonl"
+      ],
+      "last_paths": [
+        "h04-dense-percent-r2/size-aggregates.tsv",
+        "h04-dense-percent-r2/summary.json",
+        "h04-dense-percent-r2/trace-aggregates.jsonl",
+        "h04-dense-percent-r2/trace-size-aggregates.tsv",
+        "h05-medium-percent-r2/size-aggregates.tsv",
+        "h05-medium-percent-r2/summary.json",
+        "h05-medium-percent-r2/trace-aggregates.jsonl",
+        "h05-medium-percent-r2/trace-size-aggregates.tsv"
+      ]
+    },
+    "/home/zhuhe/litchi-performance-0958/review": {
+      "bytes": 226277,
+      "files": 73,
+      "first_paths": [
+        "attribute-controls-receipt-v1.json",
+        "attribute-controls-receipt-v2.json",
+        "attribute-tooling-receipt-v1.json",
+        "attribute-tooling-receipt-v2.json",
+        "control-receipt-v5.json",
+        "decoder-launch-failure-v1.json",
+        "independent-analysis-review-v1.md",
+        "make-attribute-controls-v1.py"
+      ],
+      "last_paths": [
+        "attribute-controls-v1/h05-medium-percent-r2/folded",
+        "attribute-controls-v1/h05-medium-percent-r2/histogram",
+        "attribute-controls-v1/h05-medium-percent-r2/profile",
+        "attribute-controls-v1/h05-medium-percent-r2/report.json",
+        "attribute-controls-v1/h05-medium-percent-r2/size.tsv",
+        "attribute-controls-v1/h05-medium-percent-r2/summary.json",
+        "attribute-controls-v1/h05-medium-percent-r2/trace-aggregates.jsonl",
+        "attribute-controls-v1/h05-medium-percent-r2/trace-size.tsv"
+      ]
+    },
+    "/home/zhuhe/litchi-performance-0958/tooling": {
+      "bytes": 129644,
+      "files": 6,
+      "first_paths": [
+        "attribute-contract-v1.json",
+        "attribute-contract-v2.json",
+        "capture_0958_v2.py",
+        "capture_0958_v3.py",
+        "capture_0958_v4.py",
+        "capture_0958_v5.py"
+      ],
+      "last_paths": [
+        "attribute-contract-v1.json",
+        "attribute-contract-v2.json",
+        "capture_0958_v2.py",
+        "capture_0958_v3.py",
+        "capture_0958_v4.py",
+        "capture_0958_v5.py"
+      ]
+    },
+    "/home/zhuhe/litchi-performance-0958/tools": {
+      "bytes": 39646,
+      "files": 2,
+      "first_paths": [
+        "attribute_0958_v1.py",
+        "export_heaptrack_0958_v1.py"
+      ],
+      "last_paths": [
+        "attribute_0958_v1.py",
+        "export_heaptrack_0958_v1.py"
+      ]
+    }
+  },
+  "schema": "litchi.performance.0958.cleanup-v1",
+  "scope": "0958-owned Python cache and explicitly disposable offline plan/census scratch only; no source, checkout, capture, raw profile, decoder, export, analysis, manifest, review, plan, or helper evidence removed",
+  "status": "completed"
+}

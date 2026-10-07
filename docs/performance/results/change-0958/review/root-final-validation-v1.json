@@ -1,0 +1,18 @@
+{
+  "status": "pass",
+  "scope": "0958 evidence batch; no Rust production edits",
+  "checks": {
+    "capture_children": 6,
+    "measured_samples": 18,
+    "analyzer_replay": "All fields equal authoritative attribute-v3 except created_utc",
+    "independent_report_review": "candidate_review found no blockers after report, BASELINE and HOTSPOTS cross-check",
+    "diff_check": "pass",
+    "rust_checks": "not rerun: evidence/offline tooling only; existing executable semantic/resource checks passed"
+  },
+  "limitations": [
+    "Mixed exact timed-stage and nested commit-core subset attribution",
+    "No native speedup, allocation reduction, RSS or production adoption claim",
+    "Overall docs/GOAL.md completion remains unproven"
+  ],
+  "cleanup_receipt": "cleanup-v1.json"
+}

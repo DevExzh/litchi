@@ -1,0 +1,389 @@
+{
+  "binary": {
+    "path": "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+    "sha256": "5886b0f86a697bae757994d5a757cffae4a7e8d61a2769ff1c967029cd1912c3"
+  },
+  "capture_manifest": {
+    "bytes": 10965,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0958/capture-manifest-v1.json",
+    "sha256": "bd30035f2c7926ec579fea58ecd1e5c5fe34da6b2ae129473bee033630e5c465"
+  },
+  "decoder_tool": {
+    "bytes": 16649,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0949/tools/decode_heaptrack_0949_v1.py",
+    "sha256": "c87e7089774f0eac24ffde262b7fe27b1f1ff4586798683bcc44fa68049bc7bf"
+  },
+  "export_tool": {
+    "bytes": 5043,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0958/tools/export_heaptrack_0958_v1.py",
+    "sha256": "50914d8f0bb6d35b39ef5222473e529174098cab3b9f0e61cf5144d71be7eb95"
+  },
+  "plan": {
+    "bytes": 12919,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0958/plan-v5.json",
+    "sha256": "5bd826e1f93913b5be2fc5878be0c5270e323789222fffcf0e97121dcbc37695"
+  },
+  "protocol_revision": "0958-v5",
+  "runs": [
+    {
+      "decoder_summary": {
+        "bytes": 2085,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h00-medium-percent-r1/summary.json",
+        "sha256": "c35811c2b413a3a3099eee7bf9eaf9d42055cf32ae1b210125d412351f886ead"
+      },
+      "heaptrack_folded": {
+        "bytes": 50012889,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/heaptrack-exports-v1/h00-medium-percent-r1/allocation-stacks.folded",
+        "sha256": "cedc6860e33c872c09c70bb8c636e4a09bd09bf3041b207ff4d2f74f92b49515"
+      },
+      "heaptrack_histogram": {
+        "bytes": 3207,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/heaptrack-exports-v1/h00-medium-percent-r1/allocation-size.histogram",
+        "sha256": "26bac1c25a5eb8fc7accc90175689d041802183ed60b49771e38db0a8dbaad95"
+      },
+      "id": "h00-medium-percent-r1",
+      "profile": {
+        "bytes": 593290,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/capture-v1/children/h00-medium-percent-r1/heaptrack.data.gz.zst",
+        "sha256": "f7469631770c686435c6b330d3a1aef90fe17332040d5d00b4ceb285bb18c338"
+      },
+      "repeat": 1,
+      "report": {
+        "bytes": 5445,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/capture-v1/children/h00-medium-percent-r1/workload/report.json",
+        "sha256": "4ee431a6c7379fdb3895df6fd92a9ea80e11e008ea2c12d92f1edd42725dd57d"
+      },
+      "samples": 3,
+      "shape": "medium",
+      "size_aggregates": {
+        "bytes": 5815,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h00-medium-percent-r1/size-aggregates.tsv",
+        "sha256": "2a8ded6963763ffd1669a59b7bc7e8bc600d6b9e7ab72d004a01ba48e6434b2b"
+      },
+      "trace_aggregates": {
+        "bytes": 160480698,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h00-medium-percent-r1/trace-aggregates.jsonl",
+        "sha256": "a09748aa7941f3ed17eea07f4d36310ef4c01aed728326ef6cc1dab1da7767a4"
+      },
+      "trace_size_aggregates": {
+        "bytes": 350697,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h00-medium-percent-r1/trace-size-aggregates.tsv",
+        "sha256": "bc920f4507b1b9983c2f66bcf2ec1620000dad4fd1165d21bc04ee811e2d8486"
+      },
+      "warmup": 0,
+      "workers": 1,
+      "workload": "one-percent"
+    },
+    {
+      "decoder_summary": {
+        "bytes": 2080,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h01-dense-percent-r1/summary.json",
+        "sha256": "0f0eec905c128b30194735c5cb95363bc8d13b2a9b00e14ac7018f1a46e33790"
+      },
+      "heaptrack_folded": {
+        "bytes": 50171502,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/heaptrack-exports-v1/h01-dense-percent-r1/allocation-stacks.folded",
+        "sha256": "9bd2ab004e1130cd27df29ccdac4246a96f2e011cce022a250949e2a698b3ea0"
+      },
+      "heaptrack_histogram": {
+        "bytes": 4100,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/heaptrack-exports-v1/h01-dense-percent-r1/allocation-size.histogram",
+        "sha256": "6653673609989a7bc9068d85c4bedf8bde6092dbe5714c4105ff31b78d322ddb"
+      },
+      "id": "h01-dense-percent-r1",
+      "profile": {
+        "bytes": 635066,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/capture-v1/children/h01-dense-percent-r1/heaptrack.data.gz.zst",
+        "sha256": "28934e5382945aaef5852ad416c9bce1824f9a397c4db28e7935f1827afaea63"
+      },
+      "repeat": 1,
+      "report": {
+        "bytes": 5467,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/capture-v1/children/h01-dense-percent-r1/workload/report.json",
+        "sha256": "464bd8ec111f69ec1bd7ead70f99691ed5790082d4a2ded03de5a4f374b43324"
+      },
+      "samples": 3,
+      "shape": "dense-sparse",
+      "size_aggregates": {
+        "bytes": 7421,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h01-dense-percent-r1/size-aggregates.tsv",
+        "sha256": "1bd464fe8d4220290754ff03cc253916450a1f292b0723d355d38bc83093c678"
+      },
+      "trace_aggregates": {
+        "bytes": 160968104,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h01-dense-percent-r1/trace-aggregates.jsonl",
+        "sha256": "5e879aa5354f3b7b08fa8eed369a485c1d4dc52e6284c23c44ef6f0dd86e0b50"
+      },
+      "trace_size_aggregates": {
+        "bytes": 369550,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h01-dense-percent-r1/trace-size-aggregates.tsv",
+        "sha256": "6b68dfec6b325c1264f673585c5b67c2d96bbe4aa7ca597886c6a808f088ad0d"
+      },
+      "warmup": 0,
+      "workers": 1,
+      "workload": "one-percent"
+    },
+    {
+      "decoder_summary": {
+        "bytes": 2088,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h02-medium-one-edit-r1/summary.json",
+        "sha256": "302f587c4faa87508591c3eddb8c34b17379e50ca1525f8b2bebc7beacf1a27d"
+      },
+      "heaptrack_folded": {
+        "bytes": 49781405,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/heaptrack-exports-v1/h02-medium-one-edit-r1/allocation-stacks.folded",
+        "sha256": "bba227c32c1eae570900ec64a2c3163daed1749cb524fdcbb4797d645c2ef648"
+      },
+      "heaptrack_histogram": {
+        "bytes": 2269,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/heaptrack-exports-v1/h02-medium-one-edit-r1/allocation-size.histogram",
+        "sha256": "03c2968489fd6603f0990a73543df14c2e3861071afaf64b6db0e268afc29af7"
+      },
+      "id": "h02-medium-one-edit-r1",
+      "profile": {
+        "bytes": 558297,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/capture-v1/children/h02-medium-one-edit-r1/heaptrack.data.gz.zst",
+        "sha256": "2b859567650ac640949660fc72cbb1d28c20440ad998246ca852226836fa34fa"
+      },
+      "repeat": 1,
+      "report": {
+        "bytes": 5430,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/capture-v1/children/h02-medium-one-edit-r1/workload/report.json",
+        "sha256": "3511dfd67512e88c94b8a1eb6707ca168460a0ab5ef56bd376416f0328e88a84"
+      },
+      "samples": 3,
+      "shape": "medium",
+      "size_aggregates": {
+        "bytes": 4116,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h02-medium-one-edit-r1/size-aggregates.tsv",
+        "sha256": "cc719738df54b26105e7abfc8e1c6aa975c50ea8cd67520fb3b8c236f32e5e00"
+      },
+      "trace_aggregates": {
+        "bytes": 159780171,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h02-medium-one-edit-r1/trace-aggregates.jsonl",
+        "sha256": "71d8272cddc1ac197cd149887896e83bf5ff90f86b359ad4283a375709942187"
+      },
+      "trace_size_aggregates": {
+        "bytes": 336681,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h02-medium-one-edit-r1/trace-size-aggregates.tsv",
+        "sha256": "69cc90d1314a798591850beec04fa4c9bb730227eb9f80984763ff00797acefd"
+      },
+      "warmup": 0,
+      "workers": 1,
+      "workload": "one-edit"
+    },
+    {
+      "decoder_summary": {
+        "bytes": 2088,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h03-medium-one-edit-r2/summary.json",
+        "sha256": "814075d1a278c1155efec75e6765135fdcc8600b20c1711530f27e714c62e4df"
+      },
+      "heaptrack_folded": {
+        "bytes": 49781405,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/heaptrack-exports-v1/h03-medium-one-edit-r2/allocation-stacks.folded",
+        "sha256": "f0ff6a7bd260bd3d36df803c5f24f7a41b3399aa9f4fa7c9a9f101110cf0a806"
+      },
+      "heaptrack_histogram": {
+        "bytes": 2269,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/heaptrack-exports-v1/h03-medium-one-edit-r2/allocation-size.histogram",
+        "sha256": "ef93eb5b3e0ca018ae7ab375d2229e2b37481d2c9761d57637a78bcd46ccc2e5"
+      },
+      "id": "h03-medium-one-edit-r2",
+      "profile": {
+        "bytes": 556244,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/capture-v1/children/h03-medium-one-edit-r2/heaptrack.data.gz.zst",
+        "sha256": "bad7f3c459c3a7cccd417e92e919e9a4f3efa42f52b1b1ad17890fc873339d5e"
+      },
+      "repeat": 2,
+      "report": {
+        "bytes": 5431,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/capture-v1/children/h03-medium-one-edit-r2/workload/report.json",
+        "sha256": "4512d1efb7f8b356e7c7ab103bd4456cc35fb1c469bc563a081f36842c76052e"
+      },
+      "samples": 3,
+      "shape": "medium",
+      "size_aggregates": {
+        "bytes": 4116,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h03-medium-one-edit-r2/size-aggregates.tsv",
+        "sha256": "22c1a5037763d1e55551b66e8e245b64f9ad682a9923a34a8253c12ed4dcac82"
+      },
+      "trace_aggregates": {
+        "bytes": 159780172,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h03-medium-one-edit-r2/trace-aggregates.jsonl",
+        "sha256": "608b32d607bca65dce01de68f879e8bcfd122c438e781168ee2acfc5dc0255eb"
+      },
+      "trace_size_aggregates": {
+        "bytes": 336824,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h03-medium-one-edit-r2/trace-size-aggregates.tsv",
+        "sha256": "f4b7b43b2fe2f88ca25e2a1b9718e53cde98c944780dee6da19d54dd6372b204"
+      },
+      "warmup": 0,
+      "workers": 1,
+      "workload": "one-edit"
+    },
+    {
+      "decoder_summary": {
+        "bytes": 2080,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h04-dense-percent-r2/summary.json",
+        "sha256": "9d59442c6d485f8016d9430a38f82d3fb9dd7541f24cb319fc2fc0b9a5b41e3f"
+      },
+      "heaptrack_folded": {
+        "bytes": 50171502,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/heaptrack-exports-v1/h04-dense-percent-r2/allocation-stacks.folded",
+        "sha256": "2083b14378c13bb4868e99d4ca639c935a83cc170396c7d0359635e391d78a16"
+      },
+      "heaptrack_histogram": {
+        "bytes": 4100,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/heaptrack-exports-v1/h04-dense-percent-r2/allocation-size.histogram",
+        "sha256": "af97d9d54bd2cab54a723b1a6107df6478dbc750ffb46875c76e1a5d0305a8cd"
+      },
+      "id": "h04-dense-percent-r2",
+      "profile": {
+        "bytes": 636794,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/capture-v1/children/h04-dense-percent-r2/heaptrack.data.gz.zst",
+        "sha256": "2687b137e1180d08a53779e1456012f843c0fb865d55c0a5b8e9dd6b5850c3da"
+      },
+      "repeat": 2,
+      "report": {
+        "bytes": 5467,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/capture-v1/children/h04-dense-percent-r2/workload/report.json",
+        "sha256": "79af26fdc8c608f6719ad08e4133eb9bb0b7f52149b02b275e0ee986e342812d"
+      },
+      "samples": 3,
+      "shape": "dense-sparse",
+      "size_aggregates": {
+        "bytes": 7421,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h04-dense-percent-r2/size-aggregates.tsv",
+        "sha256": "9bcc9d608ea963021eee6f96bddcad75ab367bf184fe1528d32fd9becf92dfd9"
+      },
+      "trace_aggregates": {
+        "bytes": 160968104,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h04-dense-percent-r2/trace-aggregates.jsonl",
+        "sha256": "bd910d0c94c74e3169d9b6cd8e8e13b97c2953bbd60f3b43352b79fe10c86381"
+      },
+      "trace_size_aggregates": {
+        "bytes": 369591,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h04-dense-percent-r2/trace-size-aggregates.tsv",
+        "sha256": "198a236f0f8d260c4a0ff43d14166976b703583d858fc7db73b63e6a6fb40ce9"
+      },
+      "warmup": 0,
+      "workers": 1,
+      "workload": "one-percent"
+    },
+    {
+      "decoder_summary": {
+        "bytes": 2085,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h05-medium-percent-r2/summary.json",
+        "sha256": "79d13ce779fcb76017e86ad8a8d6b34414711c581f6e233408029ffdc82efd5a"
+      },
+      "heaptrack_folded": {
+        "bytes": 50012889,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/heaptrack-exports-v1/h05-medium-percent-r2/allocation-stacks.folded",
+        "sha256": "273982341c647ac95672991019c1c371e622b47a3ffadb4a2ec05eb4510ecc39"
+      },
+      "heaptrack_histogram": {
+        "bytes": 3207,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/heaptrack-exports-v1/h05-medium-percent-r2/allocation-size.histogram",
+        "sha256": "aed9cdb87a3aa6579b1ac0010efcc971cfbbfb43fabff08d8a09f05444343300"
+      },
+      "id": "h05-medium-percent-r2",
+      "profile": {
+        "bytes": 585473,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/capture-v1/children/h05-medium-percent-r2/heaptrack.data.gz.zst",
+        "sha256": "4857e8f2cbba1bbed7e8579a4ae04e7cff97aa7b6b2e72029f3a2faada55d86a"
+      },
+      "repeat": 2,
+      "report": {
+        "bytes": 5444,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/capture-v1/children/h05-medium-percent-r2/workload/report.json",
+        "sha256": "8ee86a8415951ff31f9219a236cd19be8a035e6f6b4202a25defc37115ed4821"
+      },
+      "samples": 3,
+      "shape": "medium",
+      "size_aggregates": {
+        "bytes": 5815,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h05-medium-percent-r2/size-aggregates.tsv",
+        "sha256": "60da601754bb3f5e414f6dcc4abe912ddb15d510e89add2f87e1618c14bf9184"
+      },
+      "trace_aggregates": {
+        "bytes": 160480698,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h05-medium-percent-r2/trace-aggregates.jsonl",
+        "sha256": "3965694a55722e96fc4b81c89982bfb5150324df1a299612b1b439896e39b8c3"
+      },
+      "trace_size_aggregates": {
+        "bytes": 350716,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0958/raw-decoder-v1/h05-medium-percent-r2/trace-size-aggregates.tsv",
+        "sha256": "cc7722f033491523d8ef644d1aa47bfeff1b4434a6439852bedb59138354ddab"
+      },
+      "warmup": 0,
+      "workers": 1,
+      "workload": "one-percent"
+    }
+  ],
+  "schema": "litchi.performance.0958.heaptrack-attribution-input.v1",
+  "scope": {
+    "no_workloads_started_by_analyzer": true,
+    "owner_requires": "timed_iteration + stage_timed_commit; MultiSourceEdit::commit recorded separately as commit-core surrogate",
+    "phase_allocation_inference": false,
+    "whole_process": true
+  },
+  "source_trace": {
+    "bytes": 16803,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0958/review/number-ownership-trace-v2.md",
+    "sha256": "3de25114247d354cf6b512db9599aac5ce921149a06fb13351dd048382cd75d2"
+  },
+  "status": "sealed"
+}

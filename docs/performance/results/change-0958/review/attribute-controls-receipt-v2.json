@@ -1,0 +1,33 @@
+{
+  "controls": [
+    {
+      "manifest": "/home/zhuhe/litchi-performance-0958/review/attribute-controls-v1/manifest.json",
+      "name": "positive-conservation",
+      "output": "/home/zhuhe/litchi-performance-0958/review/attribute-controls-v1/positive-final.json",
+      "output_sha256": "d9f11ac1f4d857cf5772f3691d869ed99edefb617cf54d864a2507b3fd9a7fc2",
+      "status": "pass"
+    },
+    {
+      "expected": "fail closed on descriptor SHA mismatch",
+      "manifest": "/home/zhuhe/litchi-performance-0958/review/attribute-controls-v1/manifest-bad.json",
+      "name": "mutated-histogram",
+      "status": "fail-closed",
+      "stderr": "/home/zhuhe/litchi-performance-0958/review/attribute-controls-v1/negative-histogram-final.stderr",
+      "stderr_sha256": "91069642683aac1f608e25fcdd2c97246f72b6dc999eb48eafa248b77d03557f"
+    },
+    {
+      "command": "python3 /home/zhuhe/litchi-performance-0958/tools/attribute_0958_v1.py --self-test",
+      "name": "self-test",
+      "status": "pass"
+    }
+  ],
+  "note": "The prior v1 controls receipt remains historical; this v2 receipt binds the final clone-classification helper.",
+  "schema": "litchi.performance.0958.attribute-controls-receipt.v2",
+  "status": "pass",
+  "tool": {
+    "bytes": 34603,
+    "path": "/home/zhuhe/litchi-performance-0958/tools/attribute_0958_v1.py",
+    "sha256": "1bb7584076762eefadc409016abf50684157e9350a76386255c5763e47d7cffd"
+  },
+  "workload_started": false
+}

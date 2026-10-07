@@ -1,0 +1,1089 @@
+{
+  "aggregate": {
+    "owner_admission": "at least one selected row",
+    "raw_whole_process": {
+      "calls": 13032599,
+      "requested_bytes": 3406101409,
+      "trace_count": 6
+    },
+    "selected_timed_owner": {
+      "calls": 2081214,
+      "requested_bytes": 274320408,
+      "trace_count": 6
+    }
+  },
+  "historical_failures": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0958/analysis-v1/attribute-v1.json",
+      "reason": "tab-only folded parser",
+      "sha256": "6ee76c5be5cd3dfd409349afeca25a188f8eafab5d86df8eb3573d7955abe5b1",
+      "status": "fail"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0958/analysis-v1/attribute-v2.json",
+      "reason": "overbroad generic clone classification",
+      "sha256": "35134d757fd85250cacdffd1fea9f1c5236c611fcff4dc938b25d8bfc5775077",
+      "status": "superseded"
+    }
+  ],
+  "interpretation": [
+    "stored_clone intersections match the source-derived per-iteration model times three samples: medium-percent 27369 calls/176169 bytes, dense-percent 52842/278721, medium-one-edit 6909/32799 per child.",
+    "number_clone and merge_clone are nonadditive overlap diagnostics and must not be added to stored_clone or to the exclusive partition.",
+    "The selected owner totals include whole-process rows and the unqualified remainder is retained; they do not quantify a timed phase or establish speed/adoption impact."
+  ],
+  "runs": [
+    {
+      "conservation": "pass",
+      "exclusive_leaf_partition": {
+        "clone": {
+          "calls": 29115,
+          "requested_bytes": 220908,
+          "trace_count": 20
+        },
+        "copy": {
+          "calls": 142794,
+          "requested_bytes": 271449,
+          "trace_count": 200
+        },
+        "merge": {
+          "calls": 12,
+          "requested_bytes": 5087232,
+          "trace_count": 2
+        },
+        "number": {
+          "calls": 27927,
+          "requested_bytes": 179739,
+          "trace_count": 4
+        },
+        "realloc": {
+          "calls": 127683,
+          "requested_bytes": 36972759,
+          "trace_count": 422
+        },
+        "selected_owner_other": {
+          "calls": 2841,
+          "requested_bytes": 8767953,
+          "trace_count": 220
+        }
+      },
+      "id": "h00-medium-percent-r1",
+      "nonadditive_source_tags": {
+        "clone": {
+          "calls": 29115,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 220908,
+          "trace_count": 20
+        },
+        "copy": {
+          "calls": 142794,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 271449,
+          "trace_count": 200
+        },
+        "merge": {
+          "calls": 27453,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 5296425,
+          "trace_count": 10
+        },
+        "number": {
+          "calls": 56412,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 363048,
+          "trace_count": 14
+        },
+        "realloc": {
+          "calls": 128034,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 37007568,
+          "trace_count": 430
+        },
+        "stored": {
+          "calls": 27369,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 176169,
+          "trace_count": 2
+        }
+      },
+      "raw_whole_process": {
+        "calls": 1858480,
+        "requested_bytes": 549846107,
+        "trace_count": 0
+      },
+      "reason_trace_counts": {
+        "decoder_unknown_frame": 1,
+        "missing_stage_timed_commit": 15586,
+        "missing_timed_iteration": 15452
+      },
+      "repeat": 1,
+      "selected_source_callsite_top": [
+        {
+          "calls": 12,
+          "callsite": "litchi_xlsx::cell::Store::merge_omitted_cells::h9412643c4b1fb603|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|915",
+          "requested_bytes": 5087232,
+          "trace_count": 2
+        },
+        {
+          "calls": 27927,
+          "callsite": "litchi_xlsx::cell::Number::new::h4c4b46fd42225550|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|395",
+          "requested_bytes": 179739,
+          "trace_count": 4
+        },
+        {
+          "calls": 72,
+          "callsite": "litchi_xlsx::cell::Store::merge_omitted_cells::h9412643c4b1fb603|src/cell.rs|936",
+          "requested_bytes": 33024,
+          "trace_count": 6
+        },
+        {
+          "calls": 177,
+          "callsite": "litchi_xlsx::cell_values::snapshot::copy_boxed::h09de8fe09dc59f4a|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs|2632",
+          "requested_bytes": 6600,
+          "trace_count": 40
+        },
+        {
+          "calls": 81,
+          "callsite": "quick_xml::events::Event::into_owned::h29193e76a83cd368|src/events/mod.rs|0",
+          "requested_bytes": 3582,
+          "trace_count": 12
+        }
+      ],
+      "selected_timed_owner": {
+        "calls": 330372,
+        "requested_bytes": 51500040,
+        "trace_count": 868
+      },
+      "shape": "medium",
+      "source_tag_intersections": {
+        "merge_clone": {
+          "calls": 27441,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 209193,
+          "trace_count": 8
+        },
+        "number_clone": {
+          "calls": 28485,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 183309,
+          "trace_count": 10
+        },
+        "stored_clone": {
+          "calls": 27369,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 176169,
+          "trace_count": 2
+        }
+      },
+      "stage_resolution_note": "MultiSourceEdit::commit is an explicitly labelled commit-core surrogate; stage_timed_commit is exact when present. These buckets are disjoint resolution buckets within selected rows.",
+      "stage_resolution_totals": {
+        "MultiSourceEdit::commit": {
+          "calls": 125736,
+          "requested_bytes": 9375417,
+          "trace_count": 438
+        },
+        "stage_timed_commit": {
+          "calls": 204636,
+          "requested_bytes": 42124623,
+          "trace_count": 430
+        }
+      },
+      "unknown_any_frame": {
+        "calls": 1,
+        "requested_bytes": 73728,
+        "trace_count": 1
+      },
+      "unqualified": {
+        "calls": 1528108,
+        "requested_bytes": 498346067,
+        "trace_count": 16024
+      },
+      "workload": "one-percent"
+    },
+    {
+      "conservation": "pass",
+      "exclusive_leaf_partition": {
+        "clone": {
+          "calls": 56103,
+          "requested_bytes": 326517,
+          "trace_count": 18
+        },
+        "copy": {
+          "calls": 273798,
+          "requested_bytes": 501672,
+          "trace_count": 200
+        },
+        "merge": {
+          "calls": 12,
+          "requested_bytes": 9821184,
+          "trace_count": 2
+        },
+        "number": {
+          "calls": 53910,
+          "requested_bytes": 284334,
+          "trace_count": 4
+        },
+        "realloc": {
+          "calls": 239799,
+          "requested_bytes": 49966872,
+          "trace_count": 420
+        },
+        "selected_owner_other": {
+          "calls": 4632,
+          "requested_bytes": 12911640,
+          "trace_count": 226
+        }
+      },
+      "id": "h01-dense-percent-r1",
+      "nonadditive_source_tags": {
+        "clone": {
+          "calls": 56103,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 326517,
+          "trace_count": 18
+        },
+        "copy": {
+          "calls": 273798,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 501672,
+          "trace_count": 200
+        },
+        "merge": {
+          "calls": 52911,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 10128321,
+          "trace_count": 8
+        },
+        "number": {
+          "calls": 108888,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 574287,
+          "trace_count": 14
+        },
+        "realloc": {
+          "calls": 240390,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 49998096,
+          "trace_count": 426
+        },
+        "stored": {
+          "calls": 52842,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 278721,
+          "trace_count": 2
+        }
+      },
+      "raw_whole_process": {
+        "calls": 3475099,
+        "requested_bytes": 704324249,
+        "trace_count": 0
+      },
+      "reason_trace_counts": {
+        "decoder_unknown_frame": 1,
+        "missing_stage_timed_commit": 15621,
+        "missing_timed_iteration": 15487
+      },
+      "repeat": 1,
+      "selected_source_callsite_top": [
+        {
+          "calls": 12,
+          "callsite": "litchi_xlsx::cell::Store::merge_omitted_cells::h9412643c4b1fb603|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|915",
+          "requested_bytes": 9821184,
+          "trace_count": 2
+        },
+        {
+          "calls": 53910,
+          "callsite": "litchi_xlsx::cell::Number::new::h4c4b46fd42225550|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|395",
+          "requested_bytes": 284334,
+          "trace_count": 4
+        },
+        {
+          "calls": 57,
+          "callsite": "litchi_xlsx::cell::Store::merge_omitted_cells::h9412643c4b1fb603|src/cell.rs|936",
+          "requested_bytes": 28416,
+          "trace_count": 4
+        },
+        {
+          "calls": 177,
+          "callsite": "litchi_xlsx::cell_values::snapshot::copy_boxed::h09de8fe09dc59f4a|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs|2632",
+          "requested_bytes": 6600,
+          "trace_count": 40
+        },
+        {
+          "calls": 81,
+          "callsite": "quick_xml::events::Event::into_owned::h29193e76a83cd368|src/events/mod.rs|0",
+          "requested_bytes": 3582,
+          "trace_count": 12
+        }
+      ],
+      "selected_timed_owner": {
+        "calls": 628254,
+        "requested_bytes": 73812219,
+        "trace_count": 870
+      },
+      "shape": "dense-sparse",
+      "source_tag_intersections": {
+        "merge_clone": {
+          "calls": 52899,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 307137,
+          "trace_count": 6
+        },
+        "number_clone": {
+          "calls": 54978,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 289953,
+          "trace_count": 10
+        },
+        "stored_clone": {
+          "calls": 52842,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 278721,
+          "trace_count": 2
+        }
+      },
+      "stage_resolution_note": "MultiSourceEdit::commit is an explicitly labelled commit-core surrogate; stage_timed_commit is exact when present. These buckets are disjoint resolution buckets within selected rows.",
+      "stage_resolution_totals": {
+        "MultiSourceEdit::commit": {
+          "calls": 237912,
+          "requested_bytes": 17503743,
+          "trace_count": 448
+        },
+        "stage_timed_commit": {
+          "calls": 390342,
+          "requested_bytes": 56308476,
+          "trace_count": 422
+        }
+      },
+      "unknown_any_frame": {
+        "calls": 1,
+        "requested_bytes": 73728,
+        "trace_count": 1
+      },
+      "unqualified": {
+        "calls": 2846845,
+        "requested_bytes": 630512030,
+        "trace_count": 16069
+      },
+      "workload": "one-percent"
+    },
+    {
+      "conservation": "pass",
+      "exclusive_leaf_partition": {
+        "clone": {
+          "calls": 6945,
+          "requested_bytes": 41100,
+          "trace_count": 20
+        },
+        "copy": {
+          "calls": 35940,
+          "requested_bytes": 97491,
+          "trace_count": 200
+        },
+        "merge": {
+          "calls": 3,
+          "requested_bytes": 1271808,
+          "trace_count": 2
+        },
+        "number": {
+          "calls": 6915,
+          "requested_bytes": 32805,
+          "trace_count": 4
+        },
+        "realloc": {
+          "calls": 31851,
+          "requested_bytes": 9185382,
+          "trace_count": 412
+        },
+        "selected_owner_other": {
+          "calls": 327,
+          "requested_bytes": 1219359,
+          "trace_count": 204
+        }
+      },
+      "id": "h02-medium-one-edit-r1",
+      "nonadditive_source_tags": {
+        "clone": {
+          "calls": 6945,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 41100,
+          "trace_count": 20
+        },
+        "copy": {
+          "calls": 35940,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 97491,
+          "trace_count": 200
+        },
+        "merge": {
+          "calls": 6930,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 1312863,
+          "trace_count": 10
+        },
+        "number": {
+          "calls": 13836,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 65616,
+          "trace_count": 14
+        },
+        "realloc": {
+          "calls": 31872,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 9193641,
+          "trace_count": 420
+        },
+        "stored": {
+          "calls": 6909,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 32799,
+          "trace_count": 2
+        }
+      },
+      "raw_whole_process": {
+        "calls": 1182718,
+        "requested_bytes": 448880297,
+        "trace_count": 0
+      },
+      "reason_trace_counts": {
+        "decoder_unknown_frame": 1,
+        "missing_stage_timed_commit": 15554,
+        "missing_timed_iteration": 15408
+      },
+      "repeat": 1,
+      "selected_source_callsite_top": [
+        {
+          "calls": 3,
+          "callsite": "litchi_xlsx::cell::Store::merge_omitted_cells::h9412643c4b1fb603|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|915",
+          "requested_bytes": 1271808,
+          "trace_count": 2
+        },
+        {
+          "calls": 6915,
+          "callsite": "litchi_xlsx::cell::Number::new::h4c4b46fd42225550|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|395",
+          "requested_bytes": 32805,
+          "trace_count": 4
+        },
+        {
+          "calls": 18,
+          "callsite": "litchi_xlsx::cell::Store::merge_omitted_cells::h9412643c4b1fb603|src/cell.rs|936",
+          "requested_bytes": 8256,
+          "trace_count": 6
+        },
+        {
+          "calls": 150,
+          "callsite": "litchi_xlsx::cell_values::snapshot::copy_boxed::h09de8fe09dc59f4a|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs|2632",
+          "requested_bytes": 5214,
+          "trace_count": 40
+        },
+        {
+          "calls": 81,
+          "callsite": "quick_xml::events::Event::into_owned::h29193e76a83cd368|src/events/mod.rs|0",
+          "requested_bytes": 3582,
+          "trace_count": 12
+        }
+      ],
+      "selected_timed_owner": {
+        "calls": 81981,
+        "requested_bytes": 11847945,
+        "trace_count": 842
+      },
+      "shape": "medium",
+      "source_tag_intersections": {
+        "merge_clone": {
+          "calls": 6927,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 41055,
+          "trace_count": 8
+        },
+        "number_clone": {
+          "calls": 6921,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 32811,
+          "trace_count": 10
+        },
+        "stored_clone": {
+          "calls": 6909,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 32799,
+          "trace_count": 2
+        }
+      },
+      "stage_resolution_note": "MultiSourceEdit::commit is an explicitly labelled commit-core surrogate; stage_timed_commit is exact when present. These buckets are disjoint resolution buckets within selected rows.",
+      "stage_resolution_totals": {
+        "MultiSourceEdit::commit": {
+          "calls": 30525,
+          "requested_bytes": 2173233,
+          "trace_count": 416
+        },
+        "stage_timed_commit": {
+          "calls": 51456,
+          "requested_bytes": 9674712,
+          "trace_count": 426
+        }
+      },
+      "unknown_any_frame": {
+        "calls": 1,
+        "requested_bytes": 73728,
+        "trace_count": 1
+      },
+      "unqualified": {
+        "calls": 1100737,
+        "requested_bytes": 437032352,
+        "trace_count": 15970
+      },
+      "workload": "one-edit"
+    },
+    {
+      "conservation": "pass",
+      "exclusive_leaf_partition": {
+        "clone": {
+          "calls": 6945,
+          "requested_bytes": 41100,
+          "trace_count": 20
+        },
+        "copy": {
+          "calls": 35940,
+          "requested_bytes": 97491,
+          "trace_count": 200
+        },
+        "merge": {
+          "calls": 3,
+          "requested_bytes": 1271808,
+          "trace_count": 2
+        },
+        "number": {
+          "calls": 6915,
+          "requested_bytes": 32805,
+          "trace_count": 4
+        },
+        "realloc": {
+          "calls": 31851,
+          "requested_bytes": 9185382,
+          "trace_count": 412
+        },
+        "selected_owner_other": {
+          "calls": 327,
+          "requested_bytes": 1219359,
+          "trace_count": 204
+        }
+      },
+      "id": "h03-medium-one-edit-r2",
+      "nonadditive_source_tags": {
+        "clone": {
+          "calls": 6945,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 41100,
+          "trace_count": 20
+        },
+        "copy": {
+          "calls": 35940,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 97491,
+          "trace_count": 200
+        },
+        "merge": {
+          "calls": 6930,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 1312863,
+          "trace_count": 10
+        },
+        "number": {
+          "calls": 13836,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 65616,
+          "trace_count": 14
+        },
+        "realloc": {
+          "calls": 31872,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 9193641,
+          "trace_count": 420
+        },
+        "stored": {
+          "calls": 6909,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 32799,
+          "trace_count": 2
+        }
+      },
+      "raw_whole_process": {
+        "calls": 1182722,
+        "requested_bytes": 448880388,
+        "trace_count": 0
+      },
+      "reason_trace_counts": {
+        "decoder_unknown_frame": 1,
+        "missing_stage_timed_commit": 15554,
+        "missing_timed_iteration": 15408
+      },
+      "repeat": 2,
+      "selected_source_callsite_top": [
+        {
+          "calls": 3,
+          "callsite": "litchi_xlsx::cell::Store::merge_omitted_cells::h9412643c4b1fb603|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|915",
+          "requested_bytes": 1271808,
+          "trace_count": 2
+        },
+        {
+          "calls": 6915,
+          "callsite": "litchi_xlsx::cell::Number::new::h4c4b46fd42225550|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|395",
+          "requested_bytes": 32805,
+          "trace_count": 4
+        },
+        {
+          "calls": 18,
+          "callsite": "litchi_xlsx::cell::Store::merge_omitted_cells::h9412643c4b1fb603|src/cell.rs|936",
+          "requested_bytes": 8256,
+          "trace_count": 6
+        },
+        {
+          "calls": 150,
+          "callsite": "litchi_xlsx::cell_values::snapshot::copy_boxed::h09de8fe09dc59f4a|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs|2632",
+          "requested_bytes": 5214,
+          "trace_count": 40
+        },
+        {
+          "calls": 81,
+          "callsite": "quick_xml::events::Event::into_owned::h29193e76a83cd368|src/events/mod.rs|0",
+          "requested_bytes": 3582,
+          "trace_count": 12
+        }
+      ],
+      "selected_timed_owner": {
+        "calls": 81981,
+        "requested_bytes": 11847945,
+        "trace_count": 842
+      },
+      "shape": "medium",
+      "source_tag_intersections": {
+        "merge_clone": {
+          "calls": 6927,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 41055,
+          "trace_count": 8
+        },
+        "number_clone": {
+          "calls": 6921,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 32811,
+          "trace_count": 10
+        },
+        "stored_clone": {
+          "calls": 6909,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 32799,
+          "trace_count": 2
+        }
+      },
+      "stage_resolution_note": "MultiSourceEdit::commit is an explicitly labelled commit-core surrogate; stage_timed_commit is exact when present. These buckets are disjoint resolution buckets within selected rows.",
+      "stage_resolution_totals": {
+        "MultiSourceEdit::commit": {
+          "calls": 30525,
+          "requested_bytes": 2173233,
+          "trace_count": 416
+        },
+        "stage_timed_commit": {
+          "calls": 51456,
+          "requested_bytes": 9674712,
+          "trace_count": 426
+        }
+      },
+      "unknown_any_frame": {
+        "calls": 1,
+        "requested_bytes": 73728,
+        "trace_count": 1
+      },
+      "unqualified": {
+        "calls": 1100741,
+        "requested_bytes": 437032443,
+        "trace_count": 15970
+      },
+      "workload": "one-edit"
+    },
+    {
+      "conservation": "pass",
+      "exclusive_leaf_partition": {
+        "clone": {
+          "calls": 56103,
+          "requested_bytes": 326517,
+          "trace_count": 18
+        },
+        "copy": {
+          "calls": 273798,
+          "requested_bytes": 501672,
+          "trace_count": 200
+        },
+        "merge": {
+          "calls": 12,
+          "requested_bytes": 9821184,
+          "trace_count": 2
+        },
+        "number": {
+          "calls": 53910,
+          "requested_bytes": 284334,
+          "trace_count": 4
+        },
+        "realloc": {
+          "calls": 239799,
+          "requested_bytes": 49966872,
+          "trace_count": 420
+        },
+        "selected_owner_other": {
+          "calls": 4632,
+          "requested_bytes": 12911640,
+          "trace_count": 226
+        }
+      },
+      "id": "h04-dense-percent-r2",
+      "nonadditive_source_tags": {
+        "clone": {
+          "calls": 56103,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 326517,
+          "trace_count": 18
+        },
+        "copy": {
+          "calls": 273798,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 501672,
+          "trace_count": 200
+        },
+        "merge": {
+          "calls": 52911,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 10128321,
+          "trace_count": 8
+        },
+        "number": {
+          "calls": 108888,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 574287,
+          "trace_count": 14
+        },
+        "realloc": {
+          "calls": 240390,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 49998096,
+          "trace_count": 426
+        },
+        "stored": {
+          "calls": 52842,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 278721,
+          "trace_count": 2
+        }
+      },
+      "raw_whole_process": {
+        "calls": 3475099,
+        "requested_bytes": 704324238,
+        "trace_count": 0
+      },
+      "reason_trace_counts": {
+        "decoder_unknown_frame": 1,
+        "missing_stage_timed_commit": 15621,
+        "missing_timed_iteration": 15487
+      },
+      "repeat": 2,
+      "selected_source_callsite_top": [
+        {
+          "calls": 12,
+          "callsite": "litchi_xlsx::cell::Store::merge_omitted_cells::h9412643c4b1fb603|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|915",
+          "requested_bytes": 9821184,
+          "trace_count": 2
+        },
+        {
+          "calls": 53910,
+          "callsite": "litchi_xlsx::cell::Number::new::h4c4b46fd42225550|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|395",
+          "requested_bytes": 284334,
+          "trace_count": 4
+        },
+        {
+          "calls": 57,
+          "callsite": "litchi_xlsx::cell::Store::merge_omitted_cells::h9412643c4b1fb603|src/cell.rs|936",
+          "requested_bytes": 28416,
+          "trace_count": 4
+        },
+        {
+          "calls": 177,
+          "callsite": "litchi_xlsx::cell_values::snapshot::copy_boxed::h09de8fe09dc59f4a|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs|2632",
+          "requested_bytes": 6600,
+          "trace_count": 40
+        },
+        {
+          "calls": 81,
+          "callsite": "quick_xml::events::Event::into_owned::h29193e76a83cd368|src/events/mod.rs|0",
+          "requested_bytes": 3582,
+          "trace_count": 12
+        }
+      ],
+      "selected_timed_owner": {
+        "calls": 628254,
+        "requested_bytes": 73812219,
+        "trace_count": 870
+      },
+      "shape": "dense-sparse",
+      "source_tag_intersections": {
+        "merge_clone": {
+          "calls": 52899,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 307137,
+          "trace_count": 6
+        },
+        "number_clone": {
+          "calls": 54978,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 289953,
+          "trace_count": 10
+        },
+        "stored_clone": {
+          "calls": 52842,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 278721,
+          "trace_count": 2
+        }
+      },
+      "stage_resolution_note": "MultiSourceEdit::commit is an explicitly labelled commit-core surrogate; stage_timed_commit is exact when present. These buckets are disjoint resolution buckets within selected rows.",
+      "stage_resolution_totals": {
+        "MultiSourceEdit::commit": {
+          "calls": 237912,
+          "requested_bytes": 17503743,
+          "trace_count": 448
+        },
+        "stage_timed_commit": {
+          "calls": 390342,
+          "requested_bytes": 56308476,
+          "trace_count": 422
+        }
+      },
+      "unknown_any_frame": {
+        "calls": 1,
+        "requested_bytes": 73728,
+        "trace_count": 1
+      },
+      "unqualified": {
+        "calls": 2846845,
+        "requested_bytes": 630512019,
+        "trace_count": 16069
+      },
+      "workload": "one-percent"
+    },
+    {
+      "conservation": "pass",
+      "exclusive_leaf_partition": {
+        "clone": {
+          "calls": 29115,
+          "requested_bytes": 220908,
+          "trace_count": 20
+        },
+        "copy": {
+          "calls": 142794,
+          "requested_bytes": 271449,
+          "trace_count": 200
+        },
+        "merge": {
+          "calls": 12,
+          "requested_bytes": 5087232,
+          "trace_count": 2
+        },
+        "number": {
+          "calls": 27927,
+          "requested_bytes": 179739,
+          "trace_count": 4
+        },
+        "realloc": {
+          "calls": 127683,
+          "requested_bytes": 36972759,
+          "trace_count": 422
+        },
+        "selected_owner_other": {
+          "calls": 2841,
+          "requested_bytes": 8767953,
+          "trace_count": 220
+        }
+      },
+      "id": "h05-medium-percent-r2",
+      "nonadditive_source_tags": {
+        "clone": {
+          "calls": 29115,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 220908,
+          "trace_count": 20
+        },
+        "copy": {
+          "calls": 142794,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 271449,
+          "trace_count": 200
+        },
+        "merge": {
+          "calls": 27453,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 5296425,
+          "trace_count": 10
+        },
+        "number": {
+          "calls": 56412,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 363048,
+          "trace_count": 14
+        },
+        "realloc": {
+          "calls": 128034,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 37007568,
+          "trace_count": 430
+        },
+        "stored": {
+          "calls": 27369,
+          "interpretation": "overlap diagnostic; not additive",
+          "requested_bytes": 176169,
+          "trace_count": 2
+        }
+      },
+      "raw_whole_process": {
+        "calls": 1858481,
+        "requested_bytes": 549846130,
+        "trace_count": 0
+      },
+      "reason_trace_counts": {
+        "decoder_unknown_frame": 1,
+        "missing_stage_timed_commit": 15586,
+        "missing_timed_iteration": 15452
+      },
+      "repeat": 2,
+      "selected_source_callsite_top": [
+        {
+          "calls": 12,
+          "callsite": "litchi_xlsx::cell::Store::merge_omitted_cells::h9412643c4b1fb603|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|915",
+          "requested_bytes": 5087232,
+          "trace_count": 2
+        },
+        {
+          "calls": 27927,
+          "callsite": "litchi_xlsx::cell::Number::new::h4c4b46fd42225550|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs|395",
+          "requested_bytes": 179739,
+          "trace_count": 4
+        },
+        {
+          "calls": 72,
+          "callsite": "litchi_xlsx::cell::Store::merge_omitted_cells::h9412643c4b1fb603|src/cell.rs|936",
+          "requested_bytes": 33024,
+          "trace_count": 6
+        },
+        {
+          "calls": 177,
+          "callsite": "litchi_xlsx::cell_values::snapshot::copy_boxed::h09de8fe09dc59f4a|/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs|2632",
+          "requested_bytes": 6600,
+          "trace_count": 40
+        },
+        {
+          "calls": 81,
+          "callsite": "quick_xml::events::Event::into_owned::h29193e76a83cd368|src/events/mod.rs|0",
+          "requested_bytes": 3582,
+          "trace_count": 12
+        }
+      ],
+      "selected_timed_owner": {
+        "calls": 330372,
+        "requested_bytes": 51500040,
+        "trace_count": 868
+      },
+      "shape": "medium",
+      "source_tag_intersections": {
+        "merge_clone": {
+          "calls": 27441,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 209193,
+          "trace_count": 8
+        },
+        "number_clone": {
+          "calls": 28485,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 183309,
+          "trace_count": 10
+        },
+        "stored_clone": {
+          "calls": 27369,
+          "interpretation": "nonadditive intersection; do not sum with source tags",
+          "requested_bytes": 176169,
+          "trace_count": 2
+        }
+      },
+      "stage_resolution_note": "MultiSourceEdit::commit is an explicitly labelled commit-core surrogate; stage_timed_commit is exact when present. These buckets are disjoint resolution buckets within selected rows.",
+      "stage_resolution_totals": {
+        "MultiSourceEdit::commit": {
+          "calls": 125736,
+          "requested_bytes": 9375417,
+          "trace_count": 438
+        },
+        "stage_timed_commit": {
+          "calls": 204636,
+          "requested_bytes": 42124623,
+          "trace_count": 430
+        }
+      },
+      "unknown_any_frame": {
+        "calls": 1,
+        "requested_bytes": 73728,
+        "trace_count": 1
+      },
+      "unqualified": {
+        "calls": 1528109,
+        "requested_bytes": 498346090,
+        "trace_count": 16024
+      },
+      "workload": "one-percent"
+    }
+  ],
+  "schema": "litchi.performance.0958.heaptrack-attribution-summary.v1",
+  "scope": {
+    "capture": "six sealed 0958 heaptrack children; this is offline only and launched no workloads",
+    "folded_export": "standard heaptrack folded output conserved calls but did not expose requested bytes; raw decoder and histogram conserved requested bytes",
+    "owner_admission": "whole-process allocation events requiring timed_iteration plus either exact stage_timed_commit or the separately labelled MultiSourceEdit::commit commit-core surrogate; rows with unknown frames remain unqualified",
+    "source_tags": "number/stored/clone/merge/copy/realloc are overlapping diagnostics; exclusive_leaf_partition is the only additive partition; intersections are nonadditive",
+    "stage_resolution": "exact stage_timed_commit rows and separately labelled MultiSourceEdit::commit commit-core surrogate rows; no phase-only allocation claim"
+  },
+  "status": "pass",
+  "tooling": {
+    "analysis": {
+      "bytes": 102361,
+      "path": "/home/zhuhe/litchi-performance-0958/analysis-v1/attribute-v3.json",
+      "sha256": "9fb5ae3b1b484e2fc8294c66d4712d8f818c1aed60a974fbe51bcd03173cf983"
+    },
+    "capture_manifest": {
+      "bytes": 10965,
+      "path": "/home/zhuhe/litchi-performance-0958/capture-manifest-v1.json",
+      "sha256": "bd30035f2c7926ec579fea58ecd1e5c5fe34da6b2ae129473bee033630e5c465"
+    },
+    "contract": {
+      "bytes": 3779,
+      "path": "/home/zhuhe/litchi-performance-0958/tooling/attribute-contract-v2.json",
+      "sha256": "9818ca39217c7fd363f5abe04e5a2feecde1450bfc8e4596c0e9fc362ef546e5"
+    },
+    "controls_receipt": {
+      "bytes": 1446,
+      "path": "/home/zhuhe/litchi-performance-0958/review/attribute-controls-receipt-v2.json",
+      "sha256": "5e623409ec7337aed8dea6a5db47c02c55f0b39196a815d32e4d2f9253832d68"
+    },
+    "helper": {
+      "bytes": 34603,
+      "path": "/home/zhuhe/litchi-performance-0958/tools/attribute_0958_v1.py",
+      "sha256": "1bb7584076762eefadc409016abf50684157e9350a76386255c5763e47d7cffd"
+    },
+    "input_manifest": {
+      "bytes": 16403,
+      "path": "/home/zhuhe/litchi-performance-0958/analysis-input-manifest-v1.json",
+      "sha256": "0dc7a9a4757d73a05d9fc289581a8ec6add494565f039b94e7addf8d18629495"
+    },
+    "plan": {
+      "bytes": 12919,
+      "path": "/home/zhuhe/litchi-performance-0958/plan-v5.json",
+      "sha256": "5bd826e1f93913b5be2fc5878be0c5270e323789222fffcf0e97121dcbc37695"
+    },
+    "receipt": {
+      "bytes": 5254,
+      "path": "/home/zhuhe/litchi-performance-0958/review/attribute-tooling-receipt-v2.json",
+      "sha256": "7f6573f7cfe8532d81a77ce40f252f5660648571885220d6d7907701a9c4d03a"
+    }
+  }
+}

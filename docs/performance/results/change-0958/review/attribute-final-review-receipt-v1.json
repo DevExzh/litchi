@@ -1,0 +1,68 @@
+{
+  "aggregate": {
+    "owner_admission": "at least one selected row",
+    "raw_whole_process": {
+      "calls": 13032599,
+      "requested_bytes": 3406101409,
+      "trace_count": 6
+    },
+    "selected_timed_owner": {
+      "calls": 2081214,
+      "requested_bytes": 274320408,
+      "trace_count": 6
+    }
+  },
+  "analysis": {
+    "bytes": 102361,
+    "path": "/home/zhuhe/litchi-performance-0958/analysis-v1/attribute-v3.json",
+    "sha256": "9fb5ae3b1b484e2fc8294c66d4712d8f818c1aed60a974fbe51bcd03173cf983"
+  },
+  "analyzer": {
+    "bytes": 34603,
+    "path": "/home/zhuhe/litchi-performance-0958/tools/attribute_0958_v1.py",
+    "sha256": "1bb7584076762eefadc409016abf50684157e9350a76386255c5763e47d7cffd"
+  },
+  "artifact_manifest": {
+    "bytes": 4075,
+    "path": "/home/zhuhe/litchi-performance-0958/review/attribute-artifact-manifest-v1.json",
+    "sha256": "e132f847eea3fa1d48a67b8dcbba7b3710bbf17e7d2a1b2dde12f346453588de"
+  },
+  "clone_and_source_tags": {
+    "exclusive_partition": "The only additive selected-owner partition.",
+    "merge_clone": "Nonadditive diagnostic overlap with merge-tagged rows; do not add to stored/number clone or exclusive partition.",
+    "number_clone": "Nonadditive diagnostic overlap; generic allocator Box::clone is excluded by the final classifier.",
+    "stored_clone": "Nonadditive intersection; matches the source-derived count/byte model in the three workloads, repeated at samples=3."
+  },
+  "compact_summary": {
+    "bytes": 35870,
+    "path": "/home/zhuhe/litchi-performance-0958/analysis-v1/summary-compact-v1.json",
+    "sha256": "60651f3f1495bd167b4a38d042b6d5201527ceae10403a0c6a7610e14ce61197"
+  },
+  "conservation": "Raw decoder, size aggregates, trace-size aggregates, and heaptrack histogram pass calls/requested-byte checks for all six runs; standard folded export calls pass but has no requested-byte column.",
+  "controls": {
+    "mutated_histogram": "fail-closed",
+    "positive": "pass",
+    "py_compile": "pass",
+    "self_test": "pass"
+  },
+  "historical_failures": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0958/analysis-v1/attribute-v1.json",
+      "reason": "tab-only folded parser",
+      "status": "preserved-fail"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0958/analysis-v1/attribute-v2.json",
+      "reason": "overbroad generic clone classification",
+      "status": "preserved-superseded"
+    }
+  ],
+  "schema": "litchi.performance.0958.attribute-final-review-receipt.v1",
+  "stage_resolution": {
+    "exact": "stage_timed_commit rows are admitted when this callsite resolves",
+    "interpretation": "Either exact stage_timed_commit or the explicit commit-core surrogate is required with timed_iteration; both are selected whole-process allocation rows, not a phase-only allocation measurement.",
+    "surrogate": "MultiSourceEdit::commit is retained in a separately labelled commit-core bucket only for inlined/unresolved stage_timed_commit stacks"
+  },
+  "status": "pass",
+  "workloads_started_by_analyzer": false
+}

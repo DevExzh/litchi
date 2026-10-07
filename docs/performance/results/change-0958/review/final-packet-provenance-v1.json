@@ -1,0 +1,342 @@
+{
+  "authoritative_analysis": {
+    "aggregate": {
+      "owner_admission": "at least one selected row",
+      "raw_whole_process": {
+        "calls": 13032599,
+        "requested_bytes": 3406101409,
+        "trace_count": 6
+      },
+      "selected_timed_owner": {
+        "calls": 2081214,
+        "requested_bytes": 274320408,
+        "trace_count": 6
+      }
+    },
+    "compact_summary": {
+      "bytes": 35870,
+      "path": "analysis-v1/summary-compact-v1.json",
+      "sha256": "60651f3f1495bd167b4a38d042b6d5201527ceae10403a0c6a7610e14ce61197"
+    },
+    "input_manifest": {
+      "bytes": 16403,
+      "path": "analysis-input-manifest-v1.json",
+      "sha256": "0dc7a9a4757d73a05d9fc289581a8ec6add494565f039b94e7addf8d18629495"
+    },
+    "output": {
+      "bytes": 102361,
+      "path": "analysis-v1/attribute-v3.json",
+      "sha256": "9fb5ae3b1b484e2fc8294c66d4712d8f818c1aed60a974fbe51bcd03173cf983"
+    },
+    "replay_receipt": {
+      "bytes": 536,
+      "path": "review/root-replay-receipt-v1.json",
+      "sha256": "4d83458f8185309788c3d46660f404f89a5562b95093765700d572eac83f9099"
+    },
+    "status": "pass",
+    "tool": "attribute_0958_v1"
+  },
+  "capture": {
+    "admission_note": "First-child symbol feasibility was checked after its terminal and before remaining children; bulk offline decoding and attribution started after capture freeze.",
+    "external_root": "/home/zhuhe/litchi-performance-0958",
+    "freeze": {
+      "bytes": 175,
+      "path": "capture-freeze-v1.json",
+      "sha256": "adcede1e6a20a397bb2f459a7bda81cbbfbc732bc8139f36e69ba866478efdab"
+    },
+    "frozen_before_offline_decode": true,
+    "large_artifacts": "capture-v1/, heaptrack-exports-v1/, raw-decoder-v1/ remain external and are bound by analysis-input-manifest-v1.json",
+    "manifest": {
+      "bytes": 10965,
+      "path": "capture-manifest-v1.json",
+      "sha256": "bd30035f2c7926ec579fea58ecd1e5c5fe34da6b2ae129473bee033630e5c465"
+    },
+    "manifest_bytes": 92466528,
+    "manifest_file_count": 57,
+    "plan_status_note": "plan-v5 retains pre-capture prospective_no_capture; capture-manifest-v1 and capture-freeze-v1 are authoritative post-capture custody records.",
+    "returncode": 0
+  },
+  "created_utc": "2026-10-07",
+  "final_controls": {
+    "analyzer": {
+      "bytes": 34603,
+      "path": "tools/attribute_0958_v1.py",
+      "sha256": "1bb7584076762eefadc409016abf50684157e9350a76386255c5763e47d7cffd"
+    },
+    "analyzer_controls": "positive conservation, malformed histogram descriptor fail-closed, self-test; no workload launched by controls",
+    "capture_controls": {
+      "bytes": 3590,
+      "path": "review/control-receipt-v5.json",
+      "sha256": "dedf65c6b2751c096a329d300d8c17fe8b4fce074b0989d10bf18eb2bc74309c"
+    },
+    "contract": {
+      "bytes": 3779,
+      "path": "tooling/attribute-contract-v2.json",
+      "sha256": "9818ca39217c7fd363f5abe04e5a2feecde1450bfc8e4596c0e9fc362ef546e5"
+    },
+    "controls_receipt": {
+      "bytes": 1446,
+      "path": "review/attribute-controls-receipt-v2.json",
+      "sha256": "5e623409ec7337aed8dea6a5db47c02c55f0b39196a815d32e4d2f9253832d68"
+    },
+    "exporter": {
+      "bytes": 5043,
+      "path": "tools/export_heaptrack_0958_v1.py",
+      "sha256": "50914d8f0bb6d35b39ef5222473e529174098cab3b9f0e61cf5144d71be7eb95"
+    },
+    "runner": {
+      "bytes": 32546,
+      "path": "tooling/capture_0958_v5.py",
+      "sha256": "15c09dffefed8bf6084ec0c54ddf7d19f2f69a3c70f4e2bf41a7442a40000f6c"
+    },
+    "tooling_receipt": {
+      "bytes": 5254,
+      "path": "review/attribute-tooling-receipt-v2.json",
+      "sha256": "7f6573f7cfe8532d81a77ce40f252f5660648571885220d6d7907701a9c4d03a"
+    }
+  },
+  "final_review": {
+    "cleanup_receipt": {
+      "bytes": 12765,
+      "path": "review/cleanup-v1.json",
+      "sha256": "1ee437f0afcc523c5952c84bfe23dd2c5e3abaeab56f22c37ab97e4ec18dc3d4"
+    },
+    "cleanup_scope": "0958-owned Python cache and explicitly disposable offline scratch only; source, capture, raw, decoder, exports, analysis, manifests, review, plans, and helpers retained",
+    "external_artifact_manifest": {
+      "bytes": 4075,
+      "path": "review/attribute-artifact-manifest-v1.json",
+      "sha256": "e132f847eea3fa1d48a67b8dcbba7b3710bbf17e7d2a1b2dde12f346453588de"
+    },
+    "receipt": {
+      "bytes": 3026,
+      "path": "review/attribute-final-review-receipt-v1.json",
+      "sha256": "a2a9f122ae17cb33c29703e588efd149d6b71f0a5eb533c27d9bfe2b22e5d63e"
+    },
+    "status": "pass"
+  },
+  "historical_external_analysis": [
+    {
+      "bytes": 499,
+      "path": "/home/zhuhe/litchi-performance-0958/analysis-v1/attribute-v1.json",
+      "sha256": "6ee76c5be5cd3dfd409349afeca25a188f8eafab5d86df8eb3573d7955abe5b1",
+      "status": "failed_tab_only_folded_parser"
+    },
+    {
+      "bytes": 101259,
+      "path": "/home/zhuhe/litchi-performance-0958/analysis-v1/attribute-v2.json",
+      "sha256": "35134d757fd85250cacdffd1fea9f1c5236c611fcff4dc938b25d8bfc5775077",
+      "status": "superseded_overbroad_generic_clone_rule"
+    }
+  ],
+  "packet_files": [
+    {
+      "bytes": 8451,
+      "path": "README.md",
+      "sha256": "f7d8e14df74543ce4ca10a0cef191f0aac4eebddc03c7525d62bf953e415b14d"
+    },
+    {
+      "bytes": 16403,
+      "path": "analysis-input-manifest-v1.json",
+      "sha256": "0dc7a9a4757d73a05d9fc289581a8ec6add494565f039b94e7addf8d18629495"
+    },
+    {
+      "bytes": 102361,
+      "path": "analysis-v1/attribute-v3.json",
+      "sha256": "9fb5ae3b1b484e2fc8294c66d4712d8f818c1aed60a974fbe51bcd03173cf983"
+    },
+    {
+      "bytes": 35870,
+      "path": "analysis-v1/summary-compact-v1.json",
+      "sha256": "60651f3f1495bd167b4a38d042b6d5201527ceae10403a0c6a7610e14ce61197"
+    },
+    {
+      "bytes": 175,
+      "path": "capture-freeze-v1.json",
+      "sha256": "adcede1e6a20a397bb2f459a7bda81cbbfbc732bc8139f36e69ba866478efdab"
+    },
+    {
+      "bytes": 10965,
+      "path": "capture-manifest-v1.json",
+      "sha256": "bd30035f2c7926ec579fea58ecd1e5c5fe34da6b2ae129473bee033630e5c465"
+    },
+    {
+      "bytes": 12919,
+      "path": "plan-v5.json",
+      "sha256": "5bd826e1f93913b5be2fc5878be0c5270e323789222fffcf0e97121dcbc37695"
+    },
+    {
+      "bytes": 4075,
+      "path": "review/attribute-artifact-manifest-v1.json",
+      "sha256": "e132f847eea3fa1d48a67b8dcbba7b3710bbf17e7d2a1b2dde12f346453588de"
+    },
+    {
+      "bytes": 1286,
+      "path": "review/attribute-controls-receipt-v1.json",
+      "sha256": "7431dcdcdb639a5868f8f3f20895937ba0515b6017e234e6e7acb873d661c48e"
+    },
+    {
+      "bytes": 1446,
+      "path": "review/attribute-controls-receipt-v2.json",
+      "sha256": "5e623409ec7337aed8dea6a5db47c02c55f0b39196a815d32e4d2f9253832d68"
+    },
+    {
+      "bytes": 3026,
+      "path": "review/attribute-final-review-receipt-v1.json",
+      "sha256": "a2a9f122ae17cb33c29703e588efd149d6b71f0a5eb533c27d9bfe2b22e5d63e"
+    },
+    {
+      "bytes": 1578,
+      "path": "review/attribute-tooling-receipt-v1.json",
+      "sha256": "166431d39da26c3d85ba7916ccf877be4da143afd07ee17fbd88e18c253e948b"
+    },
+    {
+      "bytes": 5254,
+      "path": "review/attribute-tooling-receipt-v2.json",
+      "sha256": "7f6573f7cfe8532d81a77ce40f252f5660648571885220d6d7907701a9c4d03a"
+    },
+    {
+      "bytes": 12765,
+      "path": "review/cleanup-v1.json",
+      "sha256": "1ee437f0afcc523c5952c84bfe23dd2c5e3abaeab56f22c37ab97e4ec18dc3d4"
+    },
+    {
+      "bytes": 3590,
+      "path": "review/control-receipt-v5.json",
+      "sha256": "dedf65c6b2751c096a329d300d8c17fe8b4fce074b0989d10bf18eb2bc74309c"
+    },
+    {
+      "bytes": 6237,
+      "path": "review/independent-analysis-review-v1.md",
+      "sha256": "8f4ae832e1bf211aee7c29db14ca0915735d869e45252504ae6fdba3741f9ec1"
+    },
+    {
+      "bytes": 7291,
+      "path": "review/mock-controls-v5.py",
+      "sha256": "02bfc2da463d38608b8efbfcd0ff6121cd338e12a995aad9398ace5ca6068e0c"
+    },
+    {
+      "bytes": 1093,
+      "path": "review/mock-controls-v5.stdout.json",
+      "sha256": "6f0d2b79f99a6a3a6347ecb5a859e24ee2dcbc70b3e866643cbc1b3a72e8d18d"
+    },
+    {
+      "bytes": 16803,
+      "path": "review/number-ownership-trace-v2.md",
+      "sha256": "3de25114247d354cf6b512db9599aac5ce921149a06fb13351dd048382cd75d2"
+    },
+    {
+      "bytes": 11480,
+      "path": "review/opc-attribute-singleton-audit.md",
+      "sha256": "0c1db077ab25cf3dc7e00d8d91d10e1f8cd4805bdf74b76762ffb11590cab7c4"
+    },
+    {
+      "bytes": 779,
+      "path": "review/root-final-validation-v1.json",
+      "sha256": "416a587c0b0eedded55453c2fc2fecace3b091229582731b8f86d3d5a4487124"
+    },
+    {
+      "bytes": 536,
+      "path": "review/root-replay-receipt-v1.json",
+      "sha256": "4d83458f8185309788c3d46660f404f89a5562b95093765700d572eac83f9099"
+    },
+    {
+      "bytes": 6539,
+      "path": "review/root-start-v1.json",
+      "sha256": "e1ed8ec0b1fb0a3068f24e9cd979003bdca57fc1a2b55ff476ece5d4b67afc5c"
+    },
+    {
+      "bytes": 4471,
+      "path": "review/root-validate-v5.json",
+      "sha256": "666ddb140c2eb144e4232b75ab88169423ccddf8df25780b568fe7f3f812ec4e"
+    },
+    {
+      "bytes": 7195,
+      "path": "source-build-provenance-v1.json",
+      "sha256": "d2b852c95295db7e434e149d12a39ec6cac9c21a87cf3804e0b2f44e7119ee6f"
+    },
+    {
+      "bytes": 2864,
+      "path": "tooling/attribute-contract-v1.json",
+      "sha256": "4cfb4492b13585409e9f855bcb35ff48f1d0cb43a59bd1077025f4eebdec5e5f"
+    },
+    {
+      "bytes": 3779,
+      "path": "tooling/attribute-contract-v2.json",
+      "sha256": "9818ca39217c7fd363f5abe04e5a2feecde1450bfc8e4596c0e9fc362ef546e5"
+    },
+    {
+      "bytes": 32546,
+      "path": "tooling/capture_0958_v5.py",
+      "sha256": "15c09dffefed8bf6084ec0c54ddf7d19f2f69a3c70f4e2bf41a7442a40000f6c"
+    },
+    {
+      "bytes": 34603,
+      "path": "tools/attribute_0958_v1.py",
+      "sha256": "1bb7584076762eefadc409016abf50684157e9350a76386255c5763e47d7cffd"
+    },
+    {
+      "bytes": 5043,
+      "path": "tools/export_heaptrack_0958_v1.py",
+      "sha256": "50914d8f0bb6d35b39ef5222473e529174098cab3b9f0e61cf5144d71be7eb95"
+    }
+  ],
+  "reproduction": {
+    "analysis": "python3 -B /home/zhuhe/litchi-performance-0958/tools/attribute_0958_v1.py --manifest /home/zhuhe/litchi-performance-0958/analysis-input-manifest-v1.json --output <fresh-external-output.json>",
+    "capture": "python3 -B /home/zhuhe/litchi-performance-0958/tooling/capture_0958_v5.py --capture --go",
+    "controls": "python3 -B /home/zhuhe/litchi-performance-0958/tools/attribute_0958_v1.py --self-test && python3 -B /home/zhuhe/litchi-performance-0958/review/mock-controls-v5.py",
+    "decoder": "python3 -B /home/zhuhe/litchi-performance-0949/tools/decode_heaptrack_0949_v1.py --profile LABEL=/path/to/sealed/profile ... --output-root <fresh-external-decoder-root>",
+    "export": "python3 -B /home/zhuhe/litchi-performance-0958/tools/export_heaptrack_0958_v1.py",
+    "fresh_output_required": true,
+    "output_policy": "Use fresh non-existing capture/admission/decoder/analysis output roots; historical paths in the executed commands are sealed and must not be overwritten.",
+    "relocation": "A relocated replay requires an external versioned adapter for approved historical path fields; the sealed analyzer must not read the original packet as fallback."
+  },
+  "schema": "litchi.performance.0958.final-packet-provenance.v1",
+  "scope": {
+    "additive_partition": "exclusive_leaf_partition only; source tags overlap",
+    "capture_children": 6,
+    "format": "XLSX managed compression",
+    "iwork_excluded": true,
+    "latency_adoption_rss_claims": false,
+    "mixed_resolution_limit": "stage_timed_commit is exact when symbolized; MultiSourceEdit::commit is a separately labelled commit-core surrogate; selected totals are not complete phase totals",
+    "offline_analysis_only_after_capture": true,
+    "whole_process_attribution": true
+  },
+  "source_and_review": {
+    "independent_analysis_review": {
+      "bytes": 6237,
+      "path": "review/independent-analysis-review-v1.md",
+      "sha256": "8f4ae832e1bf211aee7c29db14ca0915735d869e45252504ae6fdba3741f9ec1"
+    },
+    "number_ownership_trace": {
+      "bytes": 16803,
+      "path": "review/number-ownership-trace-v2.md",
+      "sha256": "3de25114247d354cf6b512db9599aac5ce921149a06fb13351dd048382cd75d2"
+    },
+    "opc_audit": {
+      "bytes": 11480,
+      "path": "review/opc-attribute-singleton-audit.md",
+      "sha256": "0c1db077ab25cf3dc7e00d8d91d10e1f8cd4805bdf74b76762ffb11590cab7c4"
+    },
+    "root_final_validation": {
+      "bytes": 779,
+      "path": "review/root-final-validation-v1.json",
+      "sha256": "416a587c0b0eedded55453c2fc2fecace3b091229582731b8f86d3d5a4487124"
+    },
+    "root_start": {
+      "bytes": 6539,
+      "path": "review/root-start-v1.json",
+      "sha256": "e1ed8ec0b1fb0a3068f24e9cd979003bdca57fc1a2b55ff476ece5d4b67afc5c"
+    },
+    "root_validation": {
+      "bytes": 4471,
+      "path": "review/root-validate-v5.json",
+      "sha256": "666ddb140c2eb144e4232b75ab88169423ccddf8df25780b568fe7f3f812ec4e"
+    },
+    "source_build": {
+      "bytes": 7195,
+      "path": "source-build-provenance-v1.json",
+      "sha256": "d2b852c95295db7e434e149d12a39ec6cac9c21a87cf3804e0b2f44e7119ee6f"
+    }
+  },
+  "status": "final_bounded_packet"
+}
