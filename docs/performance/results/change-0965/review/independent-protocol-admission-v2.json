@@ -1,0 +1,191 @@
+{
+  "build_started": false,
+  "capture_authorized": false,
+  "created_utc": "2026-10-07T22:15:05.412124+00:00",
+  "final_plan_requirements": [
+    "copy the immutable v6 schedule/custody/runner/reducer/design/controls bindings without other changes",
+    "replace capture.host_snapshot_before with the exact host-before-v2 descriptor",
+    "bind protocol/report-scope-contract-v1.json and its shared_exact_values under report_contract",
+    "set status authorized and bind a fresh root GO receipt to the final plan descriptor",
+    "root GO must itself include the exact final-plan descriptor; runner v1 does not independently compare a GO plan field",
+    "rehash source manifests, retained executables, all descriptors, and host-before-v2 immediately before capture"
+  ],
+  "findings": [
+    {
+      "detail": "v6 binds host-before-v1, whose object lacks filesystem, online_cpus, and scheduling_settings while v6 requires filesystem and scheduling_settings (and online affinity). host-before-v2 supplies these fields.",
+      "id": "HOST-BEFORE-V1-MISSING-REQUIRED-FIELDS",
+      "required_rebind": {
+        "bytes": 6088,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0965/protocol/host-before-v2.json",
+        "sha256": "6646310015b9e0acebb3db5aec2766fcf4716bd3936d5d1174ab2926fcfa514e"
+      },
+      "severity": "capture_blocker_for_v6",
+      "status": "resolved_only_by_final-plan-rebind",
+      "v6_binding": {
+        "bytes": 5822,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0965/protocol/host-before-v1.json",
+        "sha256": "ec271e6e98334218f81120e1444cae1ab4a022d88da4803988356599a6c4f8e3"
+      }
+    },
+    {
+      "contract": {
+        "bytes": 6792,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0965/protocol/report-scope-contract-v1.json",
+        "sha256": "f4476e77d44cb31ada4981b182210a134cad0968121929472ae48ab5c410d686"
+      },
+      "detail": "v6 runner/reducer validate only report schema/status/root identity/performance_claim and do not enforce timing_scope, phase_scope, setup_scope, or verification_scope. The source-bound contract records all five exact root literals; an independent audit must compare every final report root byte-for-byte before any interpretation or decision.",
+      "id": "REPORT-SCOPE-ROOT-FIELDS-POSTCAPTURE-GATE",
+      "severity": "mandatory-postcapture-gate",
+      "status": "addressed_by_separate-contract"
+    }
+  ],
+  "interpretation_limits": [
+    "This review admits execution only after the final-plan deltas above; it is not root GO and authorizes no workload.",
+    "0964 rejection remains binding and the 0965 labels are descriptive packet patterns only.",
+    "The report scope contract is a custody/evidence check and does not turn phase timings into a causal source or build result."
+  ],
+  "mandatory_postcapture_gate": {
+    "before_any_result_decision": true,
+    "checks": [
+      "final plan, capture start/terminal, completed packet and child validation bindings",
+      "all 24 fresh serial children, exact affinity verification before wait, terminal-before-parse, reaping and resource cleanup",
+      "all deterministic source/output/semantic/inverse oracles and retained binary hashes",
+      "every report root timing_scope, phase_scope, setup_scope, verification_scope, performance_claim equals report-scope-contract shared_exact_values",
+      "raw nearest-rank quantiles, RC/CR ratios, RR/CC reciprocal controls and frozen diagnostic classification",
+      "no report or sample vector imported from any prior packet",
+      "host-after contains all required CPU/load/online affinity/memory/filesystem/scheduling fields and binds to final packet"
+    ],
+    "failure_action": "seal packet invalid; no adaptive samples, replacement children, screen reopening, adoption, or causal attribution",
+    "independent_auditor": "/root/staging_review"
+  },
+  "reviewed_bindings": {
+    "affinity_controls": {
+      "bytes": 1479,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/protocol/affinity-controls-0965-v5.json",
+      "sha256": "e78d6aa051007a23696c5cfce7d8c48fea577b9b6b0fd6ba40ec6d92355c4ec1"
+    },
+    "design": {
+      "bytes": 14211,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/diagnostic-design-v3.md",
+      "sha256": "0dbff34e930aec3d63350ebf6cce9d0c8a86afdcd8f176f50e52a7e6fe2c06bf"
+    },
+    "host_before_bound_by_v6": {
+      "bytes": 5822,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/protocol/host-before-v1.json",
+      "sha256": "ec271e6e98334218f81120e1444cae1ab4a022d88da4803988356599a6c4f8e3"
+    },
+    "host_before_required_replacement": {
+      "bytes": 6088,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/protocol/host-before-v2.json",
+      "sha256": "6646310015b9e0acebb3db5aec2766fcf4716bd3936d5d1174ab2926fcfa514e"
+    },
+    "reducer": {
+      "bytes": 32116,
+      "executable": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0965/tools/reduce_ingress_0965_v1.py",
+      "sha256": "89d6a199e3420512a39cd5f75dec062321bd283f3a922bf23428aa48dccb5d26"
+    },
+    "report_scope_contract": {
+      "bytes": 6792,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/protocol/report-scope-contract-v1.json",
+      "sha256": "f4476e77d44cb31ada4981b182210a134cad0968121929472ae48ab5c410d686"
+    },
+    "runner": {
+      "bytes": 36410,
+      "executable": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0965/tools/run_ingress_diagnostic_0965_v1.py",
+      "sha256": "f97c250b008fffe579a09bb302280d1cb64251635c8dd7cc09eac22b2046bb1e"
+    }
+  },
+  "reviewed_plan": {
+    "bytes": 36900,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0965/protocol/plan-diagnostic-0965-v6.json",
+    "sha256": "7aa592e0a25748dec544f567661d52a320c8b472219b01367e6999138cd21373"
+  },
+  "reviewer": "/root/staging_review",
+  "schema": "litchi.performance.0965.independent-protocol-admission.v2",
+  "source_edits": false,
+  "static_checks": {
+    "affinity_controls": {
+      "negative_guard_rejected": true,
+      "positive_observed": [
+        12,
+        13,
+        14,
+        15
+      ],
+      "status": "pass",
+      "workload_started": false
+    },
+    "binary_hashes": {
+      "C": "d21863a6613800391a01914865fc4eaecdf54ad3061447be8b6be7d47d0dc910",
+      "R": "5886b0f86a697bae757994d5a757cffae4a7e8d61a2769ff1c967029cd1912c3"
+    },
+    "diagnostic_policy": {
+      "0964_rejection_binding": true,
+      "adoption_allowed": false,
+      "invalid_no_label": true,
+      "labels": [
+        "concordant",
+        "nonreproduced",
+        "mixed"
+      ],
+      "screen_reopened": false,
+      "threshold": 1.05
+    },
+    "reducer_self_test_nearest_rank": {
+      "p50": 128,
+      "p95": 244,
+      "p99": 254
+    },
+    "reducer_self_test_rc": 0,
+    "runner_check_plan_v6_rc": 0,
+    "sample_contract": {
+      "measured": 256,
+      "p99_rank": 254,
+      "retry_or_replacement": false,
+      "warmups": 20
+    },
+    "schedule": {
+      "adjacent": true,
+      "cases": 3,
+      "children": 24,
+      "pairs": 12,
+      "pairs_per_case": {
+        "CC": 1,
+        "CR": 1,
+        "RC": 1,
+        "RR": 1
+      },
+      "serial": true
+    },
+    "source_manifest_revalidation": {
+      "baseline_files": 10933,
+      "candidate_files": 10933,
+      "mismatches": 0,
+      "status": "passed"
+    }
+  },
+  "status": "conditional_admission",
+  "workload_started": false
+}

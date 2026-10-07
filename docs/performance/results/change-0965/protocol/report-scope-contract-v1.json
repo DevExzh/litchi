@@ -1,0 +1,73 @@
+{
+  "adoption_or_screen_decision": false,
+  "authority": "exact literals in the retained 0964 benchmark harness source; post-capture report roots must match these values byte-for-byte",
+  "created_utc": "2026-10-07T22:14:18.034900+00:00",
+  "fields": [
+    "timing_scope",
+    "phase_scope",
+    "setup_scope",
+    "verification_scope",
+    "performance_claim"
+  ],
+  "independent_postcapture_check_required": true,
+  "roles": [
+    {
+      "exact_values": {
+        "performance_claim": "none; raw phase timings describe this explicit in-memory harness and do not claim OS thread counts, speedup, allocation behavior, or physical I/O",
+        "phase_scope": "ingress_ns is the direct SourceBackedEditor constructor; edit_commit_ns is selector staging, cell sets, and MultiCommit::commit; publication_ns is publish_multi_commit_to_stream plus returned MultiSnapshot drop; commit_drop_ns is MultiCommit drop; total_ns starts at the constructor and ends after commit teardown",
+        "setup_scope": "deterministic corpus and expected output construction, frozen source/output/semantic oracles, SourceCacheLimits and output ceiling, one untimed admission preflight, inverse patch, fresh OwnedSource clone, finite managed context, and sink capacity reservation are outside measured phases",
+        "timing_scope": "with fresh finite managed context prepared outside the clock, the timer begins at SourceBackedEditor construction and covers edit/commit, source-backed publication, returned snapshot drop, and commit/package worker-pool teardown; precomputed source/cache/context setup and bounded sink allocation are outside",
+        "verification_scope": "exact output bytes, immutable fixture source hash, output/semantic hashes, workbook verification, sink bounds, CpuTasks/OutputBytes counters, and post-drop Memory/Workers/IoConcurrency/Objects checks run outside timers; the untimed admission preflight verifies an actual managed-commit inverse (preflight_actual_commit_inverse_verified=true), while each timed sample applies the precomputed inverse patch only as a fixture to its published bytes (fixture_inverse_restored_exact_source)"
+      },
+      "field_line_numbers": {
+        "performance_claim": 706,
+        "phase_scope": 703,
+        "setup_scope": 704,
+        "timing_scope": 702,
+        "verification_scope": 705
+      },
+      "role": "baseline",
+      "source_file": {
+        "bytes": 28537,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0964/source-baseline/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+        "sha256": "7d8afadf9f5414ac5215f62411c60e139a798d1c182a441902a0cc62b4445961"
+      }
+    },
+    {
+      "exact_values": {
+        "performance_claim": "none; raw phase timings describe this explicit in-memory harness and do not claim OS thread counts, speedup, allocation behavior, or physical I/O",
+        "phase_scope": "ingress_ns is the direct SourceBackedEditor constructor; edit_commit_ns is selector staging, cell sets, and MultiCommit::commit; publication_ns is publish_multi_commit_to_stream plus returned MultiSnapshot drop; commit_drop_ns is MultiCommit drop; total_ns starts at the constructor and ends after commit teardown",
+        "setup_scope": "deterministic corpus and expected output construction, frozen source/output/semantic oracles, SourceCacheLimits and output ceiling, one untimed admission preflight, inverse patch, fresh OwnedSource clone, finite managed context, and sink capacity reservation are outside measured phases",
+        "timing_scope": "with fresh finite managed context prepared outside the clock, the timer begins at SourceBackedEditor construction and covers edit/commit, source-backed publication, returned snapshot drop, and commit/package worker-pool teardown; precomputed source/cache/context setup and bounded sink allocation are outside",
+        "verification_scope": "exact output bytes, immutable fixture source hash, output/semantic hashes, workbook verification, sink bounds, CpuTasks/OutputBytes counters, and post-drop Memory/Workers/IoConcurrency/Objects checks run outside timers; the untimed admission preflight verifies an actual managed-commit inverse (preflight_actual_commit_inverse_verified=true), while each timed sample applies the precomputed inverse patch only as a fixture to its published bytes (fixture_inverse_restored_exact_source)"
+      },
+      "field_line_numbers": {
+        "performance_claim": 706,
+        "phase_scope": 703,
+        "setup_scope": 704,
+        "timing_scope": 702,
+        "verification_scope": 705
+      },
+      "role": "candidate",
+      "source_file": {
+        "bytes": 28537,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0964/source-candidate/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+        "sha256": "7d8afadf9f5414ac5215f62411c60e139a798d1c182a441902a0cc62b4445961"
+      }
+    }
+  ],
+  "schema": "litchi.performance.0965.report-scope-contract.v1",
+  "shared_exact_values": {
+    "performance_claim": "none; raw phase timings describe this explicit in-memory harness and do not claim OS thread counts, speedup, allocation behavior, or physical I/O",
+    "phase_scope": "ingress_ns is the direct SourceBackedEditor constructor; edit_commit_ns is selector staging, cell sets, and MultiCommit::commit; publication_ns is publish_multi_commit_to_stream plus returned MultiSnapshot drop; commit_drop_ns is MultiCommit drop; total_ns starts at the constructor and ends after commit teardown",
+    "setup_scope": "deterministic corpus and expected output construction, frozen source/output/semantic oracles, SourceCacheLimits and output ceiling, one untimed admission preflight, inverse patch, fresh OwnedSource clone, finite managed context, and sink capacity reservation are outside measured phases",
+    "timing_scope": "with fresh finite managed context prepared outside the clock, the timer begins at SourceBackedEditor construction and covers edit/commit, source-backed publication, returned snapshot drop, and commit/package worker-pool teardown; precomputed source/cache/context setup and bounded sink allocation are outside",
+    "verification_scope": "exact output bytes, immutable fixture source hash, output/semantic hashes, workbook verification, sink bounds, CpuTasks/OutputBytes counters, and post-drop Memory/Workers/IoConcurrency/Objects checks run outside timers; the untimed admission preflight verifies an actual managed-commit inverse (preflight_actual_commit_inverse_verified=true), while each timed sample applies the precomputed inverse patch only as a fixture to its published bytes (fixture_inverse_restored_exact_source)"
+  },
+  "status": "sealed",
+  "workload_started": false
+}

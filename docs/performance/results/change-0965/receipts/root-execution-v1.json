@@ -1,0 +1,58 @@
+{
+  "status": "completed",
+  "created_utc": "2026-10-07T22:33:47.191325+00:00",
+  "record_scope": "Closure record of root-issued commands; authoritative start/terminal timestamps remain in capture receipts.",
+  "capture": {
+    "argv": [
+      "python3",
+      "/home/zhuhe/litchi-performance-0965/tools/run_ingress_diagnostic_0965_v1.py",
+      "--capture",
+      "--plan",
+      "/home/zhuhe/litchi-performance-0965/protocol/plan-final-v2.json",
+      "--packet",
+      "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1"
+    ],
+    "environment_overrides": {
+      "LITCHI_PERF_0965_CAPTURE_APPROVED": "1",
+      "PYTHONDONTWRITEBYTECODE": "1"
+    },
+    "returncode": 0,
+    "terminal": {
+      "path": "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/capture-terminal.json",
+      "bytes": 743,
+      "sha256": "51052e816294a8f4f3ac43bdb8513424816fed2545b4769079b8a2b1c9295dec"
+    },
+    "completed": {
+      "path": "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/completed-packet.json",
+      "bytes": 10990,
+      "sha256": "a8be912089527c0f01a5c705ce036c81a117dd11419449d366c39816ab88a334"
+    }
+  },
+  "reduction": {
+    "argv": [
+      "python3",
+      "/home/zhuhe/litchi-performance-0965/tools/reduce_ingress_0965_v1.py",
+      "--plan",
+      "/home/zhuhe/litchi-performance-0965/protocol/plan-final-v2.json",
+      "--packet",
+      "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1",
+      "--output",
+      "/home/zhuhe/litchi-performance-0965/analysis/diagnostic-result-v1.json"
+    ],
+    "returncode": 0,
+    "output": {
+      "path": "/home/zhuhe/litchi-performance-0965/analysis/diagnostic-result-v1.json",
+      "bytes": 284168,
+      "sha256": "1eb904d55ad2ee4498da7ee1fd980fbd222d60e11c8cdcb5b4472f8047db2e10"
+    }
+  },
+  "audit": {
+    "path": "/home/zhuhe/litchi-performance-0965/review/independent-raw-audit-v3.json",
+    "bytes": 240496,
+    "sha256": "25353dd5e02720b7a125897a611993331b23feec8c8a96b208a5386743af97bd"
+  },
+  "no_retry_or_replacement": true,
+  "workloads_in_this_packet": 24,
+  "samples": 6144,
+  "production_adopted": false
+}

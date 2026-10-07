@@ -1,0 +1,9 @@
+{
+  "build_started_by_auditor": false,
+  "created_utc": "2026-10-07T22:29:17.178212+00:00",
+  "error": "root final confirmation plan.mode changed",
+  "reviewer": "/root/staging_review",
+  "schema": "litchi.performance.0965.independent-raw-audit.v1",
+  "status": "failed",
+  "workload_started_by_auditor": false
+}

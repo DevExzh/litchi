@@ -1,5 +1,26 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0965 — ingress-tail diagnostic is mixed; 0964 rejection preserved
+
+[0965](0965-xlsx-ingress-tail-diagnostic.md) completes the native-only matched
+diagnostic using 24 fresh serial children, 20 warmups and 256 samples per
+child. Each case has one `RR`, `RC`, `CC` and `CR` pair; p99 uses rank 254.
+The three cases are all `mixed`: `RC/CR` p99 ratios are
+`1.065359/0.897036`, `1.073303/0.984729` and `0.975812/1.076656` for
+medium-one-percent, dense-sparse-one-percent and medium-one-edit. `CC`
+magnitudes are `1.054635`, `1.057456` and `1.047029`; `RR` controls are
+`1.042147`,
+`1.012618` and `1.045083`. The independent raw audit passes with zero
+mismatches across 24 children, 12 pairs and 120 phase-quantile sets.
+
+Source review establishes that 0964's changed XLSX reader loops execute after
+the `ingress_ns` timer; ingress includes the OPC constructor and structural
+`PackageReader::source_catalog`. The mixed orders and same-binary controls
+provide neither candidate-ingress causality nor proven host noise. The 0964
+rejection, `1.05` safety bound and unchanged production remain in force. A
+separate measurement/attribution design is required before revisiting this
+question; no further captures or adaptive extension are planned.
+
 ## 0964 — direct XLSX event transport screen rejected
 
 [0964](0964-xlsx-direct-event-transport-trial.md) evaluates the external

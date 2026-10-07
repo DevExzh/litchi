@@ -1,0 +1,1301 @@
+{
+  "affinity_controls": {
+    "cpu_mask": [
+      12,
+      13,
+      14,
+      15
+    ],
+    "descriptor": {
+      "bytes": 1479,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/protocol/affinity-controls-0965-v5.json",
+      "sha256": "e78d6aa051007a23696c5cfce7d8c48fea577b9b6b0fd6ba40ec6d92355c4ec1"
+    },
+    "runner": {
+      "bytes": 36410,
+      "executable": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0965/tools/run_ingress_diagnostic_0965_v1.py",
+      "sha256": "f97c250b008fffe579a09bb302280d1cb64251635c8dd7cc09eac22b2046bb1e"
+    },
+    "schema": "litchi.performance.0965.affinity-launch-controls.v1",
+    "status": "pass",
+    "workload_started": false
+  },
+  "analysis": {
+    "adoption_allowed": false,
+    "causal_claim": false,
+    "cross_binary_orders": [
+      "RC",
+      "CR"
+    ],
+    "cross_binary_pairs_per_case": {
+      "CR": 1,
+      "RC": 1
+    },
+    "packet_wide_pair_counts": {
+      "CC": 3,
+      "CR": 3,
+      "RC": 3,
+      "RR": 3
+    },
+    "root": "/home/zhuhe/litchi-performance-0965/analysis/ingress-diagnostic-v1",
+    "same_binary_controls": [
+      "RR",
+      "CC"
+    ],
+    "screen_reopened": false
+  },
+  "binaries": {
+    "C": {
+      "bytes": 43270848,
+      "executable": true,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0964/executables/xlsx_managed_compression_benchmark.v3",
+      "sha256": "d21863a6613800391a01914865fc4eaecdf54ad3061447be8b6be7d47d0dc910"
+    },
+    "R": {
+      "bytes": 43259328,
+      "executable": true,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+      "sha256": "5886b0f86a697bae757994d5a757cffae4a7e8d61a2769ff1c967029cd1912c3"
+    },
+    "roles": {
+      "C": "retained 0964 candidate executable",
+      "R": "retained 0957 baseline executable"
+    }
+  },
+  "capture": {
+    "authorization": "root_GO_required",
+    "host_snapshot_after": {
+      "path": "/home/zhuhe/litchi-performance-0965/protocol/host-after-v1.json",
+      "status": "required_after_terminal"
+    },
+    "host_snapshot_before": {
+      "bytes": 6088,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/protocol/host-before-v2.json",
+      "sha256": "6646310015b9e0acebb3db5aec2766fcf4716bd3936d5d1174ab2926fcfa514e"
+    },
+    "host_snapshot_required": {
+      "after": true,
+      "before": true,
+      "field_mapping": {
+        "cpu_load": [
+          "loadavg"
+        ],
+        "filesystem": [
+          "filesystem"
+        ],
+        "memory": [
+          "meminfo"
+        ],
+        "online_affinity": [
+          "affinity",
+          "online_cpus"
+        ],
+        "scheduling_settings": [
+          "scheduling_settings"
+        ]
+      },
+      "fields": [
+        "cpu_load",
+        "online_affinity",
+        "memory",
+        "filesystem",
+        "scheduling_settings"
+      ]
+    },
+    "measurements_started": false,
+    "root": "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1"
+  },
+  "cases": [
+    {
+      "case_id": "medium-one-percent",
+      "context_limits": {
+        "depth": 256,
+        "execution_in_flight_bytes": 2956761,
+        "execution_in_flight_tasks": 1,
+        "execution_min_parallel_bytes": 0,
+        "execution_min_task_bytes": 0,
+        "execution_workers": 1,
+        "input_bytes": 67108864,
+        "memory": 2956761,
+        "objects": 1000000,
+        "output_bytes": 8519112,
+        "root_cpu_tasks": 5,
+        "root_io_concurrency": 1,
+        "root_workers": 1,
+        "work": 1000000000
+      },
+      "expected_cpu_tasks": 5,
+      "expected_worker_permits": 0,
+      "output_bytes": 4226788,
+      "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+      "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+      "shape": "medium",
+      "source_bytes": 4226429,
+      "source_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+      "update_count": 93,
+      "workload": "one-percent"
+    },
+    {
+      "case_id": "dense-sparse-one-percent",
+      "context_limits": {
+        "depth": 256,
+        "execution_in_flight_bytes": 3196436,
+        "execution_in_flight_tasks": 1,
+        "execution_min_parallel_bytes": 0,
+        "execution_min_task_bytes": 0,
+        "execution_workers": 1,
+        "input_bytes": 67108864,
+        "memory": 3196436,
+        "objects": 1000000,
+        "output_bytes": 8570408,
+        "root_cpu_tasks": 5,
+        "root_io_concurrency": 1,
+        "root_workers": 1,
+        "work": 1000000000
+      },
+      "expected_cpu_tasks": 5,
+      "expected_worker_permits": 0,
+      "output_bytes": 4252436,
+      "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+      "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+      "shape": "dense-sparse",
+      "source_bytes": 4251863,
+      "source_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+      "update_count": 178,
+      "workload": "one-percent"
+    },
+    {
+      "case_id": "medium-one-edit",
+      "context_limits": {
+        "depth": 256,
+        "execution_in_flight_bytes": 2751297,
+        "execution_in_flight_tasks": 1,
+        "execution_min_parallel_bytes": 0,
+        "execution_min_task_bytes": 0,
+        "execution_workers": 1,
+        "input_bytes": 67108864,
+        "memory": 2751297,
+        "objects": 1000000,
+        "output_bytes": 8518496,
+        "root_cpu_tasks": 2,
+        "root_io_concurrency": 1,
+        "root_workers": 1,
+        "work": 1000000000
+      },
+      "expected_cpu_tasks": 2,
+      "expected_worker_permits": 0,
+      "output_bytes": 4226480,
+      "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+      "semantic_sha256": "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+      "shape": "medium",
+      "source_bytes": 4226429,
+      "source_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+      "update_count": 1,
+      "workload": "one-edit"
+    }
+  ],
+  "created_utc": "2026-10-07T22:15:20.172817+00:00",
+  "design": {
+    "descriptor": {
+      "bytes": 14211,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/diagnostic-design-v3.md",
+      "sha256": "0dbff34e930aec3d63350ebf6cce9d0c8a86afdcd8f176f50e52a7e6fe2c06bf"
+    },
+    "schema": "prospective-design-v3",
+    "status": "sealed"
+  },
+  "diagnostic_rule": {
+    "cross_order_spread_reported_only": true,
+    "frozen_0964_screen_rule_relaxed": false,
+    "invalid_packet_no_diagnostic_label": true,
+    "labels": [
+      "concordant",
+      "nonreproduced",
+      "mixed"
+    ],
+    "no_adoption_or_confirmation": true,
+    "threshold": 1.05,
+    "type": "descriptive_classification_only"
+  },
+  "execution": {
+    "argv_template": [
+      "/usr/bin/taskset",
+      "--cpu-list",
+      "12-15",
+      "<BINARY>",
+      "--shape",
+      "<SHAPE>",
+      "--workload",
+      "<WORKLOAD>",
+      "--workers",
+      "1",
+      "--warmup",
+      "20",
+      "--samples",
+      "256",
+      "--output",
+      "<OUTPUT>"
+    ],
+    "cpu_mask": [
+      12,
+      13,
+      14,
+      15
+    ],
+    "deadline_seconds": 900,
+    "environment": {
+      "LANG": "C",
+      "LC_ALL": "C",
+      "PATH": "/usr/bin:/bin",
+      "RUST_BACKTRACE": "0",
+      "TZ": "UTC",
+      "approval_variable": "LITCHI_PERF_0965_CAPTURE_APPROVED"
+    },
+    "max_parallel_children": 1,
+    "retry_or_replacement": false,
+    "taskset_path": "/usr/bin/taskset",
+    "terminal_before_parse": true,
+    "time_argv_prefix": [
+      "/usr/bin/time",
+      "-v",
+      "-o",
+      "time-v.txt",
+      "--"
+    ],
+    "time_path": "/usr/bin/time",
+    "workload_cwd": "/home/zhuhe/litchi-performance-0964/source-baseline/tools/perf-baseline"
+  },
+  "inherited_0964": {
+    "plan": {
+      "bytes": 59570,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/protocol/plan-final-epoch2-v1.json",
+      "sha256": "dcfabed26427c6a117b41c2e4b6209baec40afe06c218054b2187ae9c49b0a64"
+    },
+    "plan_revision": "epoch2-root-final-v1",
+    "raw_audit": {
+      "bytes": 150014,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/review/independent-epoch2-raw-audit-v1.json",
+      "sha256": "cb5822541294a3710ffb1cb198f08c37c4f00f724274ce6b2165e27a5f071938"
+    },
+    "rejection_remains_binding": true,
+    "safety_threshold_unchanged": 1.05
+  },
+  "plan_id": "xlsx-ingress-tail-diagnostic-0965",
+  "plan_revision": "diagnostic-prospective-v1",
+  "purpose": "Classify retained-executable ingress-tail behavior with same-binary and launch-order controls.",
+  "reducer": {
+    "adoption_decision": false,
+    "command": [
+      "python3",
+      "/home/zhuhe/litchi-performance-0965/tools/reduce_ingress_0965_v1.py",
+      "--plan",
+      "<PLAN>",
+      "--packet",
+      "<PACKET>",
+      "--output",
+      "<OUTPUT>"
+    ],
+    "descriptor": {
+      "bytes": 32116,
+      "executable": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0965/tools/reduce_ingress_0965_v1.py",
+      "sha256": "89d6a199e3420512a39cd5f75dec062321bd283f3a922bf23428aa48dccb5d26"
+    },
+    "n": 256,
+    "p99_rank": 254,
+    "quantile_method": "nearest-rank; rank=ceil(q*n), one-indexed",
+    "schema": "litchi.performance.0965.ingress-diagnostic-reduction.v1"
+  },
+  "report_contract": {
+    "cleanup_resources": [
+      "memory",
+      "workers",
+      "io_concurrency",
+      "objects"
+    ],
+    "native": {
+      "independent_postcapture_exact_scope_values": {
+        "performance_claim": "none; raw phase timings describe this explicit in-memory harness and do not claim OS thread counts, speedup, allocation behavior, or physical I/O",
+        "phase_scope": "ingress_ns is the direct SourceBackedEditor constructor; edit_commit_ns is selector staging, cell sets, and MultiCommit::commit; publication_ns is publish_multi_commit_to_stream plus returned MultiSnapshot drop; commit_drop_ns is MultiCommit drop; total_ns starts at the constructor and ends after commit teardown",
+        "setup_scope": "deterministic corpus and expected output construction, frozen source/output/semantic oracles, SourceCacheLimits and output ceiling, one untimed admission preflight, inverse patch, fresh OwnedSource clone, finite managed context, and sink capacity reservation are outside measured phases",
+        "timing_scope": "with fresh finite managed context prepared outside the clock, the timer begins at SourceBackedEditor construction and covers edit/commit, source-backed publication, returned snapshot drop, and commit/package worker-pool teardown; precomputed source/cache/context setup and bounded sink allocation are outside",
+        "verification_scope": "exact output bytes, immutable fixture source hash, output/semantic hashes, workbook verification, sink bounds, CpuTasks/OutputBytes counters, and post-drop Memory/Workers/IoConcurrency/Objects checks run outside timers; the untimed admission preflight verifies an actual managed-commit inverse (preflight_actual_commit_inverse_verified=true), while each timed sample applies the precomputed inverse patch only as a fixture to its published bytes (fixture_inverse_restored_exact_source)"
+      },
+      "measured_samples": 256,
+      "performance_claim": "none; raw phase timings describe this explicit in-memory harness and do not claim OS thread counts, speedup, allocation behavior, or physical I/O",
+      "raw_sample_count": 256,
+      "resource_field": "resources_after_drop",
+      "root_identity_fields": [
+        "shape",
+        "workload",
+        "workers",
+        "warmup_iterations",
+        "measured_samples"
+      ],
+      "sample_phase_fields": [
+        "ingress_ns",
+        "edit_commit_ns",
+        "publication_ns",
+        "commit_drop_ns",
+        "total_ns"
+      ],
+      "schema": "litchi.xlsx-managed-compression-benchmark.v1",
+      "scope": "timed in-memory phase report with source/output/semantic/resource oracles outside timers",
+      "warmup_count": 20,
+      "warmup_iterations": 20
+    },
+    "shared_oracles": [
+      "source_bytes",
+      "source_sha256",
+      "output_bytes",
+      "output_sha256",
+      "semantic_sha256",
+      "update_count",
+      "expected_cpu_tasks",
+      "context_limits",
+      "sink_capacity_bytes",
+      "sink_max_write_bytes",
+      "preflight_actual_commit_inverse_verified",
+      "fixture_inverse_restored_exact_source"
+    ],
+    "sink_max_write_bytes": 65536
+  },
+  "report_scope_contract": {
+    "bytes": 6792,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0965/protocol/report-scope-contract-v1.json",
+    "sha256": "f4476e77d44cb31ada4981b182210a134cad0968121929472ae48ab5c410d686"
+  },
+  "root_go": {
+    "descriptor": {
+      "bytes": 1604,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/protocol/root-go-0965-v1.json",
+      "sha256": "3c2de9e2ee7febf60981564c5a759cd28b89a92e71ba163618bb0100c29ea3f0"
+    },
+    "status": "GO"
+  },
+  "runner": {
+    "cpu_mask": [
+      12,
+      13,
+      14,
+      15
+    ],
+    "deadline_seconds": 900,
+    "descriptor": {
+      "bytes": 36410,
+      "executable": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0965/tools/run_ingress_diagnostic_0965_v1.py",
+      "sha256": "f97c250b008fffe579a09bb302280d1cb64251635c8dd7cc09eac22b2046bb1e"
+    },
+    "pid_affinity_getter": "os.sched_getaffinity(pid)",
+    "preexec_affinity": "os.sched_setaffinity(0, {12,13,14,15})",
+    "schema": "litchi.performance.0965.diagnostic-capture.v1",
+    "terminal_before_parse": true
+  },
+  "schedule": {
+    "adjacent_pair_boundary": "second child starts only after first terminal receipt and process-group reaping",
+    "children": [
+      {
+        "binary_role": "baseline",
+        "case_id": "medium-one-percent",
+        "child_id": "native__medium-one-percent__pair00__RR__p0",
+        "comparison_id": "retained-baseline-vs-retained-candidate",
+        "cpu_mask": [
+          12,
+          13,
+          14,
+          15
+        ],
+        "lane": "native",
+        "measured_samples": 256,
+        "pair_id": "medium-one-percent__pair00__RR",
+        "pair_index": 0,
+        "pair_type": "RR",
+        "position": 0,
+        "role": "R",
+        "shape": "medium",
+        "warmup_iterations": 20,
+        "workers": 1,
+        "workload": "one-percent"
+      },
+      {
+        "binary_role": "baseline",
+        "case_id": "medium-one-percent",
+        "child_id": "native__medium-one-percent__pair00__RR__p1",
+        "comparison_id": "retained-baseline-vs-retained-candidate",
+        "cpu_mask": [
+          12,
+          13,
+          14,
+          15
+        ],
+        "lane": "native",
+        "measured_samples": 256,
+        "pair_id": "medium-one-percent__pair00__RR",
+        "pair_index": 0,
+        "pair_type": "RR",
+        "position": 1,
+        "role": "R",
+        "shape": "medium",
+        "warmup_iterations": 20,
+        "workers": 1,
+        "workload": "one-percent"
+      },
+      {
+        "binary_role": "baseline",
+        "case_id": "medium-one-percent",
+        "child_id": "native__medium-one-percent__pair01__RC__p0",
+        "comparison_id": "retained-baseline-vs-retained-candidate",
+        "cpu_mask": [
+          12,
+          13,
+          14,
+          15
+        ],
+        "lane": "native",
+        "measured_samples": 256,
+        "pair_id": "medium-one-percent__pair01__RC",
+        "pair_index": 1,
+        "pair_type": "RC",
+        "position": 0,
+        "role": "R",
+        "shape": "medium",
+        "warmup_iterations": 20,
+        "workers": 1,
+        "workload": "one-percent"
+      },
+      {
+        "binary_role": "candidate",
+        "case_id": "medium-one-percent",
+        "child_id": "native__medium-one-percent__pair01__RC__p1",
+        "comparison_id": "retained-baseline-vs-retained-candidate",
+        "cpu_mask": [
+          12,
+          13,
+          14,
+          15
+        ],
+        "lane": "native",
+        "measured_samples": 256,
+        "pair_id": "medium-one-percent__pair01__RC",
+        "pair_index": 1,
+        "pair_type": "RC",
+        "position": 1,
+        "role": "C",
+        "shape": "medium",
+        "warmup_iterations": 20,
+        "workers": 1,
+        "workload": "one-percent"
+      },
+      {
+        "binary_role": "candidate",
+        "case_id": "medium-one-percent",
+        "child_id": "native__medium-one-percent__pair02__CC__p0",
+        "comparison_id": "retained-baseline-vs-retained-candidate",
+        "cpu_mask": [
+          12,
+          13,
+          14,
+          15
+        ],
+        "lane": "native",
+        "measured_samples": 256,
+        "pair_id": "medium-one-percent__pair02__CC",
+        "pair_index": 2,
+        "pair_type": "CC",
+        "position": 0,
+        "role": "C",
+        "shape": "medium",
+        "warmup_iterations": 20,
+        "workers": 1,
+        "workload": "one-percent"
+      },
+      {
+        "binary_role": "candidate",
+        "case_id": "medium-one-percent",
+        "child_id": "native__medium-one-percent__pair02__CC__p1",
+        "comparison_id": "retained-baseline-vs-retained-candidate",
+        "cpu_mask": [
+          12,
+          13,
+          14,
+          15
+        ],
+        "lane": "native",
+        "measured_samples": 256,
+        "pair_id": "medium-one-percent__pair02__CC",
+        "pair_index": 2,
+        "pair_type": "CC",
+        "position": 1,
+        "role": "C",
+        "shape": "medium",
+        "warmup_iterations": 20,
+        "workers": 1,
+        "workload": "one-percent"
+      },
+      {
+        "binary_role": "candidate",
+        "case_id": "medium-one-percent",
+        "child_id": "native__medium-one-percent__pair03__CR__p0",
+        "comparison_id": "retained-baseline-vs-retained-candidate",
+        "cpu_mask": [
+          12,
+          13,
+          14,
+          15
+        ],
+        "lane": "native",
+        "measured_samples": 256,
+        "pair_id": "medium-one-percent__pair03__CR",
+        "pair_index": 3,
+        "pair_type": "CR",
+        "position": 0,
+        "role": "C",
+        "shape": "medium",
+        "warmup_iterations": 20,
+        "workers": 1,
+        "workload": "one-percent"
+      },
+      {
+        "binary_role": "baseline",
+        "case_id": "medium-one-percent",
+        "child_id": "native__medium-one-percent__pair03__CR__p1",
+        "comparison_id": "retained-baseline-vs-retained-candidate",
+        "cpu_mask": [
+          12,
+          13,
+          14,
+          15
+        ],
+        "lane": "native",
+        "measured_samples": 256,
+        "pair_id": "medium-one-percent__pair03__CR",
+        "pair_index": 3,
+        "pair_type": "CR",
+        "position": 1,
+        "role": "R",
+        "shape": "medium",
+        "warmup_iterations": 20,
+        "workers": 1,
+        "workload": "one-percent"
+      },
+      {
+        "binary_role": "baseline",
+        "case_id": "dense-sparse-one-percent",
+        "child_id": "native__dense-sparse-one-percent__pair00__RC__p0",
+        "comparison_id": "retained-baseline-vs-retained-candidate",
+        "cpu_mask": [
+          12,
+          13,
+          14,
+          15
+        ],
+        "lane": "native",
+        "measured_samples": 256,
+        "pair_id": "dense-sparse-one-percent__pair00__RC",
+        "pair_index": 0,
+        "pair_type": "RC",
+        "position": 0,
+        "role": "R",
+        "shape": "dense-sparse",
+        "warmup_iterations": 20,
+        "workers": 1,
+        "workload": "one-percent"
+      },
+      {
+        "binary_role": "candidate",
+        "case_id": "dense-sparse-one-percent",
+        "child_id": "native__dense-sparse-one-percent__pair00__RC__p1",
+        "comparison_id": "retained-baseline-vs-retained-candidate",
+        "cpu_mask": [
+          12,
+          13,
+          14,
+          15
+        ],
+        "lane": "native",
+        "measured_samples": 256,
+        "pair_id": "dense-sparse-one-percent__pair00__RC",
+        "pair_index": 0,
+        "pair_type": "RC",
+        "position": 1,
+        "role": "C",
+        "shape": "dense-sparse",
+        "warmup_iterations": 20,
+        "workers": 1,
+        "workload": "one-percent"
+      },
+      {
+        "binary_role": "candidate",
+        "case_id": "dense-sparse-one-percent",
+        "child_id": "native__dense-sparse-one-percent__pair01__CC__p0",
+        "comparison_id": "retained-baseline-vs-retained-candidate",
+        "cpu_mask": [
+          12,
+          13,
+          14,
+          15
+        ],
+        "lane": "native",
+        "measured_samples": 256,
+        "pair_id": "dense-sparse-one-percent__pair01__CC",
+        "pair_index": 1,
+        "pair_type": "CC",
+        "position": 0,
+        "role": "C",
+        "shape": "dense-sparse",
+        "warmup_iterations": 20,
+        "workers": 1,
+        "workload": "one-percent"
+      },
+      {
+        "binary_role": "candidate",
+        "case_id": "dense-sparse-one-percent",
+        "child_id": "native__dense-sparse-one-percent__pair01__CC__p1",
+        "comparison_id": "retained-baseline-vs-retained-candidate",
+        "cpu_mask": [
+          12,
+          13,
+          14,
+          15
+        ],
+        "lane": "native",
+        "measured_samples": 256,
+        "pair_id": "dense-sparse-one-percent__pair01__CC",
+        "pair_index": 1,
+        "pair_type": "CC",
+        "position": 1,
+        "role": "C",
+        "shape": "dense-sparse",
+        "warmup_iterations": 20,
+        "workers": 1,
+        "workload": "one-percent"
+      },
+      {
+        "binary_role": "candidate",
+        "case_id": "dense-sparse-one-percent",
+        "child_id": "native__dense-sparse-one-percent__pair02__CR__p0",
+        "comparison_id": "retained-baseline-vs-retained-candidate",
+        "cpu_mask": [
+          12,
+          13,
+          14,
+          15
+        ],
+        "lane": "native",
+        "measured_samples": 256,
+        "pair_id": "dense-sparse-one-percent__pair02__CR",
+        "pair_index": 2,
+        "pair_type": "CR",
+        "position": 0,
+        "role": "C",
+        "shape": "dense-sparse",
+        "warmup_iterations": 20,
+        "workers": 1,
+        "workload": "one-percent"
+      },
+      {
+        "binary_role": "baseline",
+        "case_id": "dense-sparse-one-percent",
+        "child_id": "native__dense-sparse-one-percent__pair02__CR__p1",
+        "comparison_id": "retained-baseline-vs-retained-candidate",
+        "cpu_mask": [
+          12,
+          13,
+          14,
+          15
+        ],
+        "lane": "native",
+        "measured_samples": 256,
+        "pair_id": "dense-sparse-one-percent__pair02__CR",
+        "pair_index": 2,
+        "pair_type": "CR",
+        "position": 1,
+        "role": "R",
+        "shape": "dense-sparse",
+        "warmup_iterations": 20,
+        "workers": 1,
+        "workload": "one-percent"
+      },
+      {
+        "binary_role": "baseline",
+        "case_id": "dense-sparse-one-percent",
+        "child_id": "native__dense-sparse-one-percent__pair03__RR__p0",
+        "comparison_id": "retained-baseline-vs-retained-candidate",
+        "cpu_mask": [
+          12,
+          13,
+          14,
+          15
+        ],
+        "lane": "native",
+        "measured_samples": 256,
+        "pair_id": "dense-sparse-one-percent__pair03__RR",
+        "pair_index": 3,
+        "pair_type": "RR",
+        "position": 0,
+        "role": "R",
+        "shape": "dense-sparse",
+        "warmup_iterations": 20,
+        "workers": 1,
+        "workload": "one-percent"
+      },
+      {
+        "binary_role": "baseline",
+        "case_id": "dense-sparse-one-percent",
+        "child_id": "native__dense-sparse-one-percent__pair03__RR__p1",
+        "comparison_id": "retained-baseline-vs-retained-candidate",
+        "cpu_mask": [
+          12,
+          13,
+          14,
+          15
+        ],
+        "lane": "native",
+        "measured_samples": 256,
+        "pair_id": "dense-sparse-one-percent__pair03__RR",
+        "pair_index": 3,
+        "pair_type": "RR",
+        "position": 1,
+        "role": "R",
+        "shape": "dense-sparse",
+        "warmup_iterations": 20,
+        "workers": 1,
+        "workload": "one-percent"
+      },
+      {
+        "binary_role": "candidate",
+        "case_id": "medium-one-edit",
+        "child_id": "native__medium-one-edit__pair00__CC__p0",
+        "comparison_id": "retained-baseline-vs-retained-candidate",
+        "cpu_mask": [
+          12,
+          13,
+          14,
+          15
+        ],
+        "lane": "native",
+        "measured_samples": 256,
+        "pair_id": "medium-one-edit__pair00__CC",
+        "pair_index": 0,
+        "pair_type": "CC",
+        "position": 0,
+        "role": "C",
+        "shape": "medium",
+        "warmup_iterations": 20,
+        "workers": 1,
+        "workload": "one-edit"
+      },
+      {
+        "binary_role": "candidate",
+        "case_id": "medium-one-edit",
+        "child_id": "native__medium-one-edit__pair00__CC__p1",
+        "comparison_id": "retained-baseline-vs-retained-candidate",
+        "cpu_mask": [
+          12,
+          13,
+          14,
+          15
+        ],
+        "lane": "native",
+        "measured_samples": 256,
+        "pair_id": "medium-one-edit__pair00__CC",
+        "pair_index": 0,
+        "pair_type": "CC",
+        "position": 1,
+        "role": "C",
+        "shape": "medium",
+        "warmup_iterations": 20,
+        "workers": 1,
+        "workload": "one-edit"
+      },
+      {
+        "binary_role": "candidate",
+        "case_id": "medium-one-edit",
+        "child_id": "native__medium-one-edit__pair01__CR__p0",
+        "comparison_id": "retained-baseline-vs-retained-candidate",
+        "cpu_mask": [
+          12,
+          13,
+          14,
+          15
+        ],
+        "lane": "native",
+        "measured_samples": 256,
+        "pair_id": "medium-one-edit__pair01__CR",
+        "pair_index": 1,
+        "pair_type": "CR",
+        "position": 0,
+        "role": "C",
+        "shape": "medium",
+        "warmup_iterations": 20,
+        "workers": 1,
+        "workload": "one-edit"
+      },
+      {
+        "binary_role": "baseline",
+        "case_id": "medium-one-edit",
+        "child_id": "native__medium-one-edit__pair01__CR__p1",
+        "comparison_id": "retained-baseline-vs-retained-candidate",
+        "cpu_mask": [
+          12,
+          13,
+          14,
+          15
+        ],
+        "lane": "native",
+        "measured_samples": 256,
+        "pair_id": "medium-one-edit__pair01__CR",
+        "pair_index": 1,
+        "pair_type": "CR",
+        "position": 1,
+        "role": "R",
+        "shape": "medium",
+        "warmup_iterations": 20,
+        "workers": 1,
+        "workload": "one-edit"
+      },
+      {
+        "binary_role": "baseline",
+        "case_id": "medium-one-edit",
+        "child_id": "native__medium-one-edit__pair02__RR__p0",
+        "comparison_id": "retained-baseline-vs-retained-candidate",
+        "cpu_mask": [
+          12,
+          13,
+          14,
+          15
+        ],
+        "lane": "native",
+        "measured_samples": 256,
+        "pair_id": "medium-one-edit__pair02__RR",
+        "pair_index": 2,
+        "pair_type": "RR",
+        "position": 0,
+        "role": "R",
+        "shape": "medium",
+        "warmup_iterations": 20,
+        "workers": 1,
+        "workload": "one-edit"
+      },
+      {
+        "binary_role": "baseline",
+        "case_id": "medium-one-edit",
+        "child_id": "native__medium-one-edit__pair02__RR__p1",
+        "comparison_id": "retained-baseline-vs-retained-candidate",
+        "cpu_mask": [
+          12,
+          13,
+          14,
+          15
+        ],
+        "lane": "native",
+        "measured_samples": 256,
+        "pair_id": "medium-one-edit__pair02__RR",
+        "pair_index": 2,
+        "pair_type": "RR",
+        "position": 1,
+        "role": "R",
+        "shape": "medium",
+        "warmup_iterations": 20,
+        "workers": 1,
+        "workload": "one-edit"
+      },
+      {
+        "binary_role": "baseline",
+        "case_id": "medium-one-edit",
+        "child_id": "native__medium-one-edit__pair03__RC__p0",
+        "comparison_id": "retained-baseline-vs-retained-candidate",
+        "cpu_mask": [
+          12,
+          13,
+          14,
+          15
+        ],
+        "lane": "native",
+        "measured_samples": 256,
+        "pair_id": "medium-one-edit__pair03__RC",
+        "pair_index": 3,
+        "pair_type": "RC",
+        "position": 0,
+        "role": "R",
+        "shape": "medium",
+        "warmup_iterations": 20,
+        "workers": 1,
+        "workload": "one-edit"
+      },
+      {
+        "binary_role": "candidate",
+        "case_id": "medium-one-edit",
+        "child_id": "native__medium-one-edit__pair03__RC__p1",
+        "comparison_id": "retained-baseline-vs-retained-candidate",
+        "cpu_mask": [
+          12,
+          13,
+          14,
+          15
+        ],
+        "lane": "native",
+        "measured_samples": 256,
+        "pair_id": "medium-one-edit__pair03__RC",
+        "pair_index": 3,
+        "pair_type": "RC",
+        "position": 1,
+        "role": "C",
+        "shape": "medium",
+        "warmup_iterations": 20,
+        "workers": 1,
+        "workload": "one-edit"
+      }
+    ],
+    "pair_order_by_case": {
+      "dense-sparse-one-percent": [
+        "RC",
+        "CC",
+        "CR",
+        "RR"
+      ],
+      "medium-one-edit": [
+        "CC",
+        "CR",
+        "RR",
+        "RC"
+      ],
+      "medium-one-percent": [
+        "RR",
+        "RC",
+        "CC",
+        "CR"
+      ]
+    },
+    "pairs": [
+      {
+        "adjacent": true,
+        "case_id": "medium-one-percent",
+        "children": [
+          "native__medium-one-percent__pair00__RR__p0",
+          "native__medium-one-percent__pair00__RR__p1"
+        ],
+        "pair_id": "medium-one-percent__pair00__RR",
+        "pair_index": 0,
+        "pair_type": "RR",
+        "roles": [
+          "R",
+          "R"
+        ]
+      },
+      {
+        "adjacent": true,
+        "case_id": "medium-one-percent",
+        "children": [
+          "native__medium-one-percent__pair01__RC__p0",
+          "native__medium-one-percent__pair01__RC__p1"
+        ],
+        "pair_id": "medium-one-percent__pair01__RC",
+        "pair_index": 1,
+        "pair_type": "RC",
+        "roles": [
+          "R",
+          "C"
+        ]
+      },
+      {
+        "adjacent": true,
+        "case_id": "medium-one-percent",
+        "children": [
+          "native__medium-one-percent__pair02__CC__p0",
+          "native__medium-one-percent__pair02__CC__p1"
+        ],
+        "pair_id": "medium-one-percent__pair02__CC",
+        "pair_index": 2,
+        "pair_type": "CC",
+        "roles": [
+          "C",
+          "C"
+        ]
+      },
+      {
+        "adjacent": true,
+        "case_id": "medium-one-percent",
+        "children": [
+          "native__medium-one-percent__pair03__CR__p0",
+          "native__medium-one-percent__pair03__CR__p1"
+        ],
+        "pair_id": "medium-one-percent__pair03__CR",
+        "pair_index": 3,
+        "pair_type": "CR",
+        "roles": [
+          "C",
+          "R"
+        ]
+      },
+      {
+        "adjacent": true,
+        "case_id": "dense-sparse-one-percent",
+        "children": [
+          "native__dense-sparse-one-percent__pair00__RC__p0",
+          "native__dense-sparse-one-percent__pair00__RC__p1"
+        ],
+        "pair_id": "dense-sparse-one-percent__pair00__RC",
+        "pair_index": 0,
+        "pair_type": "RC",
+        "roles": [
+          "R",
+          "C"
+        ]
+      },
+      {
+        "adjacent": true,
+        "case_id": "dense-sparse-one-percent",
+        "children": [
+          "native__dense-sparse-one-percent__pair01__CC__p0",
+          "native__dense-sparse-one-percent__pair01__CC__p1"
+        ],
+        "pair_id": "dense-sparse-one-percent__pair01__CC",
+        "pair_index": 1,
+        "pair_type": "CC",
+        "roles": [
+          "C",
+          "C"
+        ]
+      },
+      {
+        "adjacent": true,
+        "case_id": "dense-sparse-one-percent",
+        "children": [
+          "native__dense-sparse-one-percent__pair02__CR__p0",
+          "native__dense-sparse-one-percent__pair02__CR__p1"
+        ],
+        "pair_id": "dense-sparse-one-percent__pair02__CR",
+        "pair_index": 2,
+        "pair_type": "CR",
+        "roles": [
+          "C",
+          "R"
+        ]
+      },
+      {
+        "adjacent": true,
+        "case_id": "dense-sparse-one-percent",
+        "children": [
+          "native__dense-sparse-one-percent__pair03__RR__p0",
+          "native__dense-sparse-one-percent__pair03__RR__p1"
+        ],
+        "pair_id": "dense-sparse-one-percent__pair03__RR",
+        "pair_index": 3,
+        "pair_type": "RR",
+        "roles": [
+          "R",
+          "R"
+        ]
+      },
+      {
+        "adjacent": true,
+        "case_id": "medium-one-edit",
+        "children": [
+          "native__medium-one-edit__pair00__CC__p0",
+          "native__medium-one-edit__pair00__CC__p1"
+        ],
+        "pair_id": "medium-one-edit__pair00__CC",
+        "pair_index": 0,
+        "pair_type": "CC",
+        "roles": [
+          "C",
+          "C"
+        ]
+      },
+      {
+        "adjacent": true,
+        "case_id": "medium-one-edit",
+        "children": [
+          "native__medium-one-edit__pair01__CR__p0",
+          "native__medium-one-edit__pair01__CR__p1"
+        ],
+        "pair_id": "medium-one-edit__pair01__CR",
+        "pair_index": 1,
+        "pair_type": "CR",
+        "roles": [
+          "C",
+          "R"
+        ]
+      },
+      {
+        "adjacent": true,
+        "case_id": "medium-one-edit",
+        "children": [
+          "native__medium-one-edit__pair02__RR__p0",
+          "native__medium-one-edit__pair02__RR__p1"
+        ],
+        "pair_id": "medium-one-edit__pair02__RR",
+        "pair_index": 2,
+        "pair_type": "RR",
+        "roles": [
+          "R",
+          "R"
+        ]
+      },
+      {
+        "adjacent": true,
+        "case_id": "medium-one-edit",
+        "children": [
+          "native__medium-one-edit__pair03__RC__p0",
+          "native__medium-one-edit__pair03__RC__p1"
+        ],
+        "pair_id": "medium-one-edit__pair03__RC",
+        "pair_index": 3,
+        "pair_type": "RC",
+        "roles": [
+          "R",
+          "C"
+        ]
+      }
+    ]
+  },
+  "schema": "litchi.performance.0965.ingress-diagnostic-plan.v1",
+  "scope": {
+    "cases": [
+      "medium-one-percent",
+      "dense-sparse-one-percent",
+      "medium-one-edit"
+    ],
+    "children": 24,
+    "children_per_case": 8,
+    "diagnostic_only": true,
+    "format": "XLSX managed-compression benchmark",
+    "fresh_process": true,
+    "iwork_excluded": true,
+    "lane": "native",
+    "measured_samples": 256,
+    "pair_types_per_case": [
+      "RR",
+      "RC",
+      "CC",
+      "CR"
+    ],
+    "pairs": 12,
+    "retry_or_replacement": false,
+    "serial": true,
+    "source_rebuilt": false,
+    "warmup_iterations": 20
+  },
+  "source": {
+    "baseline_binding": {
+      "bytes": 1253,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/receipts/baseline-binding-v2.json",
+      "sha256": "01cdeb24289f5e13dbabc71964113dccb827498a52e529e8f171423b8752c2dc"
+    },
+    "baseline_manifest": {
+      "bytes": 2267944,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/source-manifest-baseline-v2.json",
+      "sha256": "74d3ead27a1518093be3f80fbe50cfa1280526e08957b1774dbc6fd891bc4eda"
+    },
+    "baseline_source_root": "/home/zhuhe/litchi-performance-0964/source-baseline",
+    "candidate_allowlist": {
+      "bytes": 1039,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/protocol/candidate-test-allowlist-v3.json",
+      "sha256": "a1c62adbe848111d1370e223614473d8f1500797d52cce4a74f7f24eab045c97"
+    },
+    "candidate_build_result": {
+      "bytes": 1354,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/receipts/candidate-managed-v3-build-result.json",
+      "sha256": "0d9ffc2f3b711b6de8b75569ab2f42cd8701b24fe874371d34b7672064fb923e"
+    },
+    "candidate_change_allowlist": [
+      "crates/litchi-xlsx/src/cell_values/validation.rs",
+      "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+      "crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs",
+      "crates/litchi-xlsx/src/cell_values/validation_borrow_tests.rs"
+    ],
+    "candidate_freeze": {
+      "bytes": 1924,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/receipts/candidate-freeze-v4.json",
+      "sha256": "4f1df545ee500b404596a90068dba815f96cb810b315658798f6793a2fdc4335"
+    },
+    "candidate_manifest": {
+      "bytes": 2268238,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/source-manifest-candidate-v4.json",
+      "sha256": "19e4bdf18aee484ade90067a98ec6ab0ff5f6d017105840df4030f697f25779b"
+    },
+    "candidate_perf_baseline_lock": {
+      "bytes": 56289,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/source-candidate/tools/perf-baseline/Cargo.lock",
+      "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+    },
+    "candidate_quality": {
+      "bytes": 1491,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/receipts/quality-0964-final-v1.json",
+      "sha256": "fd84a9dd71cf73691c091e00444a7649331da2ee0da045781484049a930a247e"
+    },
+    "candidate_root_lock_overlay": {
+      "bytes": 138443,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/source-candidate/Cargo.lock",
+      "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+    },
+    "candidate_source_root": "/home/zhuhe/litchi-performance-0964/source-candidate",
+    "inherited_0964_plan": {
+      "bytes": 59570,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/protocol/plan-final-epoch2-v1.json",
+      "sha256": "dcfabed26427c6a117b41c2e4b6209baec40afe06c218054b2187ae9c49b0a64"
+    },
+    "inherited_0964_plan_revision": "epoch2-root-final-v1",
+    "inherited_0964_raw_audit": {
+      "bytes": 150014,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/review/independent-epoch2-raw-audit-v1.json",
+      "sha256": "cb5822541294a3710ffb1cb198f08c37c4f00f724274ce6b2165e27a5f071938"
+    },
+    "production_adoption": false,
+    "required_perf_baseline_lock": {
+      "bytes": 56289,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/source-baseline/tools/perf-baseline/Cargo.lock",
+      "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+    },
+    "required_perf_baseline_lock_sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5",
+    "source_rebuilt": false
+  },
+  "status": "authorized",
+  "status_note": "Descriptive diagnostic only; does not reopen the 0964 screen or authorize adoption."
+}

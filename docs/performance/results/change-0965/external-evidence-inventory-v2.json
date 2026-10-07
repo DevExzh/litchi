@@ -1,0 +1,3396 @@
+{
+  "capture_state_attestation": "stable",
+  "created_utc": "2026-10-07T22:35:12.224252Z",
+  "file_count": 259,
+  "files": [
+    {
+      "bytes": 284168,
+      "kind": "file",
+      "mode": 436,
+      "path": "analysis/diagnostic-result-v1.json",
+      "sha256": "1eb904d55ad2ee4498da7ee1fd980fbd222d60e11c8cdcb5b4472f8047db2e10"
+    },
+    {
+      "bytes": 443033,
+      "kind": "file",
+      "mode": 436,
+      "path": "analysis/ingress-summary-replay-v1.json",
+      "sha256": "091a122bbb03f5ba65bca5964aa0659c2f2433cfd036d274c76c381b591495b8"
+    },
+    {
+      "bytes": 443033,
+      "kind": "file",
+      "mode": 436,
+      "path": "analysis/ingress-summary-v1.json",
+      "sha256": "091a122bbb03f5ba65bca5964aa0659c2f2433cfd036d274c76c381b591495b8"
+    },
+    {
+      "bytes": 1052,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/capture-start.json",
+      "sha256": "a2fa6eb7e55a8b4be3ed913240c8163bd3c20d1b59665e00f0f75eac5331813e"
+    },
+    {
+      "bytes": 743,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/capture-terminal.json",
+      "sha256": "51052e816294a8f4f3ac43bdb8513424816fed2545b4769079b8a2b1c9295dec"
+    },
+    {
+      "bytes": 312,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair00__RC__p0/launch.json",
+      "sha256": "825985358619aace24a4e5ae3f7ec09bc5dd0bfee2b0a192647d50bbdec3f2b1"
+    },
+    {
+      "bytes": 198452,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair00__RC__p0/output/report.json",
+      "sha256": "5869077cfebae4759a2010850679ee14f19eec8d9468c8a90b720d1a0af03b2d"
+    },
+    {
+      "bytes": 1970,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair00__RC__p0/post-terminal-artifacts.json",
+      "sha256": "7ab80a8616e704950bd7fd33f95afb3e2bb6ad5e6c4f605eecb7c1000ba86fab"
+    },
+    {
+      "bytes": 2697,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair00__RC__p0/start.json",
+      "sha256": "7887803076b5881732ecb9dc17eb8c6e34b265373cd4b26801a56585f0cc30fd"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair00__RC__p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair00__RC__p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1073,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair00__RC__p0/terminal.json",
+      "sha256": "9d46137f2ac38988ba431616676c3aa14b690db240cc1284143aa475f6162c34"
+    },
+    {
+      "bytes": 1030,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair00__RC__p0/time-v.txt",
+      "sha256": "4f37b0063f0f6413eac55ff4a2977868e0d084e9499168f3ce72d80b43fb5c40"
+    },
+    {
+      "bytes": 2127,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair00__RC__p0/validation.json",
+      "sha256": "474ac7fba8645c3520b756feb1cc08b37a396d6ecb180cae1f3dd716adc653bb"
+    },
+    {
+      "bytes": 312,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair00__RC__p1/launch.json",
+      "sha256": "757c4b73f4ddd8ac0aae2b27b1908ff824741f61c177fe66636614df464ed96b"
+    },
+    {
+      "bytes": 198491,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair00__RC__p1/output/report.json",
+      "sha256": "a7e0a073c5887aeaac0863f09518ec4174aa9b48a927ba1c05d18136f403f7e4"
+    },
+    {
+      "bytes": 1970,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair00__RC__p1/post-terminal-artifacts.json",
+      "sha256": "a1149e50ca35ce1bbf023b751c499e5eddf8f1ab4e2dbe3d9514301eb6a92148"
+    },
+    {
+      "bytes": 2698,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair00__RC__p1/start.json",
+      "sha256": "eb9abc78375a858e672b1fe66b30e9eab145dd8e6e2fb66165f13806193a6a32"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair00__RC__p1/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair00__RC__p1/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1073,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair00__RC__p1/terminal.json",
+      "sha256": "5443aaa01ad35c953c9ffc2a85d55736526a866b4fdc7c99263311de1d0c7026"
+    },
+    {
+      "bytes": 1030,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair00__RC__p1/time-v.txt",
+      "sha256": "4caa6a0315bda5a90ed2195f8bc11d8e22466a92cfcf9c05841b887534aaa7a1"
+    },
+    {
+      "bytes": 2127,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair00__RC__p1/validation.json",
+      "sha256": "fc4c63a3ec3ae4e2bf1d0d07ee2743ab479f1109b58d27a01189e3434eae486a"
+    },
+    {
+      "bytes": 312,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair01__CC__p0/launch.json",
+      "sha256": "a7ab57136bf110450073218cfb8dfb89ad909c5fdf20820a11cd5c1c02647fc3"
+    },
+    {
+      "bytes": 198438,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair01__CC__p0/output/report.json",
+      "sha256": "4065cb5af757cd9f6acf011c2f56f5ff5a6f2810064397f9d52ee00f90eaf55f"
+    },
+    {
+      "bytes": 1970,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair01__CC__p0/post-terminal-artifacts.json",
+      "sha256": "173cbd20ea3263b026e2127cfba984f1bf803a7c5c0f367d2ec4e229faa8e845"
+    },
+    {
+      "bytes": 2699,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair01__CC__p0/start.json",
+      "sha256": "983a7339e9509f6574dffba74bd5790fb77363b1469f267db9a89c0848733c76"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair01__CC__p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair01__CC__p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1074,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair01__CC__p0/terminal.json",
+      "sha256": "1d0df9c7e0c6c3c03465b8d4c31111483b7519804ea55be373d4b2a51525f062"
+    },
+    {
+      "bytes": 1030,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair01__CC__p0/time-v.txt",
+      "sha256": "4d41e9863cecc890c57cd616a684836f48483da3746c84a89a98d52e7309a906"
+    },
+    {
+      "bytes": 2129,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair01__CC__p0/validation.json",
+      "sha256": "aa26554a37ee0c024a999d66ba2e528b230ba4508f38ada9f1652fb85b6eb827"
+    },
+    {
+      "bytes": 312,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair01__CC__p1/launch.json",
+      "sha256": "19667b7a4d782d02a2f582179f1e0f79402c48bb742e6718f8cef86fc0c1d427"
+    },
+    {
+      "bytes": 198449,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair01__CC__p1/output/report.json",
+      "sha256": "3674f9147774e043a132624b47d8cb637d4ddef0e1e7bf663321205674f143b8"
+    },
+    {
+      "bytes": 1970,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair01__CC__p1/post-terminal-artifacts.json",
+      "sha256": "3987ec277ef0b8246130141f1ee45363fab24a3ade1f97e0ac721256e41d9b2c"
+    },
+    {
+      "bytes": 2699,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair01__CC__p1/start.json",
+      "sha256": "0628809ad624e2ea58f69a4fe3af033722ac0db97ee978e0f1fd483171870461"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair01__CC__p1/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair01__CC__p1/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1074,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair01__CC__p1/terminal.json",
+      "sha256": "1ca4e292f6b18bc48412f388b3b3f45b822edcff383d547d7e232f0b6b7f160d"
+    },
+    {
+      "bytes": 1030,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair01__CC__p1/time-v.txt",
+      "sha256": "0102d4d72d958978b94119d3e6b0cfab166c0faec2120df9a3b99f355c44770b"
+    },
+    {
+      "bytes": 2129,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair01__CC__p1/validation.json",
+      "sha256": "831fc9ceccfbce285c4dda19463220832e5c471a0ea6175a57d7793fba34cc1b"
+    },
+    {
+      "bytes": 312,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair02__CR__p0/launch.json",
+      "sha256": "454a2490443fa6d6343eef694de9b6d46a6d1e70761aa259ab8c8a5385258851"
+    },
+    {
+      "bytes": 198412,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair02__CR__p0/output/report.json",
+      "sha256": "ea5536e096ae10d8ab480f5d13cd0c67eac50083ebfb06604ab5607067fcf635"
+    },
+    {
+      "bytes": 1970,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair02__CR__p0/post-terminal-artifacts.json",
+      "sha256": "f808d3ee20e754e5f87e4cf9382213f7a54b57704f7360db9079785d8d751a69"
+    },
+    {
+      "bytes": 2699,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair02__CR__p0/start.json",
+      "sha256": "4e0679138c8aa367ffc565d15ff385ab1d5ff1d5449d0f1f1ed57dd7012984e6"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair02__CR__p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair02__CR__p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1074,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair02__CR__p0/terminal.json",
+      "sha256": "1250718384a482dbb3851aa8c55f8c4218d38bb8cbe01a9928fc073737ce238c"
+    },
+    {
+      "bytes": 1030,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair02__CR__p0/time-v.txt",
+      "sha256": "3e51f0cfd0eb1bb3f3e7d66b927da9ddc32ce32f24780e7a3ae6d156abee0031"
+    },
+    {
+      "bytes": 2129,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair02__CR__p0/validation.json",
+      "sha256": "fa5a4aeeff1cc4329abbaa6b3bec2a6701d88758f4ffcbfc49c491230c7867cc"
+    },
+    {
+      "bytes": 312,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair02__CR__p1/launch.json",
+      "sha256": "18df8fef26c2fc022a3d27103205120161441d4c5c6a687d6c19f19ff1290676"
+    },
+    {
+      "bytes": 198425,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair02__CR__p1/output/report.json",
+      "sha256": "1d287a189f49b0739175cb5952c722406c78cb6b328d7a92d55d172f34122dcf"
+    },
+    {
+      "bytes": 1970,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair02__CR__p1/post-terminal-artifacts.json",
+      "sha256": "b80882b12107b9bd3f3ebbd84c9060611608a461b319d3f28a9984d2171f1afc"
+    },
+    {
+      "bytes": 2698,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair02__CR__p1/start.json",
+      "sha256": "ee94e99276e7cb0948956f849123e18907f2932d333e2a5d33536b366865f7c6"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair02__CR__p1/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair02__CR__p1/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1074,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair02__CR__p1/terminal.json",
+      "sha256": "8d7a93083ab13eaee5b4cf2aef98cca1f5a0533a6426878497b677c278fe5ccb"
+    },
+    {
+      "bytes": 1030,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair02__CR__p1/time-v.txt",
+      "sha256": "cf3aca156423a5a5b668fa6b25c30a29a4ae3af95d81afe97ce58fb11b8003d3"
+    },
+    {
+      "bytes": 2128,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair02__CR__p1/validation.json",
+      "sha256": "627c7556de8720da699c45ecd5fd2dfac6d0cde9c87015053e5a7e7692d4f6a8"
+    },
+    {
+      "bytes": 312,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair03__RR__p0/launch.json",
+      "sha256": "9a1918841ae675fd90b28cb560e1847c199757b0b78f39b822fe8562318c9c37"
+    },
+    {
+      "bytes": 198498,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair03__RR__p0/output/report.json",
+      "sha256": "5230dd8bf9be610c2a6fef7c7b99bf37a1c360b9aa7247060e9abba5d2a15c93"
+    },
+    {
+      "bytes": 1970,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair03__RR__p0/post-terminal-artifacts.json",
+      "sha256": "bb0c3696815c2187c18870eb0b87934b35cf8c0815caa86e69ed751c61aa884c"
+    },
+    {
+      "bytes": 2698,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair03__RR__p0/start.json",
+      "sha256": "8c5d32d3f4900eae0663a3a78cdce8320a8a1e3ea3b48aecc852584e8692e0c3"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair03__RR__p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair03__RR__p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1074,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair03__RR__p0/terminal.json",
+      "sha256": "36a369a5626800ffc8e0c251cdbe4c5d93d16aefa77c9e6cdd54bb0066791d99"
+    },
+    {
+      "bytes": 1030,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair03__RR__p0/time-v.txt",
+      "sha256": "399482913b51565ded3d7f282d0514acdfa67ec1c11178d7b8e0be3f86592c25"
+    },
+    {
+      "bytes": 2128,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair03__RR__p0/validation.json",
+      "sha256": "78eeb0d1a4aca45dfe8eb2384d7c7b1cadd8b6396c98c03bf07d2f1d349536b8"
+    },
+    {
+      "bytes": 312,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair03__RR__p1/launch.json",
+      "sha256": "78fc4d20b89afcd1670462409dfe5e101fc85c3bdb8e22b2ab24edcd1b9d0251"
+    },
+    {
+      "bytes": 198437,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair03__RR__p1/output/report.json",
+      "sha256": "27815f691c9950f92c217fe075e10eb874638250ecc065b846ed71293043de19"
+    },
+    {
+      "bytes": 1970,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair03__RR__p1/post-terminal-artifacts.json",
+      "sha256": "20407c0a4f845f3caf01b0a3b8a8c8fa6b5dd4f3fefa8e9b8f50a4a9e8b22bed"
+    },
+    {
+      "bytes": 2698,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair03__RR__p1/start.json",
+      "sha256": "7e04311546bc2108f7f3553bd18bad29b6e07764cd2e044314cb5abaef590191"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair03__RR__p1/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair03__RR__p1/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1074,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair03__RR__p1/terminal.json",
+      "sha256": "d32b685d22fbd4d6c1ac0a9f0d6e846bfe24cceda20000ce8ed05e0887b8933f"
+    },
+    {
+      "bytes": 1030,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair03__RR__p1/time-v.txt",
+      "sha256": "25daae33346c6977d572dd0c90e6d40982dd2adb7c4b3b0e7f55fe8b256a3d7a"
+    },
+    {
+      "bytes": 2128,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair03__RR__p1/validation.json",
+      "sha256": "73216c9b0c5f62a07d5cfe81a42e6c2fc69b39e1c09904a029587316ccf7aaca"
+    },
+    {
+      "bytes": 312,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair00__CC__p0/launch.json",
+      "sha256": "5754903b5b6b0d4c2ab39555fde446a9ca0823a17c982784287d849be3cc0dec"
+    },
+    {
+      "bytes": 197350,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair00__CC__p0/output/report.json",
+      "sha256": "b0c95d5b93dd94819b9775e5017793bc001a5bbd2ba04aa307c2488408d8f75e"
+    },
+    {
+      "bytes": 1916,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair00__CC__p0/post-terminal-artifacts.json",
+      "sha256": "ccf11592126dd82687ae11a26e964b7bc61c3331d1626cc33ba7adb19c2064ef"
+    },
+    {
+      "bytes": 2618,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair00__CC__p0/start.json",
+      "sha256": "19eb72f1f62b3ca4bf7a8258ff6864f379a81721a5a050a064c86462acb93a05"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair00__CC__p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair00__CC__p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1056,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair00__CC__p0/terminal.json",
+      "sha256": "0672004c0127b4565c7941f0e112cc5db82e60195bc48758b28bca04df5277d2"
+    },
+    {
+      "bytes": 1012,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair00__CC__p0/time-v.txt",
+      "sha256": "71dd156c2e965478cc6537733c8103c6d2df54998d5b7da42cb37b6aa5e4fa01"
+    },
+    {
+      "bytes": 2066,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair00__CC__p0/validation.json",
+      "sha256": "a42de20924a694b245d75edd566b112420594452020df2b8e4deafe05ea3a908"
+    },
+    {
+      "bytes": 312,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair00__CC__p1/launch.json",
+      "sha256": "264e309fb20aeeb7ce415daeb84ec21d1da264d9737153edb4550f84447e20df"
+    },
+    {
+      "bytes": 197349,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair00__CC__p1/output/report.json",
+      "sha256": "ec43010bc0e5d3c361be2b662bbb9f14fde739f2cf9f0f12d15fcd005cac90f7"
+    },
+    {
+      "bytes": 1916,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair00__CC__p1/post-terminal-artifacts.json",
+      "sha256": "daf8e6ab59016e964199ffa31f1a6c1916ac14efac8eff8936c1e728bbfd5c70"
+    },
+    {
+      "bytes": 2618,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair00__CC__p1/start.json",
+      "sha256": "bba736f66bed1af90ad92989b2778c383ed250f5a000633a2f0846a9980a77fe"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair00__CC__p1/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair00__CC__p1/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1056,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair00__CC__p1/terminal.json",
+      "sha256": "172d634975a0fde8b6777a5223cb16d3dee82628e1f74d9863abd6e6e750ea89"
+    },
+    {
+      "bytes": 1012,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair00__CC__p1/time-v.txt",
+      "sha256": "fa42b2e0f6aa2e9d1086a5631de3e3d80247f0b573fb785533eba46c46127d42"
+    },
+    {
+      "bytes": 2066,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair00__CC__p1/validation.json",
+      "sha256": "57a4702dd935494cd35155c9b93c22ebff378ada32e2ee51420f0ee0532de318"
+    },
+    {
+      "bytes": 312,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair01__CR__p0/launch.json",
+      "sha256": "1934233996fd7c9ffecec4f14a3575353088905d41841f40a2a45710d7b336c5"
+    },
+    {
+      "bytes": 197353,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair01__CR__p0/output/report.json",
+      "sha256": "7c8c22408a2512d79de2d1fa30e6206d9ba7f932c496b966e3548cd4dc2125d1"
+    },
+    {
+      "bytes": 1916,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair01__CR__p0/post-terminal-artifacts.json",
+      "sha256": "666935a43fed43cc1461b7c0c402ef429e85c51bcc4c01c198a657cde308c9e9"
+    },
+    {
+      "bytes": 2618,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair01__CR__p0/start.json",
+      "sha256": "58e4f061dfb856055c238e2280c4a1fea4f42945eff52482f79b3c17bfa59548"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair01__CR__p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair01__CR__p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1056,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair01__CR__p0/terminal.json",
+      "sha256": "f49358ac75cf93e6f56ff20b50cef9075c1511e7f84ae4657ac7e856d2d90a55"
+    },
+    {
+      "bytes": 1012,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair01__CR__p0/time-v.txt",
+      "sha256": "f5447d312713bdda7f09cbc7c6b41fa2549e53b870372fd9ef7af71847defdd2"
+    },
+    {
+      "bytes": 2066,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair01__CR__p0/validation.json",
+      "sha256": "246ccc6866e8c239e76850f0ac80b6ff4ef00810e70d93f134d51678d83e09ca"
+    },
+    {
+      "bytes": 312,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair01__CR__p1/launch.json",
+      "sha256": "ce843603e1554cb5c0b52e0560ef4c699db5de1c4348b309927570a086ed1ad9"
+    },
+    {
+      "bytes": 197349,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair01__CR__p1/output/report.json",
+      "sha256": "6863c4b1c8217c2c22ec7ac55497b0138fbcb2b573e6c72de5266f484f4f54a4"
+    },
+    {
+      "bytes": 1916,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair01__CR__p1/post-terminal-artifacts.json",
+      "sha256": "257e86ca403ac6dbbf039ea9e2b0ad6a731d62463cc20cd37d93d4c04753a6be"
+    },
+    {
+      "bytes": 2617,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair01__CR__p1/start.json",
+      "sha256": "9068e2d44577fd0332419f74b20c29dcf7ea4914f2dd30204cda229a8fe433ac"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair01__CR__p1/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair01__CR__p1/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1056,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair01__CR__p1/terminal.json",
+      "sha256": "3bfd80c48e881e2913fcfda305ca6cf52631305b3b2e06d9c13ae99311ec2fc1"
+    },
+    {
+      "bytes": 1012,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair01__CR__p1/time-v.txt",
+      "sha256": "5ebeadba789fcd23e41cbe6e20d5b87871f079f96b5476975497f1dc3ceb039e"
+    },
+    {
+      "bytes": 2065,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair01__CR__p1/validation.json",
+      "sha256": "6c7c31aa4b7325e1229e4ce96a384f5280be38ccf30e6fb10d45d26fc638922b"
+    },
+    {
+      "bytes": 312,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair02__RR__p0/launch.json",
+      "sha256": "df688813c5d917e5bc5bef520a1f86c7b4a39663152cf746fb5ab513fc660d7b"
+    },
+    {
+      "bytes": 197352,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair02__RR__p0/output/report.json",
+      "sha256": "3f1cef4300d17062a71efc30c0b16b8c66b54865a8d5009c23af40ad37a14c4a"
+    },
+    {
+      "bytes": 1916,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair02__RR__p0/post-terminal-artifacts.json",
+      "sha256": "dbf92f853e020fe1dcd873dde2f95cdd90fd2e4a4f174aeeda38006016e673b9"
+    },
+    {
+      "bytes": 2617,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair02__RR__p0/start.json",
+      "sha256": "2c08eb041d7a01035e6f96bca3a0bc8eef89275b646c9d94fb85e7597bd0a9ae"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair02__RR__p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair02__RR__p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1056,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair02__RR__p0/terminal.json",
+      "sha256": "299e5ad079a56c888896dab8aceb6553d6d8749ea9664d45d3d6f37972c66ecb"
+    },
+    {
+      "bytes": 1012,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair02__RR__p0/time-v.txt",
+      "sha256": "e585e33dfc94cff044f9af8685da3e6c0c731bd0ad28a35f9a0305f57a66a9c1"
+    },
+    {
+      "bytes": 2065,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair02__RR__p0/validation.json",
+      "sha256": "6a18fbe132ce2fa3cf3870cf2b82369942e7198856daa880d595f04ddef2a70e"
+    },
+    {
+      "bytes": 312,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair02__RR__p1/launch.json",
+      "sha256": "e17329f080d5835c9a4bf131dd48c5630d5ee7c39a4fe0259c558e21c0528d27"
+    },
+    {
+      "bytes": 197351,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair02__RR__p1/output/report.json",
+      "sha256": "f95d6946169fdc90ddc4adeab79884ff84d8b67dbfdd9729d3b1c21dcc870f85"
+    },
+    {
+      "bytes": 1916,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair02__RR__p1/post-terminal-artifacts.json",
+      "sha256": "ea79a84af5cd50a69d219f4059623789fc5be63d38e63539498ccdc0bb0ea124"
+    },
+    {
+      "bytes": 2617,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair02__RR__p1/start.json",
+      "sha256": "7bd88e2ef71eebc4e3996425f911aa65e717d370a8a12a89f08c0c00f3c2a25e"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair02__RR__p1/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair02__RR__p1/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1056,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair02__RR__p1/terminal.json",
+      "sha256": "feba4e7e7fbccbac7e730ede0a0fa8f918b075ae56b10fc2bbc7747efb13986a"
+    },
+    {
+      "bytes": 1012,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair02__RR__p1/time-v.txt",
+      "sha256": "4430febf4c07b55dd29fde3408bbdf1944921aa43f2755bc9c222a2b138e376d"
+    },
+    {
+      "bytes": 2065,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair02__RR__p1/validation.json",
+      "sha256": "8493aec09ad4f8444a0d9d7911bbf909fc8c80338ca5f94265db61296f4a1377"
+    },
+    {
+      "bytes": 312,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair03__RC__p0/launch.json",
+      "sha256": "b6bfcb376046c2ee3ce1f013941a984708c62e4663fb1d6144ac19928b1b4b28"
+    },
+    {
+      "bytes": 197350,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair03__RC__p0/output/report.json",
+      "sha256": "d73e8c49e6244e87d9791f073ff309d32ff7b5b5032d7e143847dedfbc24ee6d"
+    },
+    {
+      "bytes": 1916,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair03__RC__p0/post-terminal-artifacts.json",
+      "sha256": "1582d315ae12356d309ca283ad275f82d02834feb23873593fc03a716f180b17"
+    },
+    {
+      "bytes": 2617,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair03__RC__p0/start.json",
+      "sha256": "fb8467e5b92db77ece440b318ebfca2aab533223d4f81eb501ed22bf72ef7f5d"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair03__RC__p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair03__RC__p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1056,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair03__RC__p0/terminal.json",
+      "sha256": "0d6932038f5394ee243f824060de17c8398939d7eb993570a43c2bb057e3886e"
+    },
+    {
+      "bytes": 1012,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair03__RC__p0/time-v.txt",
+      "sha256": "2208a82df4f8e1d4a7728c72cba943f679ebf49746134a187a4e0d41b0a247e6"
+    },
+    {
+      "bytes": 2065,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair03__RC__p0/validation.json",
+      "sha256": "e11afe23ae85eb2bb1053c7bce62ea9726ade6ada93d0370264d3fb70382e605"
+    },
+    {
+      "bytes": 312,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair03__RC__p1/launch.json",
+      "sha256": "66fb3b615d6f00686a11a936a455fa44604f4e63bcb9685fa4b48acd05538b1d"
+    },
+    {
+      "bytes": 197350,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair03__RC__p1/output/report.json",
+      "sha256": "dc5c6e9bf07b0dc0db2c20c934b39b5c8ea81fb7edf4bda273754f6f8ff5c211"
+    },
+    {
+      "bytes": 1916,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair03__RC__p1/post-terminal-artifacts.json",
+      "sha256": "f52307280d4646a4e85a8f55f960ffe407522a5f297c20626c662b980b9b4724"
+    },
+    {
+      "bytes": 2618,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair03__RC__p1/start.json",
+      "sha256": "40799b0d99a805108a4a756949cdb79847883380af45c0296e8eb9c4eea8e879"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair03__RC__p1/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair03__RC__p1/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1056,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair03__RC__p1/terminal.json",
+      "sha256": "e0a3384275beed3da5b59225943c5d2ee7fc7ba8efd2cabda1c8551d0b9c7e06"
+    },
+    {
+      "bytes": 1012,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair03__RC__p1/time-v.txt",
+      "sha256": "e808790e97cd88807f6dfde4a6f61fa18bc95ea671fe561fc92a571ef4a35857"
+    },
+    {
+      "bytes": 2066,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair03__RC__p1/validation.json",
+      "sha256": "db02de15e2b77a8c51a6cb628aca373707a3fc79b84a72472c07786a9c036a31"
+    },
+    {
+      "bytes": 312,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair00__RR__p0/launch.json",
+      "sha256": "8748c5748edfd0ce3020797701c79b4fe4e78696d25b151fc6deb8d323f5d103"
+    },
+    {
+      "bytes": 197873,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair00__RR__p0/output/report.json",
+      "sha256": "c5af4e579d3203fa3045a910ec4bce4692b2174a30b704f1671199bfd91a09c2"
+    },
+    {
+      "bytes": 1934,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair00__RR__p0/post-terminal-artifacts.json",
+      "sha256": "84ba736a999915bcbb93bb6f1a4703a9e77fe62a7452ce15f4ca9764e205d1a3"
+    },
+    {
+      "bytes": 2643,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair00__RR__p0/start.json",
+      "sha256": "578d96de76d719eae743b2ca5dd2b90491862acc950c766f37baff8dcb670545"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair00__RR__p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair00__RR__p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1061,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair00__RR__p0/terminal.json",
+      "sha256": "77e72c5786ecb0754765640fe8163f552c34e4f940cefb9b8a9db6a05c8f9854"
+    },
+    {
+      "bytes": 1017,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair00__RR__p0/time-v.txt",
+      "sha256": "443591a19aca1fde785c5a8c3d77575a1069b525f9e16802d118991e7a704a16"
+    },
+    {
+      "bytes": 2083,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair00__RR__p0/validation.json",
+      "sha256": "979c416a2cb5212f6a99fe700ec6eefde6df9754e487331c7e633ea0be579dd4"
+    },
+    {
+      "bytes": 312,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair00__RR__p1/launch.json",
+      "sha256": "2abce8a7ea31142add5f8f4a3e5fc9405afb12cc75d8ce4ab70105392fa3e4da"
+    },
+    {
+      "bytes": 197898,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair00__RR__p1/output/report.json",
+      "sha256": "7a8f61c3bf41b9273d128740ddd5215d031ede74ba2720dd4248c0f4e23871c3"
+    },
+    {
+      "bytes": 1934,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair00__RR__p1/post-terminal-artifacts.json",
+      "sha256": "5e4f72da377365c6608b9ea22cf4b5cb8e3f6e13a587d5c57098edd680aa8b8c"
+    },
+    {
+      "bytes": 2643,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair00__RR__p1/start.json",
+      "sha256": "3bf0f2258a19c1a08cf6446afdafcf394bd98e9f874328d7f2cbd9f14ca0ea91"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair00__RR__p1/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair00__RR__p1/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1061,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair00__RR__p1/terminal.json",
+      "sha256": "62550a5aa399f3771fd8517b72007893ce0e4d3aecd088cd27faa103ed4d11b1"
+    },
+    {
+      "bytes": 1018,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair00__RR__p1/time-v.txt",
+      "sha256": "f5a799b960648844f123acbf2a6c2f29026522f5c29a9230020647c29c72bf9c"
+    },
+    {
+      "bytes": 2085,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair00__RR__p1/validation.json",
+      "sha256": "a603c065ae348738c94e82d6cfa21cb4e4ca5f69a1baeea8f1c69d94da1c1eb9"
+    },
+    {
+      "bytes": 312,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair01__RC__p0/launch.json",
+      "sha256": "61f507ade8fd1432b8305acaac6cecfdc2290395b1c904ae5857a42682b4d07d"
+    },
+    {
+      "bytes": 197871,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair01__RC__p0/output/report.json",
+      "sha256": "9136fbcda594414648d6632927ec9b4afe5994f0aa7fbe368e8a004210f9fd00"
+    },
+    {
+      "bytes": 1934,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair01__RC__p0/post-terminal-artifacts.json",
+      "sha256": "c117f2f4f6e4179ce8fb2e360c62ef11066ccf6d0d7272e268c1310585b1cef5"
+    },
+    {
+      "bytes": 2643,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair01__RC__p0/start.json",
+      "sha256": "7d45696c9889b00551163e2ddc6cd24922ec81886be5102ce34595ff102e1cda"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair01__RC__p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair01__RC__p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1061,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair01__RC__p0/terminal.json",
+      "sha256": "4675f729b6d18004e05cd8eea9cc3efdc66aa080e92baa335ec40eb490cff99e"
+    },
+    {
+      "bytes": 1017,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair01__RC__p0/time-v.txt",
+      "sha256": "b6f2b642a785ca397c2779f398dd9ddd0aac7c986414d5171b9898dd9ee45557"
+    },
+    {
+      "bytes": 2084,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair01__RC__p0/validation.json",
+      "sha256": "3afe11efc1d1f822f8e7a32a2ca44641e9072be2f40b531aec433a9d327a2547"
+    },
+    {
+      "bytes": 312,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair01__RC__p1/launch.json",
+      "sha256": "4fc65feee76bbf1c2a26b1ddab2837d81e9136c52293f091f95859d01f7a289d"
+    },
+    {
+      "bytes": 197876,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair01__RC__p1/output/report.json",
+      "sha256": "096c68b69e78dc54265d121e6105c68cd2188271adfaecac40176c078fece7e8"
+    },
+    {
+      "bytes": 1934,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair01__RC__p1/post-terminal-artifacts.json",
+      "sha256": "182c8b8e5579ab6389c7329ac0d052374570043212edd11dea7dcb30120d1c25"
+    },
+    {
+      "bytes": 2644,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair01__RC__p1/start.json",
+      "sha256": "4a6b64d2d688eb6b9b008f5516e6fd6447793d3da5173e5ae810acd49baa6e78"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair01__RC__p1/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair01__RC__p1/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1061,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair01__RC__p1/terminal.json",
+      "sha256": "2fcc1a132c1cb61e7c03be40643ab5cd378dd3fc68403523eb1f601df2ad27e2"
+    },
+    {
+      "bytes": 1017,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair01__RC__p1/time-v.txt",
+      "sha256": "74f646e07788a8948fcf361057887045482fbad9edd02ddc98364c10ad667d04"
+    },
+    {
+      "bytes": 2085,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair01__RC__p1/validation.json",
+      "sha256": "94c2f0831fc9df586dcf4125e4806d29015591e43d3501a88582190fc2856253"
+    },
+    {
+      "bytes": 312,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair02__CC__p0/launch.json",
+      "sha256": "35e710c8873ac8e5a2da384f5d6c85be523eee3ecbaf734de4cc5853b9b044f3"
+    },
+    {
+      "bytes": 197872,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair02__CC__p0/output/report.json",
+      "sha256": "6581f4ea4e932c27563fabc52a4168bfaa1f995fee65af2327ec46a33d332bb8"
+    },
+    {
+      "bytes": 1934,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair02__CC__p0/post-terminal-artifacts.json",
+      "sha256": "ba8cdfc3b07d34f6e5cc6aa185a0e4132c3c97b9aec780d070fc90edfae6aa57"
+    },
+    {
+      "bytes": 2644,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair02__CC__p0/start.json",
+      "sha256": "9b7c7a760eeb70cfba785f60c336f3c120f0f1f80798dc9b3c95a7e45205cd63"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair02__CC__p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair02__CC__p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1061,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair02__CC__p0/terminal.json",
+      "sha256": "de80791965dac20ede3bc325179f1ba27693e96aa3ffa7183ea8ec1825965c4f"
+    },
+    {
+      "bytes": 1016,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair02__CC__p0/time-v.txt",
+      "sha256": "2f59da5a5fd7781c68a1634a92dda9a3191f5824ac2c7da7634ec68bc4696a59"
+    },
+    {
+      "bytes": 2083,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair02__CC__p0/validation.json",
+      "sha256": "c4ac85948ec3edf0e46e27b2d89cd6ffae73cfb112faf9ee86cd91c10aba68c4"
+    },
+    {
+      "bytes": 312,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair02__CC__p1/launch.json",
+      "sha256": "999eee0d1a155aaebbbe4141c80405e6de6b7a987218a8969c85d840968f2f13"
+    },
+    {
+      "bytes": 197871,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair02__CC__p1/output/report.json",
+      "sha256": "75055ab7e01cd85e416cfe7070e380a05e7031e42fa1fdc60cf750cd37c52081"
+    },
+    {
+      "bytes": 1934,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair02__CC__p1/post-terminal-artifacts.json",
+      "sha256": "bddd099ed385cebbdf6b6d3ae87aebdff21577daede91fd32a7d3de7ed6a3c79"
+    },
+    {
+      "bytes": 2644,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair02__CC__p1/start.json",
+      "sha256": "31c166ece7354879fb881b261aae274fefcf731b07fa494879706ce73b6a1f4e"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair02__CC__p1/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair02__CC__p1/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1061,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair02__CC__p1/terminal.json",
+      "sha256": "d04ab0fb9eeaa3df301a2823ca1b3fd837ff1e5b50e70f58c31357596cbffee2"
+    },
+    {
+      "bytes": 1016,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair02__CC__p1/time-v.txt",
+      "sha256": "8d173f93cca7177fb8a31390290972a8d2c68d2fce45c9dc1a36391f088a5d25"
+    },
+    {
+      "bytes": 2084,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair02__CC__p1/validation.json",
+      "sha256": "6de0cb900b660cd5e4f8401530dc9294019360529a30551c571838a65b43b314"
+    },
+    {
+      "bytes": 312,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair03__CR__p0/launch.json",
+      "sha256": "dca11476ce83c4501fd62d0ab0877f8db0fe307c7aef3a9ca367ffd41e015ff7"
+    },
+    {
+      "bytes": 197871,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair03__CR__p0/output/report.json",
+      "sha256": "c491b35eb3f1c90732525badeff8f183399caad81e90e086afeed4755a570cc2"
+    },
+    {
+      "bytes": 1934,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair03__CR__p0/post-terminal-artifacts.json",
+      "sha256": "0a6e0d29f307a584b41eb5060b5dbf22cb022e4e250968d6830bd979e02c04f8"
+    },
+    {
+      "bytes": 2644,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair03__CR__p0/start.json",
+      "sha256": "f06efb880bed5b201a87e46c5fdef18a6546f123fb0e11651578cfeef7ec68a5"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair03__CR__p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair03__CR__p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1061,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair03__CR__p0/terminal.json",
+      "sha256": "a1f5d99eef0fa416075eee8eb0bc3b53e58816b9ff85951792ba8c32154e69e8"
+    },
+    {
+      "bytes": 1018,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair03__CR__p0/time-v.txt",
+      "sha256": "abf86a3716fdb6b695b96b2448e38f2f1213ca81c55aa52d4df8e4ccf1daa87b"
+    },
+    {
+      "bytes": 2086,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair03__CR__p0/validation.json",
+      "sha256": "0fded02dbd69b814bfb7c31014b71c791c86a29ee7c13f3b730c2098fa71a45d"
+    },
+    {
+      "bytes": 312,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair03__CR__p1/launch.json",
+      "sha256": "df4e8f351eb7a131037dc47ab2c1b3b36a63d9358d05053f4b94d12f47e0ffcd"
+    },
+    {
+      "bytes": 197900,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair03__CR__p1/output/report.json",
+      "sha256": "ad5bf60bcb9f297a6361c2898301d7f51970ab9a739ca54ab0f0e5d5ffe13b73"
+    },
+    {
+      "bytes": 1934,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair03__CR__p1/post-terminal-artifacts.json",
+      "sha256": "622c637f80ca3fab7e9ddb3496fabdeaa3e88f45b46f6af94146f1025c0c3481"
+    },
+    {
+      "bytes": 2643,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair03__CR__p1/start.json",
+      "sha256": "b56c2f8aaa5f998891fbbd615ef2ae2eb3d66abcd9b2c1ad89630dfbc4240bfb"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair03__CR__p1/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair03__CR__p1/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1061,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair03__CR__p1/terminal.json",
+      "sha256": "44c9d8a8c63759cbdfa4a9a38748c334abb8d97e39c78584ee2eb1d5ffbc74ce"
+    },
+    {
+      "bytes": 1018,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair03__CR__p1/time-v.txt",
+      "sha256": "3f2ec20ec499f610bffcfe12c69e8b66ba244b2d5f4f98e177aaeda68291fd93"
+    },
+    {
+      "bytes": 2084,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair03__CR__p1/validation.json",
+      "sha256": "f570415dd3e411ec6de81e4ab4aa667e7e2f5b5f1610d35048dfe42427acddc6"
+    },
+    {
+      "bytes": 10990,
+      "kind": "file",
+      "mode": 436,
+      "path": "capture-ingress-diagnostic-v1/completed-packet.json",
+      "sha256": "a8be912089527c0f01a5c705ce036c81a117dd11419449d366c39816ab88a334"
+    },
+    {
+      "bytes": 12915,
+      "kind": "file",
+      "mode": 436,
+      "path": "diagnostic-design-v1.md",
+      "sha256": "59a18cb8fa0670b6795702a044e28972176732e65533834b8b27866948fa761d"
+    },
+    {
+      "bytes": 13987,
+      "kind": "file",
+      "mode": 436,
+      "path": "diagnostic-design-v2.md",
+      "sha256": "5d116bd18fba93fdcab0b5b1d74f46a35f9bf915aa0f221546212a16b3a8bf73"
+    },
+    {
+      "bytes": 14211,
+      "kind": "file",
+      "mode": 436,
+      "path": "diagnostic-design-v3.md",
+      "sha256": "0dbff34e930aec3d63350ebf6cce9d0c8a86afdcd8f176f50e52a7e6fe2c06bf"
+    },
+    {
+      "bytes": 93071,
+      "kind": "file",
+      "mode": 436,
+      "path": "external-evidence-inventory-v1.json",
+      "sha256": "f1dac7b75a2b37ba2ab6f605021988fe24d7278f7a93462ff5a04541bb54db0d"
+    },
+    {
+      "bytes": 1479,
+      "kind": "file",
+      "mode": 436,
+      "path": "protocol/affinity-controls-0965-v5.json",
+      "sha256": "e78d6aa051007a23696c5cfce7d8c48fea577b9b6b0fd6ba40ec6d92355c4ec1"
+    },
+    {
+      "bytes": 1883,
+      "kind": "file",
+      "mode": 436,
+      "path": "protocol/final-preflight-v1.json",
+      "sha256": "ada69f089bf4f8a79c9dbbcd83fa85312dad2f86d115129327f00ddf3af7272f"
+    },
+    {
+      "bytes": 6088,
+      "kind": "file",
+      "mode": 436,
+      "path": "protocol/host-after-v1.json",
+      "sha256": "9a8010731546d476cfcdf36be1b939fc4943baef0a31dc0c84e6389fd2e02989"
+    },
+    {
+      "bytes": 5822,
+      "kind": "file",
+      "mode": 436,
+      "path": "protocol/host-before-v1.json",
+      "sha256": "ec271e6e98334218f81120e1444cae1ab4a022d88da4803988356599a6c4f8e3"
+    },
+    {
+      "bytes": 6088,
+      "kind": "file",
+      "mode": 436,
+      "path": "protocol/host-before-v2.json",
+      "sha256": "6646310015b9e0acebb3db5aec2766fcf4716bd3936d5d1174ab2926fcfa514e"
+    },
+    {
+      "bytes": 36900,
+      "kind": "file",
+      "mode": 436,
+      "path": "protocol/plan-diagnostic-0965-v6.json",
+      "sha256": "7aa592e0a25748dec544f567661d52a320c8b472219b01367e6999138cd21373"
+    },
+    {
+      "bytes": 39079,
+      "kind": "file",
+      "mode": 436,
+      "path": "protocol/plan-final-v1.json",
+      "sha256": "63af2990dea433942d6f347d28c899ac52cfb60735ed759fcdd726c87cc2e97a"
+    },
+    {
+      "bytes": 39436,
+      "kind": "file",
+      "mode": 436,
+      "path": "protocol/plan-final-v2.json",
+      "sha256": "147631fc34eb9230cd002b7fd2ce9ae82c156943a502c558e9eb867e24b649b0"
+    },
+    {
+      "bytes": 6792,
+      "kind": "file",
+      "mode": 436,
+      "path": "protocol/report-scope-contract-v1.json",
+      "sha256": "f4476e77d44cb31ada4981b182210a134cad0968121929472ae48ab5c410d686"
+    },
+    {
+      "bytes": 1103,
+      "kind": "file",
+      "mode": 436,
+      "path": "protocol/root-final-confirmation-v1.json",
+      "sha256": "b4a019abb2a1069ad62802644b4556d880aa36f5e6e2fa3f379bb6118e3f1f89"
+    },
+    {
+      "bytes": 1604,
+      "kind": "file",
+      "mode": 436,
+      "path": "protocol/root-go-0965-v1.json",
+      "sha256": "3c2de9e2ee7febf60981564c5a759cd28b89a92e71ba163618bb0100c29ea3f0"
+    },
+    {
+      "bytes": 381,
+      "kind": "file",
+      "mode": 436,
+      "path": "receipts/cleanup-v1.json",
+      "sha256": "b70d55e5cd0aca8ec094f32f12c0f03bbd1694283d1f74953cb6cc44b412544f"
+    },
+    {
+      "bytes": 905,
+      "kind": "file",
+      "mode": 436,
+      "path": "receipts/independent-quantile-check-v1.json",
+      "sha256": "af64fd56f05aa1504278780b636056cb1b1876859e7cada3ad975b7cc94277d7"
+    },
+    {
+      "bytes": 1859,
+      "kind": "file",
+      "mode": 436,
+      "path": "receipts/ingress-replay-v1.json",
+      "sha256": "a442457c006bd438e7ada5dc84783d1e151f658e2fc08eafbf81704b02dc9ce5"
+    },
+    {
+      "bytes": 2145,
+      "kind": "file",
+      "mode": 436,
+      "path": "receipts/root-execution-v1.json",
+      "sha256": "55cc1c37104f4925eca47d719b4dfeab694f867307045745194b5c2c8dd8e336"
+    },
+    {
+      "bytes": 841,
+      "kind": "file",
+      "mode": 436,
+      "path": "receipts/source-revalidation-v1.json",
+      "sha256": "c8ac85491bc4f4d92aa4db50b1ded030494215a30b80ae48fa8ae8f9dacb26c7"
+    },
+    {
+      "bytes": 1157,
+      "kind": "file",
+      "mode": 436,
+      "path": "review/audit-ingress-0965-v1-freeze.json",
+      "sha256": "b3d2ed807a4640edab3cedfe05cd1c938fdf450dc934d70acdb705d979be4b0b"
+    },
+    {
+      "bytes": 1340,
+      "kind": "file",
+      "mode": 436,
+      "path": "review/audit-ingress-0965-v2-freeze.json",
+      "sha256": "54e22990a1d28bcb907d6a18a96ca78f6d30a9d1d6865efbb21f732f9f0b1f29"
+    },
+    {
+      "bytes": 1655,
+      "kind": "file",
+      "mode": 436,
+      "path": "review/audit-ingress-0965-v3-freeze.json",
+      "sha256": "3cb5dc811a2ee26041577c67519ddb7817cdb45f696bea81d121d097d8bdc4b2"
+    },
+    {
+      "bytes": 10706,
+      "kind": "file",
+      "mode": 436,
+      "path": "review/final-record-review-v1.json",
+      "sha256": "590d163e7568a69629ace50ed4a94772062cc7378c7815ff8a7f16710c18797f"
+    },
+    {
+      "bytes": 5327,
+      "kind": "file",
+      "mode": 436,
+      "path": "review/independent-protocol-admission-final-v1.json",
+      "sha256": "866f42f52696b712826952b9dac3b89372e995be9de84775a3d89393f090d916"
+    },
+    {
+      "bytes": 7769,
+      "kind": "file",
+      "mode": 436,
+      "path": "review/independent-protocol-admission-v2.json",
+      "sha256": "7a6611d89864227833a9121756f942f446433d053b4085e4af6e901182937f45"
+    },
+    {
+      "bytes": 313,
+      "kind": "file",
+      "mode": 436,
+      "path": "review/independent-raw-audit-v1.json",
+      "sha256": "0a1f9df14d39497a480515d263e1ee8ff2c6bf699c4d5bdfce9b1db4a76a2ff8"
+    },
+    {
+      "bytes": 456,
+      "kind": "file",
+      "mode": 436,
+      "path": "review/independent-raw-audit-v2.json",
+      "sha256": "c5101a0a61eb65db999e02a9950a9afa03346212801b89769e36c6af96d1123d"
+    },
+    {
+      "bytes": 240496,
+      "kind": "file",
+      "mode": 436,
+      "path": "review/independent-raw-audit-v3.json",
+      "sha256": "25353dd5e02720b7a125897a611993331b23feec8c8a96b208a5386743af97bd"
+    },
+    {
+      "bytes": 4963,
+      "kind": "file",
+      "mode": 436,
+      "path": "review/ingress-reanalysis-review-v1.json",
+      "sha256": "289ff06d0bed3ad84d828b4bdf596b2f3ebb324fb660e2ded545760668712d26"
+    },
+    {
+      "bytes": 28336,
+      "kind": "file",
+      "mode": 493,
+      "path": "tools/analyze_ingress_v1.py",
+      "sha256": "b6dd1f72ffddb806188e4f7f665b64c70941a841cb8bf43dee48b288bdac240a"
+    },
+    {
+      "bytes": 49805,
+      "kind": "file",
+      "mode": 493,
+      "path": "tools/audit_ingress_0965_v1.py",
+      "sha256": "8dbe09fde18d9828bfc7dd5b79dc1a32d9e3b06811804635df76259fbb94f35a"
+    },
+    {
+      "bytes": 50247,
+      "kind": "file",
+      "mode": 493,
+      "path": "tools/audit_ingress_0965_v2.py",
+      "sha256": "8fc1c184a47bfeaa3751110702e3835a418bafcd5c1be2317ac2a1ed07403aef"
+    },
+    {
+      "bytes": 50264,
+      "kind": "file",
+      "mode": 493,
+      "path": "tools/audit_ingress_0965_v3.py",
+      "sha256": "78294b734803f2f42e30b8b8bb64759ff6e11d129788993a896161639fb99259"
+    },
+    {
+      "bytes": 20640,
+      "kind": "file",
+      "mode": 493,
+      "path": "tools/prepare_plan_0965_v1.py",
+      "sha256": "06d25ea599f88fa8eb1abc156ff7c9a922a63a4385ebf289f6f8b14d1d79e50b"
+    },
+    {
+      "bytes": 32116,
+      "kind": "file",
+      "mode": 493,
+      "path": "tools/reduce_ingress_0965_v1.py",
+      "sha256": "89d6a199e3420512a39cd5f75dec062321bd283f3a922bf23428aa48dccb5d26"
+    },
+    {
+      "bytes": 36410,
+      "kind": "file",
+      "mode": 493,
+      "path": "tools/run_ingress_diagnostic_0965_v1.py",
+      "sha256": "f97c250b008fffe579a09bb302280d1cb64251635c8dd7cc09eac22b2046bb1e"
+    }
+  ],
+  "regeneration_command_references": [
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair00__RC__p0/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+        "--shape",
+        "dense-sparse",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair00__RC__p0/output"
+      ],
+      "field": "argv",
+      "kind": "recorded_command",
+      "source": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair00__RC__p0/start.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair00__RC__p1/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0964/executables/xlsx_managed_compression_benchmark.v3",
+        "--shape",
+        "dense-sparse",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair00__RC__p1/output"
+      ],
+      "field": "argv",
+      "kind": "recorded_command",
+      "source": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair00__RC__p1/start.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair01__CC__p0/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0964/executables/xlsx_managed_compression_benchmark.v3",
+        "--shape",
+        "dense-sparse",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair01__CC__p0/output"
+      ],
+      "field": "argv",
+      "kind": "recorded_command",
+      "source": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair01__CC__p0/start.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair01__CC__p1/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0964/executables/xlsx_managed_compression_benchmark.v3",
+        "--shape",
+        "dense-sparse",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair01__CC__p1/output"
+      ],
+      "field": "argv",
+      "kind": "recorded_command",
+      "source": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair01__CC__p1/start.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair02__CR__p0/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0964/executables/xlsx_managed_compression_benchmark.v3",
+        "--shape",
+        "dense-sparse",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair02__CR__p0/output"
+      ],
+      "field": "argv",
+      "kind": "recorded_command",
+      "source": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair02__CR__p0/start.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair02__CR__p1/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+        "--shape",
+        "dense-sparse",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair02__CR__p1/output"
+      ],
+      "field": "argv",
+      "kind": "recorded_command",
+      "source": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair02__CR__p1/start.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair03__RR__p0/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+        "--shape",
+        "dense-sparse",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair03__RR__p0/output"
+      ],
+      "field": "argv",
+      "kind": "recorded_command",
+      "source": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair03__RR__p0/start.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair03__RR__p1/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+        "--shape",
+        "dense-sparse",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair03__RR__p1/output"
+      ],
+      "field": "argv",
+      "kind": "recorded_command",
+      "source": "capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair03__RR__p1/start.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair00__CC__p0/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0964/executables/xlsx_managed_compression_benchmark.v3",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-edit",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair00__CC__p0/output"
+      ],
+      "field": "argv",
+      "kind": "recorded_command",
+      "source": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair00__CC__p0/start.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair00__CC__p1/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0964/executables/xlsx_managed_compression_benchmark.v3",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-edit",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair00__CC__p1/output"
+      ],
+      "field": "argv",
+      "kind": "recorded_command",
+      "source": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair00__CC__p1/start.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair01__CR__p0/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0964/executables/xlsx_managed_compression_benchmark.v3",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-edit",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair01__CR__p0/output"
+      ],
+      "field": "argv",
+      "kind": "recorded_command",
+      "source": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair01__CR__p0/start.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair01__CR__p1/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-edit",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair01__CR__p1/output"
+      ],
+      "field": "argv",
+      "kind": "recorded_command",
+      "source": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair01__CR__p1/start.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair02__RR__p0/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-edit",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair02__RR__p0/output"
+      ],
+      "field": "argv",
+      "kind": "recorded_command",
+      "source": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair02__RR__p0/start.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair02__RR__p1/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-edit",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair02__RR__p1/output"
+      ],
+      "field": "argv",
+      "kind": "recorded_command",
+      "source": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair02__RR__p1/start.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair03__RC__p0/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-edit",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair03__RC__p0/output"
+      ],
+      "field": "argv",
+      "kind": "recorded_command",
+      "source": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair03__RC__p0/start.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair03__RC__p1/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0964/executables/xlsx_managed_compression_benchmark.v3",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-edit",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair03__RC__p1/output"
+      ],
+      "field": "argv",
+      "kind": "recorded_command",
+      "source": "capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair03__RC__p1/start.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair00__RR__p0/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair00__RR__p0/output"
+      ],
+      "field": "argv",
+      "kind": "recorded_command",
+      "source": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair00__RR__p0/start.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair00__RR__p1/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair00__RR__p1/output"
+      ],
+      "field": "argv",
+      "kind": "recorded_command",
+      "source": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair00__RR__p1/start.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair01__RC__p0/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair01__RC__p0/output"
+      ],
+      "field": "argv",
+      "kind": "recorded_command",
+      "source": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair01__RC__p0/start.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair01__RC__p1/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0964/executables/xlsx_managed_compression_benchmark.v3",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair01__RC__p1/output"
+      ],
+      "field": "argv",
+      "kind": "recorded_command",
+      "source": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair01__RC__p1/start.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair02__CC__p0/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0964/executables/xlsx_managed_compression_benchmark.v3",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair02__CC__p0/output"
+      ],
+      "field": "argv",
+      "kind": "recorded_command",
+      "source": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair02__CC__p0/start.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair02__CC__p1/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0964/executables/xlsx_managed_compression_benchmark.v3",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair02__CC__p1/output"
+      ],
+      "field": "argv",
+      "kind": "recorded_command",
+      "source": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair02__CC__p1/start.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair03__CR__p0/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0964/executables/xlsx_managed_compression_benchmark.v3",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair03__CR__p0/output"
+      ],
+      "field": "argv",
+      "kind": "recorded_command",
+      "source": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair03__CR__p0/start.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair03__CR__p1/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair03__CR__p1/output"
+      ],
+      "field": "argv",
+      "kind": "recorded_command",
+      "source": "capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair03__CR__p1/start.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair00__RC__p0/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+        "--shape",
+        "dense-sparse",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair00__RC__p0/output"
+      ],
+      "field": "regeneration_command_references[0].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair01__CR__p0/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0964/executables/xlsx_managed_compression_benchmark.v3",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-edit",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair01__CR__p0/output"
+      ],
+      "field": "regeneration_command_references[10].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair01__CR__p1/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-edit",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair01__CR__p1/output"
+      ],
+      "field": "regeneration_command_references[11].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair02__RR__p0/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-edit",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair02__RR__p0/output"
+      ],
+      "field": "regeneration_command_references[12].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair02__RR__p1/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-edit",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair02__RR__p1/output"
+      ],
+      "field": "regeneration_command_references[13].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair03__RC__p0/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-edit",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair03__RC__p0/output"
+      ],
+      "field": "regeneration_command_references[14].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair03__RC__p1/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0964/executables/xlsx_managed_compression_benchmark.v3",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-edit",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair03__RC__p1/output"
+      ],
+      "field": "regeneration_command_references[15].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair00__RR__p0/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair00__RR__p0/output"
+      ],
+      "field": "regeneration_command_references[16].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair00__RR__p1/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair00__RR__p1/output"
+      ],
+      "field": "regeneration_command_references[17].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair01__RC__p0/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair01__RC__p0/output"
+      ],
+      "field": "regeneration_command_references[18].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair01__RC__p1/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0964/executables/xlsx_managed_compression_benchmark.v3",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair01__RC__p1/output"
+      ],
+      "field": "regeneration_command_references[19].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair00__RC__p1/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0964/executables/xlsx_managed_compression_benchmark.v3",
+        "--shape",
+        "dense-sparse",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair00__RC__p1/output"
+      ],
+      "field": "regeneration_command_references[1].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair02__CC__p0/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0964/executables/xlsx_managed_compression_benchmark.v3",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair02__CC__p0/output"
+      ],
+      "field": "regeneration_command_references[20].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair02__CC__p1/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0964/executables/xlsx_managed_compression_benchmark.v3",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair02__CC__p1/output"
+      ],
+      "field": "regeneration_command_references[21].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair03__CR__p0/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0964/executables/xlsx_managed_compression_benchmark.v3",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair03__CR__p0/output"
+      ],
+      "field": "regeneration_command_references[22].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair03__CR__p1/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair03__CR__p1/output"
+      ],
+      "field": "regeneration_command_references[23].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/true"
+      ],
+      "field": "regeneration_command_references[24].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/true"
+      ],
+      "field": "regeneration_command_references[25].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/true"
+      ],
+      "field": "regeneration_command_references[26].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "python3",
+        "/home/zhuhe/litchi-performance-0965/tools/reduce_ingress_0965_v1.py",
+        "--plan",
+        "<PLAN>",
+        "--packet",
+        "<PACKET>",
+        "--output",
+        "<OUTPUT>"
+      ],
+      "field": "regeneration_command_references[27].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "python3",
+        "/home/zhuhe/litchi-performance-0965/tools/reduce_ingress_0965_v1.py",
+        "--plan",
+        "<PLAN>",
+        "--packet",
+        "<PACKET>",
+        "--output",
+        "<OUTPUT>"
+      ],
+      "field": "regeneration_command_references[28].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "python3",
+        "/home/zhuhe/litchi-performance-0965/tools/reduce_ingress_0965_v1.py",
+        "--plan",
+        "<PLAN>",
+        "--packet",
+        "<PACKET>",
+        "--output",
+        "<OUTPUT>"
+      ],
+      "field": "regeneration_command_references[29].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair01__CC__p0/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0964/executables/xlsx_managed_compression_benchmark.v3",
+        "--shape",
+        "dense-sparse",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair01__CC__p0/output"
+      ],
+      "field": "regeneration_command_references[2].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 /home/zhuhe/litchi-performance-0965/tools/analyze_ingress_v1.py --root /home/zhuhe/litchi-performance-0964 --plan /home/zhuhe/litchi-performance-0964/protocol/plan-final-epoch2-v1.json --output /home/zhuhe/litchi-performance-0965/analysis/ingress-summary-replay-v1.json",
+      "field": "regeneration_command_references[30].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair01__CC__p1/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0964/executables/xlsx_managed_compression_benchmark.v3",
+        "--shape",
+        "dense-sparse",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair01__CC__p1/output"
+      ],
+      "field": "regeneration_command_references[3].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair02__CR__p0/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0964/executables/xlsx_managed_compression_benchmark.v3",
+        "--shape",
+        "dense-sparse",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair02__CR__p0/output"
+      ],
+      "field": "regeneration_command_references[4].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair02__CR__p1/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+        "--shape",
+        "dense-sparse",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair02__CR__p1/output"
+      ],
+      "field": "regeneration_command_references[5].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair03__RR__p0/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+        "--shape",
+        "dense-sparse",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair03__RR__p0/output"
+      ],
+      "field": "regeneration_command_references[6].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair03__RR__p1/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+        "--shape",
+        "dense-sparse",
+        "--workload",
+        "one-percent",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__dense-sparse-one-percent__pair03__RR__p1/output"
+      ],
+      "field": "regeneration_command_references[7].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair00__CC__p0/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0964/executables/xlsx_managed_compression_benchmark.v3",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-edit",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair00__CC__p0/output"
+      ],
+      "field": "regeneration_command_references[8].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair00__CC__p1/time-v.txt",
+        "--",
+        "/home/zhuhe/litchi-performance-0964/executables/xlsx_managed_compression_benchmark.v3",
+        "--shape",
+        "medium",
+        "--workload",
+        "one-edit",
+        "--workers",
+        "1",
+        "--warmup",
+        "20",
+        "--samples",
+        "256",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-edit__pair00__CC__p1/output"
+      ],
+      "field": "regeneration_command_references[9].command",
+      "kind": "recorded_command",
+      "source": "external-evidence-inventory-v1.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/true"
+      ],
+      "field": "command",
+      "kind": "recorded_command",
+      "source": "protocol/affinity-controls-0965-v5.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/true"
+      ],
+      "field": "negative.command",
+      "kind": "recorded_command",
+      "source": "protocol/affinity-controls-0965-v5.json"
+    },
+    {
+      "command": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "12-15",
+        "/usr/bin/true"
+      ],
+      "field": "positive.command",
+      "kind": "recorded_command",
+      "source": "protocol/affinity-controls-0965-v5.json"
+    },
+    {
+      "command": [
+        "python3",
+        "/home/zhuhe/litchi-performance-0965/tools/reduce_ingress_0965_v1.py",
+        "--plan",
+        "<PLAN>",
+        "--packet",
+        "<PACKET>",
+        "--output",
+        "<OUTPUT>"
+      ],
+      "field": "reducer.command",
+      "kind": "recorded_command",
+      "source": "protocol/plan-diagnostic-0965-v6.json"
+    },
+    {
+      "command": [
+        "python3",
+        "/home/zhuhe/litchi-performance-0965/tools/reduce_ingress_0965_v1.py",
+        "--plan",
+        "<PLAN>",
+        "--packet",
+        "<PACKET>",
+        "--output",
+        "<OUTPUT>"
+      ],
+      "field": "reducer.command",
+      "kind": "recorded_command",
+      "source": "protocol/plan-final-v1.json"
+    },
+    {
+      "command": [
+        "python3",
+        "/home/zhuhe/litchi-performance-0965/tools/reduce_ingress_0965_v1.py",
+        "--plan",
+        "<PLAN>",
+        "--packet",
+        "<PACKET>",
+        "--output",
+        "<OUTPUT>"
+      ],
+      "field": "reducer.command",
+      "kind": "recorded_command",
+      "source": "protocol/plan-final-v2.json"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 /home/zhuhe/litchi-performance-0965/tools/analyze_ingress_v1.py --root /home/zhuhe/litchi-performance-0964 --plan /home/zhuhe/litchi-performance-0964/protocol/plan-final-epoch2-v1.json --output /home/zhuhe/litchi-performance-0965/analysis/ingress-summary-replay-v1.json",
+      "field": "replay.command",
+      "kind": "recorded_command",
+      "source": "receipts/ingress-replay-v1.json"
+    },
+    {
+      "command": [
+        "python3",
+        "/home/zhuhe/litchi-performance-0965/tools/run_ingress_diagnostic_0965_v1.py",
+        "--capture",
+        "--plan",
+        "/home/zhuhe/litchi-performance-0965/protocol/plan-final-v2.json",
+        "--packet",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1"
+      ],
+      "field": "capture.argv",
+      "kind": "recorded_command",
+      "source": "receipts/root-execution-v1.json"
+    },
+    {
+      "command": [
+        "python3",
+        "/home/zhuhe/litchi-performance-0965/tools/reduce_ingress_0965_v1.py",
+        "--plan",
+        "/home/zhuhe/litchi-performance-0965/protocol/plan-final-v2.json",
+        "--packet",
+        "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1",
+        "--output",
+        "/home/zhuhe/litchi-performance-0965/analysis/diagnostic-result-v1.json"
+      ],
+      "field": "reduction.argv",
+      "kind": "recorded_command",
+      "source": "receipts/root-execution-v1.json"
+    }
+  ],
+  "regeneration_reference_policy": {
+    "note": "References are recorded commands from custody artifacts; this helper does not execute them.",
+    "recognized_keys": [
+      "argv",
+      "build_command",
+      "capture_command",
+      "command",
+      "reducer_command",
+      "regenerate_command",
+      "regeneration_command"
+    ],
+    "source": "included JSON receipts/protocol artifacts"
+  },
+  "root": "/home/zhuhe/litchi-performance-0965",
+  "scan_policy": {
+    "descriptor": "regular files carry logical bytes, permission mode, and SHA-256; symlinks carry link-byte descriptors",
+    "excluded_directory_names": [
+      "__pycache__",
+      "source-baseline",
+      "source-candidate",
+      "tmp"
+    ],
+    "excluded_directory_prefixes": [
+      "target-"
+    ],
+    "follow_symlinks": false,
+    "max_files": 250000,
+    "max_total_bytes": 1125899906842624,
+    "output_excluded": "/home/zhuhe/litchi-performance-0965/external-evidence-inventory-v2.json"
+  },
+  "schema": "litchi.performance.0964.evidence-inventory.v1",
+  "status": "inventory_ready",
+  "total_bytes": 6978990
+}

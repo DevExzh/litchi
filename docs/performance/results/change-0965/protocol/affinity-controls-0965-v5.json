@@ -1,0 +1,77 @@
+{
+  "command": [
+    "/usr/bin/taskset",
+    "--cpu-list",
+    "12-15",
+    "/usr/bin/true"
+  ],
+  "cpu_mask": [
+    12,
+    13,
+    14,
+    15
+  ],
+  "created_utc": "2026-10-07T22:11:45.248460+00:00",
+  "negative": {
+    "cleanup": {
+      "actions": [
+        "SIGTERM"
+      ],
+      "process_group_clear": true,
+      "reaped": true
+    },
+    "command": [
+      "/usr/bin/taskset",
+      "--cpu-list",
+      "12-15",
+      "/usr/bin/true"
+    ],
+    "guard_error": "negative control observed affinity [12]",
+    "guard_rejected": true,
+    "observed_affinity": [
+      12
+    ],
+    "pid": 3283684,
+    "requested_preexec_affinity": [
+      12
+    ]
+  },
+  "positive": {
+    "cleanup": {
+      "actions": [],
+      "process_group_clear": true,
+      "reaped": true
+    },
+    "command": [
+      "/usr/bin/taskset",
+      "--cpu-list",
+      "12-15",
+      "/usr/bin/true"
+    ],
+    "guard_passed": true,
+    "observed_affinity": [
+      12,
+      13,
+      14,
+      15
+    ],
+    "pid": 3283683,
+    "requested_preexec_affinity": [
+      12,
+      13,
+      14,
+      15
+    ],
+    "returncode": 0
+  },
+  "runner": {
+    "bytes": 36410,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0965/tools/run_ingress_diagnostic_0965_v1.py",
+    "sha256": "f97c250b008fffe579a09bb302280d1cb64251635c8dd7cc09eac22b2046bb1e"
+  },
+  "schema": "litchi.performance.0965.affinity-launch-controls.v1",
+  "status": "pass",
+  "workload_started": false
+}

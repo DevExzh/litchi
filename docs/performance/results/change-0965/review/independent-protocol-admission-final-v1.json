@@ -1,0 +1,135 @@
+{
+  "acyclic_go_chain": {
+    "final_plan_binds_go": true,
+    "go_binds_final_plan_directly": false,
+    "go_binds_prospective_plan": true,
+    "go_status": "GO",
+    "pattern": "root GO binds sealed prospective v6 and review inputs; final authorized v2 binds the root GO descriptor and carries only the listed authorized deltas"
+  },
+  "bindings": {
+    "affinity_controls": {
+      "bytes": 1479,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/protocol/affinity-controls-0965-v5.json",
+      "sha256": "e78d6aa051007a23696c5cfce7d8c48fea577b9b6b0fd6ba40ec6d92355c4ec1"
+    },
+    "design_v3": {
+      "bytes": 14211,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/diagnostic-design-v3.md",
+      "sha256": "0dbff34e930aec3d63350ebf6cce9d0c8a86afdcd8f176f50e52a7e6fe2c06bf"
+    },
+    "final_authorized_plan": {
+      "bytes": 39436,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/protocol/plan-final-v2.json",
+      "sha256": "147631fc34eb9230cd002b7fd2ce9ae82c156943a502c558e9eb867e24b649b0"
+    },
+    "host_before_v2": {
+      "bytes": 6088,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/protocol/host-before-v2.json",
+      "sha256": "6646310015b9e0acebb3db5aec2766fcf4716bd3936d5d1174ab2926fcfa514e"
+    },
+    "prior_admission": {
+      "bytes": 7769,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/review/independent-protocol-admission-v2.json",
+      "sha256": "7a6611d89864227833a9121756f942f446433d053b4085e4af6e901182937f45"
+    },
+    "reducer": {
+      "bytes": 32116,
+      "executable": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0965/tools/reduce_ingress_0965_v1.py",
+      "sha256": "89d6a199e3420512a39cd5f75dec062321bd283f3a922bf23428aa48dccb5d26"
+    },
+    "root_go": {
+      "bytes": 1604,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/protocol/root-go-0965-v1.json",
+      "sha256": "3c2de9e2ee7febf60981564c5a759cd28b89a92e71ba163618bb0100c29ea3f0"
+    },
+    "runner": {
+      "bytes": 36410,
+      "executable": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0965/tools/run_ingress_diagnostic_0965_v1.py",
+      "sha256": "f97c250b008fffe579a09bb302280d1cb64251635c8dd7cc09eac22b2046bb1e"
+    },
+    "scope_contract": {
+      "bytes": 6792,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/protocol/report-scope-contract-v1.json",
+      "sha256": "f4476e77d44cb31ada4981b182210a134cad0968121929472ae48ab5c410d686"
+    },
+    "sealed_prospective_plan": {
+      "bytes": 36900,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/protocol/plan-diagnostic-0965-v6.json",
+      "sha256": "7aa592e0a25748dec544f567661d52a320c8b472219b01367e6999138cd21373"
+    }
+  },
+  "build_started": false,
+  "capture_authorized_by_reviewer": false,
+  "checks": {
+    "affinity_controls_status": "pass",
+    "final_plan_runner_check_plan_rc": 0,
+    "host_field_mapping": "all required semantic categories mapped to present host-v2 keys",
+    "p99_rank": 254,
+    "reducer_self_test_rc": 0,
+    "samples": 256,
+    "schedule_children": 24,
+    "schedule_pairs": 12,
+    "scope_contract_copy": "exact shared values copied into final plan",
+    "source_revalidation": "passed; 10933 baseline and 10933 candidate files; mismatches 0",
+    "warmups": 20
+  },
+  "created_utc": "2026-10-07T22:16:41.639415+00:00",
+  "exact_final_delta": {
+    "authorized_scope": "host-before-v2 plus explicit host field mapping, source-bound report scope contract, root GO/status/authorization metadata; no schedule, binary, source, runner, reducer, or diagnostic-rule changes",
+    "count": 11,
+    "paths": [
+      ".capture.host_snapshot_before.bytes",
+      ".capture.host_snapshot_before.path",
+      ".capture.host_snapshot_before.sha256",
+      ".capture.host_snapshot_required.field_mapping",
+      ".created_utc",
+      ".report_contract.native.independent_postcapture_exact_scope_values",
+      ".report_scope_contract",
+      ".root_go.descriptor",
+      ".root_go.path",
+      ".root_go.status",
+      ".status"
+    ]
+  },
+  "interpretation_limits": [
+    "0964 rejection remains binding",
+    "0965 labels are descriptive fresh-packet patterns only",
+    "this receipt authorizes no workload and is not a production decision"
+  ],
+  "mandatory_postcapture_gate": {
+    "before_interpretation_or_decision": true,
+    "checks": [
+      "independent exact report scope strings for all 24 reports",
+      "raw quantile/ratio/control/oracle audit",
+      "fresh serial child/affinity/terminal/reaping/resource checks",
+      "final packet and host-after custody plus required field mapping",
+      "no historical report/sample import"
+    ],
+    "failure_action": "seal invalid; no replacements, adaptive samples, screen reopening, adoption, or causal attribution"
+  },
+  "reviewer": "/root/staging_review",
+  "schema": "litchi.performance.0965.independent-protocol-admission-final.v1",
+  "source_edits": false,
+  "status": "passed_for_root_GO_capture",
+  "workload_started": false
+}

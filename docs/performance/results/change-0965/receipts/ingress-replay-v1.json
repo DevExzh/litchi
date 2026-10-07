@@ -1,0 +1,44 @@
+{
+  "schema": "litchi.performance.0965.ingress-replay-receipt.v1",
+  "status": "passed",
+  "analysis_scope": "valid 0964 epoch2 native raw reports only",
+  "workload_launched": false,
+  "build_started": false,
+  "allocator_reports_read": false,
+  "plan": {
+    "path": "/home/zhuhe/litchi-performance-0964/protocol/plan-final-epoch2-v1.json",
+    "bytes": 59570,
+    "sha256": "dcfabed26427c6a117b41c2e4b6209baec40afe06c218054b2187ae9c49b0a64"
+  },
+  "native_completed_packet": {
+    "path": "/home/zhuhe/litchi-performance-0964/capture-native-epoch2-v1/completed-packet.json",
+    "bytes": 14839,
+    "sha256": "d9934f4ffbf4646953d18909de48ccea4db36aceaa1e5367c7c3d18a241fd69f"
+  },
+  "helper": {
+    "path": "/home/zhuhe/litchi-performance-0965/tools/analyze_ingress_v1.py",
+    "bytes": 28336,
+    "mode": 493,
+    "sha256": "b6dd1f72ffddb806188e4f7f665b64c70941a841cb8bf43dee48b288bdac240a"
+  },
+  "result": {
+    "path": "/home/zhuhe/litchi-performance-0965/analysis/ingress-summary-v1.json",
+    "bytes": 443033,
+    "sha256": "091a122bbb03f5ba65bca5964aa0659c2f2433cfd036d274c76c381b591495b8"
+  },
+  "replay": {
+    "command": "PYTHONDONTWRITEBYTECODE=1 python3 /home/zhuhe/litchi-performance-0965/tools/analyze_ingress_v1.py --root /home/zhuhe/litchi-performance-0964 --plan /home/zhuhe/litchi-performance-0964/protocol/plan-final-epoch2-v1.json --output /home/zhuhe/litchi-performance-0965/analysis/ingress-summary-replay-v1.json",
+    "output_bytes": 443033,
+    "output_sha256": "091a122bbb03f5ba65bca5964aa0659c2f2433cfd036d274c76c381b591495b8",
+    "matches_retained_result": true,
+    "child_count": 36,
+    "samples_per_child": 60,
+    "warmup_iterations": 10,
+    "quantile": "nearest-rank ceil(q*n), ranks p50=30 p95=57 p99=60"
+  },
+  "decision": {
+    "adoption_allowed": false,
+    "screen_reopened": false,
+    "causal_claim": false
+  }
+}

@@ -1,0 +1,315 @@
+{
+  "artifact_bindings": {
+    "completed_packet": {
+      "bytes": 10990,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/completed-packet.json",
+      "sha256": "a8be912089527c0f01a5c705ce036c81a117dd11419449d366c39816ab88a334"
+    },
+    "historical_summary": {
+      "bytes": 443033,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/analysis/ingress-summary-v1.json",
+      "sha256": "091a122bbb03f5ba65bca5964aa0659c2f2433cfd036d274c76c381b591495b8"
+    },
+    "host_after": {
+      "bytes": 6088,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/protocol/host-after-v1.json",
+      "sha256": "9a8010731546d476cfcdf36be1b939fc4943baef0a31dc0c84e6389fd2e02989"
+    },
+    "host_before": {
+      "bytes": 6088,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/protocol/host-before-v2.json",
+      "sha256": "6646310015b9e0acebb3db5aec2766fcf4716bd3936d5d1174ab2926fcfa514e"
+    },
+    "independent_raw_audit_v3": {
+      "bytes": 240496,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/review/independent-raw-audit-v3.json",
+      "sha256": "25353dd5e02720b7a125897a611993331b23feec8c8a96b208a5386743af97bd"
+    },
+    "matched_reduction": {
+      "bytes": 284168,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/analysis/diagnostic-result-v1.json",
+      "sha256": "1eb904d55ad2ee4498da7ee1fd980fbd222d60e11c8cdcb5b4472f8047db2e10"
+    },
+    "plan": {
+      "bytes": 39436,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/protocol/plan-final-v2.json",
+      "sha256": "147631fc34eb9230cd002b7fd2ce9ae82c156943a502c558e9eb867e24b649b0"
+    },
+    "scope_contract": {
+      "bytes": 6792,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/protocol/report-scope-contract-v1.json",
+      "sha256": "f4476e77d44cb31ada4981b182210a134cad0968121929472ae48ab5c410d686"
+    }
+  },
+  "checks": {
+    "byte_identical_copies": [
+      {
+        "byte_identical": true,
+        "external": {
+          "bytes": 443033,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0965/analysis/ingress-summary-v1.json",
+          "sha256": "091a122bbb03f5ba65bca5964aa0659c2f2433cfd036d274c76c381b591495b8"
+        },
+        "repository": {
+          "bytes": 443033,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0965/analysis/ingress-summary-v1.json",
+          "sha256": "091a122bbb03f5ba65bca5964aa0659c2f2433cfd036d274c76c381b591495b8"
+        }
+      },
+      {
+        "byte_identical": true,
+        "external": {
+          "bytes": 284168,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0965/analysis/diagnostic-result-v1.json",
+          "sha256": "1eb904d55ad2ee4498da7ee1fd980fbd222d60e11c8cdcb5b4472f8047db2e10"
+        },
+        "repository": {
+          "bytes": 284168,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0965/analysis/diagnostic-result-v1.json",
+          "sha256": "1eb904d55ad2ee4498da7ee1fd980fbd222d60e11c8cdcb5b4472f8047db2e10"
+        }
+      },
+      {
+        "byte_identical": true,
+        "external": {
+          "bytes": 240496,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0965/review/independent-raw-audit-v3.json",
+          "sha256": "25353dd5e02720b7a125897a611993331b23feec8c8a96b208a5386743af97bd"
+        },
+        "repository": {
+          "bytes": 240496,
+          "mode": 436,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0965/review/independent-raw-audit-v3.json",
+          "sha256": "25353dd5e02720b7a125897a611993331b23feec8c8a96b208a5386743af97bd"
+        }
+      },
+      {
+        "byte_identical": true,
+        "external": {
+          "bytes": 28336,
+          "mode": 493,
+          "path": "/home/zhuhe/litchi-performance-0965/tools/analyze_ingress_v1.py",
+          "sha256": "b6dd1f72ffddb806188e4f7f665b64c70941a841cb8bf43dee48b288bdac240a"
+        },
+        "repository": {
+          "bytes": 28336,
+          "mode": 493,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0965/tools/analyze_ingress_v1.py",
+          "sha256": "b6dd1f72ffddb806188e4f7f665b64c70941a841cb8bf43dee48b288bdac240a"
+        }
+      },
+      {
+        "byte_identical": true,
+        "external": {
+          "bytes": 50264,
+          "mode": 493,
+          "path": "/home/zhuhe/litchi-performance-0965/tools/audit_ingress_0965_v3.py",
+          "sha256": "78294b734803f2f42e30b8b8bb64759ff6e11d129788993a896161639fb99259"
+        },
+        "repository": {
+          "bytes": 50264,
+          "mode": 493,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0965/tools/audit_ingress_0965_v3.py",
+          "sha256": "78294b734803f2f42e30b8b8bb64759ff6e11d129788993a896161639fb99259"
+        }
+      }
+    ],
+    "historical_summary": {
+      "children": true,
+      "p99_rank": true,
+      "paired_legs": true,
+      "paired_p99_medians": {
+        "dense-sparse-one-percent": {
+          "actual": 1.0247250029289336,
+          "expected": 1.024725,
+          "matches": true
+        },
+        "medium-one-edit": {
+          "actual": 1.1075162249245518,
+          "expected": 1.107516,
+          "matches": true
+        },
+        "medium-one-percent": {
+          "actual": 1.1115534802297398,
+          "expected": 1.111553,
+          "matches": true
+        }
+      },
+      "role_quantile_medians": true,
+      "samples_per_child": true,
+      "status": true
+    },
+    "independent_audit": {
+      "adoption_disallowed": true,
+      "all_five_phase_tail_fields": true,
+      "build_started_by_auditor": true,
+      "causal_claim_false": true,
+      "children": true,
+      "decision_preserves_0964_rejection": true,
+      "mismatch_count": true,
+      "pairs": true,
+      "quantile_sets": true,
+      "scope_exact_values_checked": true,
+      "screen_not_reopened": true,
+      "status": true,
+      "workload_started_by_auditor": true
+    },
+    "matched_reduction": {
+      "all_labels_mixed": true,
+      "cc": {
+        "dense-sparse-one-percent": {
+          "actual": 1.0574555033333033,
+          "expected": 1.057456,
+          "matches": true
+        },
+        "medium-one-edit": {
+          "actual": 1.0470288316924619,
+          "expected": 1.047029,
+          "matches": true
+        },
+        "medium-one-percent": {
+          "actual": 1.0546348765102107,
+          "expected": 1.054635,
+          "matches": true
+        }
+      },
+      "children": true,
+      "cross_order": {
+        "dense-sparse-one-percent": {
+          "CR": {
+            "actual": 0.9847293436688659,
+            "expected": 0.984729,
+            "matches": true
+          },
+          "RC": {
+            "actual": 1.073303121079448,
+            "expected": 1.073303,
+            "matches": true
+          }
+        },
+        "medium-one-edit": {
+          "CR": {
+            "actual": 1.0766561514195583,
+            "expected": 1.076656,
+            "matches": true
+          },
+          "RC": {
+            "actual": 0.9758121523188985,
+            "expected": 0.975812,
+            "matches": true
+          }
+        },
+        "medium-one-percent": {
+          "CR": {
+            "actual": 0.8970360237118103,
+            "expected": 0.897036,
+            "matches": true
+          },
+          "RC": {
+            "actual": 1.0653592805365897,
+            "expected": 1.065359,
+            "matches": true
+          }
+        }
+      },
+      "measured_rows": true,
+      "p99_rank": true,
+      "pairs": true,
+      "rr": {
+        "dense-sparse-one-percent": {
+          "actual": 1.0126181889488537,
+          "expected": 1.012618,
+          "matches": true
+        },
+        "medium-one-edit": {
+          "actual": 1.045082534348127,
+          "expected": 1.045083,
+          "matches": true
+        },
+        "medium-one-percent": {
+          "actual": 1.0421474823620374,
+          "expected": 1.042147,
+          "matches": true
+        }
+      },
+      "samples_per_child": true,
+      "status": true
+    },
+    "paths": {
+      "relative_links_exist": true,
+      "required_external_paths_exist": true
+    },
+    "reproduction_text": {
+      "audit_fresh_output_bound": true,
+      "p99_rank_254_recorded": true,
+      "packet_directory_bound": true,
+      "reciprocal_definition_recorded": true
+    },
+    "scope_claims": {
+      "0964_rejection_preserved_in_record": true,
+      "no_adoption_claim": true,
+      "no_workload_false_claim": true,
+      "shared_host_warm_fs_caveat": true,
+      "source_boundary_caution": true
+    }
+  },
+  "created_utc": "2026-10-07T22:35:00.286943+00:00",
+  "documents": [
+    {
+      "bytes": 7312,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/0965-xlsx-ingress-tail-diagnostic.md",
+      "sha256": "53566fa0ce0ed7ebce046131e75ff43e67ed997ddef84ad8dacb5a74b6164aa3"
+    },
+    {
+      "bytes": 13724,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0965/README.md",
+      "sha256": "c47ea6658a03b2669b973151f3710fc8bcace88f5bfd6fab6f0c9ee8fa8acad0"
+    },
+    {
+      "bytes": 505520,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/BASELINE.md",
+      "sha256": "d48eea6fd99c8de2852a96975e9bf750a4a00420fd3f3c9dcf01e3d17b7a94a7"
+    },
+    {
+      "bytes": 819712,
+      "mode": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/HOTSPOTS.md",
+      "sha256": "45c1ad885c75578af233065a329c246c7a530d796d17cdb221bf581fd86c2b0c"
+    }
+  ],
+  "findings": [],
+  "inventory_v2": {
+    "note": "Created after this receipt by the capture owner; not used to support the document/content checks.",
+    "status": "pending_at_review"
+  },
+  "limitations": [
+    "The documents correctly preserve descriptive-only interpretation: no confidence interval, causal attribution, host-noise proof, screen reopening, or adoption decision is inferred.",
+    "Raw captures remain external; this review checked the bound descriptors and retained summaries/audit output."
+  ],
+  "review_scope": "Read-only verification of the 0965 diagnostic record, result README, and top BASELINE/HOTSPOTS entries against retained external summaries, reduction, and independent raw audit.",
+  "reviewer": "/root/staging_review",
+  "reviewer_actions": {
+    "build_started": false,
+    "main_tree_edited": false,
+    "source_or_benchmark_files_changed": false,
+    "workload_started": false
+  },
+  "schema": "litchi.performance.0965.final-record-review.v1",
+  "status": "passed"
+}

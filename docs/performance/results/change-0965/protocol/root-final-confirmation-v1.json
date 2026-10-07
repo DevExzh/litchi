@@ -1,0 +1,25 @@
+{
+  "status": "GO",
+  "created_utc": "2026-10-07T22:16:31.706327+00:00",
+  "scope": "Explicit root confirmation of exact final plan for24serial diagnosticchildren. This external confirmation intentionally is not bound back into the plan, avoiding a cyclic digest.",
+  "final_plan": {
+    "path": "/home/zhuhe/litchi-performance-0965/protocol/plan-final-v2.json",
+    "bytes": 39436,
+    "sha256": "147631fc34eb9230cd002b7fd2ce9ae82c156943a502c558e9eb867e24b649b0"
+  },
+  "prior_go": {
+    "path": "/home/zhuhe/litchi-performance-0965/protocol/root-go-0965-v1.json",
+    "bytes": 1604,
+    "sha256": "3c2de9e2ee7febf60981564c5a759cd28b89a92e71ba163618bb0100c29ea3f0"
+  },
+  "mandatory_scope_contract": {
+    "path": "/home/zhuhe/litchi-performance-0965/protocol/report-scope-contract-v1.json",
+    "bytes": 6792,
+    "sha256": "f4476e77d44cb31ada4981b182210a134cad0968121929472ae48ab5c410d686"
+  },
+  "host_before": {
+    "path": "/home/zhuhe/litchi-performance-0965/protocol/host-before-v2.json",
+    "bytes": 6088,
+    "sha256": "6646310015b9e0acebb3db5aec2766fcf4716bd3936d5d1174ab2926fcfa514e"
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "audit_inputs": [
+    "final authorized plan descriptor",
+    "completed 0965 packet",
+    "completed 0965 reduction",
+    "host-before/after snapshots",
+    "source/binary/report scope bindings"
+  ],
+  "build_started": false,
+  "capture_read": false,
+  "created_utc": "2026-10-07T22:19:19.638318+00:00",
+  "failure_policy": "write immutable failed receipt and do not infer a result",
+  "helper": {
+    "bytes": 49805,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0965/tools/audit_ingress_0965_v1.py",
+    "sha256": "8dbe09fde18d9828bfc7dd5b79dc1a32d9e3b06811804635df76259fbb94f35a"
+  },
+  "output_schema": "litchi.performance.0965.independent-raw-audit.v1",
+  "pure_checks": {
+    "ast_parse": "passed",
+    "help": "passed",
+    "nearest_rank_256": [
+      128,
+      244,
+      254
+    ],
+    "schedule_reconstruction": "passed",
+    "synthetic_pair_and_v3_label": "passed",
+    "top5_index_order": "passed"
+  },
+  "reducer_imported": false,
+  "reviewer": "/root/staging_review",
+  "schema": "litchi.performance.0965.independent-raw-audit-helper-freeze.v1",
+  "status": "frozen",
+  "workload_started": false
+}

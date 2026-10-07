@@ -1,0 +1,25 @@
+{
+  "schema": "litchi.performance.0965.independent-quantile-check.v1",
+  "status": "passed",
+  "source": {
+    "plan_sha256": "dcfabed26427c6a117b41c2e4b6209baec40afe06c218054b2187ae9c49b0a64",
+    "completed_packet_sha256": "d9934f4ffbf4646953d18909de48ccea4db36aceaa1e5367c7c3d18a241fd69f",
+    "result_sha256": "091a122bbb03f5ba65bca5964aa0659c2f2433cfd036d274c76c381b591495b8"
+  },
+  "method": {
+    "implementation": "separate stdlib Python recomputation over raw output/report.json files",
+    "quantile": "sorted(values)[ceil(q*n)-1]",
+    "pooled_samples": false,
+    "workload_launched": false
+  },
+  "checks": {
+    "child_p99_checks": 180,
+    "paired_ingress_p99_ratio_checks": 18,
+    "mismatches": 0
+  },
+  "paired_ingress_p99_ratio_medians": {
+    "medium-one-percent": 1.1115534802297398,
+    "dense-sparse-one-percent": 1.0247250029289336,
+    "medium-one-edit": 1.1075162249245518
+  }
+}

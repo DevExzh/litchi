@@ -1,0 +1,94 @@
+{
+  "checks": {
+    "child_count": 36,
+    "child_phase_quantile_sets_recomputed": 180,
+    "child_stats_mismatches": 0,
+    "paired_leg_count": 18,
+    "paired_leg_quantile_ratio_mismatches": 0,
+    "reported_independent_quantile_check_mismatches": 0,
+    "reported_p99_ratio_medians": {
+      "dense-sparse-one-percent": 1.0247250029289336,
+      "medium-one-edit": 1.1075162249245518,
+      "medium-one-percent": 1.1115534802297398
+    },
+    "samples_per_child": 60,
+    "summary_replay_byte_identical": true
+  },
+  "decision": {
+    "capture_go_issued": false,
+    "production_adoption_allowed": false,
+    "raw_reanalysis_admitted": true
+  },
+  "inputs": {
+    "bound_0964_plan": {
+      "bytes": 59570,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/protocol/plan-final-epoch2-v1.json",
+      "sha256": "dcfabed26427c6a117b41c2e4b6209baec40afe06c218054b2187ae9c49b0a64"
+    },
+    "design_v3": {
+      "bytes": 14211,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/diagnostic-design-v3.md",
+      "sha256": "0dbff34e930aec3d63350ebf6cce9d0c8a86afdcd8f176f50e52a7e6fe2c06bf"
+    },
+    "helper": {
+      "bytes": 28336,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0965/tools/analyze_ingress_v1.py",
+      "sha256": "b6dd1f72ffddb806188e4f7f665b64c70941a841cb8bf43dee48b288bdac240a"
+    },
+    "independent_quantile_check": {
+      "bytes": 905,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/receipts/independent-quantile-check-v1.json",
+      "sha256": "af64fd56f05aa1504278780b636056cb1b1876859e7cada3ad975b7cc94277d7"
+    },
+    "replay": {
+      "bytes": 443033,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/analysis/ingress-summary-replay-v1.json",
+      "sha256": "091a122bbb03f5ba65bca5964aa0659c2f2433cfd036d274c76c381b591495b8"
+    },
+    "replay_receipt": {
+      "bytes": 1859,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/receipts/ingress-replay-v1.json",
+      "sha256": "a442457c006bd438e7ada5dc84783d1e151f658e2fc08eafbf81704b02dc9ce5"
+    },
+    "summary": {
+      "bytes": 443033,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0965/analysis/ingress-summary-v1.json",
+      "sha256": "091a122bbb03f5ba65bca5964aa0659c2f2433cfd036d274c76c381b591495b8"
+    }
+  },
+  "interpretation": {
+    "absolute_quantiles": "Each child is checked independently; nearest-rank p99 at n=60 is the maximum (rank 60). Six paired legs per case and their per-child quantile ratios are descriptive packet observations.",
+    "decision_scope": "0964 rejection remains binding; this reanalysis permits no adoption, screen reopening, or causal claim.",
+    "mechanism_scope": "The candidate validation/raw worksheet paths run during edit_sheets within edit_commit, after the benchmark ingress timer. Ingress-only R/C observations cannot attribute ingress tails to that source mechanism.",
+    "pooled_diagnostics": "Role/sample-window aggregation, phase correlations, launch-order Spearman values, and top-tail/index counts are pooled or small-n diagnostics only; they are excluded from decisions and do not establish causality.",
+    "raw_sample_pairing": "paired_raw_sample_delta_ns and paired_raw_sample_ratio align equal sample indices from separate fresh processes. They are descriptive index alignments, not paired experimental units, confidence intervals, or decision metrics.",
+    "warmup_scope": "0965 design uses 20 warmups versus 0964\u2019s 10, so these values cannot be presented as a direct recurrence or magnitude comparison to 0964; interpretation is packet-scoped."
+  },
+  "review_scope": "read-only independent reanalysis of retained 0964 epoch2 native raw reports; no workload, build, or source edit",
+  "reviewer": "/root/staging_review",
+  "schema": "litchi.performance.0965.ingress-reanalysis-review.v1",
+  "status": "passed",
+  "timing_evidence": {
+    "benchmark_contract": "timed_iteration starts ingress_started immediately before SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context and ends ingress_ns immediately after constructor; stage_timed_commit begins afterward and calls editor.edit_sheets.",
+    "benchmark_source": {
+      "bytes": 28537,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/source-candidate/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+      "sha256": "7d8afadf9f5414ac5215f62411c60e139a798d1c182a441902a0cc62b4445961"
+    },
+    "candidate_path_contract": "cell_values/snapshot.rs load_source_backed performs validation::workbook_xml, raw::parse_catalog, validation::worksheet_xml during edit_sheets.",
+    "snapshot_source": {
+      "bytes": 142741,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0964/source-candidate/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+      "sha256": "50a4ef8fd9f2e810d2b1315d8a389086134a28901a2b86a98cc8abeb84308726"
+    }
+  }
+}

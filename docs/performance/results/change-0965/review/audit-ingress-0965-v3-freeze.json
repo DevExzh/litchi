@@ -1,0 +1,41 @@
+{
+  "build_started": false,
+  "capture_read_before_freeze": false,
+  "correction": "only exclude text /time-v.txt from JSON artifact map; parse it with independent parse_time; compact root confirmation binding correction retained",
+  "correction_from": "audit-ingress-0965-v2.py",
+  "created_utc": "2026-10-07T22:29:59.772073+00:00",
+  "failed_v1_receipt": {
+    "path": "/home/zhuhe/litchi-performance-0965/review/independent-raw-audit-v1.json",
+    "sha256": "0a1f9df14d39497a480515d263e1ee8ff2c6bf699c4d5bdfce9b1db4a76a2ff8"
+  },
+  "failed_v2_receipt": {
+    "path": "/home/zhuhe/litchi-performance-0965/review/independent-raw-audit-v2.json",
+    "sha256": "c5101a0a61eb65db999e02a9950a9afa03346212801b89769e36c6af96d1123d"
+  },
+  "helper": {
+    "bytes": 50264,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0965/tools/audit_ingress_0965_v3.py",
+    "sha256": "78294b734803f2f42e30b8b8bb64759ff6e11d129788993a896161639fb99259"
+  },
+  "output_schema": "litchi.performance.0965.independent-raw-audit.v1",
+  "preserved_v1_helper_sha256": "8dbe09fde18d9828bfc7dd5b79dc1a32d9e3b06811804635df76259fbb94f35a",
+  "preserved_v2_helper_sha256": "8fc1c184a47bfeaa3751110702e3835a418bafcd5c1be2317ac2a1ed07403aef",
+  "pure_checks": {
+    "ast_parse": "passed",
+    "help": "passed",
+    "nearest_rank_256": [
+      128,
+      244,
+      254
+    ],
+    "schedule_reconstruction": "passed",
+    "top5_index_order": "passed"
+  },
+  "reducer_imported": false,
+  "reviewer": "/root/staging_review",
+  "schema": "litchi.performance.0965.independent-raw-audit-helper-freeze.v3",
+  "status": "frozen",
+  "workload_started": false
+}

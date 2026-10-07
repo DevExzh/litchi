@@ -1,0 +1,21 @@
+{
+  "status": "passed",
+  "created_utc": "2026-10-07T22:12:03.259801+00:00",
+  "sources": [
+    {
+      "root": "/home/zhuhe/litchi-performance-0964/source-baseline",
+      "manifest": "/home/zhuhe/litchi-performance-0964/source-manifest-baseline-v2.json",
+      "manifest_sha256": "74d3ead27a1518093be3f80fbe50cfa1280526e08957b1774dbc6fd891bc4eda",
+      "file_count": 10933,
+      "mismatches": 0
+    },
+    {
+      "root": "/home/zhuhe/litchi-performance-0964/source-candidate",
+      "manifest": "/home/zhuhe/litchi-performance-0964/source-manifest-candidate-v4.json",
+      "manifest_sha256": "19e4bdf18aee484ade90067a98ec6ab0ff5f6d017105840df4030f697f25779b",
+      "file_count": 10933,
+      "mismatches": 0
+    }
+  ],
+  "scope": "Fresh content/mode source-custody check; retained binary bindings verified by diagnostic preflight."
+}

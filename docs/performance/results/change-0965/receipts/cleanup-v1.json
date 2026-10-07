@@ -1,0 +1,12 @@
+{
+  "status": "passed",
+  "created_utc": "2026-10-07T22:31:26.452038+00:00",
+  "removed": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0965/tools/__pycache__",
+      "bytes": 145930
+    }
+  ],
+  "builds_started": false,
+  "retained": "All captures, plans, source bindings, analysis, failed audit attempts, and reusable helpers; no runtime/source changes in this batch."
+}

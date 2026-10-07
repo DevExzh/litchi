@@ -1,0 +1,43 @@
+{
+  "status": "GO",
+  "created_utc": "2026-10-07T22:15:20.172817+00:00",
+  "scope": "One fixed24child diagnostic packet; no retries/replacements, no adoption, original0964rejection unchanged.",
+  "mandatory_postcapture_gate": "Independent scope-contract and raw quantile/pair/oracle audit before interpretation.",
+  "bindings": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0965/protocol/plan-diagnostic-0965-v6.json",
+      "bytes": 36900,
+      "mode": 436,
+      "executable": false,
+      "sha256": "7aa592e0a25748dec544f567661d52a320c8b472219b01367e6999138cd21373"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0965/review/independent-protocol-admission-v2.json",
+      "bytes": 7769,
+      "mode": 436,
+      "executable": false,
+      "sha256": "7a6611d89864227833a9121756f942f446433d053b4085e4af6e901182937f45"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0965/protocol/host-before-v2.json",
+      "bytes": 6088,
+      "mode": 436,
+      "executable": false,
+      "sha256": "6646310015b9e0acebb3db5aec2766fcf4716bd3936d5d1174ab2926fcfa514e"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0965/protocol/report-scope-contract-v1.json",
+      "bytes": 6792,
+      "mode": 436,
+      "executable": false,
+      "sha256": "f4476e77d44cb31ada4981b182210a134cad0968121929472ae48ab5c410d686"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0965/receipts/source-revalidation-v1.json",
+      "bytes": 841,
+      "mode": 436,
+      "executable": false,
+      "sha256": "c8ac85491bc4f4d92aa4db50b1ded030494215a30b80ae48fa8ae8f9dacb26c7"
+    }
+  ]
+}

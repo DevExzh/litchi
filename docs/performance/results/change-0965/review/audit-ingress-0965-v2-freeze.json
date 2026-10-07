@@ -1,0 +1,36 @@
+{
+  "build_started": false,
+  "capture_read_before_freeze": false,
+  "correction": "only root-final-confirmation compact descriptor acceptance; packet custody descriptors remain full path/bytes/mode/executable/SHA",
+  "correction_from": "audit-ingress-0965-v1.py",
+  "created_utc": "2026-10-07T22:29:40.848890+00:00",
+  "failed_v1_receipt": {
+    "path": "/home/zhuhe/litchi-performance-0965/review/independent-raw-audit-v1.json",
+    "sha256": "0a1f9df14d39497a480515d263e1ee8ff2c6bf699c4d5bdfce9b1db4a76a2ff8"
+  },
+  "helper": {
+    "bytes": 50247,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0965/tools/audit_ingress_0965_v2.py",
+    "sha256": "8fc1c184a47bfeaa3751110702e3835a418bafcd5c1be2317ac2a1ed07403aef"
+  },
+  "output_schema": "litchi.performance.0965.independent-raw-audit.v1",
+  "preserved_v1_helper_sha256": "8dbe09fde18d9828bfc7dd5b79dc1a32d9e3b06811804635df76259fbb94f35a",
+  "pure_checks": {
+    "ast_parse": "passed",
+    "help": "passed",
+    "nearest_rank_256": [
+      128,
+      244,
+      254
+    ],
+    "schedule_reconstruction": "passed",
+    "top5_index_order": "passed"
+  },
+  "reducer_imported": false,
+  "reviewer": "/root/staging_review",
+  "schema": "litchi.performance.0965.independent-raw-audit-helper-freeze.v2",
+  "status": "frozen",
+  "workload_started": false
+}

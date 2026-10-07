@@ -1,0 +1,9 @@
+{
+  "build_started_by_auditor": false,
+  "created_utc": "2026-10-07T22:29:46.273410+00:00",
+  "error": "invalid JSON /home/zhuhe/litchi-performance-0965/capture-ingress-diagnostic-v1/children/native__medium-one-percent__pair00__RR__p0/time-v.txt: Expecting value: line 1 column 2 (char 1)",
+  "reviewer": "/root/staging_review",
+  "schema": "litchi.performance.0965.independent-raw-audit.v1",
+  "status": "failed",
+  "workload_started_by_auditor": false
+}

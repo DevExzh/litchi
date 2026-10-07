@@ -1,0 +1,186 @@
+{
+  "scope": "Retained files before this manifest, which excludes itself.",
+  "file_count": 36,
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 13724,
+      "sha256": "c47ea6658a03b2669b973151f3710fc8bcace88f5bfd6fab6f0c9ee8fa8acad0"
+    },
+    {
+      "path": "analysis/diagnostic-result-v1.json",
+      "bytes": 284168,
+      "sha256": "1eb904d55ad2ee4498da7ee1fd980fbd222d60e11c8cdcb5b4472f8047db2e10"
+    },
+    {
+      "path": "analysis/ingress-summary-v1.json",
+      "bytes": 443033,
+      "sha256": "091a122bbb03f5ba65bca5964aa0659c2f2433cfd036d274c76c381b591495b8"
+    },
+    {
+      "path": "diagnostic-design-v3.md",
+      "bytes": 14211,
+      "sha256": "0dbff34e930aec3d63350ebf6cce9d0c8a86afdcd8f176f50e52a7e6fe2c06bf"
+    },
+    {
+      "path": "external-evidence-inventory-v2.json",
+      "bytes": 118999,
+      "sha256": "ac346a1404cae5e8e85ab032b229076c29b0ed63f89aedd468023b2781e03643"
+    },
+    {
+      "path": "ingress-source-review.md",
+      "bytes": 11300,
+      "sha256": "dc4419e8becd39557b4c7de3bb1b0dce53bcda40cd4eefb7f0c875e04fa0a7ca"
+    },
+    {
+      "path": "protocol/affinity-controls-0965-v5.json",
+      "bytes": 1479,
+      "sha256": "e78d6aa051007a23696c5cfce7d8c48fea577b9b6b0fd6ba40ec6d92355c4ec1"
+    },
+    {
+      "path": "protocol/host-after-v1.json",
+      "bytes": 6088,
+      "sha256": "9a8010731546d476cfcdf36be1b939fc4943baef0a31dc0c84e6389fd2e02989"
+    },
+    {
+      "path": "protocol/host-before-v2.json",
+      "bytes": 6088,
+      "sha256": "6646310015b9e0acebb3db5aec2766fcf4716bd3936d5d1174ab2926fcfa514e"
+    },
+    {
+      "path": "protocol/plan-diagnostic-0965-v6.json",
+      "bytes": 36900,
+      "sha256": "7aa592e0a25748dec544f567661d52a320c8b472219b01367e6999138cd21373"
+    },
+    {
+      "path": "protocol/plan-final-v2.json",
+      "bytes": 39436,
+      "sha256": "147631fc34eb9230cd002b7fd2ce9ae82c156943a502c558e9eb867e24b649b0"
+    },
+    {
+      "path": "protocol/report-scope-contract-v1.json",
+      "bytes": 6792,
+      "sha256": "f4476e77d44cb31ada4981b182210a134cad0968121929472ae48ab5c410d686"
+    },
+    {
+      "path": "protocol/root-final-confirmation-v1.json",
+      "bytes": 1103,
+      "sha256": "b4a019abb2a1069ad62802644b4556d880aa36f5e6e2fa3f379bb6118e3f1f89"
+    },
+    {
+      "path": "protocol/root-go-0965-v1.json",
+      "bytes": 1604,
+      "sha256": "3c2de9e2ee7febf60981564c5a759cd28b89a92e71ba163618bb0100c29ea3f0"
+    },
+    {
+      "path": "receipts/cleanup-v1.json",
+      "bytes": 381,
+      "sha256": "b70d55e5cd0aca8ec094f32f12c0f03bbd1694283d1f74953cb6cc44b412544f"
+    },
+    {
+      "path": "receipts/independent-quantile-check-v1.json",
+      "bytes": 905,
+      "sha256": "af64fd56f05aa1504278780b636056cb1b1876859e7cada3ad975b7cc94277d7"
+    },
+    {
+      "path": "receipts/ingress-replay-v1.json",
+      "bytes": 1859,
+      "sha256": "a442457c006bd438e7ada5dc84783d1e151f658e2fc08eafbf81704b02dc9ce5"
+    },
+    {
+      "path": "receipts/root-execution-v1.json",
+      "bytes": 2145,
+      "sha256": "55cc1c37104f4925eca47d719b4dfeab694f867307045745194b5c2c8dd8e336"
+    },
+    {
+      "path": "receipts/source-revalidation-v1.json",
+      "bytes": 841,
+      "sha256": "c8ac85491bc4f4d92aa4db50b1ded030494215a30b80ae48fa8ae8f9dacb26c7"
+    },
+    {
+      "path": "review/audit-ingress-0965-v1-freeze.json",
+      "bytes": 1157,
+      "sha256": "b3d2ed807a4640edab3cedfe05cd1c938fdf450dc934d70acdb705d979be4b0b"
+    },
+    {
+      "path": "review/audit-ingress-0965-v2-freeze.json",
+      "bytes": 1340,
+      "sha256": "54e22990a1d28bcb907d6a18a96ca78f6d30a9d1d6865efbb21f732f9f0b1f29"
+    },
+    {
+      "path": "review/audit-ingress-0965-v3-freeze.json",
+      "bytes": 1655,
+      "sha256": "3cb5dc811a2ee26041577c67519ddb7817cdb45f696bea81d121d097d8bdc4b2"
+    },
+    {
+      "path": "review/final-record-review-v1.json",
+      "bytes": 10705,
+      "sha256": "9473ff4bffb2ee59135f288ef75cf6c05d1966e099d29c82d95eb124bf1a9085"
+    },
+    {
+      "path": "review/independent-protocol-admission-final-v1.json",
+      "bytes": 5327,
+      "sha256": "866f42f52696b712826952b9dac3b89372e995be9de84775a3d89393f090d916"
+    },
+    {
+      "path": "review/independent-protocol-admission-v2.json",
+      "bytes": 7769,
+      "sha256": "7a6611d89864227833a9121756f942f446433d053b4085e4af6e901182937f45"
+    },
+    {
+      "path": "review/independent-raw-audit-v1.json",
+      "bytes": 313,
+      "sha256": "0a1f9df14d39497a480515d263e1ee8ff2c6bf699c4d5bdfce9b1db4a76a2ff8"
+    },
+    {
+      "path": "review/independent-raw-audit-v2.json",
+      "bytes": 456,
+      "sha256": "c5101a0a61eb65db999e02a9950a9afa03346212801b89769e36c6af96d1123d"
+    },
+    {
+      "path": "review/independent-raw-audit-v3.json",
+      "bytes": 240496,
+      "sha256": "25353dd5e02720b7a125897a611993331b23feec8c8a96b208a5386743af97bd"
+    },
+    {
+      "path": "review/ingress-reanalysis-review-v1.json",
+      "bytes": 4963,
+      "sha256": "289ff06d0bed3ad84d828b4bdf596b2f3ebb324fb660e2ded545760668712d26"
+    },
+    {
+      "path": "tools/analyze_ingress_v1.py",
+      "bytes": 28336,
+      "sha256": "b6dd1f72ffddb806188e4f7f665b64c70941a841cb8bf43dee48b288bdac240a"
+    },
+    {
+      "path": "tools/audit_ingress_0965_v1.py",
+      "bytes": 49805,
+      "sha256": "8dbe09fde18d9828bfc7dd5b79dc1a32d9e3b06811804635df76259fbb94f35a"
+    },
+    {
+      "path": "tools/audit_ingress_0965_v2.py",
+      "bytes": 50247,
+      "sha256": "8fc1c184a47bfeaa3751110702e3835a418bafcd5c1be2317ac2a1ed07403aef"
+    },
+    {
+      "path": "tools/audit_ingress_0965_v3.py",
+      "bytes": 50264,
+      "sha256": "78294b734803f2f42e30b8b8bb64759ff6e11d129788993a896161639fb99259"
+    },
+    {
+      "path": "tools/prepare_plan_0965_v1.py",
+      "bytes": 20640,
+      "sha256": "06d25ea599f88fa8eb1abc156ff7c9a922a63a4385ebf289f6f8b14d1d79e50b"
+    },
+    {
+      "path": "tools/reduce_ingress_0965_v1.py",
+      "bytes": 32116,
+      "sha256": "89d6a199e3420512a39cd5f75dec062321bd283f3a922bf23428aa48dccb5d26"
+    },
+    {
+      "path": "tools/run_ingress_diagnostic_0965_v1.py",
+      "bytes": 36410,
+      "sha256": "f97c250b008fffe579a09bb302280d1cb64251635c8dd7cc09eac22b2046bb1e"
+    }
+  ]
+}

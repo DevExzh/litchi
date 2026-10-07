@@ -1,5 +1,23 @@
 # Performance hotspot inventory
 
+## 0965 — matched ingress-tail controls remain unresolved
+
+[0965](0965-xlsx-ingress-tail-diagnostic.md) runs the accepted 24-child native
+diagnostic with `RR`/`CC` same-binary controls and one `RC`/`CR` pair in each
+case. All three labels are `mixed`: the cross-order p99 ratios disagree, and
+the `CC` one-percent controls also exceed `1.05`. The independent raw audit
+passes zero mismatches. This packet neither attributes the tail to the
+candidate nor proves host/runtime noise.
+
+The source path matters: `ingress_ns` covers the managed `SourceBackedEditor`
+constructor and OPC structural catalog; the 0964 `Reader`/
+`NamespaceResolver` worksheet loops run later in `edit_commit_ns`.
+`source_stream_admission` is the later worksheet semantic decision and is
+distinct from OPC catalog admission. Do not infer a candidate ingress cause
+from the unchanged callgraph or treat controls as a host explanation. Require
+a separate measurement/attribution design before revisiting the tail; retain
+the 0964 safety gate and production baseline.
+
 ## 0964 — direct event transport screen rejected; ingress tail is separate
 
 [0964](0964-xlsx-direct-event-transport-trial.md) tests the current-source
