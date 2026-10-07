@@ -1,0 +1,29 @@
+{
+  "argv": [
+    "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/rustc",
+    "-vV"
+  ],
+  "cwd": "/home/zhuhe/litchi-performance-0950/candidate-source-v1",
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1",
+    "HOME": "/home/zhuhe",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/home/zhuhe/.cargo/bin:/usr/bin:/bin",
+    "RUSTFLAGS": "-C force-frame-pointers=yes",
+    "RUSTUP_HOME": "/home/zhuhe/.rustup"
+  },
+  "observed_utc": "2026-10-07T09:08:15.381034Z",
+  "returncode": 0,
+  "schema": "litchi.performance.0953.rustc-identity.v1",
+  "scope": "read-only tool identity; no Cargo invocation",
+  "stderr": "",
+  "stdout": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "tool": {
+    "bytes": 644784,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/rustc",
+    "sha256": "bff349e72704ff70bc08a234a3847338e797065bbedde5e556808bc87b7bf7c6"
+  }
+}

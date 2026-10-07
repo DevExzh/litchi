@@ -1,0 +1,433 @@
+{
+  "aggregates": {
+    "all": {
+      "period": 180928729644,
+      "samples": 45077
+    },
+    "fractions": {
+      "owner_period": 0.16971118109001915,
+      "owner_samples": 0.1549348891896089,
+      "unknown_period": 0.8302888189099809,
+      "unknown_samples": 0.8450651108103912
+    },
+    "owner_qualified": {
+      "period": 30705628401,
+      "samples": 6984
+    },
+    "unknown_or_unqualified": {
+      "period": 150223101243,
+      "samples": 38093
+    }
+  },
+  "claim_limits": [
+    "Owner fractions are cycles:u sample-period fractions only.",
+    "Nested stack rows overlap and are not added to exclusive leaf totals.",
+    "No native uninstrumented speedup, latency, allocation, RSS, or adoption inference."
+  ],
+  "command": "python3 -B tools/summarize_0953_v1.py --packet /home/zhuhe/litchi-performance-0953 --output /home/zhuhe/litchi-performance-0953/analysis/summary-v1.json",
+  "conservation": {
+    "all_period": true,
+    "all_samples": true,
+    "nested_rows_are_nonadditive": true,
+    "owner_period_equals_exclusive_leaf_period": true
+  },
+  "diagnostic_interpretation": {
+    "largest_exclusive_leaf": "zlib_rs::deflate::longest_match::longest_match",
+    "largest_exclusive_leaf_scope": "Aggregate normalized function period; offset variants combined; owner-qualified leaf total only.",
+    "nested_scope": "Nested stack rows overlap and are retained as rankings, never summed with exclusive leaves or treated as disjoint costs.",
+    "xml_audit_leaf": "litchi_opc::source_backed::audit_source_part_replacement_xml"
+  },
+  "exclusive_leaf_top10_normalized_function": [
+    {
+      "original_symbols": [
+        "zlib_rs::deflate::longest_match::longest_match"
+      ],
+      "owner_period_fraction": 0.6385387829210315,
+      "period": 19606734588,
+      "rows": 4,
+      "symbol": "zlib_rs::deflate::longest_match::longest_match"
+    },
+    {
+      "original_symbols": [
+        "litchi_opc::source_backed::audit_source_part_replacement_xml"
+      ],
+      "owner_period_fraction": 0.115475770164812,
+      "period": 3545756088,
+      "rows": 4,
+      "symbol": "litchi_opc::source_backed::audit_source_part_replacement_xml"
+    },
+    {
+      "original_symbols": [
+        "zlib_rs::deflate::algorithm::medium::deflate_medium"
+      ],
+      "owner_period_fraction": 0.08878237971222297,
+      "period": 2726118760,
+      "rows": 4,
+      "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium"
+    },
+    {
+      "original_symbols": [
+        "__memmove_avx512_unaligned_erms"
+      ],
+      "owner_period_fraction": 0.023792195569467902,
+      "period": 730554316,
+      "rows": 4,
+      "symbol": "__memmove_avx512_unaligned_erms"
+    },
+    {
+      "original_symbols": [
+        "quick_xml::reader::Reader<R>::read_event_impl"
+      ],
+      "owner_period_fraction": 0.021895849556301677,
+      "period": 672325820,
+      "rows": 4,
+      "symbol": "quick_xml::reader::Reader<R>::read_event_impl"
+    },
+    {
+      "original_symbols": [
+        "memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2"
+      ],
+      "owner_period_fraction": 0.01388780755212006,
+      "period": 426433858,
+      "rows": 4,
+      "symbol": "memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2"
+    },
+    {
+      "original_symbols": [
+        "zlib_rs::deflate::flush_block_only"
+      ],
+      "owner_period_fraction": 0.010448574828370926,
+      "period": 320830056,
+      "rows": 4,
+      "symbol": "zlib_rs::deflate::flush_block_only"
+    },
+    {
+      "original_symbols": [
+        "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2"
+      ],
+      "owner_period_fraction": 0.007444952306937807,
+      "period": 228601939,
+      "rows": 4,
+      "symbol": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2"
+    },
+    {
+      "original_symbols": [
+        "zlib_rs::deflate::compare256::avx2::compare256"
+      ],
+      "owner_period_fraction": 0.0074410747116498985,
+      "period": 228482875,
+      "rows": 4,
+      "symbol": "zlib_rs::deflate::compare256::avx2::compare256"
+    },
+    {
+      "original_symbols": [
+        "memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2"
+      ],
+      "owner_period_fraction": 0.006292954453708788,
+      "period": 193229121,
+      "rows": 4,
+      "symbol": "memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2"
+    }
+  ],
+  "full_summary": {
+    "bytes": 492067,
+    "path": "/home/zhuhe/litchi-performance-0953/analysis/summary-v1.json",
+    "sha256": "a68ec751e5bbdf18b93a713c240f85b08347f12c242e8ad06a8c2648079fe420"
+  },
+  "nested_top10_normalized_function_nonadditive": [
+    {
+      "nested_nonadditive": true,
+      "original_symbols": [
+        "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+      ],
+      "period": 30692453350,
+      "rows": 4,
+      "symbol": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+    },
+    {
+      "nested_nonadditive": true,
+      "original_symbols": [
+        "litchi_opc::source_backed::SourceBackedPackage::write_changed_overlays_with_appended_inner"
+      ],
+      "period": 24272170519,
+      "rows": 4,
+      "symbol": "litchi_opc::source_backed::SourceBackedPackage::write_changed_overlays_with_appended_inner"
+    },
+    {
+      "nested_nonadditive": true,
+      "original_symbols": [
+        "soapberry_zip::preserve::PreservationIndex<R>::write_prepared"
+      ],
+      "period": 24206266548,
+      "rows": 4,
+      "symbol": "soapberry_zip::preserve::PreservationIndex<R>::write_prepared"
+    },
+    {
+      "nested_nonadditive": true,
+      "original_symbols": [
+        "soapberry_zip::preserve::PreservationIndex<R>::prepare_with"
+      ],
+      "period": 23462400991,
+      "rows": 4,
+      "symbol": "soapberry_zip::preserve::PreservationIndex<R>::prepare_with"
+    },
+    {
+      "nested_nonadditive": true,
+      "original_symbols": [
+        "soapberry_zip::preserve::generated_entry"
+      ],
+      "period": 23458010098,
+      "rows": 4,
+      "symbol": "soapberry_zip::preserve::generated_entry"
+    },
+    {
+      "nested_nonadditive": true,
+      "original_symbols": [
+        "zlib_rs::deflate::deflate"
+      ],
+      "period": 23220613517,
+      "rows": 4,
+      "symbol": "zlib_rs::deflate::deflate"
+    },
+    {
+      "nested_nonadditive": true,
+      "original_symbols": [
+        "zlib_rs::deflate::algorithm::medium::deflate_medium"
+      ],
+      "period": 23189901772,
+      "rows": 4,
+      "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium"
+    },
+    {
+      "nested_nonadditive": true,
+      "original_symbols": [
+        "zlib_rs::deflate::longest_match::longest_match"
+      ],
+      "period": 19870487205,
+      "rows": 4,
+      "symbol": "zlib_rs::deflate::longest_match::longest_match"
+    },
+    {
+      "nested_nonadditive": true,
+      "original_symbols": [
+        "litchi_opc::source_backed::SourceBackedPackage::prepare_topology_state"
+      ],
+      "period": 6398303656,
+      "rows": 4,
+      "symbol": "litchi_opc::source_backed::SourceBackedPackage::prepare_topology_state"
+    },
+    {
+      "nested_nonadditive": true,
+      "original_symbols": [
+        "litchi_opc::source_backed::audit_source_part_replacement_xml"
+      ],
+      "period": 6292864832,
+      "rows": 4,
+      "symbol": "litchi_opc::source_backed::audit_source_part_replacement_xml"
+    }
+  ],
+  "per_repeat": {
+    "0": {
+      "owner_period": 15352290878,
+      "owner_period_fraction": 0.16969126266525808,
+      "owner_sample_fraction": 0.15497270669684463,
+      "owner_samples": 3492,
+      "period": 90471899595,
+      "rows": 2,
+      "samples": 22533
+    },
+    "1": {
+      "owner_period": 15353337523,
+      "owner_period_fraction": 0.16973110283306608,
+      "owner_sample_fraction": 0.1548970901348474,
+      "owner_samples": 3492,
+      "period": 90456830049,
+      "rows": 2,
+      "samples": 22544
+    }
+  },
+  "plan": {
+    "binary": {
+      "bytes": 264707944,
+      "executable": true,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1/release/litchi-perf-baseline",
+      "sha256": "0df5a52fc7b716cc0e7810b798987501f0053afcd85fcbe5a04cc00ec57a2274"
+    },
+    "descriptor": {
+      "bytes": 18661,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0953/plan-0953-v3.json",
+      "sha256": "8e295dc6a23059400a5855e3bd15d9aede22c9ff54d02a2261671e5b669bc3a5"
+    },
+    "raw_gate": {
+      "all_event_period_accounted": true,
+      "fully_resolved_owner_samples_min": 100,
+      "lost_records": 0,
+      "mapping_export_terminal": "pass",
+      "new_binary_sha_and_build_id": "exact plan binding",
+      "nonframe_lines": 0,
+      "owner_parent_mapping": "every admitted sample exact physical owner frame followed immediately by exact parent frame in new binary",
+      "owner_period_min": 100000,
+      "owner_samples_min": 100,
+      "record_terminal": "pass",
+      "sample_export_terminal": "pass"
+    },
+    "runner": {
+      "bytes": 44719,
+      "executable": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0953/tools/capture_0953_v6.py",
+      "sha256": "21dc19f3ad3b4b970b2dd72d97754cc4b02cba61a53e716674345f5dd6ab2def"
+    }
+  },
+  "reducer": {
+    "bytes": 16865,
+    "path": "/home/zhuhe/litchi-performance-0953/tools/summarize_0953_v1.py",
+    "sha256": "fd399c4c90d2a5c9ee3fcdcd965fdfea4acd319db86c5326c64035f3572428c9"
+  },
+  "result_count": 4,
+  "results": [
+    {
+      "all": {
+        "period": 34766302092,
+        "samples": 8884
+      },
+      "fractions": {
+        "owner_period": 0.1460131939993729,
+        "owner_samples": 0.13023412877082396,
+        "unknown_period": 0.8539868060006272,
+        "unknown_samples": 0.869765871229176
+      },
+      "input": {
+        "bytes": 90289,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0953/analysis/native-admission-00-v1.json",
+        "sha256": "34eeaeb950fc03ef46adbe71555cc44f89c1bda5f141dc29a49f00ae7c0ecdbf"
+      },
+      "owner_qualified": {
+        "period": 5076338812,
+        "samples": 1157
+      },
+      "row": {
+        "id": "native-fp-publish-medium-r0",
+        "index": 0,
+        "repeat": 0,
+        "shape": "medium"
+      },
+      "unknown_or_unqualified": {
+        "period": 29689963280,
+        "samples": 7727
+      }
+    },
+    {
+      "all": {
+        "period": 55705597503,
+        "samples": 13649
+      },
+      "fractions": {
+        "owner_period": 0.18446893178816712,
+        "owner_samples": 0.17107480401494615,
+        "unknown_period": 0.8155310682118329,
+        "unknown_samples": 0.8289251959850539
+      },
+      "input": {
+        "bytes": 110751,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0953/analysis/native-admission-01-v1.json",
+        "sha256": "ad8c12c044de6916f31a9fb82b3919bf95d200ad33eb7400df41b78cd081bb9e"
+      },
+      "owner_qualified": {
+        "period": 10275952066,
+        "samples": 2335
+      },
+      "row": {
+        "id": "native-fp-publish-dense-sparse-r0",
+        "index": 1,
+        "repeat": 0,
+        "shape": "dense-sparse"
+      },
+      "unknown_or_unqualified": {
+        "period": 45429645437,
+        "samples": 11314
+      }
+    },
+    {
+      "all": {
+        "period": 55683764483,
+        "samples": 13661
+      },
+      "fractions": {
+        "owner_period": 0.18508812851807996,
+        "owner_samples": 0.17143693726667156,
+        "unknown_period": 0.81491187148192,
+        "unknown_samples": 0.8285630627333285
+      },
+      "input": {
+        "bytes": 110019,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0953/analysis/native-admission-02-v1.json",
+        "sha256": "2eca406b0f9dc48e7aff8421be6ed54e9b0a5f9cbe1686209575e22e384d7ea5"
+      },
+      "owner_qualified": {
+        "period": 10306403757,
+        "samples": 2342
+      },
+      "row": {
+        "id": "native-fp-publish-dense-sparse-r1",
+        "index": 2,
+        "repeat": 1,
+        "shape": "dense-sparse"
+      },
+      "unknown_or_unqualified": {
+        "period": 45377360726,
+        "samples": 11319
+      }
+    },
+    {
+      "all": {
+        "period": 34773065566,
+        "samples": 8883
+      },
+      "fractions": {
+        "owner_period": 0.14513916687675452,
+        "owner_samples": 0.1294607677586401,
+        "unknown_period": 0.8548608331232455,
+        "unknown_samples": 0.8705392322413599
+      },
+      "input": {
+        "bytes": 88780,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0953/analysis/native-admission-03-v1.json",
+        "sha256": "a75cad7cbd93eaa880525d2632d59c3f6e3546eab36b5d87bdfab5a7fc935341"
+      },
+      "owner_qualified": {
+        "period": 5046933766,
+        "samples": 1150
+      },
+      "row": {
+        "id": "native-fp-publish-medium-r1",
+        "index": 3,
+        "repeat": 1,
+        "shape": "medium"
+      },
+      "unknown_or_unqualified": {
+        "period": 29726131800,
+        "samples": 7733
+      }
+    }
+  ],
+  "schema": "litchi.performance.0953.native-admission-summary-compact.v2",
+  "scope": "Compact descriptive summary; cycles:u owner attribution only. Nested rows are explicitly nonadditive and have no owner fraction.",
+  "status": "pass",
+  "supersedes": {
+    "bytes": 13475,
+    "path": "/home/zhuhe/litchi-performance-0953/analysis/summary-compact-v1.json",
+    "sha256": "f8a3b1abaf1fc22f96394256563ba62a195aa489901777e5b545752de01013f9"
+  }
+}

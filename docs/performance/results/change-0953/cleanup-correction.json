@@ -1,0 +1,68 @@
+{
+  "authoritative_postconditions": {
+    "binary_bytes": 264707944,
+    "binary_sha256": "0df5a52fc7b716cc0e7810b798987501f0053afcd85fcbe5a04cc00ec57a2274",
+    "replay_root_absent": true,
+    "target_frame_pointer_remaining_paths": [
+      "target-frame-pointer-native-v1/release",
+      "target-frame-pointer-native-v1/release/litchi-perf-baseline"
+    ],
+    "target_root_absent": true,
+    "tmp_root_absent": true
+  },
+  "completed_helper": {
+    "bytes": 4537,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0953-archive/cleanup_0953_v2.py",
+    "sha256": "b67eca57fa03dcc09fa8ce7c01c7c5287d1e2d925ca8eed1916b63602caafd2f"
+  },
+  "completed_receipt": {
+    "bytes": 561700,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0953-archive/cleanup-receipt-v2.json",
+    "sha256": "abb238434f91c9f65678e846b3c771e1212df7b7c0266faa94a9bdcca384fae2"
+  },
+  "correction": "The v2 helper recorded exact replay-tree bytes (154 files, 115376952 bytes) but its per-path census was invoked on each nested path after traversal and therefore did not retain target-cache byte totals. The target-frame-pointer cache was removed (2112 path records) and its exact deleted logical byte total is unavailable; do not treat cleanup-receipt-v2.removed_totals as a whole-cleanup byte total. No canonical evidence was deleted.",
+  "created_utc": "2026-10-07T09:51:10.262648+00:00",
+  "limitations": [
+    "Target-cache removal was authorized and completed, but exact deleted bytes are unavailable after the receipt bug; the external archive is the custody source."
+  ],
+  "observed_removed_scopes": [
+    {
+      "recorded_directory_count": 0,
+      "recorded_file_count": 0,
+      "recorded_logical_bytes": 0,
+      "removed_path_records": 2112,
+      "scope": "target_frame_pointer_cache"
+    },
+    {
+      "recorded_directory_count": 0,
+      "recorded_file_count": 0,
+      "recorded_logical_bytes": 0,
+      "removed_path_records": 1,
+      "scope": "target_root"
+    },
+    {
+      "recorded_directory_count": 1,
+      "recorded_file_count": 0,
+      "recorded_logical_bytes": 0,
+      "removed_path_records": 1,
+      "scope": "tmp_root"
+    },
+    {
+      "recorded_directory_count": 24,
+      "recorded_file_count": 154,
+      "recorded_logical_bytes": 115376952,
+      "removed_path_records": 1,
+      "scope": "relocated_replay"
+    }
+  ],
+  "prior_failed_attempt": {
+    "bytes": 1449,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0953-archive/cleanup-attempt-v1-failure.json",
+    "sha256": "ec1e0d74e48db683c6e48e92e7abedcf320edec9eb79133a8dd219769be3c627"
+  },
+  "schema": "litchi.performance.0953.cleanup-correction.v1",
+  "status": "pass_with_unmeasured_prior_cache_bytes"
+}

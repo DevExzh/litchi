@@ -1,0 +1,15 @@
+{
+  "schema": "litchi.performance.0953.root-prelaunch-refusal.v1",
+  "created_utc": "2026-10-07T09:34:57.504821+00:00",
+  "status": "failed_before_workload",
+  "command": "LITCHI_PERF_0953_CAPTURE_APPROVED=1 python3 -B tools/capture_0953_v5.py capture --plan plan-0953-v2.json --index 0",
+  "returncode": 2,
+  "error": "plan runner: bytes differs",
+  "expected_bytes": 44720,
+  "expected_sha256": "dbce1eae192a2a236c4b02107419192244402c8991ac39b83f636eb4e12fb933",
+  "observed_bytes": 44719,
+  "observed_sha256": "21dc19f3ad3b4b970b2dd72d97754cc4b02cba61a53e716674345f5dd6ab2def",
+  "capture_directory_exists": false,
+  "workload_launched": false,
+  "scope": "Metadata custody preflight; no perf record or benchmark launched; not a replacement capture"
+}

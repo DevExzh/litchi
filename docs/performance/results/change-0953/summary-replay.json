@@ -1,0 +1,26 @@
+{
+  "commands": [
+    "python3 -B /home/zhuhe/litchi-performance-0953/tools/summarize_0953_v1.py --packet /home/zhuhe/litchi-performance-0953 --output <fresh-original-output>",
+    "python3 -B /home/zhuhe/litchi-performance-0953/tools/summarize_0953_v1.py --packet <fresh-extracted-packet> --output <fresh-moved-output>",
+    "python3 -B <replace only fresh extracted packet root with historical packet root and compare bytes>"
+  ],
+  "created_utc": "2026-10-07T09:52:16.427541+00:00",
+  "extraction_root_removed_after_replay": true,
+  "moved": {
+    "bytes": 492247,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0953-archive/summary-replay-moved-v1.json",
+    "sha256": "f1ba8344d757f8e742e81e0b5f16c78d8a9608018024f53dd615ee1929484002"
+  },
+  "normalized_moved_sha256": "a68ec751e5bbdf18b93a713c240f85b08347f12c242e8ad06a8c2648079fe420",
+  "original": {
+    "bytes": 492067,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0953-archive/summary-replay-original-v1.json",
+    "sha256": "a68ec751e5bbdf18b93a713c240f85b08347f12c242e8ad06a8c2648079fe420"
+  },
+  "raw_path_normalized_byte_equal": true,
+  "schema": "litchi.performance.0953.summary-relocated-replay.v1",
+  "status": "pass",
+  "summary_scope": "Offline bounded reduction over all four native-admission-v3 rows; no workload/perf/decoder capture."
+}

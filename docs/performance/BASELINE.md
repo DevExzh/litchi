@@ -1,5 +1,13 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0953 — frame-pointer publication attribution passes
+
+[0953](0953-xlsx-frame-pointer-publication-attribution.md) qualifies a separate
+same-source frame-pointer executable after 0952's DWARF rejection. Four
+captures pass all 800 semantic iterations and owner-quality gates. Longest-match
+search contributes 60.00–65.88% of qualified publication sampled period weights.
+These are profiling-build fractions, not ordinary-baseline timings or speedups.
+
 ## 0952 — native publication profile fails owner admission
 
 [0952](0952-xlsx-native-publication-unwind-rejection.md) retains one medium

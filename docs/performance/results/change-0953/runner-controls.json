@@ -1,0 +1,26 @@
+{
+  "controls": {
+    "first_child_plan_binding_error": "first-child plan-binding mutation: CaptureError: first-child admission plan: path differs",
+    "first_child_plan_binding_mutation_rejected": true,
+    "positive_8879_profile_events_200_semantic_iterations": true,
+    "schedule_mutation_error": "schedule mutation: CaptureError: capture schedule differs",
+    "schedule_mutation_rejected": true
+  },
+  "plan": {
+    "bytes": 17477,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0953/plan-0953-v1.json",
+    "sha256": "cee1c4a21d1e7049a5781940139ad4c7ca75ab1386e2ba79c19e1eff50153554"
+  },
+  "runner": {
+    "bytes": 44719,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0953/tools/capture_0953_v5.py",
+    "sha256": "21dc19f3ad3b4b970b2dd72d97754cc4b02cba61a53e716674345f5dd6ab2def"
+  },
+  "schema": "litchi.performance.0953.capture-v5-controls.v4",
+  "scope": "Synthetic temporary descriptors and in-memory contract controls only; no workload, build, perf capture, decoder export, or sealed-packet mutation.",
+  "status": "pass"
+}

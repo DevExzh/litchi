@@ -1,0 +1,1205 @@
+{
+  "binary_external_to_core_archive": true,
+  "cleanup_requires_explicit_go": true,
+  "dependencies": {
+    "0950": {
+      "copied": false,
+      "path": "/home/zhuhe/litchi-performance-0950"
+    },
+    "0952": {
+      "copied": false,
+      "path": "/home/zhuhe/litchi-performance-0952"
+    }
+  },
+  "directories": [
+    {
+      "mode": 509,
+      "path": "analysis"
+    },
+    {
+      "mode": 509,
+      "path": "analysis/mmap"
+    },
+    {
+      "mode": 509,
+      "path": "analysis/mmap/00-medium"
+    },
+    {
+      "mode": 509,
+      "path": "analysis/mmap/01-dense-sparse"
+    },
+    {
+      "mode": 509,
+      "path": "analysis/mmap/02-dense-sparse"
+    },
+    {
+      "mode": 509,
+      "path": "analysis/mmap/03-medium"
+    },
+    {
+      "mode": 509,
+      "path": "analysis/sample"
+    },
+    {
+      "mode": 509,
+      "path": "analysis/sample/00-medium"
+    },
+    {
+      "mode": 509,
+      "path": "analysis/sample/01-dense-sparse"
+    },
+    {
+      "mode": 509,
+      "path": "analysis/sample/02-dense-sparse"
+    },
+    {
+      "mode": 509,
+      "path": "analysis/sample/03-medium"
+    },
+    {
+      "mode": 509,
+      "path": "build-tools"
+    },
+    {
+      "mode": 509,
+      "path": "builds"
+    },
+    {
+      "mode": 509,
+      "path": "builds/frame-pointer-native-v1"
+    },
+    {
+      "mode": 509,
+      "path": "capture"
+    },
+    {
+      "mode": 509,
+      "path": "capture/00-medium"
+    },
+    {
+      "mode": 509,
+      "path": "capture/01-dense-sparse"
+    },
+    {
+      "mode": 509,
+      "path": "capture/02-dense-sparse"
+    },
+    {
+      "mode": 509,
+      "path": "capture/03-medium"
+    },
+    {
+      "mode": 509,
+      "path": "preflight-v1"
+    },
+    {
+      "mode": 509,
+      "path": "receipts"
+    },
+    {
+      "mode": 509,
+      "path": "review"
+    },
+    {
+      "mode": 509,
+      "path": "task-census"
+    },
+    {
+      "mode": 509,
+      "path": "tools"
+    }
+  ],
+  "entries": [
+    {
+      "bytes": 2068,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/mmap/00-medium/events.txt",
+      "sha256": "7da9a0381a0c88a78e306db9c624877bf996a3dd3cb3df5769b02ee4ff989fc2"
+    },
+    {
+      "bytes": 2529,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/mmap/00-medium/receipt.json",
+      "sha256": "76618ec7eeb13d39614119d8a97c0baf406180df5367e76e84a10fb57116b5ab"
+    },
+    {
+      "bytes": 2126,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/mmap/00-medium/start.json",
+      "sha256": "46c0f056f2dee92910bd8d983a762bcd068b7b0fb8c83d9c7a48e144eee71659"
+    },
+    {
+      "bytes": 25,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/mmap/00-medium/stderr.txt",
+      "sha256": "d760457f9a459836db8c86aa1e430280f8b3c8762575616f72e4aee52e767536"
+    },
+    {
+      "bytes": 746,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/mmap/00-medium/terminal.json",
+      "sha256": "a35422411d61dae6cc0b64e7f8a99db1cf6c099409f93ec6dbd0fc063014bfbf"
+    },
+    {
+      "bytes": 2068,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/mmap/01-dense-sparse/events.txt",
+      "sha256": "206f61322c08bbd583469e48eb328ffd4f17c0d5ade0a7eea11a7c6fe0e1edc3"
+    },
+    {
+      "bytes": 2577,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/mmap/01-dense-sparse/receipt.json",
+      "sha256": "5af2c56235d21811b376cf2ba44ea014b0169f6d8e800c02bc9845059edb063c"
+    },
+    {
+      "bytes": 2156,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/mmap/01-dense-sparse/start.json",
+      "sha256": "82b022a54086fa5f0ec5c0f2f7120a391e6c8fe83d4e405e0271708801fb8afc"
+    },
+    {
+      "bytes": 25,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/mmap/01-dense-sparse/stderr.txt",
+      "sha256": "d760457f9a459836db8c86aa1e430280f8b3c8762575616f72e4aee52e767536"
+    },
+    {
+      "bytes": 753,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/mmap/01-dense-sparse/terminal.json",
+      "sha256": "09ba73ae4c8c3e91364149757179fc5f9a23db45fe6fdd66749e72a9314b354a"
+    },
+    {
+      "bytes": 2068,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/mmap/02-dense-sparse/events.txt",
+      "sha256": "1d146422ecd9e4ae6a5bb03c8f30feca1d5179ccac3ca45978e0a5ee41189109"
+    },
+    {
+      "bytes": 2577,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/mmap/02-dense-sparse/receipt.json",
+      "sha256": "a3ff3f680e95a84497d850762257f40514f52b8d653740a162ed76972fdbf032"
+    },
+    {
+      "bytes": 2156,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/mmap/02-dense-sparse/start.json",
+      "sha256": "d731372badab2ec7c6a665fd7f87a11e8bc58206aea3d3e570c29709e83c097c"
+    },
+    {
+      "bytes": 25,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/mmap/02-dense-sparse/stderr.txt",
+      "sha256": "d760457f9a459836db8c86aa1e430280f8b3c8762575616f72e4aee52e767536"
+    },
+    {
+      "bytes": 753,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/mmap/02-dense-sparse/terminal.json",
+      "sha256": "4abddf71b0f48a9820518740a1766f90e5b92014afbf59c5fdcc68643155d458"
+    },
+    {
+      "bytes": 2068,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/mmap/03-medium/events.txt",
+      "sha256": "d4f9899e951b37126d2c56b3fe3f1649d1c6f8be2fe2d38b439b0be6b6a41890"
+    },
+    {
+      "bytes": 2529,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/mmap/03-medium/receipt.json",
+      "sha256": "d293fde6938458c5452557cf18a017c5ca346efe817d7de3e6731e1926caa29a"
+    },
+    {
+      "bytes": 2126,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/mmap/03-medium/start.json",
+      "sha256": "57c45d1ae5baa941001d688a31e0284f2359663fb2ef9236cb0d608a04c5b907"
+    },
+    {
+      "bytes": 25,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/mmap/03-medium/stderr.txt",
+      "sha256": "d760457f9a459836db8c86aa1e430280f8b3c8762575616f72e4aee52e767536"
+    },
+    {
+      "bytes": 747,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/mmap/03-medium/terminal.json",
+      "sha256": "fa191eeb2b19198a1742dd557f9728ba98c57ad373a4941275cf1a8460805d32"
+    },
+    {
+      "bytes": 90289,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/native-admission-00-v1.json",
+      "sha256": "34eeaeb950fc03ef46adbe71555cc44f89c1bda5f141dc29a49f00ae7c0ecdbf"
+    },
+    {
+      "bytes": 110751,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/native-admission-01-v1.json",
+      "sha256": "ad8c12c044de6916f31a9fb82b3919bf95d200ad33eb7400df41b78cd081bb9e"
+    },
+    {
+      "bytes": 110019,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/native-admission-02-v1.json",
+      "sha256": "2eca406b0f9dc48e7aff8421be6ed54e9b0a5f9cbe1686209575e22e384d7ea5"
+    },
+    {
+      "bytes": 88780,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/native-admission-03-v1.json",
+      "sha256": "a75cad7cbd93eaa880525d2632d59c3f6e3546eab36b5d87bdfab5a7fc935341"
+    },
+    {
+      "bytes": 19356547,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/sample/00-medium/events.txt",
+      "sha256": "eb8e341fc308521ba50bc9b6afa4d471cc7802a927bc021828de8c83e6dce81e"
+    },
+    {
+      "bytes": 2184,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/sample/00-medium/receipt.json",
+      "sha256": "a9b21bf84f9277e03335763f2a30044cf5278443ae8a40a69df4adc302c23c07"
+    },
+    {
+      "bytes": 2031,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/sample/00-medium/start.json",
+      "sha256": "5991e964ee893bcae1e0f39fe18d0cead3f395d75c97c75330580f103e426e51"
+    },
+    {
+      "bytes": 0,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/sample/00-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 651,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/sample/00-medium/terminal.json",
+      "sha256": "e1cad5de842d8211b13e210fdb0928ba1abfbffb5351c35a85ae53edd7f9b928"
+    },
+    {
+      "bytes": 30079479,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/sample/01-dense-sparse/events.txt",
+      "sha256": "d4c9cde917069dd0226e8343f871401441ebf771a7d933bd2c53a00d73bc723e"
+    },
+    {
+      "bytes": 2232,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/sample/01-dense-sparse/receipt.json",
+      "sha256": "3ffe6f7c72ca72599acc38b0a684208685b32aea2d9cc22a17074ac20d27aeeb"
+    },
+    {
+      "bytes": 2061,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/sample/01-dense-sparse/start.json",
+      "sha256": "87398175ab1d09f28e776f9ba454c51223aff814aac766d94d74ba8f00847a3c"
+    },
+    {
+      "bytes": 0,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/sample/01-dense-sparse/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 657,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/sample/01-dense-sparse/terminal.json",
+      "sha256": "05d88d843595fec2a5f8d544a114af62f268b4f44f2f887144d29b5786168ce0"
+    },
+    {
+      "bytes": 30080765,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/sample/02-dense-sparse/events.txt",
+      "sha256": "071c8ca288758e25ead8d26b5d7ca445a353fa5ecdaa500130aca4ae17cdfcbc"
+    },
+    {
+      "bytes": 2232,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/sample/02-dense-sparse/receipt.json",
+      "sha256": "01a585ae6ec6508febcb9366c8feef50190a17ee00bd3d0ced8ce2651048a826"
+    },
+    {
+      "bytes": 2061,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/sample/02-dense-sparse/start.json",
+      "sha256": "228f0538469754a1bdd8f261f6eee115b5c6913624429344ec3b018cf608c263"
+    },
+    {
+      "bytes": 0,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/sample/02-dense-sparse/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 657,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/sample/02-dense-sparse/terminal.json",
+      "sha256": "48a8d67980738afadc0d4c915aeb7b7bdbb566f8b14d6daa100255d85d65f7b5"
+    },
+    {
+      "bytes": 19348227,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/sample/03-medium/events.txt",
+      "sha256": "834af2dea32cfe1ad0d2f54ec88b3d7baba3743bb3189fce6628d0b8d9182bde"
+    },
+    {
+      "bytes": 2184,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/sample/03-medium/receipt.json",
+      "sha256": "f8b5a407398d1d1e488b7dd6ae3b8d4920eb61c9972b2ac0425b9c13921d5054"
+    },
+    {
+      "bytes": 2031,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/sample/03-medium/start.json",
+      "sha256": "c3630157c82d01134b8568073351f096ee56e013cf1d584403ea5838a62d7b2f"
+    },
+    {
+      "bytes": 0,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/sample/03-medium/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 651,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/sample/03-medium/terminal.json",
+      "sha256": "598c0d8319ccb4df9a3d43851a0847a6d33c860d1812b47084aa9e923d5a0f3e"
+    },
+    {
+      "bytes": 13475,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/summary-compact-v1.json",
+      "sha256": "f8a3b1abaf1fc22f96394256563ba62a195aa489901777e5b545752de01013f9"
+    },
+    {
+      "bytes": 13538,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/summary-compact-v2.json",
+      "sha256": "9c3e056c8a08fc17e99fac0e2b30c3c58e7bdd5aeacabafaf60cc7a132204cb0"
+    },
+    {
+      "bytes": 492067,
+      "executable": false,
+      "mode": 436,
+      "path": "analysis/summary-v1.json",
+      "sha256": "a68ec751e5bbdf18b93a713c240f85b08347f12c242e8ad06a8c2648079fe420"
+    },
+    {
+      "bytes": 28058,
+      "executable": true,
+      "mode": 493,
+      "path": "build-tools/build_frame_pointer_native_v1.py",
+      "sha256": "4463fbe1918a6b8d5fa1b135c4778f9b7c8546571bb42c7ae7bbe1d379e23a0a"
+    },
+    {
+      "bytes": 801,
+      "executable": false,
+      "mode": 436,
+      "path": "builds/frame-pointer-native-v1/binary.json",
+      "sha256": "b337a99cd04a47dd4abbc2e1ee29c06a31ee89f791ad16c189a582aeaddc686a"
+    },
+    {
+      "bytes": 8366,
+      "executable": false,
+      "mode": 436,
+      "path": "builds/frame-pointer-native-v1/bindings.json",
+      "sha256": "ac1ab2631286f7677334b43641c9a1084ed683ab50e835251bee56612b9c637b"
+    },
+    {
+      "bytes": 9002,
+      "executable": false,
+      "mode": 436,
+      "path": "builds/frame-pointer-native-v1/build.stderr.log",
+      "sha256": "6f75d16b7bce6a13f5b88539a9a20bac108bad96c2ef4f93b321e3ca05537e3a"
+    },
+    {
+      "bytes": 0,
+      "executable": false,
+      "mode": 436,
+      "path": "builds/frame-pointer-native-v1/build.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 8427,
+      "executable": false,
+      "mode": 436,
+      "path": "builds/frame-pointer-native-v1/launch.json",
+      "sha256": "48e3d6bdd44e6ea039b9389d7df0dceeb78f4bb7d39daf592247f7862c65fd36"
+    },
+    {
+      "bytes": 1041,
+      "executable": false,
+      "mode": 436,
+      "path": "builds/frame-pointer-native-v1/result.json",
+      "sha256": "c7639719fb0908c76ba89d6e2c80eb8c4fb895ca03bd66c02d283b509dc92742"
+    },
+    {
+      "bytes": 8915,
+      "executable": false,
+      "mode": 436,
+      "path": "builds/frame-pointer-native-v1/start.json",
+      "sha256": "d44efe4dcdd542965ac81bd8e49eb20be9bb509a81ddd87dc62eb5a69b6946fd"
+    },
+    {
+      "bytes": 9316,
+      "executable": false,
+      "mode": 436,
+      "path": "builds/frame-pointer-native-v1/terminal.json",
+      "sha256": "21a96dbc3d28d87309ef54164e987f7745e3f88a8cd03bfa7fe4c95aef0882a4"
+    },
+    {
+      "bytes": 2062,
+      "executable": false,
+      "mode": 436,
+      "path": "capture/00-medium/command.json",
+      "sha256": "648927b76947e49ce0ad73ad3f0029f5396a25061c3dee5c190c48ec1710c971"
+    },
+    {
+      "bytes": 1597736,
+      "executable": false,
+      "mode": 384,
+      "path": "capture/00-medium/perf.data",
+      "sha256": "eecd7a6bbfb78d06f6c857bfab2046bad7fb99ed9388126cc112d6fea24088c4"
+    },
+    {
+      "bytes": 8845,
+      "executable": false,
+      "mode": 436,
+      "path": "capture/00-medium/receipt.json",
+      "sha256": "271da245f1662c19b3c8718f3b8c29be836b2348d6cad13c50c7e5679865d31a"
+    },
+    {
+      "bytes": 1173,
+      "executable": false,
+      "mode": 436,
+      "path": "capture/00-medium/record-terminal.json",
+      "sha256": "f4173e1eb1cefed01e60191bb4bda8c6dabd0baae081161cd3ca8239025b02d9"
+    },
+    {
+      "bytes": 157,
+      "executable": false,
+      "mode": 436,
+      "path": "capture/00-medium/record.stderr",
+      "sha256": "7c02163b9623e035f9c350af4256b2f80b36eadff4bf6bcf4ad9c23c402420fc"
+    },
+    {
+      "bytes": 0,
+      "executable": false,
+      "mode": 436,
+      "path": "capture/00-medium/record.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 528244,
+      "executable": false,
+      "mode": 436,
+      "path": "capture/00-medium/report.json",
+      "sha256": "57cf96c9bf6ac97e93ad44a67b7f1146cf523c185139912168dd9d8e250dd0c6"
+    },
+    {
+      "bytes": 2104,
+      "executable": false,
+      "mode": 436,
+      "path": "capture/00-medium/start.json",
+      "sha256": "0969cbc489da821ac4d2c1fc251266c98f043ec8fc478020e162c766cf502c94"
+    },
+    {
+      "bytes": 2092,
+      "executable": false,
+      "mode": 436,
+      "path": "capture/01-dense-sparse/command.json",
+      "sha256": "14937b144f58eac60ab5aae270c8fc4b18f483abb279cb0aa8cbde2d607dac75"
+    },
+    {
+      "bytes": 2442680,
+      "executable": false,
+      "mode": 384,
+      "path": "capture/01-dense-sparse/perf.data",
+      "sha256": "08600bb7ef09f3bd383e3f0f06e59a32ba5a384bc81adbf4c86078cb40ce9c74"
+    },
+    {
+      "bytes": 9013,
+      "executable": false,
+      "mode": 436,
+      "path": "capture/01-dense-sparse/receipt.json",
+      "sha256": "9076a478c42f114a8d9804bd0809ba99c47f430c1ebf6fe9cf0c9a275134aa56"
+    },
+    {
+      "bytes": 1192,
+      "executable": false,
+      "mode": 436,
+      "path": "capture/01-dense-sparse/record-terminal.json",
+      "sha256": "613939295fed351eda049db3b475de9210c801a5aa9f794c8282e1b66b68bf5b"
+    },
+    {
+      "bytes": 164,
+      "executable": false,
+      "mode": 436,
+      "path": "capture/01-dense-sparse/record.stderr",
+      "sha256": "df4986769827a523d89b8786519a6bb888e3fcbb75b2cf8ea89b186b943ede66"
+    },
+    {
+      "bytes": 0,
+      "executable": false,
+      "mode": 436,
+      "path": "capture/01-dense-sparse/record.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 528680,
+      "executable": false,
+      "mode": 436,
+      "path": "capture/01-dense-sparse/report.json",
+      "sha256": "0064af9862eba4c15d0ef2c778d27b9380a9788243c6efb5b545f18d5406d82e"
+    },
+    {
+      "bytes": 2134,
+      "executable": false,
+      "mode": 436,
+      "path": "capture/01-dense-sparse/start.json",
+      "sha256": "4ef919fade045f9c1590400a8e0af63161430f4a94314d6248969282f147da9b"
+    },
+    {
+      "bytes": 2092,
+      "executable": false,
+      "mode": 436,
+      "path": "capture/02-dense-sparse/command.json",
+      "sha256": "87c273e7418f87d7b420e137c4ca4f2ba6a9d612b2288afb7a8ff76f9289da1d"
+    },
+    {
+      "bytes": 2443464,
+      "executable": false,
+      "mode": 384,
+      "path": "capture/02-dense-sparse/perf.data",
+      "sha256": "d7f383968e3bad0eec09cbe43847d083c8b93dd6ac73d1e0e228184945b2635e"
+    },
+    {
+      "bytes": 9013,
+      "executable": false,
+      "mode": 436,
+      "path": "capture/02-dense-sparse/receipt.json",
+      "sha256": "4bdcc6aed8f4d580d37a1e0b18310e90aae3d3197fcd09583ce9813bcd8a2b78"
+    },
+    {
+      "bytes": 1192,
+      "executable": false,
+      "mode": 436,
+      "path": "capture/02-dense-sparse/record-terminal.json",
+      "sha256": "2d66aeefa56e6d5cae234a356b0fbe07b351fb9ed04efc9613edcbd000ce33a6"
+    },
+    {
+      "bytes": 164,
+      "executable": false,
+      "mode": 436,
+      "path": "capture/02-dense-sparse/record.stderr",
+      "sha256": "90a6c9df9c4b575a984db07afb9cbd0ea37cad54b8c8f584620784d949b85643"
+    },
+    {
+      "bytes": 0,
+      "executable": false,
+      "mode": 436,
+      "path": "capture/02-dense-sparse/record.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 528683,
+      "executable": false,
+      "mode": 436,
+      "path": "capture/02-dense-sparse/report.json",
+      "sha256": "18433e830ff0f9a0d461c11fc4fec0dc096228fd379aea7e009fa57f790a5e3b"
+    },
+    {
+      "bytes": 2134,
+      "executable": false,
+      "mode": 436,
+      "path": "capture/02-dense-sparse/start.json",
+      "sha256": "33706313d62736aff2033f8704b9b0cea5ec77dfea815d5d661e651344804017"
+    },
+    {
+      "bytes": 2062,
+      "executable": false,
+      "mode": 436,
+      "path": "capture/03-medium/command.json",
+      "sha256": "6467f86d5d6341abc170456217043dfe5bedfe55ffedd7c5f312ab457c2589d1"
+    },
+    {
+      "bytes": 1597080,
+      "executable": false,
+      "mode": 384,
+      "path": "capture/03-medium/perf.data",
+      "sha256": "1e19faaa4e7a2ba86124a5dbcb310fef51891817c398ebcd456c74d98646211b"
+    },
+    {
+      "bytes": 8845,
+      "executable": false,
+      "mode": 436,
+      "path": "capture/03-medium/receipt.json",
+      "sha256": "ec3c83384e90f3a10c18ca20e12c12aebc4af8dc97fe17dabdec6592a883f032"
+    },
+    {
+      "bytes": 1173,
+      "executable": false,
+      "mode": 436,
+      "path": "capture/03-medium/record-terminal.json",
+      "sha256": "7cef7fe2cab1fe95a7aba77d44e957a7e19afac8f8018f6b2cd0d0162230e538"
+    },
+    {
+      "bytes": 157,
+      "executable": false,
+      "mode": 436,
+      "path": "capture/03-medium/record.stderr",
+      "sha256": "018914a1aa27596cf74fb7930b428e764e816e484cdb6e89cb6a15074ca62d0d"
+    },
+    {
+      "bytes": 0,
+      "executable": false,
+      "mode": 436,
+      "path": "capture/03-medium/record.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 528245,
+      "executable": false,
+      "mode": 436,
+      "path": "capture/03-medium/report.json",
+      "sha256": "0344ae53603e0634a7871f7b87eaacaf9d20d1b1c9f089507e4b51d3af26dc1b"
+    },
+    {
+      "bytes": 2104,
+      "executable": false,
+      "mode": 436,
+      "path": "capture/03-medium/start.json",
+      "sha256": "f97ac66e51680430251b72ef9fa47e0bf041f1856d3343210adc348c29a1d8ef"
+    },
+    {
+      "bytes": 1883,
+      "executable": false,
+      "mode": 436,
+      "path": "capture/first-child-admission.json",
+      "sha256": "527493e75de25c15530e820bb46936bc48c166022ea4954fd0c485c584963223"
+    },
+    {
+      "bytes": 17477,
+      "executable": false,
+      "mode": 436,
+      "path": "plan-0953-v1.json",
+      "sha256": "cee1c4a21d1e7049a5781940139ad4c7ca75ab1386e2ba79c19e1eff50153554"
+    },
+    {
+      "bytes": 18060,
+      "executable": false,
+      "mode": 436,
+      "path": "plan-0953-v2.json",
+      "sha256": "efd81113f30bfa056c369296bbaeeb7e83f4f200dfd937c9e22c35031feb5591"
+    },
+    {
+      "bytes": 18661,
+      "executable": false,
+      "mode": 436,
+      "path": "plan-0953-v3.json",
+      "sha256": "8e295dc6a23059400a5855e3bd15d9aede22c9ff54d02a2261671e5b669bc3a5"
+    },
+    {
+      "bytes": 2233948,
+      "executable": false,
+      "mode": 436,
+      "path": "preflight-v1/mmap-debug.events.txt",
+      "sha256": "ea31f400aa251b3926cc5dd9e33d5a7d47b31f7c6858901f4f22e36d6ecda380"
+    },
+    {
+      "bytes": 25,
+      "executable": false,
+      "mode": 436,
+      "path": "preflight-v1/mmap-debug.stderr.txt",
+      "sha256": "d760457f9a459836db8c86aa1e430280f8b3c8762575616f72e4aee52e767536"
+    },
+    {
+      "bytes": 776,
+      "executable": false,
+      "mode": 436,
+      "path": "preflight-v1/mmap-debug.terminal.json",
+      "sha256": "22a0dbc5977de8016a228f7f93ee2dda6dfb69b34b6459129b8a552aba175924"
+    },
+    {
+      "bytes": 3410,
+      "executable": false,
+      "mode": 436,
+      "path": "preflight-v1/old-identity-validator.json",
+      "sha256": "dba2a73b32674722960aee553401c14c5e651f430b008ea243ce00e9e0713075"
+    },
+    {
+      "bytes": 5416,
+      "executable": false,
+      "mode": 436,
+      "path": "preflight-v1/preflight.json",
+      "sha256": "17514f02ee06cda1367e86e7e69a3c4f39a2ad15fa9042fd153821485c87c3b4"
+    },
+    {
+      "bytes": 2203611,
+      "executable": false,
+      "mode": 436,
+      "path": "preflight-v1/sample-no-debug.events.txt",
+      "sha256": "2eb3bc3df2fd4322f3b55c07238810eeea95428803eeb96aa990db6fb2fe95c8"
+    },
+    {
+      "bytes": 0,
+      "executable": false,
+      "mode": 436,
+      "path": "preflight-v1/sample-no-debug.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 684,
+      "executable": false,
+      "mode": 436,
+      "path": "preflight-v1/sample-no-debug.terminal.json",
+      "sha256": "a688514c5473a7a84e188da4b86019a0333307ae70d7dee6554d5fbfa61b1a81"
+    },
+    {
+      "bytes": 20238,
+      "executable": false,
+      "mode": 436,
+      "path": "protocol-0953-v1.json",
+      "sha256": "b37b826da1d6c5be6347efd5ebbd8377e2d1e935848e6aee693ccac2049e772e"
+    },
+    {
+      "bytes": 21628,
+      "executable": false,
+      "mode": 436,
+      "path": "protocol-0953-v2.json",
+      "sha256": "71521a4a26dab699a97318cfb1b404b258389e63aef169ade03096bb1419a0af"
+    },
+    {
+      "bytes": 2447,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/analyze-v2-controls-v1.json",
+      "sha256": "8793b17423fabbe0a70a2cde91893e3d90448fcb44b11c2124ac8300cfc241ef"
+    },
+    {
+      "bytes": 2480,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/analyze-v2-controls-v2.json",
+      "sha256": "68f7775e5485f6c8935d8c82c18ae4e6deeea1b12454bcdaada3970f34f855eb"
+    },
+    {
+      "bytes": 3222,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/analyze-v3-controls-v1.json",
+      "sha256": "a8e39e4952de59d59b4c41503156ae23bed3c42f556e233aebad2cad1eab6e23"
+    },
+    {
+      "bytes": 4313,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/analyzer-custody-v2-review-v1.json",
+      "sha256": "8221594eff1d2f6d00518a0f92558d39009503539191854d060ea61d246b0775"
+    },
+    {
+      "bytes": 3604,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/analyzer-custody-v3-review-v1.json",
+      "sha256": "e9dbbb9f422b75515131f20bc978b9e791776495d8412b6a47ca70a6b9f7bd45"
+    },
+    {
+      "bytes": 6340,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/analyzer-design-v1.json",
+      "sha256": "f647618eaa8e0f088ebee4085a08b946c01e9df04031a219a5e40244e6287bab"
+    },
+    {
+      "bytes": 1786,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/build-buildid-v1.json",
+      "sha256": "2df03e033072ae2a40fe5ba901696171fec19a85111f10d8c548979060fb8f13"
+    },
+    {
+      "bytes": 7800,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/build-frame-pointer-native-v1.json",
+      "sha256": "95d79f02cd9fabbf70c5bd16cfd2d59fd83dd1a177ef97a725f044a2a39e4973"
+    },
+    {
+      "bytes": 1167,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/build-rustc-identity-v1.json",
+      "sha256": "62f3d3e711036c2245e44c272c81170b8157883a830aff09ab60e1108ca9023d"
+    },
+    {
+      "bytes": 1981,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/build-source-postcheck-v1.json",
+      "sha256": "c88122605f093022aad96fce310f1dd2dc553cc70b6b17da92931e3bcccd510f"
+    },
+    {
+      "bytes": 2295,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/capture-v5-archive-correction-v1.json",
+      "sha256": "160ed47d295ebe3ec884582ee93354d0a06ea47409e0cfb6a44b39163115f9a9"
+    },
+    {
+      "bytes": 1011,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/capture-v5-controls-v1.json",
+      "sha256": "e671cd969654530d05a6e96a05355e5a6fda086b2c4deb21879ee3103aa28261"
+    },
+    {
+      "bytes": 1011,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/capture-v5-controls-v2.json",
+      "sha256": "c69609b4f8b6ccfe920a7b512ecf2a1ee369afe289823db379d6c90707be991f"
+    },
+    {
+      "bytes": 1117,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/capture-v5-controls-v3.json",
+      "sha256": "9ca4ae3f658a974b076504f8a0d9122fe5816b9324091847d5523fdba6bb99e2"
+    },
+    {
+      "bytes": 1117,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/capture-v5-controls-v4.json",
+      "sha256": "8ce4715b1a83b14513c4c59f421fa5cf4f8e415c9d5d10378875c583e21d5342"
+    },
+    {
+      "bytes": 3079,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/capture-v5-freeze-v1.json",
+      "sha256": "942506f255bbdd37f2935bff70ba7b308b4d496e6b630d0b1f1776fef0ba0bcf"
+    },
+    {
+      "bytes": 2940,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/capture-v5-freeze-v2.json",
+      "sha256": "716055f4dde6815d66bdf4cc763ee8a8932771789810f9353e2c8f94f7d4754a"
+    },
+    {
+      "bytes": 2589,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/root-go-v1.json",
+      "sha256": "c10254a6c0879dffa75aea240732e898229ce64301c773b953c71b5ca71ca25f"
+    },
+    {
+      "bytes": 3346,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/root-go-v2.json",
+      "sha256": "bc441e6221112c0a836c77b216c960424867a26690c469b47a51787d728c1182"
+    },
+    {
+      "bytes": 755,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/root-prelaunch-refusal-v1.json",
+      "sha256": "4b4ef2b00be0724cc7109073d9d321f0c328ffc785c5117987b2ee211cfc2fce"
+    },
+    {
+      "bytes": 4129,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/root-prologue-check-v1.json",
+      "sha256": "b27ed14bbc0c244e4bfb7492ea22d9c25fba0674f3fcb34ea5ee64e1735828a0"
+    },
+    {
+      "bytes": 6833,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/root-start-v1.json",
+      "sha256": "c3fed046aba24c6975c801a27398126c2cdb72ec4c7f9c23f28c4c3dfb27b759"
+    },
+    {
+      "bytes": 2502,
+      "executable": false,
+      "mode": 436,
+      "path": "receipts/source-head-continuity-v1.json",
+      "sha256": "0d77558ef3443752a08930f65c3c3c71ef09e081fffe57eaa8e774be205119da"
+    },
+    {
+      "bytes": 6728,
+      "executable": false,
+      "mode": 436,
+      "path": "report-draft.md",
+      "sha256": "1065223817d4a1a37bc5e9e174bd894ccea4ddebef2639579017a4b1fce08035"
+    },
+    {
+      "bytes": 12680,
+      "executable": false,
+      "mode": 436,
+      "path": "review/capture-analyzer-interface-review-v1.json",
+      "sha256": "8af8e396a0715e2bdebc29b42b93520d59de73c8984091c973ad49327ef2739e"
+    },
+    {
+      "bytes": 25678,
+      "executable": false,
+      "mode": 436,
+      "path": "review/final-profile-review-v1.json",
+      "sha256": "8ed20a8428b1dbeea2cc827fa2b15f2c42c0628a504e80fe3a1e2d454efb80ce"
+    },
+    {
+      "bytes": 2185,
+      "executable": false,
+      "mode": 436,
+      "path": "review/final-profile-review-v1.md",
+      "sha256": "c276e9e352792508f6c801af1de8563c196566e76a653a6e99f67ea791180e8a"
+    },
+    {
+      "bytes": 32068,
+      "executable": false,
+      "mode": 436,
+      "path": "review/final-profile-review-v2.json",
+      "sha256": "9675557e5cb09ce44e4b7aaa6754125e65038b6383566ded04f47327d5bf0367"
+    },
+    {
+      "bytes": 2816,
+      "executable": false,
+      "mode": 436,
+      "path": "review/final-profile-review-v2.md",
+      "sha256": "857c31ce7f789e4fd0ea4eee8e1ef3ac46b7a3ec4567d90781530f1d5a3d001d"
+    },
+    {
+      "bytes": 5080,
+      "executable": false,
+      "mode": 436,
+      "path": "review/force-frame-pointer-review-v1.json",
+      "sha256": "0f8987386b6edb3fab5c02ed95d7e2315bdb51989422ee2f39bce3d14b195899"
+    },
+    {
+      "bytes": 8574,
+      "executable": false,
+      "mode": 436,
+      "path": "review/force-frame-pointer-review-v1.md",
+      "sha256": "2faa73ec1524144a95c9a4e2f4b8650f8e80cbcad39553983b794055f0425683"
+    },
+    {
+      "bytes": 9589,
+      "executable": false,
+      "mode": 436,
+      "path": "task-census/source-census.json",
+      "sha256": "c96d66a72db59ec847247b1e8e2472b821a54c7a4221bdd61c90abcfe1be281a"
+    },
+    {
+      "bytes": 3028,
+      "executable": false,
+      "mode": 436,
+      "path": "task-census/source-census.md",
+      "sha256": "5c770ff64d564f85bacab43313af0278c9b6500e4160e559eb283f9ed1bbfed6"
+    },
+    {
+      "bytes": 33060,
+      "executable": false,
+      "mode": 436,
+      "path": "tools/analyze_0953_v1.py",
+      "sha256": "bb06c905724ee2d63342076fe237986810b0b22551178b19aff7410bb804a0a2"
+    },
+    {
+      "bytes": 39319,
+      "executable": false,
+      "mode": 436,
+      "path": "tools/analyze_0953_v2.py",
+      "sha256": "0a82c62e1aee551bed20e4a272527b0c5855ba4adb0ef6c2779e2ba51572f222"
+    },
+    {
+      "bytes": 22041,
+      "executable": false,
+      "mode": 436,
+      "path": "tools/analyze_0953_v2_controls.py",
+      "sha256": "eeae77244f530714d42efbb6126667abc121de2be5f17940053e90a4aff20e2f"
+    },
+    {
+      "bytes": 22335,
+      "executable": false,
+      "mode": 436,
+      "path": "tools/analyze_0953_v2_controls_v2.py",
+      "sha256": "8cf516e5c6afa17e32ba632c2a383b67bc4f810453fdc2515e7b46f2c14c0d12"
+    },
+    {
+      "bytes": 40056,
+      "executable": false,
+      "mode": 436,
+      "path": "tools/analyze_0953_v3.py",
+      "sha256": "063eef6c4d29f01eb512100ed0d755e13ea1724eef4ccf6dbcae4fe96c165ac5"
+    },
+    {
+      "bytes": 23433,
+      "executable": false,
+      "mode": 436,
+      "path": "tools/analyze_0953_v3_controls.py",
+      "sha256": "dc8d641b134c62a021a9a8c5ee5652703f3d31f232dd37b3fbe154e43c6d5d85"
+    },
+    {
+      "bytes": 30463,
+      "executable": true,
+      "mode": 493,
+      "path": "tools/capture_0953_v1.py",
+      "sha256": "ddd7a6a076ef5e638908e5508aa64d64e82b4562a432b88962e01f3d29b619a2"
+    },
+    {
+      "bytes": 31104,
+      "executable": true,
+      "mode": 493,
+      "path": "tools/capture_0953_v2.py",
+      "sha256": "67cd3994e42c1fbb8666bdb4917794d2e12cec320ac5e0a4ba86bf9a7ccb4f16"
+    },
+    {
+      "bytes": 30778,
+      "executable": true,
+      "mode": 493,
+      "path": "tools/capture_0953_v3.py",
+      "sha256": "d8387110d1b0f8a66af6310f3de5b5b8bea3e02c627512b1178d3a1ffec4fdbe"
+    },
+    {
+      "bytes": 31975,
+      "executable": true,
+      "mode": 493,
+      "path": "tools/capture_0953_v4.py",
+      "sha256": "873221be0d1b060aae90d6be131354ec41ccb4828294a72a4571ba3139d395fa"
+    },
+    {
+      "bytes": 44719,
+      "executable": true,
+      "mode": 493,
+      "path": "tools/capture_0953_v5.py",
+      "sha256": "21dc19f3ad3b4b970b2dd72d97754cc4b02cba61a53e716674345f5dd6ab2def"
+    },
+    {
+      "bytes": 3828,
+      "executable": false,
+      "mode": 436,
+      "path": "tools/capture_0953_v5_controls.py",
+      "sha256": "ac1ea36d9c074944a048ec7263a27e76d6788d7ab3434b03571027dfb18a9871"
+    },
+    {
+      "bytes": 3828,
+      "executable": false,
+      "mode": 436,
+      "path": "tools/capture_0953_v5_controls_v2.py",
+      "sha256": "92062981e7848222da0efb8cfc46d3b5adfcdaa33dda34cd012b2e2aadaa7a06"
+    },
+    {
+      "bytes": 7884,
+      "executable": false,
+      "mode": 436,
+      "path": "tools/capture_0953_v5_controls_v3.py",
+      "sha256": "51d3bc7d8bb699ed7d41eae978a0644ece5d3dc6f0ca9cbb64e4fdc1f01095a4"
+    },
+    {
+      "bytes": 7884,
+      "executable": false,
+      "mode": 436,
+      "path": "tools/capture_0953_v5_controls_v4.py",
+      "sha256": "7f9f9fd0cb3cb75bdf109dba3e8dbb8105d2f6413d59abaa500b0aa93c4b93b9"
+    },
+    {
+      "bytes": 44720,
+      "executable": true,
+      "mode": 493,
+      "path": "tools/capture_0953_v5_frozen_v1.py",
+      "sha256": "dbce1eae192a2a236c4b02107419192244402c8991ac39b83f636eb4e12fb933"
+    },
+    {
+      "bytes": 44719,
+      "executable": true,
+      "mode": 493,
+      "path": "tools/capture_0953_v6.py",
+      "sha256": "21dc19f3ad3b4b970b2dd72d97754cc4b02cba61a53e716674345f5dd6ab2def"
+    },
+    {
+      "bytes": 15508,
+      "executable": false,
+      "mode": 436,
+      "path": "tools/semantic_0953_v1.py",
+      "sha256": "aacf38abab63713aa5e8e9227632915e8713d63e6b0dddc3b71976f73056e28f"
+    },
+    {
+      "bytes": 16865,
+      "executable": false,
+      "mode": 436,
+      "path": "tools/summarize_0953_v1.py",
+      "sha256": "fd399c4c90d2a5c9ee3fcdcd965fdfea4acd319db86c5326c64035f3572428c9"
+    }
+  ],
+  "entry_count": 154,
+  "excluded": [
+    "target-frame-pointer-native-v1/",
+    "target/",
+    "tmp/",
+    "tools/__pycache__/"
+  ],
+  "generated_utc": "2026-10-07T09:43:53.869979+00:00",
+  "logical_bytes": 115376952,
+  "packet_root": "/home/zhuhe/litchi-performance-0953",
+  "schema": "litchi.performance.0953.external-archive-manifest.v1",
+  "status": "sealed",
+  "symlinks": []
+}

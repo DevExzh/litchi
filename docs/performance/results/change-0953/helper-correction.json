@@ -1,0 +1,43 @@
+{
+  "archived_original": {
+    "bytes": 44720,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0953/tools/capture_0953_v5_frozen_v1.py",
+    "sha256": "dbce1eae192a2a236c4b02107419192244402c8991ac39b83f636eb4e12fb933"
+  },
+  "cause": {
+    "capture_effect": "Root check-plan passed against the old descriptor, but capture stopped before workload because the actual runner path had the new descriptor; capture directory was not created.",
+    "mutation": "One post-freeze guard changed at run_child line 788: ANALYSIS_ROOT / \"samples\" / child.name -> ANALYSIS_ROOT / \"sample\" / child.name; this changed size 44720 to 44719 and SHA to 21dc19f3ad3b4b970b2dd72d97754cc4b02cba61a53e716674345f5dd6ab2def.",
+    "observed_current_path": {
+      "bytes": 44719,
+      "executable": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0953/tools/capture_0953_v5.py",
+      "sha256": "21dc19f3ad3b4b970b2dd72d97754cc4b02cba61a53e716674345f5dd6ab2def"
+    },
+    "original_frozen_bytes": 44720,
+    "original_frozen_path": "/home/zhuhe/litchi-performance-0953/tools/capture_0953_v5.py",
+    "original_frozen_sha256": "dbce1eae192a2a236c4b02107419192244402c8991ac39b83f636eb4e12fb933"
+  },
+  "created_utc": "2026-10-07T09:35:39.966540Z",
+  "no_result_claim": true,
+  "prior_controls_receipt": {
+    "bytes": 1117,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0953/receipts/capture-v5-controls-v3.json",
+    "sha256": "9ca4ae3f658a974b076504f8a0d9122fe5816b9324091847d5523fdba6bb99e2"
+  },
+  "prior_freeze_receipt": {
+    "bytes": 3079,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0953/receipts/capture-v5-freeze-v1.json",
+    "sha256": "942506f255bbdd37f2935bff70ba7b308b4d496e6b630d0b1f1776fef0ba0bcf"
+  },
+  "required_action": "Bind final plan runner descriptor to archived_original.path (or an independently copied byte-identical artifact) and use that exact path; retain observed current path as an unbound historical correction.",
+  "schema": "litchi.performance.0953.capture-v5-archive-correction.v1",
+  "scope": "Custody correction only; no workload, build, perf capture, decoder export, or plan mutation.",
+  "status": "runner_rebind_required_before_go"
+}

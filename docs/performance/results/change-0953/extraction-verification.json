@@ -1,0 +1,112 @@
+{
+  "archive": {
+    "bytes": 2584519,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0953-archive-sealed-v1/archive-0953-v1.tar.zst",
+    "sha256": "f0da81fc4c33f42416f2be49325cc2e85c72245b62e0c5f00d61d70c5a46902b"
+  },
+  "archive_receipt": {
+    "bytes": 2938,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0953-archive-sealed-v1/archive-receipt-v1.json",
+    "sha256": "3bafd8959c5eb52a47e70d61bdeaea4771a0ad0f65a1d6c930d4a6babd540b67"
+  },
+  "commands": [
+    "tar --extract --same-permissions --no-same-owner --file /home/zhuhe/litchi-performance-0953-archive-sealed-v1/archive-0953-v1.tar.zst --directory /home/zhuhe/litchi-performance-0953-replay-v1",
+    "python3 -B <independent extraction census>"
+  ],
+  "created_utc": "2026-10-07T09:46:25.196999+00:00",
+  "large_artifacts_ge_1MiB": [
+    {
+      "bytes": 19356547,
+      "path": "analysis/sample/00-medium/events.txt",
+      "sha256": "eb8e341fc308521ba50bc9b6afa4d471cc7802a927bc021828de8c83e6dce81e"
+    },
+    {
+      "bytes": 30079479,
+      "path": "analysis/sample/01-dense-sparse/events.txt",
+      "sha256": "d4c9cde917069dd0226e8343f871401441ebf771a7d933bd2c53a00d73bc723e"
+    },
+    {
+      "bytes": 30080765,
+      "path": "analysis/sample/02-dense-sparse/events.txt",
+      "sha256": "071c8ca288758e25ead8d26b5d7ca445a353fa5ecdaa500130aca4ae17cdfcbc"
+    },
+    {
+      "bytes": 19348227,
+      "path": "analysis/sample/03-medium/events.txt",
+      "sha256": "834af2dea32cfe1ad0d2f54ec88b3d7baba3743bb3189fce6628d0b8d9182bde"
+    },
+    {
+      "bytes": 1597736,
+      "path": "capture/00-medium/perf.data",
+      "sha256": "eecd7a6bbfb78d06f6c857bfab2046bad7fb99ed9388126cc112d6fea24088c4"
+    },
+    {
+      "bytes": 2442680,
+      "path": "capture/01-dense-sparse/perf.data",
+      "sha256": "08600bb7ef09f3bd383e3f0f06e59a32ba5a384bc81adbf4c86078cb40ce9c74"
+    },
+    {
+      "bytes": 2443464,
+      "path": "capture/02-dense-sparse/perf.data",
+      "sha256": "d7f383968e3bad0eec09cbe43847d083c8b93dd6ac73d1e0e228184945b2635e"
+    },
+    {
+      "bytes": 1597080,
+      "path": "capture/03-medium/perf.data",
+      "sha256": "1e19faaa4e7a2ba86124a5dbcb310fef51891817c398ebcd456c74d98646211b"
+    },
+    {
+      "bytes": 2233948,
+      "path": "preflight-v1/mmap-debug.events.txt",
+      "sha256": "ea31f400aa251b3926cc5dd9e33d5a7d47b31f7c6858901f4f22e36d6ecda380"
+    },
+    {
+      "bytes": 2203611,
+      "path": "preflight-v1/sample-no-debug.events.txt",
+      "sha256": "2eb3bc3df2fd4322f3b55c07238810eeea95428803eeb96aa990db6fb2fe95c8"
+    }
+  ],
+  "limitations": [
+    "Core archive manifest excludes the external binary by design; binary role copy is checked through archive-receipt-v1.json.",
+    "No byte-identical compressed archive regeneration is claimed; extracted manifest/census is the closure check."
+  ],
+  "manifest": {
+    "bytes": 35596,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0953-archive-sealed-v1/manifest-v1.json",
+    "sha256": "25693ee3d710c2794ec14202f42f50cc3cea2323f881cbb4b9da26cb37705c52"
+  },
+  "metadata_checks": {
+    "archive_descriptor": true,
+    "binary_role": true,
+    "manifest_descriptor": true,
+    "packet_census": true,
+    "selection_content": true,
+    "selection_descriptor": true
+  },
+  "packet_census": {
+    "actual_directories": 24,
+    "actual_entries": 154,
+    "actual_logical_bytes": 115376952,
+    "directory_mismatches": [],
+    "expected_directories": 24,
+    "expected_entries": 154,
+    "expected_logical_bytes": 115376952,
+    "extra_directories": [],
+    "extra_files": [],
+    "file_mismatches": [],
+    "missing_directories": [],
+    "missing_files": [],
+    "symlinks": []
+  },
+  "schema": "litchi.performance.0953.extract-verification.v1",
+  "selection": {
+    "bytes": 5985,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0953-archive-sealed-v1/selection-v1.list",
+    "sha256": "cadc01eec9a8e81031b655f847d9a9663f884defcfceb2d75cc99abbbaa95b4b"
+  },
+  "status": "pass"
+}

@@ -1,0 +1,106 @@
+{
+  "controls": {
+    "changed_child_artifact": {
+      "error": "child artifact record.stdout descriptor bytes differs",
+      "error_type": "AdmissionError",
+      "status": "rejected"
+    },
+    "changed_raw_gate_fully_resolved_owner_samples_min": {
+      "error": "first-child raw gate fully_resolved_owner_samples_min differs",
+      "error_type": "AdmissionError",
+      "status": "rejected"
+    },
+    "changed_raw_gate_lost_records": {
+      "error": "first-child raw gate lost_records differs",
+      "error_type": "AdmissionError",
+      "status": "rejected"
+    },
+    "changed_raw_gate_owner_period_min": {
+      "error": "first-child raw gate owner_period_min differs",
+      "error_type": "AdmissionError",
+      "status": "rejected"
+    },
+    "changed_raw_gate_owner_samples_min": {
+      "error": "first-child raw gate owner_samples_min differs",
+      "error_type": "AdmissionError",
+      "status": "rejected"
+    },
+    "positive_child_and_exports": "pass",
+    "positive_mmap_argv": [
+      "/usr/bin/perf",
+      "script",
+      "--input",
+      "/tmp/0953-v2-custody-controls-z0zvwkqq/packet/capture/00-medium/perf.data",
+      "--show-mmap-events",
+      "--debug-mode",
+      "--show-task-events",
+      "--show-lost-events",
+      "--ns",
+      "--hide-call-graph",
+      "--no-inline",
+      "--demangle",
+      "--fields",
+      "comm,pid,tid,time,event,period,ip,sym,symoff,dso"
+    ],
+    "positive_sample_argv": [
+      "/usr/bin/perf",
+      "script",
+      "--input",
+      "/tmp/0953-v2-custody-controls-z0zvwkqq/packet/capture/00-medium/perf.data",
+      "--show-lost-events",
+      "--ns",
+      "--no-inline",
+      "--demangle",
+      "--fields",
+      "comm,pid,tid,time,event,period,ip,sym,symoff,dso"
+    ],
+    "real_mapping_controls": {
+      "positive_owner_parent": {
+        "period": 7,
+        "samples": 1
+      },
+      "wrong_event": {
+        "error": "unexpected perf event instructions:u at line 1",
+        "error_type": "AdmissionError",
+        "status": "rejected"
+      },
+      "wrong_parent": {
+        "owner_qualified": {
+          "period": 0,
+          "samples": 0
+        }
+      },
+      "wrong_pid": {
+        "owner_qualified": {
+          "period": 0,
+          "samples": 0
+        }
+      }
+    },
+    "wrong_export_fields": {
+      "error": "sample start argv differs from frozen decoder template",
+      "error_type": "AdmissionError",
+      "status": "rejected"
+    },
+    "wrong_export_input": {
+      "error": "sample start argv differs from frozen decoder template",
+      "error_type": "AdmissionError",
+      "status": "rejected"
+    },
+    "wrong_record_callgraph": {
+      "error": "child start record argv differs",
+      "error_type": "AdmissionError",
+      "status": "rejected"
+    }
+  },
+  "reader": {
+    "bytes": 40056,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0953/tools/analyze_0953_v3.py",
+    "sha256": "063eef6c4d29f01eb512100ed0d755e13ea1724eef4ccf6dbcae4fe96c165ac5"
+  },
+  "schema": "litchi.performance.0953.native-admission.v3-controls.v1",
+  "scope": "Synthetic custody/argv controls plus retained 0952 parser mapping controls; no workload/build/export.",
+  "status": "pass"
+}

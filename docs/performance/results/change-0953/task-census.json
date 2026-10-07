@@ -1,0 +1,183 @@
+{
+  "schema": "litchi.performance.0953.source-census.v1",
+  "created_utc": "2026-10-07T09:08:09Z",
+  "scope": "Read-only census of the frozen 0950 XLSX source-backed one-percent edit fixtures for a possible managed Deflate compression wave.",
+  "workload_executed": false,
+  "build_executed": false,
+  "source_root": "/home/zhuhe/litchi-performance-0950/candidate-source-v1",
+  "artifact_retention": "No generated ZIP/XLSX member artifact was found under /home/zhuhe/litchi-performance-0950; only reports, source, and frozen build outputs were inspected.",
+  "reports": [
+    {
+      "shape": "medium",
+      "path": "/home/zhuhe/litchi-performance-0950/qualification/q00-candidate-native-primary-percent-medium/report.json",
+      "sha256": "6db50999d8eb3c4d31f1d104417b16552e0824fb3fedd2c227b375ef01ed85a0",
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+      "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+      "archive_member_count": 17,
+      "archive_bytes": 4226429,
+      "whole_archive_uncompressed_payload_bytes": 4231168,
+      "entry_count": 9216,
+      "update_count": 93,
+      "selected_worksheet_count": 4,
+      "untouched_member_count": 12,
+      "source_compressed_range_bytes": {
+        "workbook": 226,
+        "selected_worksheets": 27146,
+        "changed_source_aggregate": 27372,
+        "meaning": "Observed source compressed ZIP data-range read overlap only; not an original-member-size or replacement Deflate-task measurement."
+      },
+      "published_sink_accepted_bytes": 4226788
+    },
+    {
+      "shape": "dense-sparse",
+      "path": "/home/zhuhe/litchi-performance-0950/qualification/q00-candidate-native-primary-percent-dense-sparse/report.json",
+      "sha256": "779afd45f75c05a4fb4a647aa651cdc0ba148a1f9f174c887955cdb21252fa0b",
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+      "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+      "archive_member_count": 17,
+      "archive_bytes": 4251863,
+      "whole_archive_uncompressed_payload_bytes": 4265472,
+      "entry_count": 17792,
+      "update_count": 178,
+      "selected_worksheet_count": 4,
+      "untouched_member_count": 12,
+      "source_compressed_range_bytes": {
+        "workbook": 226,
+        "selected_worksheets": 52580,
+        "changed_source_aggregate": 52806,
+        "meaning": "Observed source compressed ZIP data-range read overlap only; not an original-member-size or replacement Deflate-task measurement."
+      },
+      "published_sink_accepted_bytes": 4252436
+    }
+  ],
+  "changed_member_census": {
+    "exact_regenerated_member_count": 5,
+    "exact_regenerated_members": [
+      "xl/workbook.xml",
+      "xl/worksheets/sheet1.xml",
+      "xl/worksheets/sheet2.xml",
+      "xl/worksheets/sheet3.xml",
+      "xl/worksheets/sheet4.xml"
+    ],
+    "exact_deflate_task_count_for_this_fixture": 5,
+    "expected_non_deflate_regenerated_count": 0,
+    "unchanged_copy_member_count": 12,
+    "ordinary_payload_materializations": 6,
+    "materializations_are_deflate_task_count": false,
+    "method_basis": "The deterministic corpus is serialized through the OPC Deflate writer; source-backed regeneration retains each source entry's method. The five changed source entries therefore enter the Deflate task set. This is source proof, not a retained central-directory measurement.",
+    "proof_basis": [
+      "A changed-cell commit invalidates workbook XML and appends the workbook replacement.",
+      "Each of the four selected worksheets has edits in both fixture shapes and appends one worksheet replacement.",
+      "The preservation plan copies every other source entry, matching the report's untouched-member count of 12.",
+      "No calculation-chain add/remove is present in these fixtures, so it adds no task."
+    ]
+  },
+  "task_sizes": {
+    "medium": {
+      "replacement_deflate_total_bytes": null,
+      "largest_task_bytes": null,
+      "remainder_bytes": null,
+      "per_member_replacement_bytes": null,
+      "status": "unavailable",
+      "reason": "Reports retain only aggregate source compressed-range overlap and whole-archive payload totals. They explicitly mark compressed, decompressed, and recompressed publication counters not_applicable; no generated ZIP is retained."
+    },
+    "dense-sparse": {
+      "replacement_deflate_total_bytes": null,
+      "largest_task_bytes": null,
+      "remainder_bytes": null,
+      "per_member_replacement_bytes": null,
+      "status": "unavailable",
+      "reason": "Reports retain only aggregate source compressed-range overlap and whole-archive payload totals. They explicitly mark compressed, decompressed, and recompressed publication counters not_applicable; no generated ZIP is retained."
+    }
+  },
+  "parallel_write_policy": {
+    "library_defaults": {
+      "warm_min_parallelizable_remainder_bytes": 8192,
+      "cold_pool_min_parallelizable_remainder_bytes": 65536,
+      "default_min_task_bytes": 0,
+      "worker_state_bytes": 655360
+    },
+    "frozen_0950_xlsx_managed_profile": {
+      "workers": 1,
+      "max_in_flight_tasks": 1,
+      "execution_min_parallel_bytes": 0,
+      "execution_min_task_bytes": 0,
+      "managed_wave_width_ceiling": 1,
+      "unmanaged_route_width": 1,
+      "interpretation": "The existing 0950 managed profile cannot exercise a parallel wave because its worker and in-flight-task caps are one, even if a future census shows the remainder clears the ZIP threshold."
+    },
+    "counterfactual_task_count_ceiling": 5,
+    "counterfactual_wave_width_ceiling": 5,
+    "width_formula": "min(task_count, workers, max_in_flight_tasks, 1 + remainder/min_task_bytes when min_task_bytes > 0)",
+    "eligibility": "At least two Deflate tasks and remainder >= warm threshold for an existing worker facility, or >= cold pool threshold when a local pool must be built."
+  },
+  "source_review": {
+    "path": "/home/zhuhe/litchi-performance-0952/source-review.md",
+    "sha256": "b5deec54d1404adae196d34ead0949fb7f021474ada1a3c77fc7fadd30249e8f"
+  },
+  "source_refs": [
+    {
+      "path": "tools/perf-baseline/src/lib.rs",
+      "sha256": "0d8d00f265157083af4d1e31f035dadd0a624969f43ef8f1b5ca97f350f2535d",
+      "lines": "22855-22964",
+      "claim": "Fixture construction, eight 512 KiB media members, corpus compression label, whole-payload totals, and source member manifest."
+    },
+    {
+      "path": "tools/perf-baseline/src/lib.rs",
+      "sha256": "0d8d00f265157083af4d1e31f035dadd0a624969f43ef8f1b5ca97f350f2535d",
+      "lines": "46182-46192;46554-46612",
+      "claim": "Tracked source ranges are compressed ZIP data ranges and the workbook/worksheet member classification."
+    },
+    {
+      "path": "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+      "sha256": "50a4ef8fd9f2e810d2b1315d8a389086134a28901a2b86a98cc8abeb84308726",
+      "lines": "1734-1827",
+      "claim": "Workbook plus changed worksheet topology replacements."
+    },
+    {
+      "path": "crates/litchi-opc/src/source_backed.rs",
+      "sha256": "571ec3e2e08d11626b5ce489c5d7de498445c1dd72441692306772c1893c3498",
+      "lines": "5431-5446;12086-12115;5650-5692",
+      "claim": "ZIP parallel limits use the caller's worker/task/floor bounds, changed entries retain source compression methods, and managed admission narrows/charges waves."
+    },
+    {
+      "path": "crates/soapberry-zip/src/preserve.rs",
+      "sha256": "21e679a6c0cdc027859d13c87a24564fba3ba59f7ecfc651b971930b1fa063ae",
+      "lines": "312-332;413-463",
+      "claim": "Deflate task membership, total/largest/remainder computation, and wave-width formula."
+    },
+    {
+      "path": "crates/soapberry-zip/src/office/parallel_write.rs",
+      "sha256": "c8228b7ce57a11338a5a3e84480ac23f0d1d7e47760f1245b2050161390954f0",
+      "lines": "33-66;245-260",
+      "claim": "Measured warm/cold thresholds, zero default task floor, worker state bound, and cold-versus-warm threshold selection."
+    },
+    {
+      "path": "tools/perf-baseline/src/lib.rs",
+      "sha256": "0d8d00f265157083af4d1e31f035dadd0a624969f43ef8f1b5ca97f350f2535d",
+      "lines": "46324-46343",
+      "claim": "The frozen XLSX managed profile sets workers=max in-flight tasks=1 and core parallel threshold=0."
+    },
+    {
+      "path": "crates/litchi-opc/src/phys_pkg.rs",
+      "sha256": "1ee24e5296de8a6bc67946681a080da54580ccab03a3099363e4526df4f36248",
+      "lines": "1697-1711",
+      "claim": "Full OPC part publication uses write_deflated."
+    },
+    {
+      "path": "crates/litchi-opc/src/pkgwriter.rs",
+      "sha256": "067eb6ef070ce00e1d5dc1033ad65c227a7931cbb45d71469e55e1f2f3df601f",
+      "lines": "1114-1126;1296-1322",
+      "claim": "Generated non-precompressed parts use Deflate and package serialization routes through the physical writer."
+    },
+    {
+      "path": "crates/litchi-core/src/execution.rs",
+      "sha256": "c8578d53faba5ead985e5fc364ceecc313858a1fcefa3d72f109206bd593ad0e",
+      "lines": "47-95",
+      "claim": "ExecutionLimits defaults min_task_bytes to zero; the profile's fourth argument is the aggregate parallel threshold."
+    }
+  ],
+  "next_evidence": "A future profile must record each PreservationPlan RegeneratedEntry's member name, compression method, replacement payload length, and Copy/Regenerate action before compression, then emit only bounded aggregate task census fields externally."
+}

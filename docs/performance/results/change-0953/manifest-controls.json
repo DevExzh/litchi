@@ -1,0 +1,69 @@
+{
+  "cases": [
+    {
+      "case": "missing_file",
+      "reason": "ValueError: file set mismatch missing=['analysis/mmap/00-medium/events.txt'] extra=[]",
+      "rejected": true
+    },
+    {
+      "case": "extra_file",
+      "reason": "ValueError: file set mismatch missing=[] extra=['unexpected-extra.bin']",
+      "rejected": true
+    },
+    {
+      "case": "symlink_file",
+      "reason": "ValueError: symlink paths: ['analysis/mmap/00-medium/events.txt']",
+      "rejected": true
+    },
+    {
+      "case": "symlink_dir",
+      "reason": "ValueError: symlink paths: ['unexpected-directory']",
+      "rejected": true
+    },
+    {
+      "case": "wrong_hash",
+      "reason": "ValueError: file descriptor mismatch: analysis/mmap/00-medium/events.txt",
+      "rejected": true
+    },
+    {
+      "case": "wrong_mode",
+      "reason": "ValueError: file descriptor mismatch: analysis/mmap/00-medium/events.txt",
+      "rejected": true
+    },
+    {
+      "case": "duplicate_entry",
+      "reason": "ValueError: duplicate path: analysis/mmap/00-medium/events.txt",
+      "rejected": true
+    },
+    {
+      "case": "path_traversal",
+      "reason": "ValueError: unsafe relative path: '../escape'",
+      "rejected": true
+    },
+    {
+      "case": "duplicate_json_key",
+      "reason": "ValueError: duplicate JSON key: schema",
+      "rejected": true
+    }
+  ],
+  "command": "python3 -B /home/zhuhe/litchi-performance-0953-archive/replay_0953_manifest_controls_v2.py --manifest <sealed-manifest> --tree <extracted-tree> --work <owned-temp> --output <receipt>",
+  "created_utc": "2026-10-07T09:47:41.133741+00:00",
+  "helper": {
+    "bytes": 10128,
+    "path": "/home/zhuhe/litchi-performance-0953-archive/replay_0953_manifest_controls_v2.py",
+    "sha256": "0cccececf9a67bf4be7d09d48ef1b506138bb9e5076d8f311ac96f73344a1b9e"
+  },
+  "manifest": {
+    "bytes": 35596,
+    "path": "/home/zhuhe/litchi-performance-0953-archive-sealed-v1/manifest-v1.json",
+    "sha256": "25693ee3d710c2794ec14202f42f50cc3cea2323f881cbb4b9da26cb37705c52"
+  },
+  "schema": "litchi.performance.0953.archive-manifest-controls.v2",
+  "status": "pass",
+  "tree": {
+    "directories": 24,
+    "entries": 154,
+    "path": "/home/zhuhe/litchi-performance-0953-replay-v1",
+    "positive_status": "pass"
+  }
+}

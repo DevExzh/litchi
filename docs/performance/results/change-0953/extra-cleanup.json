@@ -1,0 +1,24 @@
+{
+  "schema": "litchi.performance.0953.root-extra-cleanup.v1",
+  "status": "pass",
+  "root_removed": [
+    {
+      "path": "/tmp/protocol0953.json",
+      "bytes": 19998,
+      "sha256": "d79136e0ee77e6add2d8d614112af22ab6c62c974ab3db73e6ce2a663e9caf6a"
+    },
+    {
+      "path": "/tmp/0953-files.txt",
+      "bytes": 234625,
+      "sha256": "baeedb1a6f18e15512f6cb43d87bfaab1c3490e9940cca22cc63db40e160ee56"
+    }
+  ],
+  "comparison_agent_report": {
+    "directories": 11,
+    "standalone_files": 5,
+    "regular_files_total": 30,
+    "bytes_total": 223312,
+    "scope": "Only named 0953 control fixtures and helper-output scratch under /tmp; sealed packet untouched"
+  },
+  "archive_agent_temps": "Active archive replay helpers excluded from this cleanup; final archive receipt owns their disposition"
+}

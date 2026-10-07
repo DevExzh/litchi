@@ -1,0 +1,813 @@
+{
+  "aggregate": {
+    "all_period": 180928729644,
+    "all_samples": 45077,
+    "coverage_interpretation": "owner_sample_share and owner_period_share are diagnostic coverage of the sampled denominator, not publication-time shares.",
+    "leaf_rows_top20": [
+      {
+        "all_period_share": 0.056039405842013196,
+        "owner_qualified_share": 0.33020455978259006,
+        "period": 10139138509,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "zlib_rs::deflate::longest_match::longest_match+0x1b8"
+      },
+      {
+        "all_period_share": 0.040105778133067406,
+        "owner_qualified_share": 0.23631783053701264,
+        "period": 7256287489,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "zlib_rs::deflate::longest_match::longest_match+0x1da"
+      },
+      {
+        "all_period_share": 0.014960270744872063,
+        "owner_qualified_share": 0.08815135602018322,
+        "period": 2706742781,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "litchi_opc::source_backed::audit_source_part_replacement_xml+0x744"
+      },
+      {
+        "all_period_share": 0.0028442997085790117,
+        "owner_qualified_share": 0.01675964830549569,
+        "period": 514615533,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium+0x558"
+      },
+      {
+        "all_period_share": 0.0019663781296648166,
+        "owner_qualified_share": 0.011586615077658315,
+        "period": 355774297,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "litchi_opc::source_backed::audit_source_part_replacement_xml+0x87d"
+      },
+      {
+        "all_period_share": 0.0018239880457312653,
+        "owner_qualified_share": 0.010747600918314129,
+        "period": 330011840,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "__memmove_avx512_unaligned_erms+0x22f"
+      },
+      {
+        "all_period_share": 0.001384474685103206,
+        "owner_qualified_share": 0.00815782835409557,
+        "period": 250491246,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium+0x550"
+      },
+      {
+        "all_period_share": 0.0011671651617491086,
+        "owner_qualified_share": 0.006877361610782818,
+        "period": 211173710,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium+0x543"
+      },
+      {
+        "all_period_share": 0.0009950413367420129,
+        "owner_qualified_share": 0.005863145435386591,
+        "period": 180031565,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "zlib_rs::deflate::longest_match::longest_match+0x1c8"
+      },
+      {
+        "all_period_share": 0.0009474059666326986,
+        "owner_qualified_share": 0.005582460510543322,
+        "period": 171412958,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "zlib_rs::deflate::longest_match::longest_match+0x1dd"
+      },
+      {
+        "all_period_share": 0.000873855198735394,
+        "owner_qualified_share": 0.005149072636951827,
+        "period": 158105511,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "zlib_rs::deflate::longest_match::longest_match+0x1d5"
+      },
+      {
+        "all_period_share": 0.0007782423514333753,
+        "owner_qualified_share": 0.004585686967911535,
+        "period": 140806400,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "zlib_rs::deflate::longest_match::longest_match+0x1a7"
+      },
+      {
+        "all_period_share": 0.0007773749822747636,
+        "owner_qualified_share": 0.004580576113381852,
+        "period": 140649468,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "zlib_rs::deflate::longest_match::longest_match+0x31d"
+      },
+      {
+        "all_period_share": 0.0007529880869006474,
+        "owner_qualified_share": 0.004436879656746029,
+        "period": 136237178,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "zlib_rs::deflate::longest_match::longest_match+0x324"
+      },
+      {
+        "all_period_share": 0.0007286723355622258,
+        "owner_qualified_share": 0.004293602406642373,
+        "period": 131837760,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium+0x572"
+      },
+      {
+        "all_period_share": 0.0006317197342008217,
+        "owner_qualified_share": 0.003722322419438831,
+        "period": 114296249,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2+0x25"
+      },
+      {
+        "all_period_share": 0.000631616174086091,
+        "owner_qualified_share": 0.0037217122055798178,
+        "period": 114277512,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "zlib_rs::deflate::longest_match::longest_match+0x1b4"
+      },
+      {
+        "all_period_share": 0.0006078738363796788,
+        "owner_qualified_share": 0.0035818137171365685,
+        "period": 109981841,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium+0x9b9"
+      },
+      {
+        "all_period_share": 0.000583266716168532,
+        "owner_qualified_share": 0.0034368196156690017,
+        "period": 105529706,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium+0x564"
+      },
+      {
+        "all_period_share": 0.0005348076736646055,
+        "owner_qualified_share": 0.003151281313521293,
+        "period": 96762073,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "__memmove_avx512_unaligned_erms+0x206"
+      }
+    ],
+    "lost_records": 0,
+    "nested_rows_top20": [
+      {
+        "all_period_share": 0.13417748643218347,
+        "owner_qualified_share": 0.790622548086636,
+        "period": 24276562167,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream+0x577"
+      },
+      {
+        "all_period_share": 0.1338860358919417,
+        "owner_qualified_share": 0.7889052155080173,
+        "period": 24223830391,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "litchi_opc::source_backed::SourceBackedPackage::write_changed_overlays_with_appended_inner+0x1628"
+      },
+      {
+        "all_period_share": 0.1296775865124639,
+        "owner_qualified_share": 0.7641075012239741,
+        "period": 23462400991,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "soapberry_zip::preserve::PreservationIndex<R>::write_prepared+0x61"
+      },
+      {
+        "all_period_share": 0.12965331787912612,
+        "owner_qualified_share": 0.7639645016102662,
+        "period": 23458010098,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "soapberry_zip::preserve::PreservationIndex<R>::prepare_with+0xca8"
+      },
+      {
+        "all_period_share": 0.12829270108551694,
+        "owner_qualified_share": 0.7559472526295554,
+        "period": 23211835430,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "zlib_rs::deflate::deflate+0x623"
+      },
+      {
+        "all_period_share": 0.12695853076621516,
+        "owner_qualified_share": 0.7480858358935886,
+        "period": 22970445689,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "soapberry_zip::preserve::generated_entry+0x8ea"
+      },
+      {
+        "all_period_share": 0.10987337394185501,
+        "owner_qualified_share": 0.6474138783087919,
+        "period": 19879249969,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium+0x821"
+      },
+      {
+        "all_period_share": 0.056039405842013196,
+        "owner_qualified_share": 0.33020455978259006,
+        "period": 10139138509,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "zlib_rs::deflate::longest_match::longest_match+0x1b8"
+      },
+      {
+        "all_period_share": 0.040105778133067406,
+        "owner_qualified_share": 0.23631783053701264,
+        "period": 7256287489,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "zlib_rs::deflate::longest_match::longest_match+0x1da"
+      },
+      {
+        "all_period_share": 0.035460875647687747,
+        "owner_qualified_share": 0.20894837582255935,
+        "period": 6415891183,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream+0x4a"
+      },
+      {
+        "all_period_share": 0.03495090517930747,
+        "owner_qualified_share": 0.20594344435543474,
+        "period": 6323622874,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "litchi_opc::source_backed::SourceBackedPackage::prepare_topology_state+0x8ad6"
+      },
+      {
+        "all_period_share": 0.014960270744872063,
+        "owner_qualified_share": 0.08815135602018322,
+        "period": 2706742781,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "litchi_opc::source_backed::audit_source_part_replacement_xml+0x744"
+      },
+      {
+        "all_period_share": 0.011758449098636839,
+        "owner_qualified_share": 0.06928505843347973,
+        "period": 2127441258,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "litchi_opc::source_backed::audit_source_part_replacement_xml+0x6f5"
+      },
+      {
+        "all_period_share": 0.003892513634433486,
+        "owner_qualified_share": 0.02293610597388275,
+        "period": 704267547,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "soapberry_zip::preserve::PreservationIndex<R>::write_prepared+0x21d"
+      },
+      {
+        "all_period_share": 0.0031089929946825,
+        "owner_qualified_share": 0.0183193174115818,
+        "period": 562506153,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "quick_xml::reader::Reader<R>::read_event_impl+0xf8"
+      },
+      {
+        "all_period_share": 0.0028442997085790117,
+        "owner_qualified_share": 0.01675964830549569,
+        "period": 514615533,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "zlib_rs::deflate::algorithm::medium::deflate_medium+0x558"
+      },
+      {
+        "all_period_share": 0.002384582215598989,
+        "owner_qualified_share": 0.014050825645566308,
+        "period": 431439431,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "soapberry_zip::preserve::write_prepared_local+0xc1"
+      },
+      {
+        "all_period_share": 0.0023602467216801214,
+        "owner_qualified_share": 0.013907432064998629,
+        "period": 427036441,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "<litchi_opc::source_backed::SourceReader as soapberry_zip::reader_at::ReaderAt>::read_at+0x5af"
+      },
+      {
+        "all_period_share": 0.0022872500504163215,
+        "owner_qualified_share": 0.013477309130287093,
+        "period": 413829246,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "litchi_opc::source_backed::read_source_at_with_context+0x21d"
+      },
+      {
+        "all_period_share": 0.0019663781296648166,
+        "owner_qualified_share": 0.011586615077658315,
+        "period": 355774297,
+        "period_weight_unit": "sampled_period_weight",
+        "symbol": "litchi_opc::source_backed::audit_source_part_replacement_xml+0x87d"
+      }
+    ],
+    "owner_period": 30705628401,
+    "owner_period_share": 0.16971118109001915,
+    "owner_sample_share": 0.1549348891896089,
+    "owner_samples": 6984,
+    "period_conserved": true,
+    "period_weight_unit": "perf sample period values from cycles:u; sampled weights, not exact elapsed CPU cycles",
+    "unknown_period": 150223101243,
+    "unknown_samples": 38093
+  },
+  "bindings": {
+    "analyzer": {
+      "bytes": 40056,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0953/tools/analyze_0953_v3.py",
+      "sha256": "063eef6c4d29f01eb512100ed0d755e13ea1724eef4ccf6dbcae4fe96c165ac5"
+    },
+    "binary": {
+      "bytes": 264707944,
+      "executable": true,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1/release/litchi-perf-baseline",
+      "sha256": "0df5a52fc7b716cc0e7810b798987501f0053afcd85fcbe5a04cc00ec57a2274"
+    },
+    "binary_build_id": "81b9bad2e48766f5e60bd2e853c1f3d56fd4519e",
+    "elf_pt_load_count": 4,
+    "plan": {
+      "bytes": 18661,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0953/plan-0953-v3.json",
+      "sha256": "8e295dc6a23059400a5855e3bd15d9aede22c9ff54d02a2261671e5b669bc3a5"
+    },
+    "runner": {
+      "bytes": 44719,
+      "executable": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0953/tools/capture_0953_v6.py",
+      "sha256": "21dc19f3ad3b4b970b2dd72d97754cc4b02cba61a53e716674345f5dd6ab2def"
+    },
+    "static_symbols": {
+      "owner_ranges": [
+        {
+          "address": "0x173a5f0",
+          "end_exclusive": "0x173be59",
+          "size": "0x1869"
+        },
+        {
+          "address": "0x1a4cba0",
+          "end_exclusive": "0x1a4e409",
+          "size": "0x1869"
+        },
+        {
+          "address": "0x1c2ac50",
+          "end_exclusive": "0x1c2c4b9",
+          "size": "0x1869"
+        },
+        {
+          "address": "0x1c2e620",
+          "end_exclusive": "0x1c2fe89",
+          "size": "0x1869"
+        }
+      ],
+      "owner_symbol": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+      "parent_range": {
+        "address": "0x1813c70",
+        "end_exclusive": "0x1819a1b",
+        "size": "0x5dab"
+      },
+      "parent_symbol": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+      "prologue": "All four owner instances and parent start with push %rbp; mov %rsp,%rbp; static evidence only.",
+      "text_range": {
+        "end_exclusive": "0x2dc44c9",
+        "start": "0x8061e0"
+      }
+    }
+  },
+  "children": [
+    {
+      "binary_sha256": "0df5a52fc7b716cc0e7810b798987501f0053afcd85fcbe5a04cc00ec57a2274",
+      "build_id": "81b9bad2e48766f5e60bd2e853c1f3d56fd4519e",
+      "descriptor": {
+        "bytes": 90289,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0953/analysis/native-admission-00-v1.json",
+        "sha256": "34eeaeb950fc03ef46adbe71555cc44f89c1bda5f141dc29a49f00ae7c0ecdbf"
+      },
+      "file": "/home/zhuhe/litchi-performance-0953/analysis/native-admission-00-v1.json",
+      "mmap": {
+        "ambiguous_bound_mappings": 0,
+        "bound_build_ids": [
+          "81b9bad2e48766f5e60bd2e853c1f3d56fd4519e"
+        ],
+        "bound_pids": [
+          2839559
+        ],
+        "line_count": 6,
+        "unsupported": 0
+      },
+      "plan_sha256": "8e295dc6a23059400a5855e3bd15d9aede22c9ff54d02a2261671e5b669bc3a5",
+      "profile": {
+        "admitted": true,
+        "all_period": 34766302092,
+        "all_period_meaning": "sampled_period_weight",
+        "all_samples": 8884,
+        "classification_reasons": {
+          "owner_not_observed": 7707,
+          "owner_parent_bound": 1157,
+          "unresolved_or_truncated": 16,
+          "wrong_or_missing_parent": 4
+        },
+        "gate": {
+          "fully_resolved_owner_samples_min": true,
+          "lost_records_zero": true,
+          "owner_period_min": true
+        },
+        "lost_records": 0,
+        "owner_period": 5076338812,
+        "owner_period_meaning": "sampled_period_weight",
+        "owner_samples": 1157,
+        "period_conserved": true,
+        "period_weight_unit": "perf sample period values from cycles:u; sampled weights, not exact elapsed CPU cycles",
+        "unknown_period": 29689963280,
+        "unknown_period_meaning": "sampled_period_weight",
+        "unknown_samples": 7727
+      },
+      "row": {
+        "id": "native-fp-publish-medium-r0",
+        "index": 0,
+        "repeat": 0,
+        "shape": "medium"
+      },
+      "runner_sha256": "21dc19f3ad3b4b970b2dd72d97754cc4b02cba61a53e716674345f5dd6ab2def",
+      "semantic": {
+        "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+        "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+        "status": "pass"
+      },
+      "status": "pass",
+      "terminals": {
+        "mmap": {
+          "process_group_clear": true,
+          "returncode": 0,
+          "terminal_before_parse": true,
+          "timed_out": false
+        },
+        "record": {
+          "process_group_clear": true,
+          "returncode": 0,
+          "terminal_before_parse": true,
+          "timed_out": false
+        },
+        "sample": {
+          "process_group_clear": true,
+          "returncode": 0,
+          "terminal_before_parse": true,
+          "timed_out": false
+        }
+      }
+    },
+    {
+      "binary_sha256": "0df5a52fc7b716cc0e7810b798987501f0053afcd85fcbe5a04cc00ec57a2274",
+      "build_id": "81b9bad2e48766f5e60bd2e853c1f3d56fd4519e",
+      "descriptor": {
+        "bytes": 110751,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0953/analysis/native-admission-01-v1.json",
+        "sha256": "ad8c12c044de6916f31a9fb82b3919bf95d200ad33eb7400df41b78cd081bb9e"
+      },
+      "file": "/home/zhuhe/litchi-performance-0953/analysis/native-admission-01-v1.json",
+      "mmap": {
+        "ambiguous_bound_mappings": 0,
+        "bound_build_ids": [
+          "81b9bad2e48766f5e60bd2e853c1f3d56fd4519e"
+        ],
+        "bound_pids": [
+          2840098
+        ],
+        "line_count": 6,
+        "unsupported": 0
+      },
+      "plan_sha256": "8e295dc6a23059400a5855e3bd15d9aede22c9ff54d02a2261671e5b669bc3a5",
+      "profile": {
+        "admitted": true,
+        "all_period": 55705597503,
+        "all_period_meaning": "sampled_period_weight",
+        "all_samples": 13649,
+        "classification_reasons": {
+          "owner_not_observed": 11264,
+          "owner_parent_bound": 2335,
+          "unresolved_or_truncated": 28,
+          "wrong_or_missing_parent": 22
+        },
+        "gate": {
+          "fully_resolved_owner_samples_min": true,
+          "lost_records_zero": true,
+          "owner_period_min": true
+        },
+        "lost_records": 0,
+        "owner_period": 10275952066,
+        "owner_period_meaning": "sampled_period_weight",
+        "owner_samples": 2335,
+        "period_conserved": true,
+        "period_weight_unit": "perf sample period values from cycles:u; sampled weights, not exact elapsed CPU cycles",
+        "unknown_period": 45429645437,
+        "unknown_period_meaning": "sampled_period_weight",
+        "unknown_samples": 11314
+      },
+      "row": {
+        "id": "native-fp-publish-dense-sparse-r0",
+        "index": 1,
+        "repeat": 0,
+        "shape": "dense-sparse"
+      },
+      "runner_sha256": "21dc19f3ad3b4b970b2dd72d97754cc4b02cba61a53e716674345f5dd6ab2def",
+      "semantic": {
+        "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+        "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+        "status": "pass"
+      },
+      "status": "pass",
+      "terminals": {
+        "mmap": {
+          "process_group_clear": true,
+          "returncode": 0,
+          "terminal_before_parse": true,
+          "timed_out": false
+        },
+        "record": {
+          "process_group_clear": true,
+          "returncode": 0,
+          "terminal_before_parse": true,
+          "timed_out": false
+        },
+        "sample": {
+          "process_group_clear": true,
+          "returncode": 0,
+          "terminal_before_parse": true,
+          "timed_out": false
+        }
+      }
+    },
+    {
+      "binary_sha256": "0df5a52fc7b716cc0e7810b798987501f0053afcd85fcbe5a04cc00ec57a2274",
+      "build_id": "81b9bad2e48766f5e60bd2e853c1f3d56fd4519e",
+      "descriptor": {
+        "bytes": 110019,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0953/analysis/native-admission-02-v1.json",
+        "sha256": "2eca406b0f9dc48e7aff8421be6ed54e9b0a5f9cbe1686209575e22e384d7ea5"
+      },
+      "file": "/home/zhuhe/litchi-performance-0953/analysis/native-admission-02-v1.json",
+      "mmap": {
+        "ambiguous_bound_mappings": 0,
+        "bound_build_ids": [
+          "81b9bad2e48766f5e60bd2e853c1f3d56fd4519e"
+        ],
+        "bound_pids": [
+          2840400
+        ],
+        "line_count": 6,
+        "unsupported": 0
+      },
+      "plan_sha256": "8e295dc6a23059400a5855e3bd15d9aede22c9ff54d02a2261671e5b669bc3a5",
+      "profile": {
+        "admitted": true,
+        "all_period": 55683764483,
+        "all_period_meaning": "sampled_period_weight",
+        "all_samples": 13661,
+        "classification_reasons": {
+          "owner_not_observed": 11276,
+          "owner_parent_bound": 2342,
+          "unresolved_or_truncated": 19,
+          "wrong_or_missing_parent": 24
+        },
+        "gate": {
+          "fully_resolved_owner_samples_min": true,
+          "lost_records_zero": true,
+          "owner_period_min": true
+        },
+        "lost_records": 0,
+        "owner_period": 10306403757,
+        "owner_period_meaning": "sampled_period_weight",
+        "owner_samples": 2342,
+        "period_conserved": true,
+        "period_weight_unit": "perf sample period values from cycles:u; sampled weights, not exact elapsed CPU cycles",
+        "unknown_period": 45377360726,
+        "unknown_period_meaning": "sampled_period_weight",
+        "unknown_samples": 11319
+      },
+      "row": {
+        "id": "native-fp-publish-dense-sparse-r1",
+        "index": 2,
+        "repeat": 1,
+        "shape": "dense-sparse"
+      },
+      "runner_sha256": "21dc19f3ad3b4b970b2dd72d97754cc4b02cba61a53e716674345f5dd6ab2def",
+      "semantic": {
+        "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+        "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+        "status": "pass"
+      },
+      "status": "pass",
+      "terminals": {
+        "mmap": {
+          "process_group_clear": true,
+          "returncode": 0,
+          "terminal_before_parse": true,
+          "timed_out": false
+        },
+        "record": {
+          "process_group_clear": true,
+          "returncode": 0,
+          "terminal_before_parse": true,
+          "timed_out": false
+        },
+        "sample": {
+          "process_group_clear": true,
+          "returncode": 0,
+          "terminal_before_parse": true,
+          "timed_out": false
+        }
+      }
+    },
+    {
+      "binary_sha256": "0df5a52fc7b716cc0e7810b798987501f0053afcd85fcbe5a04cc00ec57a2274",
+      "build_id": "81b9bad2e48766f5e60bd2e853c1f3d56fd4519e",
+      "descriptor": {
+        "bytes": 88780,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0953/analysis/native-admission-03-v1.json",
+        "sha256": "a75cad7cbd93eaa880525d2632d59c3f6e3546eab36b5d87bdfab5a7fc935341"
+      },
+      "file": "/home/zhuhe/litchi-performance-0953/analysis/native-admission-03-v1.json",
+      "mmap": {
+        "ambiguous_bound_mappings": 0,
+        "bound_build_ids": [
+          "81b9bad2e48766f5e60bd2e853c1f3d56fd4519e"
+        ],
+        "bound_pids": [
+          2840805
+        ],
+        "line_count": 6,
+        "unsupported": 0
+      },
+      "plan_sha256": "8e295dc6a23059400a5855e3bd15d9aede22c9ff54d02a2261671e5b669bc3a5",
+      "profile": {
+        "admitted": true,
+        "all_period": 34773065566,
+        "all_period_meaning": "sampled_period_weight",
+        "all_samples": 8883,
+        "classification_reasons": {
+          "owner_not_observed": 7711,
+          "owner_parent_bound": 1150,
+          "unresolved_or_truncated": 18,
+          "wrong_or_missing_parent": 4
+        },
+        "gate": {
+          "fully_resolved_owner_samples_min": true,
+          "lost_records_zero": true,
+          "owner_period_min": true
+        },
+        "lost_records": 0,
+        "owner_period": 5046933766,
+        "owner_period_meaning": "sampled_period_weight",
+        "owner_samples": 1150,
+        "period_conserved": true,
+        "period_weight_unit": "perf sample period values from cycles:u; sampled weights, not exact elapsed CPU cycles",
+        "unknown_period": 29726131800,
+        "unknown_period_meaning": "sampled_period_weight",
+        "unknown_samples": 7733
+      },
+      "row": {
+        "id": "native-fp-publish-medium-r1",
+        "index": 3,
+        "repeat": 1,
+        "shape": "medium"
+      },
+      "runner_sha256": "21dc19f3ad3b4b970b2dd72d97754cc4b02cba61a53e716674345f5dd6ab2def",
+      "semantic": {
+        "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+        "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+        "status": "pass"
+      },
+      "status": "pass",
+      "terminals": {
+        "mmap": {
+          "process_group_clear": true,
+          "returncode": 0,
+          "terminal_before_parse": true,
+          "timed_out": false
+        },
+        "record": {
+          "process_group_clear": true,
+          "returncode": 0,
+          "terminal_before_parse": true,
+          "timed_out": false
+        },
+        "sample": {
+          "process_group_clear": true,
+          "returncode": 0,
+          "terminal_before_parse": true,
+          "timed_out": false
+        }
+      }
+    }
+  ],
+  "conclusion": "All four children pass semantic, terminal, exact binary/build-ID/MMAP, owner-parent, zero-loss, and sampled-period-weight conservation checks. The profile supports descriptive owner-qualified leaf attribution only; coverage fractions are not publication-time shares.",
+  "interpretation": {
+    "binary_scope": "The force-frame-pointers executable is a diagnostic build for physical FP stack attribution, not the ordinary 0950 baseline and not a timing/speedup/allocation/RSS/adoption measurement.",
+    "coverage_not_time_share": "Owner-qualified sample/period fractions describe diagnostic coverage of the captured denominator; they are not a publication-time or wall-time share.",
+    "denominator": "All event periods and non-owner/unresolved/truncated observations remain in the denominator.",
+    "function_aggregation_caution": "A function-level view must sum its multiple leaf-offset rows; the +0x1b8 row alone is not the whole longest_match function.",
+    "largest_leaf": "zlib_rs::deflate::longest_match::longest_match+0x1b8",
+    "largest_leaf_all_weight_share": 0.056039405842013196,
+    "largest_leaf_definition": "exclusive_leaf_ranking counts the first physical frame symbol only for owner-qualified stacks; rows are disjoint by leaf symbol and are not whole-workload timing or exact-cycle fractions.",
+    "largest_leaf_owner_qualified_weight_share": 0.33020455978259006,
+    "largest_leaf_sampled_period_weight": 10139138509,
+    "longest_match_function_aggregation": {
+      "aggregate_all_weight_share": 0.10836717102131162,
+      "aggregate_owner_qualified_weight_share": 0.6385387829210315,
+      "aggregate_sampled_period_weight": 19606734588,
+      "interpretation": "diagnostic coverage within owner-qualified sampled stacks; not publication-time share or exact CPU-cycle share.",
+      "method": "sum exclusive leaf rows with this function prefix across all offsets",
+      "owner_qualified_share_range": [
+        0.5999570085433454,
+        0.658839430231726
+      ],
+      "per_child": [
+        {
+          "all_weight_share": 0.08760163907972292,
+          "file": "native-admission-00-v1.json",
+          "owner_qualified_weight_share": 0.5999570085433454,
+          "repeat": 0,
+          "sampled_period_weight": 3045585048,
+          "shape": "medium"
+        },
+        {
+          "all_weight_share": 0.12063499896286177,
+          "file": "native-admission-01-v1.json",
+          "owner_qualified_weight_share": 0.6539583538185804,
+          "repeat": 0,
+          "sampled_period_weight": 6720044697,
+          "shape": "dense-sparse"
+        },
+        {
+          "all_weight_share": 0.12194335713550827,
+          "file": "native-admission-02-v1.json",
+          "owner_qualified_weight_share": 0.658839430231726,
+          "repeat": 1,
+          "sampled_period_weight": 6790265179,
+          "shape": "dense-sparse"
+        },
+        {
+          "all_weight_share": 0.08773571194663418,
+          "file": "native-admission-03-v1.json",
+          "owner_qualified_weight_share": 0.6044936996306125,
+          "repeat": 1,
+          "sampled_period_weight": 3050839664,
+          "shape": "medium"
+        }
+      ],
+      "period_weight_unit": "sampled_period_weight",
+      "symbol_prefix": "zlib_rs::deflate::longest_match::longest_match"
+    },
+    "nested_rows": "nested_compression_xml_rows are stack-presence rows and overlap; they must not be summed.",
+    "period_weight_unit": "perf sample period values from cycles:u; sampled weights, not exact elapsed CPU cycles"
+  },
+  "period_weight_unit": "perf sample period values from cycles:u; sampled weights, not exact elapsed CPU cycles",
+  "representative_owner_parent_binding": {
+    "event": "cycles:u",
+    "header_line": 11480,
+    "load_bias": "0x626aec640000",
+    "mmap_events": "/home/zhuhe/litchi-performance-0953/analysis/mmap/01-dense-sparse/events.txt",
+    "mmap_events_sha256": "206f61322c08bbd583469e48eb328ffd4f17c0d5ade0a7eea11a7c6fe0e1edc3",
+    "mmap_row": {
+      "build_id": "81b9bad2e48766f5e60bd2e853c1f3d56fd4519e",
+      "dso": "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1/release/litchi-perf-baseline",
+      "is_bound_dso": true,
+      "line": 3,
+      "load_bias": 108211372032000,
+      "mapping_ambiguous": false,
+      "offset": 8409088,
+      "perm": "r-xp",
+      "pid": 2840098,
+      "pt_load_index": 1,
+      "size": 39579648,
+      "start": 108211380445184,
+      "tid": 2840098,
+      "time": "231531.558266873"
+    },
+    "owner_frame": "626aee08d256 litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream+0x6b6 (/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1/release/litchi-perf-baseline)",
+    "owner_line": 11485,
+    "owner_range_containment": true,
+    "owner_runtime_ip": "0x626aee08d256",
+    "owner_static_ip": "0x1a4d256",
+    "parent_frame": "626aede56746 litchi_perf_baseline::run_xlsx_cell_values_edit_save+0x2ad6 (/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1/release/litchi-perf-baseline)",
+    "parent_line": 11486,
+    "parent_range_containment": true,
+    "parent_runtime_ip": "0x626aede56746",
+    "parent_static_ip": "0x1816746",
+    "period_weight_unit": "sampled_period_weight",
+    "pid": 2840098,
+    "sample_events": "/home/zhuhe/litchi-performance-0953/analysis/sample/01-dense-sparse/events.txt",
+    "sample_events_sha256": "d4c9cde917069dd0226e8343f871401441ebf771a7d933bd2c53a00d73bc723e",
+    "sampled_period_weight": 4410187,
+    "tid": 2840098,
+    "time": "231532.205148744"
+  },
+  "reviewed_utc": "2026-10-07T09:41:33.120758Z",
+  "schema": "litchi.performance.0953.final-profile-review.v2",
+  "scope": "Independent read-only review of all four admitted children; no helper/source/build/capture changes.",
+  "status": "pass_descriptive_fp_attribution",
+  "supersedes": {
+    "path": "/home/zhuhe/litchi-performance-0953/review/final-profile-review-v1.json",
+    "reason": "Wording correction: perf period counts are sampled weights, not exact CPU-cycle counts; owner fractions are diagnostic coverage.",
+    "sha256": "8ed20a8428b1dbeea2cc827fa2b15f2c42c0628a504e80fe3a1e2d454efb80ce"
+  }
+}

@@ -1,0 +1,86 @@
+{
+  "binary_external": {
+    "destination": {
+      "bytes": 264707944,
+      "executable": true,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0953-archive-sealed-v1/binaries/litchi-perf-baseline-frame-pointer-v1",
+      "sha256": "0df5a52fc7b716cc0e7810b798987501f0053afcd85fcbe5a04cc00ec57a2274"
+    },
+    "receipt": {
+      "bytes": 801,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0953/builds/frame-pointer-native-v1/binary.json",
+      "sha256": "b337a99cd04a47dd4abbc2e1ee29c06a31ee89f791ad16c189a582aeaddc686a"
+    },
+    "source": {
+      "bytes": 264707944,
+      "executable": true,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1/release/litchi-perf-baseline",
+      "sha256": "0df5a52fc7b716cc0e7810b798987501f0053afcd85fcbe5a04cc00ec57a2274"
+    }
+  },
+  "compressed_archive": {
+    "bytes": 2584519,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0953-archive-sealed-v1/archive-0953-v1.tar.zst",
+    "sha256": "f0da81fc4c33f42416f2be49325cc2e85c72245b62e0c5f00d61d70c5a46902b"
+  },
+  "dependencies": {
+    "0950": {
+      "copied": false,
+      "path": "/home/zhuhe/litchi-performance-0950"
+    },
+    "0952": {
+      "copied": false,
+      "path": "/home/zhuhe/litchi-performance-0952"
+    }
+  },
+  "helper": {
+    "bytes": 8624,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0953-archive/archive-0953-v1.py",
+    "sha256": "9edacfe7f8ee11d32a6e88a4af2d23edf0559b1b55c767f860df334901839b76"
+  },
+  "manifest": {
+    "bytes": 35596,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0953-archive-sealed-v1/manifest-v1.json",
+    "sha256": "25693ee3d710c2794ec14202f42f50cc3cea2323f881cbb4b9da26cb37705c52"
+  },
+  "packet_census": {
+    "directories": 24,
+    "entries": 154,
+    "excluded": [
+      "target-frame-pointer-native-v1/",
+      "target/",
+      "tmp/",
+      "tools/__pycache__/"
+    ],
+    "logical_bytes": 115376952,
+    "symlinks": []
+  },
+  "regeneration": "python3 -B /home/zhuhe/litchi-performance-0953-archive/archive-0953-v1.py --packet /home/zhuhe/litchi-performance-0953 --archive-root <fresh-archive-root> --seal --go",
+  "schema": "litchi.performance.0953.external-archive-receipt.v1",
+  "selection": {
+    "bytes": 5985,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0953-archive-sealed-v1/selection-v1.list",
+    "sha256": "cadc01eec9a8e81031b655f847d9a9663f884defcfceb2d75cc99abbbaa95b4b"
+  },
+  "status": "sealed",
+  "uncompressed_tar": {
+    "bytes": 115701760,
+    "deleted_after_compression": true,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0953-archive-sealed-v1/archive-0953-v1.tar",
+    "sha256": "1fe17515273c5ea26032bd83941b6e2c0930e6c17d9b682bd27bd3e1d4b6a7aa"
+  }
+}

@@ -1,5 +1,15 @@
 # Performance hotspot inventory
 
+## 0953 — compression dominates admitted publication samples
+
+[0953](0953-xlsx-frame-pointer-publication-attribution.md) observes longest-match
+search as the largest exclusive function in all four frame-pointer captures:
+60.00–65.88% of owner-qualified sampled period weights. This supports examining
+changed-member compression next. Source review establishes five Deflate tasks
+and twelve copied members, but exact replacement task sizes remain unavailable.
+Census total/largest/remainder bytes before qualifying the explicit managed
+write wave; ordinary native and allocation evidence remains required for adoption.
+
 ## 0952 — native compression ranking remains unproven
 
 [0952](0952-xlsx-native-publication-unwind-rejection.md) finds no duplicate

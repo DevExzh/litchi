@@ -1,0 +1,52 @@
+{
+  "all_manifest_hashes_match": true,
+  "all_manifest_paths_rehashed": true,
+  "binary": {
+    "bytes": 264707944,
+    "executable": true,
+    "mode": 509,
+    "path": "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1/release/litchi-perf-baseline",
+    "sha256": "0df5a52fc7b716cc0e7810b798987501f0053afcd85fcbe5a04cc00ec57a2274"
+  },
+  "build_result": {
+    "bytes": 1041,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0953/builds/frame-pointer-native-v1/result.json",
+    "sha256": "c7639719fb0908c76ba89d6e2c80eb8c4fb895ca03bd66c02d283b509dc92742"
+  },
+  "build_terminal": {
+    "bytes": 9316,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0953/builds/frame-pointer-native-v1/terminal.json",
+    "sha256": "21a96dbc3d28d87309ef54164e987f7745e3f88a8cd03bfa7fe4c95aef0882a4"
+  },
+  "bytes": 260102337,
+  "changed_since_prebuild": [],
+  "file_count": 10790,
+  "observed_utc": "2026-10-07T09:15:28.122610Z",
+  "prebuild_binding": {
+    "bindings": {
+      "bytes": 8366,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0953/builds/frame-pointer-native-v1/bindings.json",
+      "sha256": "ac1ab2631286f7677334b43641c9a1084ed683ab50e835251bee56612b9c637b"
+    },
+    "bytes": 260102337,
+    "file_count": 10790,
+    "source_manifest_sha256": "5b16ef65a17f868a2d941355baed30dbbf9e338b817365c02bfb7133fedc80d4"
+  },
+  "schema": "litchi.performance.0953.build-source-postcheck.v1",
+  "scope": "independent complete source census after terminal; no source mutation by frame-pointer build",
+  "source_manifest": {
+    "bytes": 2037928,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0950/candidate-source-manifest-v1.json",
+    "sha256": "5b16ef65a17f868a2d941355baed30dbbf9e338b817365c02bfb7133fedc80d4"
+  },
+  "source_root": "/home/zhuhe/litchi-performance-0950/candidate-source-v1",
+  "status": "pass"
+}

@@ -1,0 +1,729 @@
+{
+  "archive": {
+    "archive": {
+      "bytes": 2584519,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0953-archive-sealed-v1/archive-0953-v1.tar.zst",
+      "sha256": "f0da81fc4c33f42416f2be49325cc2e85c72245b62e0c5f00d61d70c5a46902b"
+    },
+    "archive_byte_regeneration_not_claimed": true,
+    "helper": {
+      "bytes": 8624,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0953-archive/archive-0953-v1.py",
+      "sha256": "9edacfe7f8ee11d32a6e88a4af2d23edf0559b1b55c767f860df334901839b76"
+    },
+    "manifest": {
+      "bytes": 35596,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0953-archive-sealed-v1/manifest-v1.json",
+      "sha256": "25693ee3d710c2794ec14202f42f50cc3cea2323f881cbb4b9da26cb37705c52"
+    },
+    "packet_census": {
+      "directories": 24,
+      "entries": 154,
+      "excluded": [
+        "target-frame-pointer-native-v1/",
+        "target/",
+        "tmp/",
+        "tools/__pycache__/"
+      ],
+      "logical_bytes": 115376952,
+      "symlinks": []
+    },
+    "receipt": {
+      "bytes": 2938,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0953-archive-sealed-v1/archive-receipt-v1.json",
+      "sha256": "3bafd8959c5eb52a47e70d61bdeaea4771a0ad0f65a1d6c930d4a6babd540b67"
+    },
+    "root": "/home/zhuhe/litchi-performance-0953-archive-sealed-v1",
+    "selection": {
+      "bytes": 5985,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0953-archive-sealed-v1/selection-v1.list",
+      "sha256": "cadc01eec9a8e81031b655f847d9a9663f884defcfceb2d75cc99abbbaa95b4b"
+    }
+  },
+  "cleanup": {
+    "completed_binary_after": {
+      "bytes": 264707944,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1/release/litchi-perf-baseline",
+      "sha256": "0df5a52fc7b716cc0e7810b798987501f0053afcd85fcbe5a04cc00ec57a2274"
+    },
+    "completed_binary_before": {
+      "bytes": 264707944,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1/release/litchi-perf-baseline",
+      "sha256": "0df5a52fc7b716cc0e7810b798987501f0053afcd85fcbe5a04cc00ec57a2274"
+    },
+    "completed_note": "cleanup-receipt-v2 accurately records the relocated replay tree deletion (154 files/115376952 bytes) and preserved binary; cleanup-correction-v1 discloses that target-cache per-path census values were not authoritative after a helper traversal bug, while postconditions prove target cache removal and canonical packet preservation.",
+    "completed_receipt": {
+      "bytes": 561700,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0953-archive/cleanup-receipt-v2.json",
+      "sha256": "abb238434f91c9f65678e846b3c771e1212df7b7c0266faa94a9bdcca384fae2"
+    },
+    "completed_totals": {
+      "directories": 25,
+      "files": 154,
+      "logical_bytes": 115376952,
+      "paths": 2117,
+      "symlinks": 0
+    },
+    "correction": {
+      "bytes": 2715,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0953-archive/cleanup-correction-v1.json",
+      "sha256": "025285b55c8ee71495c5d88fde832bafad3e8548185a575c454190b5a1c6c349"
+    },
+    "failed_attempt": {
+      "bytes": 1449,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0953-archive/cleanup-attempt-v1-failure.json",
+      "sha256": "ec1e0d74e48db683c6e48e92e7abedcf320edec9eb79133a8dd219769be3c627"
+    },
+    "postconditions": {
+      "binary_after": {
+        "bytes": 264707944,
+        "mode": 509,
+        "path": "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1/release/litchi-perf-baseline",
+        "sha256": "0df5a52fc7b716cc0e7810b798987501f0053afcd85fcbe5a04cc00ec57a2274"
+      },
+      "replay_root_removed": true,
+      "target_root_preserves_only_binary": true
+    },
+    "v2_helper": {
+      "bytes": 4537,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0953-archive/cleanup_0953_v2.py",
+      "sha256": "b67eca57fa03dcc09fa8ce7c01c7c5287d1e2d925ca8eed1916b63602caafd2f"
+    }
+  },
+  "created_utc": "2026-10-07T09:50:20.794817+00:00",
+  "decision_scope": "0953 descriptive frame-pointer native profiling packet custody/replay only; no workload rerun, timing/adoption claim, or production source change.",
+  "extraction": {
+    "archive": {
+      "bytes": 2584519,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0953-archive-sealed-v1/archive-0953-v1.tar.zst",
+      "sha256": "f0da81fc4c33f42416f2be49325cc2e85c72245b62e0c5f00d61d70c5a46902b"
+    },
+    "archive_receipt": {
+      "bytes": 2938,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0953-archive-sealed-v1/archive-receipt-v1.json",
+      "sha256": "3bafd8959c5eb52a47e70d61bdeaea4771a0ad0f65a1d6c930d4a6babd540b67"
+    },
+    "commands": [
+      "tar --extract --same-permissions --no-same-owner --file /home/zhuhe/litchi-performance-0953-archive-sealed-v1/archive-0953-v1.tar.zst --directory /home/zhuhe/litchi-performance-0953-replay-v1",
+      "python3 -B <independent extraction census>"
+    ],
+    "created_utc": "2026-10-07T09:46:25.196999+00:00",
+    "large_artifacts_ge_1MiB": [
+      {
+        "bytes": 19356547,
+        "path": "analysis/sample/00-medium/events.txt",
+        "sha256": "eb8e341fc308521ba50bc9b6afa4d471cc7802a927bc021828de8c83e6dce81e"
+      },
+      {
+        "bytes": 30079479,
+        "path": "analysis/sample/01-dense-sparse/events.txt",
+        "sha256": "d4c9cde917069dd0226e8343f871401441ebf771a7d933bd2c53a00d73bc723e"
+      },
+      {
+        "bytes": 30080765,
+        "path": "analysis/sample/02-dense-sparse/events.txt",
+        "sha256": "071c8ca288758e25ead8d26b5d7ca445a353fa5ecdaa500130aca4ae17cdfcbc"
+      },
+      {
+        "bytes": 19348227,
+        "path": "analysis/sample/03-medium/events.txt",
+        "sha256": "834af2dea32cfe1ad0d2f54ec88b3d7baba3743bb3189fce6628d0b8d9182bde"
+      },
+      {
+        "bytes": 1597736,
+        "path": "capture/00-medium/perf.data",
+        "sha256": "eecd7a6bbfb78d06f6c857bfab2046bad7fb99ed9388126cc112d6fea24088c4"
+      },
+      {
+        "bytes": 2442680,
+        "path": "capture/01-dense-sparse/perf.data",
+        "sha256": "08600bb7ef09f3bd383e3f0f06e59a32ba5a384bc81adbf4c86078cb40ce9c74"
+      },
+      {
+        "bytes": 2443464,
+        "path": "capture/02-dense-sparse/perf.data",
+        "sha256": "d7f383968e3bad0eec09cbe43847d083c8b93dd6ac73d1e0e228184945b2635e"
+      },
+      {
+        "bytes": 1597080,
+        "path": "capture/03-medium/perf.data",
+        "sha256": "1e19faaa4e7a2ba86124a5dbcb310fef51891817c398ebcd456c74d98646211b"
+      },
+      {
+        "bytes": 2233948,
+        "path": "preflight-v1/mmap-debug.events.txt",
+        "sha256": "ea31f400aa251b3926cc5dd9e33d5a7d47b31f7c6858901f4f22e36d6ecda380"
+      },
+      {
+        "bytes": 2203611,
+        "path": "preflight-v1/sample-no-debug.events.txt",
+        "sha256": "2eb3bc3df2fd4322f3b55c07238810eeea95428803eeb96aa990db6fb2fe95c8"
+      }
+    ],
+    "limitations": [
+      "Core archive manifest excludes the external binary by design; binary role copy is checked through archive-receipt-v1.json.",
+      "No byte-identical compressed archive regeneration is claimed; extracted manifest/census is the closure check."
+    ],
+    "manifest": {
+      "bytes": 35596,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0953-archive-sealed-v1/manifest-v1.json",
+      "sha256": "25693ee3d710c2794ec14202f42f50cc3cea2323f881cbb4b9da26cb37705c52"
+    },
+    "metadata_checks": {
+      "archive_descriptor": true,
+      "binary_role": true,
+      "manifest_descriptor": true,
+      "packet_census": true,
+      "selection_content": true,
+      "selection_descriptor": true
+    },
+    "packet_census": {
+      "actual_directories": 24,
+      "actual_entries": 154,
+      "actual_logical_bytes": 115376952,
+      "directory_mismatches": [],
+      "expected_directories": 24,
+      "expected_entries": 154,
+      "expected_logical_bytes": 115376952,
+      "extra_directories": [],
+      "extra_files": [],
+      "file_mismatches": [],
+      "missing_directories": [],
+      "missing_files": [],
+      "symlinks": []
+    },
+    "schema": "litchi.performance.0953.extract-verification.v1",
+    "selection": {
+      "bytes": 5985,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0953-archive-sealed-v1/selection-v1.list",
+      "sha256": "cadc01eec9a8e81031b655f847d9a9663f884defcfceb2d75cc99abbbaa95b4b"
+    },
+    "status": "pass"
+  },
+  "large_artifacts_ge_1MiB": [
+    {
+      "bytes": 19356547,
+      "path": "analysis/sample/00-medium/events.txt",
+      "sha256": "eb8e341fc308521ba50bc9b6afa4d471cc7802a927bc021828de8c83e6dce81e"
+    },
+    {
+      "bytes": 30079479,
+      "path": "analysis/sample/01-dense-sparse/events.txt",
+      "sha256": "d4c9cde917069dd0226e8343f871401441ebf771a7d933bd2c53a00d73bc723e"
+    },
+    {
+      "bytes": 30080765,
+      "path": "analysis/sample/02-dense-sparse/events.txt",
+      "sha256": "071c8ca288758e25ead8d26b5d7ca445a353fa5ecdaa500130aca4ae17cdfcbc"
+    },
+    {
+      "bytes": 19348227,
+      "path": "analysis/sample/03-medium/events.txt",
+      "sha256": "834af2dea32cfe1ad0d2f54ec88b3d7baba3743bb3189fce6628d0b8d9182bde"
+    },
+    {
+      "bytes": 1597736,
+      "path": "capture/00-medium/perf.data",
+      "sha256": "eecd7a6bbfb78d06f6c857bfab2046bad7fb99ed9388126cc112d6fea24088c4"
+    },
+    {
+      "bytes": 2442680,
+      "path": "capture/01-dense-sparse/perf.data",
+      "sha256": "08600bb7ef09f3bd383e3f0f06e59a32ba5a384bc81adbf4c86078cb40ce9c74"
+    },
+    {
+      "bytes": 2443464,
+      "path": "capture/02-dense-sparse/perf.data",
+      "sha256": "d7f383968e3bad0eec09cbe43847d083c8b93dd6ac73d1e0e228184945b2635e"
+    },
+    {
+      "bytes": 1597080,
+      "path": "capture/03-medium/perf.data",
+      "sha256": "1e19faaa4e7a2ba86124a5dbcb310fef51891817c398ebcd456c74d98646211b"
+    },
+    {
+      "bytes": 2233948,
+      "path": "preflight-v1/mmap-debug.events.txt",
+      "sha256": "ea31f400aa251b3926cc5dd9e33d5a7d47b31f7c6858901f4f22e36d6ecda380"
+    },
+    {
+      "bytes": 2203611,
+      "path": "preflight-v1/sample-no-debug.events.txt",
+      "sha256": "2eb3bc3df2fd4322f3b55c07238810eeea95428803eeb96aa990db6fb2fe95c8"
+    }
+  ],
+  "limitations": [
+    "The core archive intentionally excludes the 264707944-byte executable; its external role copy and source path are separately hash-bound.",
+    "Relocated replay is offline analyzer execution only. Its traced historical binary dependency is explicit; it does not prove zero original-path metadata checks.",
+    "The compressed archive is not claimed byte-identical under regeneration because archive metadata can vary; extracted entry bytes, modes, set, and logical census are the custody invariant.",
+    "The target-frame-pointer cache cleanup path was completed, but its exact deleted logical byte total is unavailable because cleanup-receipt-v2 recorded per-file census after traversal; cleanup-correction-v1 is the authoritative disclosure."
+  ],
+  "manifest_controls": {
+    "corrected_v2": {
+      "cases": [
+        {
+          "case": "missing_file",
+          "reason": "ValueError: file set mismatch missing=['analysis/mmap/00-medium/events.txt'] extra=[]",
+          "rejected": true
+        },
+        {
+          "case": "extra_file",
+          "reason": "ValueError: file set mismatch missing=[] extra=['unexpected-extra.bin']",
+          "rejected": true
+        },
+        {
+          "case": "symlink_file",
+          "reason": "ValueError: symlink paths: ['analysis/mmap/00-medium/events.txt']",
+          "rejected": true
+        },
+        {
+          "case": "symlink_dir",
+          "reason": "ValueError: symlink paths: ['unexpected-directory']",
+          "rejected": true
+        },
+        {
+          "case": "wrong_hash",
+          "reason": "ValueError: file descriptor mismatch: analysis/mmap/00-medium/events.txt",
+          "rejected": true
+        },
+        {
+          "case": "wrong_mode",
+          "reason": "ValueError: file descriptor mismatch: analysis/mmap/00-medium/events.txt",
+          "rejected": true
+        },
+        {
+          "case": "duplicate_entry",
+          "reason": "ValueError: duplicate path: analysis/mmap/00-medium/events.txt",
+          "rejected": true
+        },
+        {
+          "case": "path_traversal",
+          "reason": "ValueError: unsafe relative path: '../escape'",
+          "rejected": true
+        },
+        {
+          "case": "duplicate_json_key",
+          "reason": "ValueError: duplicate JSON key: schema",
+          "rejected": true
+        }
+      ],
+      "command": "python3 -B /home/zhuhe/litchi-performance-0953-archive/replay_0953_manifest_controls_v2.py --manifest <sealed-manifest> --tree <extracted-tree> --work <owned-temp> --output <receipt>",
+      "created_utc": "2026-10-07T09:47:41.133741+00:00",
+      "helper": {
+        "bytes": 10128,
+        "path": "/home/zhuhe/litchi-performance-0953-archive/replay_0953_manifest_controls_v2.py",
+        "sha256": "0cccececf9a67bf4be7d09d48ef1b506138bb9e5076d8f311ac96f73344a1b9e"
+      },
+      "manifest": {
+        "bytes": 35596,
+        "path": "/home/zhuhe/litchi-performance-0953-archive-sealed-v1/manifest-v1.json",
+        "sha256": "25693ee3d710c2794ec14202f42f50cc3cea2323f881cbb4b9da26cb37705c52"
+      },
+      "schema": "litchi.performance.0953.archive-manifest-controls.v2",
+      "status": "pass",
+      "tree": {
+        "directories": 24,
+        "entries": 154,
+        "path": "/home/zhuhe/litchi-performance-0953-replay-v1",
+        "positive_status": "pass"
+      }
+    },
+    "helper_v1": {
+      "bytes": 9953,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0953-archive/replay_0953_manifest_controls_v1.py",
+      "sha256": "3ed2c6e56d17c23eed74da52946476c4fc71c6f381402e6a2e40700bc488dad3"
+    },
+    "helper_v2": {
+      "bytes": 10128,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0953-archive/replay_0953_manifest_controls_v2.py",
+      "sha256": "0cccececf9a67bf4be7d09d48ef1b506138bb9e5076d8f311ac96f73344a1b9e"
+    },
+    "historical_v1": {
+      "bytes": 2372,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0953-archive/manifest-controls-v1.json",
+      "sha256": "e2db82e44c1435c07e49d83378cf023dd54bc2730a115adc61ed20d60d004439"
+    },
+    "historical_v1_note": "The v1 symlink-directory case failed during fixture setup with OSError Directory not empty; it is retained as a failed control attempt."
+  },
+  "regeneration": {
+    "archive": "mkdir -p <fresh-archive-root> && python3 -B /home/zhuhe/litchi-performance-0953-archive/archive-0953-v1.py --packet /home/zhuhe/litchi-performance-0953 --archive-root <fresh-archive-root> --binary /home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1/release/litchi-perf-baseline --binary-receipt /home/zhuhe/litchi-performance-0953/builds/frame-pointer-native-v1/binary.json --seal --go",
+    "cleanup": "python3 -B /home/zhuhe/litchi-performance-0953-archive/cleanup_0953_v2.py --go --output <cleanup-receipt>",
+    "extract": "mkdir -p <fresh-replay-root> && tar --extract --same-permissions --no-same-owner --file <fresh-archive-root>/archive-0953-v1.tar.zst --directory <fresh-replay-root>",
+    "fresh_archive_root_required": true,
+    "manifest_controls": "python3 -B /home/zhuhe/litchi-performance-0953-archive/replay_0953_manifest_controls_v2.py --manifest <fresh-archive-root>/manifest-v1.json --tree <fresh-replay-root> --work <owned-temp> --output <controls-receipt>",
+    "replay": "python3 -B /home/zhuhe/litchi-performance-0953-archive/replay_0953_v1.py --packet /home/zhuhe/litchi-performance-0953-replay-v1 --plan /home/zhuhe/litchi-performance-0953-replay-v1/plan-0953-v3.json --index <0..3> --sample-export /home/zhuhe/litchi-performance-0953-replay-v1/analysis/sample/<index-shape> --mmap-export /home/zhuhe/litchi-performance-0953-replay-v1/analysis/mmap/<index-shape> --output <fresh-output>",
+    "replay_root_requirement": "The adapter MOVED constant is /home/zhuhe/litchi-performance-0953-replay-v1. Use that fresh root or an explicitly reviewed derived adapter; --packet alone does not change the mapping constant."
+  },
+  "relocated_replay": {
+    "binary_path_policy": "The adapter retained the explicitly bound binary at the historical external packet path. Traces show only that binary file plus parent-directory metadata; no other original packet path was observed.",
+    "exact_post_census_replay": true,
+    "failed_no_workload_attempt": {
+      "output": {
+        "bytes": 273,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0953-archive/replay-results-postverify/native-admission-00-relocated-postverify.json",
+        "sha256": "6d42d5ab4ec381cd20ce709465da436d43601fe4c6d47cb62ea913e0a259776c"
+      },
+      "reason": "A post-census adapter invocation supplied event files where the analyzer requires export directories; retained transparently and superseded by postverify-v2.",
+      "trace": {
+        "bytes": 191068,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0953-archive/replay-traces-postverify/replay-00.strace.log",
+        "sha256": "251b63a374c436edfaf2207b43f79880d78f4042cd905335d15d3fce943b745e"
+      }
+    },
+    "historical_pre_census_outputs": [
+      {
+        "bytes": 90889,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0953-archive/replay-results/native-admission-00-relocated.json",
+        "sha256": "fca19767247de2ff48734638819bde220f0a88178a61a47da68518bb99a2865c"
+      },
+      {
+        "bytes": 111351,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0953-archive/replay-results/native-admission-01-relocated.json",
+        "sha256": "32a0896f46c41299460a247c6e37b72131087b679bdaff3cf0b316fe08048a53"
+      },
+      {
+        "bytes": 110619,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0953-archive/replay-results/native-admission-02-relocated.json",
+        "sha256": "481e2bb27b2bd3386d9d99d76a1a7105381c5eb1ddb2b5a6ba26f51b9a12ecbb"
+      },
+      {
+        "bytes": 89380,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0953-archive/replay-results/native-admission-03-relocated.json",
+        "sha256": "92129f5b90807ad612625a2920a22c213838dc74648131c332962a299c7f9a36"
+      }
+    ],
+    "rows": [
+      {
+        "byte_equal_after_known_root_normalization": true,
+        "canonical": {
+          "bytes": 90289,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0953/analysis/native-admission-00-v1.json",
+          "sha256": "34eeaeb950fc03ef46adbe71555cc44f89c1bda5f141dc29a49f00ae7c0ecdbf"
+        },
+        "cell": 0,
+        "explicit_binary_file_open_events": 3,
+        "non_binary_original_packet_paths": [
+          "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1",
+          "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1/release"
+        ],
+        "normalized_output_sha256": "34eeaeb950fc03ef46adbe71555cc44f89c1bda5f141dc29a49f00ae7c0ecdbf",
+        "original_packet_unique_paths": [
+          "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1",
+          "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1/release",
+          "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1/release/litchi-perf-baseline"
+        ],
+        "postverify_relocated_output": {
+          "bytes": 90889,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0953-archive/replay-results-postverify-v2/native-admission-00-relocated-postverify.json",
+          "sha256": "fca19767247de2ff48734638819bde220f0a88178a61a47da68518bb99a2865c"
+        },
+        "postverify_trace": {
+          "bytes": 278690,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0953-archive/replay-traces-postverify-v2/replay-00.strace.log",
+          "sha256": "943555ae71dfaa89014d3186b448ec74e037733fbe7675cb18c36a8827978cb5"
+        },
+        "profile": {
+          "all_period": 34766302092,
+          "all_samples": 8884,
+          "lost_records": 0,
+          "owner_period": 5076338812,
+          "owner_samples": 1157,
+          "unresolved_period": 65889672
+        },
+        "replay_status": "pass",
+        "shape": "00-medium",
+        "status": "pass"
+      },
+      {
+        "byte_equal_after_known_root_normalization": true,
+        "canonical": {
+          "bytes": 110751,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0953/analysis/native-admission-01-v1.json",
+          "sha256": "ad8c12c044de6916f31a9fb82b3919bf95d200ad33eb7400df41b78cd081bb9e"
+        },
+        "cell": 1,
+        "explicit_binary_file_open_events": 3,
+        "non_binary_original_packet_paths": [
+          "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1",
+          "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1/release"
+        ],
+        "normalized_output_sha256": "ad8c12c044de6916f31a9fb82b3919bf95d200ad33eb7400df41b78cd081bb9e",
+        "original_packet_unique_paths": [
+          "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1",
+          "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1/release",
+          "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1/release/litchi-perf-baseline"
+        ],
+        "postverify_relocated_output": {
+          "bytes": 111351,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0953-archive/replay-results-postverify-v2/native-admission-01-relocated-postverify.json",
+          "sha256": "32a0896f46c41299460a247c6e37b72131087b679bdaff3cf0b316fe08048a53"
+        },
+        "postverify_trace": {
+          "bytes": 281288,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0953-archive/replay-traces-postverify-v2/replay-01.strace.log",
+          "sha256": "913933afe5e4028c20f45c625395d0202474982398bc78fffe12cdc229b664fe"
+        },
+        "profile": {
+          "all_period": 55705597503,
+          "all_samples": 13649,
+          "lost_records": 0,
+          "owner_period": 10275952066,
+          "owner_samples": 2335,
+          "unresolved_period": 104432751
+        },
+        "replay_status": "pass",
+        "shape": "01-dense-sparse",
+        "status": "pass"
+      },
+      {
+        "byte_equal_after_known_root_normalization": true,
+        "canonical": {
+          "bytes": 110019,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0953/analysis/native-admission-02-v1.json",
+          "sha256": "2eca406b0f9dc48e7aff8421be6ed54e9b0a5f9cbe1686209575e22e384d7ea5"
+        },
+        "cell": 2,
+        "explicit_binary_file_open_events": 3,
+        "non_binary_original_packet_paths": [
+          "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1",
+          "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1/release"
+        ],
+        "normalized_output_sha256": "2eca406b0f9dc48e7aff8421be6ed54e9b0a5f9cbe1686209575e22e384d7ea5",
+        "original_packet_unique_paths": [
+          "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1",
+          "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1/release",
+          "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1/release/litchi-perf-baseline"
+        ],
+        "postverify_relocated_output": {
+          "bytes": 110619,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0953-archive/replay-results-postverify-v2/native-admission-02-relocated-postverify.json",
+          "sha256": "481e2bb27b2bd3386d9d99d76a1a7105381c5eb1ddb2b5a6ba26f51b9a12ecbb"
+        },
+        "postverify_trace": {
+          "bytes": 281288,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0953-archive/replay-traces-postverify-v2/replay-02.strace.log",
+          "sha256": "5bf6e480cb4e7fe6124fd2b5ba9ee26e6b94e056192981e54ffcfb81373c32f3"
+        },
+        "profile": {
+          "all_period": 55683764483,
+          "all_samples": 13661,
+          "lost_records": 0,
+          "owner_period": 10306403757,
+          "owner_samples": 2342,
+          "unresolved_period": 79059667
+        },
+        "replay_status": "pass",
+        "shape": "02-dense-sparse",
+        "status": "pass"
+      },
+      {
+        "byte_equal_after_known_root_normalization": true,
+        "canonical": {
+          "bytes": 88780,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0953/analysis/native-admission-03-v1.json",
+          "sha256": "a75cad7cbd93eaa880525d2632d59c3f6e3546eab36b5d87bdfab5a7fc935341"
+        },
+        "cell": 3,
+        "explicit_binary_file_open_events": 3,
+        "non_binary_original_packet_paths": [
+          "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1",
+          "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1/release"
+        ],
+        "normalized_output_sha256": "a75cad7cbd93eaa880525d2632d59c3f6e3546eab36b5d87bdfab5a7fc935341",
+        "original_packet_unique_paths": [
+          "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1",
+          "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1/release",
+          "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1/release/litchi-perf-baseline"
+        ],
+        "postverify_relocated_output": {
+          "bytes": 89380,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0953-archive/replay-results-postverify-v2/native-admission-03-relocated-postverify.json",
+          "sha256": "92129f5b90807ad612625a2920a22c213838dc74648131c332962a299c7f9a36"
+        },
+        "postverify_trace": {
+          "bytes": 278690,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0953-archive/replay-traces-postverify-v2/replay-03.strace.log",
+          "sha256": "51e8981477305ee1d90e0559fba5193ddd315fc0932e45a25c7a9b8cc05fa907"
+        },
+        "profile": {
+          "all_period": 34773065566,
+          "all_samples": 8883,
+          "lost_records": 0,
+          "owner_period": 5046933766,
+          "owner_samples": 1150,
+          "unresolved_period": 74376456
+        },
+        "replay_status": "pass",
+        "shape": "03-medium",
+        "status": "pass"
+      }
+    ],
+    "verification": {
+      "bytes": 10806,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0953-archive/replay-verification-v2.json",
+      "sha256": "6cf84a1ae66aec767c7d27246d4484346eaf22356deff0a8b697d7a8103eae51"
+    }
+  },
+  "repository_copy_note": "Root clarified that the current replay adapter remaps to its fixed designated extraction root; this command requires that root to be fresh. Numeric evidence and artifact descriptors are unchanged.",
+  "schema": "litchi.performance.0953.external-closure.v4",
+  "source_build_inputs": {
+    "dependencies": [
+      {
+        "copied": false,
+        "name": "0950",
+        "path": "/home/zhuhe/litchi-performance-0950"
+      },
+      {
+        "copied": false,
+        "name": "0952",
+        "path": "/home/zhuhe/litchi-performance-0952"
+      }
+    ],
+    "external_binary_archive_role": {
+      "bytes": 264707944,
+      "executable": true,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0953-archive-sealed-v1/binaries/litchi-perf-baseline-frame-pointer-v1",
+      "sha256": "0df5a52fc7b716cc0e7810b798987501f0053afcd85fcbe5a04cc00ec57a2274"
+    },
+    "external_binary_source": {
+      "bytes": 264707944,
+      "mode": 509,
+      "path": "/home/zhuhe/litchi-performance-0953/target-frame-pointer-native-v1/release/litchi-perf-baseline",
+      "sha256": "0df5a52fc7b716cc0e7810b798987501f0053afcd85fcbe5a04cc00ec57a2274"
+    },
+    "final_packet_files": {
+      "analysis/summary-compact-v2.json": {
+        "bytes": 13538,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0953/analysis/summary-compact-v2.json",
+        "sha256": "9c3e056c8a08fc17e99fac0e2b30c3c58e7bdd5aeacabafaf60cc7a132204cb0"
+      },
+      "analysis/summary-v1.json": {
+        "bytes": 492067,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0953/analysis/summary-v1.json",
+        "sha256": "a68ec751e5bbdf18b93a713c240f85b08347f12c242e8ad06a8c2648079fe420"
+      },
+      "builds/frame-pointer-native-v1/binary.json": {
+        "bytes": 801,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0953/builds/frame-pointer-native-v1/binary.json",
+        "sha256": "b337a99cd04a47dd4abbc2e1ee29c06a31ee89f791ad16c189a582aeaddc686a"
+      },
+      "builds/frame-pointer-native-v1/terminal.json": {
+        "bytes": 9316,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0953/builds/frame-pointer-native-v1/terminal.json",
+        "sha256": "21a96dbc3d28d87309ef54164e987f7745e3f88a8cd03bfa7fe4c95aef0882a4"
+      },
+      "plan-0953-v3.json": {
+        "bytes": 18661,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0953/plan-0953-v3.json",
+        "sha256": "8e295dc6a23059400a5855e3bd15d9aede22c9ff54d02a2261671e5b669bc3a5"
+      },
+      "review/final-profile-review-v2.json": {
+        "bytes": 32068,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0953/review/final-profile-review-v2.json",
+        "sha256": "9675557e5cb09ce44e4b7aaa6754125e65038b6383566ded04f47327d5bf0367"
+      },
+      "tools/analyze_0953_v3.py": {
+        "bytes": 40056,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0953/tools/analyze_0953_v3.py",
+        "sha256": "063eef6c4d29f01eb512100ed0d755e13ea1724eef4ccf6dbcae4fe96c165ac5"
+      },
+      "tools/capture_0953_v6.py": {
+        "bytes": 44719,
+        "mode": 493,
+        "path": "/home/zhuhe/litchi-performance-0953/tools/capture_0953_v6.py",
+        "sha256": "21dc19f3ad3b4b970b2dd72d97754cc4b02cba61a53e716674345f5dd6ab2def"
+      },
+      "tools/semantic_0953_v1.py": {
+        "bytes": 15508,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0953/tools/semantic_0953_v1.py",
+        "sha256": "aacf38abab63713aa5e8e9227632915e8713d63e6b0dddc3b71976f73056e28f"
+      }
+    },
+    "source_chain": {
+      "0950_source_manifest_sha256": "5b16ef65a17f868a2d941355baed30dbbf9e338b817365c02bfb7133fedc80d4",
+      "0950_source_root": "/home/zhuhe/litchi-performance-0950/candidate-source-v1",
+      "binary_build_receipt": {
+        "bytes": 801,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0953/builds/frame-pointer-native-v1/binary.json",
+        "sha256": "b337a99cd04a47dd4abbc2e1ee29c06a31ee89f791ad16c189a582aeaddc686a"
+      },
+      "binary_sha256": "0df5a52fc7b716cc0e7810b798987501f0053afcd85fcbe5a04cc00ec57a2274"
+    }
+  },
+  "source_closure": {
+    "bytes": 31385,
+    "path": "/home/zhuhe/litchi-performance-0953-archive/closure-0953-v4.json",
+    "sha256": "7e1419bd02d2b562445cb6e191fe22d810a8e90d234433f288e2e7b175a85358"
+  },
+  "status": "pass_with_cleanup_correction",
+  "summary_relocated_replay": {
+    "moved": {
+      "bytes": 492247,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0953-archive/summary-replay-moved-v1.json",
+      "sha256": "f1ba8344d757f8e742e81e0b5f16c78d8a9608018024f53dd615ee1929484002"
+    },
+    "normalized_sha256": "a68ec751e5bbdf18b93a713c240f85b08347f12c242e8ad06a8c2648079fe420",
+    "original": {
+      "bytes": 492067,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0953-archive/summary-replay-original-v1.json",
+      "sha256": "a68ec751e5bbdf18b93a713c240f85b08347f12c242e8ad06a8c2648079fe420"
+    },
+    "raw_path_normalized_byte_equal": true,
+    "scope": "Offline bounded reduction over all four native-admission-v3 rows; no workload/perf/decoder capture.",
+    "verification": {
+      "bytes": 1339,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0953-archive/summary-replay-verification-v1.json",
+      "sha256": "236113ad9b14ade18bd7fd53ae85ae9f3e114902d7d1b6595302b341451499f8"
+    }
+  }
+}
