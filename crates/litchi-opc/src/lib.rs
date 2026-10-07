@@ -88,7 +88,7 @@ pub use rel::{Relationship, Relationships, TargetMode};
 pub use source_backed::{
     AuthorizedPrecompressedPart, EffectiveContentType, EffectivePart, EffectivePartData,
     EffectiveTopology, PartBatch, PartData, PartReadSession, PartView, PreparedTopology,
-    RetainedPrecompressedPart, SourceArtifact, SourceArtifactFingerprint,
+    ReplacementSpan, RetainedPrecompressedPart, SourceArtifact, SourceArtifactFingerprint,
     SourceArtifactRestoreProof, SourceBackedPackage, SourceCacheCounterDelta,
     SourceCacheDiagnostics, SourceCacheDiagnosticsError, SourceCacheLimitError, SourceCacheLimits,
     SourceLineage, SourcePartSpliceFragment, SourcePartSpliceLimits, SourcePartSplicePlan,

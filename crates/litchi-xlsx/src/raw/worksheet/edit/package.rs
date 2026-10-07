@@ -2,6 +2,7 @@
 
 use std::collections::BTreeMap;
 
+use litchi_opc::ReplacementSpan;
 use litchi_sheet::{Cell as Address, Rect};
 
 use super::codec::{
@@ -10,7 +11,7 @@ use super::codec::{
     write_columns, write_defaults, write_new_columns, write_new_defaults, write_root,
     write_sheet_data, write_sheet_data_from_facts, write_sheet_data_with_provenance, write_tag,
 };
-use super::model::{MergePlan, Payload, Plan};
+use super::model::{Action, MergePlan, Payload, Plan};
 use super::validation::{
     expanded_dimension, plan_sets_descent, validate_actions, validate_column_actions,
     validate_defaults_action, validate_row_actions,
@@ -29,6 +30,9 @@ pub(crate) struct OmittedCells {
     pub(crate) start: usize,
     pub(crate) end: usize,
 }
+
+/// Upper bound for optional multi-window replacement metadata.
+pub(crate) const MAX_REPLACEMENT_SPANS: usize = 4_096;
 
 impl OmittedCells {
     /// The single-row cell range this omission covers.
@@ -53,6 +57,7 @@ pub(crate) struct ValueOnlyRewrite<'a> {
     pub(crate) source: &'a [u8],
     pub(crate) bytes: Vec<u8>,
     pub(crate) omitted: Box<[OmittedCells]>,
+    pub(crate) spans: Box<[ReplacementSpan]>,
 }
 pub(crate) fn rewrite(content: &[u8], sheet: &str, plan: impl Into<Plan>) -> Result<Vec<u8>> {
     let plan = plan.into();
@@ -177,7 +182,7 @@ fn rewrite_with_layout(content: &[u8], sheet: &str, layout: Layout, plan: Plan) 
 pub(crate) fn rewrite_value_only_with_provenance<'a>(
     content: &'a [u8],
     sheet: &str,
-    cells: BTreeMap<Address, super::model::Action>,
+    cells: BTreeMap<Address, Action>,
     facts: Option<&SourceFacts>,
 ) -> Result<ValueOnlyRewrite<'a>> {
     let plan = Plan::cells(cells);
@@ -186,6 +191,7 @@ pub(crate) fn rewrite_value_only_with_provenance<'a>(
             source: content,
             bytes: content.to_vec(),
             omitted: Box::new([]),
+            spans: Box::new([]),
         });
     }
 
@@ -222,10 +228,12 @@ pub(crate) fn rewrite_value_only_with_provenance<'a>(
             source: content,
             bytes: rewrite_with_layout(content, sheet, layout, plan)?,
             omitted: Box::new([]),
+            spans: Box::new([]),
         });
     }
 
     let dimension = expanded_dimension(&layout, &plan.cells);
+    let retain_spans = dimension.is_none() && admits_replacement_spans(&layout, &plan.cells);
     let extension_names = ExtensionNames::plan(&layout, plan_sets_descent(&plan))?;
     let effects = plan
         .cells
@@ -258,26 +266,63 @@ pub(crate) fn rewrite_value_only_with_provenance<'a>(
         cursor = tag.span.end;
     }
     output.extend_from_slice(&content[cursor..layout.sheet_data.span.start]);
-    let omitted = if cells.is_empty() {
+    let (omitted, spans) = if cells.is_empty() {
         output
             .extend_from_slice(&content[layout.sheet_data.span.start..layout.sheet_data.span.end]);
-        Box::new([])
+        (
+            Vec::<OmittedCells>::new().into_boxed_slice(),
+            Vec::<ReplacementSpan>::new().into_boxed_slice(),
+        )
     } else {
-        write_sheet_data_with_provenance(
+        let mut spans = Vec::new();
+        let mut recording_spans = retain_spans
+            && spans
+                .try_reserve(cells.len().min(MAX_REPLACEMENT_SPANS))
+                .is_ok();
+        let omitted = write_sheet_data_with_provenance(
             &mut output,
             content,
             &layout.sheet_data,
             cells,
             BTreeMap::new(),
             &extension_names.descent,
-        )?
+            &mut spans,
+            &mut recording_spans,
+        )?;
+        let spans = if recording_spans {
+            spans.into_boxed_slice()
+        } else {
+            Box::new([])
+        };
+        (omitted, spans)
     };
     output.extend_from_slice(&content[layout.sheet_data.span.end..]);
     Ok(ValueOnlyRewrite {
         source: content,
         bytes: output,
         omitted,
+        spans,
     })
+}
+
+fn admits_replacement_spans(layout: &Layout, cells: &BTreeMap<Address, Action>) -> bool {
+    cells.len() >= 2
+        && cells.iter().all(|(address, action)| {
+            let Some(number) = address.row().get().checked_add(1) else {
+                return false;
+            };
+            matches!(action, Action::Update { .. })
+                && layout
+                    .sheet_data
+                    .rows
+                    .iter()
+                    .find(|row| row.number == number)
+                    .is_some_and(|row| {
+                        row.cells
+                            .binary_search_by_key(address, |cell| cell.address)
+                            .is_ok()
+                    })
+        })
 }
 
 /// Test-only accounting of which commit route ran.
@@ -382,6 +427,7 @@ fn rewrite_from_facts<'a>(
     output
         .try_reserve(extra)
         .map_err(|source| allocation("worksheet edit output", source))?;
+    let retain_spans = dimension.is_none() && plan.cells.len() >= 2;
     let Plan { cells, .. } = plan;
     let mut cursor = 0usize;
     if let Some((fact, tag, range)) = dimension.as_ref() {
@@ -396,14 +442,33 @@ fn rewrite_from_facts<'a>(
         cursor = fact.span.end;
     }
     output.extend_from_slice(&content[cursor..facts.sheet_data.start]);
-    let omitted = write_sheet_data_from_facts(&mut output, content, facts, cells, &slots)?;
+    let mut spans = Vec::new();
+    let mut recording_spans = retain_spans
+        && spans
+            .try_reserve(cells.len().min(MAX_REPLACEMENT_SPANS))
+            .is_ok();
+    let omitted = write_sheet_data_from_facts(
+        &mut output,
+        content,
+        facts,
+        cells,
+        &slots,
+        &mut spans,
+        &mut recording_spans,
+    )?;
     output.extend_from_slice(&content[facts.sheet_data.end..]);
     #[cfg(test)]
     route::note_accepted();
+    let spans = if recording_spans {
+        spans.into_boxed_slice()
+    } else {
+        Box::new([])
+    };
     Ok(FactRewrite::Written(ValueOnlyRewrite {
         source: content,
         bytes: output,
         omitted,
+        spans,
     }))
 }
 
@@ -423,7 +488,7 @@ fn facts_admit_plan(facts: &SourceFacts, plan: &Plan) -> bool {
         return false;
     }
     plan.cells.iter().all(|(address, action)| {
-        if matches!(action, super::model::Action::Remove)
+        if matches!(action, Action::Remove)
             || matches!(action.payload(), Some(Payload::SharedFormula { .. }))
         {
             return false;
@@ -486,15 +551,12 @@ fn facts_cell(facts: &SourceFacts, address: Address) -> Option<CellFact> {
 /// the retained cell addresses instead of a rebuilt layout.
 fn expanded_dimension_from_facts(
     facts: &SourceFacts,
-    actions: &BTreeMap<Address, super::model::Action>,
+    actions: &BTreeMap<Address, Action>,
 ) -> Option<(DimensionFact, Rect)> {
     let dimension = facts.dimension?;
     let mut bounds = None::<Rect>;
     for cell in &*facts.cells {
-        if matches!(
-            actions.get(&cell.address),
-            Some(super::model::Action::Remove)
-        ) {
+        if matches!(actions.get(&cell.address), Some(Action::Remove)) {
             continue;
         }
         let single = Rect::single(cell.address);

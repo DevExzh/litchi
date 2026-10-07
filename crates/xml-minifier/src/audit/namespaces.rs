@@ -29,7 +29,10 @@
 //! The keys of every hash are random per audit, so an input cannot choose the
 //! collisions that would lengthen a comparison chain.
 
-use core::hash::{BuildHasher, BuildHasherDefault, Hasher};
+use core::{
+    hash::{BuildHasher, BuildHasherDefault, Hasher},
+    mem::size_of,
+};
 use std::collections::{HashMap, HashSet};
 use std::hash::RandomState;
 
@@ -145,6 +148,25 @@ impl Namespaces {
             recent: [EMPTY; RECENT],
             tags: self.tags,
         })
+    }
+
+    /// A checked logical admission charge for one independent namespace
+    /// snapshot. The hash-map factor deliberately charges more than the
+    /// key/value pair alone, covering bucket control bytes, alignment and
+    /// allocator slack. It is a conservative resource-accounting value, not a
+    /// physical RSS or allocator measurement. Callers charge it before
+    /// cloning, so an overflow or an exhausted aggregate budget falls back to
+    /// the complete audit.
+    pub(super) fn clone_memory_charge(&self) -> Option<usize> {
+        const HASH_ENTRY_FACTOR: usize = 8;
+        let hash_entry_bytes = size_of::<(u64, usize)>().checked_mul(HASH_ENTRY_FACTOR)?;
+        let mut bytes = size_of::<Self>();
+        bytes = bytes.checked_add(self.text.capacity())?;
+        bytes = bytes.checked_add(self.bindings.capacity().checked_mul(size_of::<Binding>())?)?;
+        bytes = bytes.checked_add(self.prefixes.capacity().checked_mul(hash_entry_bytes)?)?;
+        bytes = bytes.checked_add(self.names.capacity().checked_mul(size_of::<Name>())?)?;
+        bytes = bytes.checked_add(self.name_index.capacity().checked_mul(hash_entry_bytes)?)?;
+        Some(bytes)
     }
 
     fn prefix(&self, binding: usize) -> &[u8] {

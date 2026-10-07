@@ -1,5 +1,20 @@
 # Performance hotspot inventory
 
+## 0950 — transient windows remove the multi-window allocation regression
+
+[0950](0950-xlsx-transient-multi-window-audit.md) adopts the bounded candidate
+motivated by 0949: one pending source element replaces retained window/ancestor
+vectors, and a balanced-boundary reader reuses parser capacities. Complete
+original auditing and error precedence, exact gaps, inherited state, aggregate
+limits, and canonical fallback remain. Publication p50 improves 15.09%/11.47%
+on medium/dense-sparse one-percent edits; allocation calls fall 3.94%/3.45%,
+and requested bytes are nearly unchanged. Every frozen latency/memory gate
+passes; a single ordinary-control workflow-p99 +5.65% review flag is retained.
+The original scan and preservation writer remain necessary work. Refresh their
+post-adoption attribution before another optimization; do not reuse the older
+0944 instruction shares as current native-time fractions. Keep namespace-rich
+fallbacks and the control-tail observation in future qualification.
+
 ## 0949 — window storage dominates rejected candidate allocation bytes
 
 [0949](0949-xlsx-multi-window-allocation-attribution.md) attributes four fresh

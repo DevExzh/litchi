@@ -58,6 +58,7 @@ pub use splice::{
     SourcePartSplicePublication, SourcePartSpliceReplay, SourcePartSpliceReplayError,
     SourcePartSpliceReplayHandle, SourcePartSpliceReplayProof,
 };
+pub use xml_minifier::audit::ReplacementSpan;
 mod batch;
 pub use batch::PartBatch;
 pub(crate) mod content_types_plan;
@@ -83,6 +84,7 @@ const MAX_SOURCE_TOPOLOGY_PARTS: usize = 64;
 const MAX_SOURCE_TOPOLOGY_RELATIONSHIPS: usize = 4096;
 const MAX_SOURCE_RELATIONSHIP_FIELD_BYTES: usize = 64 * 1024;
 const MAX_SOURCE_TOPOLOGY_RELATIONSHIP_BYTES: usize = 8 * 1024 * 1024;
+const MAX_SOURCE_REPLACEMENT_SPANS: usize = 4096;
 const MAX_SOURCE_RELATIONSHIP_ATTRIBUTES_PER_ELEMENT: usize = 4096;
 const MAX_SOURCE_RELATIONSHIP_NAMESPACE_DECLARATIONS_PER_ELEMENT: usize = 256;
 const QUICK_XML_MAX_SAFE_DEPTH: usize = (u16::MAX as usize) - 1;
@@ -161,6 +163,7 @@ struct PendingOverlay {
     target: usize,
     replacement: Arc<Vec<u8>>,
     source_xml: Option<SourceXmlPart>,
+    replacement_spans: Option<Arc<[ReplacementSpan]>>,
 }
 
 /// A bounded source-backed OPC publication plan.
@@ -183,6 +186,7 @@ struct TopologyReplacement {
     partname: PackURI,
     replacement: Arc<Vec<u8>>,
     source_xml: Option<SourceXmlPart>,
+    replacement_spans: Option<Arc<[ReplacementSpan]>>,
 }
 
 #[derive(Debug)]
@@ -1915,6 +1919,29 @@ impl SourceTopologyPlan {
         self.try_replace_part_with_payload(partname, || replacement)
     }
 
+    /// Replace the payload of one existing Part while retaining caller-owned
+    /// replacement bytes and bounded, untrusted source-window hints.
+    ///
+    /// The hints are only used by the source XML audit during topology
+    /// publication. They never authorize a replacement and are discarded when
+    /// their count is outside the bounded multi-window range. A zero or one
+    /// hint therefore follows the historical complete replacement audit.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same typed URI, operation-count, duplicate-name, and
+    /// allocation errors as [`Self::try_replace_part_shared`].
+    pub fn try_replace_part_shared_with_spans(
+        &mut self,
+        partname: PackURI,
+        replacement: Arc<Vec<u8>>,
+        spans: Arc<[ReplacementSpan]>,
+    ) -> Result<()> {
+        let spans =
+            (spans.len() > 1 && spans.len() <= MAX_SOURCE_REPLACEMENT_SPANS).then_some(spans);
+        self.try_replace_part_with_payload_and_spans(partname, || replacement, spans)
+    }
+
     /// Replace one existing XML Part with a source-authorized payload.
     ///
     /// The source payload may be an exact copy or a checked splice assembled
@@ -1949,11 +1976,24 @@ impl SourceTopologyPlan {
             partname,
             replacement,
             source_xml: Some(source_xml),
+            replacement_spans: None,
         });
         Ok(())
     }
 
     fn try_replace_part_with_payload<F>(&mut self, partname: PackURI, replacement: F) -> Result<()>
+    where
+        F: FnOnce() -> Arc<Vec<u8>>,
+    {
+        self.try_replace_part_with_payload_and_spans(partname, replacement, None)
+    }
+
+    fn try_replace_part_with_payload_and_spans<F>(
+        &mut self,
+        partname: PackURI,
+        replacement: F,
+        replacement_spans: Option<Arc<[ReplacementSpan]>>,
+    ) -> Result<()>
     where
         F: FnOnce() -> Arc<Vec<u8>>,
     {
@@ -1968,6 +2008,7 @@ impl SourceTopologyPlan {
             partname,
             replacement: replacement(),
             source_xml: None,
+            replacement_spans,
         });
         Ok(())
     }
@@ -8308,6 +8349,7 @@ impl SourceBackedPackage {
                 target,
                 replacement: Arc::clone(&replacement.replacement),
                 source_xml: replacement.source_xml.clone(),
+                replacement_spans: replacement.replacement_spans.clone(),
             });
         }
         let mut pending_replacement_indices = HashMap::new();
@@ -9628,10 +9670,11 @@ impl SourceBackedPackage {
                     part.partname.as_str(),
                     part.content_type.as_str(),
                 ) {
-                    validate_source_part_replacement_xml(
+                    audit_source_part_replacement_xml(
                         part.partname.as_str(),
                         original.as_bytes(),
                         &replacement.replacement,
+                        replacement.replacement_spans.as_deref(),
                     )?;
                 }
                 changed.push(ChangedOverlay {
@@ -10420,6 +10463,7 @@ impl SourceBackedPackage {
                     target,
                     replacement: Arc::new(replacement),
                     source_xml: None,
+                    replacement_spans: None,
                 });
                 continue;
             }
@@ -10453,6 +10497,7 @@ impl SourceBackedPackage {
                 target,
                 replacement: Arc::new(replacement),
                 source_xml: None,
+                replacement_spans: None,
             });
             relationship_overlays.push((
                 target,
@@ -10731,6 +10776,7 @@ impl SourceBackedPackage {
                 target,
                 replacement: into_shared(replacement),
                 source_xml: None,
+                replacement_spans: None,
             });
         }
         let mut omitted_members = Vec::new();
@@ -12938,32 +12984,55 @@ fn validate_overlay_xml(part: &str, bytes: &[u8]) -> Result<()> {
 /// after the XML declaration, attribute separators of any length and
 /// whitespace before a tag close are accepted as the producer spelled them.
 ///
-/// Change 0747 audits the pair with one
-/// [`xml_minifier::audit::verify_source_replacement`] call. Its verdict is
-/// exactly that of auditing the original and then the replacement with
+/// Change 0747 audits the pair with one source-replacement audit call. The
+/// established paths use
+/// [`xml_minifier::audit::verify_source_replacement`], while the topology
+/// path may use its bounded
+/// [`xml_minifier::audit::verify_source_replacement_with_spans`] variant when
+/// it receives more than one untrusted window hint. Both verdicts are exactly
+/// those of auditing the original and then the replacement with
 /// `verify_source`, including which side fails first and the error it
-/// reports; it only avoids scanning again the replacement bytes that repeat
-/// the original's outside the one element an edit replaced, which the
-/// original's audit checked in the same parser state moments earlier.
+/// reports; the window path only avoids scanning again replacement bytes that
+/// repeat the original outside the hinted elements, which the original's
+/// audit checked in the same parser state moments earlier. Invalid or
+/// incomplete hints fall back to the complete replacement audit.
 ///
 /// [`validate_overlay_xml`] keeps the authored contract where this library
 /// composes a whole stream with no source to inherit from: its canonical
 /// relationship XML and a Part a plan *adds*.
+fn audit_source_part_replacement_xml(
+    part: &str,
+    original: &[u8],
+    replacement: &[u8],
+    spans: Option<&[ReplacementSpan]>,
+) -> Result<xml_minifier::audit::ReplacementProof> {
+    let audit = match spans {
+        Some(spans) if spans.len() > 1 && spans.len() <= MAX_SOURCE_REPLACEMENT_SPANS => {
+            xml_minifier::audit::verify_source_replacement_with_spans(
+                original,
+                replacement,
+                xml_minifier::audit::Limits::default(),
+                spans,
+            )
+        },
+        _ => xml_minifier::audit::verify_source_replacement(
+            original,
+            replacement,
+            xml_minifier::audit::Limits::default(),
+        ),
+    };
+    audit.map_err(|error| OpcError::XmlPublication {
+        part: part.to_string(),
+        source: error.into_error(),
+    })
+}
+
 fn validate_source_part_replacement_xml(
     part: &str,
     original: &[u8],
     replacement: &[u8],
 ) -> Result<()> {
-    xml_minifier::audit::verify_source_replacement(
-        original,
-        replacement,
-        xml_minifier::audit::Limits::default(),
-    )
-    .map(|_proof| ())
-    .map_err(|error| OpcError::XmlPublication {
-        part: part.to_string(),
-        source: error.into_error(),
-    })
+    audit_source_part_replacement_xml(part, original, replacement, None).map(|_| ())
 }
 
 fn checked_overlay_total(
@@ -14987,6 +15056,151 @@ mod tests {
                 .read(partname.membername())
                 .unwrap(),
             b"<after/>"
+        );
+    }
+
+    #[test]
+    fn topology_replace_part_shared_with_spans_publishes_multiwindow_xml() {
+        let original = "<r><a>0</a><b>0</b><c>unchanged</c></r>";
+        let replacement = "<r><a>1</a><b>12345</b><c>unchanged</c></r>";
+        let original_a = original.find("<a>0</a>").unwrap();
+        let replacement_a = replacement.find("<a>1</a>").unwrap();
+        let original_b = original.find("<b>0</b>").unwrap();
+        let replacement_b = replacement.find("<b>12345</b>").unwrap();
+        let spans: Arc<[ReplacementSpan]> = Arc::from(vec![
+            ReplacementSpan {
+                original: original_a..original_a + "<a>0</a>".len(),
+                replacement: replacement_a..replacement_a + "<a>1</a>".len(),
+            },
+            ReplacementSpan {
+                original: original_b..original_b + "<b>0</b>".len(),
+                replacement: replacement_b..replacement_b + "<b>12345</b>".len(),
+            },
+        ]);
+        let proof = audit_source_part_replacement_xml(
+            "/word/document.xml",
+            original.as_bytes(),
+            replacement.as_bytes(),
+            Some(spans.as_ref()),
+        );
+        assert!(matches!(
+            proof,
+            Ok(xml_minifier::audit::ReplacementProof::Windows { count: 2, .. })
+        ));
+
+        let partname = PackURI::new("/word/document.xml").unwrap();
+        let mut plan = SourceTopologyPlan::new();
+        plan.try_replace_part_shared_with_spans(
+            partname.clone(),
+            Arc::new(replacement.as_bytes().to_vec()),
+            Arc::clone(&spans),
+        )
+        .unwrap();
+        assert_eq!(
+            plan.replacements[0].replacement_spans.as_deref(),
+            Some(spans.as_ref())
+        );
+
+        let mut output = Vec::new();
+        SourceBackedPackage::from_vec(archive_bytes(
+            root_relationships(),
+            original.as_bytes(),
+            false,
+        ))
+        .unwrap()
+        .write_topology_to_stream(&mut output, plan)
+        .unwrap();
+        assert_eq!(
+            soapberry_zip::office::ArchiveReader::new(&output)
+                .unwrap()
+                .read(partname.membername())
+                .unwrap(),
+            replacement.as_bytes()
+        );
+    }
+
+    #[test]
+    fn topology_replace_part_shared_with_spans_cannot_bypass_malformed_replacement() {
+        let original = "<r><a>0</a><b>0</b><c>0</c></r>";
+        let replacement = "<r><a>1</broken><b>2</b><c>0</c></r>";
+        let original_a = original.find("<a>0</a>").unwrap();
+        let replacement_a = replacement.find("<a>1</broken>").unwrap();
+        let original_b = original.find("<b>0</b>").unwrap();
+        let spans: Arc<[ReplacementSpan]> = Arc::from(vec![
+            ReplacementSpan {
+                original: original_a..original_a + "<a>0</a>".len(),
+                replacement: replacement_a..replacement_a + "<a>1</broken>".len(),
+            },
+            // This out-of-bounds hint forces the auditor's complete fallback;
+            // it cannot turn the malformed first window into a proof.
+            ReplacementSpan {
+                original: original_b..original_b + "<b>0</b>".len(),
+                replacement: replacement.len()..replacement.len() + 1,
+            },
+        ]);
+        assert!(matches!(
+            audit_source_part_replacement_xml(
+                "/word/document.xml",
+                original.as_bytes(),
+                replacement.as_bytes(),
+                Some(spans.as_ref()),
+            ),
+            Err(OpcError::XmlPublication { .. })
+        ));
+
+        let partname = PackURI::new("/word/document.xml").unwrap();
+        let mut plan = SourceTopologyPlan::new();
+        plan.try_replace_part_shared_with_spans(
+            partname,
+            Arc::new(replacement.as_bytes().to_vec()),
+            spans,
+        )
+        .unwrap();
+        let mut output = Vec::new();
+        assert!(matches!(
+            SourceBackedPackage::from_vec(archive_bytes(
+                root_relationships(),
+                original.as_bytes(),
+                false,
+            ))
+            .unwrap()
+            .write_topology_to_stream(&mut output, plan),
+            Err(OpcError::XmlPublication { .. })
+        ));
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn topology_replace_part_shared_with_spans_drops_overbound_hints() {
+        let mut plan = SourceTopologyPlan::new();
+        let spans: Arc<[ReplacementSpan]> = Arc::from(
+            (0..=MAX_SOURCE_REPLACEMENT_SPANS)
+                .map(|index| ReplacementSpan {
+                    original: index..index + 1,
+                    replacement: index..index + 1,
+                })
+                .collect::<Vec<_>>(),
+        );
+        let partname = PackURI::new("/word/document.xml").unwrap();
+        plan.try_replace_part_shared_with_spans(
+            partname.clone(),
+            Arc::new(b"<replacement/>".to_vec()),
+            spans,
+        )
+        .unwrap();
+        assert!(plan.replacements[0].replacement_spans.is_none());
+
+        let mut output = Vec::new();
+        SourceBackedPackage::from_vec(archive_bytes(root_relationships(), b"<before/>", false))
+            .unwrap()
+            .write_topology_to_stream(&mut output, plan)
+            .unwrap();
+        assert_eq!(
+            soapberry_zip::office::ArchiveReader::new(&output)
+                .unwrap()
+                .read(partname.membername())
+                .unwrap(),
+            b"<replacement/>"
         );
     }
 

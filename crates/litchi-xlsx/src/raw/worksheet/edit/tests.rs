@@ -242,6 +242,105 @@ fn ordinary_and_provenance_writers_match_for_nonsemantic_multi_primary_bytes() {
 }
 
 #[test]
+fn provenance_records_changed_cell_windows_and_preserves_length_changed_gaps() {
+    let source = format!(
+        r#"<worksheet xmlns="{S}"><sheetData><row r="1"><c r="A1"><v>1</v></c>  <c r="B1"><v>2</v></c></row></sheetData></worksheet>"#
+    )
+    .into_bytes();
+    let edited = rewrite_value_only_with_provenance(
+        &source,
+        "Data",
+        BTreeMap::from([
+            (
+                Address::from_a1("A1").expect("A1"),
+                Action::set("a longer replacement value".into()),
+            ),
+            (
+                Address::from_a1("B1").expect("B1"),
+                Action::set("short".into()),
+            ),
+        ]),
+        None,
+    )
+    .expect("multi-cell rewrite");
+
+    assert_eq!(edited.spans.len(), 2, "both existing cells get windows");
+    let mut source_cursor = 0;
+    let mut replacement_cursor = 0;
+    for span in &edited.spans {
+        assert_eq!(
+            &source[source_cursor..span.original.start],
+            &edited.bytes[replacement_cursor..span.replacement.start],
+            "unchanged gaps stay byte-identical",
+        );
+        assert!(
+            source[span.original.clone()].starts_with(b"<c "),
+            "source windows cover complete cell elements",
+        );
+        assert!(
+            edited.bytes[span.replacement.clone()].starts_with(b"<c "),
+            "replacement windows cover complete cell elements",
+        );
+        source_cursor = span.original.end;
+        replacement_cursor = span.replacement.end;
+    }
+    assert_eq!(
+        &source[source_cursor..],
+        &edited.bytes[replacement_cursor..],
+        "the trailing gap stays byte-identical",
+    );
+    assert_ne!(source, edited.bytes);
+}
+
+#[test]
+fn provenance_drops_windows_for_single_new_or_removed_cell_changes() {
+    let source = format!(
+        r#"<worksheet xmlns="{S}"><dimension ref="A1:B1"/><sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1"><v>2</v></c></row></sheetData></worksheet>"#
+    )
+    .into_bytes();
+    let rewrite = |actions| {
+        rewrite_value_only_with_provenance(&source, "Data", actions, None)
+            .expect("value-only fallback rewrite")
+    };
+
+    let single = rewrite(BTreeMap::from([(
+        Address::from_a1("A1").expect("A1"),
+        Action::set(3_i32.into()),
+    )]));
+    assert!(
+        single.spans.is_empty(),
+        "one window delegates the old route"
+    );
+
+    let with_new = rewrite(BTreeMap::from([
+        (
+            Address::from_a1("A1").expect("A1"),
+            Action::set(3_i32.into()),
+        ),
+        (
+            Address::from_a1("C1").expect("C1"),
+            Action::set(4_i32.into()),
+        ),
+    ]));
+    assert!(
+        with_new.spans.is_empty(),
+        "new cell changes use the full route"
+    );
+
+    let with_remove = rewrite(BTreeMap::from([
+        (Address::from_a1("A1").expect("A1"), Action::Remove),
+        (
+            Address::from_a1("B1").expect("B1"),
+            Action::set(4_i32.into()),
+        ),
+    ]));
+    assert!(
+        with_remove.spans.is_empty(),
+        "removed cell changes use the full route"
+    );
+}
+
+#[test]
 fn style_only_multi_primary_and_empty_owner_rewrite_is_lossless() {
     let source = format!(
         r#"<x:worksheet xmlns:x="{S}" xmlns:u="urn:future"><x:sheetData><x:row r="1"><x:c r="A1"><x:v>first</x:v><!--style-only-sentinel--><x:v>second</x:v><x:extLst><u:opaque marker="keep"/></x:extLst><x:is><x:t>third</x:t></x:is></x:c><x:c r="B1"/></x:row><x:row r="2"/></x:sheetData></x:worksheet>"#

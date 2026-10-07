@@ -1,5 +1,17 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0950 — adopted transient XLSX multi-window audit
+
+[0950](0950-xlsx-transient-multi-window-audit.md) adopts transient replacement
+windows with reused parser capacity after all 88 children pass semantic/custody
+checks and all frozen latency/allocation gates pass. Medium/dense-sparse
+one-percent edits improve publication p50 by 15.09%/11.47% and workflow p50 by
+6.20%/4.88% (medians of paired ratios). Publication allocation calls fall from
+406 to 390/392, with nearly unchanged requested bytes. All 30 broader quality
+checks pass. Ordinary one-edit block 2 retains a +5.65% workflow-p99 review flag;
+its p50/p95 hard gates pass, and independent review accepts adoption with this
+limitation disclosed. No cold-cache, concurrency, or general Office claim is made.
+
 ## 0949 — allocation attribution of the rejected multi-window candidate
 
 [0949](0949-xlsx-multi-window-allocation-attribution.md) retains four serial

@@ -830,6 +830,33 @@ impl State {
         }
     }
 
+    /// Reinitializes reusable replacement-window state without giving up the
+    /// capacities of its per-window scratch vectors.
+    ///
+    /// The exhaustive literal makes a new state field force a decision about
+    /// reset semantics. The namespace snapshot is the only state carried in
+    /// from the original audit.
+    fn reset_within(&mut self, depth: usize, namespaces: Namespaces) {
+        let mut prefixed = core::mem::take(&mut self.prefixed);
+        let mut spaces = core::mem::take(&mut self.spaces);
+        prefixed.clear();
+        spaces.clear();
+        *self = Self {
+            ambiguous_space_offset: None,
+            attributes: 0,
+            depth,
+            document_start: false,
+            events: 0,
+            max_depth: depth,
+            namespaces: Some(namespaces),
+            prefixed,
+            roots: 1,
+            spaces,
+            text_bytes: 0,
+            text_run_has_explicit_content: false,
+        };
+    }
+
     fn current_space(&self) -> Space {
         self.spaces.last().copied().unwrap_or(Space::Default)
     }
@@ -935,6 +962,22 @@ pub fn verify_source(input: &[u8], limits: Limits) -> Result<Report, Error> {
     verify_with_policy(input, limits, Policy::SOURCE)
 }
 
+/// One untrusted source/replacement byte-span hint for
+/// [`verify_source_replacement_with_spans`].
+///
+/// A caller may use this low-level type to describe an element-sized change it
+/// already located while producing a replacement. The auditor treats every
+/// field as a hint: it checks the ranges against both payloads, checks that
+/// the corresponding gaps are byte-identical, and falls back to a complete
+/// replacement audit when the hints do not describe a safe set of windows.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReplacementSpan {
+    /// The source bytes replaced by this edit.
+    pub original: Range<usize>,
+    /// The replacement bytes that take the source span's place.
+    pub replacement: Range<usize>,
+}
+
 /// How [`verify_source_replacement`] established the replacement's verdict.
 ///
 /// Every variant means the same thing about the replacement: it passed every
@@ -956,6 +999,17 @@ pub enum ReplacementProof {
         original: Range<usize>,
         /// The replacement bytes that took its place.
         replacement: Range<usize>,
+    },
+    /// The replacement was proved by auditing several disjoint element
+    /// windows while the identical gaps retained the original audit's
+    /// verdict.
+    Windows {
+        /// Number of replacement windows that were audited.
+        count: usize,
+        /// Total source bytes occupied by the audited windows.
+        original_bytes: usize,
+        /// Total replacement bytes occupied by the audited windows.
+        replacement_bytes: usize,
     },
     /// The replacement was scanned completely, as [`verify_source`] scans it.
     Complete,
@@ -1010,18 +1064,18 @@ impl std::error::Error for ReplacementError {
 /// [`ReplacementError::Replacement`] carrying the error of
 /// `verify_source(replacement, limits)` when that fails, otherwise `Ok`.
 ///
-/// The original is always scanned completely. The replacement usually differs
-/// from it only locally, and is then not scanned again where it repeats the
-/// original byte for byte: the audit of the original also locates the
-/// innermost element, other than the document element, that covers every
-/// byte in which the two differ. Outside that element the replacement is the
-/// original's own bytes, so they tokenize as the original's did and were
-/// checked, in the same parser state, moments earlier. Only the replacement
-/// bytes that took the element's place are scanned, starting in the state the
-/// original reached there: the same open-element depth, inside the document
-/// element, with no enclosing element closable from inside. They must be
-/// balanced and must begin and end with markup, so the parse outside them is
-/// unchanged; each aggregate budget is then re-totalled for the whole
+/// The original is always scanned completely before a replacement verdict is
+/// returned. The replacement usually differs from it only locally, and is then
+/// not scanned again where it repeats the original byte for byte: the audit of
+/// the original also locates the innermost element, other than the document
+/// element, that covers every byte in which the two differ. Outside that
+/// element the replacement is the original's own bytes, so they tokenize as
+/// the original's did and were checked in the same parser state. Only the
+/// replacement bytes that took the element's place are scanned, starting in
+/// the state the original reached there: the same open-element depth, inside
+/// the document element, with no enclosing element closable from inside. They
+/// must be balanced and must begin and end with markup, so the parse outside
+/// them is unchanged; each aggregate budget is then re-totalled for the whole
 /// replacement, and the replacement's length is checked against
 /// [`Limits::max_bytes`]. UTF-8 validity composes, because the window starts
 /// and ends at an ASCII delimiter.
@@ -1074,6 +1128,175 @@ pub fn verify_source_replacement(
     verify_source(replacement, limits)
         .map(|_report| ReplacementProof::Complete)
         .map_err(ReplacementError::Replacement)
+}
+
+/// The maximum number of caller-supplied windows the multi-window candidate
+/// will retain while observing the original. A larger hint set is treated as
+/// untrusted metadata and uses the canonical complete replacement audit.
+const MAX_REPLACEMENT_SPANS: usize = 4_096;
+/// Aggregate bound for retained namespace snapshots in one candidate proof.
+/// A source with larger inherited namespace state falls back to the complete
+/// replacement audit instead of multiplying that state across windows.
+const MAX_REPLACEMENT_NAMESPACE_CLONE_BYTES: usize = 8 * 1024 * 1024;
+
+/// Verifies a source/replacement pair using several caller-supplied element
+/// spans when they can be proved safe.
+///
+/// The hints are deliberately low-level and untrusted. The original is
+/// audited completely before any replacement verdict is returned. For two or
+/// more spans, the auditor uses that scan to establish that each source range
+/// is exactly one balanced, non-root element and to capture the inherited
+/// namespace state at its boundary. As each such element closes, its
+/// corresponding replacement range may be audited provisionally while the
+/// original scan continues; no provisional result can suppress an original
+/// error. Every gap between the ranges must be byte-identical on both sides,
+/// and aggregate event, attribute, text, and byte limits are checked after all
+/// windows are re-totalled.
+///
+/// Any unsupported or ambiguous shape, including an out-of-order, overlapping,
+/// out-of-bounds, non-element, or allocation-failed hint, falls back to the
+/// complete replacement audit. That fallback supplies the canonical
+/// replacement error and offset. A single span deliberately uses
+/// [`verify_source_replacement`] so the established one-window behavior and
+/// proof variant remain unchanged.
+///
+/// # Errors
+///
+/// Returns [`ReplacementError::Original`] when the complete source audit
+/// fails, or [`ReplacementError::Replacement`] with the canonical complete
+/// replacement error when the replacement fails.
+pub fn verify_source_replacement_with_spans(
+    original: &[u8],
+    replacement: &[u8],
+    limits: Limits,
+    spans: &[ReplacementSpan],
+) -> Result<ReplacementProof, ReplacementError> {
+    if spans.len() <= 1 {
+        return verify_source_replacement(original, replacement, limits);
+    }
+
+    // Preserve the exact no-op proof after auditing the original, regardless
+    // of whether a caller supplied stale or otherwise unnecessary hints.
+    if original == replacement {
+        return verify_source(original, limits)
+            .map(|_report| ReplacementProof::Identical)
+            .map_err(ReplacementError::Original);
+    }
+
+    if spans.len() > MAX_REPLACEMENT_SPANS {
+        let _report = verify_source(original, limits).map_err(ReplacementError::Original)?;
+        return verify_source(replacement, limits)
+            .map(|_report| ReplacementProof::Complete)
+            .map_err(ReplacementError::Replacement);
+    }
+
+    // Keep the established byte-limit precedence and avoid comparing gaps in
+    // an over-limit payload before the canonical original audit reports it.
+    if original.len() > limits.bytes {
+        return verify_source(original, limits)
+            .map(|_report| ReplacementProof::Complete)
+            .map_err(ReplacementError::Original);
+    }
+    if replacement.len() > limits.bytes {
+        let _report = verify_source(original, limits).map_err(ReplacementError::Original)?;
+        return verify_source(replacement, limits)
+            .map(|_report| ReplacementProof::Complete)
+            .map_err(ReplacementError::Replacement);
+    }
+
+    let byte_totals = span_byte_totals(spans);
+    let bounds_ok = span_ranges_fit(original, replacement, spans);
+    let sums_ok = byte_totals
+        .is_some_and(|(_original, replacement_bytes)| replacement_bytes <= replacement.len() / 2);
+    let layout_ok = bounds_ok && sums_ok && spans_cover_differences(original, replacement, spans);
+    let mut search = MultiWindowSearch::new(
+        spans,
+        replacement,
+        limits,
+        layout_ok && sums_ok,
+        byte_totals,
+    );
+    let report = verify_observed(original, limits, Policy::SOURCE, &mut search)
+        .map_err(ReplacementError::Original)?;
+    if !layout_ok || !search.complete() {
+        drop(search);
+        return verify_source(replacement, limits)
+            .map(|_report| ReplacementProof::Complete)
+            .map_err(ReplacementError::Replacement);
+    }
+
+    let Some(proof) = search.prove(report, limits) else {
+        return verify_source(replacement, limits)
+            .map(|_report| ReplacementProof::Complete)
+            .map_err(ReplacementError::Replacement);
+    };
+    #[cfg(debug_assertions)]
+    debug_check_window_proof(replacement, limits, &proof);
+    Ok(proof)
+}
+
+/// Checked source and replacement byte totals for untrusted span metadata.
+fn span_byte_totals(spans: &[ReplacementSpan]) -> Option<(usize, usize)> {
+    spans.iter().try_fold(
+        (0usize, 0usize),
+        |(original_total, replacement_total), span| {
+            let original = span.original.end.checked_sub(span.original.start)?;
+            let replacement = span.replacement.end.checked_sub(span.replacement.start)?;
+            Some((
+                original_total.checked_add(original)?,
+                replacement_total.checked_add(replacement)?,
+            ))
+        },
+    )
+}
+
+/// Checks untrusted ranges with bounded indexing before comparing their gaps.
+fn span_ranges_fit(original: &[u8], replacement: &[u8], spans: &[ReplacementSpan]) -> bool {
+    spans.iter().all(|span| {
+        span.original.start < span.original.end
+            && span.replacement.start < span.replacement.end
+            && original.get(span.original.clone()).is_some()
+            && replacement.get(span.replacement.clone()).is_some()
+    })
+}
+
+/// Check the untrusted span layout without parsing either payload.
+///
+/// Every byte outside a supplied replacement range must occur at the same
+/// relative gap on both sides. This proves that the hints cover every changed
+/// byte while keeping the original audit responsible for all XML structure.
+fn spans_cover_differences(original: &[u8], replacement: &[u8], spans: &[ReplacementSpan]) -> bool {
+    let mut original_cursor = 0;
+    let mut replacement_cursor = 0;
+    for span in spans {
+        let original_range = &span.original;
+        let replacement_range = &span.replacement;
+        if original_range.start >= original_range.end
+            || replacement_range.start >= replacement_range.end
+            || original_range.start < original_cursor
+            || replacement_range.start < replacement_cursor
+        {
+            return false;
+        }
+        let Some(original_gap) = original.get(original_cursor..original_range.start) else {
+            return false;
+        };
+        let Some(replacement_gap) = replacement.get(replacement_cursor..replacement_range.start)
+        else {
+            return false;
+        };
+        if original_gap != replacement_gap {
+            return false;
+        }
+        if original.get(original_range.clone()).is_none()
+            || replacement.get(replacement_range.clone()).is_none()
+        {
+            return false;
+        }
+        original_cursor = original_range.end;
+        replacement_cursor = replacement_range.end;
+    }
+    original.get(original_cursor..) == replacement.get(replacement_cursor..)
 }
 
 /// A shared allocation whose exact bytes passed [`verify_source`] under
@@ -1893,16 +2116,50 @@ struct Source<'a> {
 /// it must make [`verify_source_replacement`] fall back to the complete scan.
 /// Debug builds re-derive every window proof from a complete audit of the
 /// replacement, so a violation fails any debug test that reaches one.
-fn scan<O: Observer>(
-    source: Source<'_>,
+fn scan<'a, O: Observer>(
+    source: Source<'a>,
     limits: Limits,
     policy: Policy,
     state: &mut State,
     observer: &mut O,
 ) -> Result<(), Error> {
+    let mut reader = Reader::from_str(source.xml);
+    reader.config_mut().trim_text(false);
+    scan_reader::<false, _>(source, limits, policy, state, observer, &mut reader, 0)
+}
+
+/// The normal source scan ends by reading quick-xml's EOF event. A reusable
+/// replacement scan stops when its current slice is consumed instead, before
+/// asking quick-xml for EOF (which would put the reader in `Done`).
+fn scan_position<const SEGMENT: bool>(
+    reader: &Reader<&[u8]>,
+    bom_bytes: usize,
+    base: u64,
+) -> Result<usize, Error> {
+    if SEGMENT {
+        reader
+            .buffer_position()
+            .checked_sub(base)
+            .and_then(|offset| usize::try_from(offset).ok())
+            .and_then(|offset| offset.checked_add(bom_bytes))
+            .ok_or_else(|| Error::malformed(usize::MAX, "parser position escaped input"))
+    } else {
+        Ok(position(reader).saturating_add(bom_bytes))
+    }
+}
+
+fn scan_reader<'a, const SEGMENT: bool, O: Observer>(
+    source: Source<'a>,
+    limits: Limits,
+    policy: Policy,
+    state: &mut State,
+    observer: &mut O,
+    reader: &mut Reader<&'a [u8]>,
+    base: u64,
+) -> Result<(), Error> {
     let Source {
         input,
-        xml,
+        xml: _,
         bom_bytes,
         characters,
     } = source;
@@ -1910,18 +2167,15 @@ fn scan<O: Observer>(
     // Where the next `]]>` at or after the latest text token starts: found
     // with the characters, and searched for again only past it.
     let mut cdata_close = characters.cdata_close;
-    let mut reader = Reader::from_str(xml);
-    reader.config_mut().trim_text(false);
-
     loop {
-        let start = position(&reader).saturating_add(bom_bytes);
+        let start = scan_position::<SEGMENT>(reader, bom_bytes, base)?;
         let event = reader.read_event().map_err(|error| {
             Error::malformed(
-                position(&reader).saturating_add(bom_bytes),
+                scan_position::<SEGMENT>(reader, bom_bytes, base).unwrap_or(usize::MAX),
                 error.to_string(),
             )
         })?;
-        let end = position(&reader).saturating_add(bom_bytes);
+        let end = scan_position::<SEGMENT>(reader, bom_bytes, base)?;
         let raw = input
             .get(start..end)
             .ok_or_else(|| Error::malformed(start, "parser position escaped input"))?;
@@ -2073,12 +2327,23 @@ fn scan<O: Observer>(
                 return Err(Error::Doctype { offset: start });
             },
             Event::Eof => {
+                if SEGMENT {
+                    return Err(Error::malformed(start, "reusable reader reached EOF"));
+                }
                 finish_text_run(state, policy.reject_ambiguous_space)?;
                 break;
             },
         };
         if listening {
             observer.accepted(token, start, end, before, state);
+        }
+        if SEGMENT && reader.get_ref().is_empty() {
+            // The old per-window scan charged and then removed its EOF event.
+            // Charge the same synthetic event without asking the reusable
+            // reader to enter its terminal state.
+            state.events = checked_add(state.events, 1, Resource::Events, limits.events, end)?;
+            finish_text_run(state, policy.reject_ambiguous_space)?;
+            break;
         }
     }
     Ok(())
@@ -2133,6 +2398,14 @@ impl Counters {
             && self.events <= limits.events
             && self.text_bytes <= limits.text_bytes
     }
+}
+
+fn add_counters(left: Counters, right: Counters) -> Option<Counters> {
+    Some(Counters {
+        attributes: left.attributes.checked_add(right.attributes)?,
+        events: left.events.checked_add(right.events)?,
+        text_bytes: left.text_bytes.checked_add(right.text_bytes)?,
+    })
 }
 
 /// The lexical class of one token the slice auditor accepted.
@@ -2294,6 +2567,320 @@ impl Observer for WindowSearch<'_> {
             },
             Token::Empty if start <= self.prefix => self.consider(start, end, before, state),
             Token::Empty | Token::Markup | Token::Character => {},
+        }
+    }
+}
+
+/// One active source element whose exact closing token still has to be seen.
+#[derive(Clone, Copy)]
+struct PendingWindow {
+    span: usize,
+    end: usize,
+    /// Depth immediately after the target's start tag.
+    depth: usize,
+    before: Counters,
+}
+
+/// Watches a complete original audit for the exact element ranges named by a
+/// bounded set of replacement hints.
+///
+/// The observer retains no per-window vector. It keeps one pending source
+/// element and audits each corresponding replacement slice as soon as that
+/// element closes. Any allocation failure or unmatched range disables the
+/// candidate while the complete original scan continues.
+struct MultiWindowSearch<'s, 'r> {
+    spans: &'s [ReplacementSpan],
+    replacement: &'r [u8],
+    next: usize,
+    pending: Option<PendingWindow>,
+    namespace_clone_bytes: usize,
+    removed: Counters,
+    added: Counters,
+    count: usize,
+    original_bytes: usize,
+    replacement_bytes: usize,
+    limits: Limits,
+    reader: Option<Reader<&'r [u8]>>,
+    state: Option<State>,
+    last: LastToken,
+    eligible: bool,
+    failed: bool,
+}
+
+impl<'s, 'r> MultiWindowSearch<'s, 'r> {
+    fn new(
+        spans: &'s [ReplacementSpan],
+        replacement: &'r [u8],
+        limits: Limits,
+        eligible: bool,
+        byte_totals: Option<(usize, usize)>,
+    ) -> Self {
+        let (original_bytes, replacement_bytes) = byte_totals.unwrap_or_default();
+        Self {
+            spans,
+            replacement,
+            next: 0,
+            pending: None,
+            namespace_clone_bytes: 0,
+            removed: Counters::default(),
+            added: Counters::default(),
+            count: 0,
+            original_bytes,
+            replacement_bytes,
+            limits,
+            reader: None,
+            state: None,
+            last: LastToken::default(),
+            eligible,
+            failed: false,
+        }
+    }
+
+    fn complete(&self) -> bool {
+        self.eligible && !self.failed && self.pending.is_none() && self.next == self.spans.len()
+    }
+
+    fn fail(&mut self) {
+        self.failed = true;
+        self.pending = None;
+    }
+
+    fn observe_pending(&mut self, token: Token, end: usize, state: &State) {
+        let Some(pending) = self.pending else {
+            self.fail();
+            return;
+        };
+        let closes_target_depth = state.depth.checked_add(1) == Some(pending.depth);
+        match token {
+            Token::End if closes_target_depth => {
+                if end != pending.end {
+                    self.fail();
+                    return;
+                }
+                self.pending = None;
+                self.finish(pending.span, pending.before, state);
+            },
+            Token::End => {
+                if end >= pending.end
+                    || state
+                        .depth
+                        .checked_add(1)
+                        .is_some_and(|d| d < pending.depth)
+                {
+                    self.fail();
+                }
+            },
+            _ if end >= pending.end => self.fail(),
+            _ => {},
+        }
+    }
+
+    fn finish(&mut self, span_index: usize, before: Counters, state: &State) {
+        let Some((replacement_start, replacement_end)) = self
+            .spans
+            .get(span_index)
+            .map(|span| (span.replacement.start, span.replacement.end))
+        else {
+            self.fail();
+            return;
+        };
+        if state.depth == 0 {
+            self.fail();
+            return;
+        }
+        let Some(removed) = Counters::of(state).since(before) else {
+            self.fail();
+            return;
+        };
+        let Some(namespace_bytes) = state.namespaces.as_ref().map_or_else(
+            || Some(size_of::<Namespaces>()),
+            Namespaces::clone_memory_charge,
+        ) else {
+            self.fail();
+            return;
+        };
+        // Keep the established per-window logical admission charge even though
+        // the metadata is now transient rather than retained in a `Window`.
+        let Some(window_metadata) = size_of::<Window>().checked_sub(size_of::<Namespaces>()) else {
+            self.fail();
+            return;
+        };
+        let Some(charge) = namespace_bytes.checked_add(window_metadata) else {
+            self.fail();
+            return;
+        };
+        let Some(total) = self.namespace_clone_bytes.checked_add(charge) else {
+            self.fail();
+            return;
+        };
+        if total > MAX_REPLACEMENT_NAMESPACE_CLONE_BYTES {
+            self.fail();
+            return;
+        }
+        let Some(namespaces) = state
+            .namespaces
+            .as_ref()
+            .map_or_else(|| Some(Namespaces::new()), Namespaces::try_clone)
+        else {
+            self.fail();
+            return;
+        };
+        self.namespace_clone_bytes = total;
+        let Some(added) =
+            self.audit_replacement(replacement_start..replacement_end, state.depth, namespaces)
+        else {
+            self.fail();
+            return;
+        };
+        let Some(removed_total) = add_counters(self.removed, removed) else {
+            self.fail();
+            return;
+        };
+        let Some(added_total) = add_counters(self.added, added) else {
+            self.fail();
+            return;
+        };
+        let Some(count) = self.count.checked_add(1) else {
+            self.fail();
+            return;
+        };
+        self.removed = removed_total;
+        self.added = added_total;
+        self.count = count;
+        let Some(next) = self.next.checked_add(1) else {
+            self.fail();
+            return;
+        };
+        self.next = next;
+    }
+
+    fn audit_replacement(
+        &mut self,
+        range: Range<usize>,
+        depth: usize,
+        namespaces: Namespaces,
+    ) -> Option<Counters> {
+        let replacement = self.replacement;
+        let bytes = replacement.get(range)?;
+        if depth == 0 || bytes.first() != Some(&b'<') {
+            return None;
+        }
+        let xml = std::str::from_utf8(bytes).ok()?;
+        let characters = wellformed::scan_characters(bytes);
+        if characters.illegal.is_some() {
+            return None;
+        }
+        if let Some(state) = self.state.as_mut() {
+            state.reset_within(depth, namespaces);
+        } else {
+            self.state = Some(State::within(depth, namespaces));
+        }
+        if let Some(reader) = self.reader.as_mut() {
+            *reader.get_mut() = bytes;
+        } else {
+            let mut reader = Reader::from_str(xml);
+            reader.config_mut().trim_text(false);
+            self.reader = Some(reader);
+        }
+        self.last = LastToken::default();
+        let base = self.reader.as_ref()?.buffer_position();
+        let source = Source {
+            input: bytes,
+            xml,
+            bom_bytes: 0,
+            characters,
+        };
+        let reader = self.reader.as_mut()?;
+        let state = self.state.as_mut()?;
+        scan_reader::<true, _>(
+            source,
+            self.limits,
+            Policy::SOURCE,
+            state,
+            &mut self.last,
+            reader,
+            base,
+        )
+        .ok()?;
+        if state.depth != depth
+            || !reader.get_ref().is_empty()
+            || !self.last.is_markup_ending_at(bytes.len())
+        {
+            return None;
+        }
+        let charged = Counters::of(state);
+        Some(Counters {
+            events: charged.events.checked_sub(1)?,
+            ..charged
+        })
+    }
+
+    fn prove(self, original: Report, limits: Limits) -> Option<ReplacementProof> {
+        if !self.complete() {
+            return None;
+        }
+        let totals = Counters {
+            attributes: original.attributes,
+            events: original.events,
+            text_bytes: original.text_bytes,
+        }
+        .replaced(self.removed, self.added)?;
+        if !totals.within(limits) {
+            return None;
+        }
+        Some(ReplacementProof::Windows {
+            count: self.count,
+            original_bytes: self.original_bytes,
+            replacement_bytes: self.replacement_bytes,
+        })
+    }
+}
+
+impl Observer for MultiWindowSearch<'_, '_> {
+    #[inline]
+    fn listening(&self) -> bool {
+        self.eligible && !self.failed && self.next < self.spans.len()
+    }
+
+    #[inline]
+    fn accepted(
+        &mut self,
+        token: Token,
+        start: usize,
+        end: usize,
+        before: Counters,
+        state: &State,
+    ) {
+        if self.failed || !self.eligible {
+            return;
+        }
+        if self.pending.is_some() {
+            self.observe_pending(token, end, state);
+            return;
+        }
+        let Some(span) = self.spans.get(self.next) else {
+            return;
+        };
+        if span.original.start < start {
+            self.fail();
+            return;
+        }
+        if span.original.start > start {
+            return;
+        }
+        let span_end = span.original.end;
+        match token {
+            Token::Start => {
+                self.pending = Some(PendingWindow {
+                    span: self.next,
+                    end: span.original.end,
+                    depth: state.depth,
+                    before,
+                });
+            },
+            Token::Empty if end == span_end => self.finish(self.next, before, state),
+            Token::Empty => self.fail(),
+            Token::End | Token::Markup | Token::Character => self.fail(),
         }
     }
 }

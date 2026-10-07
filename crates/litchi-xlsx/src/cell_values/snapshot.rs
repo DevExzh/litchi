@@ -6,7 +6,7 @@ use std::sync::{Arc, OnceLock};
 use litchi_core::{ExecutionContext, ExecutionError, Selector as CoreSelector, SourceVersion};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    BlobPart, OpcError, OpcPackage, PackURI, Part, Relationship, Relationships,
+    BlobPart, OpcError, OpcPackage, PackURI, Part, Relationship, Relationships, ReplacementSpan,
     SourceBackedPackage, SourceLineage, SourceRelationshipTarget, SourceTopologyPlan, TargetMode,
 };
 use litchi_sheet::{Cell as Address, Rect};
@@ -459,6 +459,7 @@ impl Snapshot {
                 context: None,
                 source_lineage: None,
                 source_version: None,
+                worksheet_replacement_hint: None,
             },
         })
     }
@@ -528,6 +529,7 @@ impl Snapshot {
                 context: package.execution_context(),
                 source_lineage: Some(capture.source_lineage.clone()),
                 source_version: Some(capture.source_version),
+                worksheet_replacement_hint: None,
             },
         })
     }
@@ -762,6 +764,7 @@ impl Snapshot {
                 context,
                 source_lineage,
                 source_version,
+                worksheet_replacement_hint: None,
             },
         })
     }
@@ -777,6 +780,7 @@ impl Snapshot {
         result.cells = Arc::new(cells);
         result.facts = None;
         result.source.worksheet.bytes = SourcePayload::Owned(Arc::new(bytes));
+        result.source.worksheet_replacement_hint = None;
         result.source.check_execution()?;
         Ok(result)
     }
@@ -792,25 +796,35 @@ impl Snapshot {
         source: &Self,
         rewrite: raw::worksheet::edit::ValueOnlyRewrite<'_>,
     ) -> Result<Self> {
-        if rewrite.omitted.is_empty() || !std::ptr::eq(rewrite.source, source.source_xml()) {
+        if !std::ptr::eq(rewrite.source, source.source_xml()) {
             return Self::from_rewritten_source(source, rewrite.bytes);
         }
         source.source.check_execution()?;
         validation::worksheet_xml(&rewrite.bytes)?;
         // Speculative buffers are dropped before the complete parser fallback.
-        let cells = match Self::try_rewritten_value_cells(source, &rewrite) {
-            Some(cells) => cells,
-            None => {
-                let shared_strings = source.source.shared_strings.as_ref();
-                raw::worksheet::parse_refusing_repairs(&rewrite.bytes, || {
-                    shared_strings.map(SharedStringsState::strings).transpose()
-                })?
-            },
+        let cells = if rewrite.omitted.is_empty() {
+            let shared_strings = source.source.shared_strings.as_ref();
+            raw::worksheet::parse_refusing_repairs(&rewrite.bytes, || {
+                shared_strings.map(SharedStringsState::strings).transpose()
+            })?
+        } else {
+            match Self::try_rewritten_value_cells(source, &rewrite) {
+                Some(cells) => cells,
+                None => {
+                    let shared_strings = source.source.shared_strings.as_ref();
+                    raw::worksheet::parse_refusing_repairs(&rewrite.bytes, || {
+                        shared_strings.map(SharedStringsState::strings).transpose()
+                    })?
+                },
+            }
         };
+        let bytes = Arc::new(rewrite.bytes);
+        let replacement_hint = WorksheetReplacementHint::new(rewrite.source, &bytes, rewrite.spans);
         let mut result = source.clone();
         result.cells = Arc::new(cells);
         result.facts = None;
-        result.source.worksheet.bytes = SourcePayload::Owned(Arc::new(rewrite.bytes));
+        result.source.worksheet.bytes = SourcePayload::Owned(bytes);
+        result.source.worksheet_replacement_hint = replacement_hint;
         result.source.check_execution()?;
         Ok(result)
     }
@@ -887,6 +901,7 @@ impl Snapshot {
         let mut result = source.clone();
         result.facts = None;
         result.source.worksheet.bytes = SourcePayload::Owned(Arc::new(bytes));
+        result.source.worksheet_replacement_hint = None;
         result.source.check_execution()?;
         Ok(result)
     }
@@ -1463,6 +1478,7 @@ struct SourceState {
     context: Option<ExecutionContext>,
     source_lineage: Option<SourceLineage>,
     source_version: Option<SourceVersion>,
+    worksheet_replacement_hint: Option<WorksheetReplacementHint>,
 }
 
 impl SourceState {
@@ -1489,6 +1505,62 @@ impl SourceState {
                 (Some(left), Some(right)) => left == right,
                 (None, _) | (_, None) => true,
             }
+    }
+}
+
+/// Bounded, detached metadata describing the worksheet replacement produced by
+/// one value-only rewrite. The source and replacement payloads themselves are
+/// deliberately not retained: publication checks these identities against the
+/// before and after snapshots and the OPC auditor treats every span as
+/// untrusted input.
+#[derive(Clone, Debug)]
+struct WorksheetReplacementHint {
+    source_ptr: usize,
+    source_len: usize,
+    replacement_ptr: usize,
+    replacement_len: usize,
+    spans: Arc<[ReplacementSpan]>,
+}
+
+impl WorksheetReplacementHint {
+    fn new(
+        source: &[u8],
+        replacement: &Arc<Vec<u8>>,
+        spans: Box<[ReplacementSpan]>,
+    ) -> Option<Self> {
+        if spans.len() < 2 || spans.len() > raw::worksheet::edit::MAX_REPLACEMENT_SPANS {
+            return None;
+        }
+        let mut source_end = 0;
+        let mut replacement_end = 0;
+        for span in &spans {
+            if span.original.start >= span.original.end
+                || span.replacement.start >= span.replacement.end
+                || span.original.start < source_end
+                || span.replacement.start < replacement_end
+                || span.original.end > source.len()
+                || span.replacement.end > replacement.len()
+            {
+                return None;
+            }
+            source_end = span.original.end;
+            replacement_end = span.replacement.end;
+        }
+        let spans: Arc<[ReplacementSpan]> = Arc::from(spans);
+        Some(Self {
+            source_ptr: source.as_ptr() as usize,
+            source_len: source.len(),
+            replacement_ptr: replacement.as_ptr() as usize,
+            replacement_len: replacement.len(),
+            spans,
+        })
+    }
+
+    fn matches(&self, source: &[u8], replacement: &[u8]) -> bool {
+        self.source_ptr == source.as_ptr() as usize
+            && self.source_len == source.len()
+            && self.replacement_ptr == replacement.as_ptr() as usize
+            && self.replacement_len == replacement.len()
     }
 }
 
@@ -1632,14 +1704,25 @@ fn try_replace_source_payload(
     partname: PackURI,
     payload: &SourcePayload,
     resource: &'static str,
+    replacement_spans: Option<&Arc<[ReplacementSpan]>>,
 ) -> Result<()> {
     // Only already-detached bytes may cross the OPC publication boundary by
     // Arc. Keep managed and budgeted payloads on the old fallible Vec copy so
     // their reservation and allocation behavior stays unchanged.
     match payload {
-        SourcePayload::Owned(bytes) => plan
-            .try_replace_part_shared(partname, Arc::clone(bytes))
-            .map_err(Error::Package)?,
+        SourcePayload::Owned(bytes) => {
+            if let Some(spans) = replacement_spans {
+                plan.try_replace_part_shared_with_spans(
+                    partname,
+                    Arc::clone(bytes),
+                    Arc::clone(spans),
+                )
+                .map_err(Error::Package)?;
+            } else {
+                plan.try_replace_part_shared(partname, Arc::clone(bytes))
+                    .map_err(Error::Package)?;
+            }
+        },
         SourcePayload::Managed(_) | SourcePayload::OwnedBudgeted { .. } => {
             plan.try_replace_part(partname, copy_payload(payload.as_bytes(), resource)?)
                 .map_err(Error::Package)?;
@@ -1665,11 +1748,22 @@ fn append_worksheet_replacement(
         // bytes only for the `<dimension>` tag and the edited `<c>` records.
         // The replacement therefore carries the producer's own formatting,
         // which publication audits with source rules since change 0657.
+        let replacement_spans = after
+            .worksheet_replacement_hint
+            .as_ref()
+            .filter(|hint| {
+                hint.matches(
+                    before.worksheet.bytes.as_bytes(),
+                    after.worksheet.bytes.as_bytes(),
+                )
+            })
+            .map(|hint| &hint.spans);
         try_replace_source_payload(
             plan,
             after.worksheet.uri.clone(),
             &after.worksheet.bytes,
             "source-backed worksheet topology replacement",
+            replacement_spans,
         )?;
     }
     Ok(())
@@ -1696,6 +1790,7 @@ fn append_owner_topology(
             after.workbook.uri.clone(),
             &after.workbook.bytes,
             "source-backed workbook topology replacement",
+            None,
         )?;
     }
     match (&before.calculation_chain, &after.calculation_chain) {
@@ -2594,6 +2689,7 @@ mod tests {
             PackURI::new("/xl/workbook.xml").unwrap(),
             &owned,
             "owned replacement test",
+            None,
         )
         .unwrap();
         assert_eq!(Arc::strong_count(&owned_bytes), 3);
@@ -2618,6 +2714,7 @@ mod tests {
             PackURI::new("/xl/worksheets/sheet1.xml").unwrap(),
             &budgeted,
             "budgeted replacement test",
+            None,
         )
         .unwrap();
         assert_eq!(
@@ -2680,6 +2777,7 @@ mod tests {
             PackURI::new("/xl/ctrlProps/ctrlProp1.xml").unwrap(),
             &payload,
             "managed replacement test",
+            None,
         )
         .unwrap();
         assert!(matches!(
@@ -2707,7 +2805,7 @@ mod row_reuse_tests {
     use litchi_opc::{
         BlobPart, OpcPackage, PackURI, PackageWriter, SourceBackedPackage, TargetMode,
     };
-    use litchi_sheet::{Cell as Address, Rect};
+    use litchi_sheet::{Cell as Address, Rect, Row};
 
     use super::Snapshot;
     use crate::cell::{Cell, Store, Value};
@@ -2717,6 +2815,7 @@ mod row_reuse_tests {
     use crate::raw::worksheet::edit::{
         Action, ValueOnlyRewrite, rewrite, rewrite_value_only_with_provenance,
     };
+    use crate::row_visibility::SourceBackedEditor as RowVisibilitySourceBackedEditor;
     use crate::{ErrorValue, Number};
 
     const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -2944,6 +3043,108 @@ mod row_reuse_tests {
             .iter()
             .map(|span| (span.row, span.first_column, span.last_column))
             .collect()
+    }
+
+    #[test]
+    fn replacement_hints_refresh_and_clear_across_rebinds() {
+        let worksheet = format!(
+            r#"<worksheet xmlns="{SML}"><dimension ref="A1:B1"/><sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1"><v>2</v></c></row></sheetData></worksheet>"#
+        );
+        let source = Snapshot::load(&fixture_package(&worksheet), "Sheet1").unwrap();
+        let first_proof = proof_for_sets(&source, &[("A1", 11), ("B1", 12)]);
+        assert_eq!(first_proof.spans.len(), 2);
+        let first = Snapshot::from_rewritten_value_source(&source, first_proof).unwrap();
+        let first_hint = first
+            .source
+            .worksheet_replacement_hint
+            .as_ref()
+            .expect("multi-cell rewrite retains a hint");
+        assert_eq!(
+            first_hint.source_ptr,
+            source.source_xml().as_ptr() as usize,
+            "the hint is tied to the exact source allocation"
+        );
+        assert_eq!(
+            first_hint.replacement_ptr,
+            first.source_xml().as_ptr() as usize,
+            "the hint is tied to the exact detached output allocation"
+        );
+
+        let second_proof = proof_for_sets(&first, &[("A1", 21), ("B1", 22)]);
+        assert_eq!(second_proof.spans.len(), 2);
+        let second = Snapshot::from_rewritten_value_source(&first, second_proof).unwrap();
+        let second_hint = second
+            .source
+            .worksheet_replacement_hint
+            .as_ref()
+            .expect("repeated rewrite retains a refreshed hint");
+        assert_eq!(
+            second_hint.source_ptr,
+            first.source_xml().as_ptr() as usize,
+            "the second hint points at the immediately preceding payload"
+        );
+        assert_eq!(
+            second_hint.replacement_ptr,
+            second.source_xml().as_ptr() as usize,
+            "the second hint points at its own output payload"
+        );
+        assert_ne!(
+            first_hint.source_ptr, second_hint.source_ptr,
+            "repeated rewrites must not retain the original source identity"
+        );
+
+        let rebased = Snapshot::from_rewritten_source(&first, first.source_xml().to_vec())
+            .expect("ordinary worksheet rebind");
+        assert!(
+            rebased.source.worksheet_replacement_hint.is_none(),
+            "ordinary worksheet rebind clears stale span metadata"
+        );
+        let invalidated = first
+            .clone()
+            .with_invalidated_calculation()
+            .expect("workbook-only invalidation");
+        assert!(
+            invalidated.source.worksheet_replacement_hint.is_some(),
+            "workbook-only invalidation preserves the worksheet hint"
+        );
+
+        let visibility_package = SourceBackedPackage::from_vec(
+            PackageWriter::to_bytes(&fixture_package(
+                std::str::from_utf8(first.source_xml()).expect("worksheet XML is UTF-8"),
+            ))
+            .expect("visibility package archive"),
+        )
+        .expect("visibility source package");
+        let visibility_editor =
+            RowVisibilitySourceBackedEditor::from_source_backed_package(visibility_package)
+                .expect("visibility editor");
+        let mut visibility_edit = visibility_editor.edit("Sheet1").expect("visibility edit");
+        visibility_edit
+            .hide(Row::new(0).unwrap())
+            .expect("visibility stage");
+        let (visibility_snapshot, _) = visibility_edit
+            .commit()
+            .expect("visibility commit")
+            .into_parts();
+        let visibility_rebound =
+            Snapshot::from_rewritten_source(&first, visibility_snapshot.source_xml().to_vec())
+                .expect("visibility rebind");
+        assert!(
+            visibility_rebound
+                .source
+                .worksheet_replacement_hint
+                .is_none(),
+            "worksheet visibility rebind clears cell span metadata"
+        );
+
+        let other = Snapshot::load(&fixture_package(&worksheet), "Sheet1").unwrap();
+        let stale_proof = proof_for_sets(&first, &[("A1", 31), ("B1", 32)]);
+        let stale = Snapshot::from_rewritten_value_source(&other, stale_proof)
+            .expect("stale proof falls back to complete parse");
+        assert!(
+            stale.source.worksheet_replacement_hint.is_none(),
+            "a proof from another allocation cannot publish span metadata"
+        );
     }
 
     fn bytes_between<'a>(bytes: &'a [u8], start: &[u8], end: &[u8]) -> &'a [u8] {

@@ -226,6 +226,47 @@ fn scalar_sheet(body: &str) -> String {
     format!(r#"<worksheet xmlns="{SML}">{body}</worksheet>"#)
 }
 
+#[test]
+fn facts_and_layout_routes_retain_identical_changed_cell_spans() {
+    let source = scalar_sheet(
+        r#"<dimension ref="A1:C2"/><sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1"><v>2</v></c><c r="C1"><v>3</v></c></row><row r="2"><c r="A2"><v>4</v></c><c r="C2"><v>6</v></c></row></sheetData>"#,
+    );
+    let source = source.as_bytes();
+    let facts = plan(source).expect("admitted source facts");
+    let actions = BTreeMap::from([
+        (
+            Address::from_a1("A1").expect("A1"),
+            Action::set("a longer replacement".into()),
+        ),
+        (
+            Address::from_a1("C2").expect("C2"),
+            Action::set("short".into()),
+        ),
+    ]);
+    let from_facts = rewrite_value_only_with_provenance(
+        source,
+        "Sheet1",
+        BTreeMap::from([
+            (
+                Address::from_a1("A1").expect("A1"),
+                Action::set("a longer replacement".into()),
+            ),
+            (
+                Address::from_a1("C2").expect("C2"),
+                Action::set("short".into()),
+            ),
+        ]),
+        Some(&facts),
+    )
+    .expect("fact route rewrite");
+    let from_layout = rewrite_value_only_with_provenance(source, "Sheet1", actions, None)
+        .expect("layout route rewrite");
+
+    assert_eq!(from_facts.bytes, from_layout.bytes);
+    assert_eq!(from_facts.spans, from_layout.spans);
+    assert_eq!(from_facts.spans.len(), 2);
+}
+
 /// Shapes the fact route is expected to accept.
 fn admitted_shapes() -> Vec<(&'static str, String)> {
     vec![

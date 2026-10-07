@@ -27,6 +27,6 @@ pub(crate) use model::{
 #[cfg(test)]
 pub(crate) use package::route;
 pub(crate) use package::{
-    OmittedCells, ValueOnlyRewrite, reduced_readback, rewrite, rewrite_merges,
-    rewrite_value_only_with_provenance,
+    MAX_REPLACEMENT_SPANS, OmittedCells, ValueOnlyRewrite, reduced_readback, rewrite,
+    rewrite_merges, rewrite_value_only_with_provenance,
 };

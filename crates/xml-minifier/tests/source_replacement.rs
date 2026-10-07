@@ -7,9 +7,11 @@
     reason = "each test states one fixed expected verdict"
 )]
 
+use core::ops::Range;
+
 use xml_minifier::audit::{
-    Error, Limits, ReplacementError, ReplacementProof, Resource, verify_source,
-    verify_source_replacement,
+    Error, Limits, ReplacementError, ReplacementProof, ReplacementSpan, Resource, verify_source,
+    verify_source_replacement, verify_source_replacement_with_spans,
 };
 
 /// The two audits the pair API replaces, in their order.
@@ -39,19 +41,28 @@ fn checked(
     actual
 }
 
-fn window(
-    original: std::ops::Range<usize>,
-    replacement: std::ops::Range<usize>,
-) -> ReplacementProof {
+fn window(original: Range<usize>, replacement: Range<usize>) -> ReplacementProof {
     ReplacementProof::Window {
         original,
         replacement,
     }
 }
 
-fn span(document: &str, needle: &str) -> std::ops::Range<usize> {
+fn span(document: &str, needle: &str) -> Range<usize> {
     let start = document.find(needle).expect("fixture needle");
     start..start + needle.len()
+}
+
+fn replacement_span(
+    original: &str,
+    replacement: &str,
+    original_needle: &str,
+    replacement_needle: &str,
+) -> ReplacementSpan {
+    ReplacementSpan {
+        original: span(original, original_needle),
+        replacement: span(replacement, replacement_needle),
+    }
 }
 
 const WORKSHEET_HEAD: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n<worksheet xmlns=\"urn:sml\"><dimension ref=\"A1:C3\"/>\n  <sheetData>\n";
@@ -100,6 +111,395 @@ fn a_length_changing_cell_edit_is_proved_by_the_enclosing_element() {
     let cell = span(&original, "<c r=\"A1\" s=\"1\"><v>7</v></c>");
     let edited = span(&replacement, "<c r=\"A1\"><v>123456</v></c>");
     assert_eq!(proof, window(cell, edited));
+}
+
+#[test]
+fn several_sibling_elements_are_proved_by_independent_windows() {
+    let original = "<r><a>0</a><b>0</b><c>unchanged</c></r>";
+    let replacement = "<r><a>1</a><b>12345</b><c>unchanged</c></r>";
+    let spans = [
+        replacement_span(original, replacement, "<a>0</a>", "<a>1</a>"),
+        replacement_span(original, replacement, "<b>0</b>", "<b>12345</b>"),
+    ];
+    let actual = verify_source_replacement_with_spans(
+        original.as_bytes(),
+        replacement.as_bytes(),
+        Limits::default(),
+        &spans,
+    );
+    assert_eq!(
+        actual,
+        Ok(ReplacementProof::Windows {
+            count: 2,
+            original_bytes: "<a>0</a>".len() + "<b>0</b>".len(),
+            replacement_bytes: "<a>1</a>".len() + "<b>12345</b>".len(),
+        })
+    );
+}
+
+#[test]
+fn multiwindow_replays_inherited_namespace_bindings() {
+    let original =
+        r#"<r xmlns:x="urn"><a x:k="0"/><b x:k="0"/><pad>paddingpaddingpadding</pad></r>"#;
+    let replacement =
+        r#"<r xmlns:x="urn"><a x:k="1"/><b x:k="123"/><pad>paddingpaddingpadding</pad></r>"#;
+    let spans = [
+        replacement_span(original, replacement, r#"<a x:k="0"/>"#, r#"<a x:k="1"/>"#),
+        replacement_span(
+            original,
+            replacement,
+            r#"<b x:k="0"/>"#,
+            r#"<b x:k="123"/>"#,
+        ),
+    ];
+    let proof = verify_source_replacement_with_spans(
+        original.as_bytes(),
+        replacement.as_bytes(),
+        Limits::default(),
+        &spans,
+    )
+    .expect("inherited namespaces are part of the source proof");
+    assert!(matches!(proof, ReplacementProof::Windows { count: 2, .. }));
+}
+
+#[test]
+fn multiwindow_retotals_length_changes_and_shifted_coordinates() {
+    let replacement = "<r><a>123456</a><b>0</b><c>789</c><pad>paddingpaddingpadding</pad></r>";
+    let original = "<r><a>0</a><b>0</b><c>0</c><pad>paddingpaddingpadding</pad></r>";
+    let spans = [
+        replacement_span(original, replacement, "<a>0</a>", "<a>123456</a>"),
+        replacement_span(original, replacement, "<c>0</c>", "<c>789</c>"),
+    ];
+    let expected = oracle(
+        original.as_bytes(),
+        replacement.as_bytes(),
+        Limits::default(),
+    );
+    let actual = verify_source_replacement_with_spans(
+        original.as_bytes(),
+        replacement.as_bytes(),
+        Limits::default(),
+        &spans,
+    );
+    assert!(expected.is_ok(), "{expected:?}");
+    assert!(matches!(
+        actual,
+        Ok(ReplacementProof::Windows { count: 2, .. })
+    ));
+}
+
+#[test]
+fn gaps_outside_hints_force_the_canonical_complete_audit() {
+    let original = "<r><a>0</a><b>0</b><c>0</c></r>";
+    let replacement = "<r><a>1</a><b>0</b><c>2</c></r>";
+    let spans = [
+        replacement_span(original, replacement, "<a>0</a>", "<a>1</a>"),
+        replacement_span(original, replacement, "<b>0</b>", "<b>0</b>"),
+    ];
+    let expected = oracle(
+        original.as_bytes(),
+        replacement.as_bytes(),
+        Limits::default(),
+    );
+    let actual = verify_source_replacement_with_spans(
+        original.as_bytes(),
+        replacement.as_bytes(),
+        Limits::default(),
+        &spans,
+    );
+    assert!(expected.is_ok(), "{expected:?}");
+    assert_eq!(actual, Ok(ReplacementProof::Complete));
+}
+
+#[test]
+fn malformed_window_reports_the_complete_replacement_error() {
+    let original = "<r><a>0</a><b>0</b><c>0</c></r>";
+    let replacement = "<r><a>1</broken><b>2</b><c>0</c></r>";
+    let spans = [
+        replacement_span(original, replacement, "<a>0</a>", "<a>1</broken>"),
+        replacement_span(original, replacement, "<b>0</b>", "<b>2</b>"),
+    ];
+    let expected = oracle(
+        original.as_bytes(),
+        replacement.as_bytes(),
+        Limits::default(),
+    )
+    .expect_err("the replacement is malformed");
+    let actual = verify_source_replacement_with_spans(
+        original.as_bytes(),
+        replacement.as_bytes(),
+        Limits::default(),
+        &spans,
+    );
+    assert_eq!(actual, Err(expected));
+}
+
+#[test]
+fn root_or_non_element_hints_fall_back_without_changing_the_verdict() {
+    let original = "<r><a>0</a><b>0</b></r>";
+    let replacement = "<r><a>1</a><b>0</b></r>";
+    let spans = [
+        ReplacementSpan {
+            original: 0..original.len(),
+            replacement: 0..replacement.len(),
+        },
+        replacement_span(original, replacement, "<a>0</a>", "<a>1</a>"),
+    ];
+    assert_eq!(
+        verify_source_replacement_with_spans(
+            original.as_bytes(),
+            replacement.as_bytes(),
+            Limits::default(),
+            &spans,
+        ),
+        Ok(ReplacementProof::Complete)
+    );
+}
+
+#[test]
+fn aggregate_limits_are_rechecked_after_all_windows() {
+    let original = "<r><a/><b/><pad>paddingpaddingpaddingpadding</pad></r>";
+    let replacement =
+        "<r><a x=\"1\">123</a><b y=\"2\">456</b><pad>paddingpaddingpaddingpadding</pad></r>";
+    let spans = [
+        replacement_span(original, replacement, "<a/>", "<a x=\"1\">123</a>"),
+        replacement_span(original, replacement, "<b/>", "<b y=\"2\">456</b>"),
+    ];
+    for limits in [
+        Limits::builder().events(11).expect("event limit").build(),
+        Limits::builder()
+            .attributes(1)
+            .expect("attribute limit")
+            .build(),
+        Limits::builder()
+            .text_bytes(29)
+            .expect("text limit")
+            .build(),
+    ] {
+        let expected = oracle(original.as_bytes(), replacement.as_bytes(), limits)
+            .expect_err("the replacement exceeds one aggregate limit");
+        let actual = verify_source_replacement_with_spans(
+            original.as_bytes(),
+            replacement.as_bytes(),
+            limits,
+            &spans,
+        );
+        assert_eq!(actual, Err(expected));
+    }
+}
+
+#[test]
+fn more_than_the_bounded_span_cap_uses_the_complete_path() {
+    let count = 4_097;
+    let mut original = String::from("<r>");
+    let mut replacement = String::from("<r>");
+    let mut spans = Vec::with_capacity(count);
+    for index in 0..count {
+        let start = original.len();
+        original.push_str("<a/>");
+        replacement.push_str(if index == 0 { "<b/>" } else { "<a/>" });
+        spans.push(ReplacementSpan {
+            original: start..start + 4,
+            replacement: start..start + 4,
+        });
+    }
+    original.push_str("</r>");
+    replacement.push_str("</r>");
+    assert_eq!(
+        verify_source_replacement_with_spans(
+            original.as_bytes(),
+            replacement.as_bytes(),
+            Limits::default(),
+            &spans,
+        ),
+        Ok(ReplacementProof::Complete)
+    );
+}
+
+#[test]
+fn deep_empty_elements_keep_balanced_non_root_boundaries() {
+    let original = "<r><a><b><c/><e/></b></a><pad>paddingpaddingpadding</pad></r>";
+    let replacement = "<r><a><b><d/><f/></b></a><pad>paddingpaddingpadding</pad></r>";
+    let spans = [
+        replacement_span(original, replacement, "<c/>", "<d/>"),
+        replacement_span(original, replacement, "<e/>", "<f/>"),
+    ];
+    assert!(matches!(
+        verify_source_replacement_with_spans(
+            original.as_bytes(),
+            replacement.as_bytes(),
+            Limits::default(),
+            &spans,
+        ),
+        Ok(ReplacementProof::Windows { count: 2, .. })
+    ));
+}
+
+#[test]
+fn invalid_original_precedes_invalid_span_hints() {
+    let original = b"<r><a></r>";
+    let replacement = b"<r><a>1</a></r>";
+    let spans = [
+        ReplacementSpan {
+            original: usize::MAX - 1..usize::MAX,
+            replacement: usize::MAX - 1..usize::MAX,
+        },
+        ReplacementSpan {
+            original: 0..0,
+            replacement: 0..0,
+        },
+    ];
+    let actual =
+        verify_source_replacement_with_spans(original, replacement, Limits::default(), &spans);
+    assert!(matches!(&actual, Err(ReplacementError::Original(_))));
+    assert_eq!(
+        actual.map(|_| ()),
+        oracle(original, replacement, Limits::default())
+    );
+}
+
+#[test]
+fn reversed_spans_fall_back_with_the_oracle_verdict() {
+    let original = "<r><a>0</a><b>0</b><c>0</c><pad>paddingpaddingpadding</pad></r>";
+    let replacement = "<r><a>1</a><b>2</b><c>0</c><pad>paddingpaddingpadding</pad></r>";
+    let spans = [
+        replacement_span(original, replacement, "<b>0</b>", "<b>2</b>"),
+        replacement_span(original, replacement, "<a>0</a>", "<a>1</a>"),
+    ];
+    assert_eq!(
+        verify_source_replacement_with_spans(
+            original.as_bytes(),
+            replacement.as_bytes(),
+            Limits::default(),
+            &spans,
+        ),
+        Ok(ReplacementProof::Complete)
+    );
+}
+
+#[test]
+fn overlapping_and_nested_spans_fall_back_without_a_partial_proof() {
+    let original = "<r><a><b>0</b></a><pad>paddingpaddingpadding</pad></r>";
+    let replacement = "<r><a><b>1</b></a><pad>paddingpaddingpadding</pad></r>";
+    let spans = [
+        replacement_span(original, replacement, "<a><b>0</b></a>", "<a><b>1</b></a>"),
+        replacement_span(original, replacement, "<b>0</b>", "<b>1</b>"),
+    ];
+    assert_eq!(
+        verify_source_replacement_with_spans(
+            original.as_bytes(),
+            replacement.as_bytes(),
+            Limits::default(),
+            &spans,
+        ),
+        Ok(ReplacementProof::Complete)
+    );
+}
+
+#[test]
+fn malformed_ranges_on_valid_inputs_use_the_complete_path() {
+    let original = "<r><a>0</a><b>0</b><pad>paddingpaddingpadding</pad></r>";
+    let replacement = "<r><a>1</a><b>2</b><pad>paddingpaddingpadding</pad></r>";
+    let valid = replacement_span(original, replacement, "<b>0</b>", "<b>2</b>");
+    let cases = [
+        ReplacementSpan {
+            original: 0..0,
+            replacement: 0..0,
+        },
+        ReplacementSpan {
+            original: Range { start: 10, end: 9 },
+            replacement: Range { start: 10, end: 9 },
+        },
+        ReplacementSpan {
+            original: 0..original.len() + 1,
+            replacement: 0..replacement.len() + 1,
+        },
+        ReplacementSpan {
+            original: original.len() + 1..original.len() + 2,
+            replacement: replacement.len() + 1..replacement.len() + 2,
+        },
+    ];
+    for malformed in cases {
+        assert_eq!(
+            verify_source_replacement_with_spans(
+                original.as_bytes(),
+                replacement.as_bytes(),
+                Limits::default(),
+                &[malformed, valid.clone()],
+            ),
+            Ok(ReplacementProof::Complete)
+        );
+    }
+}
+
+#[test]
+fn valid_but_wrong_element_hints_cannot_hide_a_distant_edit() {
+    let original = "<r><a>0</a><b>0</b><c>0</c><pad>paddingpaddingpadding</pad></r>";
+    let replacement = "<r><a>1</a><b>0</b><c>0</c><pad>paddingpaddingpadding</pad></r>";
+    let spans = [
+        replacement_span(original, replacement, "<b>0</b>", "<b>0</b>"),
+        replacement_span(original, replacement, "<c>0</c>", "<c>0</c>"),
+    ];
+    assert_eq!(
+        verify_source_replacement_with_spans(
+            original.as_bytes(),
+            replacement.as_bytes(),
+            Limits::default(),
+            &spans,
+        ),
+        Ok(ReplacementProof::Complete)
+    );
+}
+
+#[test]
+fn replacement_byte_limit_is_checked_before_multiwindow_success() {
+    let original = "<r><a/><b/><pad>paddingpaddingpadding</pad></r>";
+    let replacement = "<r><a>1</a><b>2</b><pad>paddingpaddingpadding</pad></r>";
+    let spans = [
+        replacement_span(original, replacement, "<a/>", "<a>1</a>"),
+        replacement_span(original, replacement, "<b/>", "<b>2</b>"),
+    ];
+    let limits = Limits::builder()
+        .bytes(replacement.len() - 1)
+        .expect("replacement byte limit")
+        .build();
+    let expected = oracle(original.as_bytes(), replacement.as_bytes(), limits)
+        .expect_err("the replacement exceeds the byte limit");
+    assert_eq!(
+        verify_source_replacement_with_spans(
+            original.as_bytes(),
+            replacement.as_bytes(),
+            limits,
+            &spans,
+        ),
+        Err(expected)
+    );
+}
+
+#[test]
+fn namespace_snapshot_budget_falls_back_before_multiplication() {
+    let namespace = "u".repeat(5_000_000);
+    let original =
+        format!(r#"<r xmlns:x="{namespace}"><a/><b/><pad>paddingpaddingpadding</pad></r>"#);
+    let replacement =
+        format!(r#"<r xmlns:x="{namespace}"><c/><d/><pad>paddingpaddingpadding</pad></r>"#);
+    let spans = [
+        replacement_span(&original, &replacement, "<a/>", "<c/>"),
+        replacement_span(&original, &replacement, "<b/>", "<d/>"),
+    ];
+    let limits = Limits::builder()
+        .token_bytes(8 * 1024 * 1024)
+        .expect("large namespace token limit")
+        .build();
+    assert_eq!(
+        verify_source_replacement_with_spans(
+            original.as_bytes(),
+            replacement.as_bytes(),
+            limits,
+            &spans,
+        ),
+        Ok(ReplacementProof::Complete)
+    );
 }
 
 #[test]

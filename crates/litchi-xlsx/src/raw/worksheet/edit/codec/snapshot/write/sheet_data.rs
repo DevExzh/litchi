@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 
 use litchi_core::xml::escape_xml;
+use litchi_opc::ReplacementSpan;
 use litchi_sheet::{Cell as Address, Row};
 
 use super::super::super::wire::{
@@ -13,10 +14,10 @@ use crate::cell::{Content, Value};
 use crate::error::{Result, invalid};
 use crate::outline::Outline;
 use crate::raw::strings::encode_spreadsheet_text;
-use crate::raw::worksheet::edit::OmittedCells;
 use crate::raw::worksheet::edit::model::{
     Action, DescentEffect, HeightEffect, Payload, RowAction, StyleEffect,
 };
+use crate::raw::worksheet::edit::{MAX_REPLACEMENT_SPANS, OmittedCells};
 
 pub(crate) fn write_sheet_data(
     output: &mut Vec<u8>,
@@ -92,6 +93,8 @@ pub(crate) fn write_sheet_data_with_provenance(
     cells: BTreeMap<Address, Action>,
     rows: BTreeMap<Row, RowAction>,
     descent_name: &str,
+    spans: &mut Vec<ReplacementSpan>,
+    recording_spans: &mut bool,
 ) -> Result<Box<[OmittedCells]>> {
     let mut by_row = BTreeMap::<u32, RowEdits>::new();
     for (address, action) in cells {
@@ -162,7 +165,16 @@ pub(crate) fn write_sheet_data_with_provenance(
             if membership_changed || edits.row.is_some() || row.empty {
                 write_row(output, source, row, &edits, descent_name)?;
             } else {
-                write_replacement_row(output, source, row, &edits, &mut omitted, &mut recording)?;
+                write_replacement_row(
+                    output,
+                    source,
+                    row,
+                    &edits,
+                    &mut omitted,
+                    &mut recording,
+                    spans,
+                    recording_spans,
+                )?;
             }
         } else {
             output.extend_from_slice(&source[row.span.start..row.tag_end]);
@@ -201,6 +213,8 @@ pub(crate) fn write_sheet_data_from_facts(
     facts: &SourceFacts,
     cells: BTreeMap<Address, Action>,
     slots: &BTreeMap<Address, CellSlot>,
+    spans: &mut Vec<ReplacementSpan>,
+    recording_spans: &mut bool,
 ) -> Result<Box<[OmittedCells]>> {
     let mut by_row = BTreeMap::<u32, BTreeMap<Address, Action>>::new();
     for (address, action) in cells {
@@ -240,6 +254,8 @@ pub(crate) fn write_sheet_data_from_facts(
                     slots,
                     &mut omitted,
                     &mut recording,
+                    spans,
+                    recording_spans,
                 )?;
             },
             None => {
@@ -281,6 +297,8 @@ fn write_replacement_row_from_facts(
     slots: &BTreeMap<Address, CellSlot>,
     omitted: &mut Vec<OmittedCells>,
     recording: &mut bool,
+    spans: &mut Vec<ReplacementSpan>,
+    recording_spans: &mut bool,
 ) -> Result<()> {
     let start = usize::try_from(row.start)
         .map_err(|_source| invalid("worksheet row fact does not fit usize"))?;
@@ -310,12 +328,23 @@ fn write_replacement_row_from_facts(
             let slot = slots
                 .get(&cell.address)
                 .ok_or_else(|| invalid("worksheet changed cell lost its materialized slot"))?;
+            let replacement_start = output.len();
             match action {
                 Action::Update { .. } => write_cell(output, source, slot, action)?,
                 Action::Remove => {
                     return Err(invalid("fact rewrite unexpectedly removes a cell"));
                 },
             }
+            record_replacement_span(
+                spans,
+                recording_spans,
+                Span {
+                    start: cell_span_start,
+                    end: cell_span_end,
+                },
+                replacement_start,
+                output.len(),
+            );
         } else {
             let start = run.map(|(start, _, _)| start).unwrap_or(cell_start);
             let first = run.map(|(_, first, _)| first).unwrap_or(cell.address);
@@ -359,6 +388,8 @@ fn write_replacement_row(
     edits: &RowEdits,
     omitted: &mut Vec<OmittedCells>,
     recording: &mut bool,
+    spans: &mut Vec<ReplacementSpan>,
+    recording_spans: &mut bool,
 ) -> Result<()> {
     output.extend_from_slice(&source[row.span.start..row.tag_end]);
     let mut cursor = row.tag_end;
@@ -392,12 +423,20 @@ fn write_replacement_row(
             if let Some((start, first, last)) = run.take() {
                 record_omitted(omitted, recording, first, last, start, cell_start)?;
             }
+            let replacement_start = output.len();
             match action {
                 Action::Update { .. } => write_cell(output, source, cell, action)?,
                 Action::Remove => {
                     return Err(invalid("replacement row unexpectedly removes a cell"));
                 },
             }
+            record_replacement_span(
+                spans,
+                recording_spans,
+                cell.span,
+                replacement_start,
+                output.len(),
+            );
         } else {
             let start = run.map(|(start, _, _)| start).unwrap_or(cell_start);
             let first = run.map(|(_, first, _)| first).unwrap_or(cell.address);
@@ -514,6 +553,31 @@ fn record_omitted(
         end,
     });
     Ok(())
+}
+
+fn record_replacement_span(
+    spans: &mut Vec<ReplacementSpan>,
+    recording: &mut bool,
+    original: Span,
+    replacement_start: usize,
+    replacement_end: usize,
+) {
+    if !*recording {
+        return;
+    }
+    if original.start >= original.end
+        || replacement_start >= replacement_end
+        || spans.len() >= MAX_REPLACEMENT_SPANS
+        || spans.try_reserve(1).is_err()
+    {
+        *recording = false;
+        spans.clear();
+        return;
+    }
+    spans.push(ReplacementSpan {
+        original: original.start..original.end,
+        replacement: replacement_start..replacement_end,
+    });
 }
 
 #[derive(Debug, Default)]
