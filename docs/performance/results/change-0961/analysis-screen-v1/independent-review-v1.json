@@ -1,0 +1,13 @@
+{
+  "reviewer": "independent staging_review agent",
+  "status": "passed",
+  "v1_failure": "message-only mismatch; no result emitted",
+  "v2_delta": "exactly one no-signal message literal; no arithmetic, threshold or control changes",
+  "raw_audit_sha256": "5b5437cb5d2fc4ca115400f6b45d090b57d84327b6cab449893ecb7c7f8d0203",
+  "validated_children": 54,
+  "oracles_passed": 54,
+  "reduction_mismatches": 0,
+  "selector_match": true,
+  "decision": "reject_screen",
+  "adoption": false
+}

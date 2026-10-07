@@ -1,0 +1,313 @@
+--- source-baseline/crates/litchi-xlsx/src/cell_values/source.rs
++++ source-candidate/crates/litchi-xlsx/src/cell_values/source.rs
+@@ -979,9 +979,19 @@
+     {
+         self.before.check_execution()?;
+         let remaining = MAX_BATCH_EDITS.saturating_sub(self.staged_cells);
++        let edits = edits.into_iter();
++        let initial_capacity = edits
++            .size_hint()
++            .1
++            .map_or(remaining, |upper| upper.min(remaining));
++        // `size_hint` is a performance hint only.  Iterator implementations
++        // may under-report (and a hostile implementation may even violate
++        // the upper bound), so check execution again after asking for it and
++        // grow the pending vector fallibly below when it is exhausted.
++        self.before.check_execution()?;
+         let mut pending = Vec::new();
+         pending
+-            .try_reserve_exact(remaining)
++            .try_reserve_exact(initial_capacity)
+             .map_err(|source| Error::Allocation {
+                 resource: "multi-sheet pending value batch",
+                 source,
+@@ -1098,6 +1108,15 @@
+                 },
+             };
+             self.before.check_execution()?;
++            if pending.len() == pending.capacity() {
++                let additional = remaining.saturating_sub(pending.len());
++                pending
++                    .try_reserve_exact(additional)
++                    .map_err(|source| Error::Allocation {
++                        resource: "multi-sheet pending value batch",
++                        source,
++                    })?;
++            }
+             pending.push((position, address, value));
+         }
+         self.before.check_execution()?;
+--- source-baseline/crates/litchi-xlsx/src/cell_values/admission_tests.rs
++++ source-candidate/crates/litchi-xlsx/src/cell_values/admission_tests.rs
+@@ -12,13 +12,17 @@
+ //! commit rewrites it deliberately), or **refused** (its meaning depends on
+ //! the value the edit replaces, and the editor does not model it).
+ 
++use std::num::{NonZeroU64, NonZeroUsize};
+ use std::sync::Arc;
+ 
+-use litchi_core::OwnedSource;
++use litchi_core::{
++    Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource,
++};
+ use litchi_opc::constants::content_type as ct;
++use litchi_opc::{OpcError, ReadLimits};
+ use soapberry_zip::office::StreamingArchiveWriter;
+ 
+-use crate::cell_values::{CellValueEdit, SheetCellValueEdit, SourceBackedEditor};
++use crate::cell_values::{CellValueEdit, MAX_BATCH_EDITS, SheetCellValueEdit, SourceBackedEditor};
+ use crate::error::EditBlock;
+ use crate::{Address, Error, Number, Value};
+ 
+@@ -45,6 +49,47 @@
+     workbook_tail: Option<String>,
+ }
+ 
++/// Iterator witness used to exercise the bounded staging reservation without
++/// relying on the standard library's truthful size hints.
++struct HintedBatch<T> {
++    items: std::vec::IntoIter<T>,
++    upper: Option<usize>,
++    cancel_on_hint: Option<CancellationSource>,
++}
++
++impl<T> HintedBatch<T> {
++    fn new(items: Vec<T>, upper: Option<usize>) -> Self {
++        Self {
++            items: items.into_iter(),
++            upper,
++            cancel_on_hint: None,
++        }
++    }
++
++    fn cancelling_on_hint(items: Vec<T>, cancellation_source: CancellationSource) -> Self {
++        Self {
++            items: items.into_iter(),
++            upper: Some(1),
++            cancel_on_hint: Some(cancellation_source),
++        }
++    }
++}
++
++impl<T> Iterator for HintedBatch<T> {
++    type Item = T;
++
++    fn next(&mut self) -> Option<Self::Item> {
++        self.items.next()
++    }
++
++    fn size_hint(&self) -> (usize, Option<usize>) {
++        if let Some(source) = &self.cancel_on_hint {
++            source.cancel();
++        }
++        (0, self.upper)
++    }
++}
++
+ /// The canonical relationship serialization `litchi-opc` itself writes, so
+ /// that a published package can replace a relationship member in place.
+ fn relationships(entries: &[(&'static str, String, &'static str, bool)]) -> String {
+@@ -147,6 +192,31 @@
+     SourceBackedEditor::from_read_at(Arc::new(OwnedSource::new(bytes)))
+ }
+ 
++fn cancellable_editor(
++    sheet: &str,
++    shape: &PackageShape,
++) -> Result<(SourceBackedEditor, CancellationSource), Error> {
++    let budget = Budget::root(
++        "xlsx-value-staging-admission-test",
++        Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
++    );
++    let (cancellation_source, cancellation) = CancellationSource::pair();
++    let execution_limits = ExecutionLimits::new(
++        NonZeroUsize::new(1).expect("one worker"),
++        NonZeroUsize::new(1).expect("one task"),
++        NonZeroU64::new(u64::MAX).expect("unbounded in-flight bytes"),
++        0,
++    )
++    .expect("execution limits");
++    let context = ExecutionContext::new(budget, cancellation, execution_limits);
++    let editor = SourceBackedEditor::from_read_at_with_execution_context(
++        Arc::new(OwnedSource::new(package(sheet, shape))),
++        ReadLimits::default(),
++        context,
++    )?;
++    Ok((editor, cancellation_source))
++}
++
+ /// Set `A1` to 42 through the multi-sheet door and return the committed
+ /// worksheet bytes.
+ fn edit_a1(sheet: &str, shape: &PackageShape) -> Result<Vec<u8>, Error> {
+@@ -1061,3 +1131,171 @@
+         "invalid XLSX structure: value-only XML has an unbound element namespace"
+     );
+ }
++
++#[test]
++fn multi_sheet_staging_accepts_empty_and_unknown_hint_iterators() {
++    let mut edit = editor(&worksheet("", ""), &PackageShape::default())
++        .expect("fixture editor")
++        .edit_sheets(["Sheet1".into()])
++        .expect("selected worksheet");
++    edit.apply_batch(HintedBatch::new(
++        Vec::<SheetCellValueEdit<'static>>::new(),
++        Some(0),
++    ))
++    .expect("empty batch");
++    assert!(edit.is_empty());
++
++    edit.apply_batch(HintedBatch::new(
++        vec![SheetCellValueEdit::set(
++            "Sheet1",
++            Address::from_a1("A1").expect("A1"),
++            2u32,
++        )],
++        Some(0),
++    ))
++    .expect("a nonempty zero upper bound must grow fallibly");
++    assert_eq!(edit.len(), 1);
++
++    edit.apply_batch(HintedBatch::new(
++        vec![SheetCellValueEdit::set(
++            "Sheet1",
++            Address::from_a1("B1").expect("B1"),
++            3u32,
++        )],
++        None,
++    ))
++    .expect("unknown upper bound remains valid");
++    assert_eq!(edit.len(), 2);
++}
++
++#[test]
++fn multi_sheet_staging_grows_after_an_underreported_upper_bound() {
++    let mut edit = editor(&worksheet("", ""), &PackageShape::default())
++        .expect("fixture editor")
++        .edit_sheets(["Sheet1".into()])
++        .expect("selected worksheet");
++    let edits = vec![
++        SheetCellValueEdit::set("Sheet1", Address::from_a1("A1").expect("A1"), 2u32),
++        SheetCellValueEdit::set("Sheet1", Address::from_a1("B1").expect("B1"), 3u32),
++    ];
++    // This deliberately violates Iterator's upper-bound promise.  The
++    // staging path treats the hint as a performance input, never as a
++    // correctness boundary.
++    edit.apply_batch(HintedBatch::new(edits, Some(1)))
++        .expect("a lying upper bound must not affect correctness");
++    assert_eq!(edit.len(), 2);
++}
++
++#[test]
++fn multi_sheet_staging_caps_an_overestimated_upper_bound() {
++    let mut edit = editor(&worksheet("", ""), &PackageShape::default())
++        .expect("fixture editor")
++        .edit_sheets(["Sheet1".into()])
++        .expect("selected worksheet");
++    edit.apply_batch(HintedBatch::new(
++        vec![SheetCellValueEdit::set(
++            "Sheet1",
++            Address::from_a1("A1").expect("A1"),
++            2u32,
++        )],
++        Some(usize::MAX),
++    ))
++    .expect("overestimated upper bound must be capped");
++    assert_eq!(edit.len(), 1);
++}
++
++#[test]
++fn multi_sheet_staging_duplicate_and_late_failure_roll_back_pending_values() {
++    let mut edit = editor(&worksheet("", ""), &PackageShape::default())
++        .expect("fixture editor")
++        .edit_sheets(["Sheet1".into()])
++        .expect("selected worksheet");
++    let duplicate = edit.apply_batch(HintedBatch::new(
++        vec![
++            SheetCellValueEdit::set("Sheet1", Address::from_a1("A1").expect("A1"), 2u32),
++            SheetCellValueEdit::set("Sheet1", Address::from_a1("A1").expect("A1"), 3u32),
++        ],
++        Some(2),
++    ));
++    assert!(matches!(
++        duplicate,
++        Err(Error::Invalid(message))
++            if message == "duplicate multi-sheet value-only selector '0:A1'"
++    ));
++    assert!(edit.is_empty());
++
++    edit.set("Sheet1", Address::from_a1("A1").expect("A1"), 2u32)
++        .expect("preexisting staged value");
++    assert_eq!(edit.len(), 1);
++    let late_failure = edit.apply_batch(HintedBatch::new(
++        vec![
++            SheetCellValueEdit::set("Sheet1", Address::from_a1("B1").expect("B1"), 3u32),
++            SheetCellValueEdit::insert(
++                "Sheet1",
++                Address::from_a1("C1").expect("C1"),
++                Number::new("4").expect("numeral"),
++            ),
++            SheetCellValueEdit::set("Sheet1", Address::from_a1("Z99").expect("Z99"), 5u32),
++        ],
++        Some(1),
++    ));
++    assert!(matches!(
++        late_failure,
++        Err(Error::Invalid(message))
++            if message == "cell selector 'Sheet1!Z99' has no existing cell owner"
++    ));
++    assert_eq!(edit.len(), 1, "preexisting staging must survive rollback");
++}
++
++#[test]
++fn multi_sheet_staging_over_limit_refuses_before_hint_growth_and_rolls_back() {
++    let mut rows = String::new();
++    for row in 1..=MAX_BATCH_EDITS + 1 {
++        rows.push_str(&format!(
++            r#"<row r="{row}"><c r="A{row}"><v>{row}</v></c></row>"#
++        ));
++    }
++    let sheet = format!(
++        r#"<worksheet xmlns="{SML}"><dimension ref="A1:A257"/><sheetData>{rows}</sheetData></worksheet>"#
++    );
++    let mut edit = editor(&sheet, &PackageShape::default())
++        .expect("fixture editor")
++        .edit_sheets(["Sheet1".into()])
++        .expect("selected worksheet");
++    let edits = (1..=MAX_BATCH_EDITS + 1)
++        .map(|row| {
++            SheetCellValueEdit::set(
++                "Sheet1",
++                Address::from_a1(&format!("A{row}")).expect("address"),
++                0u32,
++            )
++        })
++        .collect::<Vec<_>>();
++    let result = edit.apply_batch(HintedBatch::new(edits, Some(MAX_BATCH_EDITS + 1)));
++    assert!(matches!(
++        result,
++        Err(Error::Invalid(message))
++            if message == format!("multi-sheet value-only batch exceeds {MAX_BATCH_EDITS} unique cells")
++    ));
++    assert!(edit.is_empty());
++}
++
++#[test]
++fn multi_sheet_staging_checks_cancellation_after_size_hint() {
++    let (editor, cancellation_source) =
++        cancellable_editor(&worksheet("", ""), &PackageShape::default())
++            .expect("cancellable fixture editor");
++    let mut edit = editor
++        .edit_sheets(["Sheet1".into()])
++        .expect("selected worksheet");
++    let result = edit.apply_batch(HintedBatch::cancelling_on_hint(
++        vec![SheetCellValueEdit::set(
++            "Sheet1",
++            Address::from_a1("A1").expect("A1"),
++            2u32,
++        )],
++        cancellation_source,
++    ));
++    assert!(matches!(result, Err(Error::Package(OpcError::Cancelled))));
++    assert!(edit.is_empty());
++}

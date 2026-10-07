@@ -1,0 +1,31 @@
+{
+  "schema": "litchi.performance.0961.root-go.v1",
+  "status": "GO",
+  "created_utc": "2026-10-07T19:06:11.548411+00:00",
+  "scope": "One screening experiment only; sequential native then allocator; no retries; no adoption",
+  "bound_prospective_plan": {
+    "path": "/home/zhuhe/litchi-performance-0961/protocol/plan-bound-prospective-v2.json",
+    "bytes": 55739,
+    "mode": 436,
+    "sha256": "c4e994d0d7a9d626a93b2def10aaa17ef7dc21d9e0ff621215920620f74413e7"
+  },
+  "preflight": {
+    "path": "/home/zhuhe/litchi-performance-0961/protocol/preflight-v2.json",
+    "bytes": 410,
+    "mode": 436,
+    "sha256": "43877fc78e82365ab359207d848a8a8a558e76022363d13029838b8eeb4f54dc"
+  },
+  "descriptor_preflight": {
+    "path": "/home/zhuhe/litchi-performance-0961/protocol/descriptor-preflight-v2.json",
+    "bytes": 133,
+    "mode": 436,
+    "sha256": "47b8d204d550cbd275de9b759f189637e0aa3740767bf68a127adcb60a0addcf"
+  },
+  "build_result": {
+    "path": "/home/zhuhe/litchi-performance-0961/receipts/candidate-managed-v1-build-result.json",
+    "bytes": 1354,
+    "mode": 436,
+    "sha256": "7eff6a6fb29d9378f81730ffd87f627d147bfe09e2559ef2e353bfa45d32069f"
+  },
+  "source_review": "Independent staging_review: implementation and quality accepted for screening; exact8/256 and ordinary/fallback controls remain adoption gates"
+}

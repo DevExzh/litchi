@@ -1,0 +1,1847 @@
+{
+  "analysis_root": "/home/zhuhe/litchi-performance-0961/analysis-screen-v1",
+  "build_policy": {
+    "build_authorization": "root separately authorized isolated release build after quality",
+    "builds_started_by_this_plan": false,
+    "candidate_build_flags": "Rust1.95.0 release opt3 fatLTO cg1 debug1 incremental0 jobs2 RUSTFLAGS unset; build is root-owned and already terminal before plan generation.",
+    "candidate_build_result": {
+      "bytes": 1354,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0961/receipts/candidate-managed-v1-build-result.json",
+      "sha256": "7eff6a6fb29d9378f81730ffd87f627d147bfe09e2559ef2e353bfa45d32069f"
+    },
+    "candidate_build_start": {
+      "bytes": 4381,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0961/receipts/candidate-managed-v1-build-start.json",
+      "sha256": "b2d602f27e5a0d569be0b9f25be70d0ec10fa8b2eae398cde0a7aef211ed1048"
+    },
+    "candidate_build_terminal": {
+      "bytes": 1514,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0961/receipts/candidate-managed-v1-build-terminal.json",
+      "sha256": "8182051b0131957d64b0e56bcc09c924289b123483f59feaed546332ed6f0a96"
+    },
+    "candidate_build_tool": {
+      "bytes": 13039,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0961/build-tools/build_candidate_managed_v1.py",
+      "sha256": "8576297695a0dad9dd98b8d653998f23554caa7134519327b29edd975ef96d0d"
+    },
+    "no_workload_before_root_GO": true,
+    "source_freeze_required_before_build": true
+  },
+  "candidate_change": {
+    "description": "bounded advisory iterator capacity hint in MultiSourceEdit::apply_batch",
+    "expected_allowlist": [
+      "crates/litchi-xlsx/src/cell_values/admission_tests.rs",
+      "crates/litchi-xlsx/src/cell_values/source.rs"
+    ],
+    "fallible_growth_and_max_batch_limit_unchanged": true,
+    "production_adoption": false,
+    "size_hint_is_advisory": true,
+    "status": "quality_and_build_validated"
+  },
+  "capture_authorization": "root_GO_required",
+  "capture_root": {
+    "allocator": "/home/zhuhe/litchi-performance-0961/capture-allocator-v1",
+    "native": "/home/zhuhe/litchi-performance-0961/capture-native-v1"
+  },
+  "cases": [
+    {
+      "case_id": "medium-one-percent",
+      "context_limits": {
+        "depth": 256,
+        "execution_in_flight_bytes": 2956761,
+        "execution_in_flight_tasks": 1,
+        "execution_min_parallel_bytes": 0,
+        "execution_min_task_bytes": 0,
+        "execution_workers": 1,
+        "input_bytes": 67108864,
+        "memory": 2956761,
+        "objects": 1000000,
+        "output_bytes": 8519112,
+        "root_cpu_tasks": 5,
+        "root_io_concurrency": 1,
+        "root_workers": 1,
+        "work": 1000000000
+      },
+      "expected_cpu_tasks": 5,
+      "expected_worker_permits": 0,
+      "output_bytes": 4226788,
+      "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+      "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+      "shape": "medium",
+      "source_bytes": 4226429,
+      "source_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+      "update_count": 93,
+      "workload": "one-percent"
+    },
+    {
+      "case_id": "dense-sparse-one-percent",
+      "context_limits": {
+        "depth": 256,
+        "execution_in_flight_bytes": 3196436,
+        "execution_in_flight_tasks": 1,
+        "execution_min_parallel_bytes": 0,
+        "execution_min_task_bytes": 0,
+        "execution_workers": 1,
+        "input_bytes": 67108864,
+        "memory": 3196436,
+        "objects": 1000000,
+        "output_bytes": 8570408,
+        "root_cpu_tasks": 5,
+        "root_io_concurrency": 1,
+        "root_workers": 1,
+        "work": 1000000000
+      },
+      "expected_cpu_tasks": 5,
+      "expected_worker_permits": 0,
+      "output_bytes": 4252436,
+      "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+      "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+      "shape": "dense-sparse",
+      "source_bytes": 4251863,
+      "source_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+      "update_count": 178,
+      "workload": "one-percent"
+    },
+    {
+      "case_id": "medium-one-edit",
+      "context_limits": {
+        "depth": 256,
+        "execution_in_flight_bytes": 2751297,
+        "execution_in_flight_tasks": 1,
+        "execution_min_parallel_bytes": 0,
+        "execution_min_task_bytes": 0,
+        "execution_workers": 1,
+        "input_bytes": 67108864,
+        "memory": 2751297,
+        "objects": 1000000,
+        "output_bytes": 8518496,
+        "root_cpu_tasks": 2,
+        "root_io_concurrency": 1,
+        "root_workers": 1,
+        "work": 1000000000
+      },
+      "expected_cpu_tasks": 2,
+      "expected_worker_permits": 0,
+      "output_bytes": 4226480,
+      "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+      "semantic_sha256": "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+      "shape": "medium",
+      "source_bytes": 4226429,
+      "source_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+      "update_count": 1,
+      "workload": "one-edit"
+    }
+  ],
+  "comparison": {
+    "allocator_blocks": [
+      {
+        "id": 0,
+        "order": [
+          "A",
+          "B"
+        ]
+      },
+      {
+        "id": 1,
+        "order": [
+          "B",
+          "A"
+        ]
+      },
+      {
+        "id": 2,
+        "order": [
+          "A",
+          "B"
+        ]
+      }
+    ],
+    "allocator_repeats_per_role": 3,
+    "allocator_statistic": "descriptive median of three paired screening repeats",
+    "block_count": 3,
+    "blocks": [
+      {
+        "id": 0,
+        "order": [
+          "A",
+          "B",
+          "B",
+          "A"
+        ]
+      },
+      {
+        "id": 1,
+        "order": [
+          "B",
+          "A",
+          "A",
+          "B"
+        ]
+      },
+      {
+        "id": 2,
+        "order": [
+          "A",
+          "B",
+          "B",
+          "A"
+        ]
+      }
+    ],
+    "full_followup_required": true,
+    "id": "baseline-vs-candidate",
+    "native_statistic": "descriptive median of six paired screening legs",
+    "pairing": "adjacent A/B or B/A within each frozen block; native and allocator lanes never pair",
+    "pairs_per_case_allocator": 3,
+    "pairs_per_case_native": 6,
+    "role_A": "retained 0957 baseline executable",
+    "role_B": "bounded edit-staging capacity candidate executable",
+    "screening_only": true,
+    "workers": 1
+  },
+  "confirmation": {
+    "additional_controls_before_adoption": [
+      "MultiSourceEdit exact 8-item and 256-item success",
+      "ordinary non-managed and fallback performance controls"
+    ],
+    "allocator": "fresh plan with three paired AB/BA repeats, 2 warmups, 10 samples per child",
+    "fresh_bindings_required": true,
+    "native": "fresh plan with six ABBA/BAAB blocks, 20 warmups, 200 samples per child",
+    "screening_result_not_adoption_evidence": true,
+    "when": "only after a qualifying screen signal and all safety/oracle/control checks pass"
+  },
+  "cpu_mask": [
+    12,
+    13,
+    14,
+    15
+  ],
+  "created_utc": "2026-10-07T19:03:32.776947+00:00",
+  "deadline_seconds": 900,
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/usr/bin:/bin",
+    "RUST_BACKTRACE": "0",
+    "TZ": "UTC"
+  },
+  "execution": {
+    "child_owns_output_directory": true,
+    "fixed_affinity": true,
+    "fresh_process_per_child": true,
+    "no_retries": true,
+    "output_absent_before_launch": true,
+    "process_group": "start_new_session; bounded SIGTERM then SIGKILL; reap and verify clear",
+    "serial": true,
+    "stop_on_first_failure": true,
+    "terminal_before_parse": true,
+    "terminal_before_report_parse": true
+  },
+  "gates": {
+    "adoption_allowed": false,
+    "allocation_claim": false,
+    "allocator": {
+      "metrics": [
+        "allocated_bytes",
+        "allocation_calls",
+        "region_peak_live_bytes",
+        "core_combined_with_drain.allocated_bytes",
+        "max_rss_kib"
+      ],
+      "role": "descriptive counter evidence; no latency or adoption inference",
+      "safety_ratio_upper": 1.05
+    },
+    "ci": "No confidence interval or statistically qualified benefit is emitted for screening; full confirmation uses the frozen0959 bootstrap protocol.",
+    "full_followup": "Any promising or ambiguous signal requires a fresh six-block/200-sample native and separately bound allocator confirmation.",
+    "full_followup_interpretation": "Required before adoption only. Root pre-capture selection rule determines whether candidate advances or is rejected.",
+    "full_followup_required": true,
+    "memory_control": {
+      "adoption_ci_upper": 1.0,
+      "adoption_point_ratio": 0.95,
+      "metric": "max_rss_kib",
+      "safety_ratio_upper": 1.05,
+      "scope": "whole process including setup and oracle work"
+    },
+    "native_primary": {
+      "adoption_ci_upper": 1.0,
+      "adoption_point_ratio": 0.95,
+      "metrics": [
+        "edit_commit_ns",
+        "total_ns"
+      ],
+      "quantiles": [
+        "p50",
+        "p95"
+      ],
+      "ratio_direction": "candidate_over_baseline; lower is better",
+      "safety_ratio_upper": 1.05
+    },
+    "no_gate_relaxation": "full confirmation retains the adopted 0959 5% point and CI gates; screening cannot adopt",
+    "screening_only": true,
+    "screening_safety": "Any custody, terminal, report, semantic, inverse, resource, allocator, or control failure rejects without retry; native primary/native RSS/allocator region peak/allocator RSS median >1.05 stops.",
+    "useful_signal": "native primary or native max_rss_kib or allocator region_peak_live_bytes median <=0.95; requested bytes/calls alone never signal"
+  },
+  "helpers": {
+    "capture": {
+      "bytes": 36205,
+      "executable": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0960/tools/screen_0960_v7.py",
+      "sha256": "8f8b9a8bb83905dafcc109f6b113a3db9ae98420d86f031ba761482b74721238"
+    },
+    "controls": {
+      "bytes": 6079,
+      "executable": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0960/tools/check_screening_contract_v9.py",
+      "sha256": "9c52375a689318ace6007b983d71c3508846ddc1a46e64d69b58f7b9344b9f70"
+    },
+    "reducer": {
+      "bytes": 31267,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0960/tools/reduce_0960_v3.py",
+      "sha256": "7000e9094a9c8174907788dd8161b14b7f61210c74fe3930c43306a49c9852f2"
+    }
+  },
+  "host": {
+    "bytes": 5958,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0961/protocol/host-v1.json",
+    "receipt": {
+      "bytes": 5958,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0961/protocol/host-v1.json",
+      "sha256": "e8d9e997da9d6cbab082bca5f43aebbd6bc5d7082d87f4c281a0c726e7507c5d"
+    },
+    "sha256": "e8d9e997da9d6cbab082bca5f43aebbd6bc5d7082d87f4c281a0c726e7507c5d",
+    "status": "bound"
+  },
+  "lanes": {
+    "allocator": {
+      "baseline_binary": {
+        "bytes": 43676872,
+        "executable": true,
+        "mode": 509,
+        "path": "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_alloc.v2",
+        "sha256": "9ba37a6b9796ad0e316e7571ebe117ba7a5f97bcf5d29153c7cb3d74c485e9a5"
+      },
+      "candidate_binary": {
+        "bytes": 43669696,
+        "executable": true,
+        "mode": 509,
+        "path": "/home/zhuhe/litchi-performance-0961/executables/xlsx_managed_compression_alloc.v1",
+        "sha256": "3ad5573d6b7cb26a13d238a313c31100812da70edf7a06331ef8b7ef573b23ef"
+      },
+      "candidate_receipt": {
+        "bytes": 1354,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0961/receipts/candidate-managed-v1-build-result.json",
+        "sha256": "7eff6a6fb29d9378f81730ffd87f627d147bfe09e2559ef2e353bfa45d32069f"
+      },
+      "child_count": 18,
+      "children": [
+        {
+          "binary_role": "baseline",
+          "block": 0,
+          "case_id": "medium-one-percent",
+          "child_id": "allocator__medium-one-percent__b00__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 0,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 0,
+          "case_id": "medium-one-percent",
+          "child_id": "allocator__medium-one-percent__b00__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 1,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 1,
+          "case_id": "medium-one-percent",
+          "child_id": "allocator__medium-one-percent__b01__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 0,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 1,
+          "case_id": "medium-one-percent",
+          "child_id": "allocator__medium-one-percent__b01__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 1,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 2,
+          "case_id": "medium-one-percent",
+          "child_id": "allocator__medium-one-percent__b02__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 0,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 2,
+          "case_id": "medium-one-percent",
+          "child_id": "allocator__medium-one-percent__b02__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 1,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 0,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "allocator__dense-sparse-one-percent__b00__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 0,
+          "role": "A",
+          "shape": "dense-sparse",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 0,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "allocator__dense-sparse-one-percent__b00__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 1,
+          "role": "B",
+          "shape": "dense-sparse",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 1,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "allocator__dense-sparse-one-percent__b01__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 0,
+          "role": "B",
+          "shape": "dense-sparse",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 1,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "allocator__dense-sparse-one-percent__b01__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 1,
+          "role": "A",
+          "shape": "dense-sparse",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 2,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "allocator__dense-sparse-one-percent__b02__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 0,
+          "role": "A",
+          "shape": "dense-sparse",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 2,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "allocator__dense-sparse-one-percent__b02__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 1,
+          "role": "B",
+          "shape": "dense-sparse",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 0,
+          "case_id": "medium-one-edit",
+          "child_id": "allocator__medium-one-edit__b00__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 0,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 0,
+          "case_id": "medium-one-edit",
+          "child_id": "allocator__medium-one-edit__b00__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 1,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 1,
+          "case_id": "medium-one-edit",
+          "child_id": "allocator__medium-one-edit__b01__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 0,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 1,
+          "case_id": "medium-one-edit",
+          "child_id": "allocator__medium-one-edit__b01__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 1,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 2,
+          "case_id": "medium-one-edit",
+          "child_id": "allocator__medium-one-edit__b02__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 0,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 2,
+          "case_id": "medium-one-edit",
+          "child_id": "allocator__medium-one-edit__b02__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "allocator",
+          "measured_samples": 10,
+          "position": 1,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 2,
+          "workers": 1,
+          "workload": "one-edit"
+        }
+      ],
+      "execution": {
+        "argv_template": [
+          "/usr/bin/taskset",
+          "--cpu-list",
+          "12-15",
+          "<BINARY>",
+          "--shape",
+          "<SHAPE>",
+          "--workload",
+          "<WORKLOAD>",
+          "--workers",
+          "1",
+          "--warmup",
+          "2",
+          "--samples",
+          "10",
+          "--output",
+          "<OUTPUT>"
+        ],
+        "cpu_mask": [
+          12,
+          13,
+          14,
+          15
+        ],
+        "deadline_seconds": 900,
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin",
+          "RUST_BACKTRACE": "0",
+          "TZ": "UTC",
+          "approval_variable": "LITCHI_PERF_0960_CAPTURE_APPROVED"
+        },
+        "max_parallel_children": 1,
+        "retry_or_replacement": false,
+        "taskset_path": "/usr/bin/taskset",
+        "terminal_before_parse": true,
+        "time_argv_prefix": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "time-v.txt",
+          "--"
+        ],
+        "time_path": "/usr/bin/time",
+        "workload_cwd": "/home/zhuhe/litchi-performance-0961/source-baseline/tools/perf-baseline"
+      },
+      "measured_samples": 10,
+      "report_schema": "litchi.xlsx-managed-compression-allocation.v1",
+      "warmup_iterations": 2
+    },
+    "native": {
+      "baseline_binary": {
+        "bytes": 43259328,
+        "executable": true,
+        "mode": 509,
+        "path": "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_benchmark.v2",
+        "sha256": "5886b0f86a697bae757994d5a757cffae4a7e8d61a2769ff1c967029cd1912c3"
+      },
+      "candidate_binary": {
+        "bytes": 43245840,
+        "executable": true,
+        "mode": 509,
+        "path": "/home/zhuhe/litchi-performance-0961/executables/xlsx_managed_compression_benchmark.v1",
+        "sha256": "2a9712593fe9e4ef682fa4d6ad4fe0bec528259b0342340f8215a49f3f2c3bed"
+      },
+      "candidate_receipt": {
+        "bytes": 1354,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0961/receipts/candidate-managed-v1-build-result.json",
+        "sha256": "7eff6a6fb29d9378f81730ffd87f627d147bfe09e2559ef2e353bfa45d32069f"
+      },
+      "child_count": 36,
+      "children": [
+        {
+          "binary_role": "baseline",
+          "block": 0,
+          "case_id": "medium-one-percent",
+          "child_id": "native__medium-one-percent__b00__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 0,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 0,
+          "case_id": "medium-one-percent",
+          "child_id": "native__medium-one-percent__b00__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 1,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 0,
+          "case_id": "medium-one-percent",
+          "child_id": "native__medium-one-percent__b00__p2",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 2,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 0,
+          "case_id": "medium-one-percent",
+          "child_id": "native__medium-one-percent__b00__p3",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 3,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 1,
+          "case_id": "medium-one-percent",
+          "child_id": "native__medium-one-percent__b01__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 0,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 1,
+          "case_id": "medium-one-percent",
+          "child_id": "native__medium-one-percent__b01__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 1,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 1,
+          "case_id": "medium-one-percent",
+          "child_id": "native__medium-one-percent__b01__p2",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 2,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 1,
+          "case_id": "medium-one-percent",
+          "child_id": "native__medium-one-percent__b01__p3",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 3,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 2,
+          "case_id": "medium-one-percent",
+          "child_id": "native__medium-one-percent__b02__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 0,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 2,
+          "case_id": "medium-one-percent",
+          "child_id": "native__medium-one-percent__b02__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 1,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 2,
+          "case_id": "medium-one-percent",
+          "child_id": "native__medium-one-percent__b02__p2",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 2,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 2,
+          "case_id": "medium-one-percent",
+          "child_id": "native__medium-one-percent__b02__p3",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 3,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 0,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "native__dense-sparse-one-percent__b00__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 0,
+          "role": "A",
+          "shape": "dense-sparse",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 0,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "native__dense-sparse-one-percent__b00__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 1,
+          "role": "B",
+          "shape": "dense-sparse",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 0,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "native__dense-sparse-one-percent__b00__p2",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 2,
+          "role": "B",
+          "shape": "dense-sparse",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 0,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "native__dense-sparse-one-percent__b00__p3",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 3,
+          "role": "A",
+          "shape": "dense-sparse",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 1,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "native__dense-sparse-one-percent__b01__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 0,
+          "role": "B",
+          "shape": "dense-sparse",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 1,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "native__dense-sparse-one-percent__b01__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 1,
+          "role": "A",
+          "shape": "dense-sparse",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 1,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "native__dense-sparse-one-percent__b01__p2",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 2,
+          "role": "A",
+          "shape": "dense-sparse",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 1,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "native__dense-sparse-one-percent__b01__p3",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 3,
+          "role": "B",
+          "shape": "dense-sparse",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 2,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "native__dense-sparse-one-percent__b02__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 0,
+          "role": "A",
+          "shape": "dense-sparse",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 2,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "native__dense-sparse-one-percent__b02__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 1,
+          "role": "B",
+          "shape": "dense-sparse",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 2,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "native__dense-sparse-one-percent__b02__p2",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 2,
+          "role": "B",
+          "shape": "dense-sparse",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 2,
+          "case_id": "dense-sparse-one-percent",
+          "child_id": "native__dense-sparse-one-percent__b02__p3",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 3,
+          "role": "A",
+          "shape": "dense-sparse",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-percent"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 0,
+          "case_id": "medium-one-edit",
+          "child_id": "native__medium-one-edit__b00__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 0,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 0,
+          "case_id": "medium-one-edit",
+          "child_id": "native__medium-one-edit__b00__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 1,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 0,
+          "case_id": "medium-one-edit",
+          "child_id": "native__medium-one-edit__b00__p2",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 2,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 0,
+          "case_id": "medium-one-edit",
+          "child_id": "native__medium-one-edit__b00__p3",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 3,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 1,
+          "case_id": "medium-one-edit",
+          "child_id": "native__medium-one-edit__b01__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 0,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 1,
+          "case_id": "medium-one-edit",
+          "child_id": "native__medium-one-edit__b01__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 1,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 1,
+          "case_id": "medium-one-edit",
+          "child_id": "native__medium-one-edit__b01__p2",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 2,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 1,
+          "case_id": "medium-one-edit",
+          "child_id": "native__medium-one-edit__b01__p3",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 3,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 2,
+          "case_id": "medium-one-edit",
+          "child_id": "native__medium-one-edit__b02__p0",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 0,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 2,
+          "case_id": "medium-one-edit",
+          "child_id": "native__medium-one-edit__b02__p1",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 1,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "candidate",
+          "block": 2,
+          "case_id": "medium-one-edit",
+          "child_id": "native__medium-one-edit__b02__p2",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 2,
+          "role": "B",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-edit"
+        },
+        {
+          "binary_role": "baseline",
+          "block": 2,
+          "case_id": "medium-one-edit",
+          "child_id": "native__medium-one-edit__b02__p3",
+          "comparison_id": "baseline-vs-candidate",
+          "cpu_mask": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "lane": "native",
+          "measured_samples": 60,
+          "position": 3,
+          "role": "A",
+          "shape": "medium",
+          "warmup_iterations": 10,
+          "workers": 1,
+          "workload": "one-edit"
+        }
+      ],
+      "execution": {
+        "argv_template": [
+          "/usr/bin/taskset",
+          "--cpu-list",
+          "12-15",
+          "<BINARY>",
+          "--shape",
+          "<SHAPE>",
+          "--workload",
+          "<WORKLOAD>",
+          "--workers",
+          "1",
+          "--warmup",
+          "10",
+          "--samples",
+          "60",
+          "--output",
+          "<OUTPUT>"
+        ],
+        "cpu_mask": [
+          12,
+          13,
+          14,
+          15
+        ],
+        "deadline_seconds": 900,
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin",
+          "RUST_BACKTRACE": "0",
+          "TZ": "UTC",
+          "approval_variable": "LITCHI_PERF_0960_CAPTURE_APPROVED"
+        },
+        "max_parallel_children": 1,
+        "retry_or_replacement": false,
+        "taskset_path": "/usr/bin/taskset",
+        "terminal_before_parse": true,
+        "time_argv_prefix": [
+          "/usr/bin/time",
+          "-v",
+          "-o",
+          "time-v.txt",
+          "--"
+        ],
+        "time_path": "/usr/bin/time",
+        "workload_cwd": "/home/zhuhe/litchi-performance-0961/source-baseline/tools/perf-baseline"
+      },
+      "measured_samples": 60,
+      "report_schema": "litchi.xlsx-managed-compression-benchmark.v1",
+      "warmup_iterations": 10
+    }
+  },
+  "measurements_started": false,
+  "plan_id": "0961-apply-batch-capacity-screen",
+  "plan_revision": "root-final-v1",
+  "protocol_schema": "litchi.performance.0961.xlsx-apply-batch-capacity-screen-plan.v1",
+  "purpose": "Prospective descriptive screening of a bounded MultiSourceEdit::apply_batch capacity hint; screening cannot authorize adoption.",
+  "quality": {
+    "receipt": {
+      "bytes": 4322,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0961/quality/0961-quality-receipt.txt",
+      "sha256": "9e539db2a974e9f61350bf0e907b1863e2f48b473ede47a928a0fe2b777a6b24"
+    },
+    "scope": "full 1403 on production-final source before final test-only additions; final focused34, Clippy and scoped format"
+  },
+  "report_contract": {
+    "allocator": {
+      "allocation_scope": "global system-allocator callbacks serialized by allocation_metrics; process-wide across threads; observer peaks are not RSS, unique heap, per-thread bytes, OS-thread counts, or timing",
+      "allocator_identity": "CountingSystemAllocator(std::alloc::System)",
+      "case_identity_fields": [
+        "shape",
+        "workload",
+        "workers",
+        "warmup_iterations",
+        "measured_samples"
+      ],
+      "counter_revision": "serialized_region_peak_v3",
+      "instrumentation_identity": "system_allocator_operation_scoped",
+      "measured_samples": 10,
+      "performance_claim": "none; allocator counters do not claim latency, throughput, RSS, OS-thread width, worker/task overlap, speedup, or adoption; procfs Threads values are quiescence observations only",
+      "raw_sample_count": 10,
+      "resource_field": "resources_after_core",
+      "root_identity_fields": [],
+      "sample_phase_fields": [
+        "setup",
+        "ingress",
+        "edit_commit",
+        "publication",
+        "commit_drop",
+        "worker_drain",
+        "core_combined",
+        "core_combined_with_drain",
+        "postdrop"
+      ],
+      "schema": "litchi.xlsx-managed-compression-allocation.v1",
+      "scope": "process-wide serialized allocator regions with exact phase conservation; no latency or adoption claim",
+      "warmup_count": 2,
+      "warmup_iterations": 2
+    },
+    "cleanup_resources": [
+      "memory",
+      "workers",
+      "io_concurrency",
+      "objects"
+    ],
+    "native": {
+      "measured_samples": 60,
+      "performance_claim": "none; raw phase timings describe this explicit in-memory harness and do not claim OS thread counts, speedup, allocation behavior, or physical I/O",
+      "raw_sample_count": 60,
+      "resource_field": "resources_after_drop",
+      "root_identity_fields": [
+        "shape",
+        "workload",
+        "workers",
+        "warmup_iterations",
+        "measured_samples"
+      ],
+      "sample_phase_fields": [
+        "ingress_ns",
+        "edit_commit_ns",
+        "publication_ns",
+        "commit_drop_ns",
+        "total_ns"
+      ],
+      "schema": "litchi.xlsx-managed-compression-benchmark.v1",
+      "scope": "timed in-memory phase report with source/output/semantic/resource oracles outside timers",
+      "warmup_count": 10,
+      "warmup_iterations": 10
+    },
+    "shared_oracles": [
+      "source_bytes",
+      "source_sha256",
+      "output_bytes",
+      "output_sha256",
+      "semantic_sha256",
+      "update_count",
+      "expected_cpu_tasks",
+      "context_limits",
+      "sink_capacity_bytes",
+      "sink_max_write_bytes",
+      "preflight_actual_commit_inverse_verified",
+      "fixture_inverse_restored_exact_source"
+    ],
+    "sink_max_write_bytes": 65536
+  },
+  "reused_0959": {
+    "capture_validator": {
+      "bytes": 51799,
+      "executable": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0959/tools/capture_0959_v7.py",
+      "sha256": "0c3e298c1e9db9d6e40a313d82f9c75a27ffbd3a2d42d7bd612b73078ec5c10e"
+    },
+    "reducer": {
+      "bytes": 63546,
+      "executable": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0959/tools/reduce_0959_v3_finalplan.py",
+      "sha256": "4f13cb43b96081ca4736a2b431eaeb1165fd0e28d6c571b285f974c1c428d2f1"
+    },
+    "reuse_policy": "import only nearest-rank/geometric-mean/ratio/bootstrap after exact SHA validation; schedule and sample-count validation is 0960-specific"
+  },
+  "root_go": {
+    "status": "GO",
+    "receipt": {
+      "path": "/home/zhuhe/litchi-performance-0961/protocol/root-go-v1.json",
+      "bytes": 1331,
+      "mode": 436,
+      "sha256": "494edf7bb87c58df7e51027aa18c12fd63d19d928351477a1787819e6edd86e3"
+    }
+  },
+  "root_screen_selector": {
+    "bytes": 3610,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0961/tools/select_screen_0961_v1.py",
+    "sha256": "c5dd44d789c9852bd8245eb37b21aea867eab76fad01f312c1518a204ea62119"
+  },
+  "root_screen_selector_controls": {
+    "bytes": 2889,
+    "description": "six synthetic boundary, invalid, no-signal, and safety-stop controls",
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0961/tools/check_selector_0961_v1.py",
+    "sha256": "74d388265200f8184f0d2c8180400ad06c10e66c5f2a6749cb0a1e171d41ee71"
+  },
+  "root_screening_rule": {
+    "bytes": 1076,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0961/protocol/root-screening-rule-0961-v1.json",
+    "sha256": "299bc7e1016500aea85baa439239f5c56df715fb5e6023abc07394472e921c03"
+  },
+  "runner": {
+    "cpu_mask": [
+      12,
+      13,
+      14,
+      15
+    ],
+    "deadline_seconds": 900,
+    "schema": "litchi.performance.0960.capture.v1"
+  },
+  "schema": "litchi.performance.0960.inline-number-screen-plan.v1",
+  "scope": {
+    "allocator_schedule": "3 paired AB/BA/AB repeats, 2 warmups, 10 measured rows, 18 serial fresh-process children",
+    "candidate_mechanism": "bounded advisory MultiSourceEdit::apply_batch capacity hint",
+    "cases": [
+      "medium-one-percent",
+      "dense-sparse-one-percent",
+      "medium-one-edit"
+    ],
+    "format": "XLSX managed-compression benchmark",
+    "iwork_excluded": true,
+    "native_schedule": "3 blocks ABBA/BAAB/ABBA, 10 warmups, 60 measured samples, 36 serial fresh-process children",
+    "screening_only": true
+  },
+  "source": {
+    "base_commit": "4e69e7cda66ad9691a3c8a4babe709a5c1145d39",
+    "baseline_manifest": {
+      "bytes": 2561623,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0961/source-manifest-baseline-v1.json",
+      "sha256": "71f57c45e52ca6f8134e5ee4700e89655979cee800453ca1552b283dfb9e4578"
+    },
+    "baseline_receipt": {
+      "bytes": 1142,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0961/receipts/baseline-binding-v1.json",
+      "sha256": "87b07bef6a9970941b965a4a44e1c97152ad7a1381fe0769a316e17a38f68b54"
+    },
+    "baseline_runtime_manifest": {
+      "bytes": 2267268,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0957/source-manifest-v2.json",
+      "sha256": "f5fd1ee75b734bb7efaa1882be0397defea98c76c835be0bdf1f565c573ef617"
+    },
+    "baseline_runtime_source_root": "/home/zhuhe/litchi-performance-0957/source-v1",
+    "baseline_source_root": "/home/zhuhe/litchi-performance-0961/source-baseline",
+    "candidate_change_allowlist": [
+      "crates/litchi-xlsx/src/cell_values/admission_tests.rs",
+      "crates/litchi-xlsx/src/cell_values/source.rs"
+    ],
+    "candidate_freeze": {
+      "bytes": 4381,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0961/receipts/candidate-managed-v1-build-start.json",
+      "sha256": "b2d602f27e5a0d569be0b9f25be70d0ec10fa8b2eae398cde0a7aef211ed1048"
+    },
+    "candidate_manifest": {
+      "bytes": 2561647,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0961/source-manifest-candidate-v1.json",
+      "sha256": "226f4b485747f8eaa753d357b59a6ed44590f46e541cc020324965893ac7cf1f"
+    },
+    "candidate_runtime_source_root": "/home/zhuhe/litchi-performance-0961/source-candidate",
+    "candidate_source_root": "/home/zhuhe/litchi-performance-0961/source-candidate",
+    "mode_correction": "/home/zhuhe/litchi-performance-0961/source-mode-correction.json",
+    "source_cache_state": "fresh process and in-memory OwnedSource; no cold filesystem claim",
+    "source_start": "/home/zhuhe/litchi-performance-0961/source-start.json"
+  },
+  "status": "authorized",
+  "status_note": "Root authorized reviewed 0961 screening; no measurements started at freeze.",
+  "supersedes": {
+    "bytes": 54646,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0960/plan-final-v1.json",
+    "role": "historical 0960 schedule source; runner contract reused unchanged",
+    "sha256": "a9c0db61ae9dd48c349d3c264c140d6126c35979c32cecc1f671ded8bb2b176d"
+  },
+  "workers": 1
+}

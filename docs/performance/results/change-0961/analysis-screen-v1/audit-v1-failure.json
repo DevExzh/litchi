@@ -1,0 +1,8 @@
+{
+  "command": "python3 -B /home/zhuhe/litchi-performance-0961/tools/audit_raw_0961_v1.py /home/zhuhe/litchi-performance-0961 --output /home/zhuhe/litchi-performance-0961/analysis-screen-v1/independent-raw-audit-v1.json",
+  "exit_code": 2,
+  "stderr": "audit_raw_0961_v1: selector stop list differs",
+  "helper_sha256": "3859d154de958db48a1fe21cc4ba0db93426d0d9f0f3392ffd93a100f731a5f1",
+  "diagnosis": "Adapted independent auditor retained old no-signal stop-message text. Decision comparison had passed; exact stop-list comparison detected text mismatch. v2 changes only that string; no arithmetic/threshold change.",
+  "v1_output_created": false
+}

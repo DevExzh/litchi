@@ -1,0 +1,16 @@
+{
+  "baseline": {
+    "path": "/home/zhuhe/litchi-performance-0961/source-manifest-baseline-v1.json",
+    "bytes": 2561623,
+    "sha256": "71f57c45e52ca6f8134e5ee4700e89655979cee800453ca1552b283dfb9e4578"
+  },
+  "candidate": {
+    "path": "/home/zhuhe/litchi-performance-0961/source-manifest-candidate-v1.json",
+    "bytes": 2561647,
+    "sha256": "226f4b485747f8eaa753d357b59a6ed44590f46e541cc020324965893ac7cf1f"
+  },
+  "regenerate_command": "python3 -B docs/performance/results/change-0960/tools/rebuild_source_manifest_0960_v1.py --root <source-root> --output <fresh-output> --role <baseline|candidate> --source-commit 4e69e7cda66ad9691a3c8a4babe709a5c1145d39",
+  "root_source_export": "git archive 4e69e7cda66ad9691a3c8a4babe709a5c1145d39 -- . :(exclude)docs/performance/** :(exclude)docs/report/**",
+  "lock_overlay": "/home/zhuhe/litchi-performance-0960/source-baseline-v1/Cargo.lock",
+  "candidate_patch": "candidate.patch"
+}

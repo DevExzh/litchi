@@ -1,0 +1,109 @@
+{
+  "build_dir": "/home/zhuhe/litchi-performance-0961/builds/candidate-managed-v1",
+  "build_helper": {
+    "bytes": 13039,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0961/build-tools/build_candidate_managed_v1.py",
+    "sha256": "8576297695a0dad9dd98b8d653998f23554caa7134519327b29edd975ef96d0d"
+  },
+  "cargo_identity": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\nrelease: 1.95.0\ncommit-hash: f2d3ce0bd7f24a49f8f72d9000448f8838c4e850\ncommit-date: 2026-03-21\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.2 (sys:0.20.4 vendored)\nlibcurl: 8.15.0-DEV (sys:0.4.83+curl-8.15.0 vendored ssl:OpenSSL/3.5.4)\nssl: OpenSSL 3.5.4 30 Sep 2025\nos: Ubuntu 26.4.0 (resolute) [64-bit]\n",
+  "command": [
+    "/home/zhuhe/.cargo/bin/cargo",
+    "+1.95.0",
+    "build",
+    "--release",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "/home/zhuhe/litchi-performance-0961/source-candidate/tools/perf-baseline/Cargo.toml",
+    "--features",
+    "allocator-metrics",
+    "--bin",
+    "xlsx_managed_compression_alloc",
+    "--example",
+    "xlsx_managed_compression_benchmark"
+  ],
+  "cwd": "/home/zhuhe/litchi-performance-0961/source-candidate",
+  "deadline_seconds": 1800,
+  "effective_build_environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_PROFILE_RELEASE_LTO": "fat",
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-performance-0961/target-candidate-managed-v1",
+    "CARGO_TERM_COLOR": "never",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/home/zhuhe/.cargo/bin:/usr/bin:/bin",
+    "RUSTUP_TOOLCHAIN": "1.95.0",
+    "RUST_BACKTRACE": "0",
+    "TMPDIR": "/home/zhuhe/litchi-performance-0961/tmp/candidate-managed-v1",
+    "TZ": "UTC"
+  },
+  "env_overrides": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_PROFILE_RELEASE_LTO": "fat",
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-performance-0961/target-candidate-managed-v1",
+    "CARGO_TERM_COLOR": "never",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/home/zhuhe/.cargo/bin:/usr/bin:/bin",
+    "RUSTUP_TOOLCHAIN": "1.95.0",
+    "RUST_BACKTRACE": "0",
+    "TMPDIR": "/home/zhuhe/litchi-performance-0961/tmp/candidate-managed-v1",
+    "TZ": "UTC"
+  },
+  "no_rustflags": true,
+  "removed_environment_flags": [
+    "RUSTFLAGS",
+    "CARGO_ENCODED_RUSTFLAGS",
+    "RUSTC_WRAPPER",
+    "RUSTC_WORKSPACE_WRAPPER",
+    "RUSTC",
+    "RUSTDOC",
+    "CARGO_BUILD_RUSTC_WRAPPER",
+    "CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER",
+    "CARGO_BUILD_RUSTFLAGS"
+  ],
+  "roles": [
+    "xlsx_managed_compression_alloc",
+    "xlsx_managed_compression_benchmark"
+  ],
+  "rustc_identity": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "schema": "litchi.performance.0961.candidate-managed-v1.build-start",
+  "source_manifest": {
+    "bytes": 2561647,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0961/source-manifest-candidate-v1.json",
+    "sha256": "226f4b485747f8eaa753d357b59a6ed44590f46e541cc020324965893ac7cf1f"
+  },
+  "source_root": "/home/zhuhe/litchi-performance-0961/source-candidate",
+  "source_verification_start": {
+    "actual_bytes": 273576924,
+    "actual_file_count": 10933,
+    "file_count": 10933,
+    "manifest": {
+      "bytes": 2561647,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0961/source-manifest-candidate-v1.json",
+      "sha256": "226f4b485747f8eaa753d357b59a6ed44590f46e541cc020324965893ac7cf1f"
+    },
+    "manifest_bytes": 273576924,
+    "mismatch_count": 0,
+    "mismatches": [],
+    "source_root": "/home/zhuhe/litchi-performance-0961/source-candidate",
+    "tree_digest_from_manifest": "125bae2510967045c56007c26188e1a584dcd28788e515e6eea2860be5c3f703",
+    "tree_digest_from_source": "125bae2510967045c56007c26188e1a584dcd28788e515e6eea2860be5c3f703",
+    "verified": true
+  },
+  "started_utc": "2026-10-07T18:53:27.337547Z",
+  "target_dir": "/home/zhuhe/litchi-performance-0961/target-candidate-managed-v1"
+}

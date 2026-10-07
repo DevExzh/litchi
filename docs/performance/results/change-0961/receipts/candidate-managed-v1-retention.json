@@ -1,0 +1,64 @@
+{
+  "binaries": {
+    "xlsx_managed_compression_alloc": {
+      "build_output": {
+        "build_id": "c806c3c11fa813135233db322fda2e76cea95bdb",
+        "bytes": 43669696,
+        "exists": true,
+        "mode": 509,
+        "path": "/home/zhuhe/litchi-performance-0961/target-candidate-managed-v1/release/xlsx_managed_compression_alloc",
+        "readelf_returncode": 0,
+        "readelf_sha256": "0d3986861d236396aceb27b115b13846abac1eccc64ae5d98c1de4f34a0143ca",
+        "sha256": "3ad5573d6b7cb26a13d238a313c31100812da70edf7a06331ef8b7ef573b23ef"
+      },
+      "byte_match": true,
+      "retained": {
+        "build_id": "c806c3c11fa813135233db322fda2e76cea95bdb",
+        "bytes": 43669696,
+        "exists": true,
+        "mode": 509,
+        "path": "/home/zhuhe/litchi-performance-0961/executables/xlsx_managed_compression_alloc.v1",
+        "readelf_returncode": 0,
+        "readelf_sha256": "0d3986861d236396aceb27b115b13846abac1eccc64ae5d98c1de4f34a0143ca",
+        "sha256": "3ad5573d6b7cb26a13d238a313c31100812da70edf7a06331ef8b7ef573b23ef"
+      }
+    },
+    "xlsx_managed_compression_benchmark": {
+      "build_output": {
+        "build_id": "780740865f729d72b9d1f755d2aa54616d5b9ddf",
+        "bytes": 43245840,
+        "exists": true,
+        "mode": 509,
+        "path": "/home/zhuhe/litchi-performance-0961/target-candidate-managed-v1/release/examples/xlsx_managed_compression_benchmark",
+        "readelf_returncode": 0,
+        "readelf_sha256": "55c7374de1e72987574f21340addf579d9fe044da1e6e94e404be9c5610b242e",
+        "sha256": "2a9712593fe9e4ef682fa4d6ad4fe0bec528259b0342340f8215a49f3f2c3bed"
+      },
+      "byte_match": true,
+      "retained": {
+        "build_id": "780740865f729d72b9d1f755d2aa54616d5b9ddf",
+        "bytes": 43245840,
+        "exists": true,
+        "mode": 509,
+        "path": "/home/zhuhe/litchi-performance-0961/executables/xlsx_managed_compression_benchmark.v1",
+        "readelf_returncode": 0,
+        "readelf_sha256": "55c7374de1e72987574f21340addf579d9fe044da1e6e94e404be9c5610b242e",
+        "sha256": "2a9712593fe9e4ef682fa4d6ad4fe0bec528259b0342340f8215a49f3f2c3bed"
+      }
+    }
+  },
+  "binary_receipt": {
+    "bytes": 1364,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0961/receipts/candidate-managed-v1-build-binaries.json",
+    "sha256": "395e1bda4ab5f991a276a04077db4766afbb372f1b9b34a0da33abf2fdc1c7e1"
+  },
+  "schema": "litchi.performance.0961.candidate-managed-v1.retention",
+  "status": true,
+  "terminal_receipt": {
+    "bytes": 1514,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0961/receipts/candidate-managed-v1-build-terminal.json",
+    "sha256": "8182051b0131957d64b0e56bcc09c924289b123483f59feaed546332ed6f0a96"
+  }
+}

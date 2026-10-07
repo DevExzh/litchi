@@ -1,0 +1,83 @@
+0961 XLSX MultiSourceEdit staging-reservation candidate quality receipt
+=======================================================================
+
+Source
+------
+Base source SHA (source-start.json head): 4e69e7cda66ad9691a3c8a4babe709a5c1145d39
+Candidate: /home/zhuhe/litchi-performance-0961/source-candidate
+Only these files differ from source-baseline:
+  crates/litchi-xlsx/src/cell_values/source.rs
+  crates/litchi-xlsx/src/cell_values/admission_tests.rs
+Final source.rs SHA-256: 7c12048110d604d3b487a46d2dfd6719d99bf0eb96bfa584e62233b3b6575f1d
+Final admission_tests.rs SHA-256: 17c2cfbd100c1b81b95e03c882342cf61b39d1fa7d84ee43f17e7fe9f5542abb
+Patch: /home/zhuhe/litchi-performance-0961/quality/0961-multisource-edit-staging.patch
+Patch SHA-256: fd013cd9047104d838c276431520780667f75c53eca49970fe762b60e7501e8c
+
+Common quality environment
+--------------------------
+PATH=/home/zhuhe/.cargo/bin:/usr/bin:/bin
+LANG=C LC_ALL=C TZ=UTC RUST_BACKTRACE=0 CARGO_TERM_COLOR=never
+CARGO_NET_OFFLINE=true CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0
+CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0961/target-quality
+Toolchain: cargo +1.95.0 where explicit; candidate rust-toolchain otherwise.
+
+Commands and receipts
+---------------------
+1. Focused admission compile (intentional failed first attempt; MAX_BATCH_EDITS
+   import was then corrected; preserve this receipt):
+   env CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0961/target-quality \
+   CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0 \
+   cargo test -p litchi-xlsx --lib cell_values::admission_tests --locked --offline
+   Started 2026-10-07 18:44:30 UTC; ended 18:45:08 UTC; exit 101.
+   Log: focused-admission-20261007.log
+
+2. Focused admission rerun after import correction:
+   env CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0961/target-quality \
+   CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0 \
+   cargo test -p litchi-xlsx --lib cell_values::admission_tests --locked --offline
+   Started 2026-10-07 18:45:23 UTC; ended 18:45:52 UTC; exit 0.
+   Result: 34 passed, 0 failed, 0 ignored, 1369 filtered out.
+   Log: focused-admission-rerun-20261007.log
+
+3. Full litchi-xlsx library tests (before the final test-only edge-case
+   additions; production source.rs was already frozen):
+   env CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0961/target-quality \
+   CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0 \
+   cargo test -p litchi-xlsx --lib --locked --offline
+   Started 2026-10-07 18:45:56 UTC; ended 18:50:40 UTC; exit 0.
+   Result: 1403 passed, 0 failed, 0 ignored, 0 filtered out.
+   Log: full-xlsx-lib-20261007.log
+
+4. Final focused admission run after all requested edge-case tests:
+   env CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0961/target-quality \
+   CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0 \
+   cargo test -p litchi-xlsx --lib cell_values::admission_tests --locked --offline
+   Started 2026-10-07 18:50:42 UTC; ended 18:51:11 UTC; exit 0.
+   Result: 34 passed, 0 failed, 0 ignored, 1369 filtered out.
+   Log: focused-admission-final-20261007.log
+
+5. Warning-denied Clippy for litchi-xlsx library:
+   env PATH=/home/zhuhe/.cargo/bin:/usr/bin:/bin LANG=C LC_ALL=C TZ=UTC \
+   RUST_BACKTRACE=0 CARGO_TERM_COLOR=never CARGO_NET_OFFLINE=true \
+   CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0 \
+   CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0961/target-quality \
+   cargo +1.95.0 clippy --manifest-path \
+   /home/zhuhe/litchi-performance-0961/source-candidate/Cargo.toml \
+   --locked --offline -p litchi-xlsx --lib -- -D warnings
+   Started 2026-10-07 18:51:49 UTC; ended 18:52:19 UTC; exit 0.
+   Log: clippy-xlsx-lib-20261007.log
+
+6. Scoped formatting check for both changed files:
+   env PATH=/home/zhuhe/.cargo/bin:/usr/bin:/bin LANG=C LC_ALL=C TZ=UTC \
+   RUST_BACKTRACE=0 CARGO_TERM_COLOR=never CARGO_NET_OFFLINE=true \
+   CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0 \
+   CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0961/target-quality \
+   rustfmt +1.95.0 --edition 2024 --check \
+   crates/litchi-xlsx/src/cell_values/source.rs \
+   crates/litchi-xlsx/src/cell_values/admission_tests.rs
+   Started 2026-10-07 18:52:22 UTC; ended 18:52:22 UTC; exit 0.
+   Log: scoped-rustfmt-20261007.log
+
+No release benchmark build was run. The quality build target is retained until
+the coordinator confirms capture/release; all source changes remain isolated
+to source-candidate.

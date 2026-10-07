@@ -1,0 +1,172 @@
+{
+  "schema": "litchi.performance.0961.xlsx-apply-batch-capacity-screen-plan.v1",
+  "status": "prospective",
+  "measurements_started": false,
+  "purpose": "Screen bounded MultiSourceEdit capacity while preserving normal validation, cancellation and atomicity; allocation refusal timing changes as disclosed.",
+  "candidate_change": {
+    "expected_allowlist": [
+      "crates/litchi-xlsx/src/cell_values/admission_tests.rs",
+      "crates/litchi-xlsx/src/cell_values/source.rs"
+    ],
+    "production_adoption": false,
+    "test_only_allowlist_entry": "crates/litchi-xlsx/src/cell_values/admission_tests.rs",
+    "hint_policy": "size_hint is advisory; clamp any reservation to remaining capacity and retain fallible growth",
+    "requested_bytes_alone_is_not_signal": true
+  },
+  "source": {
+    "baseline_root": "/home/zhuhe/litchi-performance-0961/source-baseline",
+    "candidate_root": "/home/zhuhe/litchi-performance-0961/source-candidate",
+    "retained_0957_root": "/home/zhuhe/litchi-performance-0957/source-v1",
+    "baseline_binding_receipt": "/home/zhuhe/litchi-performance-0961/receipts/baseline-binding-v1.json",
+    "source_start": "/home/zhuhe/litchi-performance-0961/source-start.json",
+    "mode_correction": "/home/zhuhe/litchi-performance-0961/source-mode-correction.json",
+    "root_lock_overlay_is_not_runtime_binding": true,
+    "required_perf_lock_sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+  },
+  "baseline_executables": {
+    "root": "/home/zhuhe/litchi-performance-0957/executables",
+    "managed": {
+      "name": "xlsx_managed_compression_benchmark.v2",
+      "sha256": "5886b0f86a697bae757994d5a757cffae4a7e8d61a2769ff1c967029cd1912c3"
+    },
+    "allocator": {
+      "name": "xlsx_managed_compression_alloc.v2",
+      "sha256": "9ba37a6b9796ad0e316e7571ebe117ba7a5f97bcf5d29153c7cb3d74c485e9a5"
+    }
+  },
+  "candidate_build": {
+    "tool": "/home/zhuhe/litchi-performance-0961/build-tools/build_candidate_managed_v1.py",
+    "root_go_required": false,
+    "fresh_source_freeze_required": true,
+    "cargo_jobs": 2,
+    "release_only": true,
+    "postbuild_binding_required": true,
+    "authorization": "root separately authorized build after quality"
+  },
+  "cases": [
+    {
+      "case_id": "medium-one-percent",
+      "shape": "medium",
+      "workload": "one-percent",
+      "updates": 93,
+      "role": "managed edit.set repeatedly through apply_batch([one item])"
+    },
+    {
+      "case_id": "dense-sparse-one-percent",
+      "shape": "dense-sparse",
+      "workload": "one-percent",
+      "updates": 178,
+      "role": "managed edit.set repeatedly through apply_batch([one item])"
+    },
+    {
+      "case_id": "medium-one-edit",
+      "shape": "medium",
+      "workload": "one-edit",
+      "updates": 1,
+      "role": "ordinary single-edit control and managed primary case"
+    }
+  ],
+  "screening": {
+    "native": {
+      "blocks": [
+        "ABBA",
+        "BAAB",
+        "ABBA"
+      ],
+      "warmups_per_role": 10,
+      "samples_per_role": 60,
+      "children": 36,
+      "measured_rows": 2160
+    },
+    "allocator": {
+      "blocks": [
+        "AB",
+        "BA",
+        "AB"
+      ],
+      "warmups_per_role": 2,
+      "samples_per_role": 10,
+      "children": 18,
+      "measured_rows": 180
+    },
+    "total_children": 54,
+    "total_measured_rows": 2340,
+    "warmup_rows": 396,
+    "workers": 1,
+    "cpu_mask": [
+      12,
+      13,
+      14,
+      15
+    ],
+    "serial": true,
+    "deadline_seconds_per_child": 900,
+    "retries": 0
+  },
+  "controls": {
+    "timed": false,
+    "must_pass": true,
+    "groups": [
+      "ordinary one-item set route",
+      "empty iterator and unknown/underreported size_hint",
+      "257-item over-limit refusal",
+      "duplicate or invalid late item",
+      "cancellation before and during consumption"
+    ],
+    "oracles": [
+      "output",
+      "semantic",
+      "inverse",
+      "resource counters",
+      "sink publication",
+      "error class",
+      "no partial staging"
+    ],
+    "scope": "Focused iterator admission tests plus existing library suite; capture oracles independently verify output, semantic readback, inverse, resource counters and sink behavior. Not every oracle applies to every unit test."
+  },
+  "environment": {
+    "PATH": "/usr/bin:/bin",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "RUST_BACKTRACE": "0",
+    "TZ": "UTC",
+    "process_start_new_session": true,
+    "no_cargo_parallelism": "one Cargo process; two internal build jobs; no Cargo during capture"
+  },
+  "screen_rule": {
+    "eligible_signal": "any named native primary or native peak RSS or allocator region peak live bytes candidate/baseline median ratio <= 0.95",
+    "requested_bytes_or_allocation_calls_signal": false,
+    "primary_safety_stop": "any native primary, native peak RSS, allocator region peak, or allocator peak RSS median > 1.05",
+    "no_signal_result": "reject_screen",
+    "malformed_oracle_or_terminal_result": "reject_packet_and_stop_without_retry",
+    "full_confirmation_only_after_screen_signal_and_all_safety_oracles": true
+  },
+  "root_screen_selector_controls": {
+    "path": "/home/zhuhe/litchi-performance-0961/tools/check_selector_0961_v1.py",
+    "description": "six synthetic boundary, invalid, no-signal, and safety-stop controls"
+  },
+  "confirmation": {
+    "native": "six fresh ABBA/BAAB blocks, 20 warmups, 200 samples per child",
+    "allocator": "three fresh AB/BA repeats, 2 warmups, 10 samples per child",
+    "adoption_gate": "named primary ratio <= 0.95, bootstrap CI upper < 1.0, no primary safety ratio > 1.05, all controls/oracles pass",
+    "screening_is_not_adoption_evidence": true,
+    "additional_controls_required_before_adoption": [
+      "MultiSourceEdit exact 8-item success",
+      "MultiSourceEdit exact 256-item success",
+      "ordinary non-managed and fallback performance controls"
+    ]
+  },
+  "capture_authorization": "root_GO_required",
+  "runner_reducer": {
+    "runner_family": "0960 serial fail-stop runner, freshly bound to this plan and root",
+    "reducer_family": "0960 reducer/selector policy, schema-bound to this plan",
+    "terminal_first": true,
+    "stop_on_first_failure": true,
+    "no_retry": true
+  },
+  "estimated_serial_runtime": {
+    "screening": "45-90 minutes planning budget",
+    "conditional_confirmation": "2-4 hours planning budget",
+    "basis": "54 children and 2340 measured rows at one worker; no measured claim"
+  }
+}

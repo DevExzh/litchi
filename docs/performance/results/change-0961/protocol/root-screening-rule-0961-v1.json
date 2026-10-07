@@ -1,0 +1,26 @@
+{
+  "schema": "litchi.performance.0961.root-screening-rule.v1",
+  "scope": "Descriptive candidate selection only; screening cannot authorize adoption or a qualified effect claim.",
+  "native_primary_metrics": [
+    "edit_commit_ns.p50",
+    "edit_commit_ns.p95",
+    "total_ns.p50",
+    "total_ns.p95"
+  ],
+  "signal_threshold": 0.95,
+  "safety_review_threshold": 1.05,
+  "signal_any": [
+    "native primary metric median <= 0.95",
+    "native max_rss_kib median <= 0.95",
+    "allocator region_peak_live_bytes median <= 0.95"
+  ],
+  "stop_conditions": [
+    "Any invalid/undefined required metric, custody, terminal, semantic, output, inverse, resource, allocator, or control result",
+    "Any native primary or native max_rss_kib median > 1.05",
+    "Any allocator region_peak_live_bytes or max_rss_kib median > 1.05",
+    "No qualifying signal metric"
+  ],
+  "allocation_calls_or_requested_bytes_alone": "Do not qualify as a signal.",
+  "decision_if_no_stop": "Require independent full confirmation and regression review; never adopt from screening.",
+  "no_retry": true
+}

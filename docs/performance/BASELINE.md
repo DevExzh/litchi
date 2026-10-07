@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0961 — edit-staging reservation screen rejected
+
+[0961](0961-xlsx-edit-staging-capacity-trial.md) completed and validated 36
+native and 18 allocator children. The 1% cases reduce requested allocation
+bytes by 9.3–10.3%, while allocation calls and live peaks remain flat. No eligible
+latency/native-RSS/live-peak median reaches the frozen 0.95 threshold; medium
+1% allocator-process RSS also crosses the 1.05 safety threshold. The candidate
+is rejected. These are descriptive screening ratios, not qualified effects or
+a new production baseline. Independent raw audit passes with zero mismatches.
+
 ## 0960 — capacity hint rejected in complete second screening epoch
 
 [0960](0960-xlsx-raw-cell-capacity-trial.md) records the result.

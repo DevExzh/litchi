@@ -1,0 +1,35 @@
+{
+  "logs": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0961/quality/clippy-xlsx-lib-20261007.log",
+      "bytes": 4308,
+      "sha256": "39854cdaeaadd6e917f3f41ba20d0fa23161cf87c2b7301907d0a22f4a8643b8"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0961/quality/full-xlsx-lib-20261007.log",
+      "bytes": 135383,
+      "sha256": "924f1bcbb2607afdf780a985bb03d88496697b735d3e721a065327d69b9c205e"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0961/quality/focused-admission-20261007.log",
+      "bytes": 6914,
+      "sha256": "590fb714689ba2c7487f05a601e7fb55cf4b2c77ff6609fc01f96291e6fd33a9"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0961/quality/scoped-rustfmt-20261007.log",
+      "bytes": 313,
+      "sha256": "f3299938aa6c8edbcd550c89955f68f7313b654892276f001899321ba05d68c1"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0961/quality/focused-admission-rerun-20261007.log",
+      "bytes": 4162,
+      "sha256": "efb6cc8d211528ad008b2906e0851e07be7ba599cf0e665c493347a1b2d6a091"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0961/quality/focused-admission-final-20261007.log",
+      "bytes": 4162,
+      "sha256": "555fb68b3eebc9c15fc4c0845dc00fd5e340c7ef0efc128268dc5f5af0ec33ac"
+    }
+  ],
+  "note": "Initial compile failed due to missing test import, then corrected; not a planned negative control. Full library suite predates final test-only strengthening; see receipt."
+}

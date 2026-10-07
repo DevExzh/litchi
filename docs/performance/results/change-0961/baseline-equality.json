@@ -1,0 +1,7 @@
+{
+  "files": 10933,
+  "equal_membership_bytes_modes_hashes": true,
+  "baseline": "/home/zhuhe/litchi-performance-0961/source-manifest-baseline-v1.json",
+  "prior_baseline": "/home/zhuhe/litchi-performance-0960/source-manifest-baseline-v2.json",
+  "prior_custody": "docs/performance/results/change-0960/protocol/plan-final-v1.json"
+}

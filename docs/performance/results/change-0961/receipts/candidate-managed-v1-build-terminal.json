@@ -1,0 +1,41 @@
+{
+  "finished_utc": "2026-10-07T19:01:29.371475Z",
+  "launch_error": null,
+  "pid": 3149078,
+  "process_group": 3149078,
+  "returncode": 0,
+  "schema": "litchi.performance.0961.candidate-managed-v1.build-terminal",
+  "source_verification_end": {
+    "actual_bytes": 273576924,
+    "actual_file_count": 10933,
+    "file_count": 10933,
+    "manifest": {
+      "bytes": 2561647,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0961/source-manifest-candidate-v1.json",
+      "sha256": "226f4b485747f8eaa753d357b59a6ed44590f46e541cc020324965893ac7cf1f"
+    },
+    "manifest_bytes": 273576924,
+    "mismatch_count": 0,
+    "mismatches": [],
+    "source_root": "/home/zhuhe/litchi-performance-0961/source-candidate",
+    "tree_digest_from_manifest": "125bae2510967045c56007c26188e1a584dcd28788e515e6eea2860be5c3f703",
+    "tree_digest_from_source": "125bae2510967045c56007c26188e1a584dcd28788e515e6eea2860be5c3f703",
+    "verified": true
+  },
+  "source_verification_error": null,
+  "stderr": {
+    "bytes": 8902,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0961/builds/candidate-managed-v1/build.stderr.log",
+    "sha256": "82a612dde8fdbe916925c6a32a6d258676b3da65e3126f84be619f89f1f6ae31"
+  },
+  "stdout": {
+    "bytes": 0,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0961/builds/candidate-managed-v1/build.stdout.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "terminal_before_binary_parse": true,
+  "timed_out": false
+}

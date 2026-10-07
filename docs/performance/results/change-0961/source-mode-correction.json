@@ -1,0 +1,5 @@
+{
+  "reason": "git archive extraction modes differ from retained snapshot; restore prior modes only after verifying equal content",
+  "mode_count": 10932,
+  "content_differences": []
+}

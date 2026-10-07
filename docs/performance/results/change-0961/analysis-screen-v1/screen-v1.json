@@ -1,0 +1,2924 @@
+{
+  "allocator": {
+    "cases": {
+      "dense-sparse-one-percent": {
+        "child_count": 6,
+        "full_followup_required": true,
+        "metrics": {
+          "allocated_bytes": {
+            "max": 0.8971892500607617,
+            "median": 0.8971892500607617,
+            "min": 0.8971892500607617,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "allocation_calls": {
+            "max": 1.0,
+            "median": 1.0,
+            "min": 1.0,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "core_combined_with_drain.allocated_bytes": {
+            "max": 0.8971892500607617,
+            "median": 0.8971892500607617,
+            "min": 0.8971892500607617,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "max_rss_kib": {
+            "max": 1.0054115999236009,
+            "median": 1.0050280040733197,
+            "min": 1.0033078880407125,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "region_peak_live_bytes": {
+            "max": 1.0,
+            "median": 1.0,
+            "min": 1.0,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          }
+        },
+        "pairs": [
+          {
+            "baseline_child": "allocator__dense-sparse-one-percent__b00__p0",
+            "candidate_child": "allocator__dense-sparse-one-percent__b00__p1",
+            "ratios": {
+              "allocated_bytes": {
+                "denominator": 27673682.0,
+                "numerator": 24828530.0,
+                "status": "defined",
+                "value": 0.8971892500607617
+              },
+              "allocation_calls": {
+                "denominator": 210321.0,
+                "numerator": 210321.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "core_combined_with_drain.allocated_bytes": {
+                "denominator": 27673682.0,
+                "numerator": 24828530.0,
+                "status": "defined",
+                "value": 0.8971892500607617
+              },
+              "max_rss_kib": {
+                "denominator": 62828.0,
+                "numerator": 63168.0,
+                "status": "defined",
+                "value": 1.0054115999236009
+              },
+              "region_peak_live_bytes": {
+                "denominator": 43397035.0,
+                "numerator": 43397035.0,
+                "status": "defined",
+                "value": 1.0
+              }
+            },
+            "repeat": 0
+          },
+          {
+            "baseline_child": "allocator__dense-sparse-one-percent__b01__p1",
+            "candidate_child": "allocator__dense-sparse-one-percent__b01__p0",
+            "ratios": {
+              "allocated_bytes": {
+                "denominator": 27673682.0,
+                "numerator": 24828530.0,
+                "status": "defined",
+                "value": 0.8971892500607617
+              },
+              "allocation_calls": {
+                "denominator": 210321.0,
+                "numerator": 210321.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "core_combined_with_drain.allocated_bytes": {
+                "denominator": 27673682.0,
+                "numerator": 24828530.0,
+                "status": "defined",
+                "value": 0.8971892500607617
+              },
+              "max_rss_kib": {
+                "denominator": 62848.0,
+                "numerator": 63164.0,
+                "status": "defined",
+                "value": 1.0050280040733197
+              },
+              "region_peak_live_bytes": {
+                "denominator": 43397035.0,
+                "numerator": 43397035.0,
+                "status": "defined",
+                "value": 1.0
+              }
+            },
+            "repeat": 1
+          },
+          {
+            "baseline_child": "allocator__dense-sparse-one-percent__b02__p0",
+            "candidate_child": "allocator__dense-sparse-one-percent__b02__p1",
+            "ratios": {
+              "allocated_bytes": {
+                "denominator": 27673682.0,
+                "numerator": 24828530.0,
+                "status": "defined",
+                "value": 0.8971892500607617
+              },
+              "allocation_calls": {
+                "denominator": 210321.0,
+                "numerator": 210321.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "core_combined_with_drain.allocated_bytes": {
+                "denominator": 27673682.0,
+                "numerator": 24828530.0,
+                "status": "defined",
+                "value": 0.8971892500607617
+              },
+              "max_rss_kib": {
+                "denominator": 62880.0,
+                "numerator": 63088.0,
+                "status": "defined",
+                "value": 1.0033078880407125
+              },
+              "region_peak_live_bytes": {
+                "denominator": 43397035.0,
+                "numerator": 43397035.0,
+                "status": "defined",
+                "value": 1.0
+              }
+            },
+            "repeat": 2
+          }
+        ],
+        "screening_only": true
+      },
+      "medium-one-edit": {
+        "child_count": 6,
+        "full_followup_required": true,
+        "metrics": {
+          "allocated_bytes": {
+            "max": 0.9953422362327216,
+            "median": 0.9953422362327216,
+            "min": 0.9953422362327216,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "allocation_calls": {
+            "max": 1.0,
+            "median": 1.0,
+            "min": 1.0,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "core_combined_with_drain.allocated_bytes": {
+            "max": 0.9953422362327216,
+            "median": 0.9953422362327216,
+            "min": 0.9953422362327216,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "max_rss_kib": {
+            "max": 1.0825554508863577,
+            "median": 1.0050382209867963,
+            "min": 1.0015117759388925,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 1,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "region_peak_live_bytes": {
+            "max": 1.0,
+            "median": 1.0,
+            "min": 1.0,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          }
+        },
+        "pairs": [
+          {
+            "baseline_child": "allocator__medium-one-edit__b00__p0",
+            "candidate_child": "allocator__medium-one-edit__b00__p1",
+            "ratios": {
+              "allocated_bytes": {
+                "denominator": 5255741.0,
+                "numerator": 5231261.0,
+                "status": "defined",
+                "value": 0.9953422362327216
+              },
+              "allocation_calls": {
+                "denominator": 28142.0,
+                "numerator": 28142.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "core_combined_with_drain.allocated_bytes": {
+                "denominator": 5255741.0,
+                "numerator": 5231261.0,
+                "status": "defined",
+                "value": 0.9953422362327216
+              },
+              "max_rss_kib": {
+                "denominator": 46708.0,
+                "numerator": 50564.0,
+                "status": "defined",
+                "value": 1.0825554508863577
+              },
+              "region_peak_live_bytes": {
+                "denominator": 24361310.0,
+                "numerator": 24361310.0,
+                "status": "defined",
+                "value": 1.0
+              }
+            },
+            "repeat": 0
+          },
+          {
+            "baseline_child": "allocator__medium-one-edit__b01__p1",
+            "candidate_child": "allocator__medium-one-edit__b01__p0",
+            "ratios": {
+              "allocated_bytes": {
+                "denominator": 5255741.0,
+                "numerator": 5231261.0,
+                "status": "defined",
+                "value": 0.9953422362327216
+              },
+              "allocation_calls": {
+                "denominator": 28142.0,
+                "numerator": 28142.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "core_combined_with_drain.allocated_bytes": {
+                "denominator": 5255741.0,
+                "numerator": 5231261.0,
+                "status": "defined",
+                "value": 0.9953422362327216
+              },
+              "max_rss_kib": {
+                "denominator": 50272.0,
+                "numerator": 50348.0,
+                "status": "defined",
+                "value": 1.0015117759388925
+              },
+              "region_peak_live_bytes": {
+                "denominator": 24361310.0,
+                "numerator": 24361310.0,
+                "status": "defined",
+                "value": 1.0
+              }
+            },
+            "repeat": 1
+          },
+          {
+            "baseline_child": "allocator__medium-one-edit__b02__p0",
+            "candidate_child": "allocator__medium-one-edit__b02__p1",
+            "ratios": {
+              "allocated_bytes": {
+                "denominator": 5255741.0,
+                "numerator": 5231261.0,
+                "status": "defined",
+                "value": 0.9953422362327216
+              },
+              "allocation_calls": {
+                "denominator": 28142.0,
+                "numerator": 28142.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "core_combined_with_drain.allocated_bytes": {
+                "denominator": 5255741.0,
+                "numerator": 5231261.0,
+                "status": "defined",
+                "value": 0.9953422362327216
+              },
+              "max_rss_kib": {
+                "denominator": 46048.0,
+                "numerator": 46280.0,
+                "status": "defined",
+                "value": 1.0050382209867963
+              },
+              "region_peak_live_bytes": {
+                "denominator": 24361310.0,
+                "numerator": 24361310.0,
+                "status": "defined",
+                "value": 1.0
+              }
+            },
+            "repeat": 2
+          }
+        ],
+        "screening_only": true
+      },
+      "medium-one-percent": {
+        "child_count": 6,
+        "full_followup_required": true,
+        "metrics": {
+          "allocated_bytes": {
+            "max": 0.9065447877845987,
+            "median": 0.9065447877845987,
+            "min": 0.9065447877845987,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "allocation_calls": {
+            "max": 1.0,
+            "median": 1.0,
+            "min": 1.0,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "core_combined_with_drain.allocated_bytes": {
+            "max": 0.9065447877845987,
+            "median": 0.9065447877845987,
+            "min": 0.9065447877845987,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "max_rss_kib": {
+            "max": 1.0819907481256978,
+            "median": 1.0779065121853775,
+            "min": 1.0585118815738215,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 3,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          },
+          "region_peak_live_bytes": {
+            "max": 1.0,
+            "median": 1.0,
+            "min": 1.0,
+            "pair_count": 3,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of three paired repeats",
+            "undefined_count": 0
+          }
+        },
+        "pairs": [
+          {
+            "baseline_child": "allocator__medium-one-percent__b00__p0",
+            "candidate_child": "allocator__medium-one-percent__b00__p1",
+            "ratios": {
+              "allocated_bytes": {
+                "denominator": 19966270.0,
+                "numerator": 18100318.0,
+                "status": "defined",
+                "value": 0.9065447877845987
+              },
+              "allocation_calls": {
+                "denominator": 111025.0,
+                "numerator": 111025.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "core_combined_with_drain.allocated_bytes": {
+                "denominator": 19966270.0,
+                "numerator": 18100318.0,
+                "status": "defined",
+                "value": 0.9065447877845987
+              },
+              "max_rss_kib": {
+                "denominator": 50152.0,
+                "numerator": 54264.0,
+                "status": "defined",
+                "value": 1.0819907481256978
+              },
+              "region_peak_live_bytes": {
+                "denominator": 31033914.0,
+                "numerator": 31033914.0,
+                "status": "defined",
+                "value": 1.0
+              }
+            },
+            "repeat": 0
+          },
+          {
+            "baseline_child": "allocator__medium-one-percent__b01__p1",
+            "candidate_child": "allocator__medium-one-percent__b01__p0",
+            "ratios": {
+              "allocated_bytes": {
+                "denominator": 19966270.0,
+                "numerator": 18100318.0,
+                "status": "defined",
+                "value": 0.9065447877845987
+              },
+              "allocation_calls": {
+                "denominator": 111025.0,
+                "numerator": 111025.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "core_combined_with_drain.allocated_bytes": {
+                "denominator": 19966270.0,
+                "numerator": 18100318.0,
+                "status": "defined",
+                "value": 0.9065447877845987
+              },
+              "max_rss_kib": {
+                "denominator": 50060.0,
+                "numerator": 53960.0,
+                "status": "defined",
+                "value": 1.0779065121853775
+              },
+              "region_peak_live_bytes": {
+                "denominator": 31033914.0,
+                "numerator": 31033914.0,
+                "status": "defined",
+                "value": 1.0
+              }
+            },
+            "repeat": 1
+          },
+          {
+            "baseline_child": "allocator__medium-one-percent__b02__p0",
+            "candidate_child": "allocator__medium-one-percent__b02__p1",
+            "ratios": {
+              "allocated_bytes": {
+                "denominator": 19966270.0,
+                "numerator": 18100318.0,
+                "status": "defined",
+                "value": 0.9065447877845987
+              },
+              "allocation_calls": {
+                "denominator": 111025.0,
+                "numerator": 111025.0,
+                "status": "defined",
+                "value": 1.0
+              },
+              "core_combined_with_drain.allocated_bytes": {
+                "denominator": 19966270.0,
+                "numerator": 18100318.0,
+                "status": "defined",
+                "value": 0.9065447877845987
+              },
+              "max_rss_kib": {
+                "denominator": 51340.0,
+                "numerator": 54344.0,
+                "status": "defined",
+                "value": 1.0585118815738215
+              },
+              "region_peak_live_bytes": {
+                "denominator": 31033914.0,
+                "numerator": 31033914.0,
+                "status": "defined",
+                "value": 1.0
+              }
+            },
+            "repeat": 2
+          }
+        ],
+        "screening_only": true
+      }
+    }
+  },
+  "canonical_mapping": "canonical-v1",
+  "limitations": [
+    "Three native blocks and 60 samples are descriptive screening only; no bootstrap or adoption decision is emitted.",
+    "Allocator observer peaks and max RSS remain distinct metrics.",
+    "The protocol-plan mapping is structural only; all bound file descriptors and report/oracle validators remain fail-closed."
+  ],
+  "native": {
+    "cases": {
+      "dense-sparse-one-percent": {
+        "child_count": 12,
+        "full_followup_required": true,
+        "metrics": {
+          "commit_drop_ns.p50": {
+            "max": 1.0214438305343334,
+            "median": 1.0186948393557966,
+            "min": 0.9993614429424709,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "commit_drop_ns.p95": {
+            "max": 1.0251349751399892,
+            "median": 1.017327701270757,
+            "min": 0.9990410188216039,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "commit_drop_ns.p99": {
+            "max": 1.0440556662608071,
+            "median": 1.0115083057370653,
+            "min": 0.9922796328935517,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "edit_commit_ns.p50": {
+            "max": 1.0197181878894601,
+            "median": 0.9873987949208657,
+            "min": 0.9771721010273754,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "edit_commit_ns.p95": {
+            "max": 1.0247371993403216,
+            "median": 0.9933502527236439,
+            "min": 0.977572760789709,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "edit_commit_ns.p99": {
+            "max": 1.0208302178824553,
+            "median": 0.9940832068291878,
+            "min": 0.9514590039378485,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "ingress_ns.p50": {
+            "max": 1.1263223721924018,
+            "median": 1.0444451942416306,
+            "min": 0.9448081839041784,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 3,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "ingress_ns.p95": {
+            "max": 1.10326299335678,
+            "median": 1.0594402604826083,
+            "min": 0.9577179029378348,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 3,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "ingress_ns.p99": {
+            "max": 1.1422407029656363,
+            "median": 1.0172115471322671,
+            "min": 0.9208274992485943,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 2,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "max_rss_kib": {
+            "max": 1.0017140680548502,
+            "median": 0.9978427033222081,
+            "min": 0.9942214884429769,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "publication_ns.p50": {
+            "max": 1.0036614900719414,
+            "median": 1.0014803679310669,
+            "min": 0.9959261505442181,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "publication_ns.p95": {
+            "max": 1.0085958624825622,
+            "median": 0.9971906219118067,
+            "min": 0.994745702503076,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "publication_ns.p99": {
+            "max": 1.011744107592249,
+            "median": 0.9989315405758312,
+            "min": 0.9935808204838964,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "total_ns.p50": {
+            "max": 1.0108120119194453,
+            "median": 0.9934014366061159,
+            "min": 0.9851735979646936,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "total_ns.p95": {
+            "max": 1.0153295440675523,
+            "median": 0.9948640567153694,
+            "min": 0.9831049160582707,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "total_ns.p99": {
+            "max": 1.0144121187830215,
+            "median": 0.9959512943552968,
+            "min": 0.9776361201687532,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          }
+        },
+        "pairs": [
+          {
+            "baseline_child": "native__dense-sparse-one-percent__b00__p0",
+            "block": 0,
+            "candidate_child": "native__dense-sparse-one-percent__b00__p1",
+            "pair_id": "b00-leg0",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 304011.5,
+                "numerator": 310201.0,
+                "status": "defined",
+                "value": 1.0203594271927214
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 314681.0,
+                "numerator": 320941.0,
+                "status": "defined",
+                "value": 1.0198931616462386
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 321671.0,
+                "numerator": 327251.0,
+                "status": "defined",
+                "value": 1.017346916570036
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 17484066.0,
+                "numerator": 17276350.0,
+                "status": "defined",
+                "value": 0.9881196971002054
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 17610401.0,
+                "numerator": 18046033.0,
+                "status": "defined",
+                "value": 1.0247371993403216
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 17687381.0,
+                "numerator": 18055813.0,
+                "status": "defined",
+                "value": 1.0208302178824553
+              },
+              "ingress_ns.p50": {
+                "denominator": 95945.0,
+                "numerator": 108065.0,
+                "status": "defined",
+                "value": 1.1263223721924018
+              },
+              "ingress_ns.p95": {
+                "denominator": 108041.0,
+                "numerator": 118160.0,
+                "status": "defined",
+                "value": 1.0936588887551948
+              },
+              "ingress_ns.p99": {
+                "denominator": 118340.0,
+                "numerator": 120281.0,
+                "status": "defined",
+                "value": 1.016401892851107
+              },
+              "max_rss_kib": {
+                "denominator": 63008.0,
+                "numerator": 63116.0,
+                "status": "defined",
+                "value": 1.0017140680548502
+              },
+              "publication_ns.p50": {
+                "denominator": 11904083.0,
+                "numerator": 11929758.5,
+                "status": "defined",
+                "value": 1.0021568650016974
+              },
+              "publication_ns.p95": {
+                "denominator": 12049558.0,
+                "numerator": 12031389.0,
+                "status": "defined",
+                "value": 0.9984921438612105
+              },
+              "publication_ns.p99": {
+                "denominator": 12088259.0,
+                "numerator": 12148369.0,
+                "status": "defined",
+                "value": 1.004972593654719
+              },
+              "total_ns.p50": {
+                "denominator": 29799330.0,
+                "numerator": 29631389.5,
+                "status": "defined",
+                "value": 0.9943642860426728
+              },
+              "total_ns.p95": {
+                "denominator": 29978191.0,
+                "numerator": 30437743.0,
+                "status": "defined",
+                "value": 1.0153295440675523
+              },
+              "total_ns.p99": {
+                "denominator": 30179532.0,
+                "numerator": 30614483.0,
+                "status": "defined",
+                "value": 1.0144121187830215
+              }
+            }
+          },
+          {
+            "baseline_child": "native__dense-sparse-one-percent__b00__p3",
+            "block": 0,
+            "candidate_child": "native__dense-sparse-one-percent__b00__p2",
+            "pair_id": "b00-leg1",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 305376.0,
+                "numerator": 305181.0,
+                "status": "defined",
+                "value": 0.9993614429424709
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 312832.0,
+                "numerator": 312532.0,
+                "status": "defined",
+                "value": 0.9990410188216039
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 334181.0,
+                "numerator": 331601.0,
+                "status": "defined",
+                "value": 0.9922796328935517
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 17619996.5,
+                "numerator": 17217769.0,
+                "status": "defined",
+                "value": 0.9771721010273754
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 17802102.0,
+                "numerator": 17402850.0,
+                "status": "defined",
+                "value": 0.977572760789709
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 18460334.0,
+                "numerator": 17564251.0,
+                "status": "defined",
+                "value": 0.9514590039378485
+              },
+              "ingress_ns.p50": {
+                "denominator": 106990.5,
+                "numerator": 101085.5,
+                "status": "defined",
+                "value": 0.9448081839041784
+              },
+              "ingress_ns.p95": {
+                "denominator": 123220.0,
+                "numerator": 118010.0,
+                "status": "defined",
+                "value": 0.9577179029378348
+              },
+              "ingress_ns.p99": {
+                "denominator": 127460.0,
+                "numerator": 145590.0,
+                "status": "defined",
+                "value": 1.1422407029656363
+              },
+              "max_rss_kib": {
+                "denominator": 63060.0,
+                "numerator": 62844.0,
+                "status": "defined",
+                "value": 0.9965746907706946
+              },
+              "publication_ns.p50": {
+                "denominator": 11951963.5,
+                "numerator": 11903273.0,
+                "status": "defined",
+                "value": 0.9959261505442181
+              },
+              "publication_ns.p95": {
+                "denominator": 12019509.0,
+                "numerator": 11970098.0,
+                "status": "defined",
+                "value": 0.9958890999624028
+              },
+              "publication_ns.p99": {
+                "denominator": 12101118.0,
+                "numerator": 12089889.0,
+                "status": "defined",
+                "value": 0.999072069208812
+              },
+              "total_ns.p50": {
+                "denominator": 29985461.0,
+                "numerator": 29540884.5,
+                "status": "defined",
+                "value": 0.9851735979646936
+              },
+              "total_ns.p95": {
+                "denominator": 30260992.0,
+                "numerator": 29749730.0,
+                "status": "defined",
+                "value": 0.9831049160582707
+              },
+              "total_ns.p99": {
+                "denominator": 30801185.0,
+                "numerator": 30112351.0,
+                "status": "defined",
+                "value": 0.9776361201687532
+              }
+            }
+          },
+          {
+            "baseline_child": "native__dense-sparse-one-percent__b01__p1",
+            "block": 1,
+            "candidate_child": "native__dense-sparse-one-percent__b01__p0",
+            "pair_id": "b01-leg0",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 302161.5,
+                "numerator": 308641.0,
+                "status": "defined",
+                "value": 1.0214438305343334
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 308742.0,
+                "numerator": 316432.0,
+                "status": "defined",
+                "value": 1.024907527968336
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 309631.0,
+                "numerator": 323272.0,
+                "status": "defined",
+                "value": 1.0440556662608071
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 17436795.0,
+                "numerator": 17780617.0,
+                "status": "defined",
+                "value": 1.0197181878894601
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 17708012.0,
+                "numerator": 17895222.0,
+                "status": "defined",
+                "value": 1.010572050662717
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 17747182.0,
+                "numerator": 17995573.0,
+                "status": "defined",
+                "value": 1.013996081180663
+              },
+              "ingress_ns.p50": {
+                "denominator": 94376.0,
+                "numerator": 103965.5,
+                "status": "defined",
+                "value": 1.1016095193693312
+              },
+              "ingress_ns.p95": {
+                "denominator": 110840.0,
+                "numerator": 120231.0,
+                "status": "defined",
+                "value": 1.0847257307831109
+              },
+              "ingress_ns.p99": {
+                "denominator": 136411.0,
+                "numerator": 125611.0,
+                "status": "defined",
+                "value": 0.9208274992485943
+              },
+              "max_rss_kib": {
+                "denominator": 63076.0,
+                "numerator": 63060.0,
+                "status": "defined",
+                "value": 0.9997463377512842
+              },
+              "publication_ns.p50": {
+                "denominator": 11898298.0,
+                "numerator": 11941863.5,
+                "status": "defined",
+                "value": 1.0036614900719414
+              },
+              "publication_ns.p95": {
+                "denominator": 11979019.0,
+                "numerator": 12081989.0,
+                "status": "defined",
+                "value": 1.0085958624825622
+              },
+              "publication_ns.p99": {
+                "denominator": 12061538.0,
+                "numerator": 12203190.0,
+                "status": "defined",
+                "value": 1.011744107592249
+              },
+              "total_ns.p50": {
+                "denominator": 29787795.5,
+                "numerator": 30109861.5,
+                "status": "defined",
+                "value": 1.0108120119194453
+              },
+              "total_ns.p95": {
+                "denominator": 30025341.0,
+                "numerator": 30299543.0,
+                "status": "defined",
+                "value": 1.0091323525684521
+              },
+              "total_ns.p99": {
+                "denominator": 30110091.0,
+                "numerator": 30393513.0,
+                "status": "defined",
+                "value": 1.009412857636332
+              }
+            }
+          },
+          {
+            "baseline_child": "native__dense-sparse-one-percent__b01__p2",
+            "block": 1,
+            "candidate_child": "native__dense-sparse-one-percent__b01__p3",
+            "pair_id": "b01-leg1",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 302776.5,
+                "numerator": 303951.0,
+                "status": "defined",
+                "value": 1.0038790989393167
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 310141.0,
+                "numerator": 313282.0,
+                "status": "defined",
+                "value": 1.0101276516165227
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 311571.0,
+                "numerator": 316842.0,
+                "status": "defined",
+                "value": 1.0169174923211723
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 17388090.0,
+                "numerator": 17156444.0,
+                "status": "defined",
+                "value": 0.986677892741526
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 17464971.0,
+                "numerator": 17268859.0,
+                "status": "defined",
+                "value": 0.9887711236394267
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 17520070.0,
+                "numerator": 17296399.0,
+                "status": "defined",
+                "value": 0.9872334414188985
+              },
+              "ingress_ns.p50": {
+                "denominator": 91940.5,
+                "numerator": 92180.5,
+                "status": "defined",
+                "value": 1.0026103838895808
+              },
+              "ingress_ns.p95": {
+                "denominator": 101040.0,
+                "numerator": 104491.0,
+                "status": "defined",
+                "value": 1.034154790182106
+              },
+              "ingress_ns.p99": {
+                "denominator": 113200.0,
+                "numerator": 115240.0,
+                "status": "defined",
+                "value": 1.0180212014134276
+              },
+              "max_rss_kib": {
+                "denominator": 63108.0,
+                "numerator": 62816.0,
+                "status": "defined",
+                "value": 0.9953730113456297
+              },
+              "publication_ns.p50": {
+                "denominator": 11856382.0,
+                "numerator": 11865913.0,
+                "status": "defined",
+                "value": 1.000803870860436
+              },
+              "publication_ns.p95": {
+                "denominator": 11997798.0,
+                "numerator": 11934758.0,
+                "status": "defined",
+                "value": 0.994745702503076
+              },
+              "publication_ns.p99": {
+                "denominator": 12043898.0,
+                "numerator": 11972168.0,
+                "status": "defined",
+                "value": 0.9940442869908065
+              },
+              "total_ns.p50": {
+                "denominator": 29652659.5,
+                "numerator": 29428443.5,
+                "status": "defined",
+                "value": 0.9924385871695589
+              },
+              "total_ns.p95": {
+                "denominator": 29798230.0,
+                "numerator": 29559520.0,
+                "status": "defined",
+                "value": 0.991989121501512
+              },
+              "total_ns.p99": {
+                "denominator": 29832560.0,
+                "numerator": 29616989.0,
+                "status": "defined",
+                "value": 0.9927739691129424
+              }
+            }
+          },
+          {
+            "baseline_child": "native__dense-sparse-one-percent__b02__p0",
+            "block": 2,
+            "candidate_child": "native__dense-sparse-one-percent__b02__p1",
+            "pair_id": "b02-leg0",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 300996.0,
+                "numerator": 307221.0,
+                "status": "defined",
+                "value": 1.0206813379579796
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 309131.0,
+                "numerator": 316901.0,
+                "status": "defined",
+                "value": 1.0251349751399892
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 324801.0,
+                "numerator": 326782.0,
+                "status": "defined",
+                "value": 1.0060991191529582
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 17666281.0,
+                "numerator": 17279664.5,
+                "status": "defined",
+                "value": 0.9781155694285628
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 17754031.0,
+                "numerator": 17408920.0,
+                "status": "defined",
+                "value": 0.9805615412071771
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 17870612.0,
+                "numerator": 17504820.0,
+                "status": "defined",
+                "value": 0.9795310871278499
+              },
+              "ingress_ns.p50": {
+                "denominator": 91630.0,
+                "numerator": 97330.5,
+                "status": "defined",
+                "value": 1.062212157590309
+              },
+              "ingress_ns.p95": {
+                "denominator": 102360.0,
+                "numerator": 112930.0,
+                "status": "defined",
+                "value": 1.10326299335678
+              },
+              "ingress_ns.p99": {
+                "denominator": 107160.0,
+                "numerator": 119180.0,
+                "status": "defined",
+                "value": 1.1121687196715193
+              },
+              "max_rss_kib": {
+                "denominator": 62992.0,
+                "numerator": 62628.0,
+                "status": "defined",
+                "value": 0.9942214884429769
+              },
+              "publication_ns.p50": {
+                "denominator": 11892478.0,
+                "numerator": 11929173.0,
+                "status": "defined",
+                "value": 1.0030855638328697
+              },
+              "publication_ns.p95": {
+                "denominator": 12059768.0,
+                "numerator": 12066848.0,
+                "status": "defined",
+                "value": 1.000587075970284
+              },
+              "publication_ns.p99": {
+                "denominator": 12092758.0,
+                "numerator": 12078138.0,
+                "status": "defined",
+                "value": 0.9987910119428505
+              },
+              "total_ns.p50": {
+                "denominator": 29958786.0,
+                "numerator": 29632459.5,
+                "status": "defined",
+                "value": 0.98910748586408
+              },
+              "total_ns.p95": {
+                "denominator": 30158761.0,
+                "numerator": 29832310.0,
+                "status": "defined",
+                "value": 0.9891755831746536
+              },
+              "total_ns.p99": {
+                "denominator": 30187072.0,
+                "numerator": 29979091.0,
+                "status": "defined",
+                "value": 0.9931102625653789
+              }
+            }
+          },
+          {
+            "baseline_child": "native__dense-sparse-one-percent__b02__p3",
+            "block": 2,
+            "candidate_child": "native__dense-sparse-one-percent__b02__p2",
+            "pair_id": "b02-leg1",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 301786.5,
+                "numerator": 306926.0,
+                "status": "defined",
+                "value": 1.0170302515188718
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 310251.0,
+                "numerator": 314831.0,
+                "status": "defined",
+                "value": 1.0147622408952752
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 330521.0,
+                "numerator": 329171.0,
+                "status": "defined",
+                "value": 0.9959155394059681
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 17302749.0,
+                "numerator": 17187099.0,
+                "status": "defined",
+                "value": 0.9933160909864669
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 17405430.0,
+                "numerator": 17369390.0,
+                "status": "defined",
+                "value": 0.9979293818078611
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 17450680.0,
+                "numerator": 17466961.0,
+                "status": "defined",
+                "value": 1.0009329722394773
+              },
+              "ingress_ns.p50": {
+                "denominator": 91085.5,
+                "numerator": 93515.5,
+                "status": "defined",
+                "value": 1.0266782308929523
+              },
+              "ingress_ns.p95": {
+                "denominator": 103660.0,
+                "numerator": 103420.0,
+                "status": "defined",
+                "value": 0.9976847385683967
+              },
+              "ingress_ns.p99": {
+                "denominator": 114161.0,
+                "numerator": 107411.0,
+                "status": "defined",
+                "value": 0.9408729776368462
+              },
+              "max_rss_kib": {
+                "denominator": 62972.0,
+                "numerator": 62916.0,
+                "status": "defined",
+                "value": 0.9991107158737217
+              },
+              "publication_ns.p50": {
+                "denominator": 11884058.0,
+                "numerator": 11855292.5,
+                "status": "defined",
+                "value": 0.9975794884205378
+              },
+              "publication_ns.p95": {
+                "denominator": 12023009.0,
+                "numerator": 11964778.0,
+                "status": "defined",
+                "value": 0.9951567032845106
+              },
+              "publication_ns.p99": {
+                "denominator": 12081139.0,
+                "numerator": 12003588.0,
+                "status": "defined",
+                "value": 0.9935808204838964
+              },
+              "total_ns.p50": {
+                "denominator": 29588249.0,
+                "numerator": 29458029.0,
+                "status": "defined",
+                "value": 0.9955989284800192
+              },
+              "total_ns.p95": {
+                "denominator": 29708430.0,
+                "numerator": 29641259.0,
+                "status": "defined",
+                "value": 0.9977389919292268
+              },
+              "total_ns.p99": {
+                "denominator": 29751410.0,
+                "numerator": 29715480.0,
+                "status": "defined",
+                "value": 0.9987923261452146
+              }
+            }
+          }
+        ],
+        "screening_only": true
+      },
+      "medium-one-edit": {
+        "child_count": 12,
+        "full_followup_required": true,
+        "metrics": {
+          "commit_drop_ns.p50": {
+            "max": 1.0246866339676024,
+            "median": 1.010602591140789,
+            "min": 0.9945079412201276,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "commit_drop_ns.p95": {
+            "max": 1.1075005564210996,
+            "median": 1.018900102289832,
+            "min": 0.9202040816326531,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 2,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "commit_drop_ns.p99": {
+            "max": 1.0495178524889237,
+            "median": 0.9119305422308446,
+            "min": 0.7677239719606553,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "edit_commit_ns.p50": {
+            "max": 0.9944267774750073,
+            "median": 0.9896015782152762,
+            "min": 0.975269447248867,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "edit_commit_ns.p95": {
+            "max": 0.9984472452679469,
+            "median": 0.9891048681350164,
+            "min": 0.9753701030480892,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "edit_commit_ns.p99": {
+            "max": 1.022025565992256,
+            "median": 0.9855839732981444,
+            "min": 0.9746145498754176,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "ingress_ns.p50": {
+            "max": 1.0268387994607389,
+            "median": 1.004662195249798,
+            "min": 0.9823361345544501,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "ingress_ns.p95": {
+            "max": 1.0608730339639845,
+            "median": 1.0238405866951001,
+            "min": 0.9658744733715027,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 1,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "ingress_ns.p99": {
+            "max": 1.3442194101587235,
+            "median": 1.053247648536673,
+            "min": 0.8890304252199414,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 3,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "max_rss_kib": {
+            "max": 1.0257588898525585,
+            "median": 1.0037241349755355,
+            "min": 0.980455472467709,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "publication_ns.p50": {
+            "max": 1.008933885383468,
+            "median": 1.0011323435492356,
+            "min": 0.9874529127144241,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "publication_ns.p95": {
+            "max": 1.0164254601301028,
+            "median": 1.0013060756669743,
+            "min": 0.986266423898915,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "publication_ns.p99": {
+            "max": 1.0178351730710966,
+            "median": 1.0019890782448722,
+            "min": 0.9938664555030804,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "total_ns.p50": {
+            "max": 0.996609133476594,
+            "median": 0.9931101806039342,
+            "min": 0.9869270673509869,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "total_ns.p95": {
+            "max": 1.0003419485940632,
+            "median": 0.992954064290321,
+            "min": 0.9874184299852294,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "total_ns.p99": {
+            "max": 1.0315530879944228,
+            "median": 0.9928850780749043,
+            "min": 0.9860004070662578,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          }
+        },
+        "pairs": [
+          {
+            "baseline_child": "native__medium-one-edit__b00__p0",
+            "block": 0,
+            "candidate_child": "native__medium-one-edit__b00__p1",
+            "pair_id": "b00-leg0",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 43330.0,
+                "numerator": 43610.0,
+                "status": "defined",
+                "value": 1.0064620355411955
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 45100.0,
+                "numerator": 44390.0,
+                "status": "defined",
+                "value": 0.9842572062084257
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 51420.0,
+                "numerator": 44800.0,
+                "status": "defined",
+                "value": 0.8712563204978607
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 2261144.0,
+                "numerator": 2213894.0,
+                "status": "defined",
+                "value": 0.9791034980523133
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 2288080.0,
+                "numerator": 2232879.0,
+                "status": "defined",
+                "value": 0.9758745323590085
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 2294299.0,
+                "numerator": 2252349.0,
+                "status": "defined",
+                "value": 0.9817155479734768
+              },
+              "ingress_ns.p50": {
+                "denominator": 81451.0,
+                "numerator": 81405.5,
+                "status": "defined",
+                "value": 0.9994413819351512
+              },
+              "ingress_ns.p95": {
+                "denominator": 86611.0,
+                "numerator": 88761.0,
+                "status": "defined",
+                "value": 1.024823636720509
+              },
+              "ingress_ns.p99": {
+                "denominator": 99410.0,
+                "numerator": 95970.0,
+                "status": "defined",
+                "value": 0.9653958354290313
+              },
+              "max_rss_kib": {
+                "denominator": 46404.0,
+                "numerator": 46212.0,
+                "status": "defined",
+                "value": 0.9958624256529609
+              },
+              "publication_ns.p50": {
+                "denominator": 1552516.0,
+                "numerator": 1566386.0,
+                "status": "defined",
+                "value": 1.008933885383468
+              },
+              "publication_ns.p95": {
+                "denominator": 1579496.0,
+                "numerator": 1602487.0,
+                "status": "defined",
+                "value": 1.0145559089734952
+              },
+              "publication_ns.p99": {
+                "denominator": 1612626.0,
+                "numerator": 1635236.0,
+                "status": "defined",
+                "value": 1.0140206098624232
+              },
+              "total_ns.p50": {
+                "denominator": 3938436.0,
+                "numerator": 3907400.5,
+                "status": "defined",
+                "value": 0.9921198414802221
+              },
+              "total_ns.p95": {
+                "denominator": 3989126.0,
+                "numerator": 3961496.0,
+                "status": "defined",
+                "value": 0.9930736707739991
+              },
+              "total_ns.p99": {
+                "denominator": 4048006.0,
+                "numerator": 4008086.0,
+                "status": "defined",
+                "value": 0.990138354538012
+              }
+            }
+          },
+          {
+            "baseline_child": "native__medium-one-edit__b00__p3",
+            "block": 0,
+            "candidate_child": "native__medium-one-edit__b00__p2",
+            "pair_id": "b00-leg1",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 43410.0,
+                "numerator": 44050.0,
+                "status": "defined",
+                "value": 1.0147431467403825
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 45550.0,
+                "numerator": 50061.0,
+                "status": "defined",
+                "value": 1.099034028540066
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 49690.0,
+                "numerator": 51190.0,
+                "status": "defined",
+                "value": 1.0301871603944455
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 2245559.0,
+                "numerator": 2233044.0,
+                "status": "defined",
+                "value": 0.9944267774750073
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 2272369.0,
+                "numerator": 2255839.0,
+                "status": "defined",
+                "value": 0.9927256532719818
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 2300049.0,
+                "numerator": 2275789.0,
+                "status": "defined",
+                "value": 0.989452398622812
+              },
+              "ingress_ns.p50": {
+                "denominator": 83475.5,
+                "numerator": 82001.0,
+                "status": "defined",
+                "value": 0.9823361345544501
+              },
+              "ingress_ns.p95": {
+                "denominator": 94741.0,
+                "numerator": 93650.0,
+                "status": "defined",
+                "value": 0.9884843942960281
+              },
+              "ingress_ns.p99": {
+                "denominator": 100200.0,
+                "numerator": 100991.0,
+                "status": "defined",
+                "value": 1.0078942115768463
+              },
+              "max_rss_kib": {
+                "denominator": 46256.0,
+                "numerator": 46468.0,
+                "status": "defined",
+                "value": 1.0045831892078865
+              },
+              "publication_ns.p50": {
+                "denominator": 1573336.0,
+                "numerator": 1562311.0,
+                "status": "defined",
+                "value": 0.9929925966227175
+              },
+              "publication_ns.p95": {
+                "denominator": 1617767.0,
+                "numerator": 1607996.0,
+                "status": "defined",
+                "value": 0.9939601932787602
+              },
+              "publication_ns.p99": {
+                "denominator": 1657827.0,
+                "numerator": 1649297.0,
+                "status": "defined",
+                "value": 0.9948547104130889
+              },
+              "total_ns.p50": {
+                "denominator": 3948406.0,
+                "numerator": 3923645.5,
+                "status": "defined",
+                "value": 0.993728988356314
+              },
+              "total_ns.p95": {
+                "denominator": 4012397.0,
+                "numerator": 3983646.0,
+                "status": "defined",
+                "value": 0.9928344578066428
+              },
+              "total_ns.p99": {
+                "denominator": 4103726.0,
+                "numerator": 4067616.0,
+                "status": "defined",
+                "value": 0.9912006795775351
+              }
+            }
+          },
+          {
+            "baseline_child": "native__medium-one-edit__b01__p1",
+            "block": 1,
+            "candidate_child": "native__medium-one-edit__b01__p0",
+            "pair_id": "b01-leg0",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 43790.5,
+                "numerator": 43550.0,
+                "status": "defined",
+                "value": 0.9945079412201276
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 44930.0,
+                "numerator": 49760.0,
+                "status": "defined",
+                "value": 1.1075005564210996
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 71471.0,
+                "numerator": 54870.0,
+                "status": "defined",
+                "value": 0.7677239719606553
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 2254529.0,
+                "numerator": 2239294.0,
+                "status": "defined",
+                "value": 0.9932424910036641
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 2273379.0,
+                "numerator": 2269849.0,
+                "status": "defined",
+                "value": 0.9984472452679469
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 2279669.0,
+                "numerator": 2329880.0,
+                "status": "defined",
+                "value": 1.022025565992256
+              },
+              "ingress_ns.p50": {
+                "denominator": 82530.0,
+                "numerator": 81700.5,
+                "status": "defined",
+                "value": 0.9899491094147582
+              },
+              "ingress_ns.p95": {
+                "denominator": 92570.0,
+                "numerator": 89411.0,
+                "status": "defined",
+                "value": 0.9658744733715027
+              },
+              "ingress_ns.p99": {
+                "denominator": 96331.0,
+                "numerator": 129490.0,
+                "status": "defined",
+                "value": 1.3442194101587235
+              },
+              "max_rss_kib": {
+                "denominator": 47072.0,
+                "numerator": 46152.0,
+                "status": "defined",
+                "value": 0.980455472467709
+              },
+              "publication_ns.p50": {
+                "denominator": 1575266.0,
+                "numerator": 1555501.0,
+                "status": "defined",
+                "value": 0.9874529127144241
+              },
+              "publication_ns.p95": {
+                "denominator": 1604826.0,
+                "numerator": 1582786.0,
+                "status": "defined",
+                "value": 0.986266423898915
+              },
+              "publication_ns.p99": {
+                "denominator": 1630486.0,
+                "numerator": 1659566.0,
+                "status": "defined",
+                "value": 1.0178351730710966
+              },
+              "total_ns.p50": {
+                "denominator": 3956116.0,
+                "numerator": 3926411.0,
+                "status": "defined",
+                "value": 0.9924913728515544
+              },
+              "total_ns.p95": {
+                "denominator": 4020166.0,
+                "numerator": 3969586.0,
+                "status": "defined",
+                "value": 0.9874184299852294
+              },
+              "total_ns.p99": {
+                "denominator": 4039256.0,
+                "numerator": 4166707.0,
+                "status": "defined",
+                "value": 1.0315530879944228
+              }
+            }
+          },
+          {
+            "baseline_child": "native__medium-one-edit__b01__p2",
+            "block": 1,
+            "candidate_child": "native__medium-one-edit__b01__p3",
+            "pair_id": "b01-leg1",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 43510.5,
+                "numerator": 43755.0,
+                "status": "defined",
+                "value": 1.0056193332643844
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 50220.0,
+                "numerator": 49681.0,
+                "status": "defined",
+                "value": 0.9892672242134608
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 66300.0,
+                "numerator": 52491.0,
+                "status": "defined",
+                "value": 0.7917194570135747
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 2252879.0,
+                "numerator": 2230159.0,
+                "status": "defined",
+                "value": 0.9899151263782919
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 2278019.0,
+                "numerator": 2247809.0,
+                "status": "defined",
+                "value": 0.9867384775982992
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 2320779.0,
+                "numerator": 2268339.0,
+                "status": "defined",
+                "value": 0.9774041388688884
+              },
+              "ingress_ns.p50": {
+                "denominator": 80390.5,
+                "numerator": 81185.0,
+                "status": "defined",
+                "value": 1.0098830085644448
+              },
+              "ingress_ns.p95": {
+                "denominator": 87061.0,
+                "numerator": 89051.0,
+                "status": "defined",
+                "value": 1.0228575366696913
+              },
+              "ingress_ns.p99": {
+                "denominator": 109120.0,
+                "numerator": 97011.0,
+                "status": "defined",
+                "value": 0.8890304252199414
+              },
+              "max_rss_kib": {
+                "denominator": 45916.0,
+                "numerator": 46204.0,
+                "status": "defined",
+                "value": 1.0062723233731161
+              },
+              "publication_ns.p50": {
+                "denominator": 1552691.0,
+                "numerator": 1558746.5,
+                "status": "defined",
+                "value": 1.0039000032846201
+              },
+              "publication_ns.p95": {
+                "denominator": 1574446.0,
+                "numerator": 1600307.0,
+                "status": "defined",
+                "value": 1.0164254601301028
+              },
+              "publication_ns.p99": {
+                "denominator": 1618966.0,
+                "numerator": 1609036.0,
+                "status": "defined",
+                "value": 0.9938664555030804
+              },
+              "total_ns.p50": {
+                "denominator": 3932496.0,
+                "numerator": 3915870.5,
+                "status": "defined",
+                "value": 0.9957722779629019
+              },
+              "total_ns.p95": {
+                "denominator": 3977206.0,
+                "numerator": 3978566.0,
+                "status": "defined",
+                "value": 1.0003419485940632
+              },
+              "total_ns.p99": {
+                "denominator": 4014346.0,
+                "numerator": 3992546.0,
+                "status": "defined",
+                "value": 0.9945694765722736
+              }
+            }
+          },
+          {
+            "baseline_child": "native__medium-one-edit__b02__p0",
+            "block": 2,
+            "candidate_child": "native__medium-one-edit__b02__p1",
+            "pair_id": "b02-leg0",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 43275.5,
+                "numerator": 44025.0,
+                "status": "defined",
+                "value": 1.0173192684082217
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 45330.0,
+                "numerator": 47530.0,
+                "status": "defined",
+                "value": 1.0485329803662033
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 53191.0,
+                "numerator": 50670.0,
+                "status": "defined",
+                "value": 0.9526047639638284
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 2247019.0,
+                "numerator": 2222949.0,
+                "status": "defined",
+                "value": 0.9892880300522604
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 2264109.0,
+                "numerator": 2244799.0,
+                "status": "defined",
+                "value": 0.9914712586717336
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 2278609.0,
+                "numerator": 2263579.0,
+                "status": "defined",
+                "value": 0.993403870519251
+              },
+              "ingress_ns.p50": {
+                "denominator": 80915.0,
+                "numerator": 82080.5,
+                "status": "defined",
+                "value": 1.0144040042019402
+              },
+              "ingress_ns.p95": {
+                "denominator": 87431.0,
+                "numerator": 90731.0,
+                "status": "defined",
+                "value": 1.0377440495933936
+              },
+              "ingress_ns.p99": {
+                "denominator": 97630.0,
+                "numerator": 112110.0,
+                "status": "defined",
+                "value": 1.1483150670900337
+              },
+              "max_rss_kib": {
+                "denominator": 46120.0,
+                "numerator": 47308.0,
+                "status": "defined",
+                "value": 1.0257588898525585
+              },
+              "publication_ns.p50": {
+                "denominator": 1557911.0,
+                "numerator": 1569546.0,
+                "status": "defined",
+                "value": 1.0074683341988084
+              },
+              "publication_ns.p95": {
+                "denominator": 1591266.0,
+                "numerator": 1599606.0,
+                "status": "defined",
+                "value": 1.0052411099087142
+              },
+              "publication_ns.p99": {
+                "denominator": 1603447.0,
+                "numerator": 1616157.0,
+                "status": "defined",
+                "value": 1.0079266729739118
+              },
+              "total_ns.p50": {
+                "denominator": 3931296.0,
+                "numerator": 3917965.5,
+                "status": "defined",
+                "value": 0.996609133476594
+              },
+              "total_ns.p95": {
+                "denominator": 3966376.0,
+                "numerator": 3960296.0,
+                "status": "defined",
+                "value": 0.9984671145650337
+              },
+              "total_ns.p99": {
+                "denominator": 3990736.0,
+                "numerator": 4008836.0,
+                "status": "defined",
+                "value": 1.0045355042277915
+              }
+            }
+          },
+          {
+            "baseline_child": "native__medium-one-edit__b02__p3",
+            "block": 2,
+            "candidate_child": "native__medium-one-edit__b02__p2",
+            "pair_id": "b02-leg1",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 43120.5,
+                "numerator": 44185.0,
+                "status": "defined",
+                "value": 1.0246866339676024
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 49000.0,
+                "numerator": 45090.0,
+                "status": "defined",
+                "value": 0.9202040816326531
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 49881.0,
+                "numerator": 52351.0,
+                "status": "defined",
+                "value": 1.0495178524889237
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 2301424.5,
+                "numerator": 2244509.0,
+                "status": "defined",
+                "value": 0.975269447248867
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 2329689.0,
+                "numerator": 2272309.0,
+                "status": "defined",
+                "value": 0.9753701030480892
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 2343429.0,
+                "numerator": 2283940.0,
+                "status": "defined",
+                "value": 0.9746145498754176
+              },
+              "ingress_ns.p50": {
+                "denominator": 80480.5,
+                "numerator": 82640.5,
+                "status": "defined",
+                "value": 1.0268387994607389
+              },
+              "ingress_ns.p95": {
+                "denominator": 87740.0,
+                "numerator": 93081.0,
+                "status": "defined",
+                "value": 1.0608730339639845
+              },
+              "ingress_ns.p99": {
+                "denominator": 91571.0,
+                "numerator": 100600.0,
+                "status": "defined",
+                "value": 1.0986010854965
+              },
+              "max_rss_kib": {
+                "denominator": 46072.0,
+                "numerator": 46204.0,
+                "status": "defined",
+                "value": 1.0028650807431845
+              },
+              "publication_ns.p50": {
+                "denominator": 1565446.5,
+                "numerator": 1562886.5,
+                "status": "defined",
+                "value": 0.9983646838138512
+              },
+              "publication_ns.p95": {
+                "denominator": 1593787.0,
+                "numerator": 1589597.0,
+                "status": "defined",
+                "value": 0.9973710414252344
+              },
+              "publication_ns.p99": {
+                "denominator": 1603387.0,
+                "numerator": 1597056.0,
+                "status": "defined",
+                "value": 0.9960514835158324
+              },
+              "total_ns.p50": {
+                "denominator": 3988776.0,
+                "numerator": 3936631.0,
+                "status": "defined",
+                "value": 0.9869270673509869
+              },
+              "total_ns.p95": {
+                "denominator": 4038846.0,
+                "numerator": 3991047.0,
+                "status": "defined",
+                "value": 0.9881651838173577
+              },
+              "total_ns.p99": {
+                "denominator": 4073047.0,
+                "numerator": 4016026.0,
+                "status": "defined",
+                "value": 0.9860004070662578
+              }
+            }
+          }
+        ],
+        "screening_only": true
+      },
+      "medium-one-percent": {
+        "child_count": 12,
+        "full_followup_required": true,
+        "metrics": {
+          "commit_drop_ns.p50": {
+            "max": 1.0385950045154826,
+            "median": 1.0123823061602901,
+            "min": 0.999453785720138,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "commit_drop_ns.p95": {
+            "max": 1.039475708621812,
+            "median": 1.0095902155879002,
+            "min": 0.9816197587593337,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "commit_drop_ns.p99": {
+            "max": 1.1781816335854611,
+            "median": 0.9934155170841052,
+            "min": 0.913007607918083,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 1,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "edit_commit_ns.p50": {
+            "max": 1.0050628950884215,
+            "median": 0.9844420517032108,
+            "min": 0.9485949729128623,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "edit_commit_ns.p95": {
+            "max": 1.0096442333743376,
+            "median": 0.9845046100514312,
+            "min": 0.9453204232783807,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "edit_commit_ns.p99": {
+            "max": 1.0118736840192228,
+            "median": 0.9817876814128934,
+            "min": 0.9407932221425731,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "ingress_ns.p50": {
+            "max": 1.0321167279791674,
+            "median": 0.9948553707280421,
+            "min": 0.9278530080628489,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "ingress_ns.p95": {
+            "max": 1.044943315243649,
+            "median": 0.9738949303483614,
+            "min": 0.8839209755175348,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "ingress_ns.p99": {
+            "max": 1.1601416546910286,
+            "median": 0.9791615213409264,
+            "min": 0.8176309717118195,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 2,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "max_rss_kib": {
+            "max": 1.060272248013219,
+            "median": 0.9995200627911142,
+            "min": 0.9651964963956282,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 1,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "publication_ns.p50": {
+            "max": 1.0021294047915588,
+            "median": 0.9953672225504067,
+            "min": 0.9866217414333087,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "publication_ns.p95": {
+            "max": 1.0114429397264493,
+            "median": 0.9967998966096709,
+            "min": 0.9801493840554226,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "publication_ns.p99": {
+            "max": 1.017473612918756,
+            "median": 0.9978178344889109,
+            "min": 0.9829507568283279,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "total_ns.p50": {
+            "max": 1.0038568630712705,
+            "median": 0.989337072725774,
+            "min": 0.9638270048764496,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "total_ns.p95": {
+            "max": 1.0077155552465709,
+            "median": 0.9912797380081224,
+            "min": 0.9608323710304478,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          },
+          "total_ns.p99": {
+            "max": 1.0014558544066219,
+            "median": 0.9924765950203116,
+            "min": 0.9580265570522964,
+            "pair_count": 6,
+            "review_flag_pair_gt_1_05": 0,
+            "screening_statistic": "median of six paired screening legs",
+            "undefined_count": 0
+          }
+        },
+        "pairs": [
+          {
+            "baseline_child": "native__medium-one-percent__b00__p0",
+            "block": 0,
+            "candidate_child": "native__medium-one-percent__b00__p1",
+            "pair_id": "b00-leg0",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 164770.5,
+                "numerator": 164680.5,
+                "status": "defined",
+                "value": 0.999453785720138
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 174100.0,
+                "numerator": 170900.0,
+                "status": "defined",
+                "value": 0.9816197587593337
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 178610.0,
+                "numerator": 174691.0,
+                "status": "defined",
+                "value": 0.9780583393986899
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 9189780.5,
+                "numerator": 9012189.5,
+                "status": "defined",
+                "value": 0.9806751641130057
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 9302396.0,
+                "numerator": 9069575.0,
+                "status": "defined",
+                "value": 0.974971931962475
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 9385177.0,
+                "numerator": 9115696.0,
+                "status": "defined",
+                "value": 0.9712865298118512
+              },
+              "ingress_ns.p50": {
+                "denominator": 84180.0,
+                "numerator": 81655.0,
+                "status": "defined",
+                "value": 0.9700047517224994
+              },
+              "ingress_ns.p95": {
+                "denominator": 99940.0,
+                "numerator": 90720.0,
+                "status": "defined",
+                "value": 0.9077446467880729
+              },
+              "ingress_ns.p99": {
+                "denominator": 117010.0,
+                "numerator": 95671.0,
+                "status": "defined",
+                "value": 0.8176309717118195
+              },
+              "max_rss_kib": {
+                "denominator": 54024.0,
+                "numerator": 54080.0,
+                "status": "defined",
+                "value": 1.001036576336443
+              },
+              "publication_ns.p50": {
+                "denominator": 5516561.0,
+                "numerator": 5474716.0,
+                "status": "defined",
+                "value": 0.9924146583351475
+              },
+              "publication_ns.p95": {
+                "denominator": 5589461.0,
+                "numerator": 5521331.0,
+                "status": "defined",
+                "value": 0.9878109892885915
+              },
+              "publication_ns.p99": {
+                "denominator": 5652471.0,
+                "numerator": 5581371.0,
+                "status": "defined",
+                "value": 0.9874214303797402
+              },
+              "total_ns.p50": {
+                "denominator": 14958068.0,
+                "numerator": 14732722.0,
+                "status": "defined",
+                "value": 0.9849348191223626
+              },
+              "total_ns.p95": {
+                "denominator": 15138068.0,
+                "numerator": 14818018.0,
+                "status": "defined",
+                "value": 0.9788579361646413
+              },
+              "total_ns.p99": {
+                "denominator": 15248119.0,
+                "numerator": 14889578.0,
+                "status": "defined",
+                "value": 0.9764862144635676
+              }
+            }
+          },
+          {
+            "baseline_child": "native__medium-one-percent__b00__p3",
+            "block": 0,
+            "candidate_child": "native__medium-one-percent__b00__p2",
+            "pair_id": "b00-leg1",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 163070.5,
+                "numerator": 164311.0,
+                "status": "defined",
+                "value": 1.007607139243456
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 171941.0,
+                "numerator": 173211.0,
+                "status": "defined",
+                "value": 1.0073862545873293
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 191511.0,
+                "numerator": 174851.0,
+                "status": "defined",
+                "value": 0.913007607918083
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 9131106.5,
+                "numerator": 9033987.0,
+                "status": "defined",
+                "value": 0.9893638848698129
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 9180917.0,
+                "numerator": 9134256.0,
+                "status": "defined",
+                "value": 0.9949176100818687
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 9204638.0,
+                "numerator": 9165067.0,
+                "status": "defined",
+                "value": 0.995700971618873
+              },
+              "ingress_ns.p50": {
+                "denominator": 83891.0,
+                "numerator": 83225.5,
+                "status": "defined",
+                "value": 0.9920670870534384
+              },
+              "ingress_ns.p95": {
+                "denominator": 93450.0,
+                "numerator": 93810.0,
+                "status": "defined",
+                "value": 1.003852327447833
+              },
+              "ingress_ns.p99": {
+                "denominator": 107610.0,
+                "numerator": 107820.0,
+                "status": "defined",
+                "value": 1.0019514914970729
+              },
+              "max_rss_kib": {
+                "denominator": 54096.0,
+                "numerator": 53988.0,
+                "status": "defined",
+                "value": 0.9980035492457853
+              },
+              "publication_ns.p50": {
+                "denominator": 5488017.0,
+                "numerator": 5491382.0,
+                "status": "defined",
+                "value": 1.0006131540773289
+              },
+              "publication_ns.p95": {
+                "denominator": 5591223.0,
+                "numerator": 5572373.0,
+                "status": "defined",
+                "value": 0.9966286445738258
+              },
+              "publication_ns.p99": {
+                "denominator": 5615062.0,
+                "numerator": 5610853.0,
+                "status": "defined",
+                "value": 0.9992504089892507
+              },
+              "total_ns.p50": {
+                "denominator": 14871080.0,
+                "numerator": 14774154.5,
+                "status": "defined",
+                "value": 0.9934822823897121
+              },
+              "total_ns.p95": {
+                "denominator": 15009210.0,
+                "numerator": 14948440.0,
+                "status": "defined",
+                "value": 0.9959511526589341
+              },
+              "total_ns.p99": {
+                "denominator": 15098311.0,
+                "numerator": 15000670.0,
+                "status": "defined",
+                "value": 0.9935329852458331
+              }
+            }
+          },
+          {
+            "baseline_child": "native__medium-one-percent__b01__p1",
+            "block": 1,
+            "candidate_child": "native__medium-one-percent__b01__p0",
+            "pair_id": "b01-leg0",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 161721.0,
+                "numerator": 164796.0,
+                "status": "defined",
+                "value": 1.0190142282078394
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 168161.0,
+                "numerator": 171511.0,
+                "status": "defined",
+                "value": 1.0199213848633155
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 178590.0,
+                "numerator": 174040.0,
+                "status": "defined",
+                "value": 0.974522649644437
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 9144076.5,
+                "numerator": 9190372.0,
+                "status": "defined",
+                "value": 1.0050628950884215
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 9186837.0,
+                "numerator": 9275437.0,
+                "status": "defined",
+                "value": 1.0096442333743376
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 9244056.0,
+                "numerator": 9353817.0,
+                "status": "defined",
+                "value": 1.0118736840192228
+              },
+              "ingress_ns.p50": {
+                "denominator": 80515.5,
+                "numerator": 82185.0,
+                "status": "defined",
+                "value": 1.0207351379548038
+              },
+              "ingress_ns.p95": {
+                "denominator": 89001.0,
+                "numerator": 93001.0,
+                "status": "defined",
+                "value": 1.044943315243649
+              },
+              "ingress_ns.p99": {
+                "denominator": 98901.0,
+                "numerator": 107130.0,
+                "status": "defined",
+                "value": 1.08320441653775
+              },
+              "max_rss_kib": {
+                "denominator": 53996.0,
+                "numerator": 54176.0,
+                "status": "defined",
+                "value": 1.0033335802652048
+              },
+              "publication_ns.p50": {
+                "denominator": 5499302.0,
+                "numerator": 5490062.0,
+                "status": "defined",
+                "value": 0.9983197867656659
+              },
+              "publication_ns.p95": {
+                "denominator": 5547732.0,
+                "numerator": 5563292.0,
+                "status": "defined",
+                "value": 1.0028047497608032
+              },
+              "publication_ns.p99": {
+                "denominator": 5610362.0,
+                "numerator": 5590082.0,
+                "status": "defined",
+                "value": 0.9963852599885712
+              },
+              "total_ns.p50": {
+                "denominator": 14890469.0,
+                "numerator": 14947899.5,
+                "status": "defined",
+                "value": 1.0038568630712705
+              },
+              "total_ns.p95": {
+                "denominator": 14959390.0,
+                "numerator": 15074810.0,
+                "status": "defined",
+                "value": 1.0077155552465709
+              },
+              "total_ns.p99": {
+                "denominator": 15118270.0,
+                "numerator": 15140280.0,
+                "status": "defined",
+                "value": 1.0014558544066219
+              }
+            }
+          },
+          {
+            "baseline_child": "native__medium-one-percent__b01__p2",
+            "block": 1,
+            "candidate_child": "native__medium-one-percent__b01__p3",
+            "pair_id": "b01-leg1",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 163175.5,
+                "numerator": 164310.5,
+                "status": "defined",
+                "value": 1.00695570107032
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 171400.0,
+                "numerator": 171141.0,
+                "status": "defined",
+                "value": 0.9984889148191365
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 177291.0,
+                "numerator": 208881.0,
+                "status": "defined",
+                "value": 1.1781816335854611
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 9453287.5,
+                "numerator": 8967341.0,
+                "status": "defined",
+                "value": 0.9485949729128623
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 9532828.0,
+                "numerator": 9011577.0,
+                "status": "defined",
+                "value": 0.9453204232783807
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 9600438.0,
+                "numerator": 9032027.0,
+                "status": "defined",
+                "value": 0.9407932221425731
+              },
+              "ingress_ns.p50": {
+                "denominator": 84665.0,
+                "numerator": 84465.5,
+                "status": "defined",
+                "value": 0.9976436544026457
+              },
+              "ingress_ns.p95": {
+                "denominator": 105790.0,
+                "numerator": 93510.0,
+                "status": "defined",
+                "value": 0.8839209755175348
+              },
+              "ingress_ns.p99": {
+                "denominator": 110371.0,
+                "numerator": 99861.0,
+                "status": "defined",
+                "value": 0.9047757110110446
+              },
+              "max_rss_kib": {
+                "denominator": 50836.0,
+                "numerator": 53900.0,
+                "status": "defined",
+                "value": 1.060272248013219
+              },
+              "publication_ns.p50": {
+                "denominator": 5558272.0,
+                "numerator": 5483912.0,
+                "status": "defined",
+                "value": 0.9866217414333087
+              },
+              "publication_ns.p95": {
+                "denominator": 5630052.0,
+                "numerator": 5518292.0,
+                "status": "defined",
+                "value": 0.9801493840554226
+              },
+              "publication_ns.p99": {
+                "denominator": 5665882.0,
+                "numerator": 5569283.0,
+                "status": "defined",
+                "value": 0.9829507568283279
+              },
+              "total_ns.p50": {
+                "denominator": 15251875.0,
+                "numerator": 14700169.0,
+                "status": "defined",
+                "value": 0.9638270048764496
+              },
+              "total_ns.p95": {
+                "denominator": 15382371.0,
+                "numerator": 14779880.0,
+                "status": "defined",
+                "value": 0.9608323710304478
+              },
+              "total_ns.p99": {
+                "denominator": 15509402.0,
+                "numerator": 14858419.0,
+                "status": "defined",
+                "value": 0.9580265570522964
+              }
+            }
+          },
+          {
+            "baseline_child": "native__medium-one-percent__b02__p0",
+            "block": 2,
+            "candidate_child": "native__medium-one-percent__b02__p1",
+            "pair_id": "b02-leg0",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 162640.5,
+                "numerator": 165431.0,
+                "status": "defined",
+                "value": 1.017157473077124
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 169660.0,
+                "numerator": 171661.0,
+                "status": "defined",
+                "value": 1.011794176588471
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 172011.0,
+                "numerator": 173520.0,
+                "status": "defined",
+                "value": 1.0087726947695206
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 9238087.5,
+                "numerator": 9049141.0,
+                "status": "defined",
+                "value": 0.9795470112185016
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 9283067.0,
+                "numerator": 9110997.0,
+                "status": "defined",
+                "value": 0.9814641001729277
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 9378808.0,
+                "numerator": 9164627.0,
+                "status": "defined",
+                "value": 0.9771633026286496
+              },
+              "ingress_ns.p50": {
+                "denominator": 84675.5,
+                "numerator": 87395.0,
+                "status": "defined",
+                "value": 1.0321167279791674
+              },
+              "ingress_ns.p95": {
+                "denominator": 95620.0,
+                "numerator": 94870.0,
+                "status": "defined",
+                "value": 0.9921564526249739
+              },
+              "ingress_ns.p99": {
+                "denominator": 97420.0,
+                "numerator": 113021.0,
+                "status": "defined",
+                "value": 1.1601416546910286
+              },
+              "max_rss_kib": {
+                "denominator": 50248.0,
+                "numerator": 49760.0,
+                "status": "defined",
+                "value": 0.9902881706734596
+              },
+              "publication_ns.p50": {
+                "denominator": 6029854.0,
+                "numerator": 6042694.0,
+                "status": "defined",
+                "value": 1.0021294047915588
+              },
+              "publication_ns.p95": {
+                "denominator": 6070905.0,
+                "numerator": 6140374.0,
+                "status": "defined",
+                "value": 1.0114429397264493
+              },
+              "publication_ns.p99": {
+                "denominator": 6127525.0,
+                "numerator": 6234595.0,
+                "status": "defined",
+                "value": 1.017473612918756
+              },
+              "total_ns.p50": {
+                "denominator": 15515542.0,
+                "numerator": 15354327.0,
+                "status": "defined",
+                "value": 0.9896094509621385
+              },
+              "total_ns.p95": {
+                "denominator": 15577153.0,
+                "numerator": 15462112.0,
+                "status": "defined",
+                "value": 0.9926147608616286
+              },
+              "total_ns.p99": {
+                "denominator": 15736334.0,
+                "numerator": 15681253.0,
+                "status": "defined",
+                "value": 0.996499756550668
+              }
+            }
+          },
+          {
+            "baseline_child": "native__medium-one-percent__b02__p3",
+            "block": 2,
+            "candidate_child": "native__medium-one-percent__b02__p2",
+            "pair_id": "b02-leg1",
+            "ratios": {
+              "commit_drop_ns.p50": {
+                "denominator": 161666.0,
+                "numerator": 167905.5,
+                "status": "defined",
+                "value": 1.0385950045154826
+              },
+              "commit_drop_ns.p95": {
+                "denominator": 168990.0,
+                "numerator": 175661.0,
+                "status": "defined",
+                "value": 1.039475708621812
+              },
+              "commit_drop_ns.p99": {
+                "denominator": 171471.0,
+                "numerator": 176851.0,
+                "status": "defined",
+                "value": 1.031375567880283
+              },
+              "edit_commit_ns.p50": {
+                "denominator": 9153587.0,
+                "numerator": 9045656.5,
+                "status": "defined",
+                "value": 0.9882089392934158
+              },
+              "edit_commit_ns.p95": {
+                "denominator": 9216548.0,
+                "numerator": 9101757.0,
+                "status": "defined",
+                "value": 0.9875451199299348
+              },
+              "edit_commit_ns.p99": {
+                "denominator": 9244227.0,
+                "numerator": 9118617.0,
+                "status": "defined",
+                "value": 0.9864120601971371
+              },
+              "ingress_ns.p50": {
+                "denominator": 96740.0,
+                "numerator": 89760.5,
+                "status": "defined",
+                "value": 0.9278530080628489
+              },
+              "ingress_ns.p95": {
+                "denominator": 107040.0,
+                "numerator": 102291.0,
+                "status": "defined",
+                "value": 0.9556334080717489
+              },
+              "ingress_ns.p99": {
+                "denominator": 113481.0,
+                "numerator": 108530.0,
+                "status": "defined",
+                "value": 0.9563715511847798
+              },
+              "max_rss_kib": {
+                "denominator": 51604.0,
+                "numerator": 49808.0,
+                "status": "defined",
+                "value": 0.9651964963956282
+              },
+              "publication_ns.p50": {
+                "denominator": 6116259.5,
+                "numerator": 6053969.5,
+                "status": "defined",
+                "value": 0.9898156708360722
+              },
+              "publication_ns.p95": {
+                "denominator": 6147545.0,
+                "numerator": 6128925.0,
+                "status": "defined",
+                "value": 0.9969711486455162
+              },
+              "publication_ns.p99": {
+                "denominator": 6149244.0,
+                "numerator": 6229205.0,
+                "status": "defined",
+                "value": 1.01300338708303
+              },
+              "total_ns.p50": {
+                "denominator": 15531802.0,
+                "numerator": 15361957.0,
+                "status": "defined",
+                "value": 0.9890646944894096
+              },
+              "total_ns.p95": {
+                "denominator": 15607713.0,
+                "numerator": 15450773.0,
+                "status": "defined",
+                "value": 0.9899447151546161
+              },
+              "total_ns.p99": {
+                "denominator": 15660164.0,
+                "numerator": 15525803.0,
+                "status": "defined",
+                "value": 0.9914202047947901
+              }
+            }
+          }
+        ],
+        "screening_only": true
+      }
+    }
+  },
+  "packets": {
+    "allocator": {
+      "bytes": 574,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0961/capture-allocator-v1/capture-terminal.json",
+      "sha256": "dc4bf51bb084da0a77898e49e4607ea8b7cfd74d31911edd6cc5ddbd9e591c52"
+    },
+    "native": {
+      "bytes": 568,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0961/capture-native-v1/capture-terminal.json",
+      "sha256": "b664d63ef30b9c83842651f95485b6955fd68619331c72a9cba8589da8ffe26e"
+    }
+  },
+  "plan": {
+    "bytes": 55919,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0961/protocol/plan-final-v1.json",
+    "sha256": "c68775e0f88c367f5f137031fe4188834e334b692d9c4a8d59f980ae808537f7"
+  },
+  "plan_schema": "litchi.performance.0960.inline-number-screen-plan.v1",
+  "runner": {
+    "bytes": 36205,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0960/tools/screen_0960_v7.py",
+    "sha256": "8f8b9a8bb83905dafcc109f6b113a3db9ae98420d86f031ba761482b74721238"
+  },
+  "schedule": {
+    "allocator_children": 18,
+    "allocator_repeats_per_case": 3,
+    "allocator_rows": 10,
+    "allocator_warmups": 2,
+    "native_blocks_per_case": 3,
+    "native_children": 36,
+    "native_samples": 60,
+    "native_warmups": 10
+  },
+  "schema": "litchi.performance.0960.screen-reduction.v3-screen-adapter",
+  "scope": "offline descriptive 0960 screening; no adoption or production claim",
+  "screening_decision": {
+    "by_case": {
+      "dense-sparse-one-percent": {
+        "confidence_interval_defined": false,
+        "positive_primary_samples_validated": true,
+        "primary_ratio_defined": true,
+        "reason": "screening has no confidence interval; a descriptive result cannot be treated as a useful qualification signal",
+        "rss_ratio_defined": true,
+        "useful_signal": false
+      },
+      "medium-one-edit": {
+        "confidence_interval_defined": false,
+        "positive_primary_samples_validated": true,
+        "primary_ratio_defined": true,
+        "reason": "screening has no confidence interval; a descriptive result cannot be treated as a useful qualification signal",
+        "rss_ratio_defined": true,
+        "useful_signal": false
+      },
+      "medium-one-percent": {
+        "confidence_interval_defined": false,
+        "positive_primary_samples_validated": true,
+        "primary_ratio_defined": true,
+        "reason": "screening has no confidence interval; a descriptive result cannot be treated as a useful qualification signal",
+        "rss_ratio_defined": true,
+        "useful_signal": false
+      }
+    },
+    "decision": "followup_required_for_confirmation",
+    "useful_signal": false
+  },
+  "screening_policy": {
+    "adoption_allowed": false,
+    "allocator_statistic": "median of three paired screening repeats",
+    "confidence_interval_required_for_useful_signal": true,
+    "full_followup_required": true,
+    "native_statistic": "median of six paired screening legs",
+    "safety_review_ratio": 1.05
+  },
+  "status": "screened"
+}

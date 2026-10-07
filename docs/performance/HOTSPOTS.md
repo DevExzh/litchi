@@ -1,5 +1,16 @@
 # Performance hotspot inventory
 
+## 0961 — staging traffic is not a qualifying end-to-end signal
+
+[0961](0961-xlsx-edit-staging-capacity-trial.md) rejects the bounded iterator-hint
+reservation trial after a complete 54-child screen. Requested bytes fall in
+1% edit cases, but calls and live peaks stay flat and no eligible median reaches
+the 5% benefit threshold. Medium allocator-process RSS also triggers review.
+Keep production unchanged. Prioritize native edit/commit CPU attribution before
+another trial based only on cumulative allocation-request ownership; semantic
+materialization and omitted-cell merge remain owners to investigate, not proven
+CPU bottlenecks of the same relative size.
+
 ## 0960 — temporary cell reservation lowers traffic without qualifying benefit
 
 [0960](0960-xlsx-raw-cell-capacity-trial.md) records the result.
