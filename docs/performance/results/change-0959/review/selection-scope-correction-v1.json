@@ -1,0 +1,17 @@
+{
+  "issue": "v1 aggregated top allocation-size buckets before applying exact stage/timed selection, so its size table was whole-process despite selected-owner label",
+  "schema": "litchi.performance.0959.offline-correction-receipt.v1",
+  "status": "preserved-superseded",
+  "superseded_outputs": [
+    {
+      "bytes": 623950,
+      "path": "/home/zhuhe/litchi-performance-0959/analysis/owner-ranking-v1-selection-scope-bug.json",
+      "sha256": "833988be4989a13fb8728889a7514d26753502535afb97b1ab692f24fea13b4a"
+    },
+    {
+      "bytes": 176668,
+      "path": "/home/zhuhe/litchi-performance-0959/analysis/owner-ranking-summary-v1-selection-scope-bug.json",
+      "sha256": "d55ed66b89e5782e4eef13592338d15ef5215aa50039de94e5b2f432d5533f83"
+    }
+  ]
+}

@@ -1,0 +1,132 @@
+{
+  "binary": {
+    "bytes": 43228520,
+    "executable": true,
+    "mode": 509,
+    "path": "/home/zhuhe/litchi-performance-0959/target-candidate-arc-v2/release/examples/xlsx_managed_compression_benchmark",
+    "sha256": "3cf1714372b376ccdaeaf6a631a5439195694bdfffd4d10c25dc5f06db95f51f"
+  },
+  "build": {
+    "binary_receipt": {
+      "bytes": 2214,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/receipts/candidate-arc-v2-build-binaries.json",
+      "sha256": "a1d4933848b382402728629b045faef654d1c941c9f671ee74d57e24f82978d6"
+    },
+    "command": [
+      "/home/zhuhe/.cargo/bin/cargo",
+      "+1.95.0",
+      "build",
+      "--release",
+      "--locked",
+      "--offline",
+      "--manifest-path",
+      "/home/zhuhe/litchi-performance-0959/source-candidate-arc-v1/tools/perf-baseline/Cargo.toml",
+      "--features",
+      "allocator-metrics",
+      "--bin",
+      "xlsx_managed_compression_alloc",
+      "--example",
+      "xlsx_managed_compression_benchmark"
+    ],
+    "cwd": "/home/zhuhe/litchi-performance-0959/source-candidate-arc-v1",
+    "env": {
+      "CARGO_BUILD_JOBS": "2",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+      "CARGO_PROFILE_RELEASE_DEBUG": "1",
+      "CARGO_PROFILE_RELEASE_LTO": "fat",
+      "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+      "CARGO_TARGET_DIR": "/home/zhuhe/litchi-performance-0959/target-candidate-arc-v2",
+      "CARGO_TERM_COLOR": "never",
+      "HOME": "/home/zhuhe",
+      "LANG": "C",
+      "LC_ALL": "C",
+      "PATH": "/home/zhuhe/.cargo/bin:/usr/bin:/bin",
+      "RUSTUP_TOOLCHAIN": "1.95.0",
+      "RUST_BACKTRACE": "0",
+      "TMPDIR": "/home/zhuhe/litchi-performance-0959/tmp/candidate-arc-v2",
+      "TZ": "UTC"
+    },
+    "result": {
+      "bytes": 858,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/receipts/candidate-arc-v2-build-result.json",
+      "sha256": "38dffbc00aca90779f33135f28e3e9338619238f640e38603f09b1c4e908c918"
+    },
+    "start": {
+      "bytes": 2767,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/receipts/candidate-arc-v2-build-start.json",
+      "sha256": "e27d6fcf7fd462d9c98207681173d6bb6756f0fb0ec813f177d8dfefd50d733f"
+    },
+    "target_dir": "/home/zhuhe/litchi-performance-0959/target-candidate-arc-v2",
+    "terminal": {
+      "bytes": 1590,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/receipts/candidate-arc-v2-build-terminal.json",
+      "sha256": "c22b6724d2ba9714b09acf81c05b775982a74d108e11cea1c60dc84782a76067"
+    }
+  },
+  "candidate_manifest": {
+    "bytes": 2266853,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0959/source-manifest-candidate-arc-v1.json",
+    "sha256": "77ec8f3efe5c0dfb9aebf6a66ddcd061718c45c532388e7c26297fee9dc508cc"
+  },
+  "comparison_baseline_manifest": {
+    "bytes": 2266571,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0959/source-manifest-baseline-comparison-v1.json",
+    "sha256": "7397cc28dbaa29e3b6f43603c26cedcd7f92e9bc57b865d3ae6acf0d01418f79"
+  },
+  "created_utc": "2026-10-07T14:35:00.914857Z",
+  "lane": "native",
+  "schema": "litchi.performance.0959.candidate-build-adapter.v1",
+  "self": {
+    "path": "/home/zhuhe/litchi-performance-0959/receipts/candidate-arc-v2-native-build-adapter-v1.json"
+  },
+  "source": {
+    "changes": [
+      {
+        "path": "crates/litchi-xlsx/src/cell.rs"
+      },
+      {
+        "path": "crates/litchi-xlsx/src/raw/worksheet/semantic.rs"
+      },
+      {
+        "path": "crates/litchi-xlsx/src/raw/worksheet/selected.rs"
+      }
+    ],
+    "comparison_baseline_manifest": {
+      "bytes": 2266571,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/source-manifest-baseline-comparison-v1.json",
+      "sha256": "7397cc28dbaa29e3b6f43603c26cedcd7f92e9bc57b865d3ae6acf0d01418f79"
+    },
+    "manifest": {
+      "bytes": 2266853,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/source-manifest-candidate-arc-v1.json",
+      "sha256": "77ec8f3efe5c0dfb9aebf6a66ddcd061718c45c532388e7c26297fee9dc508cc"
+    },
+    "source_root": "/home/zhuhe/litchi-performance-0959/source-candidate-arc-v1"
+  },
+  "status": "passed",
+  "terminal": {
+    "bytes": 2389,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0959/receipts/candidate-arc-v2-native-build-terminal-adapter-v1.json",
+    "sha256": "0f457c0dfd1909433fa38e03a56820442e5063dfa5853051752d919f1362372c"
+  }
+}

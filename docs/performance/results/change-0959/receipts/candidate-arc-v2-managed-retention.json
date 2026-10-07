@@ -1,0 +1,33 @@
+{
+  "schema": "candidate-arc-v2-managed-binary-retention",
+  "created_utc": "2026-10-07T14:33:16.945197+00:00",
+  "build_receipt": "/home/zhuhe/litchi-performance-0959/receipts/candidate-arc-v2-build-binaries.json",
+  "binaries": [
+    {
+      "role": "xlsx_managed_compression_alloc",
+      "source": {
+        "path": "/home/zhuhe/litchi-performance-0959/target-candidate-arc-v2/release/xlsx_managed_compression_alloc",
+        "bytes": 43665688,
+        "sha256": "5a25f0b1a994cac635cfbc36c44b98766924683f688d2ef91764c73ffeb8450a"
+      },
+      "retained": {
+        "path": "/home/zhuhe/litchi-performance-0959/executables/xlsx_managed_compression_alloc.arc-v1",
+        "bytes": 43665688,
+        "sha256": "5a25f0b1a994cac635cfbc36c44b98766924683f688d2ef91764c73ffeb8450a"
+      }
+    },
+    {
+      "role": "xlsx_managed_compression_benchmark",
+      "source": {
+        "path": "/home/zhuhe/litchi-performance-0959/target-candidate-arc-v2/release/examples/xlsx_managed_compression_benchmark",
+        "bytes": 43228520,
+        "sha256": "3cf1714372b376ccdaeaf6a631a5439195694bdfffd4d10c25dc5f06db95f51f"
+      },
+      "retained": {
+        "path": "/home/zhuhe/litchi-performance-0959/executables/xlsx_managed_compression_benchmark.arc-v1",
+        "bytes": 43228520,
+        "sha256": "3cf1714372b376ccdaeaf6a631a5439195694bdfffd4d10c25dc5f06db95f51f"
+      }
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "schema": "focused-arc-v3-result",
+  "start_receipt": "/home/zhuhe/litchi-performance-0959/receipts/focused-arc-v3-start.json",
+  "terminal_receipt": "/home/zhuhe/litchi-performance-0959/receipts/focused-arc-v3-terminal.json",
+  "source_unchanged": true,
+  "returncode": 0,
+  "running_one_test": true,
+  "passed": true
+}

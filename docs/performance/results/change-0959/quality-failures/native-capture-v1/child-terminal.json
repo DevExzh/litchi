@@ -1,0 +1,12 @@
+{
+  "child_id": "native__medium-one-percent__b00__p0",
+  "elapsed_seconds": 0.0055155720037873834,
+  "ended_utc": "2026-10-07T14:47:56.339140Z",
+  "index": 0,
+  "pid": 3032478,
+  "process_group_clear": true,
+  "return_code": 1,
+  "schema": "litchi.performance.0959.capture.v4.child-terminal",
+  "status": "process_failed",
+  "timed_out": false
+}

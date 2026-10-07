@@ -1,5 +1,14 @@
 # 0958 — XLSX edit/commit allocation attribution
 
+**0959 correction:** the original analyzer chose the first matching stack
+frame, so its commit-core bucket could contain an exact timed-stage frame
+farther up the same stack. The later independent selector requires both fully
+qualified benchmark callsites and admits exactly the same calls and bytes in
+all six captures. All selected rows resolve the exact stage; the historical
+two-bucket labels below do not demonstrate missing stage frames. See the
+[correction record](results/change-0959/review/0958-surrogate-selection-review-v2.json).
+The original 0958 packet remains unchanged for auditability.
+
 Six current-source heaptrack captures confirm that cloning omitted numeric
 cells allocates once per retained numeric cell. This accounts for **8.28–8.43%**
 of selected edit/commit allocation calls, but only **0.28–0.38%** of requested
@@ -36,17 +45,18 @@ packet. No executable or file of 1 MiB or more is committed.
 
 Selected rows require a resolved `benchmark::timed_iteration` owner in the
 exact benchmark module and either `benchmark::stage_timed_commit` or the
-nested `MultiSourceEdit::commit` callsite. The latter is a **commit-core subset
-surrogate**, not independent evidence for the entire timed phase. No unknown
-frame is admitted. Both disjoint resolution buckets remain explicit below.
-Their union exactly matches the separate 0957 allocator phase counters in every
-capture; that correspondence corroborates coverage but does not turn a
-surrogate stack into a directly resolved stage stack.
+nested `MultiSourceEdit::commit` callsite. The original helper labelled the
+latter a **commit-core subset surrogate**; 0959 found that its frame-first
+matching did not prefer the exact stage when both occurred. No unknown frame
+is admitted. The two historical label buckets remain explicit below. Their
+union exactly matches the separate 0957 allocator phase counters in every
+capture. The independent 0959 raw-stack check, rather than that counter
+agreement alone, establishes exact stage coverage.
 
 All counts below are per iteration, dividing each three-sample capture by
 three. Both repeats agree exactly for selected costs.
 
-| Case | Exact stage calls / requested bytes | Commit-core subset calls / requested bytes | Combined selected calls / requested bytes |
+| Case | 0958 stage-labelled calls / requested bytes | 0958 commit-labelled calls / requested bytes | Combined selected calls / requested bytes |
 | --- | ---: | ---: | ---: |
 | Medium one-percent | 68,212 / 14,041,541 | 41,912 / 3,125,139 | 110,124 / 17,166,680 |
 | Dense-sparse one-percent | 130,114 / 18,769,492 | 79,304 / 5,834,581 | 209,418 / 24,604,073 |

@@ -1,0 +1,24 @@
+
+running 1 test
+layout_probe_0959 category=integrated type=Number size=16 align=8
+layout_probe_0959 category=integrated type=Value size=24 align=8
+layout_probe_0959 category=integrated type=Cell size=72 align=8
+layout_probe_0959 category=integrated type=Stored size=184 align=8
+layout_probe_0959 category=integrated type=Formula size=72 align=8
+layout_probe_0959 category=integrated type=Content size=72 align=8
+layout_probe_0959 category=integrated type=Option<Number> size=16 align=8
+layout_probe_0959 category=integrated type=Option<Value> size=24 align=8
+layout_probe_0959 category=integrated type=Option<Cell> size=72 align=8
+layout_probe_0959 category=integrated type=Option<Stored> size=184 align=8
+layout_probe_0959 category=integrated type=Option<Formula> size=72 align=8
+layout_probe_0959 category=integrated type=Option<Content> size=72 align=8
+layout_probe_0959 category=alternative_nonintegrated type=Inline15 size=16 align=1
+layout_probe_0959 category=alternative_nonintegrated type=Inline23 size=24 align=1
+layout_probe_0959 category=alternative_nonintegrated type=BoxArc(Box+Arc<str>) size=24 align=8
+layout_probe_0959 category=alternative_nonintegrated type=Option<Inline15> size=16 align=1
+layout_probe_0959 category=alternative_nonintegrated type=Option<Inline23> size=24 align=1
+layout_probe_0959 category=alternative_nonintegrated type=Option<BoxArc> size=24 align=8
+test cell::tests::layout_probe_0959 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1397 filtered out; finished in 0.00s
+

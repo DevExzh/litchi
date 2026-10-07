@@ -1,0 +1,29 @@
+{
+  "status": "pass",
+  "schema": "litchi.performance.0959.root-candidate-freeze.v1",
+  "created_utc": "2026-10-07T14:34:20.890912+00:00",
+  "source_root": "/home/zhuhe/litchi-performance-0959/source-candidate-arc-v1",
+  "manifest": {
+    "path": "/home/zhuhe/litchi-performance-0959/source-manifest-candidate-arc-v1.json",
+    "bytes": 2266853,
+    "sha256": "77ec8f3efe5c0dfb9aebf6a66ddcd061718c45c532388e7c26297fee9dc508cc"
+  },
+  "source_manifest": {
+    "path": "/home/zhuhe/litchi-performance-0959/source-manifest-candidate-arc-v1.json",
+    "bytes": 2266853,
+    "sha256": "77ec8f3efe5c0dfb9aebf6a66ddcd061718c45c532388e7c26297fee9dc508cc"
+  },
+  "file_count": 10933,
+  "checked": "Exact live file membership, sizes, SHA256 and modes match full frozen prebuild manifest after candidate build returned0",
+  "build_result": {
+    "path": "/home/zhuhe/litchi-performance-0959/receipts/candidate-arc-v2-build-result.json",
+    "bytes": 858,
+    "sha256": "38dffbc00aca90779f33135f28e3e9338619238f640e38603f09b1c4e908c918"
+  },
+  "production_delta_paths": [
+    "crates/litchi-xlsx/src/cell.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/semantic.rs"
+  ],
+  "adoption": false
+}

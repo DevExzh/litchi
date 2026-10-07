@@ -1,0 +1,212 @@
+{
+  "lanes": [
+    {
+      "cases": {
+        "dense-sparse-one-percent": {
+          "A": 12,
+          "B": 12,
+          "max_rss_kib": [
+            62888,
+            61364,
+            62088,
+            63116,
+            61432,
+            62984,
+            63072,
+            59700,
+            62824,
+            61728,
+            60460,
+            63036,
+            62208,
+            62884,
+            62912,
+            61528,
+            62940,
+            61828,
+            61656,
+            62756,
+            61796,
+            62984,
+            62976,
+            61476
+          ],
+          "reports": 24
+        },
+        "medium-one-edit": {
+          "A": 12,
+          "B": 12,
+          "max_rss_kib": [
+            46040,
+            48024,
+            45884,
+            46788,
+            47852,
+            46072,
+            47024,
+            47976,
+            46448,
+            46196,
+            48104,
+            46368,
+            50236,
+            46968,
+            46796,
+            45900,
+            47224,
+            50204,
+            50020,
+            46032,
+            49964,
+            46516,
+            45900,
+            49924
+          ],
+          "reports": 24
+        },
+        "medium-one-percent": {
+          "A": 12,
+          "B": 12,
+          "max_rss_kib": [
+            50104,
+            53968,
+            53808,
+            54220,
+            49424,
+            50012,
+            54168,
+            53876,
+            49808,
+            53624,
+            49248,
+            53880,
+            53576,
+            54376,
+            54500,
+            49708,
+            50264,
+            49664,
+            53584,
+            50468,
+            53688,
+            54212,
+            54660,
+            53720
+          ],
+          "reports": 24
+        }
+      },
+      "children_expected": 72,
+      "children_observed": 72,
+      "errors": [],
+      "lane": "native",
+      "packet_descriptor": {
+        "bytes": 28764,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/completed-packet.json",
+        "sha256": "992496f1d439c4ad1167aa19a87a7dd30b6706079fa877cf66563618bbe0e3d6"
+      },
+      "terminal": {
+        "capture_start": {
+          "bytes": 647,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/capture-start.json",
+          "sha256": "b88dfa39cb1b66b8b2db30efbd4b78c07a2485bfabd209868761e38a659ad95b"
+        },
+        "children_expected": 72,
+        "children_started": 72,
+        "elapsed_seconds": 1691.6543456619838,
+        "ended_utc": "2026-10-07T15:18:26.095382Z",
+        "lane": "native",
+        "retry_or_replacement": false,
+        "schema": "litchi.performance.0959.capture.v4.capture-terminal",
+        "status": "completed",
+        "terminal_before_parse": true
+      }
+    },
+    {
+      "cases": {
+        "dense-sparse-one-percent": {
+          "A": 3,
+          "B": 3,
+          "max_rss_kib": [
+            63088,
+            61752,
+            62244,
+            63276,
+            62820,
+            58848
+          ],
+          "reports": 6
+        },
+        "medium-one-edit": {
+          "A": 3,
+          "B": 3,
+          "max_rss_kib": [
+            46112,
+            47964,
+            48092,
+            46732,
+            46088,
+            48320
+          ],
+          "reports": 6
+        },
+        "medium-one-percent": {
+          "A": 3,
+          "B": 3,
+          "max_rss_kib": [
+            50140,
+            49360,
+            49764,
+            50000,
+            54416,
+            52168
+          ],
+          "reports": 6
+        }
+      },
+      "children_expected": 18,
+      "children_observed": 18,
+      "errors": [],
+      "lane": "allocator",
+      "packet_descriptor": {
+        "bytes": 7656,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-allocator-v1/completed-packet.json",
+        "sha256": "1b65fd057edfd73a9afa2dfc9752e274abddf8d0fd06084cc21f215b3a3589af"
+      },
+      "terminal": {
+        "capture_start": {
+          "bytes": 650,
+          "executable": false,
+          "mode": 436,
+          "path": "/home/zhuhe/litchi-performance-0959/capture-allocator-v1/capture-start.json",
+          "sha256": "a767c90919e57b39d67a4cb1d74357598cfe76ed9b50bce2c4979efd0060af24"
+        },
+        "children_expected": 18,
+        "children_started": 18,
+        "elapsed_seconds": 33.662480778002646,
+        "ended_utc": "2026-10-07T15:19:08.847724Z",
+        "lane": "allocator",
+        "retry_or_replacement": false,
+        "schema": "litchi.performance.0959.capture.v4.capture-terminal",
+        "status": "completed",
+        "terminal_before_parse": true
+      }
+    }
+  ],
+  "plan": {
+    "bytes": 84840,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0959/plan-final-v8.json",
+    "sha256": "9964f2f3a86dd467de6d7840807400aa7468a48f7d993b50ea296c6e0909abf8"
+  },
+  "schema": "litchi.performance.0959.sealed-capture-audit.v1",
+  "scope": "read-only sealed packet custody, report schema/oracle, resource, allocator-conservation, descriptor, and RSS-field audit; no workload/build/reducer execution",
+  "status": "passed"
+}

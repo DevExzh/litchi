@@ -1,0 +1,133 @@
+{
+  "schema": "litchi.performance.0959.xlsx-number-arc-candidate.v1",
+  "status": "focused_quality_complete_pending_root_adoption",
+  "created_utc": "2026-10-07",
+  "base_commit": "3fff4906c4e54382728a7fd64a50445e41d826dc",
+  "base_source": "/home/zhuhe/litchi-performance-0959/source-baseline",
+  "candidate_source": "/home/zhuhe/litchi-performance-0959/source-candidate-arc-v1",
+  "cargo_lock_sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061",
+  "source_delta_paths": [
+    "crates/litchi-xlsx/src/cell.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/semantic.rs"
+  ],
+  "source_delta_scope": "Arc<str> Number storage, borrowed lexical constructor, three worksheet parser callsites, exact integer itoa construction, and focused cell tests; no other source files differ from source-baseline.",
+  "baseline_hashes": {
+    "crates/litchi-xlsx/src/cell.rs": {
+      "path": "crates/litchi-xlsx/src/cell.rs",
+      "exists": true,
+      "bytes": 46312,
+      "sha256": "3acc82c2371beb7aa6ad7cc87eb546a3ecbfd77ef5e72b9c2f5104d44ba582a3"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/selected.rs": {
+      "path": "crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+      "exists": true,
+      "bytes": 86129,
+      "sha256": "f83cefd73e2cd5ab8f741fbd3e9eab9c2ee3793a211f5e2be63cfd7e39af1eb2"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/semantic.rs": {
+      "path": "crates/litchi-xlsx/src/raw/worksheet/semantic.rs",
+      "exists": true,
+      "bytes": 18312,
+      "sha256": "d770235faba92f561e9ed10c1460aedde43fa3fcffbf0423005c6d82843b3268"
+    },
+    "Cargo.lock": {
+      "path": "Cargo.lock",
+      "exists": false
+    }
+  },
+  "candidate_hashes": {
+    "crates/litchi-xlsx/src/cell.rs": {
+      "path": "crates/litchi-xlsx/src/cell.rs",
+      "exists": true,
+      "bytes": 48391,
+      "sha256": "f345c0ab2101d5dad2b25da4bfbfcb3f1bdafabdeca2ad31f66535887e5c2291"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/selected.rs": {
+      "path": "crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+      "exists": true,
+      "bytes": 86041,
+      "sha256": "3da16a84cf9f3cc8b36eb75baea359c17bcf969bb6f78a702452a74f4fa13a63"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/semantic.rs": {
+      "path": "crates/litchi-xlsx/src/raw/worksheet/semantic.rs",
+      "exists": true,
+      "bytes": 18321,
+      "sha256": "bd357cedab881148680fe389e7d4288c954239cfdae5f41dbba09e1327f97ebd"
+    },
+    "Cargo.lock": {
+      "path": "Cargo.lock",
+      "exists": true,
+      "bytes": 138443,
+      "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+    }
+  },
+  "layout_baseline_receipt": "/home/zhuhe/litchi-performance-0959/receipts/layout-probe-result-v2.json",
+  "layout_candidate": {
+    "receipt_log": "/home/zhuhe/litchi-performance-0959/logs/layout-arc-v1.log",
+    "log_sha256": "a82ac8e5eae7596f45dfc1dbaf30e7c9107046ecf9a8924c39a9520c3ffc57f3",
+    "rc": 0,
+    "sizes": {
+      "Number": 16,
+      "Value": 24,
+      "Cell": 72,
+      "Stored": 184,
+      "Formula": 72,
+      "Content": 72,
+      "Option<Number>": 16,
+      "Option<Value>": 24,
+      "Option<Cell>": 72,
+      "Option<Stored>": 184,
+      "Option<Formula>": 72,
+      "Option<Content>": 72
+    },
+    "alignments": {
+      "Number": 8,
+      "Value": 8,
+      "Cell": 8,
+      "Stored": 8
+    }
+  },
+  "focused_checks": {
+    "cell_and_parser": {
+      "log": "/home/zhuhe/litchi-performance-0959/logs/focused-arc-v1.log",
+      "rc": 0,
+      "tests": "12 cell tests; materialized sparse numeric and malformed lexical tests"
+    },
+    "selected_final": {
+      "log": "/home/zhuhe/litchi-performance-0959/logs/focused-arc-v1-r3-selected.log",
+      "rc": 0,
+      "tests": "8 selected scanner tests plus sparse byte lexical/prolog differential test"
+    },
+    "r2_after_integer_cleanup": {
+      "log": "/home/zhuhe/litchi-performance-0959/logs/focused-arc-v1-r2.log",
+      "rc": 0,
+      "tests": "12 cell tests plus materialized sparse numeric and malformed lexical tests"
+    },
+    "full_lib": {
+      "log": "/home/zhuhe/litchi-performance-0959/logs/full-xlsx-arc-v1.log",
+      "rc": 0,
+      "result": "1400 passed, 0 failed, 0 ignored; 276.45s"
+    },
+    "clippy_lib_denied": {
+      "log": "/home/zhuhe/litchi-performance-0959/logs/full-xlsx-arc-v1.log",
+      "rc": 0,
+      "command_suffix": "-- -D warnings"
+    },
+    "rustfmt_owned_files": {
+      "log": "/home/zhuhe/litchi-performance-0959/logs/rustfmt-arc-v1.log",
+      "rc": 0
+    }
+  },
+  "allocation_notes": {
+    "public_constructor": "Number::new signature remains impl Into<Box<str>>; Box-to-Arc conversion remains explicit and is a candidate allocation cost to measure.",
+    "parser_constructor": "Number::from_lexical(&str) validates before one Arc<str> ownership allocation, avoiding an upfront Box<str> in the three worksheet parser callsites.",
+    "integer_path": "Value integer conversions use the existing stack itoa buffer and direct exact Number construction; no String temporary.",
+    "clone": "Arc clone is shared; equality/hash/debug/display use the same retained lexical bytes."
+  },
+  "performance": {
+    "built": false,
+    "captured": false,
+    "adoption": false
+  }
+}

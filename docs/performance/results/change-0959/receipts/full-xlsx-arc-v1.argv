@@ -1,0 +1,2 @@
+cargo +1.95.0 test --manifest-path /home/zhuhe/litchi-performance-0959/source-candidate-arc-v1/Cargo.toml --locked --offline -p litchi-xlsx --lib -- --nocapture
+cargo +1.95.0 clippy --manifest-path /home/zhuhe/litchi-performance-0959/source-candidate-arc-v1/Cargo.toml --locked --offline -p litchi-xlsx --lib -- -D warnings

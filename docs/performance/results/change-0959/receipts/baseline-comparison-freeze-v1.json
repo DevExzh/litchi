@@ -1,0 +1,33 @@
+{
+  "schema": "litchi.performance.0959.baseline-comparison-freeze.v1",
+  "status": "pass",
+  "manifest": {
+    "path": "/home/zhuhe/litchi-performance-0959/source-manifest-baseline-comparison-v1.json",
+    "bytes": 2266571,
+    "sha256": "7397cc28dbaa29e3b6f43603c26cedcd7f92e9bc57b865d3ae6acf0d01418f79"
+  },
+  "prior_probe_manifest": {
+    "path": "/home/zhuhe/litchi-performance-0959/source-manifest-probe-v2.json",
+    "bytes": 2267160,
+    "sha256": "6ee0098b77168b21839550089fd2e67923aa85033cefdb4329ed1586401fd25e"
+  },
+  "added_paths": [
+    "Cargo.lock"
+  ],
+  "lock": {
+    "path": "/home/zhuhe/litchi-performance-0959/source-baseline/Cargo.lock",
+    "bytes": 138443,
+    "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+  },
+  "candidate_manifest": {
+    "path": "/home/zhuhe/litchi-performance-0959/source-manifest-candidate-arc-v1.json",
+    "bytes": 2266853,
+    "sha256": "77ec8f3efe5c0dfb9aebf6a66ddcd061718c45c532388e7c26297fee9dc508cc"
+  },
+  "actual_candidate_delta_paths": [
+    "crates/litchi-xlsx/src/cell.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/semantic.rs"
+  ],
+  "interpretation": "test-only layout probe and identical generated root Cargo.lock are explicit comparison build overlays, not production/runtime changes; retained0957 baseline binary unchanged"
+}

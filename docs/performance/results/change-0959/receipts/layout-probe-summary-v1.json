@@ -1,0 +1,403 @@
+{
+  "checkout": {
+    "head": "3fff4906c4e54382728a7fd64a50445e41d826dc",
+    "production_unchanged": true,
+    "status": [
+      " M tools/check_iwork_leaf_public_api.py",
+      "?? crates/litchi/examples/bench_word_parse.rs",
+      "?? docs/UNIFIED_OPS_API_DESIGN.md"
+    ]
+  },
+  "created_utc": "2026-10-07T14:13:13.240926+00:00",
+  "failed_v1_preserved": {
+    "reason": "workspace deny lint rejected unnecessary std::mem qualification in test-only probe",
+    "result": {
+      "bytes": 1617,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/receipts/layout-probe-result-v1.json",
+      "sha256": "60174e2760350e4c74c067281ca91cd13352892f7308eb4fd5601b8a146f6a9b"
+    },
+    "stderr": {
+      "bytes": 5754,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/review/layout-probe.stderr",
+      "sha256": "ca08545953254d7d82470572b11806e29280299bef0a9d5efd8d200db0931749"
+    },
+    "stdout": {
+      "bytes": 0,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/review/layout-probe.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "terminal": {
+      "bytes": 1353,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/receipts/layout-probe-terminal-v1.json",
+      "sha256": "43375b3de61274804c9678d25f7e11c6e9f9fb3384e9465c914529190127cda8"
+    }
+  },
+  "layout_rows": [
+    {
+      "align": 8,
+      "category": "integrated",
+      "raw": "layout_probe_0959 category=integrated type=Number size=16 align=8",
+      "size": 16,
+      "type": "Number"
+    },
+    {
+      "align": 8,
+      "category": "integrated",
+      "raw": "layout_probe_0959 category=integrated type=Value size=24 align=8",
+      "size": 24,
+      "type": "Value"
+    },
+    {
+      "align": 8,
+      "category": "integrated",
+      "raw": "layout_probe_0959 category=integrated type=Cell size=72 align=8",
+      "size": 72,
+      "type": "Cell"
+    },
+    {
+      "align": 8,
+      "category": "integrated",
+      "raw": "layout_probe_0959 category=integrated type=Stored size=184 align=8",
+      "size": 184,
+      "type": "Stored"
+    },
+    {
+      "align": 8,
+      "category": "integrated",
+      "raw": "layout_probe_0959 category=integrated type=Formula size=72 align=8",
+      "size": 72,
+      "type": "Formula"
+    },
+    {
+      "align": 8,
+      "category": "integrated",
+      "raw": "layout_probe_0959 category=integrated type=Content size=72 align=8",
+      "size": 72,
+      "type": "Content"
+    },
+    {
+      "align": 8,
+      "category": "integrated",
+      "raw": "layout_probe_0959 category=integrated type=Option<Number> size=16 align=8",
+      "size": 16,
+      "type": "Option<Number>"
+    },
+    {
+      "align": 8,
+      "category": "integrated",
+      "raw": "layout_probe_0959 category=integrated type=Option<Value> size=24 align=8",
+      "size": 24,
+      "type": "Option<Value>"
+    },
+    {
+      "align": 8,
+      "category": "integrated",
+      "raw": "layout_probe_0959 category=integrated type=Option<Cell> size=72 align=8",
+      "size": 72,
+      "type": "Option<Cell>"
+    },
+    {
+      "align": 8,
+      "category": "integrated",
+      "raw": "layout_probe_0959 category=integrated type=Option<Stored> size=184 align=8",
+      "size": 184,
+      "type": "Option<Stored>"
+    },
+    {
+      "align": 8,
+      "category": "integrated",
+      "raw": "layout_probe_0959 category=integrated type=Option<Formula> size=72 align=8",
+      "size": 72,
+      "type": "Option<Formula>"
+    },
+    {
+      "align": 8,
+      "category": "integrated",
+      "raw": "layout_probe_0959 category=integrated type=Option<Content> size=72 align=8",
+      "size": 72,
+      "type": "Option<Content>"
+    },
+    {
+      "align": 1,
+      "category": "alternative_nonintegrated",
+      "raw": "layout_probe_0959 category=alternative_nonintegrated type=Inline15 size=16 align=1",
+      "size": 16,
+      "type": "Inline15"
+    },
+    {
+      "align": 1,
+      "category": "alternative_nonintegrated",
+      "raw": "layout_probe_0959 category=alternative_nonintegrated type=Inline23 size=24 align=1",
+      "size": 24,
+      "type": "Inline23"
+    },
+    {
+      "align": 8,
+      "category": "alternative_nonintegrated",
+      "raw": "layout_probe_0959 category=alternative_nonintegrated type=BoxArc(Box+Arc<str>) size=24 align=8",
+      "size": 24,
+      "type": "BoxArc(Box+Arc<str>)"
+    },
+    {
+      "align": 1,
+      "category": "alternative_nonintegrated",
+      "raw": "layout_probe_0959 category=alternative_nonintegrated type=Option<Inline15> size=16 align=1",
+      "size": 16,
+      "type": "Option<Inline15>"
+    },
+    {
+      "align": 1,
+      "category": "alternative_nonintegrated",
+      "raw": "layout_probe_0959 category=alternative_nonintegrated type=Option<Inline23> size=24 align=1",
+      "size": 24,
+      "type": "Option<Inline23>"
+    },
+    {
+      "align": 8,
+      "category": "alternative_nonintegrated",
+      "raw": "layout_probe_0959 category=alternative_nonintegrated type=Option<BoxArc> size=24 align=8",
+      "size": 24,
+      "type": "Option<BoxArc>"
+    }
+  ],
+  "no_shared_target": true,
+  "no_workload": true,
+  "passed_v2": {
+    "lock_cleanup": {
+      "bytes": 692,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/receipts/layout-probe-lock-cleanup-v2.json",
+      "sha256": "52f1fd55a99201b04e9ee4ea0d7007d21b243fdc5c77cf54e92e017656adc042"
+    },
+    "result": {
+      "bytes": 5691,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/receipts/layout-probe-result-v2.json",
+      "sha256": "601dd859bec08538cf74d0364cb73e5e69416017f6d0ea65aec9a1cc37a51411"
+    },
+    "returncode": 0,
+    "rows": [
+      {
+        "align": 8,
+        "category": "integrated",
+        "raw": "layout_probe_0959 category=integrated type=Number size=16 align=8",
+        "size": 16,
+        "type": "Number"
+      },
+      {
+        "align": 8,
+        "category": "integrated",
+        "raw": "layout_probe_0959 category=integrated type=Value size=24 align=8",
+        "size": 24,
+        "type": "Value"
+      },
+      {
+        "align": 8,
+        "category": "integrated",
+        "raw": "layout_probe_0959 category=integrated type=Cell size=72 align=8",
+        "size": 72,
+        "type": "Cell"
+      },
+      {
+        "align": 8,
+        "category": "integrated",
+        "raw": "layout_probe_0959 category=integrated type=Stored size=184 align=8",
+        "size": 184,
+        "type": "Stored"
+      },
+      {
+        "align": 8,
+        "category": "integrated",
+        "raw": "layout_probe_0959 category=integrated type=Formula size=72 align=8",
+        "size": 72,
+        "type": "Formula"
+      },
+      {
+        "align": 8,
+        "category": "integrated",
+        "raw": "layout_probe_0959 category=integrated type=Content size=72 align=8",
+        "size": 72,
+        "type": "Content"
+      },
+      {
+        "align": 8,
+        "category": "integrated",
+        "raw": "layout_probe_0959 category=integrated type=Option<Number> size=16 align=8",
+        "size": 16,
+        "type": "Option<Number>"
+      },
+      {
+        "align": 8,
+        "category": "integrated",
+        "raw": "layout_probe_0959 category=integrated type=Option<Value> size=24 align=8",
+        "size": 24,
+        "type": "Option<Value>"
+      },
+      {
+        "align": 8,
+        "category": "integrated",
+        "raw": "layout_probe_0959 category=integrated type=Option<Cell> size=72 align=8",
+        "size": 72,
+        "type": "Option<Cell>"
+      },
+      {
+        "align": 8,
+        "category": "integrated",
+        "raw": "layout_probe_0959 category=integrated type=Option<Stored> size=184 align=8",
+        "size": 184,
+        "type": "Option<Stored>"
+      },
+      {
+        "align": 8,
+        "category": "integrated",
+        "raw": "layout_probe_0959 category=integrated type=Option<Formula> size=72 align=8",
+        "size": 72,
+        "type": "Option<Formula>"
+      },
+      {
+        "align": 8,
+        "category": "integrated",
+        "raw": "layout_probe_0959 category=integrated type=Option<Content> size=72 align=8",
+        "size": 72,
+        "type": "Option<Content>"
+      },
+      {
+        "align": 1,
+        "category": "alternative_nonintegrated",
+        "raw": "layout_probe_0959 category=alternative_nonintegrated type=Inline15 size=16 align=1",
+        "size": 16,
+        "type": "Inline15"
+      },
+      {
+        "align": 1,
+        "category": "alternative_nonintegrated",
+        "raw": "layout_probe_0959 category=alternative_nonintegrated type=Inline23 size=24 align=1",
+        "size": 24,
+        "type": "Inline23"
+      },
+      {
+        "align": 8,
+        "category": "alternative_nonintegrated",
+        "raw": "layout_probe_0959 category=alternative_nonintegrated type=BoxArc(Box+Arc<str>) size=24 align=8",
+        "size": 24,
+        "type": "BoxArc(Box+Arc<str>)"
+      },
+      {
+        "align": 1,
+        "category": "alternative_nonintegrated",
+        "raw": "layout_probe_0959 category=alternative_nonintegrated type=Option<Inline15> size=16 align=1",
+        "size": 16,
+        "type": "Option<Inline15>"
+      },
+      {
+        "align": 1,
+        "category": "alternative_nonintegrated",
+        "raw": "layout_probe_0959 category=alternative_nonintegrated type=Option<Inline23> size=24 align=1",
+        "size": 24,
+        "type": "Option<Inline23>"
+      },
+      {
+        "align": 8,
+        "category": "alternative_nonintegrated",
+        "raw": "layout_probe_0959 category=alternative_nonintegrated type=Option<BoxArc> size=24 align=8",
+        "size": 24,
+        "type": "Option<BoxArc>"
+      }
+    ],
+    "start": {
+      "bytes": 2572,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/receipts/layout-probe-start-v2.json",
+      "sha256": "9e6c96422ed3de89952bcca88d5b559be2f10e6ca721cd2d38ca2ca9c6307a72"
+    },
+    "stderr": {
+      "bytes": 301,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/review/layout-probe-v2.stderr",
+      "sha256": "89413eb9cc71714fb21a11373ce62cd45db33d3c699aefaad58f32bf6fa94c0b"
+    },
+    "stdout": {
+      "bytes": 1530,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/review/layout-probe-v2.stdout",
+      "sha256": "265847d2b8ff953697f42e9b0ce62b827e0414d88a88e2865eb8eb281c7ab91e"
+    },
+    "terminal": {
+      "bytes": 1359,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/receipts/layout-probe-terminal-v2.json",
+      "sha256": "1e5bdb8475a8c9b77b2f07434bd80b89dc56845f72b55490af81f1218eca38cf"
+    }
+  },
+  "process_probe_after_capture": [],
+  "purpose": "test-only type layout observation; no integrated representation or production candidate change",
+  "schema": "litchi.performance.0959.layout-probe-summary.v1",
+  "source": {
+    "baseline_receipt": {
+      "bytes": 438306,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/receipts/source-baseline-v2.json",
+      "sha256": "a9bfd96b76a8754b75d0828f5cb701ab031312f131903a1a06bef030360bfd31"
+    },
+    "cargo_lock_present": false,
+    "cell_sha256": "3acc82c2371beb7aa6ad7cc87eb546a3ecbfd77ef5e72b9c2f5104d44ba582a3",
+    "manifest": {
+      "bytes": 2267160,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/source-manifest-probe-v2.json",
+      "sha256": "6ee0098b77168b21839550089fd2e67923aa85033cefdb4329ed1586401fd25e"
+    },
+    "probe_patch": {
+      "bytes": 2863,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/review/cell-layout-probe-v2.patch",
+      "sha256": "417743f963723501209368f69aee7f6a970cb0da21d499f13a6992de3c86da96"
+    },
+    "root": "/home/zhuhe/litchi-performance-0959/source-baseline"
+  },
+  "status": "passed",
+  "tooling": {
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "cargo_command": [
+      "/home/zhuhe/.cargo/bin/cargo",
+      "test",
+      "--manifest-path",
+      "/home/zhuhe/litchi-performance-0959/source-baseline/Cargo.toml",
+      "--locked",
+      "--offline",
+      "-p",
+      "litchi-xlsx",
+      "--lib",
+      "layout_probe_0959",
+      "--",
+      "--nocapture"
+    ],
+    "runner": {
+      "bytes": 8854,
+      "executable": true,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0959/tooling/run-layout-probe-0959-v2.py",
+      "sha256": "84ede867e8122cb82be3c063f825b716ac29308d9c17c98cdfd19e153d1deb84"
+    },
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "target": "/home/zhuhe/litchi-performance-0959/target-v1",
+    "tmp": "/home/zhuhe/litchi-performance-0959/tmp/layout-probe"
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "checks": [
+    {
+      "name": "quantiles_even_median",
+      "status": "pass"
+    },
+    {
+      "name": "native_bootstrap_deterministic",
+      "status": "pass"
+    },
+    {
+      "name": "zero_denominator_is_explicit",
+      "status": "pass"
+    },
+    {
+      "name": "zero_numerator_bootstrap_is_valid",
+      "status": "pass"
+    },
+    {
+      "name": "negative_ratio_bootstrap_fails_closed",
+      "status": "pass"
+    },
+    {
+      "name": "allocator_live_boundary_rejected",
+      "status": "pass"
+    },
+    {
+      "name": "missing_capture_terminal_rejected",
+      "status": "pass"
+    },
+    {
+      "name": "wrong_schedule_rejected",
+      "status": "pass"
+    }
+  ],
+  "schema": "litchi.performance.0959.reducer-controls.v2",
+  "scope": "synthetic reducer and custody controls; no workload or build",
+  "status": "passed"
+}

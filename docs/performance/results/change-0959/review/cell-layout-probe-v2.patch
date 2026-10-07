@@ -1,0 +1,84 @@
+--- /home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs
++++ /home/zhuhe/litchi-performance-0959/source-baseline/crates/litchi-xlsx/src/cell.rs
+@@ -1189,6 +1189,7 @@
+ #[cfg(test)]
+ mod tests {
+     use super::*;
++    use std::mem::{align_of, size_of};
+ 
+     fn empty_store(addresses: &[(u32, u32)]) -> Store {
+         let cells = addresses
+@@ -1396,4 +1397,72 @@
+         let content = Content::Value(Value::Error(ErrorValue::Unknown("#VENDOR!".into())));
+         assert!(content.validate_for_write().is_err());
+     }
+-}
++
++    fn print_layout_0959<T>(label: &str) {
++        println!(
++            "layout_probe_0959 category=integrated type={label} size={} align={}",
++            size_of::<T>(),
++            align_of::<T>(),
++        );
++    }
++
++    // These are rough non-integrated alternatives for comparison only. They
++    // intentionally do not model or replace the production representations.
++    #[allow(dead_code)]
++    enum Inline15 {
++        Empty,
++        Bool(bool),
++        Number([u8; 15]),
++        Text([u8; 15]),
++        Formula([u8; 15]),
++    }
++
++    #[allow(dead_code)]
++    enum Inline23 {
++        Empty,
++        Bool(bool),
++        Number([u8; 23]),
++        Text([u8; 23]),
++        Formula([u8; 23]),
++    }
++
++    #[allow(dead_code)]
++    enum BoxArc {
++        Empty,
++        Bool(bool),
++        Number(Box<str>),
++        Text(Arc<str>),
++        Formula(Box<str>),
++    }
++
++    fn print_alternative_layout_0959<T>(label: &str) {
++        println!(
++            "layout_probe_0959 category=alternative_nonintegrated type={label} size={} align={}",
++            size_of::<T>(),
++            align_of::<T>(),
++        );
++    }
++
++    #[test]
++    fn layout_probe_0959() {
++        print_layout_0959::<Number>("Number");
++        print_layout_0959::<Value>("Value");
++        print_layout_0959::<Cell>("Cell");
++        print_layout_0959::<Stored>("Stored");
++        print_layout_0959::<Formula>("Formula");
++        print_layout_0959::<Content>("Content");
++        print_layout_0959::<Option<Number>>("Option<Number>");
++        print_layout_0959::<Option<Value>>("Option<Value>");
++        print_layout_0959::<Option<Cell>>("Option<Cell>");
++        print_layout_0959::<Option<Stored>>("Option<Stored>");
++        print_layout_0959::<Option<Formula>>("Option<Formula>");
++        print_layout_0959::<Option<Content>>("Option<Content>");
++
++        print_alternative_layout_0959::<Inline15>("Inline15");
++        print_alternative_layout_0959::<Inline23>("Inline23");
++        print_alternative_layout_0959::<BoxArc>("BoxArc(Box+Arc<str>)");
++        print_alternative_layout_0959::<Option<Inline15>>("Option<Inline15>");
++        print_alternative_layout_0959::<Option<Inline23>>("Option<Inline23>");
++        print_alternative_layout_0959::<Option<BoxArc>>("Option<BoxArc>");
++    }
++}

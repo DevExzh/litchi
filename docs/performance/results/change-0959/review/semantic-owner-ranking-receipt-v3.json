@@ -1,0 +1,87 @@
+{
+  "checks": [
+    {
+      "command": "python3 -m py_compile /home/zhuhe/litchi-performance-0959/tools/rank_0959_v1.py",
+      "status": "pass"
+    },
+    {
+      "command": "python3 /home/zhuhe/litchi-performance-0959/tools/rank_0959_v1.py --manifest /home/zhuhe/litchi-performance-0958/analysis-input-manifest-v1.json --reference-analysis /home/zhuhe/litchi-performance-0958/analysis-v1/attribute-v3.json --output /home/zhuhe/litchi-performance-0959/analysis/owner-ranking-v3.json",
+      "status": "pass"
+    },
+    {
+      "command": "same command with an unrelated reference file",
+      "output_created": false,
+      "status": "fail-closed",
+      "stderr": "/home/zhuhe/litchi-performance-0959/review/negative-reference-v2.stderr",
+      "stderr_sha256": "3543958f426b789606d69d723ef5782c1b1b9ae9cb4a77961cfd6035a3a7b9c3"
+    },
+    {
+      "command": "same command with plan-v5 passed as manifest",
+      "output_created": false,
+      "status": "fail-closed",
+      "stderr": "/home/zhuhe/litchi-performance-0959/review/negative-manifest-v2.stderr",
+      "stderr_sha256": "421034a1df87bc0c631512fb5a7a38ffe7bd5dd677cba0b11a9033dee690ebeb"
+    }
+  ],
+  "compact_report": {
+    "bytes": 176734,
+    "path": "/home/zhuhe/litchi-performance-0959/analysis/owner-ranking-summary-v3.json",
+    "sha256": "f50bb1f2ce39f50d5488d9c8a6a95855fcc98dfc526bbd447e58c871b0f359b4"
+  },
+  "correction_history": {
+    "qualified_callsite_correction": {
+      "path": "/home/zhuhe/litchi-performance-0959/review/callsite-selection-correction-v1.json",
+      "sha256": "d942ba8967430fa2f22fc98b60f6192497219eebf9245e82251d8cb4836f4812"
+    },
+    "reason": "v3 preserves the v2 selected-size correction and requires fully qualified benchmark callsites; no workload data changed",
+    "selection_scope_correction": {
+      "path": "/home/zhuhe/litchi-performance-0959/review/selection-scope-correction-v1.json",
+      "sha256": "48d5a1150d5a4ca903d1d8251370c676be79c5b8b7d0886524ec0d8e80e5dc07"
+    },
+    "superseded_v1_receipt": "/home/zhuhe/litchi-performance-0959/review/semantic-owner-ranking-receipt-v1.json"
+  },
+  "full_report": {
+    "bytes": 623430,
+    "path": "/home/zhuhe/litchi-performance-0959/analysis/owner-ranking-v3.json",
+    "sha256": "d7c61c1cb7a21e4b26ba12ca25a131d4249cf2da260d9ace2fd9e9ac80b1e3fa"
+  },
+  "helper": {
+    "bytes": 22650,
+    "path": "/home/zhuhe/litchi-performance-0959/tools/rank_0959_v1.py",
+    "sha256": "3daeaac5269257d60afc1089434c7eaf3d130d85ff6e62cb8bf2194adc0be2be"
+  },
+  "input_manifest": {
+    "bytes": 16403,
+    "path": "/home/zhuhe/litchi-performance-0958/analysis-input-manifest-v1.json",
+    "sha256": "0dc7a9a4757d73a05d9fc289581a8ec6add494565f039b94e7addf8d18629495"
+  },
+  "reference_analysis": {
+    "bytes": 102361,
+    "path": "/home/zhuhe/litchi-performance-0958/analysis-v1/attribute-v3.json",
+    "sha256": "9fb5ae3b1b484e2fc8294c66d4712d8f818c1aed60a974fbe51bcd03173cf983"
+  },
+  "results": {
+    "per_run_expected_selection": "all six exact fully-qualified stage/timed totals matched independent reference values",
+    "raw_calls": 13032599,
+    "raw_requested_bytes": 3406101409,
+    "selected_calls": 2081214,
+    "selected_requested_bytes": 274320408
+  },
+  "schema": "litchi.performance.0959.semantic-owner-ranking-receipt.v3",
+  "selection": {
+    "exact_callsites": [
+      "litchi_perf_baseline::xlsx_managed_compression::benchmark::stage_timed_commit",
+      "litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration"
+    ],
+    "runs": 6,
+    "surrogate_policy": "MultiSourceEdit::commit is reported as an overlap/semantic owner but is not a selection surrogate",
+    "unknown_policy": "unknown_any_frame/unknown_leaf_frame rows are unqualified"
+  },
+  "semantic_scope": [
+    "First meaningful litchi_xlsx frame above allocator/runtime frames is the ranking owner.",
+    "Growth/realloc, merge backing storage, numeric clone/construction, duplicate checking, XML lexical/parse, and copy/clone labels overlap and are retained separately.",
+    "The ranking is allocation attribution only; it makes no timing, speed, phase-only, or adoption claim."
+  ],
+  "status": "pass",
+  "workloads_started": false
+}

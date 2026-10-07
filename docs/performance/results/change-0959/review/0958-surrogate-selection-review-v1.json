@@ -1,0 +1,55 @@
+{
+  "finding": {
+    "all_six_independent_exact_stage_and_timed_selected": {
+      "calls": 2081214,
+      "requested_bytes": 274320408,
+      "trace_count": 5160
+    },
+    "all_six_surrogate_labeled": {
+      "calls": 788346,
+      "requested_bytes": 58104786,
+      "trace_count": 2620
+    },
+    "cause": "0958 resolved_owner_index scans flattened locations and returns the first matching frame; its token tuple lists stage_timed_commit before MultiSourceEdit::commit, but the scan is frame-first, so a commit frame earlier in a stack wins even when an exact stage_timed_commit frame occurs later.",
+    "claim": "This is a resolution-label defect, not evidence that the selected allocation totals or raw captures are invalid.",
+    "effect": "The 0958 selected totals are unchanged, but its stage_resolution_totals can label exact stage/timed traces as commit-core surrogate rows.",
+    "h00_example": {
+      "0958_surrogate_label": {
+        "calls": 125736,
+        "requested_bytes": 9375417,
+        "trace_count": 438
+      },
+      "independent_exact_stage_and_timed_selected": {
+        "calls": 330372,
+        "requested_bytes": 51500040,
+        "trace_count": 868
+      }
+    }
+  },
+  "independent_fix": {
+    "helper": "/home/zhuhe/litchi-performance-0959/tools/rank_0959_v1.py",
+    "report": "/home/zhuhe/litchi-performance-0959/analysis/owner-ranking-v3.json",
+    "selection": "Requires fully qualified litchi_perf_baseline benchmark stage_timed_commit and timed_iteration callsites; MultiSourceEdit::commit is not a selection surrogate."
+  },
+  "recommended_record_action": "Amend the 0958 interpretation/receipt to describe its commit-core bucket as an overlapping stack-owner label unless the resolver is corrected; retain original 0958 bytes and results.",
+  "schema": "litchi.performance.0959.review-of-0958-surrogate-selection.v1",
+  "scope": "Offline review of the sealed 0958 analyzer and raw decoder traces; no workload/build launched.",
+  "sealed_inputs": {
+    "0958_analysis": {
+      "bytes": 102361,
+      "path": "/home/zhuhe/litchi-performance-0958/analysis-v1/attribute-v3.json",
+      "sha256": "9fb5ae3b1b484e2fc8294c66d4712d8f818c1aed60a974fbe51bcd03173cf983"
+    },
+    "0958_helper": {
+      "bytes": 34603,
+      "path": "/home/zhuhe/litchi-performance-0958/tools/attribute_0958_v1.py",
+      "sha256": "1bb7584076762eefadc409016abf50684157e9350a76386255c5763e47d7cffd"
+    },
+    "independent_0959_report": {
+      "bytes": 623430,
+      "path": "/home/zhuhe/litchi-performance-0959/analysis/owner-ranking-v3.json",
+      "sha256": "d7c61c1cb7a21e4b26ba12ca25a131d4249cf2da260d9ace2fd9e9ac80b1e3fa"
+    }
+  },
+  "status": "finding"
+}

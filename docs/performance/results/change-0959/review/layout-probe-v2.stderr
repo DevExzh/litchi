@@ -1,0 +1,3 @@
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/litchi-performance-0959/source-baseline/crates/litchi-xlsx)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 29.15s
+     Running unittests src/lib.rs (/home/zhuhe/litchi-performance-0959/target-v1/debug/deps/litchi_xlsx-45ca481a8206a055)

@@ -1,0 +1,4452 @@
+{
+  "aggregate": {
+    "raw_whole_process": {
+      "calls": 13032599,
+      "requested_bytes": 3406101409,
+      "trace_count": 101286
+    },
+    "selected_exact_stage_timed": {
+      "calls": 2081214,
+      "requested_bytes": 274320408,
+      "trace_count": 5160
+    },
+    "unknown_any_or_leaf": {
+      "calls": 6,
+      "requested_bytes": 442368,
+      "trace_count": 6
+    },
+    "unqualified": {
+      "calls": 10951385,
+      "requested_bytes": 3131781001,
+      "trace_count": 96126
+    }
+  },
+  "aggregate_owner_ranking": [
+    {
+      "calls": 540,
+      "owner": {
+        "file": "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+        "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell",
+        "key": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1587",
+        "line": 1587
+      },
+      "requested_bytes": 102826752,
+      "runs": [
+        "h00-medium-percent-r1",
+        "h01-dense-percent-r1",
+        "h02-medium-one-edit-r1",
+        "h03-medium-one-edit-r2",
+        "h04-dense-percent-r2",
+        "h05-medium-percent-r2"
+      ],
+      "trace_count": 24
+    },
+    {
+      "calls": 108,
+      "owner": {
+        "file": "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+        "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse",
+        "key": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse|crates/litchi-xlsx/src/raw/worksheet/codec.rs|654",
+        "line": 654
+      },
+      "requested_bytes": 32669568,
+      "runs": [
+        "h00-medium-percent-r1",
+        "h01-dense-percent-r1",
+        "h02-medium-one-edit-r1",
+        "h03-medium-one-edit-r2",
+        "h04-dense-percent-r2",
+        "h05-medium-percent-r2"
+      ],
+      "trace_count": 24
+    },
+    {
+      "calls": 54,
+      "owner": {
+        "file": "crates/litchi-xlsx/src/cell.rs",
+        "function": "litchi_xlsx::cell::Store::merge_omitted_cells",
+        "key": "litchi_xlsx::cell::Store::merge_omitted_cells|crates/litchi-xlsx/src/cell.rs|915",
+        "line": 915
+      },
+      "requested_bytes": 32360448,
+      "runs": [
+        "h00-medium-percent-r1",
+        "h01-dense-percent-r1",
+        "h02-medium-one-edit-r1",
+        "h03-medium-one-edit-r2",
+        "h04-dense-percent-r2",
+        "h05-medium-percent-r2"
+      ],
+      "trace_count": 12
+    },
+    {
+      "calls": 1632,
+      "owner": {
+        "file": "crates/litchi-xlsx/src/cell_values/source.rs",
+        "function": "litchi_xlsx::cell_values::source::MultiSourceEdit::apply_batch",
+        "key": "litchi_xlsx::cell_values::source::MultiSourceEdit::apply_batch|crates/litchi-xlsx/src/cell_values/source.rs|984",
+        "line": 984
+      },
+      "requested_bytes": 28570176,
+      "runs": [
+        "h00-medium-percent-r1",
+        "h01-dense-percent-r1",
+        "h02-medium-one-edit-r1",
+        "h03-medium-one-edit-r2",
+        "h04-dense-percent-r2",
+        "h05-medium-percent-r2"
+      ],
+      "trace_count": 12
+    },
+    {
+      "calls": 359082,
+      "owner": {
+        "file": "crates/litchi-xlsx/src/cell_values/validation.rs",
+        "function": "litchi_xlsx::cell_values::validation::scan_attributes",
+        "key": "litchi_xlsx::cell_values::validation::scan_attributes|crates/litchi-xlsx/src/cell_values/validation.rs|489",
+        "line": 489
+      },
+      "requested_bytes": 22985856,
+      "runs": [
+        "h00-medium-percent-r1",
+        "h01-dense-percent-r1",
+        "h02-medium-one-edit-r1",
+        "h03-medium-one-edit-r2",
+        "h04-dense-percent-r2",
+        "h05-medium-percent-r2"
+      ],
+      "trace_count": 192
+    },
+    {
+      "calls": 175872,
+      "owner": {
+        "file": "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+        "function": "litchi_xlsx::raw::worksheet::codec::scan_cell_attributes",
+        "key": "litchi_xlsx::raw::worksheet::codec::scan_cell_attributes|crates/litchi-xlsx/src/raw/worksheet/codec.rs|241",
+        "line": 241
+      },
+      "requested_bytes": 11255808,
+      "runs": [
+        "h00-medium-percent-r1",
+        "h01-dense-percent-r1",
+        "h02-medium-one-edit-r1",
+        "h03-medium-one-edit-r2",
+        "h04-dense-percent-r2",
+        "h05-medium-percent-r2"
+      ],
+      "trace_count": 12
+    },
+    {
+      "calls": 552,
+      "owner": {
+        "file": "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+        "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+        "key": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected|crates/litchi-xlsx/src/cell_values/snapshot.rs|483",
+        "line": 483
+      },
+      "requested_bytes": 9924396,
+      "runs": [
+        "h00-medium-percent-r1",
+        "h01-dense-percent-r1",
+        "h02-medium-one-edit-r1",
+        "h03-medium-one-edit-r2",
+        "h04-dense-percent-r2",
+        "h05-medium-percent-r2"
+      ],
+      "trace_count": 128
+    },
+    {
+      "calls": 540,
+      "owner": {
+        "file": "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/facts.rs",
+        "function": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::facts::FactsBuilder::push_cell",
+        "key": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::facts::FactsBuilder::push_cell|crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/facts.rs|478",
+        "line": 478
+      },
+      "requested_bytes": 7344768,
+      "runs": [
+        "h00-medium-percent-r1",
+        "h01-dense-percent-r1",
+        "h02-medium-one-edit-r1",
+        "h03-medium-one-edit-r2",
+        "h04-dense-percent-r2",
+        "h05-medium-percent-r2"
+      ],
+      "trace_count": 24
+    },
+    {
+      "calls": 54,
+      "owner": {
+        "file": "crates/litchi-xlsx/src/raw/worksheet/edit/package.rs",
+        "function": "litchi_xlsx::raw::worksheet::edit::package::rewrite_from_facts",
+        "key": "litchi_xlsx::raw::worksheet::edit::package::rewrite_from_facts|crates/litchi-xlsx/src/raw/worksheet/edit/package.rs|428",
+        "line": 428
+      },
+      "requested_bytes": 5251806,
+      "runs": [
+        "h00-medium-percent-r1",
+        "h01-dense-percent-r1",
+        "h02-medium-one-edit-r1",
+        "h03-medium-one-edit-r2",
+        "h04-dense-percent-r2",
+        "h05-medium-percent-r2"
+      ],
+      "trace_count": 12
+    },
+    {
+      "calls": 45696,
+      "owner": {
+        "file": "src/raw/worksheet/validation.rs",
+        "function": "litchi_xlsx::raw::worksheet::validation::optional_bool",
+        "key": "litchi_xlsx::raw::worksheet::validation::optional_bool|src/raw/worksheet/validation.rs|265",
+        "line": 265
+      },
+      "requested_bytes": 2924544,
+      "runs": [
+        "h00-medium-percent-r1",
+        "h01-dense-percent-r1",
+        "h02-medium-one-edit-r1",
+        "h03-medium-one-edit-r2",
+        "h04-dense-percent-r2",
+        "h05-medium-percent-r2"
+      ],
+      "trace_count": 168
+    },
+    {
+      "calls": 1662,
+      "owner": {
+        "file": "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs",
+        "function": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_sheet_data_from_facts",
+        "key": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_sheet_data_from_facts|crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs|226",
+        "line": 226
+      },
+      "requested_bytes": 1849920,
+      "runs": [
+        "h00-medium-percent-r1",
+        "h01-dense-percent-r1",
+        "h02-medium-one-edit-r1",
+        "h03-medium-one-edit-r2",
+        "h04-dense-percent-r2",
+        "h05-medium-percent-r2"
+      ],
+      "trace_count": 44
+    },
+    {
+      "calls": 234,
+      "owner": {
+        "file": "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+        "function": "litchi_xlsx::cell_values::snapshot::load_source_catalog",
+        "key": "litchi_xlsx::cell_values::snapshot::load_source_catalog|crates/litchi-xlsx/src/cell_values/snapshot.rs|2338",
+        "line": 2338
+      },
+      "requested_bytes": 1471176,
+      "runs": [
+        "h00-medium-percent-r1",
+        "h01-dense-percent-r1",
+        "h02-medium-one-edit-r1",
+        "h03-medium-one-edit-r2",
+        "h04-dense-percent-r2",
+        "h05-medium-percent-r2"
+      ],
+      "trace_count": 156
+    },
+    {
+      "calls": 180,
+      "owner": {
+        "file": "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+        "function": "litchi_xlsx::cell_values::snapshot::capture_auxiliary_source",
+        "key": "litchi_xlsx::cell_values::snapshot::capture_auxiliary_source|crates/litchi-xlsx/src/cell_values/snapshot.rs|2506",
+        "line": 2506
+      },
+      "requested_bytes": 1468584,
+      "runs": [
+        "h00-medium-percent-r1",
+        "h01-dense-percent-r1",
+        "h02-medium-one-edit-r1",
+        "h03-medium-one-edit-r2",
+        "h04-dense-percent-r2",
+        "h05-medium-percent-r2"
+      ],
+      "trace_count": 120
+    },
+    {
+      "calls": 175872,
+      "owner": {
+        "file": "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+        "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::push_text",
+        "key": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::push_text|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1453",
+        "line": 1453
+      },
+      "requested_bytes": 1406976,
+      "runs": [
+        "h00-medium-percent-r1",
+        "h01-dense-percent-r1",
+        "h02-medium-one-edit-r1",
+        "h03-medium-one-edit-r2",
+        "h04-dense-percent-r2",
+        "h05-medium-percent-r2"
+      ],
+      "trace_count": 12
+    },
+    {
+      "calls": 30,
+      "owner": {
+        "file": "src/raw/worksheet/edit/codec/snapshot/facts.rs",
+        "function": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::facts::FactsBuilder::finish",
+        "key": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::facts::FactsBuilder::finish|src/raw/worksheet/edit/codec/snapshot/facts.rs|539",
+        "line": 539
+      },
+      "requested_bytes": 1105920,
+      "runs": [
+        "h00-medium-percent-r1",
+        "h02-medium-one-edit-r1",
+        "h03-medium-one-edit-r2",
+        "h05-medium-percent-r2"
+      ],
+      "trace_count": 8
+    },
+    {
+      "calls": 177504,
+      "owner": {
+        "file": "crates/litchi-xlsx/src/cell.rs",
+        "function": "litchi_xlsx::cell::Number::new",
+        "key": "litchi_xlsx::cell::Number::new|crates/litchi-xlsx/src/cell.rs|395",
+        "line": 395
+      },
+      "requested_bytes": 993756,
+      "runs": [
+        "h00-medium-percent-r1",
+        "h01-dense-percent-r1",
+        "h02-medium-one-edit-r1",
+        "h03-medium-one-edit-r2",
+        "h04-dense-percent-r2",
+        "h05-medium-percent-r2"
+      ],
+      "trace_count": 24
+    },
+    {
+      "calls": 175872,
+      "owner": {
+        "file": "crates/litchi-xlsx/src/cell.rs",
+        "function": "_$LT$litchi_xlsx..cell..Number$u20$as$u20$core..clone..Clone$GT$::clone",
+        "key": "_$LT$litchi_xlsx..cell..Number$u20$as$u20$core..clone..Clone$GT$::clone|crates/litchi-xlsx/src/cell.rs|389",
+        "line": 389
+      },
+      "requested_bytes": 984570,
+      "runs": [
+        "h00-medium-percent-r1",
+        "h01-dense-percent-r1",
+        "h02-medium-one-edit-r1",
+        "h03-medium-one-edit-r2",
+        "h04-dense-percent-r2",
+        "h05-medium-percent-r2"
+      ],
+      "trace_count": 24
+    },
+    {
+      "calls": 18,
+      "owner": {
+        "file": "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+        "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+        "key": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed|crates/litchi-xlsx/src/cell_values/snapshot.rs|230",
+        "line": 230
+      },
+      "requested_bytes": 893952,
+      "runs": [
+        "h00-medium-percent-r1",
+        "h01-dense-percent-r1",
+        "h02-medium-one-edit-r1",
+        "h03-medium-one-edit-r2",
+        "h04-dense-percent-r2",
+        "h05-medium-percent-r2"
+      ],
+      "trace_count": 12
+    },
+    {
+      "calls": 13056,
+      "owner": {
+        "file": "src/raw/worksheet/validation.rs",
+        "function": "litchi_xlsx::raw::worksheet::validation::optional_u32",
+        "key": "litchi_xlsx::raw::worksheet::validation::optional_u32|src/raw/worksheet/validation.rs|225",
+        "line": 225
+      },
+      "requested_bytes": 835584,
+      "runs": [
+        "h00-medium-percent-r1",
+        "h01-dense-percent-r1",
+        "h02-medium-one-edit-r1",
+        "h03-medium-one-edit-r2",
+        "h04-dense-percent-r2",
+        "h05-medium-percent-r2"
+      ],
+      "trace_count": 48
+    },
+    {
+      "calls": 710412,
+      "owner": {
+        "file": "crates/litchi-xlsx/src/cell_values/validation.rs",
+        "function": "litchi_xlsx::cell_values::validation::Validator::observe_inner",
+        "key": "litchi_xlsx::cell_values::validation::Validator::observe_inner|crates/litchi-xlsx/src/cell_values/validation.rs|133",
+        "line": 133
+      },
+      "requested_bytes": 726276,
+      "runs": [
+        "h00-medium-percent-r1",
+        "h01-dense-percent-r1",
+        "h02-medium-one-edit-r1",
+        "h03-medium-one-edit-r2",
+        "h04-dense-percent-r2",
+        "h05-medium-percent-r2"
+      ],
+      "trace_count": 60
+    }
+  ],
+  "aggregate_tag_totals": {
+    "allocator_growth_or_realloc": {
+      "calls": 1366326,
+      "requested_bytes": 273498336,
+      "trace_count": 4876
+    },
+    "copy_or_clone_mechanism": {
+      "calls": 1720080,
+      "requested_bytes": 264676992,
+      "trace_count": 4328
+    },
+    "duplicate_checking": {
+      "calls": 608898,
+      "requested_bytes": 38974080,
+      "trace_count": 588
+    },
+    "merge_backing_storage": {
+      "calls": 174588,
+      "requested_bytes": 33475218,
+      "trace_count": 56
+    },
+    "numeric_clone": {
+      "calls": 180768,
+      "requested_bytes": 1012146,
+      "trace_count": 60
+    },
+    "numeric_construction": {
+      "calls": 177504,
+      "requested_bytes": 993756,
+      "trace_count": 24
+    },
+    "xml_lexical_or_parse": {
+      "calls": 1511634,
+      "requested_bytes": 188128074,
+      "trace_count": 2460
+    }
+  },
+  "aggregate_top_allocation_sizes": [
+    {
+      "calls": 612852,
+      "requested_bytes": 39222528,
+      "size_bytes": 64
+    },
+    {
+      "calls": 12,
+      "requested_bytes": 36175872,
+      "size_bytes": 3014656
+    },
+    {
+      "calls": 36,
+      "requested_bytes": 33030144,
+      "size_bytes": 917504
+    },
+    {
+      "calls": 60,
+      "requested_bytes": 25436160,
+      "size_bytes": 423936
+    },
+    {
+      "calls": 6,
+      "requested_bytes": 22020096,
+      "size_bytes": 3670016
+    },
+    {
+      "calls": 36,
+      "requested_bytes": 16515072,
+      "size_bytes": 458752
+    },
+    {
+      "calls": 6,
+      "requested_bytes": 11010048,
+      "size_bytes": 1835008
+    },
+    {
+      "calls": 42,
+      "requested_bytes": 9633792,
+      "size_bytes": 229376
+    },
+    {
+      "calls": 42,
+      "requested_bytes": 4816896,
+      "size_bytes": 114688
+    },
+    {
+      "calls": 90,
+      "requested_bytes": 4279680,
+      "size_bytes": 47552
+    },
+    {
+      "calls": 126,
+      "requested_bytes": 4128768,
+      "size_bytes": 32768
+    },
+    {
+      "calls": 6,
+      "requested_bytes": 2901360,
+      "size_bytes": 483560
+    },
+    {
+      "calls": 6,
+      "requested_bytes": 2775414,
+      "size_bytes": 462569
+    },
+    {
+      "calls": 48,
+      "requested_bytes": 2752512,
+      "size_bytes": 57344
+    },
+    {
+      "calls": 36,
+      "requested_bytes": 2359296,
+      "size_bytes": 65536
+    },
+    {
+      "calls": 1866,
+      "requested_bytes": 2328768,
+      "size_bytes": 1248
+    },
+    {
+      "calls": 12,
+      "requested_bytes": 2260992,
+      "size_bytes": 188416
+    },
+    {
+      "calls": 6,
+      "requested_bytes": 1572864,
+      "size_bytes": 262144
+    },
+    {
+      "calls": 54,
+      "requested_bytes": 1548288,
+      "size_bytes": 28672
+    },
+    {
+      "calls": 179190,
+      "requested_bytes": 1433520,
+      "size_bytes": 8
+    }
+  ],
+  "decision_support": {
+    "larger_work_elimination": "Parser/worksheet growth and snapshot/edit backing-storage owners dominate the largest selected traces; merge backing storage is material but smaller than parser growth. This is prioritization evidence, not a native phase or speed claim.",
+    "next_candidate_boundary": "Target one concrete owner with preservation tests and a new bounded measurement; do not infer that all parser growth is avoidable.",
+    "numeric_ownership": "Numeric clone/construction is a small overlapping tag in the exact selected scope; it is not the largest bounded owner by requested bytes.",
+    "selection_correction": "v1 size buckets were aggregated before exact selection and are preserved as superseded; v2/v3 accumulate them only inside the exact stage/timed branch. v3 additionally requires fully qualified benchmark callsites."
+  },
+  "full_report": {
+    "bytes": 623430,
+    "path": "/home/zhuhe/litchi-performance-0959/analysis/owner-ranking-v3.json",
+    "sha256": "d7c61c1cb7a21e4b26ba12ca25a131d4249cf2da260d9ace2fd9e9ac80b1e3fa"
+  },
+  "input_manifest": {
+    "bytes": 16403,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0958/analysis-input-manifest-v1.json",
+    "sha256": "0dc7a9a4757d73a05d9fc289581a8ec6add494565f039b94e7addf8d18629495"
+  },
+  "interpretation": [
+    "owners_ranked is the first meaningful litchi_xlsx frame above allocator/runtime frames; this is a nearest-owner ranking, not an inclusive call-tree sum.",
+    "merge_backing_storage, numeric_clone, numeric_construction, duplicate_checking, xml_lexical_or_parse, copy_or_clone_mechanism, and allocator_growth_or_realloc labels overlap and are retained separately.",
+    "Requested bytes and calls are raw allocation totals in the selected whole-process stack scope; they do not establish a timed phase total, speedup, or adoption recommendation.",
+    "The 0958 analyzer's commit-core surrogate bucket is not used for this independent selection; exact stage/timed selection is cross-checked against its selected totals."
+  ],
+  "per_run": [
+    {
+      "id": "h00-medium-percent-r1",
+      "owners_ranked": [
+        {
+          "calls": 132,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+            "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell",
+            "key": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1587",
+            "line": 1587
+          },
+          "requested_bytes": 22009344,
+          "runs": [
+            "h00-medium-percent-r1"
+          ],
+          "trace_count": 4
+        },
+        {
+          "calls": 279,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/cell_values/source.rs",
+            "function": "litchi_xlsx::cell_values::source::MultiSourceEdit::apply_batch",
+            "key": "litchi_xlsx::cell_values::source::MultiSourceEdit::apply_batch|crates/litchi-xlsx/src/cell_values/source.rs|984",
+            "line": 984
+          },
+          "requested_bytes": 5624640,
+          "runs": [
+            "h00-medium-percent-r1"
+          ],
+          "trace_count": 2
+        },
+        {
+          "calls": 24,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+            "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse",
+            "key": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse|crates/litchi-xlsx/src/raw/worksheet/codec.rs|654",
+            "line": 654
+          },
+          "requested_bytes": 5138568,
+          "runs": [
+            "h00-medium-percent-r1"
+          ],
+          "trace_count": 4
+        },
+        {
+          "calls": 12,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/cell.rs",
+            "function": "litchi_xlsx::cell::Store::merge_omitted_cells",
+            "key": "litchi_xlsx::cell::Store::merge_omitted_cells|crates/litchi-xlsx/src/cell.rs|915",
+            "line": 915
+          },
+          "requested_bytes": 5087232,
+          "runs": [
+            "h00-medium-percent-r1"
+          ],
+          "trace_count": 2
+        },
+        {
+          "calls": 56616,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/cell_values/validation.rs",
+            "function": "litchi_xlsx::cell_values::validation::scan_attributes",
+            "key": "litchi_xlsx::cell_values::validation::scan_attributes|crates/litchi-xlsx/src/cell_values/validation.rs|489",
+            "line": 489
+          },
+          "requested_bytes": 3624384,
+          "runs": [
+            "h00-medium-percent-r1"
+          ],
+          "trace_count": 32
+        },
+        {
+          "calls": 123,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+            "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+            "key": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected|crates/litchi-xlsx/src/cell_values/snapshot.rs|483",
+            "line": 483
+          },
+          "requested_bytes": 1857204,
+          "runs": [
+            "h00-medium-percent-r1"
+          ],
+          "trace_count": 22
+        },
+        {
+          "calls": 27648,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+            "function": "litchi_xlsx::raw::worksheet::codec::scan_cell_attributes",
+            "key": "litchi_xlsx::raw::worksheet::codec::scan_cell_attributes|crates/litchi-xlsx/src/raw/worksheet/codec.rs|241",
+            "line": 241
+          },
+          "requested_bytes": 1769472,
+          "runs": [
+            "h00-medium-percent-r1"
+          ],
+          "trace_count": 2
+        },
+        {
+          "calls": 132,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/facts.rs",
+            "function": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::facts::FactsBuilder::push_cell",
+            "key": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::facts::FactsBuilder::push_cell|crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/facts.rs|478",
+            "line": 478
+          },
+          "requested_bytes": 1572096,
+          "runs": [
+            "h00-medium-percent-r1"
+          ],
+          "trace_count": 4
+        },
+        {
+          "calls": 12,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/edit/package.rs",
+            "function": "litchi_xlsx::raw::worksheet::edit::package::rewrite_from_facts",
+            "key": "litchi_xlsx::raw::worksheet::edit::package::rewrite_from_facts|crates/litchi-xlsx/src/raw/worksheet/edit/package.rs|428",
+            "line": 428
+          },
+          "requested_bytes": 841986,
+          "runs": [
+            "h00-medium-percent-r1"
+          ],
+          "trace_count": 2
+        },
+        {
+          "calls": 8064,
+          "owner": {
+            "file": "src/raw/worksheet/validation.rs",
+            "function": "litchi_xlsx::raw::worksheet::validation::optional_bool",
+            "key": "litchi_xlsx::raw::worksheet::validation::optional_bool|src/raw/worksheet/validation.rs|265",
+            "line": 265
+          },
+          "requested_bytes": 516096,
+          "runs": [
+            "h00-medium-percent-r1"
+          ],
+          "trace_count": 28
+        },
+        {
+          "calls": 12,
+          "owner": {
+            "file": "src/raw/worksheet/edit/codec/snapshot/facts.rs",
+            "function": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::facts::FactsBuilder::finish",
+            "key": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::facts::FactsBuilder::finish|src/raw/worksheet/edit/codec/snapshot/facts.rs|539",
+            "line": 539
+          },
+          "requested_bytes": 442368,
+          "runs": [
+            "h00-medium-percent-r1"
+          ],
+          "trace_count": 2
+        },
+        {
+          "calls": 327,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs",
+            "function": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_sheet_data_from_facts",
+            "key": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_sheet_data_from_facts|crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs|226",
+            "line": 226
+          },
+          "requested_bytes": 364704,
+          "runs": [
+            "h00-medium-percent-r1"
+          ],
+          "trace_count": 8
+        }
+      ],
+      "repeat": 1,
+      "selected_exact_stage_timed": {
+        "calls": 330372,
+        "requested_bytes": 51500040,
+        "trace_count": 868
+      },
+      "shape": "medium",
+      "tag_totals": {
+        "allocator_growth_or_realloc": {
+          "calls": 217758,
+          "requested_bytes": 51368688,
+          "trace_count": 820
+        },
+        "copy_or_clone_mechanism": {
+          "calls": 273384,
+          "requested_bytes": 49687695,
+          "trace_count": 726
+        },
+        "duplicate_checking": {
+          "calls": 97305,
+          "requested_bytes": 6228480,
+          "trace_count": 98
+        },
+        "merge_backing_storage": {
+          "calls": 27453,
+          "requested_bytes": 5296425,
+          "trace_count": 10
+        },
+        "numeric_clone": {
+          "calls": 28485,
+          "requested_bytes": 183309,
+          "trace_count": 10
+        },
+        "numeric_construction": {
+          "calls": 27927,
+          "requested_bytes": 179739,
+          "trace_count": 4
+        },
+        "xml_lexical_or_parse": {
+          "calls": 239937,
+          "requested_bytes": 36312642,
+          "trace_count": 412
+        }
+      },
+      "top_allocation_sizes": [
+        {
+          "calls": 12,
+          "requested_bytes": 11010048,
+          "size_bytes": 917504
+        },
+        {
+          "calls": 24,
+          "requested_bytes": 10174464,
+          "size_bytes": 423936
+        },
+        {
+          "calls": 98001,
+          "requested_bytes": 6272064,
+          "size_bytes": 64
+        },
+        {
+          "calls": 12,
+          "requested_bytes": 5505024,
+          "size_bytes": 458752
+        },
+        {
+          "calls": 12,
+          "requested_bytes": 2752512,
+          "size_bytes": 229376
+        },
+        {
+          "calls": 12,
+          "requested_bytes": 1376256,
+          "size_bytes": 114688
+        },
+        {
+          "calls": 30,
+          "requested_bytes": 983040,
+          "size_bytes": 32768
+        },
+        {
+          "calls": 18,
+          "requested_bytes": 855936,
+          "size_bytes": 47552
+        },
+        {
+          "calls": 12,
+          "requested_bytes": 786432,
+          "size_bytes": 65536
+        },
+        {
+          "calls": 12,
+          "requested_bytes": 688128,
+          "size_bytes": 57344
+        }
+      ],
+      "top_selected_traces": [
+        {
+          "calls": 80,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell",
+              "line": 1587
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish",
+              "line": 1480
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::transition",
+              "line": 806
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+              "line": 1699
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+              "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+              "line": 408
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+              "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+              "line": 283
+            },
+            {
+              "file": "src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+              "line": 489
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+              "line": 249
+            }
+          ],
+          "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1587",
+          "requested_bytes": 14665728,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism",
+            "xml_lexical_or_parse"
+          ],
+          "trace_id": "9a2e"
+        },
+        {
+          "calls": 40,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell",
+              "line": 1587
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish",
+              "line": 1480
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::transition",
+              "line": 806
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+              "line": 1699
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+              "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+              "line": 408
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+              "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+              "line": 283
+            },
+            {
+              "file": "src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+              "line": 489
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+              "line": 249
+            }
+          ],
+          "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1587",
+          "requested_bytes": 7332864,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism",
+            "xml_lexical_or_parse"
+          ],
+          "trace_id": "7674"
+        },
+        {
+          "calls": 186,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/source.rs",
+              "function": "litchi_xlsx::cell_values::source::MultiSourceEdit::apply_batch",
+              "line": 984
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/source.rs",
+              "function": "litchi_xlsx::cell_values::source::MultiSourceEdit::set",
+              "line": 936
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::stage_timed_commit",
+              "line": 389
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration",
+              "line": 428
+            },
+            {
+              "file": "src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::run_case",
+              "line": 654
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::run",
+              "line": 693
+            },
+            {
+              "file": "src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::benchmark",
+              "line": 744
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/lib.rs",
+              "function": "litchi_perf_baseline::benchmark_xlsx_managed_compression",
+              "line": 10327
+            }
+          ],
+          "owner": "litchi_xlsx::cell_values::source::MultiSourceEdit::apply_batch|crates/litchi-xlsx/src/cell_values/source.rs|984",
+          "requested_bytes": 3749760,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism"
+          ],
+          "trace_id": "9a6c"
+        },
+        {
+          "calls": 8,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse",
+              "line": 654
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+              "line": 1715
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+              "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+              "line": 408
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+              "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+              "line": 283
+            },
+            {
+              "file": "src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+              "line": 489
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+              "line": 249
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/source.rs",
+              "function": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+              "line": 475
+            },
+            {
+              "file": "src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::stage_timed_commit",
+              "line": 387
+            }
+          ],
+          "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse|crates/litchi-xlsx/src/raw/worksheet/codec.rs|654",
+          "requested_bytes": 3391488,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism",
+            "xml_lexical_or_parse"
+          ],
+          "trace_id": "9a38"
+        },
+        {
+          "calls": 8,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs",
+              "function": "litchi_xlsx::cell::Store::merge_omitted_cells",
+              "line": 915
+            },
+            {
+              "file": "src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::try_rewritten_value_cells",
+              "line": 856
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_value_source",
+              "line": 811
+            },
+            {
+              "file": "src/cell_values/source.rs",
+              "function": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+              "line": 1209
+            },
+            {
+              "file": "src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::stage_timed_commit",
+              "line": 398
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration",
+              "line": 428
+            },
+            {
+              "file": "src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::run_case",
+              "line": 654
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::run",
+              "line": 693
+            }
+          ],
+          "owner": "litchi_xlsx::cell::Store::merge_omitted_cells|crates/litchi-xlsx/src/cell.rs|915",
+          "requested_bytes": 3391488,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism",
+            "merge_backing_storage"
+          ],
+          "trace_id": "9bb1"
+        }
+      ],
+      "workload": "one-percent"
+    },
+    {
+      "id": "h01-dense-percent-r1",
+      "owners_ranked": [
+        {
+          "calls": 105,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+            "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell",
+            "key": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1587",
+            "line": 1587
+          },
+          "requested_bytes": 23901696,
+          "runs": [
+            "h01-dense-percent-r1"
+          ],
+          "trace_count": 4
+        },
+        {
+          "calls": 24,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+            "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse",
+            "key": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse|crates/litchi-xlsx/src/raw/worksheet/codec.rs|654",
+            "line": 654
+          },
+          "requested_bytes": 9922200,
+          "runs": [
+            "h01-dense-percent-r1"
+          ],
+          "trace_count": 4
+        },
+        {
+          "calls": 12,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/cell.rs",
+            "function": "litchi_xlsx::cell::Store::merge_omitted_cells",
+            "key": "litchi_xlsx::cell::Store::merge_omitted_cells|crates/litchi-xlsx/src/cell.rs|915",
+            "line": 915
+          },
+          "requested_bytes": 9821184,
+          "runs": [
+            "h01-dense-percent-r1"
+          ],
+          "trace_count": 2
+        },
+        {
+          "calls": 534,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/cell_values/source.rs",
+            "function": "litchi_xlsx::cell_values::source::MultiSourceEdit::apply_batch",
+            "key": "litchi_xlsx::cell_values::source::MultiSourceEdit::apply_batch|crates/litchi-xlsx/src/cell_values/source.rs|984",
+            "line": 984
+          },
+          "requested_bytes": 8586720,
+          "runs": [
+            "h01-dense-percent-r1"
+          ],
+          "trace_count": 2
+        },
+        {
+          "calls": 108744,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/cell_values/validation.rs",
+            "function": "litchi_xlsx::cell_values::validation::scan_attributes",
+            "key": "litchi_xlsx::cell_values::validation::scan_attributes|crates/litchi-xlsx/src/cell_values/validation.rs|489",
+            "line": 489
+          },
+          "requested_bytes": 6960576,
+          "runs": [
+            "h01-dense-percent-r1"
+          ],
+          "trace_count": 32
+        },
+        {
+          "calls": 53376,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+            "function": "litchi_xlsx::raw::worksheet::codec::scan_cell_attributes",
+            "key": "litchi_xlsx::raw::worksheet::codec::scan_cell_attributes|crates/litchi-xlsx/src/raw/worksheet/codec.rs|241",
+            "line": 241
+          },
+          "requested_bytes": 3416064,
+          "runs": [
+            "h01-dense-percent-r1"
+          ],
+          "trace_count": 2
+        },
+        {
+          "calls": 123,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+            "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+            "key": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected|crates/litchi-xlsx/src/cell_values/snapshot.rs|483",
+            "line": 483
+          },
+          "requested_bytes": 2652531,
+          "runs": [
+            "h01-dense-percent-r1"
+          ],
+          "trace_count": 22
+        },
+        {
+          "calls": 105,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/facts.rs",
+            "function": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::facts::FactsBuilder::push_cell",
+            "key": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::facts::FactsBuilder::push_cell|crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/facts.rs|478",
+            "line": 478
+          },
+          "requested_bytes": 1707264,
+          "runs": [
+            "h01-dense-percent-r1"
+          ],
+          "trace_count": 4
+        },
+        {
+          "calls": 12,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/edit/package.rs",
+            "function": "litchi_xlsx::raw::worksheet::edit::package::rewrite_from_facts",
+            "key": "litchi_xlsx::raw::worksheet::edit::package::rewrite_from_facts|crates/litchi-xlsx/src/raw/worksheet/edit/package.rs|428",
+            "line": 428
+          },
+          "requested_bytes": 1593651,
+          "runs": [
+            "h01-dense-percent-r1"
+          ],
+          "trace_count": 2
+        },
+        {
+          "calls": 12768,
+          "owner": {
+            "file": "src/raw/worksheet/validation.rs",
+            "function": "litchi_xlsx::raw::worksheet::validation::optional_bool",
+            "key": "litchi_xlsx::raw::worksheet::validation::optional_bool|src/raw/worksheet/validation.rs|265",
+            "line": 265
+          },
+          "requested_bytes": 817152,
+          "runs": [
+            "h01-dense-percent-r1"
+          ],
+          "trace_count": 28
+        },
+        {
+          "calls": 498,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs",
+            "function": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_sheet_data_from_facts",
+            "key": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_sheet_data_from_facts|crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs|226",
+            "line": 226
+          },
+          "requested_bytes": 555552,
+          "runs": [
+            "h01-dense-percent-r1"
+          ],
+          "trace_count": 10
+        },
+        {
+          "calls": 53376,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+            "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::push_text",
+            "key": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::push_text|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1453",
+            "line": 1453
+          },
+          "requested_bytes": 427008,
+          "runs": [
+            "h01-dense-percent-r1"
+          ],
+          "trace_count": 2
+        }
+      ],
+      "repeat": 1,
+      "selected_exact_stage_timed": {
+        "calls": 628254,
+        "requested_bytes": 73812219,
+        "trace_count": 870
+      },
+      "shape": "dense-sparse",
+      "tag_totals": {
+        "allocator_growth_or_realloc": {
+          "calls": 411549,
+          "requested_bytes": 73565700,
+          "trace_count": 822
+        },
+        "copy_or_clone_mechanism": {
+          "calls": 518784,
+          "requested_bytes": 71355495,
+          "trace_count": 722
+        },
+        "duplicate_checking": {
+          "calls": 182808,
+          "requested_bytes": 11700672,
+          "trace_count": 98
+        },
+        "merge_backing_storage": {
+          "calls": 52911,
+          "requested_bytes": 10128321,
+          "trace_count": 8
+        },
+        "numeric_clone": {
+          "calls": 54978,
+          "requested_bytes": 289953,
+          "trace_count": 10
+        },
+        "numeric_construction": {
+          "calls": 53910,
+          "requested_bytes": 284334,
+          "trace_count": 4
+        },
+        "xml_lexical_or_parse": {
+          "calls": 455739,
+          "requested_bytes": 48673917,
+          "trace_count": 406
+        }
+      },
+      "top_allocation_sizes": [
+        {
+          "calls": 6,
+          "requested_bytes": 18087936,
+          "size_bytes": 3014656
+        },
+        {
+          "calls": 184017,
+          "requested_bytes": 11777088,
+          "size_bytes": 64
+        },
+        {
+          "calls": 3,
+          "requested_bytes": 11010048,
+          "size_bytes": 3670016
+        },
+        {
+          "calls": 3,
+          "requested_bytes": 5505024,
+          "size_bytes": 1835008
+        },
+        {
+          "calls": 3,
+          "requested_bytes": 2752512,
+          "size_bytes": 917504
+        },
+        {
+          "calls": 3,
+          "requested_bytes": 1450680,
+          "size_bytes": 483560
+        },
+        {
+          "calls": 3,
+          "requested_bytes": 1387707,
+          "size_bytes": 462569
+        },
+        {
+          "calls": 6,
+          "requested_bytes": 1376256,
+          "size_bytes": 229376
+        },
+        {
+          "calls": 3,
+          "requested_bytes": 1376256,
+          "size_bytes": 458752
+        },
+        {
+          "calls": 6,
+          "requested_bytes": 1130496,
+          "size_bytes": 188416
+        }
+      ],
+      "top_selected_traces": [
+        {
+          "calls": 62,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell",
+              "line": 1587
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish",
+              "line": 1480
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::transition",
+              "line": 806
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+              "line": 1699
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+              "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+              "line": 408
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+              "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+              "line": 283
+            },
+            {
+              "file": "src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+              "line": 489
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+              "line": 249
+            }
+          ],
+          "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1587",
+          "requested_bytes": 15927296,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism",
+            "xml_lexical_or_parse"
+          ],
+          "trace_id": "9b07"
+        },
+        {
+          "calls": 31,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell",
+              "line": 1587
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish",
+              "line": 1480
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::transition",
+              "line": 806
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+              "line": 1699
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+              "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+              "line": 408
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+              "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+              "line": 283
+            },
+            {
+              "file": "src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+              "line": 489
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+              "line": 249
+            }
+          ],
+          "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1587",
+          "requested_bytes": 7963648,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism",
+            "xml_lexical_or_parse"
+          ],
+          "trace_id": "7743"
+        },
+        {
+          "calls": 8,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse",
+              "line": 654
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+              "line": 1715
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+              "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+              "line": 408
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+              "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+              "line": 283
+            },
+            {
+              "file": "src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+              "line": 489
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+              "line": 249
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/source.rs",
+              "function": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+              "line": 475
+            },
+            {
+              "file": "src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::stage_timed_commit",
+              "line": 387
+            }
+          ],
+          "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse|crates/litchi-xlsx/src/raw/worksheet/codec.rs|654",
+          "requested_bytes": 6547456,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism",
+            "xml_lexical_or_parse"
+          ],
+          "trace_id": "9b11"
+        },
+        {
+          "calls": 8,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs",
+              "function": "litchi_xlsx::cell::Store::merge_omitted_cells",
+              "line": 915
+            },
+            {
+              "file": "src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::try_rewritten_value_cells",
+              "line": 856
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_value_source",
+              "line": 811
+            },
+            {
+              "file": "src/cell_values/source.rs",
+              "function": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+              "line": 1209
+            },
+            {
+              "file": "src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::stage_timed_commit",
+              "line": 398
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration",
+              "line": 428
+            },
+            {
+              "file": "src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::run_case",
+              "line": 654
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::run",
+              "line": 693
+            }
+          ],
+          "owner": "litchi_xlsx::cell::Store::merge_omitted_cells|crates/litchi-xlsx/src/cell.rs|915",
+          "requested_bytes": 6547456,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism",
+            "merge_backing_storage"
+          ],
+          "trace_id": "9c86"
+        },
+        {
+          "calls": 356,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/source.rs",
+              "function": "litchi_xlsx::cell_values::source::MultiSourceEdit::apply_batch",
+              "line": 984
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/source.rs",
+              "function": "litchi_xlsx::cell_values::source::MultiSourceEdit::set",
+              "line": 936
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::stage_timed_commit",
+              "line": 389
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration",
+              "line": 428
+            },
+            {
+              "file": "src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::run_case",
+              "line": 654
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::run",
+              "line": 693
+            },
+            {
+              "file": "src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::benchmark",
+              "line": 744
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/lib.rs",
+              "function": "litchi_perf_baseline::benchmark_xlsx_managed_compression",
+              "line": 10327
+            }
+          ],
+          "owner": "litchi_xlsx::cell_values::source::MultiSourceEdit::apply_batch|crates/litchi-xlsx/src/cell_values/source.rs|984",
+          "requested_bytes": 5724480,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism"
+          ],
+          "trace_id": "9b3f"
+        }
+      ],
+      "workload": "one-percent"
+    },
+    {
+      "id": "h02-medium-one-edit-r1",
+      "owners_ranked": [
+        {
+          "calls": 33,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+            "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell",
+            "key": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1587",
+            "line": 1587
+          },
+          "requested_bytes": 5502336,
+          "runs": [
+            "h02-medium-one-edit-r1"
+          ],
+          "trace_count": 4
+        },
+        {
+          "calls": 6,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+            "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse",
+            "key": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse|crates/litchi-xlsx/src/raw/worksheet/codec.rs|654",
+            "line": 654
+          },
+          "requested_bytes": 1274016,
+          "runs": [
+            "h02-medium-one-edit-r1"
+          ],
+          "trace_count": 4
+        },
+        {
+          "calls": 3,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/cell.rs",
+            "function": "litchi_xlsx::cell::Store::merge_omitted_cells",
+            "key": "litchi_xlsx::cell::Store::merge_omitted_cells|crates/litchi-xlsx/src/cell.rs|915",
+            "line": 915
+          },
+          "requested_bytes": 1271808,
+          "runs": [
+            "h02-medium-one-edit-r1"
+          ],
+          "trace_count": 2
+        },
+        {
+          "calls": 14181,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/cell_values/validation.rs",
+            "function": "litchi_xlsx::cell_values::validation::scan_attributes",
+            "key": "litchi_xlsx::cell_values::validation::scan_attributes|crates/litchi-xlsx/src/cell_values/validation.rs|489",
+            "line": 489
+          },
+          "requested_bytes": 907968,
+          "runs": [
+            "h02-medium-one-edit-r1"
+          ],
+          "trace_count": 32
+        },
+        {
+          "calls": 30,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+            "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+            "key": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected|crates/litchi-xlsx/src/cell_values/snapshot.rs|483",
+            "line": 483
+          },
+          "requested_bytes": 452463,
+          "runs": [
+            "h02-medium-one-edit-r1"
+          ],
+          "trace_count": 20
+        },
+        {
+          "calls": 6912,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+            "function": "litchi_xlsx::raw::worksheet::codec::scan_cell_attributes",
+            "key": "litchi_xlsx::raw::worksheet::codec::scan_cell_attributes|crates/litchi-xlsx/src/raw/worksheet/codec.rs|241",
+            "line": 241
+          },
+          "requested_bytes": 442368,
+          "runs": [
+            "h02-medium-one-edit-r1"
+          ],
+          "trace_count": 2
+        },
+        {
+          "calls": 33,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/facts.rs",
+            "function": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::facts::FactsBuilder::push_cell",
+            "key": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::facts::FactsBuilder::push_cell|crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/facts.rs|478",
+            "line": 478
+          },
+          "requested_bytes": 393024,
+          "runs": [
+            "h02-medium-one-edit-r1"
+          ],
+          "trace_count": 4
+        },
+        {
+          "calls": 39,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+            "function": "litchi_xlsx::cell_values::snapshot::load_source_catalog",
+            "key": "litchi_xlsx::cell_values::snapshot::load_source_catalog|crates/litchi-xlsx/src/cell_values/snapshot.rs|2338",
+            "line": 2338
+          },
+          "requested_bytes": 245196,
+          "runs": [
+            "h02-medium-one-edit-r1"
+          ],
+          "trace_count": 26
+        },
+        {
+          "calls": 30,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+            "function": "litchi_xlsx::cell_values::snapshot::capture_auxiliary_source",
+            "key": "litchi_xlsx::cell_values::snapshot::capture_auxiliary_source|crates/litchi-xlsx/src/cell_values/snapshot.rs|2506",
+            "line": 2506
+          },
+          "requested_bytes": 244764,
+          "runs": [
+            "h02-medium-one-edit-r1"
+          ],
+          "trace_count": 20
+        },
+        {
+          "calls": 3,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/edit/package.rs",
+            "function": "litchi_xlsx::raw::worksheet::edit::package::rewrite_from_facts",
+            "key": "litchi_xlsx::raw::worksheet::edit::package::rewrite_from_facts|crates/litchi-xlsx/src/raw/worksheet/edit/package.rs|428",
+            "line": 428
+          },
+          "requested_bytes": 190266,
+          "runs": [
+            "h02-medium-one-edit-r1"
+          ],
+          "trace_count": 2
+        },
+        {
+          "calls": 3,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+            "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+            "key": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed|crates/litchi-xlsx/src/cell_values/snapshot.rs|230",
+            "line": 230
+          },
+          "requested_bytes": 148992,
+          "runs": [
+            "h02-medium-one-edit-r1"
+          ],
+          "trace_count": 2
+        },
+        {
+          "calls": 2016,
+          "owner": {
+            "file": "src/raw/worksheet/validation.rs",
+            "function": "litchi_xlsx::raw::worksheet::validation::optional_bool",
+            "key": "litchi_xlsx::raw::worksheet::validation::optional_bool|src/raw/worksheet/validation.rs|265",
+            "line": 265
+          },
+          "requested_bytes": 129024,
+          "runs": [
+            "h02-medium-one-edit-r1"
+          ],
+          "trace_count": 28
+        }
+      ],
+      "repeat": 1,
+      "selected_exact_stage_timed": {
+        "calls": 81981,
+        "requested_bytes": 11847945,
+        "trace_count": 842
+      },
+      "shape": "medium",
+      "tag_totals": {
+        "allocator_growth_or_realloc": {
+          "calls": 53856,
+          "requested_bytes": 11814780,
+          "trace_count": 796
+        },
+        "copy_or_clone_mechanism": {
+          "calls": 67872,
+          "requested_bytes": 11295306,
+          "trace_count": 716
+        },
+        "duplicate_checking": {
+          "calls": 24336,
+          "requested_bytes": 1557888,
+          "trace_count": 98
+        },
+        "merge_backing_storage": {
+          "calls": 6930,
+          "requested_bytes": 1312863,
+          "trace_count": 10
+        },
+        "numeric_clone": {
+          "calls": 6921,
+          "requested_bytes": 32811,
+          "trace_count": 10
+        },
+        "numeric_construction": {
+          "calls": 6915,
+          "requested_bytes": 32805,
+          "trace_count": 4
+        },
+        "xml_lexical_or_parse": {
+          "calls": 60141,
+          "requested_bytes": 9077478,
+          "trace_count": 412
+        }
+      },
+      "top_allocation_sizes": [
+        {
+          "calls": 3,
+          "requested_bytes": 2752512,
+          "size_bytes": 917504
+        },
+        {
+          "calls": 6,
+          "requested_bytes": 2543616,
+          "size_bytes": 423936
+        },
+        {
+          "calls": 24408,
+          "requested_bytes": 1562112,
+          "size_bytes": 64
+        },
+        {
+          "calls": 3,
+          "requested_bytes": 1376256,
+          "size_bytes": 458752
+        },
+        {
+          "calls": 3,
+          "requested_bytes": 688128,
+          "size_bytes": 229376
+        },
+        {
+          "calls": 9,
+          "requested_bytes": 427968,
+          "size_bytes": 47552
+        },
+        {
+          "calls": 12,
+          "requested_bytes": 393216,
+          "size_bytes": 32768
+        },
+        {
+          "calls": 3,
+          "requested_bytes": 344064,
+          "size_bytes": 114688
+        },
+        {
+          "calls": 3,
+          "requested_bytes": 196608,
+          "size_bytes": 65536
+        },
+        {
+          "calls": 3,
+          "requested_bytes": 190266,
+          "size_bytes": 63422
+        }
+      ],
+      "top_selected_traces": [
+        {
+          "calls": 20,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell",
+              "line": 1587
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish",
+              "line": 1480
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::transition",
+              "line": 806
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+              "line": 1699
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+              "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+              "line": 408
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+              "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+              "line": 283
+            },
+            {
+              "file": "src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+              "line": 489
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+              "line": 249
+            }
+          ],
+          "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1587",
+          "requested_bytes": 3666432,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism",
+            "xml_lexical_or_parse"
+          ],
+          "trace_id": "99ac"
+        },
+        {
+          "calls": 10,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell",
+              "line": 1587
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish",
+              "line": 1480
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::transition",
+              "line": 806
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+              "line": 1699
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+              "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+              "line": 408
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+              "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+              "line": 283
+            },
+            {
+              "file": "src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+              "line": 489
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+              "line": 249
+            }
+          ],
+          "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1587",
+          "requested_bytes": 1833216,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism",
+            "xml_lexical_or_parse"
+          ],
+          "trace_id": "761c"
+        },
+        {
+          "calls": 2,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse",
+              "line": 654
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+              "line": 1715
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+              "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+              "line": 408
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+              "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+              "line": 283
+            },
+            {
+              "file": "src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+              "line": 489
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+              "line": 249
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/source.rs",
+              "function": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+              "line": 475
+            },
+            {
+              "file": "src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::stage_timed_commit",
+              "line": 387
+            }
+          ],
+          "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse|crates/litchi-xlsx/src/raw/worksheet/codec.rs|654",
+          "requested_bytes": 847872,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism",
+            "xml_lexical_or_parse"
+          ],
+          "trace_id": "99b6"
+        },
+        {
+          "calls": 2,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs",
+              "function": "litchi_xlsx::cell::Store::merge_omitted_cells",
+              "line": 915
+            },
+            {
+              "file": "src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::try_rewritten_value_cells",
+              "line": 856
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_value_source",
+              "line": 811
+            },
+            {
+              "file": "src/cell_values/source.rs",
+              "function": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+              "line": 1209
+            },
+            {
+              "file": "src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::stage_timed_commit",
+              "line": 398
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration",
+              "line": 428
+            },
+            {
+              "file": "src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::run_case",
+              "line": 654
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::run",
+              "line": 693
+            }
+          ],
+          "owner": "litchi_xlsx::cell::Store::merge_omitted_cells|crates/litchi-xlsx/src/cell.rs|915",
+          "requested_bytes": 847872,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism",
+            "merge_backing_storage"
+          ],
+          "trace_id": "9b1d"
+        },
+        {
+          "calls": 1,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse",
+              "line": 654
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+              "line": 1715
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+              "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+              "line": 408
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+              "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+              "line": 283
+            },
+            {
+              "file": "src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+              "line": 489
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+              "line": 249
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/source.rs",
+              "function": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+              "line": 475
+            },
+            {
+              "file": "src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::stage_timed_commit",
+              "line": 387
+            }
+          ],
+          "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse|crates/litchi-xlsx/src/raw/worksheet/codec.rs|654",
+          "requested_bytes": 423936,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism",
+            "xml_lexical_or_parse"
+          ],
+          "trace_id": "7626"
+        }
+      ],
+      "workload": "one-edit"
+    },
+    {
+      "id": "h03-medium-one-edit-r2",
+      "owners_ranked": [
+        {
+          "calls": 33,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+            "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell",
+            "key": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1587",
+            "line": 1587
+          },
+          "requested_bytes": 5502336,
+          "runs": [
+            "h03-medium-one-edit-r2"
+          ],
+          "trace_count": 4
+        },
+        {
+          "calls": 6,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+            "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse",
+            "key": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse|crates/litchi-xlsx/src/raw/worksheet/codec.rs|654",
+            "line": 654
+          },
+          "requested_bytes": 1274016,
+          "runs": [
+            "h03-medium-one-edit-r2"
+          ],
+          "trace_count": 4
+        },
+        {
+          "calls": 3,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/cell.rs",
+            "function": "litchi_xlsx::cell::Store::merge_omitted_cells",
+            "key": "litchi_xlsx::cell::Store::merge_omitted_cells|crates/litchi-xlsx/src/cell.rs|915",
+            "line": 915
+          },
+          "requested_bytes": 1271808,
+          "runs": [
+            "h03-medium-one-edit-r2"
+          ],
+          "trace_count": 2
+        },
+        {
+          "calls": 14181,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/cell_values/validation.rs",
+            "function": "litchi_xlsx::cell_values::validation::scan_attributes",
+            "key": "litchi_xlsx::cell_values::validation::scan_attributes|crates/litchi-xlsx/src/cell_values/validation.rs|489",
+            "line": 489
+          },
+          "requested_bytes": 907968,
+          "runs": [
+            "h03-medium-one-edit-r2"
+          ],
+          "trace_count": 32
+        },
+        {
+          "calls": 30,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+            "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+            "key": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected|crates/litchi-xlsx/src/cell_values/snapshot.rs|483",
+            "line": 483
+          },
+          "requested_bytes": 452463,
+          "runs": [
+            "h03-medium-one-edit-r2"
+          ],
+          "trace_count": 20
+        },
+        {
+          "calls": 6912,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+            "function": "litchi_xlsx::raw::worksheet::codec::scan_cell_attributes",
+            "key": "litchi_xlsx::raw::worksheet::codec::scan_cell_attributes|crates/litchi-xlsx/src/raw/worksheet/codec.rs|241",
+            "line": 241
+          },
+          "requested_bytes": 442368,
+          "runs": [
+            "h03-medium-one-edit-r2"
+          ],
+          "trace_count": 2
+        },
+        {
+          "calls": 33,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/facts.rs",
+            "function": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::facts::FactsBuilder::push_cell",
+            "key": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::facts::FactsBuilder::push_cell|crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/facts.rs|478",
+            "line": 478
+          },
+          "requested_bytes": 393024,
+          "runs": [
+            "h03-medium-one-edit-r2"
+          ],
+          "trace_count": 4
+        },
+        {
+          "calls": 39,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+            "function": "litchi_xlsx::cell_values::snapshot::load_source_catalog",
+            "key": "litchi_xlsx::cell_values::snapshot::load_source_catalog|crates/litchi-xlsx/src/cell_values/snapshot.rs|2338",
+            "line": 2338
+          },
+          "requested_bytes": 245196,
+          "runs": [
+            "h03-medium-one-edit-r2"
+          ],
+          "trace_count": 26
+        },
+        {
+          "calls": 30,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+            "function": "litchi_xlsx::cell_values::snapshot::capture_auxiliary_source",
+            "key": "litchi_xlsx::cell_values::snapshot::capture_auxiliary_source|crates/litchi-xlsx/src/cell_values/snapshot.rs|2506",
+            "line": 2506
+          },
+          "requested_bytes": 244764,
+          "runs": [
+            "h03-medium-one-edit-r2"
+          ],
+          "trace_count": 20
+        },
+        {
+          "calls": 3,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/edit/package.rs",
+            "function": "litchi_xlsx::raw::worksheet::edit::package::rewrite_from_facts",
+            "key": "litchi_xlsx::raw::worksheet::edit::package::rewrite_from_facts|crates/litchi-xlsx/src/raw/worksheet/edit/package.rs|428",
+            "line": 428
+          },
+          "requested_bytes": 190266,
+          "runs": [
+            "h03-medium-one-edit-r2"
+          ],
+          "trace_count": 2
+        },
+        {
+          "calls": 3,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+            "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+            "key": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed|crates/litchi-xlsx/src/cell_values/snapshot.rs|230",
+            "line": 230
+          },
+          "requested_bytes": 148992,
+          "runs": [
+            "h03-medium-one-edit-r2"
+          ],
+          "trace_count": 2
+        },
+        {
+          "calls": 2016,
+          "owner": {
+            "file": "src/raw/worksheet/validation.rs",
+            "function": "litchi_xlsx::raw::worksheet::validation::optional_bool",
+            "key": "litchi_xlsx::raw::worksheet::validation::optional_bool|src/raw/worksheet/validation.rs|265",
+            "line": 265
+          },
+          "requested_bytes": 129024,
+          "runs": [
+            "h03-medium-one-edit-r2"
+          ],
+          "trace_count": 28
+        }
+      ],
+      "repeat": 2,
+      "selected_exact_stage_timed": {
+        "calls": 81981,
+        "requested_bytes": 11847945,
+        "trace_count": 842
+      },
+      "shape": "medium",
+      "tag_totals": {
+        "allocator_growth_or_realloc": {
+          "calls": 53856,
+          "requested_bytes": 11814780,
+          "trace_count": 796
+        },
+        "copy_or_clone_mechanism": {
+          "calls": 67872,
+          "requested_bytes": 11295306,
+          "trace_count": 716
+        },
+        "duplicate_checking": {
+          "calls": 24336,
+          "requested_bytes": 1557888,
+          "trace_count": 98
+        },
+        "merge_backing_storage": {
+          "calls": 6930,
+          "requested_bytes": 1312863,
+          "trace_count": 10
+        },
+        "numeric_clone": {
+          "calls": 6921,
+          "requested_bytes": 32811,
+          "trace_count": 10
+        },
+        "numeric_construction": {
+          "calls": 6915,
+          "requested_bytes": 32805,
+          "trace_count": 4
+        },
+        "xml_lexical_or_parse": {
+          "calls": 60141,
+          "requested_bytes": 9077478,
+          "trace_count": 412
+        }
+      },
+      "top_allocation_sizes": [
+        {
+          "calls": 3,
+          "requested_bytes": 2752512,
+          "size_bytes": 917504
+        },
+        {
+          "calls": 6,
+          "requested_bytes": 2543616,
+          "size_bytes": 423936
+        },
+        {
+          "calls": 24408,
+          "requested_bytes": 1562112,
+          "size_bytes": 64
+        },
+        {
+          "calls": 3,
+          "requested_bytes": 1376256,
+          "size_bytes": 458752
+        },
+        {
+          "calls": 3,
+          "requested_bytes": 688128,
+          "size_bytes": 229376
+        },
+        {
+          "calls": 9,
+          "requested_bytes": 427968,
+          "size_bytes": 47552
+        },
+        {
+          "calls": 12,
+          "requested_bytes": 393216,
+          "size_bytes": 32768
+        },
+        {
+          "calls": 3,
+          "requested_bytes": 344064,
+          "size_bytes": 114688
+        },
+        {
+          "calls": 3,
+          "requested_bytes": 196608,
+          "size_bytes": 65536
+        },
+        {
+          "calls": 3,
+          "requested_bytes": 190266,
+          "size_bytes": 63422
+        }
+      ],
+      "top_selected_traces": [
+        {
+          "calls": 20,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell",
+              "line": 1587
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish",
+              "line": 1480
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::transition",
+              "line": 806
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+              "line": 1699
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+              "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+              "line": 408
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+              "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+              "line": 283
+            },
+            {
+              "file": "src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+              "line": 489
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+              "line": 249
+            }
+          ],
+          "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1587",
+          "requested_bytes": 3666432,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism",
+            "xml_lexical_or_parse"
+          ],
+          "trace_id": "99ac"
+        },
+        {
+          "calls": 10,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell",
+              "line": 1587
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish",
+              "line": 1480
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::transition",
+              "line": 806
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+              "line": 1699
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+              "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+              "line": 408
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+              "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+              "line": 283
+            },
+            {
+              "file": "src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+              "line": 489
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+              "line": 249
+            }
+          ],
+          "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1587",
+          "requested_bytes": 1833216,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism",
+            "xml_lexical_or_parse"
+          ],
+          "trace_id": "761c"
+        },
+        {
+          "calls": 2,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse",
+              "line": 654
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+              "line": 1715
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+              "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+              "line": 408
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+              "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+              "line": 283
+            },
+            {
+              "file": "src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+              "line": 489
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+              "line": 249
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/source.rs",
+              "function": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+              "line": 475
+            },
+            {
+              "file": "src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::stage_timed_commit",
+              "line": 387
+            }
+          ],
+          "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse|crates/litchi-xlsx/src/raw/worksheet/codec.rs|654",
+          "requested_bytes": 847872,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism",
+            "xml_lexical_or_parse"
+          ],
+          "trace_id": "99b6"
+        },
+        {
+          "calls": 2,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs",
+              "function": "litchi_xlsx::cell::Store::merge_omitted_cells",
+              "line": 915
+            },
+            {
+              "file": "src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::try_rewritten_value_cells",
+              "line": 856
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_value_source",
+              "line": 811
+            },
+            {
+              "file": "src/cell_values/source.rs",
+              "function": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+              "line": 1209
+            },
+            {
+              "file": "src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::stage_timed_commit",
+              "line": 398
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration",
+              "line": 428
+            },
+            {
+              "file": "src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::run_case",
+              "line": 654
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::run",
+              "line": 693
+            }
+          ],
+          "owner": "litchi_xlsx::cell::Store::merge_omitted_cells|crates/litchi-xlsx/src/cell.rs|915",
+          "requested_bytes": 847872,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism",
+            "merge_backing_storage"
+          ],
+          "trace_id": "9b1d"
+        },
+        {
+          "calls": 1,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse",
+              "line": 654
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+              "line": 1715
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+              "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+              "line": 408
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+              "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+              "line": 283
+            },
+            {
+              "file": "src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+              "line": 489
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+              "line": 249
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/source.rs",
+              "function": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+              "line": 475
+            },
+            {
+              "file": "src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::stage_timed_commit",
+              "line": 387
+            }
+          ],
+          "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse|crates/litchi-xlsx/src/raw/worksheet/codec.rs|654",
+          "requested_bytes": 423936,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism",
+            "xml_lexical_or_parse"
+          ],
+          "trace_id": "7626"
+        }
+      ],
+      "workload": "one-edit"
+    },
+    {
+      "id": "h04-dense-percent-r2",
+      "owners_ranked": [
+        {
+          "calls": 105,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+            "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell",
+            "key": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1587",
+            "line": 1587
+          },
+          "requested_bytes": 23901696,
+          "runs": [
+            "h04-dense-percent-r2"
+          ],
+          "trace_count": 4
+        },
+        {
+          "calls": 24,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+            "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse",
+            "key": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse|crates/litchi-xlsx/src/raw/worksheet/codec.rs|654",
+            "line": 654
+          },
+          "requested_bytes": 9922200,
+          "runs": [
+            "h04-dense-percent-r2"
+          ],
+          "trace_count": 4
+        },
+        {
+          "calls": 12,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/cell.rs",
+            "function": "litchi_xlsx::cell::Store::merge_omitted_cells",
+            "key": "litchi_xlsx::cell::Store::merge_omitted_cells|crates/litchi-xlsx/src/cell.rs|915",
+            "line": 915
+          },
+          "requested_bytes": 9821184,
+          "runs": [
+            "h04-dense-percent-r2"
+          ],
+          "trace_count": 2
+        },
+        {
+          "calls": 534,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/cell_values/source.rs",
+            "function": "litchi_xlsx::cell_values::source::MultiSourceEdit::apply_batch",
+            "key": "litchi_xlsx::cell_values::source::MultiSourceEdit::apply_batch|crates/litchi-xlsx/src/cell_values/source.rs|984",
+            "line": 984
+          },
+          "requested_bytes": 8586720,
+          "runs": [
+            "h04-dense-percent-r2"
+          ],
+          "trace_count": 2
+        },
+        {
+          "calls": 108744,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/cell_values/validation.rs",
+            "function": "litchi_xlsx::cell_values::validation::scan_attributes",
+            "key": "litchi_xlsx::cell_values::validation::scan_attributes|crates/litchi-xlsx/src/cell_values/validation.rs|489",
+            "line": 489
+          },
+          "requested_bytes": 6960576,
+          "runs": [
+            "h04-dense-percent-r2"
+          ],
+          "trace_count": 32
+        },
+        {
+          "calls": 53376,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+            "function": "litchi_xlsx::raw::worksheet::codec::scan_cell_attributes",
+            "key": "litchi_xlsx::raw::worksheet::codec::scan_cell_attributes|crates/litchi-xlsx/src/raw/worksheet/codec.rs|241",
+            "line": 241
+          },
+          "requested_bytes": 3416064,
+          "runs": [
+            "h04-dense-percent-r2"
+          ],
+          "trace_count": 2
+        },
+        {
+          "calls": 123,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+            "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+            "key": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected|crates/litchi-xlsx/src/cell_values/snapshot.rs|483",
+            "line": 483
+          },
+          "requested_bytes": 2652531,
+          "runs": [
+            "h04-dense-percent-r2"
+          ],
+          "trace_count": 22
+        },
+        {
+          "calls": 105,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/facts.rs",
+            "function": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::facts::FactsBuilder::push_cell",
+            "key": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::facts::FactsBuilder::push_cell|crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/facts.rs|478",
+            "line": 478
+          },
+          "requested_bytes": 1707264,
+          "runs": [
+            "h04-dense-percent-r2"
+          ],
+          "trace_count": 4
+        },
+        {
+          "calls": 12,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/edit/package.rs",
+            "function": "litchi_xlsx::raw::worksheet::edit::package::rewrite_from_facts",
+            "key": "litchi_xlsx::raw::worksheet::edit::package::rewrite_from_facts|crates/litchi-xlsx/src/raw/worksheet/edit/package.rs|428",
+            "line": 428
+          },
+          "requested_bytes": 1593651,
+          "runs": [
+            "h04-dense-percent-r2"
+          ],
+          "trace_count": 2
+        },
+        {
+          "calls": 12768,
+          "owner": {
+            "file": "src/raw/worksheet/validation.rs",
+            "function": "litchi_xlsx::raw::worksheet::validation::optional_bool",
+            "key": "litchi_xlsx::raw::worksheet::validation::optional_bool|src/raw/worksheet/validation.rs|265",
+            "line": 265
+          },
+          "requested_bytes": 817152,
+          "runs": [
+            "h04-dense-percent-r2"
+          ],
+          "trace_count": 28
+        },
+        {
+          "calls": 498,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs",
+            "function": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_sheet_data_from_facts",
+            "key": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_sheet_data_from_facts|crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs|226",
+            "line": 226
+          },
+          "requested_bytes": 555552,
+          "runs": [
+            "h04-dense-percent-r2"
+          ],
+          "trace_count": 10
+        },
+        {
+          "calls": 53376,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+            "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::push_text",
+            "key": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::push_text|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1453",
+            "line": 1453
+          },
+          "requested_bytes": 427008,
+          "runs": [
+            "h04-dense-percent-r2"
+          ],
+          "trace_count": 2
+        }
+      ],
+      "repeat": 2,
+      "selected_exact_stage_timed": {
+        "calls": 628254,
+        "requested_bytes": 73812219,
+        "trace_count": 870
+      },
+      "shape": "dense-sparse",
+      "tag_totals": {
+        "allocator_growth_or_realloc": {
+          "calls": 411549,
+          "requested_bytes": 73565700,
+          "trace_count": 822
+        },
+        "copy_or_clone_mechanism": {
+          "calls": 518784,
+          "requested_bytes": 71355495,
+          "trace_count": 722
+        },
+        "duplicate_checking": {
+          "calls": 182808,
+          "requested_bytes": 11700672,
+          "trace_count": 98
+        },
+        "merge_backing_storage": {
+          "calls": 52911,
+          "requested_bytes": 10128321,
+          "trace_count": 8
+        },
+        "numeric_clone": {
+          "calls": 54978,
+          "requested_bytes": 289953,
+          "trace_count": 10
+        },
+        "numeric_construction": {
+          "calls": 53910,
+          "requested_bytes": 284334,
+          "trace_count": 4
+        },
+        "xml_lexical_or_parse": {
+          "calls": 455739,
+          "requested_bytes": 48673917,
+          "trace_count": 406
+        }
+      },
+      "top_allocation_sizes": [
+        {
+          "calls": 6,
+          "requested_bytes": 18087936,
+          "size_bytes": 3014656
+        },
+        {
+          "calls": 184017,
+          "requested_bytes": 11777088,
+          "size_bytes": 64
+        },
+        {
+          "calls": 3,
+          "requested_bytes": 11010048,
+          "size_bytes": 3670016
+        },
+        {
+          "calls": 3,
+          "requested_bytes": 5505024,
+          "size_bytes": 1835008
+        },
+        {
+          "calls": 3,
+          "requested_bytes": 2752512,
+          "size_bytes": 917504
+        },
+        {
+          "calls": 3,
+          "requested_bytes": 1450680,
+          "size_bytes": 483560
+        },
+        {
+          "calls": 3,
+          "requested_bytes": 1387707,
+          "size_bytes": 462569
+        },
+        {
+          "calls": 6,
+          "requested_bytes": 1376256,
+          "size_bytes": 229376
+        },
+        {
+          "calls": 3,
+          "requested_bytes": 1376256,
+          "size_bytes": 458752
+        },
+        {
+          "calls": 6,
+          "requested_bytes": 1130496,
+          "size_bytes": 188416
+        }
+      ],
+      "top_selected_traces": [
+        {
+          "calls": 62,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell",
+              "line": 1587
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish",
+              "line": 1480
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::transition",
+              "line": 806
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+              "line": 1699
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+              "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+              "line": 408
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+              "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+              "line": 283
+            },
+            {
+              "file": "src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+              "line": 489
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+              "line": 249
+            }
+          ],
+          "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1587",
+          "requested_bytes": 15927296,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism",
+            "xml_lexical_or_parse"
+          ],
+          "trace_id": "9b07"
+        },
+        {
+          "calls": 31,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell",
+              "line": 1587
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish",
+              "line": 1480
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::transition",
+              "line": 806
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+              "line": 1699
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+              "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+              "line": 408
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+              "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+              "line": 283
+            },
+            {
+              "file": "src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+              "line": 489
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+              "line": 249
+            }
+          ],
+          "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1587",
+          "requested_bytes": 7963648,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism",
+            "xml_lexical_or_parse"
+          ],
+          "trace_id": "7743"
+        },
+        {
+          "calls": 8,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse",
+              "line": 654
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+              "line": 1715
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+              "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+              "line": 408
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+              "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+              "line": 283
+            },
+            {
+              "file": "src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+              "line": 489
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+              "line": 249
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/source.rs",
+              "function": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+              "line": 475
+            },
+            {
+              "file": "src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::stage_timed_commit",
+              "line": 387
+            }
+          ],
+          "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse|crates/litchi-xlsx/src/raw/worksheet/codec.rs|654",
+          "requested_bytes": 6547456,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism",
+            "xml_lexical_or_parse"
+          ],
+          "trace_id": "9b11"
+        },
+        {
+          "calls": 8,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs",
+              "function": "litchi_xlsx::cell::Store::merge_omitted_cells",
+              "line": 915
+            },
+            {
+              "file": "src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::try_rewritten_value_cells",
+              "line": 856
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_value_source",
+              "line": 811
+            },
+            {
+              "file": "src/cell_values/source.rs",
+              "function": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+              "line": 1209
+            },
+            {
+              "file": "src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::stage_timed_commit",
+              "line": 398
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration",
+              "line": 428
+            },
+            {
+              "file": "src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::run_case",
+              "line": 654
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::run",
+              "line": 693
+            }
+          ],
+          "owner": "litchi_xlsx::cell::Store::merge_omitted_cells|crates/litchi-xlsx/src/cell.rs|915",
+          "requested_bytes": 6547456,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism",
+            "merge_backing_storage"
+          ],
+          "trace_id": "9c86"
+        },
+        {
+          "calls": 356,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/source.rs",
+              "function": "litchi_xlsx::cell_values::source::MultiSourceEdit::apply_batch",
+              "line": 984
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/source.rs",
+              "function": "litchi_xlsx::cell_values::source::MultiSourceEdit::set",
+              "line": 936
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::stage_timed_commit",
+              "line": 389
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration",
+              "line": 428
+            },
+            {
+              "file": "src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::run_case",
+              "line": 654
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::run",
+              "line": 693
+            },
+            {
+              "file": "src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::benchmark",
+              "line": 744
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/lib.rs",
+              "function": "litchi_perf_baseline::benchmark_xlsx_managed_compression",
+              "line": 10327
+            }
+          ],
+          "owner": "litchi_xlsx::cell_values::source::MultiSourceEdit::apply_batch|crates/litchi-xlsx/src/cell_values/source.rs|984",
+          "requested_bytes": 5724480,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism"
+          ],
+          "trace_id": "9b3f"
+        }
+      ],
+      "workload": "one-percent"
+    },
+    {
+      "id": "h05-medium-percent-r2",
+      "owners_ranked": [
+        {
+          "calls": 132,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+            "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell",
+            "key": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1587",
+            "line": 1587
+          },
+          "requested_bytes": 22009344,
+          "runs": [
+            "h05-medium-percent-r2"
+          ],
+          "trace_count": 4
+        },
+        {
+          "calls": 279,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/cell_values/source.rs",
+            "function": "litchi_xlsx::cell_values::source::MultiSourceEdit::apply_batch",
+            "key": "litchi_xlsx::cell_values::source::MultiSourceEdit::apply_batch|crates/litchi-xlsx/src/cell_values/source.rs|984",
+            "line": 984
+          },
+          "requested_bytes": 5624640,
+          "runs": [
+            "h05-medium-percent-r2"
+          ],
+          "trace_count": 2
+        },
+        {
+          "calls": 24,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+            "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse",
+            "key": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse|crates/litchi-xlsx/src/raw/worksheet/codec.rs|654",
+            "line": 654
+          },
+          "requested_bytes": 5138568,
+          "runs": [
+            "h05-medium-percent-r2"
+          ],
+          "trace_count": 4
+        },
+        {
+          "calls": 12,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/cell.rs",
+            "function": "litchi_xlsx::cell::Store::merge_omitted_cells",
+            "key": "litchi_xlsx::cell::Store::merge_omitted_cells|crates/litchi-xlsx/src/cell.rs|915",
+            "line": 915
+          },
+          "requested_bytes": 5087232,
+          "runs": [
+            "h05-medium-percent-r2"
+          ],
+          "trace_count": 2
+        },
+        {
+          "calls": 56616,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/cell_values/validation.rs",
+            "function": "litchi_xlsx::cell_values::validation::scan_attributes",
+            "key": "litchi_xlsx::cell_values::validation::scan_attributes|crates/litchi-xlsx/src/cell_values/validation.rs|489",
+            "line": 489
+          },
+          "requested_bytes": 3624384,
+          "runs": [
+            "h05-medium-percent-r2"
+          ],
+          "trace_count": 32
+        },
+        {
+          "calls": 123,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+            "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+            "key": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected|crates/litchi-xlsx/src/cell_values/snapshot.rs|483",
+            "line": 483
+          },
+          "requested_bytes": 1857204,
+          "runs": [
+            "h05-medium-percent-r2"
+          ],
+          "trace_count": 22
+        },
+        {
+          "calls": 27648,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+            "function": "litchi_xlsx::raw::worksheet::codec::scan_cell_attributes",
+            "key": "litchi_xlsx::raw::worksheet::codec::scan_cell_attributes|crates/litchi-xlsx/src/raw/worksheet/codec.rs|241",
+            "line": 241
+          },
+          "requested_bytes": 1769472,
+          "runs": [
+            "h05-medium-percent-r2"
+          ],
+          "trace_count": 2
+        },
+        {
+          "calls": 132,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/facts.rs",
+            "function": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::facts::FactsBuilder::push_cell",
+            "key": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::facts::FactsBuilder::push_cell|crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/facts.rs|478",
+            "line": 478
+          },
+          "requested_bytes": 1572096,
+          "runs": [
+            "h05-medium-percent-r2"
+          ],
+          "trace_count": 4
+        },
+        {
+          "calls": 12,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/edit/package.rs",
+            "function": "litchi_xlsx::raw::worksheet::edit::package::rewrite_from_facts",
+            "key": "litchi_xlsx::raw::worksheet::edit::package::rewrite_from_facts|crates/litchi-xlsx/src/raw/worksheet/edit/package.rs|428",
+            "line": 428
+          },
+          "requested_bytes": 841986,
+          "runs": [
+            "h05-medium-percent-r2"
+          ],
+          "trace_count": 2
+        },
+        {
+          "calls": 8064,
+          "owner": {
+            "file": "src/raw/worksheet/validation.rs",
+            "function": "litchi_xlsx::raw::worksheet::validation::optional_bool",
+            "key": "litchi_xlsx::raw::worksheet::validation::optional_bool|src/raw/worksheet/validation.rs|265",
+            "line": 265
+          },
+          "requested_bytes": 516096,
+          "runs": [
+            "h05-medium-percent-r2"
+          ],
+          "trace_count": 28
+        },
+        {
+          "calls": 12,
+          "owner": {
+            "file": "src/raw/worksheet/edit/codec/snapshot/facts.rs",
+            "function": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::facts::FactsBuilder::finish",
+            "key": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::facts::FactsBuilder::finish|src/raw/worksheet/edit/codec/snapshot/facts.rs|539",
+            "line": 539
+          },
+          "requested_bytes": 442368,
+          "runs": [
+            "h05-medium-percent-r2"
+          ],
+          "trace_count": 2
+        },
+        {
+          "calls": 327,
+          "owner": {
+            "file": "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs",
+            "function": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_sheet_data_from_facts",
+            "key": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_sheet_data_from_facts|crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs|226",
+            "line": 226
+          },
+          "requested_bytes": 364704,
+          "runs": [
+            "h05-medium-percent-r2"
+          ],
+          "trace_count": 8
+        }
+      ],
+      "repeat": 2,
+      "selected_exact_stage_timed": {
+        "calls": 330372,
+        "requested_bytes": 51500040,
+        "trace_count": 868
+      },
+      "shape": "medium",
+      "tag_totals": {
+        "allocator_growth_or_realloc": {
+          "calls": 217758,
+          "requested_bytes": 51368688,
+          "trace_count": 820
+        },
+        "copy_or_clone_mechanism": {
+          "calls": 273384,
+          "requested_bytes": 49687695,
+          "trace_count": 726
+        },
+        "duplicate_checking": {
+          "calls": 97305,
+          "requested_bytes": 6228480,
+          "trace_count": 98
+        },
+        "merge_backing_storage": {
+          "calls": 27453,
+          "requested_bytes": 5296425,
+          "trace_count": 10
+        },
+        "numeric_clone": {
+          "calls": 28485,
+          "requested_bytes": 183309,
+          "trace_count": 10
+        },
+        "numeric_construction": {
+          "calls": 27927,
+          "requested_bytes": 179739,
+          "trace_count": 4
+        },
+        "xml_lexical_or_parse": {
+          "calls": 239937,
+          "requested_bytes": 36312642,
+          "trace_count": 412
+        }
+      },
+      "top_allocation_sizes": [
+        {
+          "calls": 12,
+          "requested_bytes": 11010048,
+          "size_bytes": 917504
+        },
+        {
+          "calls": 24,
+          "requested_bytes": 10174464,
+          "size_bytes": 423936
+        },
+        {
+          "calls": 98001,
+          "requested_bytes": 6272064,
+          "size_bytes": 64
+        },
+        {
+          "calls": 12,
+          "requested_bytes": 5505024,
+          "size_bytes": 458752
+        },
+        {
+          "calls": 12,
+          "requested_bytes": 2752512,
+          "size_bytes": 229376
+        },
+        {
+          "calls": 12,
+          "requested_bytes": 1376256,
+          "size_bytes": 114688
+        },
+        {
+          "calls": 30,
+          "requested_bytes": 983040,
+          "size_bytes": 32768
+        },
+        {
+          "calls": 18,
+          "requested_bytes": 855936,
+          "size_bytes": 47552
+        },
+        {
+          "calls": 12,
+          "requested_bytes": 786432,
+          "size_bytes": 65536
+        },
+        {
+          "calls": 12,
+          "requested_bytes": 688128,
+          "size_bytes": 57344
+        }
+      ],
+      "top_selected_traces": [
+        {
+          "calls": 80,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell",
+              "line": 1587
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish",
+              "line": 1480
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::transition",
+              "line": 806
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+              "line": 1699
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+              "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+              "line": 408
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+              "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+              "line": 283
+            },
+            {
+              "file": "src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+              "line": 489
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+              "line": 249
+            }
+          ],
+          "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1587",
+          "requested_bytes": 14665728,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism",
+            "xml_lexical_or_parse"
+          ],
+          "trace_id": "9a2e"
+        },
+        {
+          "calls": 40,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell",
+              "line": 1587
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish",
+              "line": 1480
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::transition",
+              "line": 806
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+              "line": 1699
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+              "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+              "line": 408
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+              "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+              "line": 283
+            },
+            {
+              "file": "src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+              "line": 489
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+              "line": 249
+            }
+          ],
+          "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1587",
+          "requested_bytes": 7332864,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism",
+            "xml_lexical_or_parse"
+          ],
+          "trace_id": "7674"
+        },
+        {
+          "calls": 186,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/source.rs",
+              "function": "litchi_xlsx::cell_values::source::MultiSourceEdit::apply_batch",
+              "line": 984
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/source.rs",
+              "function": "litchi_xlsx::cell_values::source::MultiSourceEdit::set",
+              "line": 936
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::stage_timed_commit",
+              "line": 389
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration",
+              "line": 428
+            },
+            {
+              "file": "src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::run_case",
+              "line": 654
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::run",
+              "line": 693
+            },
+            {
+              "file": "src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::benchmark",
+              "line": 744
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/lib.rs",
+              "function": "litchi_perf_baseline::benchmark_xlsx_managed_compression",
+              "line": 10327
+            }
+          ],
+          "owner": "litchi_xlsx::cell_values::source::MultiSourceEdit::apply_batch|crates/litchi-xlsx/src/cell_values/source.rs|984",
+          "requested_bytes": 3749760,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism"
+          ],
+          "trace_id": "9a6c"
+        },
+        {
+          "calls": 8,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse",
+              "line": 654
+            },
+            {
+              "file": "src/raw/worksheet/codec.rs",
+              "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+              "line": 1715
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+              "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+              "line": 408
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+              "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+              "line": 283
+            },
+            {
+              "file": "src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+              "line": 489
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+              "line": 249
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/source.rs",
+              "function": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+              "line": 475
+            },
+            {
+              "file": "src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::stage_timed_commit",
+              "line": 387
+            }
+          ],
+          "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse|crates/litchi-xlsx/src/raw/worksheet/codec.rs|654",
+          "requested_bytes": 3391488,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism",
+            "xml_lexical_or_parse"
+          ],
+          "trace_id": "9a38"
+        },
+        {
+          "calls": 8,
+          "meaningful_frames": [
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs",
+              "function": "litchi_xlsx::cell::Store::merge_omitted_cells",
+              "line": 915
+            },
+            {
+              "file": "src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::try_rewritten_value_cells",
+              "line": 856
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+              "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_value_source",
+              "line": 811
+            },
+            {
+              "file": "src/cell_values/source.rs",
+              "function": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+              "line": 1209
+            },
+            {
+              "file": "src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::stage_timed_commit",
+              "line": 398
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration",
+              "line": 428
+            },
+            {
+              "file": "src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::run_case",
+              "line": 654
+            },
+            {
+              "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+              "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::run",
+              "line": 693
+            }
+          ],
+          "owner": "litchi_xlsx::cell::Store::merge_omitted_cells|crates/litchi-xlsx/src/cell.rs|915",
+          "requested_bytes": 3391488,
+          "tags": [
+            "allocator_growth_or_realloc",
+            "copy_or_clone_mechanism",
+            "merge_backing_storage"
+          ],
+          "trace_id": "9bb1"
+        }
+      ],
+      "workload": "one-percent"
+    }
+  ],
+  "reference_analysis": {
+    "bytes": 102361,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0958/analysis-v1/attribute-v3.json",
+    "sha256": "9fb5ae3b1b484e2fc8294c66d4712d8f818c1aed60a974fbe51bcd03173cf983"
+  },
+  "schema": "litchi.performance.0959.semantic-owner-ranking-summary.v3",
+  "selection": {
+    "exact_callsites": [
+      "stage_timed_commit",
+      "timed_iteration"
+    ],
+    "surrogate_policy": "MultiSourceEdit::commit is a reported semantic owner/tag when present but is not a selection surrogate",
+    "unknown_policy": "unknown_any_frame/unknown_leaf_frame rows are unqualified"
+  },
+  "status": "pass",
+  "top_selected_traces": [
+    {
+      "calls": 62,
+      "meaningful_frames": [
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell",
+          "line": 1587
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish",
+          "line": 1480
+        },
+        {
+          "file": "src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::transition",
+          "line": 806
+        },
+        {
+          "file": "src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+          "line": 1699
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+          "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+          "line": 408
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+          "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+          "line": 283
+        },
+        {
+          "file": "src/cell_values/snapshot.rs",
+          "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+          "line": 489
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+          "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+          "line": 249
+        }
+      ],
+      "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1587",
+      "requested_bytes": 15927296,
+      "run": "h01-dense-percent-r1",
+      "tags": [
+        "allocator_growth_or_realloc",
+        "copy_or_clone_mechanism",
+        "xml_lexical_or_parse"
+      ],
+      "trace_id": "9b07"
+    },
+    {
+      "calls": 62,
+      "meaningful_frames": [
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell",
+          "line": 1587
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish",
+          "line": 1480
+        },
+        {
+          "file": "src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::transition",
+          "line": 806
+        },
+        {
+          "file": "src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+          "line": 1699
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+          "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+          "line": 408
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+          "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+          "line": 283
+        },
+        {
+          "file": "src/cell_values/snapshot.rs",
+          "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+          "line": 489
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+          "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+          "line": 249
+        }
+      ],
+      "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1587",
+      "requested_bytes": 15927296,
+      "run": "h04-dense-percent-r2",
+      "tags": [
+        "allocator_growth_or_realloc",
+        "copy_or_clone_mechanism",
+        "xml_lexical_or_parse"
+      ],
+      "trace_id": "9b07"
+    },
+    {
+      "calls": 80,
+      "meaningful_frames": [
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell",
+          "line": 1587
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish",
+          "line": 1480
+        },
+        {
+          "file": "src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::transition",
+          "line": 806
+        },
+        {
+          "file": "src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+          "line": 1699
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+          "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+          "line": 408
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+          "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+          "line": 283
+        },
+        {
+          "file": "src/cell_values/snapshot.rs",
+          "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+          "line": 489
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+          "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+          "line": 249
+        }
+      ],
+      "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1587",
+      "requested_bytes": 14665728,
+      "run": "h00-medium-percent-r1",
+      "tags": [
+        "allocator_growth_or_realloc",
+        "copy_or_clone_mechanism",
+        "xml_lexical_or_parse"
+      ],
+      "trace_id": "9a2e"
+    },
+    {
+      "calls": 80,
+      "meaningful_frames": [
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell",
+          "line": 1587
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish",
+          "line": 1480
+        },
+        {
+          "file": "src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::transition",
+          "line": 806
+        },
+        {
+          "file": "src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+          "line": 1699
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+          "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+          "line": 408
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+          "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+          "line": 283
+        },
+        {
+          "file": "src/cell_values/snapshot.rs",
+          "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+          "line": 489
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+          "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+          "line": 249
+        }
+      ],
+      "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1587",
+      "requested_bytes": 14665728,
+      "run": "h05-medium-percent-r2",
+      "tags": [
+        "allocator_growth_or_realloc",
+        "copy_or_clone_mechanism",
+        "xml_lexical_or_parse"
+      ],
+      "trace_id": "9a2e"
+    },
+    {
+      "calls": 31,
+      "meaningful_frames": [
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell",
+          "line": 1587
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish",
+          "line": 1480
+        },
+        {
+          "file": "src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::transition",
+          "line": 806
+        },
+        {
+          "file": "src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+          "line": 1699
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+          "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+          "line": 408
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+          "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+          "line": 283
+        },
+        {
+          "file": "src/cell_values/snapshot.rs",
+          "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+          "line": 489
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+          "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+          "line": 249
+        }
+      ],
+      "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1587",
+      "requested_bytes": 7963648,
+      "run": "h01-dense-percent-r1",
+      "tags": [
+        "allocator_growth_or_realloc",
+        "copy_or_clone_mechanism",
+        "xml_lexical_or_parse"
+      ],
+      "trace_id": "7743"
+    },
+    {
+      "calls": 31,
+      "meaningful_frames": [
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell",
+          "line": 1587
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish",
+          "line": 1480
+        },
+        {
+          "file": "src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::transition",
+          "line": 806
+        },
+        {
+          "file": "src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+          "line": 1699
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+          "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+          "line": 408
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+          "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+          "line": 283
+        },
+        {
+          "file": "src/cell_values/snapshot.rs",
+          "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+          "line": 489
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+          "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+          "line": 249
+        }
+      ],
+      "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1587",
+      "requested_bytes": 7963648,
+      "run": "h04-dense-percent-r2",
+      "tags": [
+        "allocator_growth_or_realloc",
+        "copy_or_clone_mechanism",
+        "xml_lexical_or_parse"
+      ],
+      "trace_id": "7743"
+    },
+    {
+      "calls": 40,
+      "meaningful_frames": [
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell",
+          "line": 1587
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish",
+          "line": 1480
+        },
+        {
+          "file": "src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::transition",
+          "line": 806
+        },
+        {
+          "file": "src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+          "line": 1699
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+          "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+          "line": 408
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+          "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+          "line": 283
+        },
+        {
+          "file": "src/cell_values/snapshot.rs",
+          "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+          "line": 489
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+          "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+          "line": 249
+        }
+      ],
+      "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1587",
+      "requested_bytes": 7332864,
+      "run": "h00-medium-percent-r1",
+      "tags": [
+        "allocator_growth_or_realloc",
+        "copy_or_clone_mechanism",
+        "xml_lexical_or_parse"
+      ],
+      "trace_id": "7674"
+    },
+    {
+      "calls": 40,
+      "meaningful_frames": [
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell",
+          "line": 1587
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish",
+          "line": 1480
+        },
+        {
+          "file": "src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::transition",
+          "line": 806
+        },
+        {
+          "file": "src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+          "line": 1699
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+          "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+          "line": 408
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+          "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+          "line": 283
+        },
+        {
+          "file": "src/cell_values/snapshot.rs",
+          "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+          "line": 489
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+          "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+          "line": 249
+        }
+      ],
+      "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_cell|crates/litchi-xlsx/src/raw/worksheet/codec.rs|1587",
+      "requested_bytes": 7332864,
+      "run": "h05-medium-percent-r2",
+      "tags": [
+        "allocator_growth_or_realloc",
+        "copy_or_clone_mechanism",
+        "xml_lexical_or_parse"
+      ],
+      "trace_id": "7674"
+    },
+    {
+      "calls": 8,
+      "meaningful_frames": [
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse",
+          "line": 654
+        },
+        {
+          "file": "src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+          "line": 1715
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+          "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+          "line": 408
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+          "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+          "line": 283
+        },
+        {
+          "file": "src/cell_values/snapshot.rs",
+          "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+          "line": 489
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+          "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+          "line": 249
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/source.rs",
+          "function": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+          "line": 475
+        },
+        {
+          "file": "src/xlsx_managed_compression_benchmark.rs",
+          "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::stage_timed_commit",
+          "line": 387
+        }
+      ],
+      "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse|crates/litchi-xlsx/src/raw/worksheet/codec.rs|654",
+      "requested_bytes": 6547456,
+      "run": "h01-dense-percent-r1",
+      "tags": [
+        "allocator_growth_or_realloc",
+        "copy_or_clone_mechanism",
+        "xml_lexical_or_parse"
+      ],
+      "trace_id": "9b11"
+    },
+    {
+      "calls": 8,
+      "meaningful_frames": [
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs",
+          "function": "litchi_xlsx::cell::Store::merge_omitted_cells",
+          "line": 915
+        },
+        {
+          "file": "src/cell_values/snapshot.rs",
+          "function": "litchi_xlsx::cell_values::snapshot::Snapshot::try_rewritten_value_cells",
+          "line": 856
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+          "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_value_source",
+          "line": 811
+        },
+        {
+          "file": "src/cell_values/source.rs",
+          "function": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+          "line": 1209
+        },
+        {
+          "file": "src/xlsx_managed_compression_benchmark.rs",
+          "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::stage_timed_commit",
+          "line": 398
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+          "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration",
+          "line": 428
+        },
+        {
+          "file": "src/xlsx_managed_compression_benchmark.rs",
+          "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::run_case",
+          "line": 654
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+          "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::run",
+          "line": 693
+        }
+      ],
+      "owner": "litchi_xlsx::cell::Store::merge_omitted_cells|crates/litchi-xlsx/src/cell.rs|915",
+      "requested_bytes": 6547456,
+      "run": "h01-dense-percent-r1",
+      "tags": [
+        "allocator_growth_or_realloc",
+        "copy_or_clone_mechanism",
+        "merge_backing_storage"
+      ],
+      "trace_id": "9c86"
+    },
+    {
+      "calls": 8,
+      "meaningful_frames": [
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse",
+          "line": 654
+        },
+        {
+          "file": "src/raw/worksheet/codec.rs",
+          "function": "litchi_xlsx::raw::worksheet::codec::parse_source_with_observer",
+          "line": 1715
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+          "function": "litchi_xlsx::raw::worksheet::parse_source_with_observer",
+          "line": 408
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/validation.rs",
+          "function": "litchi_xlsx::cell_values::validation::worksheet_xml_and_parse_source",
+          "line": 283
+        },
+        {
+          "file": "src/cell_values/snapshot.rs",
+          "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected",
+          "line": 489
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+          "function": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+          "line": 249
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/source.rs",
+          "function": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+          "line": 475
+        },
+        {
+          "file": "src/xlsx_managed_compression_benchmark.rs",
+          "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::stage_timed_commit",
+          "line": 387
+        }
+      ],
+      "owner": "litchi_xlsx::raw::worksheet::codec::_$LT$impl$u20$litchi_xlsx..raw..worksheet..model..Parser$GT$::finish_parse|crates/litchi-xlsx/src/raw/worksheet/codec.rs|654",
+      "requested_bytes": 6547456,
+      "run": "h04-dense-percent-r2",
+      "tags": [
+        "allocator_growth_or_realloc",
+        "copy_or_clone_mechanism",
+        "xml_lexical_or_parse"
+      ],
+      "trace_id": "9b11"
+    },
+    {
+      "calls": 8,
+      "meaningful_frames": [
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell.rs",
+          "function": "litchi_xlsx::cell::Store::merge_omitted_cells",
+          "line": 915
+        },
+        {
+          "file": "src/cell_values/snapshot.rs",
+          "function": "litchi_xlsx::cell_values::snapshot::Snapshot::try_rewritten_value_cells",
+          "line": 856
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/crates/litchi-xlsx/src/cell_values/snapshot.rs",
+          "function": "litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_value_source",
+          "line": 811
+        },
+        {
+          "file": "src/cell_values/source.rs",
+          "function": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+          "line": 1209
+        },
+        {
+          "file": "src/xlsx_managed_compression_benchmark.rs",
+          "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::stage_timed_commit",
+          "line": 398
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+          "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::timed_iteration",
+          "line": 428
+        },
+        {
+          "file": "src/xlsx_managed_compression_benchmark.rs",
+          "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::run_case",
+          "line": 654
+        },
+        {
+          "file": "/home/zhuhe/litchi-performance-0957/source-v1/tools/perf-baseline/src/xlsx_managed_compression_benchmark.rs",
+          "function": "litchi_perf_baseline::xlsx_managed_compression::benchmark::run",
+          "line": 693
+        }
+      ],
+      "owner": "litchi_xlsx::cell::Store::merge_omitted_cells|crates/litchi-xlsx/src/cell.rs|915",
+      "requested_bytes": 6547456,
+      "run": "h04-dense-percent-r2",
+      "tags": [
+        "allocator_growth_or_realloc",
+        "copy_or_clone_mechanism",
+        "merge_backing_storage"
+      ],
+      "trace_id": "9c86"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "previous_helper": {
+    "note": "the previous helper bytes are preserved only by the v2 receipt hash",
+    "path": "/home/zhuhe/litchi-performance-0959/tools/rank_0959_v1.py"
+  },
+  "reason": "v2 used token-substring callsite matching; v3 requires the fully qualified litchi_perf_baseline benchmark function prefix for both stage_timed_commit and timed_iteration",
+  "schema": "litchi.performance.0959.callsite-selection-correction.v1",
+  "status": "superseded-by-v3",
+  "v2_report": {
+    "bytes": 623430,
+    "path": "/home/zhuhe/litchi-performance-0959/analysis/owner-ranking-v2.json",
+    "sha256": "d7c61c1cb7a21e4b26ba12ca25a131d4249cf2da260d9ace2fd9e9ac80b1e3fa"
+  }
+}

@@ -1,0 +1,734 @@
+{
+  "capture_terminal": {
+    "bytes": 576,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/capture-terminal.json",
+    "sha256": "b3876c4924f2aa88bbfab78a65e1522ec5227c5560efa5a2cd386cb4d2d8e8ab"
+  },
+  "children": [
+    {
+      "child_id": "native__medium-one-percent__b00__p0",
+      "validation": {
+        "bytes": 1673,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-percent__b00__p0/validation.json",
+        "sha256": "5231ed37aa306105a257b9eece296f7859044c7b33614f633c326c35c0b808ee"
+      }
+    },
+    {
+      "child_id": "native__medium-one-percent__b00__p1",
+      "validation": {
+        "bytes": 1675,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-percent__b00__p1/validation.json",
+        "sha256": "38388905bf7cbe661aed73d937b7d0e9e483073947b539139e52bc39091e9a0d"
+      }
+    },
+    {
+      "child_id": "native__medium-one-percent__b00__p2",
+      "validation": {
+        "bytes": 1674,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-percent__b00__p2/validation.json",
+        "sha256": "97cf60471eeeccd3b01d85357252106e6e9c33213ce36aa99f2f38a1be1065c2"
+      }
+    },
+    {
+      "child_id": "native__medium-one-percent__b00__p3",
+      "validation": {
+        "bytes": 1673,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-percent__b00__p3/validation.json",
+        "sha256": "060dcfe81fd0513fe5bc64d2d0b2d7ec4cc19d1532708dc0b4a444426ac67f99"
+      }
+    },
+    {
+      "child_id": "native__medium-one-percent__b01__p0",
+      "validation": {
+        "bytes": 1675,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-percent__b01__p0/validation.json",
+        "sha256": "ad2001a123567cbc114679434e3f71fca5ec8cb8026e049a0191705bbda2d69d"
+      }
+    },
+    {
+      "child_id": "native__medium-one-percent__b01__p1",
+      "validation": {
+        "bytes": 1673,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-percent__b01__p1/validation.json",
+        "sha256": "0f98dafd671d7ca483ccffbab9f9889f4122a29d90f9218c73e8d77b80f77d72"
+      }
+    },
+    {
+      "child_id": "native__medium-one-percent__b01__p2",
+      "validation": {
+        "bytes": 1672,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-percent__b01__p2/validation.json",
+        "sha256": "ca7de54e6a5c8309c4ba1262580da003f88b249a440e249e40934aee242ea970"
+      }
+    },
+    {
+      "child_id": "native__medium-one-percent__b01__p3",
+      "validation": {
+        "bytes": 1675,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-percent__b01__p3/validation.json",
+        "sha256": "271c95c7f7fe4289cdaabb34ee5db506c81cc874aa9f765d97059123b43c1983"
+      }
+    },
+    {
+      "child_id": "native__medium-one-percent__b02__p0",
+      "validation": {
+        "bytes": 1673,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-percent__b02__p0/validation.json",
+        "sha256": "be0e579eac5711feba7fb0808c20d4890de33b80d84238ff6225b7b0437b915b"
+      }
+    },
+    {
+      "child_id": "native__medium-one-percent__b02__p1",
+      "validation": {
+        "bytes": 1675,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-percent__b02__p1/validation.json",
+        "sha256": "fb000a39b52698a7f78ca481954a4022263a9682a36a951a7a1dbbaec7166eca"
+      }
+    },
+    {
+      "child_id": "native__medium-one-percent__b02__p2",
+      "validation": {
+        "bytes": 1676,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-percent__b02__p2/validation.json",
+        "sha256": "863e9623368f29117cefe106715d2138287ff28879fc0ab8a3ed932cf2666666"
+      }
+    },
+    {
+      "child_id": "native__medium-one-percent__b02__p3",
+      "validation": {
+        "bytes": 1674,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-percent__b02__p3/validation.json",
+        "sha256": "56b9de067531052b5291c939c89c053dd82d30755dfb46fbd8ce7978b8fcf334"
+      }
+    },
+    {
+      "child_id": "native__medium-one-percent__b03__p0",
+      "validation": {
+        "bytes": 1676,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-percent__b03__p0/validation.json",
+        "sha256": "d111b8bbc7d931d65275425e87ca81d39684a3b616e5b5b3b8d588b9d76fd811"
+      }
+    },
+    {
+      "child_id": "native__medium-one-percent__b03__p1",
+      "validation": {
+        "bytes": 1674,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-percent__b03__p1/validation.json",
+        "sha256": "cc20af28c8b0465f993ce5d162bf47d23f41531c948e95d613aa72ee1b670bc4"
+      }
+    },
+    {
+      "child_id": "native__medium-one-percent__b03__p2",
+      "validation": {
+        "bytes": 1674,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-percent__b03__p2/validation.json",
+        "sha256": "6f76ea77e8fb277ee54d60a64858ce2b3001022a3a9c31ad7ee982eb685c9008"
+      }
+    },
+    {
+      "child_id": "native__medium-one-percent__b03__p3",
+      "validation": {
+        "bytes": 1675,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-percent__b03__p3/validation.json",
+        "sha256": "65bb5ff093c1903a39330c2f198a381704dda23e449c1de7faa566569eca56ea"
+      }
+    },
+    {
+      "child_id": "native__medium-one-percent__b04__p0",
+      "validation": {
+        "bytes": 1675,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-percent__b04__p0/validation.json",
+        "sha256": "3a3e00d7f1fbd4dc8e0fe508986f0435da35e9e6ffb7a885d8c7f17689ecad4d"
+      }
+    },
+    {
+      "child_id": "native__medium-one-percent__b04__p1",
+      "validation": {
+        "bytes": 1676,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-percent__b04__p1/validation.json",
+        "sha256": "70edfb2adf81b1b2c3e9b7f5cb8176c43b5d4c8628112545586c86117f83a611"
+      }
+    },
+    {
+      "child_id": "native__medium-one-percent__b04__p2",
+      "validation": {
+        "bytes": 1674,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-percent__b04__p2/validation.json",
+        "sha256": "5005dc863c565ce1b8d387ff7dfdbf9bdd632eca267a6128e90ea39a8ece1ba0"
+      }
+    },
+    {
+      "child_id": "native__medium-one-percent__b04__p3",
+      "validation": {
+        "bytes": 1674,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-percent__b04__p3/validation.json",
+        "sha256": "ff1af113de4463e7afa08090b61c39c778f1418f3896ebc1e47a0a022a140dfc"
+      }
+    },
+    {
+      "child_id": "native__medium-one-percent__b05__p0",
+      "validation": {
+        "bytes": 1676,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-percent__b05__p0/validation.json",
+        "sha256": "bd2ae6bc4f793ae6c910d6c19437b0332e3058a7f48b81a97e0104ac49513271"
+      }
+    },
+    {
+      "child_id": "native__medium-one-percent__b05__p1",
+      "validation": {
+        "bytes": 1673,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-percent__b05__p1/validation.json",
+        "sha256": "5f3e6aa393f3edc7d6c8b35c57ba44f9e03ad3629245bc83a0e33230f0d0713f"
+      }
+    },
+    {
+      "child_id": "native__medium-one-percent__b05__p2",
+      "validation": {
+        "bytes": 1673,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-percent__b05__p2/validation.json",
+        "sha256": "1c6e769cbf16381ee5955f8ab1edab56f5c38843cedf27ea540ad2dae90c066c"
+      }
+    },
+    {
+      "child_id": "native__medium-one-percent__b05__p3",
+      "validation": {
+        "bytes": 1676,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-percent__b05__p3/validation.json",
+        "sha256": "02810cc7fa8d41ec9e403bbde64a722cba5bc1e638ecfa12a65a049e6c8fde5a"
+      }
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b00__p0",
+      "validation": {
+        "bytes": 1711,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__dense-sparse-one-percent__b00__p0/validation.json",
+        "sha256": "b7fb39e4868211c07aa0acbaa51818412185e1f02b9588b3b02bde2fcf5c52cc"
+      }
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b00__p1",
+      "validation": {
+        "bytes": 1711,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__dense-sparse-one-percent__b00__p1/validation.json",
+        "sha256": "4d2bb0b92c8ac41405443a313c63b7e593191a3e476f0ba83edd8e15433ecbc0"
+      }
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b00__p2",
+      "validation": {
+        "bytes": 1712,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__dense-sparse-one-percent__b00__p2/validation.json",
+        "sha256": "d5c751b409dd883f0d159d04bb9ce2103a8bdddde48566c0b336f7596b7929e0"
+      }
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b00__p3",
+      "validation": {
+        "bytes": 1711,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__dense-sparse-one-percent__b00__p3/validation.json",
+        "sha256": "d70342f6b924999342484052e3e8e1dba2c480f5a67e69f4e7f2d15eb8615080"
+      }
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b01__p0",
+      "validation": {
+        "bytes": 1713,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__dense-sparse-one-percent__b01__p0/validation.json",
+        "sha256": "463c41a3d9b41cf63114a25e251d4c1da2ba8951b0c725ccfd400f583052e4f9"
+      }
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b01__p1",
+      "validation": {
+        "bytes": 1711,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__dense-sparse-one-percent__b01__p1/validation.json",
+        "sha256": "e8e036d0d90880f05d22b6a5aef17fa926e1f7f64307b1d533fc1a9a5df2322b"
+      }
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b01__p2",
+      "validation": {
+        "bytes": 1711,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__dense-sparse-one-percent__b01__p2/validation.json",
+        "sha256": "34502c2517ac5719e44499fd157b95e699cfd1f0ab69fd38010287f14659ab6a"
+      }
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b01__p3",
+      "validation": {
+        "bytes": 1713,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__dense-sparse-one-percent__b01__p3/validation.json",
+        "sha256": "0a997bc796991e523572bc92eb3eb9c161dacf65689b988c901a16c8c6b37b58"
+      }
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b02__p0",
+      "validation": {
+        "bytes": 1711,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__dense-sparse-one-percent__b02__p0/validation.json",
+        "sha256": "3f2d5b14823fe2b7403bc743debe6ca07b6e7ee2a8fea488748c5c59804f326e"
+      }
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b02__p1",
+      "validation": {
+        "bytes": 1712,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__dense-sparse-one-percent__b02__p1/validation.json",
+        "sha256": "7ed29b0170764ccaf4d9d9e6dd3d6444d1c186800f69153450a7805fa231c7ac"
+      }
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b02__p2",
+      "validation": {
+        "bytes": 1713,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__dense-sparse-one-percent__b02__p2/validation.json",
+        "sha256": "0b3d527a0726c9193e88eaeb99cf8ed33383f7d1fb29f3125e01873b0aa305fb"
+      }
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b02__p3",
+      "validation": {
+        "bytes": 1711,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__dense-sparse-one-percent__b02__p3/validation.json",
+        "sha256": "eb4935750009d6adfaa255b7ec18da839d97d253a58256b1ebc1d09ae67a0991"
+      }
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b03__p0",
+      "validation": {
+        "bytes": 1712,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__dense-sparse-one-percent__b03__p0/validation.json",
+        "sha256": "3d7d89a87ed02dfd28bd696cde815ab572e7bfebf1fad4e64effd9f7d78373fd"
+      }
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b03__p1",
+      "validation": {
+        "bytes": 1711,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__dense-sparse-one-percent__b03__p1/validation.json",
+        "sha256": "68afac839e0684b54067c991d9534d0b5cf4cd5418bc38d6ac16386e7eb4a419"
+      }
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b03__p2",
+      "validation": {
+        "bytes": 1711,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__dense-sparse-one-percent__b03__p2/validation.json",
+        "sha256": "280cf76faf1609ed5c8a077b8f815b46cc48e5b3173677e8eefe497c67fdb0e4"
+      }
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b03__p3",
+      "validation": {
+        "bytes": 1713,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__dense-sparse-one-percent__b03__p3/validation.json",
+        "sha256": "38b2b74a7a64aa20217f3223f8a1c76d82ac16140e732f4357873939a86f7460"
+      }
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b04__p0",
+      "validation": {
+        "bytes": 1711,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__dense-sparse-one-percent__b04__p0/validation.json",
+        "sha256": "151c7d5a301c5357174cd1ba8ed4832f9235c6c2e306c7351724dc2164639380"
+      }
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b04__p1",
+      "validation": {
+        "bytes": 1712,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__dense-sparse-one-percent__b04__p1/validation.json",
+        "sha256": "9d1f10604139d12ad601011d5d71eb046ed4c6e32050aa40da5c3921d7c5d5db"
+      }
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b04__p2",
+      "validation": {
+        "bytes": 1713,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__dense-sparse-one-percent__b04__p2/validation.json",
+        "sha256": "5b823b8309b3c90fc909fb7b4aaf23b59adf5a293dbb9cd8657431593842df43"
+      }
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b04__p3",
+      "validation": {
+        "bytes": 1711,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__dense-sparse-one-percent__b04__p3/validation.json",
+        "sha256": "757a69cf3c04cf26a1e062881d51b4f276e029d930e8b45b3c81b5c47b7715cb"
+      }
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b05__p0",
+      "validation": {
+        "bytes": 1712,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__dense-sparse-one-percent__b05__p0/validation.json",
+        "sha256": "55b918da315e0476c5bea4ec6f94ff5f337c38cb1e44925a83809d19a810ae77"
+      }
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b05__p1",
+      "validation": {
+        "bytes": 1711,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__dense-sparse-one-percent__b05__p1/validation.json",
+        "sha256": "80e76695c9fc75871d0572c24ee1cc5e723a07cc6f0f954578b84fd6c8d7016e"
+      }
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b05__p2",
+      "validation": {
+        "bytes": 1711,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__dense-sparse-one-percent__b05__p2/validation.json",
+        "sha256": "b7e4ccb530917505d32dda51c2959efb9247ed55bb73f19ac48485e7e9971bbd"
+      }
+    },
+    {
+      "child_id": "native__dense-sparse-one-percent__b05__p3",
+      "validation": {
+        "bytes": 1712,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__dense-sparse-one-percent__b05__p3/validation.json",
+        "sha256": "93079bdbf594ee0996c0c52c4e19404e05c3ee09a8e36d2de46b080dca813c7e"
+      }
+    },
+    {
+      "child_id": "native__medium-one-edit__b00__p0",
+      "validation": {
+        "bytes": 1656,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-edit__b00__p0/validation.json",
+        "sha256": "e4068081d391d22ec27cabd4a499f04e3799ad4087630432664badff69b421c3"
+      }
+    },
+    {
+      "child_id": "native__medium-one-edit__b00__p1",
+      "validation": {
+        "bytes": 1658,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-edit__b00__p1/validation.json",
+        "sha256": "1937ed4803623e2425b69fcb004fac31932a8b75615d32c165c8a66bc88f365c"
+      }
+    },
+    {
+      "child_id": "native__medium-one-edit__b00__p2",
+      "validation": {
+        "bytes": 1658,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-edit__b00__p2/validation.json",
+        "sha256": "9794767c350856de005c45f0d9b9955fcb13c50f60ea7a8b6de46c53877da772"
+      }
+    },
+    {
+      "child_id": "native__medium-one-edit__b00__p3",
+      "validation": {
+        "bytes": 1657,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-edit__b00__p3/validation.json",
+        "sha256": "5b22c03aea1e788f54d46ee44e9ba9e6922fb667978b505fbc10cc5e710ac775"
+      }
+    },
+    {
+      "child_id": "native__medium-one-edit__b01__p0",
+      "validation": {
+        "bytes": 1658,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-edit__b01__p0/validation.json",
+        "sha256": "c22f8313b85022b945f52ae784c6ed4ec9536777e2c617085afb2c9120bb6c21"
+      }
+    },
+    {
+      "child_id": "native__medium-one-edit__b01__p1",
+      "validation": {
+        "bytes": 1657,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-edit__b01__p1/validation.json",
+        "sha256": "480f3267a0568f415c650ddc76f0b449103415ff109332a79f43718d895582a4"
+      }
+    },
+    {
+      "child_id": "native__medium-one-edit__b01__p2",
+      "validation": {
+        "bytes": 1657,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-edit__b01__p2/validation.json",
+        "sha256": "648fd8b0e06a27d89d9ac46df2fd02685431906c9428328942ef39d11defe665"
+      }
+    },
+    {
+      "child_id": "native__medium-one-edit__b01__p3",
+      "validation": {
+        "bytes": 1658,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-edit__b01__p3/validation.json",
+        "sha256": "4f881eecf233b60260c15870708de1a845b51d610d8619c52fcaa411f701d809"
+      }
+    },
+    {
+      "child_id": "native__medium-one-edit__b02__p0",
+      "validation": {
+        "bytes": 1657,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-edit__b02__p0/validation.json",
+        "sha256": "6c3dd60dd8f1929f2b3efbcb3bab4ced3e36c3f9002e9be6df1235d88ab856ac"
+      }
+    },
+    {
+      "child_id": "native__medium-one-edit__b02__p1",
+      "validation": {
+        "bytes": 1658,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-edit__b02__p1/validation.json",
+        "sha256": "a7fbf70dc8fb8e0216fe9b9d9edfaed7b25a9657f2eb591adf07736f1eddf1f9"
+      }
+    },
+    {
+      "child_id": "native__medium-one-edit__b02__p2",
+      "validation": {
+        "bytes": 1657,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-edit__b02__p2/validation.json",
+        "sha256": "1d967cb6d7347750359c9def3b030891b4e6313b4d6d38300e9d4fec847dbffc"
+      }
+    },
+    {
+      "child_id": "native__medium-one-edit__b02__p3",
+      "validation": {
+        "bytes": 1657,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-edit__b02__p3/validation.json",
+        "sha256": "45c09a515de1dc1f6b934449cf1c1f80c748390860ec8410d6fd9beeaa406cdb"
+      }
+    },
+    {
+      "child_id": "native__medium-one-edit__b03__p0",
+      "validation": {
+        "bytes": 1658,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-edit__b03__p0/validation.json",
+        "sha256": "132650a6785de6c37fa089c8c8db2d483ca47b4fa3ec92397de5ff1d850abb6b"
+      }
+    },
+    {
+      "child_id": "native__medium-one-edit__b03__p1",
+      "validation": {
+        "bytes": 1656,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-edit__b03__p1/validation.json",
+        "sha256": "ed03490ebc911ce633a34877409133c10f851bb1776caa6aa90d63f048a4e9ec"
+      }
+    },
+    {
+      "child_id": "native__medium-one-edit__b03__p2",
+      "validation": {
+        "bytes": 1657,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-edit__b03__p2/validation.json",
+        "sha256": "c6c03d098b4c8b217080204aebba42ade5d1d3bd2f3faf87f0d5de44f15bc194"
+      }
+    },
+    {
+      "child_id": "native__medium-one-edit__b03__p3",
+      "validation": {
+        "bytes": 1658,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-edit__b03__p3/validation.json",
+        "sha256": "10197739af020e71377aa06cbbac657b81e1686f3c3ceed763bab0371aaae887"
+      }
+    },
+    {
+      "child_id": "native__medium-one-edit__b04__p0",
+      "validation": {
+        "bytes": 1657,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-edit__b04__p0/validation.json",
+        "sha256": "d90f269b2d2abef9891262f95e9795ab6f18a8de076e4ce2b58e89a8f835ec48"
+      }
+    },
+    {
+      "child_id": "native__medium-one-edit__b04__p1",
+      "validation": {
+        "bytes": 1658,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-edit__b04__p1/validation.json",
+        "sha256": "37318286ec7cf12ca16afdb37fd7b25bd711759fc2132cb8c47735a70f987546"
+      }
+    },
+    {
+      "child_id": "native__medium-one-edit__b04__p2",
+      "validation": {
+        "bytes": 1658,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-edit__b04__p2/validation.json",
+        "sha256": "6cab76e32e5dbd503819ea240994d024b57c90b08be1a02b9d4dd74383abc122"
+      }
+    },
+    {
+      "child_id": "native__medium-one-edit__b04__p3",
+      "validation": {
+        "bytes": 1657,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-edit__b04__p3/validation.json",
+        "sha256": "e3016c5ff52e32ccd47d2a0eb3d3984127d46305e3049625cf51eeeca110b637"
+      }
+    },
+    {
+      "child_id": "native__medium-one-edit__b05__p0",
+      "validation": {
+        "bytes": 1658,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-edit__b05__p0/validation.json",
+        "sha256": "b7d63b39fe867b1b0b877687f9a3fe47eb463bf531cdd60d61759a0ccdb78385"
+      }
+    },
+    {
+      "child_id": "native__medium-one-edit__b05__p1",
+      "validation": {
+        "bytes": 1656,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-edit__b05__p1/validation.json",
+        "sha256": "73c2d812fa3816e4c7ca20d944c7bd06466f4b744b9f550cd55f3dc84baa3d50"
+      }
+    },
+    {
+      "child_id": "native__medium-one-edit__b05__p2",
+      "validation": {
+        "bytes": 1655,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-edit__b05__p2/validation.json",
+        "sha256": "ae6d01b9f73b3b56e6a9f091f3f856c3ccf440dca2a62368988b94e6648bfda8"
+      }
+    },
+    {
+      "child_id": "native__medium-one-edit__b05__p3",
+      "validation": {
+        "bytes": 1658,
+        "executable": false,
+        "mode": 436,
+        "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/children/native__medium-one-edit__b05__p3/validation.json",
+        "sha256": "944317fc8542e98d3116e1d59d61d402694585a0e4980fd34d1d73dcb8cb2fe0"
+      }
+    }
+  ],
+  "lane": "native",
+  "schema": "litchi.performance.0959.capture.v4.completed-packet",
+  "status": "completed"
+}

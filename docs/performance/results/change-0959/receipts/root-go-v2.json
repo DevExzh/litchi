@@ -1,0 +1,40 @@
+{
+  "status": "GO",
+  "created_utc": "2026-10-07T14:50:07.432010+00:00",
+  "scope": "New capture epoch after runner output-directory guard refusal; unchanged schedule, candidate, binaries, oracles and gates. No samples existed in failed epoch; no replacement within it. Native72 then allocator18 serial, no build overlap.",
+  "prior_go": {
+    "path": "/home/zhuhe/litchi-performance-0959/receipts/root-go-v1.json",
+    "bytes": 2714,
+    "mode": 436,
+    "executable": false,
+    "sha256": "452ff8355213d3fae71bd5a33eddbc9dea9f4f86cab869615d3a555d20d05bec"
+  },
+  "correction": {
+    "path": "/home/zhuhe/litchi-performance-0959/review/capture-output-directory-correction-v1.json",
+    "bytes": 1881,
+    "mode": 436,
+    "executable": false,
+    "sha256": "3b68c07d93fd133d4c916597453d8d571d025d915d3503fa583807dca1851694"
+  },
+  "capture": {
+    "path": "/home/zhuhe/litchi-performance-0959/tools/capture_0959_v7.py",
+    "bytes": 51799,
+    "mode": 493,
+    "executable": true,
+    "sha256": "0c3e298c1e9db9d6e40a313d82f9c75a27ffbd3a2d42d7bd612b73078ec5c10e"
+  },
+  "controls": {
+    "path": "/home/zhuhe/litchi-performance-0959/receipts/controls-0959-v7.json",
+    "bytes": 6040,
+    "mode": 436,
+    "executable": false,
+    "sha256": "c13977e77d82a52064b67d545efff5337faeba2b305e5827a2f85a4f5217ce77"
+  },
+  "output_and_interrupt_control": {
+    "path": "/home/zhuhe/litchi-performance-0959/review/root-interrupt-output-control-v3/result.json",
+    "bytes": 1051,
+    "mode": 436,
+    "executable": false,
+    "sha256": "c2a580d934b7b5560836446a0b888dd8421d0777f6c1d0c0256b441c631baa7e"
+  }
+}

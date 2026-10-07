@@ -1,0 +1,22 @@
+{
+  "schema": "litchi.performance.0959.root-decision.v1",
+  "decision": "reject_candidate_keep_production_unchanged",
+  "primary_safety": {
+    "dense-sparse-one-percent": true,
+    "medium-one-edit": false,
+    "medium-one-percent": true
+  },
+  "native_primary_useful_benefit": false,
+  "semantic_native_children": 72,
+  "semantic_allocator_children": 18,
+  "query_control": "not_run_primary_trial_failed",
+  "public_constructor_performance": "unqualified",
+  "comparison": {
+    "path": "/home/zhuhe/litchi-performance-0959/analysis/comparison-v3.json",
+    "bytes": 1447293,
+    "sha256": "9dbaefcd25b348c6b3f3c23ff4ed94b6e160fa7c95a5e37667a7efafa80242eb"
+  },
+  "adapter_review": "Root inspected full v2-v3 diff: source binding alias and frozen-helper identity validation only; unchanged statistical/report/gate code. External correction receipt binds adapter digest.",
+  "production_files_changed": false,
+  "push_performed": false
+}

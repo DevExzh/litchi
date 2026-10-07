@@ -1,0 +1,21 @@
+{
+  "children_expected": 72,
+  "lane": "native",
+  "plan": {
+    "bytes": 84261,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0959/plan-final-v7.json",
+    "sha256": "69b2f179888807787ef85393af3381a4998e36854b779fa205be82a6428b285f"
+  },
+  "runner": {
+    "bytes": 51730,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/litchi-performance-0959/tools/capture_0959_v6.py",
+    "sha256": "0c3a426fd668bc0d804754b190d6650eddcea5103fe647f3a41256dc7d0e9998"
+  },
+  "schema": "litchi.performance.0959.capture.v4.capture-start",
+  "serial": true,
+  "started_utc": "2026-10-07T14:47:56.305321Z"
+}

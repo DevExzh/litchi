@@ -1,0 +1,31 @@
+{
+  "status": "pass",
+  "workload_launched": false,
+  "mock": "already exited parent plus interruption",
+  "cleanup_calls": [
+    424242
+  ],
+  "terminal": {
+    "child_id": "native__medium-one-percent__b00__p0",
+    "ended_utc": "2026-10-07T14:44:04.106227Z",
+    "error": "injected observation interruption after parent exit",
+    "index": 0,
+    "process_group_clear": true,
+    "return_code": 0,
+    "schema": "litchi.performance.0959.capture.v4.child-terminal",
+    "status": "launch_or_observation_failed",
+    "timed_out": false
+  },
+  "validation": {
+    "error": "injected observation interruption after parent exit",
+    "schema": "litchi.performance.0959.capture.v4.child-validation",
+    "status": "failed",
+    "terminal": {
+      "bytes": 364,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/review/root-interrupt-control-v2/children/native__medium-one-percent__b00__p0/terminal.json",
+      "sha256": "9156155608b05d0346d345c9ee08f40254805b527c94856b6bf83919751d7824"
+    }
+  }
+}

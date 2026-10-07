@@ -1,0 +1,41 @@
+{
+  "schema": "litchi.performance.0959.reducer-attempt.v1",
+  "status": "failed_before_reduction",
+  "exit_code": 2,
+  "stderr": "reduce_0959_v1: source.candidate_source_manifest is pending\n",
+  "command": [
+    "python3",
+    "-B",
+    "/home/zhuhe/litchi-performance-0959/tools/reduce_0959_v2.py",
+    "--plan",
+    "/home/zhuhe/litchi-performance-0959/plan-final-v8.json",
+    "--native-packet",
+    "/home/zhuhe/litchi-performance-0959/capture-native-v2",
+    "--allocator-packet",
+    "/home/zhuhe/litchi-performance-0959/capture-allocator-v1",
+    "--output",
+    "/home/zhuhe/litchi-performance-0959/analysis/comparison-v1.json"
+  ],
+  "plan": {
+    "path": "/home/zhuhe/litchi-performance-0959/plan-final-v8.json",
+    "bytes": 84840,
+    "sha256": "9964f2f3a86dd467de6d7840807400aa7468a48f7d993b50ea296c6e0909abf8"
+  },
+  "reducer": {
+    "path": "/home/zhuhe/litchi-performance-0959/tools/reduce_0959_v2.py",
+    "bytes": 62578,
+    "sha256": "c3dcdb269f5170f1c9f7f5749a1a1d08b48de46c18f71e0034743f8a84f692c9"
+  },
+  "output_created": false,
+  "native_terminal": {
+    "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/capture-terminal.json",
+    "bytes": 576,
+    "sha256": "b3876c4924f2aa88bbfab78a65e1522ec5227c5560efa5a2cd386cb4d2d8e8ab"
+  },
+  "allocator_terminal": {
+    "path": "/home/zhuhe/litchi-performance-0959/capture-allocator-v1/capture-terminal.json",
+    "bytes": 582,
+    "sha256": "f66b26f72bbb837fcfa8cba12a82860605b7f49fa84b7ea39f76090bc77674a2"
+  },
+  "note": "Recorded from root tool terminal result; original tool output retained in conversation. No sample or gate changes."
+}

@@ -1,0 +1,157 @@
+{
+  "control_dir": "/home/zhuhe/litchi-performance-0959/tmp/controls-0959-v7-20261007T144943545176Z-3033067",
+  "controls": [
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/zhuhe/litchi-performance-0959/tools/capture_0959_v7.py",
+        "--plan",
+        "/home/zhuhe/litchi-performance-0959/tmp/controls-0959-v7-20261007T144943545176Z-3033067/native-role-order.json",
+        "--lane",
+        "native",
+        "--dry-run"
+      ],
+      "lane": "native",
+      "name": "native-role-order",
+      "plan": {
+        "bytes": 71202,
+        "path": "/home/zhuhe/litchi-performance-0959/tmp/controls-0959-v7-20261007T144943545176Z-3033067/native-role-order.json",
+        "sha256": "a0077b074432358058b784e05bbdce28dff986d2775e2f648910989d5c27942a"
+      },
+      "rejected": true,
+      "return_code": 2,
+      "stderr": "capture_0959_v6: native schedule differs from frozen paired matrix\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/zhuhe/litchi-performance-0959/tools/capture_0959_v7.py",
+        "--plan",
+        "/home/zhuhe/litchi-performance-0959/tmp/controls-0959-v7-20261007T144943545176Z-3033067/allocator-count.json",
+        "--lane",
+        "allocator",
+        "--dry-run"
+      ],
+      "lane": "allocator",
+      "name": "allocator-count",
+      "plan": {
+        "bytes": 70635,
+        "path": "/home/zhuhe/litchi-performance-0959/tmp/controls-0959-v7-20261007T144943545176Z-3033067/allocator-count.json",
+        "sha256": "2d92ba1c500c1e77438406b26e4412bcbe34979b508d499c51c853f9d68156e4"
+      },
+      "rejected": true,
+      "return_code": 2,
+      "stderr": "capture_0959_v6: allocator schedule differs from frozen paired matrix\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/zhuhe/litchi-performance-0959/tools/capture_0959_v7.py",
+        "--plan",
+        "/home/zhuhe/litchi-performance-0959/tmp/controls-0959-v7-20261007T144943545176Z-3033067/native-cpu-mask.json",
+        "--lane",
+        "native",
+        "--dry-run"
+      ],
+      "lane": "native",
+      "name": "native-cpu-mask",
+      "plan": {
+        "bytes": 71186,
+        "path": "/home/zhuhe/litchi-performance-0959/tmp/controls-0959-v7-20261007T144943545176Z-3033067/native-cpu-mask.json",
+        "sha256": "6949fe119966614dad848e8f338355860338cafcce1f19be5ebc25f8a7aef74f"
+      },
+      "rejected": true,
+      "return_code": 2,
+      "stderr": "capture_0959_v6: native schedule differs from frozen paired matrix\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/zhuhe/litchi-performance-0959/tools/capture_0959_v7.py",
+        "--plan",
+        "/home/zhuhe/litchi-performance-0959/tmp/controls-0959-v7-20261007T144943545176Z-3033067/source-oracle.json",
+        "--lane",
+        "native",
+        "--dry-run"
+      ],
+      "lane": "native",
+      "name": "source-oracle",
+      "plan": {
+        "bytes": 71202,
+        "path": "/home/zhuhe/litchi-performance-0959/tmp/controls-0959-v7-20261007T144943545176Z-3033067/source-oracle.json",
+        "sha256": "a6f24240f68404ae0eb976b4d73ad4a340b284235c12cb6077aabe92f99657ca"
+      },
+      "rejected": true,
+      "return_code": 2,
+      "stderr": "capture_0959_v6: case medium-one-percent output_sha256 oracle changed\n",
+      "stdout": ""
+    }
+  ],
+  "plan": {
+    "bytes": 71202,
+    "path": "/home/zhuhe/litchi-performance-0959/plan-template-0959-v4.json",
+    "sha256": "90ed32a515d93deebff09f7d638c8638c2bbaf324046d65256e8e1dfe4a4fdd8"
+  },
+  "positive_allocator_reports": [
+    {
+      "binary": {
+        "bytes": 43676872,
+        "path": "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_alloc.v2",
+        "sha256": "9ba37a6b9796ad0e316e7571ebe117ba7a5f97bcf5d29153c7cb3d74c485e9a5"
+      },
+      "case_id": "medium-one-percent",
+      "child_id": "allocator__medium-one-percent__b00__p0",
+      "report": {
+        "bytes": 74478,
+        "path": "/home/zhuhe/litchi-performance-0957/capture-allocation-v1/reports/medium-one-percent-w1-r0/report.json",
+        "sha256": "8805c17445f452dc1adfbd81f6705fce11f85f92364ef6e8e239d870ca68390f"
+      },
+      "status": "passed"
+    },
+    {
+      "binary": {
+        "bytes": 43676872,
+        "path": "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_alloc.v2",
+        "sha256": "9ba37a6b9796ad0e316e7571ebe117ba7a5f97bcf5d29153c7cb3d74c485e9a5"
+      },
+      "case_id": "dense-sparse-one-percent",
+      "child_id": "allocator__dense-sparse-one-percent__b00__p0",
+      "report": {
+        "bytes": 74501,
+        "path": "/home/zhuhe/litchi-performance-0957/capture-allocation-v1/reports/dense-sparse-one-percent-w1-r0/report.json",
+        "sha256": "b471b32badcd1a982b440a8e58df1adb8ce06715b2f9eb2d7708a860051858ce"
+      },
+      "status": "passed"
+    },
+    {
+      "binary": {
+        "bytes": 43676872,
+        "path": "/home/zhuhe/litchi-performance-0957/executables/xlsx_managed_compression_alloc.v2",
+        "sha256": "9ba37a6b9796ad0e316e7571ebe117ba7a5f97bcf5d29153c7cb3d74c485e9a5"
+      },
+      "case_id": "medium-one-edit",
+      "child_id": "allocator__medium-one-edit__b00__p0",
+      "report": {
+        "bytes": 74331,
+        "path": "/home/zhuhe/litchi-performance-0957/capture-allocation-v1/reports/medium-one-edit-w1-r0/report.json",
+        "sha256": "e524329ba37747befa9957f8e53cfb9be9110b5a21d64e018b1f958f0e725048"
+      },
+      "status": "passed"
+    }
+  ],
+  "runner": {
+    "bytes": 51799,
+    "path": "/home/zhuhe/litchi-performance-0959/tools/capture_0959_v7.py",
+    "sha256": "0c3e298c1e9db9d6e40a313d82f9c75a27ffbd3a2d42d7bd612b73078ec5c10e"
+  },
+  "schema": "litchi.performance.0959.controls-receipt.v7",
+  "status": "passed",
+  "summary": {
+    "bytes": 5688,
+    "path": "/home/zhuhe/litchi-performance-0959/tmp/controls-0959-v7-20261007T144943545176Z-3033067/summary.json",
+    "sha256": "64d583f5c93539b15114b2097ab09121b8a74d578ad47f0428ac5a1ad67768b1"
+  }
+}

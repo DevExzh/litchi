@@ -1,0 +1,687 @@
+{
+  "after": {
+    "roots": [
+      {
+        "allocated_bytes": 0,
+        "directories_below_root": 0,
+        "exists": false,
+        "files": 0,
+        "logical_bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0959/target-arc-v1",
+        "root_is_symlink": false,
+        "symlinks": 0
+      },
+      {
+        "allocated_bytes": 0,
+        "directories_below_root": 0,
+        "exists": false,
+        "files": 0,
+        "logical_bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0959/target-candidate-arc-v1",
+        "root_is_symlink": false,
+        "symlinks": 0
+      },
+      {
+        "allocated_bytes": 0,
+        "directories_below_root": 0,
+        "exists": false,
+        "files": 0,
+        "logical_bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0959/target-candidate-arc-v2",
+        "root_is_symlink": false,
+        "symlinks": 0
+      },
+      {
+        "allocated_bytes": 0,
+        "directories_below_root": 0,
+        "exists": false,
+        "files": 0,
+        "logical_bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0959/target-v1",
+        "root_is_symlink": false,
+        "symlinks": 0
+      },
+      {
+        "allocated_bytes": 0,
+        "directories_below_root": 0,
+        "exists": false,
+        "files": 0,
+        "logical_bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0959/tmp",
+        "root_is_symlink": false,
+        "symlinks": 0
+      },
+      {
+        "allocated_bytes": 0,
+        "directories_below_root": 0,
+        "exists": false,
+        "files": 0,
+        "logical_bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0959/build-tools/__pycache__",
+        "root_is_symlink": false,
+        "symlinks": 0
+      },
+      {
+        "allocated_bytes": 0,
+        "directories_below_root": 0,
+        "exists": false,
+        "files": 0,
+        "logical_bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0959/review/__pycache__",
+        "root_is_symlink": false,
+        "symlinks": 0
+      }
+    ],
+    "totals": {
+      "allocated_bytes": 0,
+      "files": 0,
+      "logical_bytes": 0
+    }
+  },
+  "allowlist_relative_paths": [
+    "target-arc-v1",
+    "target-candidate-arc-v1",
+    "target-candidate-arc-v2",
+    "target-v1",
+    "tmp",
+    "build-tools/__pycache__",
+    "review/__pycache__"
+  ],
+  "authorization": "root authorized cleanup after successful comparison-v3 reduction; no query-control builds requested",
+  "before": {
+    "roots": [
+      {
+        "allocated_bytes": 1099931648,
+        "directories_below_root": 325,
+        "exists": true,
+        "files": 1632,
+        "logical_bytes": 1095084194,
+        "path": "/home/zhuhe/litchi-performance-0959/target-arc-v1",
+        "root_is_symlink": false,
+        "symlinks": 0
+      },
+      {
+        "allocated_bytes": 24576,
+        "directories_below_root": 334,
+        "exists": true,
+        "files": 7,
+        "logical_bytes": 1868,
+        "path": "/home/zhuhe/litchi-performance-0959/target-candidate-arc-v1",
+        "root_is_symlink": false,
+        "symlinks": 0
+      },
+      {
+        "allocated_bytes": 1995300864,
+        "directories_below_root": 334,
+        "exists": true,
+        "files": 1790,
+        "logical_bytes": 1989941789,
+        "path": "/home/zhuhe/litchi-performance-0959/target-candidate-arc-v2",
+        "root_is_symlink": false,
+        "symlinks": 0
+      },
+      {
+        "allocated_bytes": 994332672,
+        "directories_below_root": 230,
+        "exists": true,
+        "files": 1059,
+        "logical_bytes": 991396925,
+        "path": "/home/zhuhe/litchi-performance-0959/target-v1",
+        "root_is_symlink": false,
+        "symlinks": 0
+      },
+      {
+        "allocated_bytes": 2949120,
+        "directories_below_root": 16,
+        "exists": true,
+        "files": 50,
+        "logical_bytes": 2855467,
+        "path": "/home/zhuhe/litchi-performance-0959/tmp",
+        "root_is_symlink": false,
+        "symlinks": 0
+      },
+      {
+        "allocated_bytes": 36864,
+        "directories_below_root": 0,
+        "exists": true,
+        "files": 3,
+        "logical_bytes": 31676,
+        "path": "/home/zhuhe/litchi-performance-0959/build-tools/__pycache__",
+        "root_is_symlink": false,
+        "symlinks": 0
+      },
+      {
+        "allocated_bytes": 8192,
+        "directories_below_root": 0,
+        "exists": true,
+        "files": 1,
+        "logical_bytes": 6593,
+        "path": "/home/zhuhe/litchi-performance-0959/review/__pycache__",
+        "root_is_symlink": false,
+        "symlinks": 0
+      }
+    ],
+    "totals": {
+      "allocated_bytes": 4092583936,
+      "files": 4542,
+      "logical_bytes": 4079318512
+    }
+  },
+  "created_utc": "2026-10-07T15:24:05.056506+00:00",
+  "deletion_performed": true,
+  "inventory_receipt": {
+    "bytes": 16387,
+    "exists": true,
+    "path": "/home/zhuhe/litchi-performance-0959/receipts/cleanup-inventory-v1.json",
+    "sha256": "57eda40c37d39d355b6b0ebd5471e8aa0078a3b7d24f31c2f2927f1fb9100335"
+  },
+  "process_probe_after": {
+    "command": "ps -eo pid=,comm=,args=",
+    "relevant_processes": [],
+    "status": "pass_empty"
+  },
+  "protected_files_before_after": {
+    "after": {
+      "/home/zhuhe/litchi-performance-0959/analysis/comparison-v3.json": {
+        "bytes": 1447293,
+        "exists": true,
+        "path": "/home/zhuhe/litchi-performance-0959/analysis/comparison-v3.json",
+        "sha256": "9dbaefcd25b348c6b3f3c23ff4ed94b6e160fa7c95a5e37667a7efafa80242eb"
+      },
+      "/home/zhuhe/litchi-performance-0959/executables/xlsx_managed_compression_alloc.arc-v1": {
+        "bytes": 43665688,
+        "exists": true,
+        "path": "/home/zhuhe/litchi-performance-0959/executables/xlsx_managed_compression_alloc.arc-v1",
+        "sha256": "5a25f0b1a994cac635cfbc36c44b98766924683f688d2ef91764c73ffeb8450a"
+      },
+      "/home/zhuhe/litchi-performance-0959/executables/xlsx_managed_compression_benchmark.arc-v1": {
+        "bytes": 43228520,
+        "exists": true,
+        "path": "/home/zhuhe/litchi-performance-0959/executables/xlsx_managed_compression_benchmark.arc-v1",
+        "sha256": "3cf1714372b376ccdaeaf6a631a5439195694bdfffd4d10c25dc5f06db95f51f"
+      },
+      "/home/zhuhe/litchi-performance-0959/receipts/baseline-comparison-freeze-v1.json": {
+        "bytes": 1376,
+        "exists": true,
+        "path": "/home/zhuhe/litchi-performance-0959/receipts/baseline-comparison-freeze-v1.json",
+        "sha256": "ac38c3adeff1fe9c84a00acd395fb952722869c73fad8c741a2579650f3a64fc"
+      },
+      "/home/zhuhe/litchi-performance-0959/receipts/candidate-arc-v2-managed-retention.json": {
+        "bytes": 1384,
+        "exists": true,
+        "path": "/home/zhuhe/litchi-performance-0959/receipts/candidate-arc-v2-managed-retention.json",
+        "sha256": "c6a19c54aece36cd075d9e5a703aaa4042f6517502c3fad66a411b3df17145ac"
+      },
+      "/home/zhuhe/litchi-performance-0959/receipts/cleanup-inventory-v1.json": {
+        "bytes": 16387,
+        "exists": true,
+        "path": "/home/zhuhe/litchi-performance-0959/receipts/cleanup-inventory-v1.json",
+        "sha256": "57eda40c37d39d355b6b0ebd5471e8aa0078a3b7d24f31c2f2927f1fb9100335"
+      },
+      "/home/zhuhe/litchi-performance-0959/source-manifest-baseline-comparison-v1.json": {
+        "bytes": 2266571,
+        "exists": true,
+        "path": "/home/zhuhe/litchi-performance-0959/source-manifest-baseline-comparison-v1.json",
+        "sha256": "7397cc28dbaa29e3b6f43603c26cedcd7f92e9bc57b865d3ae6acf0d01418f79"
+      },
+      "/home/zhuhe/litchi-performance-0959/source-manifest-candidate-arc-v1.json": {
+        "bytes": 2266853,
+        "exists": true,
+        "path": "/home/zhuhe/litchi-performance-0959/source-manifest-candidate-arc-v1.json",
+        "sha256": "77ec8f3efe5c0dfb9aebf6a66ddcd061718c45c532388e7c26297fee9dc508cc"
+      }
+    },
+    "before": {
+      "/home/zhuhe/litchi-performance-0959/analysis/comparison-v3.json": {
+        "bytes": 1447293,
+        "exists": true,
+        "path": "/home/zhuhe/litchi-performance-0959/analysis/comparison-v3.json",
+        "sha256": "9dbaefcd25b348c6b3f3c23ff4ed94b6e160fa7c95a5e37667a7efafa80242eb"
+      },
+      "/home/zhuhe/litchi-performance-0959/executables/xlsx_managed_compression_alloc.arc-v1": {
+        "bytes": 43665688,
+        "exists": true,
+        "path": "/home/zhuhe/litchi-performance-0959/executables/xlsx_managed_compression_alloc.arc-v1",
+        "sha256": "5a25f0b1a994cac635cfbc36c44b98766924683f688d2ef91764c73ffeb8450a"
+      },
+      "/home/zhuhe/litchi-performance-0959/executables/xlsx_managed_compression_benchmark.arc-v1": {
+        "bytes": 43228520,
+        "exists": true,
+        "path": "/home/zhuhe/litchi-performance-0959/executables/xlsx_managed_compression_benchmark.arc-v1",
+        "sha256": "3cf1714372b376ccdaeaf6a631a5439195694bdfffd4d10c25dc5f06db95f51f"
+      },
+      "/home/zhuhe/litchi-performance-0959/receipts/baseline-comparison-freeze-v1.json": {
+        "bytes": 1376,
+        "exists": true,
+        "path": "/home/zhuhe/litchi-performance-0959/receipts/baseline-comparison-freeze-v1.json",
+        "sha256": "ac38c3adeff1fe9c84a00acd395fb952722869c73fad8c741a2579650f3a64fc"
+      },
+      "/home/zhuhe/litchi-performance-0959/receipts/candidate-arc-v2-managed-retention.json": {
+        "bytes": 1384,
+        "exists": true,
+        "path": "/home/zhuhe/litchi-performance-0959/receipts/candidate-arc-v2-managed-retention.json",
+        "sha256": "c6a19c54aece36cd075d9e5a703aaa4042f6517502c3fad66a411b3df17145ac"
+      },
+      "/home/zhuhe/litchi-performance-0959/receipts/cleanup-inventory-v1.json": {
+        "bytes": 16387,
+        "exists": true,
+        "path": "/home/zhuhe/litchi-performance-0959/receipts/cleanup-inventory-v1.json",
+        "sha256": "57eda40c37d39d355b6b0ebd5471e8aa0078a3b7d24f31c2f2927f1fb9100335"
+      },
+      "/home/zhuhe/litchi-performance-0959/source-manifest-baseline-comparison-v1.json": {
+        "bytes": 2266571,
+        "exists": true,
+        "path": "/home/zhuhe/litchi-performance-0959/source-manifest-baseline-comparison-v1.json",
+        "sha256": "7397cc28dbaa29e3b6f43603c26cedcd7f92e9bc57b865d3ae6acf0d01418f79"
+      },
+      "/home/zhuhe/litchi-performance-0959/source-manifest-candidate-arc-v1.json": {
+        "bytes": 2266853,
+        "exists": true,
+        "path": "/home/zhuhe/litchi-performance-0959/source-manifest-candidate-arc-v1.json",
+        "sha256": "77ec8f3efe5c0dfb9aebf6a66ddcd061718c45c532388e7c26297fee9dc508cc"
+      }
+    },
+    "unchanged": true
+  },
+  "protected_roots_before_after": {
+    "after": {
+      "/home/zhuhe/litchi-performance-0959/analysis": {
+        "exists": true,
+        "is_symlink": false
+      },
+      "/home/zhuhe/litchi-performance-0959/build-tools": {
+        "exists": true,
+        "is_symlink": false
+      },
+      "/home/zhuhe/litchi-performance-0959/builds": {
+        "exists": true,
+        "is_symlink": false
+      },
+      "/home/zhuhe/litchi-performance-0959/capture-allocator-v1": {
+        "exists": true,
+        "is_symlink": false
+      },
+      "/home/zhuhe/litchi-performance-0959/capture-native-v1": {
+        "exists": true,
+        "is_symlink": false
+      },
+      "/home/zhuhe/litchi-performance-0959/capture-native-v2": {
+        "exists": true,
+        "is_symlink": false
+      },
+      "/home/zhuhe/litchi-performance-0959/executables": {
+        "exists": true,
+        "is_symlink": false
+      },
+      "/home/zhuhe/litchi-performance-0959/logs": {
+        "exists": true,
+        "is_symlink": false
+      },
+      "/home/zhuhe/litchi-performance-0959/receipts": {
+        "exists": true,
+        "is_symlink": false
+      },
+      "/home/zhuhe/litchi-performance-0959/review": {
+        "exists": true,
+        "is_symlink": false
+      },
+      "/home/zhuhe/litchi-performance-0959/source-baseline": {
+        "exists": true,
+        "is_symlink": false
+      },
+      "/home/zhuhe/litchi-performance-0959/source-candidate-arc-v1": {
+        "exists": true,
+        "is_symlink": false
+      },
+      "/home/zhuhe/litchi-performance-0959/tooling": {
+        "exists": true,
+        "is_symlink": false
+      },
+      "/home/zhuhe/litchi-performance-0959/tools": {
+        "exists": true,
+        "is_symlink": false
+      }
+    },
+    "before": {
+      "/home/zhuhe/litchi-performance-0959/analysis": {
+        "exists": true,
+        "is_symlink": false
+      },
+      "/home/zhuhe/litchi-performance-0959/build-tools": {
+        "exists": true,
+        "is_symlink": false
+      },
+      "/home/zhuhe/litchi-performance-0959/builds": {
+        "exists": true,
+        "is_symlink": false
+      },
+      "/home/zhuhe/litchi-performance-0959/capture-allocator-v1": {
+        "exists": true,
+        "is_symlink": false
+      },
+      "/home/zhuhe/litchi-performance-0959/capture-native-v1": {
+        "exists": true,
+        "is_symlink": false
+      },
+      "/home/zhuhe/litchi-performance-0959/capture-native-v2": {
+        "exists": true,
+        "is_symlink": false
+      },
+      "/home/zhuhe/litchi-performance-0959/executables": {
+        "exists": true,
+        "is_symlink": false
+      },
+      "/home/zhuhe/litchi-performance-0959/logs": {
+        "exists": true,
+        "is_symlink": false
+      },
+      "/home/zhuhe/litchi-performance-0959/receipts": {
+        "exists": true,
+        "is_symlink": false
+      },
+      "/home/zhuhe/litchi-performance-0959/review": {
+        "exists": true,
+        "is_symlink": false
+      },
+      "/home/zhuhe/litchi-performance-0959/source-baseline": {
+        "exists": true,
+        "is_symlink": false
+      },
+      "/home/zhuhe/litchi-performance-0959/source-candidate-arc-v1": {
+        "exists": true,
+        "is_symlink": false
+      },
+      "/home/zhuhe/litchi-performance-0959/tooling": {
+        "exists": true,
+        "is_symlink": false
+      },
+      "/home/zhuhe/litchi-performance-0959/tools": {
+        "exists": true,
+        "is_symlink": false
+      }
+    },
+    "unchanged": true
+  },
+  "query_control_build_launched": false,
+  "reduction_gate": {
+    "bytes": 1447293,
+    "exists": true,
+    "path": "/home/zhuhe/litchi-performance-0959/analysis/comparison-v3.json",
+    "schema": "litchi.performance.0959.reducer.v3.final-plan-adapter",
+    "sha256": "9dbaefcd25b348c6b3f3c23ff4ed94b6e160fa7c95a5e37667a7efafa80242eb",
+    "status": "reduced"
+  },
+  "removed": [
+    {
+      "after": {
+        "allocated_bytes": 0,
+        "directories_below_root": 0,
+        "exists": false,
+        "files": 0,
+        "logical_bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0959/target-arc-v1",
+        "root_is_symlink": false,
+        "symlinks": 0
+      },
+      "before": {
+        "allocated_bytes": 1099931648,
+        "directories_below_root": 325,
+        "exists": true,
+        "files": 1632,
+        "logical_bytes": 1095084194,
+        "path": "/home/zhuhe/litchi-performance-0959/target-arc-v1",
+        "root_is_symlink": false,
+        "symlinks": 0
+      },
+      "path": "/home/zhuhe/litchi-performance-0959/target-arc-v1",
+      "removed_allocated_bytes": 1099931648,
+      "removed_files": 1632,
+      "removed_logical_bytes": 1095084194
+    },
+    {
+      "after": {
+        "allocated_bytes": 0,
+        "directories_below_root": 0,
+        "exists": false,
+        "files": 0,
+        "logical_bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0959/target-candidate-arc-v1",
+        "root_is_symlink": false,
+        "symlinks": 0
+      },
+      "before": {
+        "allocated_bytes": 24576,
+        "directories_below_root": 334,
+        "exists": true,
+        "files": 7,
+        "logical_bytes": 1868,
+        "path": "/home/zhuhe/litchi-performance-0959/target-candidate-arc-v1",
+        "root_is_symlink": false,
+        "symlinks": 0
+      },
+      "path": "/home/zhuhe/litchi-performance-0959/target-candidate-arc-v1",
+      "removed_allocated_bytes": 24576,
+      "removed_files": 7,
+      "removed_logical_bytes": 1868
+    },
+    {
+      "after": {
+        "allocated_bytes": 0,
+        "directories_below_root": 0,
+        "exists": false,
+        "files": 0,
+        "logical_bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0959/target-candidate-arc-v2",
+        "root_is_symlink": false,
+        "symlinks": 0
+      },
+      "before": {
+        "allocated_bytes": 1995300864,
+        "directories_below_root": 334,
+        "exists": true,
+        "files": 1790,
+        "logical_bytes": 1989941789,
+        "path": "/home/zhuhe/litchi-performance-0959/target-candidate-arc-v2",
+        "root_is_symlink": false,
+        "symlinks": 0
+      },
+      "path": "/home/zhuhe/litchi-performance-0959/target-candidate-arc-v2",
+      "removed_allocated_bytes": 1995300864,
+      "removed_files": 1790,
+      "removed_logical_bytes": 1989941789
+    },
+    {
+      "after": {
+        "allocated_bytes": 0,
+        "directories_below_root": 0,
+        "exists": false,
+        "files": 0,
+        "logical_bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0959/target-v1",
+        "root_is_symlink": false,
+        "symlinks": 0
+      },
+      "before": {
+        "allocated_bytes": 994332672,
+        "directories_below_root": 230,
+        "exists": true,
+        "files": 1059,
+        "logical_bytes": 991396925,
+        "path": "/home/zhuhe/litchi-performance-0959/target-v1",
+        "root_is_symlink": false,
+        "symlinks": 0
+      },
+      "path": "/home/zhuhe/litchi-performance-0959/target-v1",
+      "removed_allocated_bytes": 994332672,
+      "removed_files": 1059,
+      "removed_logical_bytes": 991396925
+    },
+    {
+      "after": {
+        "allocated_bytes": 0,
+        "directories_below_root": 0,
+        "exists": false,
+        "files": 0,
+        "logical_bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0959/tmp",
+        "root_is_symlink": false,
+        "symlinks": 0
+      },
+      "before": {
+        "allocated_bytes": 2949120,
+        "directories_below_root": 16,
+        "exists": true,
+        "files": 50,
+        "logical_bytes": 2855467,
+        "path": "/home/zhuhe/litchi-performance-0959/tmp",
+        "root_is_symlink": false,
+        "symlinks": 0
+      },
+      "path": "/home/zhuhe/litchi-performance-0959/tmp",
+      "removed_allocated_bytes": 2949120,
+      "removed_files": 50,
+      "removed_logical_bytes": 2855467
+    },
+    {
+      "after": {
+        "allocated_bytes": 0,
+        "directories_below_root": 0,
+        "exists": false,
+        "files": 0,
+        "logical_bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0959/build-tools/__pycache__",
+        "root_is_symlink": false,
+        "symlinks": 0
+      },
+      "before": {
+        "allocated_bytes": 36864,
+        "directories_below_root": 0,
+        "exists": true,
+        "files": 3,
+        "logical_bytes": 31676,
+        "path": "/home/zhuhe/litchi-performance-0959/build-tools/__pycache__",
+        "root_is_symlink": false,
+        "symlinks": 0
+      },
+      "path": "/home/zhuhe/litchi-performance-0959/build-tools/__pycache__",
+      "removed_allocated_bytes": 36864,
+      "removed_files": 3,
+      "removed_logical_bytes": 31676
+    },
+    {
+      "after": {
+        "allocated_bytes": 0,
+        "directories_below_root": 0,
+        "exists": false,
+        "files": 0,
+        "logical_bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0959/review/__pycache__",
+        "root_is_symlink": false,
+        "symlinks": 0
+      },
+      "before": {
+        "allocated_bytes": 8192,
+        "directories_below_root": 0,
+        "exists": true,
+        "files": 1,
+        "logical_bytes": 6593,
+        "path": "/home/zhuhe/litchi-performance-0959/review/__pycache__",
+        "root_is_symlink": false,
+        "symlinks": 0
+      },
+      "path": "/home/zhuhe/litchi-performance-0959/review/__pycache__",
+      "removed_allocated_bytes": 8192,
+      "removed_files": 1,
+      "removed_logical_bytes": 6593
+    }
+  ],
+  "retained_binary_checks_after": [
+    {
+      "match_receipt": true,
+      "retained_executable": {
+        "bytes": 43665688,
+        "exists": true,
+        "path": "/home/zhuhe/litchi-performance-0959/executables/xlsx_managed_compression_alloc.arc-v1",
+        "sha256": "5a25f0b1a994cac635cfbc36c44b98766924683f688d2ef91764c73ffeb8450a"
+      },
+      "role": "xlsx_managed_compression_alloc"
+    },
+    {
+      "match_receipt": true,
+      "retained_executable": {
+        "bytes": 43228520,
+        "exists": true,
+        "path": "/home/zhuhe/litchi-performance-0959/executables/xlsx_managed_compression_benchmark.arc-v1",
+        "sha256": "3cf1714372b376ccdaeaf6a631a5439195694bdfffd4d10c25dc5f06db95f51f"
+      },
+      "role": "xlsx_managed_compression_benchmark"
+    }
+  ],
+  "retained_binary_checks_before": [
+    {
+      "byte_match": true,
+      "retained_executable": {
+        "bytes": 43665688,
+        "exists": true,
+        "path": "/home/zhuhe/litchi-performance-0959/executables/xlsx_managed_compression_alloc.arc-v1",
+        "sha256": "5a25f0b1a994cac635cfbc36c44b98766924683f688d2ef91764c73ffeb8450a"
+      },
+      "role": "xlsx_managed_compression_alloc",
+      "source_target": {
+        "bytes": 43665688,
+        "exists": true,
+        "path": "/home/zhuhe/litchi-performance-0959/target-candidate-arc-v2/release/xlsx_managed_compression_alloc",
+        "sha256": "5a25f0b1a994cac635cfbc36c44b98766924683f688d2ef91764c73ffeb8450a"
+      }
+    },
+    {
+      "byte_match": true,
+      "retained_executable": {
+        "bytes": 43228520,
+        "exists": true,
+        "path": "/home/zhuhe/litchi-performance-0959/executables/xlsx_managed_compression_benchmark.arc-v1",
+        "sha256": "3cf1714372b376ccdaeaf6a631a5439195694bdfffd4d10c25dc5f06db95f51f"
+      },
+      "role": "xlsx_managed_compression_benchmark",
+      "source_target": {
+        "bytes": 43228520,
+        "exists": true,
+        "path": "/home/zhuhe/litchi-performance-0959/target-candidate-arc-v2/release/examples/xlsx_managed_compression_benchmark",
+        "sha256": "3cf1714372b376ccdaeaf6a631a5439195694bdfffd4d10c25dc5f06db95f51f"
+      }
+    }
+  ],
+  "retained_dependencies": [
+    "/home/zhuhe/litchi-performance-0959/source-baseline",
+    "/home/zhuhe/litchi-performance-0959/source-candidate-arc-v1",
+    "/home/zhuhe/litchi-performance-0959/capture-allocator-v1",
+    "/home/zhuhe/litchi-performance-0959/capture-native-v1",
+    "/home/zhuhe/litchi-performance-0959/capture-native-v2",
+    "/home/zhuhe/litchi-performance-0959/analysis",
+    "/home/zhuhe/litchi-performance-0959/review",
+    "/home/zhuhe/litchi-performance-0959/tooling",
+    "/home/zhuhe/litchi-performance-0959/tools",
+    "/home/zhuhe/litchi-performance-0959/plans (top-level JSON files)",
+    "/home/zhuhe/litchi-performance-0959/protocols (top-level Markdown files)",
+    "/home/zhuhe/litchi-performance-0959/receipts",
+    "/home/zhuhe/litchi-performance-0959/logs",
+    "/home/zhuhe/litchi-performance-0959/builds",
+    "/home/zhuhe/litchi-performance-0959/executables"
+  ],
+  "safety": {
+    "checkout_touched": false,
+    "deletion_method": "shutil.rmtree on seven exact prevalidated directory paths; no globbing and no parent cleanup",
+    "executables_deleted": false,
+    "logs_deleted": false,
+    "outside_0959_touched": false,
+    "plans_deleted": false,
+    "raw_capture_packets_deleted": false,
+    "shared_target_touched": false,
+    "source_snapshots_deleted": false,
+    "tools_deleted": false,
+    "tools_pycache_deleted": false
+  },
+  "schema": "litchi.performance.0959.cleanup.v2",
+  "scope_root": "/home/zhuhe/litchi-performance-0959",
+  "workload_launched_by_cleanup": false
+}

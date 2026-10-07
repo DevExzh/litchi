@@ -1,0 +1,846 @@
+{
+  "bindings": {
+    "allocator_terminal": {
+      "bytes": 582,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/capture-allocator-v1/capture-terminal.json",
+      "sha256": "f66b26f72bbb837fcfa8cba12a82860605b7f49fa84b7ea39f76090bc77674a2"
+    },
+    "native_terminal": {
+      "bytes": 576,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/capture-terminal.json",
+      "sha256": "b3876c4924f2aa88bbfab78a65e1522ec5227c5560efa5a2cd386cb4d2d8e8ab"
+    },
+    "plan": {
+      "bytes": 84840,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/plan-final-v8.json",
+      "sha256": "9964f2f3a86dd467de6d7840807400aa7468a48f7d993b50ea296c6e0909abf8"
+    },
+    "reduction": {
+      "bytes": 1447293,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/analysis/comparison-v3.json",
+      "sha256": "9dbaefcd25b348c6b3f3c23ff4ed94b6e160fa7c95a5e37667a7efafa80242eb"
+    },
+    "sealed_capture_audit": {
+      "bytes": 5353,
+      "executable": false,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/review/sealed-capture-audit-v1.json",
+      "sha256": "6b10171134d77a11a77ca001b0bc67feb120f76d6f0d89e99452cc78a094816f"
+    }
+  },
+  "checks": {
+    "aggregate_checks": [
+      {
+        "case": "medium-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "ingress_ns.p50"
+      },
+      {
+        "case": "medium-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "ingress_ns.p95"
+      },
+      {
+        "case": "medium-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "ingress_ns.p99"
+      },
+      {
+        "case": "medium-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "edit_commit_ns.p50"
+      },
+      {
+        "case": "medium-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "edit_commit_ns.p95"
+      },
+      {
+        "case": "medium-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "edit_commit_ns.p99"
+      },
+      {
+        "case": "medium-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "publication_ns.p50"
+      },
+      {
+        "case": "medium-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "publication_ns.p95"
+      },
+      {
+        "case": "medium-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "publication_ns.p99"
+      },
+      {
+        "case": "medium-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "commit_drop_ns.p50"
+      },
+      {
+        "case": "medium-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "commit_drop_ns.p95"
+      },
+      {
+        "case": "medium-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "commit_drop_ns.p99"
+      },
+      {
+        "case": "medium-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "total_ns.p50"
+      },
+      {
+        "case": "medium-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "total_ns.p95"
+      },
+      {
+        "case": "medium-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "total_ns.p99"
+      },
+      {
+        "case": "medium-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "max_rss_kib"
+      },
+      {
+        "case": "medium-one-percent",
+        "lane": "allocator",
+        "match": true,
+        "metric": "allocated_bytes"
+      },
+      {
+        "case": "medium-one-percent",
+        "lane": "allocator",
+        "match": true,
+        "metric": "allocation_calls"
+      },
+      {
+        "case": "medium-one-percent",
+        "lane": "allocator",
+        "match": true,
+        "metric": "region_peak_live_bytes"
+      },
+      {
+        "case": "medium-one-percent",
+        "lane": "allocator",
+        "match": true,
+        "metric": "core_combined_with_drain.allocated_bytes"
+      },
+      {
+        "case": "medium-one-percent",
+        "lane": "allocator",
+        "match": true,
+        "metric": "max_rss_kib"
+      },
+      {
+        "case": "dense-sparse-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "ingress_ns.p50"
+      },
+      {
+        "case": "dense-sparse-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "ingress_ns.p95"
+      },
+      {
+        "case": "dense-sparse-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "ingress_ns.p99"
+      },
+      {
+        "case": "dense-sparse-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "edit_commit_ns.p50"
+      },
+      {
+        "case": "dense-sparse-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "edit_commit_ns.p95"
+      },
+      {
+        "case": "dense-sparse-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "edit_commit_ns.p99"
+      },
+      {
+        "case": "dense-sparse-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "publication_ns.p50"
+      },
+      {
+        "case": "dense-sparse-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "publication_ns.p95"
+      },
+      {
+        "case": "dense-sparse-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "publication_ns.p99"
+      },
+      {
+        "case": "dense-sparse-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "commit_drop_ns.p50"
+      },
+      {
+        "case": "dense-sparse-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "commit_drop_ns.p95"
+      },
+      {
+        "case": "dense-sparse-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "commit_drop_ns.p99"
+      },
+      {
+        "case": "dense-sparse-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "total_ns.p50"
+      },
+      {
+        "case": "dense-sparse-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "total_ns.p95"
+      },
+      {
+        "case": "dense-sparse-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "total_ns.p99"
+      },
+      {
+        "case": "dense-sparse-one-percent",
+        "lane": "native",
+        "match": true,
+        "metric": "max_rss_kib"
+      },
+      {
+        "case": "dense-sparse-one-percent",
+        "lane": "allocator",
+        "match": true,
+        "metric": "allocated_bytes"
+      },
+      {
+        "case": "dense-sparse-one-percent",
+        "lane": "allocator",
+        "match": true,
+        "metric": "allocation_calls"
+      },
+      {
+        "case": "dense-sparse-one-percent",
+        "lane": "allocator",
+        "match": true,
+        "metric": "region_peak_live_bytes"
+      },
+      {
+        "case": "dense-sparse-one-percent",
+        "lane": "allocator",
+        "match": true,
+        "metric": "core_combined_with_drain.allocated_bytes"
+      },
+      {
+        "case": "dense-sparse-one-percent",
+        "lane": "allocator",
+        "match": true,
+        "metric": "max_rss_kib"
+      },
+      {
+        "case": "medium-one-edit",
+        "lane": "native",
+        "match": true,
+        "metric": "ingress_ns.p50"
+      },
+      {
+        "case": "medium-one-edit",
+        "lane": "native",
+        "match": true,
+        "metric": "ingress_ns.p95"
+      },
+      {
+        "case": "medium-one-edit",
+        "lane": "native",
+        "match": true,
+        "metric": "ingress_ns.p99"
+      },
+      {
+        "case": "medium-one-edit",
+        "lane": "native",
+        "match": true,
+        "metric": "edit_commit_ns.p50"
+      },
+      {
+        "case": "medium-one-edit",
+        "lane": "native",
+        "match": true,
+        "metric": "edit_commit_ns.p95"
+      },
+      {
+        "case": "medium-one-edit",
+        "lane": "native",
+        "match": true,
+        "metric": "edit_commit_ns.p99"
+      },
+      {
+        "case": "medium-one-edit",
+        "lane": "native",
+        "match": true,
+        "metric": "publication_ns.p50"
+      },
+      {
+        "case": "medium-one-edit",
+        "lane": "native",
+        "match": true,
+        "metric": "publication_ns.p95"
+      },
+      {
+        "case": "medium-one-edit",
+        "lane": "native",
+        "match": true,
+        "metric": "publication_ns.p99"
+      },
+      {
+        "case": "medium-one-edit",
+        "lane": "native",
+        "match": true,
+        "metric": "commit_drop_ns.p50"
+      },
+      {
+        "case": "medium-one-edit",
+        "lane": "native",
+        "match": true,
+        "metric": "commit_drop_ns.p95"
+      },
+      {
+        "case": "medium-one-edit",
+        "lane": "native",
+        "match": true,
+        "metric": "commit_drop_ns.p99"
+      },
+      {
+        "case": "medium-one-edit",
+        "lane": "native",
+        "match": true,
+        "metric": "total_ns.p50"
+      },
+      {
+        "case": "medium-one-edit",
+        "lane": "native",
+        "match": true,
+        "metric": "total_ns.p95"
+      },
+      {
+        "case": "medium-one-edit",
+        "lane": "native",
+        "match": true,
+        "metric": "total_ns.p99"
+      },
+      {
+        "case": "medium-one-edit",
+        "lane": "native",
+        "match": true,
+        "metric": "max_rss_kib"
+      },
+      {
+        "case": "medium-one-edit",
+        "lane": "allocator",
+        "match": true,
+        "metric": "allocated_bytes"
+      },
+      {
+        "case": "medium-one-edit",
+        "lane": "allocator",
+        "match": true,
+        "metric": "allocation_calls"
+      },
+      {
+        "case": "medium-one-edit",
+        "lane": "allocator",
+        "match": true,
+        "metric": "region_peak_live_bytes"
+      },
+      {
+        "case": "medium-one-edit",
+        "lane": "allocator",
+        "match": true,
+        "metric": "core_combined_with_drain.allocated_bytes"
+      },
+      {
+        "case": "medium-one-edit",
+        "lane": "allocator",
+        "match": true,
+        "metric": "max_rss_kib"
+      }
+    ],
+    "aggregate_metric_matches": true,
+    "errors": [],
+    "warnings": []
+  },
+  "gates": {
+    "all_safety": false,
+    "allocator_safety": {
+      "dense-sparse-one-percent": true,
+      "medium-one-edit": true,
+      "medium-one-percent": true
+    },
+    "decision": "hold_do_not_adopt",
+    "native_safety": {
+      "dense-sparse-one-percent": true,
+      "medium-one-edit": false,
+      "medium-one-percent": true
+    }
+  },
+  "interpretation": {
+    "adoption": "hold; do not adopt candidate",
+    "dense-sparse-one-percent": "primary native safety passes; no primary improvement gate passes",
+    "medium-one-edit": "primary native safety fails for edit_commit p50/p95, total p50/p95, and max_rss_kib; allocator allocation_calls improves but allocated bytes and region peaks do not",
+    "medium-one-percent": "primary native safety passes; no primary improvement gate passes",
+    "publication_and_commit_drop": "reported as controls/diagnostics; regressions do not rescue the failed primary one-edit gate"
+  },
+  "reduction_schema": "litchi.performance.0959.reducer.v3.final-plan-adapter",
+  "reduction_status": "reduced",
+  "schema": "litchi.performance.0959.final-reduction-independent-review.v1",
+  "scope": "independent read-only recomputation of sealed capture reduction; no workload/build and no original artifact mutation",
+  "status": "passed",
+  "summaries": {
+    "allocator": {
+      "dense-sparse-one-percent": {
+        "allocated_bytes": {
+          "ci_lower": 1.008723342271549,
+          "ci_upper": 1.008723342271549,
+          "point": 1.008723342271549,
+          "safety": true
+        },
+        "allocation_calls": {
+          "ci_lower": 0.9120201976978047,
+          "ci_upper": 0.9120201976978047,
+          "point": 0.9120201976978047,
+          "safety": true
+        },
+        "core_combined_with_drain.allocated_bytes": {
+          "ci_lower": 1.008723342271549,
+          "ci_upper": 1.008723342271549,
+          "point": 1.008723342271549,
+          "safety": true
+        },
+        "max_rss_kib": {
+          "ci_lower": 0.9367717287488061,
+          "ci_upper": 0.9836904987673052,
+          "point": 0.9661966042091462,
+          "safety": true
+        },
+        "region_peak_live_bytes": {
+          "ci_lower": 1.011226527342248,
+          "ci_upper": 1.011226527342248,
+          "point": 1.011226527342248,
+          "safety": true
+        }
+      },
+      "medium-one-edit": {
+        "allocated_bytes": {
+          "ci_lower": 1.006366561822586,
+          "ci_upper": 1.006366561822586,
+          "point": 1.006366561822586,
+          "safety": true
+        },
+        "allocation_calls": {
+          "ci_lower": 0.9179873498685239,
+          "ci_upper": 0.9179873498685239,
+          "point": 0.9179873498685239,
+          "safety": true
+        },
+        "core_combined_with_drain.allocated_bytes": {
+          "ci_lower": 1.006366561822586,
+          "ci_upper": 1.006366561822586,
+          "point": 1.006366561822586,
+          "safety": true
+        },
+        "max_rss_kib": {
+          "ci_lower": 1.029102114183001,
+          "ci_upper": 1.048429092171498,
+          "point": 1.0392012401236708,
+          "safety": true
+        },
+        "region_peak_live_bytes": {
+          "ci_lower": 1.0027466503238127,
+          "ci_upper": 1.0027466503238127,
+          "point": 1.0027466503238127,
+          "safety": true
+        }
+      },
+      "medium-one-percent": {
+        "allocated_bytes": {
+          "ci_lower": 1.0051640591858169,
+          "ci_upper": 1.0051640591858169,
+          "point": 1.0051640591858169,
+          "safety": true
+        },
+        "allocation_calls": {
+          "ci_lower": 0.9136410718306688,
+          "ci_upper": 0.9136410718306688,
+          "point": 0.9136410718306688,
+          "safety": true
+        },
+        "core_combined_with_drain.allocated_bytes": {
+          "ci_lower": 1.0051640591858169,
+          "ci_upper": 1.0051640591858169,
+          "point": 1.0051640591858169,
+          "safety": true
+        },
+        "max_rss_kib": {
+          "ci_lower": 0.9586886209938253,
+          "ci_upper": 0.99528,
+          "point": 0.9793499158938499,
+          "safety": true
+        },
+        "region_peak_live_bytes": {
+          "ci_lower": 1.006752870424272,
+          "ci_upper": 1.006752870424272,
+          "point": 1.006752870424272,
+          "safety": true
+        }
+      }
+    },
+    "native": {
+      "dense-sparse-one-percent": {
+        "commit_drop_ns.p50": {
+          "ci_lower": 1.15559404299109,
+          "ci_upper": 1.1699456727893258,
+          "point": 1.1629734197567427,
+          "safety": false
+        },
+        "commit_drop_ns.p95": {
+          "ci_lower": 1.1476724680788153,
+          "ci_upper": 1.1618195931419883,
+          "point": 1.1545913098644713,
+          "safety": false
+        },
+        "commit_drop_ns.p99": {
+          "ci_lower": 1.144113404741095,
+          "ci_upper": 1.1790152063885295,
+          "point": 1.1618241645234428,
+          "safety": false
+        },
+        "edit_commit_ns.p50": {
+          "ci_lower": 1.0198000030513945,
+          "ci_upper": 1.0401879094681883,
+          "point": 1.0303116828864458,
+          "safety": true
+        },
+        "edit_commit_ns.p95": {
+          "ci_lower": 1.0183837874310564,
+          "ci_upper": 1.0413940363248262,
+          "point": 1.0300631915053402,
+          "safety": true
+        },
+        "edit_commit_ns.p99": {
+          "ci_lower": 1.0189129535074601,
+          "ci_upper": 1.0419344880598325,
+          "point": 1.030422658379121,
+          "safety": true
+        },
+        "ingress_ns.p50": {
+          "ci_lower": 0.9583792365734239,
+          "ci_upper": 1.0147462720662817,
+          "point": 0.9885419642192278,
+          "safety": true
+        },
+        "ingress_ns.p95": {
+          "ci_lower": 0.9499239500346075,
+          "ci_upper": 1.005314420279181,
+          "point": 0.9785100575098282,
+          "safety": true
+        },
+        "ingress_ns.p99": {
+          "ci_lower": 0.9466978028139882,
+          "ci_upper": 1.0040867997431215,
+          "point": 0.9739423675878001,
+          "safety": true
+        },
+        "max_rss_kib": {
+          "ci_lower": 0.9690179304694879,
+          "ci_upper": 0.9816685256669095,
+          "point": 0.9759698721823425,
+          "safety": true
+        },
+        "publication_ns.p50": {
+          "ci_lower": 0.9706398483127847,
+          "ci_upper": 0.9907868109303316,
+          "point": 0.9805967932175815,
+          "safety": true
+        },
+        "publication_ns.p95": {
+          "ci_lower": 0.9731324869562683,
+          "ci_upper": 0.9911849109608623,
+          "point": 0.9820544336057834,
+          "safety": true
+        },
+        "publication_ns.p99": {
+          "ci_lower": 0.9728329065970538,
+          "ci_upper": 0.9917063164532315,
+          "point": 0.9814156204880207,
+          "safety": true
+        },
+        "total_ns.p50": {
+          "ci_lower": 1.0057524113337348,
+          "ci_upper": 1.0180601128630171,
+          "point": 1.0120343538302508,
+          "safety": true
+        },
+        "total_ns.p95": {
+          "ci_lower": 1.0062150446360794,
+          "ci_upper": 1.0177161389244307,
+          "point": 1.0119062220582626,
+          "safety": true
+        },
+        "total_ns.p99": {
+          "ci_lower": 1.0063203964324394,
+          "ci_upper": 1.0172463170012132,
+          "point": 1.011507551855005,
+          "safety": true
+        }
+      },
+      "medium-one-edit": {
+        "commit_drop_ns.p50": {
+          "ci_lower": 1.068749936833425,
+          "ci_upper": 1.0790996306469594,
+          "point": 1.0734940306328513,
+          "safety": false
+        },
+        "commit_drop_ns.p95": {
+          "ci_lower": 1.0708357573801714,
+          "ci_upper": 1.164784053719524,
+          "point": 1.1191267643376566,
+          "safety": false
+        },
+        "commit_drop_ns.p99": {
+          "ci_lower": 1.1022987469488705,
+          "ci_upper": 1.146743254360243,
+          "point": 1.122061938318595,
+          "safety": false
+        },
+        "edit_commit_ns.p50": {
+          "ci_lower": 1.0276101067600145,
+          "ci_upper": 1.0520601634241518,
+          "point": 1.0395094499962005,
+          "safety": false
+        },
+        "edit_commit_ns.p95": {
+          "ci_lower": 1.0315297321260564,
+          "ci_upper": 1.061557391489938,
+          "point": 1.0468930334651947,
+          "safety": false
+        },
+        "edit_commit_ns.p99": {
+          "ci_lower": 1.0314645924347676,
+          "ci_upper": 1.062922325485967,
+          "point": 1.0475759575981598,
+          "safety": false
+        },
+        "ingress_ns.p50": {
+          "ci_lower": 1.0064652447264504,
+          "ci_upper": 1.0718128951473733,
+          "point": 1.038625258606523,
+          "safety": false
+        },
+        "ingress_ns.p95": {
+          "ci_lower": 1.0165608761267144,
+          "ci_upper": 1.090271538515425,
+          "point": 1.0516899484730315,
+          "safety": false
+        },
+        "ingress_ns.p99": {
+          "ci_lower": 0.9829599444976382,
+          "ci_upper": 1.0707452845087377,
+          "point": 1.028696524474824,
+          "safety": false
+        },
+        "max_rss_kib": {
+          "ci_lower": 1.0180998708510145,
+          "ci_upper": 1.061442328766055,
+          "point": 1.0390515909748952,
+          "safety": false
+        },
+        "publication_ns.p50": {
+          "ci_lower": 1.0429182011651899,
+          "ci_upper": 1.2826577078640728,
+          "point": 1.1529705928318377,
+          "safety": false
+        },
+        "publication_ns.p95": {
+          "ci_lower": 1.0875339951004592,
+          "ci_upper": 1.2989869288804448,
+          "point": 1.1851235926278898,
+          "safety": false
+        },
+        "publication_ns.p99": {
+          "ci_lower": 1.093184891812422,
+          "ci_upper": 1.292772813981497,
+          "point": 1.185487109581507,
+          "safety": false
+        },
+        "total_ns.p50": {
+          "ci_lower": 1.04215872037151,
+          "ci_upper": 1.13699513538676,
+          "point": 1.088053790341207,
+          "safety": false
+        },
+        "total_ns.p95": {
+          "ci_lower": 1.0640237460471604,
+          "ci_upper": 1.1453803328654975,
+          "point": 1.101929880483045,
+          "safety": false
+        },
+        "total_ns.p99": {
+          "ci_lower": 1.067352844948485,
+          "ci_upper": 1.1438314548725947,
+          "point": 1.1038697864626257,
+          "safety": false
+        }
+      },
+      "medium-one-percent": {
+        "commit_drop_ns.p50": {
+          "ci_lower": 1.1158286700467803,
+          "ci_upper": 1.1230682896832498,
+          "point": 1.1194400250663998,
+          "safety": false
+        },
+        "commit_drop_ns.p95": {
+          "ci_lower": 1.1017622936211433,
+          "ci_upper": 1.1130598075875622,
+          "point": 1.1078958574745317,
+          "safety": false
+        },
+        "commit_drop_ns.p99": {
+          "ci_lower": 1.08171649701099,
+          "ci_upper": 1.1090463659178296,
+          "point": 1.0949838489852315,
+          "safety": false
+        },
+        "edit_commit_ns.p50": {
+          "ci_lower": 1.0136807507342376,
+          "ci_upper": 1.0265443288141558,
+          "point": 1.0205027746258923,
+          "safety": true
+        },
+        "edit_commit_ns.p95": {
+          "ci_lower": 1.0126521810650093,
+          "ci_upper": 1.0247232902684908,
+          "point": 1.0189305353901688,
+          "safety": true
+        },
+        "edit_commit_ns.p99": {
+          "ci_lower": 1.0123762675660473,
+          "ci_upper": 1.0234305671572657,
+          "point": 1.0181688484820355,
+          "safety": true
+        },
+        "ingress_ns.p50": {
+          "ci_lower": 0.9546706264650818,
+          "ci_upper": 1.0166589503903027,
+          "point": 0.986136819145412,
+          "safety": true
+        },
+        "ingress_ns.p95": {
+          "ci_lower": 0.9433384791687682,
+          "ci_upper": 1.003569127852759,
+          "point": 0.9734944839694847,
+          "safety": true
+        },
+        "ingress_ns.p99": {
+          "ci_lower": 0.9031976391976589,
+          "ci_upper": 0.9618779765581827,
+          "point": 0.9337998191509059,
+          "safety": true
+        },
+        "max_rss_kib": {
+          "ci_lower": 0.9740269013881704,
+          "ci_upper": 1.0171113201044455,
+          "point": 0.9956218943639427,
+          "safety": true
+        },
+        "publication_ns.p50": {
+          "ci_lower": 0.9716040538317272,
+          "ci_upper": 1.0074224655444892,
+          "point": 0.9895595540914953,
+          "safety": true
+        },
+        "publication_ns.p95": {
+          "ci_lower": 0.9692851388671265,
+          "ci_upper": 1.0078273157808109,
+          "point": 0.9884903728977791,
+          "safety": true
+        },
+        "publication_ns.p99": {
+          "ci_lower": 0.969872745077412,
+          "ci_upper": 1.008361064523189,
+          "point": 0.989075553092907,
+          "safety": true
+        },
+        "total_ns.p50": {
+          "ci_lower": 0.9983529577655077,
+          "ci_upper": 1.0191751338471764,
+          "point": 1.0094615808168403,
+          "safety": true
+        },
+        "total_ns.p95": {
+          "ci_lower": 0.9978080031988192,
+          "ci_upper": 1.0181219498883316,
+          "point": 1.0083189340274166,
+          "safety": true
+        },
+        "total_ns.p99": {
+          "ci_lower": 0.9977703063203109,
+          "ci_upper": 1.018890083012776,
+          "point": 1.0086842517689718,
+          "safety": true
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "schema": "focused-arc-v3-start",
+  "started_utc": "2026-10-07T14:20:26.234236Z",
+  "source_root": "/home/zhuhe/litchi-performance-0959/source-candidate-arc-v1",
+  "target_dir": "/home/zhuhe/litchi-performance-0959/target-arc-v1",
+  "source_files": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0959/source-candidate-arc-v1/crates/litchi-xlsx/src/cell.rs",
+      "bytes": 48391,
+      "sha256": "f345c0ab2101d5dad2b25da4bfbfcb3f1bdafabdeca2ad31f66535887e5c2291"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0959/source-candidate-arc-v1/crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+      "bytes": 86041,
+      "sha256": "3da16a84cf9f3cc8b36eb75baea359c17bcf969bb6f78a702452a74f4fa13a63"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0959/source-candidate-arc-v1/crates/litchi-xlsx/src/raw/worksheet/semantic.rs",
+      "bytes": 18321,
+      "sha256": "bd357cedab881148680fe389e7d4288c954239cfdae5f41dbba09e1327f97ebd"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0959/source-candidate-arc-v1/Cargo.lock",
+      "bytes": 138443,
+      "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+    }
+  ],
+  "command": [
+    "/home/zhuhe/.cargo/bin/cargo",
+    "+1.95.0",
+    "test",
+    "--manifest-path",
+    "/home/zhuhe/litchi-performance-0959/source-candidate-arc-v1/Cargo.toml",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-xlsx",
+    "--lib",
+    "raw::worksheet::tests::streaming_0365_range_tests::sparse_bytes_plain_path_matches_baseline_lexical_and_prolog_edges",
+    "--",
+    "--exact",
+    "--nocapture"
+  ],
+  "env": {
+    "PATH": "/home/zhuhe/.cargo/bin:/usr/bin:/bin",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "TZ": "UTC",
+    "RUST_BACKTRACE": "0",
+    "CARGO_TERM_COLOR": "never",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-performance-0959/target-arc-v1",
+    "RUSTUP_TOOLCHAIN": "1.95.0",
+    "HOME": "/home/zhuhe",
+    "TMPDIR": "/home/zhuhe/litchi-performance-0959/tmp/focused-arc-v3"
+  }
+}

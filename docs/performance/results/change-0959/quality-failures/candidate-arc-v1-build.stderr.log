@@ -1,0 +1,7 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+error: options `-C embed-bitcode=no` and `-C lto` are incompatible
+
+error: could not compile `quote` (build script) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `proc-macro2` (build script) due to 1 previous error

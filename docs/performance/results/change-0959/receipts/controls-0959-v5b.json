@@ -1,0 +1,110 @@
+{
+  "control_dir": "/home/zhuhe/litchi-performance-0959/tmp/controls-0959-v5b-20261007T143617172740Z-3027821",
+  "controls": [
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/zhuhe/litchi-performance-0959/tools/capture_0959_v5.py",
+        "--plan",
+        "/home/zhuhe/litchi-performance-0959/tmp/controls-0959-v5b-20261007T143617172740Z-3027821/native-role-order.json",
+        "--lane",
+        "native",
+        "--dry-run"
+      ],
+      "lane": "native",
+      "name": "native-role-order",
+      "plan": {
+        "bytes": 71202,
+        "path": "/home/zhuhe/litchi-performance-0959/tmp/controls-0959-v5b-20261007T143617172740Z-3027821/native-role-order.json",
+        "sha256": "a0077b074432358058b784e05bbdce28dff986d2775e2f648910989d5c27942a"
+      },
+      "rejected": true,
+      "return_code": 2,
+      "stderr": "capture_0959_v3: native schedule differs from frozen paired matrix\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/zhuhe/litchi-performance-0959/tools/capture_0959_v5.py",
+        "--plan",
+        "/home/zhuhe/litchi-performance-0959/tmp/controls-0959-v5b-20261007T143617172740Z-3027821/allocator-count.json",
+        "--lane",
+        "allocator",
+        "--dry-run"
+      ],
+      "lane": "allocator",
+      "name": "allocator-count",
+      "plan": {
+        "bytes": 70635,
+        "path": "/home/zhuhe/litchi-performance-0959/tmp/controls-0959-v5b-20261007T143617172740Z-3027821/allocator-count.json",
+        "sha256": "2d92ba1c500c1e77438406b26e4412bcbe34979b508d499c51c853f9d68156e4"
+      },
+      "rejected": true,
+      "return_code": 2,
+      "stderr": "capture_0959_v3: allocator schedule differs from frozen paired matrix\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/zhuhe/litchi-performance-0959/tools/capture_0959_v5.py",
+        "--plan",
+        "/home/zhuhe/litchi-performance-0959/tmp/controls-0959-v5b-20261007T143617172740Z-3027821/native-cpu-mask.json",
+        "--lane",
+        "native",
+        "--dry-run"
+      ],
+      "lane": "native",
+      "name": "native-cpu-mask",
+      "plan": {
+        "bytes": 71186,
+        "path": "/home/zhuhe/litchi-performance-0959/tmp/controls-0959-v5b-20261007T143617172740Z-3027821/native-cpu-mask.json",
+        "sha256": "6949fe119966614dad848e8f338355860338cafcce1f19be5ebc25f8a7aef74f"
+      },
+      "rejected": true,
+      "return_code": 2,
+      "stderr": "capture_0959_v3: native schedule differs from frozen paired matrix\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "/home/zhuhe/litchi-performance-0959/tools/capture_0959_v5.py",
+        "--plan",
+        "/home/zhuhe/litchi-performance-0959/tmp/controls-0959-v5b-20261007T143617172740Z-3027821/source-oracle.json",
+        "--lane",
+        "native",
+        "--dry-run"
+      ],
+      "lane": "native",
+      "name": "source-oracle",
+      "plan": {
+        "bytes": 71202,
+        "path": "/home/zhuhe/litchi-performance-0959/tmp/controls-0959-v5b-20261007T143617172740Z-3027821/source-oracle.json",
+        "sha256": "a6f24240f68404ae0eb976b4d73ad4a340b284235c12cb6077aabe92f99657ca"
+      },
+      "rejected": true,
+      "return_code": 2,
+      "stderr": "capture_0959_v3: case medium-one-percent output_sha256 oracle changed\n",
+      "stdout": ""
+    }
+  ],
+  "plan": {
+    "bytes": 71202,
+    "path": "/home/zhuhe/litchi-performance-0959/plan-template-0959-v4.json",
+    "sha256": "90ed32a515d93deebff09f7d638c8638c2bbaf324046d65256e8e1dfe4a4fdd8"
+  },
+  "runner": {
+    "bytes": 51480,
+    "path": "/home/zhuhe/litchi-performance-0959/tools/capture_0959_v5.py",
+    "sha256": "b473136919504f3270d3302d8a42ee0107455cb6da446cbe6c02281066a89a0e"
+  },
+  "schema": "litchi.performance.0959.controls-receipt.v5b",
+  "status": "passed",
+  "summary": {
+    "bytes": 3745,
+    "path": "/home/zhuhe/litchi-performance-0959/tmp/controls-0959-v5b-20261007T143617172740Z-3027821/summary.json",
+    "sha256": "b91296b229e421f663c5093a59cfcc6beb736e47e55760d5df88d85f7a93813f"
+  }
+}

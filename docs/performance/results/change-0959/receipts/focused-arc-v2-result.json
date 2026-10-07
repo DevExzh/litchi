@@ -1,0 +1,10 @@
+{
+  "schema": "focused-arc-v2-result",
+  "source_root": "/home/zhuhe/litchi-performance-0959/source-candidate-arc-v1",
+  "target_dir": "/home/zhuhe/litchi-performance-0959/target-arc-v1",
+  "start_receipt": "/home/zhuhe/litchi-performance-0959/receipts/focused-arc-v2-start.json",
+  "terminal_receipt": "/home/zhuhe/litchi-performance-0959/receipts/focused-arc-v2-terminal.json",
+  "source_unchanged": true,
+  "all_passed": true,
+  "command_count": 5
+}

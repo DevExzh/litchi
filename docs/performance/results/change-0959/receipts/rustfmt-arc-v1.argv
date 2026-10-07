@@ -1,0 +1,1 @@
+rustfmt +1.95.0 --edition 2024 --check crates/litchi-xlsx/src/cell.rs crates/litchi-xlsx/src/raw/worksheet/selected.rs crates/litchi-xlsx/src/raw/worksheet/semantic.rs

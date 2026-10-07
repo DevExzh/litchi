@@ -1,0 +1,43 @@
+{
+  "no_workload": true,
+  "run": {
+    "cleanup": {
+      "actions": [],
+      "process_group_clear": true,
+      "reaped": true
+    },
+    "launch_error": null,
+    "launched_utc": "2026-10-07T14:10:11.407162+00:00",
+    "pid": 3000620,
+    "process_group_id": 3000620,
+    "returncode": 101,
+    "started_utc": "2026-10-07T14:10:11.406909+00:00",
+    "terminal_utc": "2026-10-07T14:10:48.875015+00:00",
+    "timed_out": false
+  },
+  "schema": "litchi.performance.0959.layout-probe-terminal.v1",
+  "source_manifest": {
+    "bytes": 2267160,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0959/source-manifest-probe-v1.json",
+    "sha256": "04422d0d862840e8cf28f1fb2bf2b6cf5e8a0ff311fe2f5100ed268932baa354"
+  },
+  "status": "terminal",
+  "stderr": {
+    "bytes": 5754,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0959/review/layout-probe.stderr",
+    "sha256": "ca08545953254d7d82470572b11806e29280299bef0a9d5efd8d200db0931749"
+  },
+  "stdout": {
+    "bytes": 0,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0959/review/layout-probe.stdout",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "target": "/home/zhuhe/litchi-performance-0959/target-v1",
+  "terminal_before_output_parse": true
+}

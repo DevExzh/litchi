@@ -1,0 +1,44 @@
+{
+  "status": "corrected_before_new_epoch",
+  "created_utc": "2026-10-07T14:48:38.448211+00:00",
+  "failed_capture": {
+    "path": "/home/zhuhe/litchi-performance-0959/capture-native-v1/capture-terminal.json",
+    "bytes": 629,
+    "mode": 436,
+    "executable": false,
+    "sha256": "f1edd9f1aca8f4f9a87dcb4f2f9993b1d043592fb6ab985098268a5a3cbe529b"
+  },
+  "failed_child": {
+    "path": "/home/zhuhe/litchi-performance-0959/capture-native-v1/children/native__medium-one-percent__b00__p0/terminal.json",
+    "bytes": 346,
+    "mode": 436,
+    "executable": false,
+    "sha256": "2d2476f83a79d394a94fa648d91ef101188683d8a70459cee3774d75a1ed77be"
+  },
+  "stderr": {
+    "path": "/home/zhuhe/litchi-performance-0959/capture-native-v1/children/native__medium-one-percent__b00__p0/stderr.log",
+    "bytes": 171,
+    "mode": 436,
+    "executable": false,
+    "sha256": "135956d90f2e7491813f009a2a935495d1bbd684d55c45aefaa74e0218c2fbff"
+  },
+  "cause": "Capture helper precreated output directory; benchmark requires absent output and refused before fixture preparation or samples",
+  "measured_samples": 0,
+  "failed_epoch_retained": true,
+  "old_helper": {
+    "path": "/home/zhuhe/litchi-performance-0959/tools/capture_0959_v6.py",
+    "bytes": 51730,
+    "mode": 493,
+    "executable": true,
+    "sha256": "0c3a426fd668bc0d804754b190d6650eddcea5103fe647f3a41256dc7d0e9998"
+  },
+  "corrected_helper": {
+    "path": "/home/zhuhe/litchi-performance-0959/tools/capture_0959_v7.py",
+    "bytes": 51799,
+    "mode": 493,
+    "executable": true,
+    "sha256": "0c3e298c1e9db9d6e40a313d82f9c75a27ffbd3a2d42d7bd612b73078ec5c10e"
+  },
+  "change": "Remove output.mkdir; require absent path and let benchmark own create_new directory",
+  "policy": "Original frozen epoch failed, no retry/replacement within it. New versioned epoch requires new GO and control. No performance sample discarded."
+}

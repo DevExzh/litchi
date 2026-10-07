@@ -1,0 +1,1045 @@
+{
+  "bindings": {
+    "adapter_controls": {
+      "bytes": 1405,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/review/final-plan-adapter-controls-v1.json",
+      "sha256": "1b5184b0cd6cef456e7111bdab48c442fe841cde618b5c7db04c0e85cba8187a"
+    },
+    "adapter_reducer_v3": {
+      "bytes": 63546,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0959/tools/reduce_0959_v3_finalplan.py",
+      "sha256": "4f13cb43b96081ca4736a2b431eaeb1165fd0e28d6c571b285f974c1c428d2f1"
+    },
+    "allocator_packet_terminal": {
+      "bytes": 582,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/capture-allocator-v1/capture-terminal.json",
+      "sha256": "f66b26f72bbb837fcfa8cba12a82860605b7f49fa84b7ea39f76090bc77674a2"
+    },
+    "frozen_reducer_v2": {
+      "bytes": 62578,
+      "mode": 493,
+      "path": "/home/zhuhe/litchi-performance-0959/tools/reduce_0959_v2.py",
+      "sha256": "c3dcdb269f5170f1c9f7f5749a1a1d08b48de46c18f71e0034743f8a84f692c9"
+    },
+    "native_packet_terminal": {
+      "bytes": 576,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/capture-native-v2/capture-terminal.json",
+      "sha256": "b3876c4924f2aa88bbfab78a65e1522ec5227c5560efa5a2cd386cb4d2d8e8ab"
+    },
+    "plan": {
+      "bytes": 84840,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/plan-final-v8.json",
+      "sha256": "9964f2f3a86dd467de6d7840807400aa7468a48f7d993b50ea296c6e0909abf8"
+    },
+    "reducer_controls": {
+      "bytes": 846,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/review/reducer-controls-finalplan-v1.json",
+      "sha256": "2e850df58bd2441628d2805f0d109c88cc49c3e826cece5530a87b49e789f72c"
+    },
+    "reduction": {
+      "bytes": 1447293,
+      "mode": 436,
+      "path": "/home/zhuhe/litchi-performance-0959/analysis/comparison-v3.json",
+      "sha256": "9dbaefcd25b348c6b3f3c23ff4ed94b6e160fa7c95a5e37667a7efafa80242eb"
+    }
+  },
+  "commands": [
+    "python3 /home/zhuhe/litchi-performance-0959/tools/reduce_0959_v2.py --plan /home/zhuhe/litchi-performance-0959/plan-final-v8.json --native-packet /home/zhuhe/litchi-performance-0959/capture-native-v2 --allocator-packet /home/zhuhe/litchi-performance-0959/capture-allocator-v1 --output /home/zhuhe/litchi-performance-0959/analysis/comparison-v1.json",
+    "python3 /home/zhuhe/litchi-performance-0959/tools/reduce_0959_v3_finalplan.py --plan /home/zhuhe/litchi-performance-0959/plan-final-v8.json --native-packet /home/zhuhe/litchi-performance-0959/capture-native-v2 --allocator-packet /home/zhuhe/litchi-performance-0959/capture-allocator-v1 --output /home/zhuhe/litchi-performance-0959/analysis/comparison-v3.json"
+  ],
+  "correction": {
+    "logic_unchanged": [
+      "report validation",
+      "phase conservation",
+      "native/allocator schedule checks",
+      "paired ratios",
+      "10,000 bootstrap resamples",
+      "seed 959",
+      "gate thresholds"
+    ],
+    "plan_helper_binding": "The authorized plan remains bound to immutable reduce_0959_v2.py; the adapter verifies that descriptor and is a separately hashed post-capture helper.",
+    "source_mapping": {
+      "legacy_candidate_source_freeze": "source.candidate_freeze",
+      "legacy_candidate_source_manifest": "source.candidate_manifest"
+    },
+    "type": "final-plan-binding-schema adapter"
+  },
+  "decision_facts": {
+    "all_safety": false,
+    "allocator_primary": "all three cases pass allocator safety for allocated_bytes, allocation_calls, region_peak_live_bytes, core_combined_with_drain.allocated_bytes, and max_rss_kib; allocation_calls improvement passes all three, while allocated-byte point ratios remain about 1.005-1.009.",
+    "allocator_safety": {
+      "dense-sparse-one-percent": true,
+      "medium-one-edit": true,
+      "medium-one-percent": true
+    },
+    "native_primary_regression": "medium-one-edit fails primary safety on edit_commit p50/p95, total p50/p95, and max_rss_kib; dense-sparse-one-percent and medium-one-percent primary safety passes.",
+    "native_safety": {
+      "dense-sparse-one-percent": true,
+      "medium-one-edit": false,
+      "medium-one-percent": true
+    },
+    "secondary_review": "commit_drop_ns aggregate ratios exceed 1.05 in all three native cases; these are retained review metrics and are not the declared native primary safety gate."
+  },
+  "failure": {
+    "error": "source.candidate_source_manifest is pending",
+    "exit_code": 2,
+    "output_created": false,
+    "status": "failed_before_reduction"
+  },
+  "failure_preserved": {
+    "bytes": 1624,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0959/review/root-reducer-v2-terminal-v1.json",
+    "sha256": "50ce4dbf7162726ddc0ecd4e9f9511171a3ccf8fd944b0928e7dd08e99d49b84"
+  },
+  "gates": {
+    "all_safety": false,
+    "allocator": {
+      "dense-sparse-one-percent": {
+        "allocated_bytes": {
+          "ci_upper": 1.008723342271549,
+          "improvement_pass": false,
+          "point": 1.008723342271549,
+          "safety_pass": true
+        },
+        "allocation_calls": {
+          "ci_upper": 0.9120201976978047,
+          "improvement_pass": true,
+          "point": 0.9120201976978047,
+          "safety_pass": true
+        },
+        "core_combined_with_drain.allocated_bytes": {
+          "ci_upper": 1.008723342271549,
+          "improvement_pass": false,
+          "point": 1.008723342271549,
+          "safety_pass": true
+        },
+        "max_rss_kib": {
+          "ci_upper": 0.9836904987673052,
+          "improvement_pass": false,
+          "point": 0.9661966042091462,
+          "safety_pass": true
+        },
+        "region_peak_live_bytes": {
+          "ci_upper": 1.011226527342248,
+          "improvement_pass": false,
+          "point": 1.011226527342248,
+          "safety_pass": true
+        }
+      },
+      "medium-one-edit": {
+        "allocated_bytes": {
+          "ci_upper": 1.006366561822586,
+          "improvement_pass": false,
+          "point": 1.006366561822586,
+          "safety_pass": true
+        },
+        "allocation_calls": {
+          "ci_upper": 0.9179873498685239,
+          "improvement_pass": true,
+          "point": 0.9179873498685239,
+          "safety_pass": true
+        },
+        "core_combined_with_drain.allocated_bytes": {
+          "ci_upper": 1.006366561822586,
+          "improvement_pass": false,
+          "point": 1.006366561822586,
+          "safety_pass": true
+        },
+        "max_rss_kib": {
+          "ci_upper": 1.048429092171498,
+          "improvement_pass": false,
+          "point": 1.0392012401236708,
+          "safety_pass": true
+        },
+        "region_peak_live_bytes": {
+          "ci_upper": 1.0027466503238127,
+          "improvement_pass": false,
+          "point": 1.0027466503238127,
+          "safety_pass": true
+        }
+      },
+      "medium-one-percent": {
+        "allocated_bytes": {
+          "ci_upper": 1.0051640591858169,
+          "improvement_pass": false,
+          "point": 1.0051640591858169,
+          "safety_pass": true
+        },
+        "allocation_calls": {
+          "ci_upper": 0.9136410718306688,
+          "improvement_pass": true,
+          "point": 0.9136410718306688,
+          "safety_pass": true
+        },
+        "core_combined_with_drain.allocated_bytes": {
+          "ci_upper": 1.0051640591858169,
+          "improvement_pass": false,
+          "point": 1.0051640591858169,
+          "safety_pass": true
+        },
+        "max_rss_kib": {
+          "ci_upper": 0.99528,
+          "improvement_pass": false,
+          "point": 0.9793499158938499,
+          "safety_pass": true
+        },
+        "region_peak_live_bytes": {
+          "ci_upper": 1.006752870424272,
+          "improvement_pass": false,
+          "point": 1.006752870424272,
+          "safety_pass": true
+        }
+      }
+    },
+    "allocator_gate_metrics": [
+      "allocated_bytes",
+      "allocation_calls",
+      "region_peak_live_bytes",
+      "core_combined_with_drain.allocated_bytes",
+      "max_rss_kib"
+    ],
+    "allocator_safety": {
+      "dense-sparse-one-percent": true,
+      "medium-one-edit": true,
+      "medium-one-percent": true
+    },
+    "custody": true,
+    "native": {
+      "dense-sparse-one-percent": {
+        "edit_commit_ns.p50": {
+          "ci_upper": 1.0401879094681883,
+          "improvement_pass": false,
+          "point": 1.0303116828864458,
+          "safety_pass": true
+        },
+        "edit_commit_ns.p95": {
+          "ci_upper": 1.0413940363248262,
+          "improvement_pass": false,
+          "point": 1.0300631915053402,
+          "safety_pass": true
+        },
+        "max_rss_kib": {
+          "ci_upper": 0.9816685256669095,
+          "improvement_pass": false,
+          "point": 0.9759698721823425,
+          "safety_pass": true
+        },
+        "total_ns.p50": {
+          "ci_upper": 1.0180601128630171,
+          "improvement_pass": false,
+          "point": 1.0120343538302508,
+          "safety_pass": true
+        },
+        "total_ns.p95": {
+          "ci_upper": 1.0177161389244307,
+          "improvement_pass": false,
+          "point": 1.0119062220582626,
+          "safety_pass": true
+        }
+      },
+      "medium-one-edit": {
+        "edit_commit_ns.p50": {
+          "ci_upper": 1.0520601634241518,
+          "improvement_pass": false,
+          "point": 1.0395094499962005,
+          "safety_pass": false
+        },
+        "edit_commit_ns.p95": {
+          "ci_upper": 1.061557391489938,
+          "improvement_pass": false,
+          "point": 1.0468930334651947,
+          "safety_pass": false
+        },
+        "max_rss_kib": {
+          "ci_upper": 1.061442328766055,
+          "improvement_pass": false,
+          "point": 1.0390515909748952,
+          "safety_pass": false
+        },
+        "total_ns.p50": {
+          "ci_upper": 1.13699513538676,
+          "improvement_pass": false,
+          "point": 1.088053790341207,
+          "safety_pass": false
+        },
+        "total_ns.p95": {
+          "ci_upper": 1.1453803328654975,
+          "improvement_pass": false,
+          "point": 1.101929880483045,
+          "safety_pass": false
+        }
+      },
+      "medium-one-percent": {
+        "edit_commit_ns.p50": {
+          "ci_upper": 1.0265443288141558,
+          "improvement_pass": false,
+          "point": 1.0205027746258923,
+          "safety_pass": true
+        },
+        "edit_commit_ns.p95": {
+          "ci_upper": 1.0247232902684908,
+          "improvement_pass": false,
+          "point": 1.0189305353901688,
+          "safety_pass": true
+        },
+        "max_rss_kib": {
+          "ci_upper": 1.0171113201044455,
+          "improvement_pass": false,
+          "point": 0.9956218943639427,
+          "safety_pass": true
+        },
+        "total_ns.p50": {
+          "ci_upper": 1.0191751338471764,
+          "improvement_pass": false,
+          "point": 1.0094615808168403,
+          "safety_pass": true
+        },
+        "total_ns.p95": {
+          "ci_upper": 1.0181219498883316,
+          "improvement_pass": false,
+          "point": 1.0083189340274166,
+          "safety_pass": true
+        }
+      }
+    },
+    "native_gate_metrics": [
+      "edit_commit_ns.p50",
+      "edit_commit_ns.p95",
+      "total_ns.p50",
+      "total_ns.p95",
+      "max_rss_kib"
+    ],
+    "native_safety": {
+      "dense-sparse-one-percent": true,
+      "medium-one-edit": false,
+      "medium-one-percent": true
+    }
+  },
+  "metrics": {
+    "allocator": {
+      "dense-sparse-one-percent": {
+        "allocated_bytes": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 1.008723342271549,
+          "ci_upper": 1.008723342271549,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 0,
+          "point": 1.008723342271549,
+          "repeat_gt_1_05_count": 0,
+          "safety_pass": true
+        },
+        "allocation_calls": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 0.9120201976978047,
+          "ci_upper": 0.9120201976978047,
+          "improvement_pass": true,
+          "leg_gt_1_05_count": 0,
+          "point": 0.9120201976978047,
+          "repeat_gt_1_05_count": 0,
+          "safety_pass": true
+        },
+        "core_combined_with_drain.allocated_bytes": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 1.008723342271549,
+          "ci_upper": 1.008723342271549,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 0,
+          "point": 1.008723342271549,
+          "repeat_gt_1_05_count": 0,
+          "safety_pass": true
+        },
+        "max_rss_kib": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 0.9367717287488061,
+          "ci_upper": 0.9836904987673052,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 0,
+          "point": 0.9661966042091462,
+          "repeat_gt_1_05_count": 0,
+          "safety_pass": true
+        },
+        "region_peak_live_bytes": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 1.011226527342248,
+          "ci_upper": 1.011226527342248,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 0,
+          "point": 1.011226527342248,
+          "repeat_gt_1_05_count": 0,
+          "safety_pass": true
+        }
+      },
+      "medium-one-edit": {
+        "allocated_bytes": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 1.006366561822586,
+          "ci_upper": 1.006366561822586,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 0,
+          "point": 1.006366561822586,
+          "repeat_gt_1_05_count": 0,
+          "safety_pass": true
+        },
+        "allocation_calls": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 0.9179873498685239,
+          "ci_upper": 0.9179873498685239,
+          "improvement_pass": true,
+          "leg_gt_1_05_count": 0,
+          "point": 0.9179873498685239,
+          "repeat_gt_1_05_count": 0,
+          "safety_pass": true
+        },
+        "core_combined_with_drain.allocated_bytes": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 1.006366561822586,
+          "ci_upper": 1.006366561822586,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 0,
+          "point": 1.006366561822586,
+          "repeat_gt_1_05_count": 0,
+          "safety_pass": true
+        },
+        "max_rss_kib": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 1.029102114183001,
+          "ci_upper": 1.048429092171498,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 0,
+          "point": 1.0392012401236708,
+          "repeat_gt_1_05_count": 0,
+          "safety_pass": true
+        },
+        "region_peak_live_bytes": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 1.0027466503238127,
+          "ci_upper": 1.0027466503238127,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 0,
+          "point": 1.0027466503238127,
+          "repeat_gt_1_05_count": 0,
+          "safety_pass": true
+        }
+      },
+      "medium-one-percent": {
+        "allocated_bytes": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 1.0051640591858169,
+          "ci_upper": 1.0051640591858169,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 0,
+          "point": 1.0051640591858169,
+          "repeat_gt_1_05_count": 0,
+          "safety_pass": true
+        },
+        "allocation_calls": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 0.9136410718306688,
+          "ci_upper": 0.9136410718306688,
+          "improvement_pass": true,
+          "leg_gt_1_05_count": 0,
+          "point": 0.9136410718306688,
+          "repeat_gt_1_05_count": 0,
+          "safety_pass": true
+        },
+        "core_combined_with_drain.allocated_bytes": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 1.0051640591858169,
+          "ci_upper": 1.0051640591858169,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 0,
+          "point": 1.0051640591858169,
+          "repeat_gt_1_05_count": 0,
+          "safety_pass": true
+        },
+        "max_rss_kib": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 0.9586886209938253,
+          "ci_upper": 0.99528,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 0,
+          "point": 0.9793499158938499,
+          "repeat_gt_1_05_count": 0,
+          "safety_pass": true
+        },
+        "region_peak_live_bytes": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 1.006752870424272,
+          "ci_upper": 1.006752870424272,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 0,
+          "point": 1.006752870424272,
+          "repeat_gt_1_05_count": 0,
+          "safety_pass": true
+        }
+      }
+    },
+    "native": {
+      "dense-sparse-one-percent": {
+        "commit_drop_ns.p50": {
+          "aggregate_gt_1_05": true,
+          "block_gt_1_05_count": 6,
+          "ci_lower": 1.15559404299109,
+          "ci_upper": 1.1699456727893258,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 12,
+          "point": 1.1629734197567427,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": false
+        },
+        "commit_drop_ns.p95": {
+          "aggregate_gt_1_05": true,
+          "block_gt_1_05_count": 6,
+          "ci_lower": 1.1476724680788153,
+          "ci_upper": 1.1618195931419883,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 12,
+          "point": 1.1545913098644713,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": false
+        },
+        "commit_drop_ns.p99": {
+          "aggregate_gt_1_05": true,
+          "block_gt_1_05_count": 6,
+          "ci_lower": 1.144113404741095,
+          "ci_upper": 1.1790152063885295,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 12,
+          "point": 1.1618241645234428,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": false
+        },
+        "edit_commit_ns.p50": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 1.0198000030513945,
+          "ci_upper": 1.0401879094681883,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 4,
+          "point": 1.0303116828864458,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": true
+        },
+        "edit_commit_ns.p95": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 1.0183837874310564,
+          "ci_upper": 1.0413940363248262,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 4,
+          "point": 1.0300631915053402,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": true
+        },
+        "edit_commit_ns.p99": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 1.0189129535074601,
+          "ci_upper": 1.0419344880598325,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 4,
+          "point": 1.030422658379121,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": true
+        },
+        "ingress_ns.p50": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 0.9583792365734239,
+          "ci_upper": 1.0147462720662817,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 0,
+          "point": 0.9885419642192278,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": true
+        },
+        "ingress_ns.p95": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 0.9499239500346075,
+          "ci_upper": 1.005314420279181,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 1,
+          "point": 0.9785100575098282,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": true
+        },
+        "ingress_ns.p99": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 0.9466978028139882,
+          "ci_upper": 1.0040867997431215,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 2,
+          "point": 0.9739423675878001,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": true
+        },
+        "max_rss_kib": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 0.9690179304694879,
+          "ci_upper": 0.9816685256669095,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 0,
+          "point": 0.9759698721823425,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": true
+        },
+        "publication_ns.p50": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 0.9706398483127847,
+          "ci_upper": 0.9907868109303316,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 0,
+          "point": 0.9805967932175815,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": true
+        },
+        "publication_ns.p95": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 0.9731324869562683,
+          "ci_upper": 0.9911849109608623,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 0,
+          "point": 0.9820544336057834,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": true
+        },
+        "publication_ns.p99": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 0.9728329065970538,
+          "ci_upper": 0.9917063164532315,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 0,
+          "point": 0.9814156204880207,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": true
+        },
+        "total_ns.p50": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 1.0057524113337348,
+          "ci_upper": 1.0180601128630171,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 0,
+          "point": 1.0120343538302508,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": true
+        },
+        "total_ns.p95": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 1.0062150446360794,
+          "ci_upper": 1.0177161389244307,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 0,
+          "point": 1.0119062220582626,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": true
+        },
+        "total_ns.p99": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 1.0063203964324394,
+          "ci_upper": 1.0172463170012132,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 0,
+          "point": 1.011507551855005,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": true
+        }
+      },
+      "medium-one-edit": {
+        "commit_drop_ns.p50": {
+          "aggregate_gt_1_05": true,
+          "block_gt_1_05_count": 6,
+          "ci_lower": 1.068749936833425,
+          "ci_upper": 1.0790996306469594,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 12,
+          "point": 1.0734940306328513,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": false
+        },
+        "commit_drop_ns.p95": {
+          "aggregate_gt_1_05": true,
+          "block_gt_1_05_count": 5,
+          "ci_lower": 1.0708357573801714,
+          "ci_upper": 1.164784053719524,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 8,
+          "point": 1.1191267643376566,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": false
+        },
+        "commit_drop_ns.p99": {
+          "aggregate_gt_1_05": true,
+          "block_gt_1_05_count": 6,
+          "ci_lower": 1.1022987469488705,
+          "ci_upper": 1.146743254360243,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 11,
+          "point": 1.122061938318595,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": false
+        },
+        "edit_commit_ns.p50": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 2,
+          "ci_lower": 1.0276101067600145,
+          "ci_upper": 1.0520601634241518,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 4,
+          "point": 1.0395094499962005,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": false
+        },
+        "edit_commit_ns.p95": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 4,
+          "ci_lower": 1.0315297321260564,
+          "ci_upper": 1.061557391489938,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 5,
+          "point": 1.0468930334651947,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": false
+        },
+        "edit_commit_ns.p99": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 3,
+          "ci_lower": 1.0314645924347676,
+          "ci_upper": 1.062922325485967,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 5,
+          "point": 1.0475759575981598,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": false
+        },
+        "ingress_ns.p50": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 2,
+          "ci_lower": 1.0064652447264504,
+          "ci_upper": 1.0718128951473733,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 4,
+          "point": 1.038625258606523,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": false
+        },
+        "ingress_ns.p95": {
+          "aggregate_gt_1_05": true,
+          "block_gt_1_05_count": 3,
+          "ci_lower": 1.0165608761267144,
+          "ci_upper": 1.090271538515425,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 6,
+          "point": 1.0516899484730315,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": false
+        },
+        "ingress_ns.p99": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 3,
+          "ci_lower": 0.9829599444976382,
+          "ci_upper": 1.0707452845087377,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 6,
+          "point": 1.028696524474824,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": false
+        },
+        "max_rss_kib": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 2,
+          "ci_lower": 1.0180998708510145,
+          "ci_upper": 1.061442328766055,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 5,
+          "point": 1.0390515909748952,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": false
+        },
+        "publication_ns.p50": {
+          "aggregate_gt_1_05": true,
+          "block_gt_1_05_count": 3,
+          "ci_lower": 1.0429182011651899,
+          "ci_upper": 1.2826577078640728,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 5,
+          "point": 1.1529705928318377,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": false
+        },
+        "publication_ns.p95": {
+          "aggregate_gt_1_05": true,
+          "block_gt_1_05_count": 5,
+          "ci_lower": 1.0875339951004592,
+          "ci_upper": 1.2989869288804448,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 7,
+          "point": 1.1851235926278898,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": false
+        },
+        "publication_ns.p99": {
+          "aggregate_gt_1_05": true,
+          "block_gt_1_05_count": 5,
+          "ci_lower": 1.093184891812422,
+          "ci_upper": 1.292772813981497,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 7,
+          "point": 1.185487109581507,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": false
+        },
+        "total_ns.p50": {
+          "aggregate_gt_1_05": true,
+          "block_gt_1_05_count": 3,
+          "ci_lower": 1.04215872037151,
+          "ci_upper": 1.13699513538676,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 8,
+          "point": 1.088053790341207,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": false
+        },
+        "total_ns.p95": {
+          "aggregate_gt_1_05": true,
+          "block_gt_1_05_count": 4,
+          "ci_lower": 1.0640237460471604,
+          "ci_upper": 1.1453803328654975,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 8,
+          "point": 1.101929880483045,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": false
+        },
+        "total_ns.p99": {
+          "aggregate_gt_1_05": true,
+          "block_gt_1_05_count": 5,
+          "ci_lower": 1.067352844948485,
+          "ci_upper": 1.1438314548725947,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 8,
+          "point": 1.1038697864626257,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": false
+        }
+      },
+      "medium-one-percent": {
+        "commit_drop_ns.p50": {
+          "aggregate_gt_1_05": true,
+          "block_gt_1_05_count": 6,
+          "ci_lower": 1.1158286700467803,
+          "ci_upper": 1.1230682896832498,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 12,
+          "point": 1.1194400250663998,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": false
+        },
+        "commit_drop_ns.p95": {
+          "aggregate_gt_1_05": true,
+          "block_gt_1_05_count": 6,
+          "ci_lower": 1.1017622936211433,
+          "ci_upper": 1.1130598075875622,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 12,
+          "point": 1.1078958574745317,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": false
+        },
+        "commit_drop_ns.p99": {
+          "aggregate_gt_1_05": true,
+          "block_gt_1_05_count": 6,
+          "ci_lower": 1.08171649701099,
+          "ci_upper": 1.1090463659178296,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 11,
+          "point": 1.0949838489852315,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": false
+        },
+        "edit_commit_ns.p50": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 1.0136807507342376,
+          "ci_upper": 1.0265443288141558,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 0,
+          "point": 1.0205027746258923,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": true
+        },
+        "edit_commit_ns.p95": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 1.0126521810650093,
+          "ci_upper": 1.0247232902684908,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 0,
+          "point": 1.0189305353901688,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": true
+        },
+        "edit_commit_ns.p99": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 1.0123762675660473,
+          "ci_upper": 1.0234305671572657,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 0,
+          "point": 1.0181688484820355,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": true
+        },
+        "ingress_ns.p50": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 0.9546706264650818,
+          "ci_upper": 1.0166589503903027,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 1,
+          "point": 0.986136819145412,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": true
+        },
+        "ingress_ns.p95": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 0.9433384791687682,
+          "ci_upper": 1.003569127852759,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 0,
+          "point": 0.9734944839694847,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": true
+        },
+        "ingress_ns.p99": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 0.9031976391976589,
+          "ci_upper": 0.9618779765581827,
+          "improvement_pass": true,
+          "leg_gt_1_05_count": 0,
+          "point": 0.9337998191509059,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": true
+        },
+        "max_rss_kib": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 0.9740269013881704,
+          "ci_upper": 1.0171113201044455,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 3,
+          "point": 0.9956218943639427,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": true
+        },
+        "publication_ns.p50": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 0.9716040538317272,
+          "ci_upper": 1.0074224655444892,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 1,
+          "point": 0.9895595540914953,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": true
+        },
+        "publication_ns.p95": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 0.9692851388671265,
+          "ci_upper": 1.0078273157808109,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 1,
+          "point": 0.9884903728977791,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": true
+        },
+        "publication_ns.p99": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 0.969872745077412,
+          "ci_upper": 1.008361064523189,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 1,
+          "point": 0.989075553092907,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": true
+        },
+        "total_ns.p50": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 0.9983529577655077,
+          "ci_upper": 1.0191751338471764,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 1,
+          "point": 1.0094615808168403,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": true
+        },
+        "total_ns.p95": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 0.9978080031988192,
+          "ci_upper": 1.0181219498883316,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 1,
+          "point": 1.0083189340274166,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": true
+        },
+        "total_ns.p99": {
+          "aggregate_gt_1_05": false,
+          "block_gt_1_05_count": 0,
+          "ci_lower": 0.9977703063203109,
+          "ci_upper": 1.018890083012776,
+          "improvement_pass": false,
+          "leg_gt_1_05_count": 1,
+          "point": 1.0086842517689718,
+          "repeat_gt_1_05_count": null,
+          "safety_pass": true
+        }
+      }
+    }
+  },
+  "schedule": {
+    "allocator_children": 18,
+    "allocator_repeats_per_case": 3,
+    "native_blocks_per_case": 6,
+    "native_children": 72
+  },
+  "schema": "litchi.performance.0959.reducer-correction-receipt.v1",
+  "scope": "post-capture offline reduction only; no workload, build, resampling change, gate change, or packet mutation",
+  "status": "reduced"
+}

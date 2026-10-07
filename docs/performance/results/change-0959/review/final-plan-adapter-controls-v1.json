@@ -1,0 +1,37 @@
+{
+  "adapter": {
+    "bytes": 63546,
+    "path": "/home/zhuhe/litchi-performance-0959/tools/reduce_0959_v3_finalplan.py",
+    "sha256": "4f13cb43b96081ca4736a2b431eaeb1165fd0e28d6c571b285f974c1c428d2f1"
+  },
+  "checks": [
+    {
+      "name": "final_plan_v8_binding_accepts_alias_adapter",
+      "status": "pass"
+    },
+    {
+      "error": "source.candidate_source_manifest is pending",
+      "name": "missing_candidate_manifest_rejected",
+      "status": "pass"
+    },
+    {
+      "error": "plan.source.candidate_manifest.sha256 differs from bound artifact",
+      "name": "mutated_candidate_manifest_rejected",
+      "status": "pass"
+    },
+    {
+      "error": "plan reducer binding differs from frozen v2 helper",
+      "name": "historical_v2_reducer_binding_rejected",
+      "status": "pass"
+    }
+  ],
+  "correction": "Final plan v8 source.candidate_manifest/source.candidate_freeze are accepted as exact equivalents of the frozen v2 reducer names; the plan still binds the immutable v2 helper descriptor, while this adapter is separately versioned.",
+  "plan": {
+    "bytes": 84840,
+    "path": "/home/zhuhe/litchi-performance-0959/plan-final-v8.json",
+    "sha256": "9964f2f3a86dd467de6d7840807400aa7468a48f7d993b50ea296c6e0909abf8"
+  },
+  "schema": "litchi.performance.0959.final-plan-adapter-controls.v1",
+  "scope": "binding adapter controls only; no workload or build",
+  "status": "passed"
+}

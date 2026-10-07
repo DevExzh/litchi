@@ -1,0 +1,23 @@
+{
+  "all_binaries_present": false,
+  "binary_parse_after_terminal": true,
+  "binary_receipt": {
+    "bytes": 1628,
+    "path": "/home/zhuhe/litchi-performance-0959/receipts/candidate-arc-v1-build-binaries.json",
+    "sha256": "f393889170747c7e165f20f86a0f79844885d624985dc55b5af7d4bdbb656a57"
+  },
+  "returncode": 101,
+  "schema": "candidate-arc-v1-build-result",
+  "source_unchanged": true,
+  "start_receipt": {
+    "bytes": 2675,
+    "path": "/home/zhuhe/litchi-performance-0959/receipts/candidate-arc-v1-build-start.json",
+    "sha256": "86169fb2985a4f53243405d11a091ac15ea6f5c2c967e0b4e84a4b20722cd784"
+  },
+  "terminal_receipt": {
+    "bytes": 1591,
+    "path": "/home/zhuhe/litchi-performance-0959/receipts/candidate-arc-v1-build-terminal.json",
+    "sha256": "f255939c9f36b84bbbb2bf519d131fd635caf2352dd92b3251efc642451bed60"
+  },
+  "timed_out": false
+}

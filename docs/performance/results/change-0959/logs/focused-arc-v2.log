@@ -1,0 +1,83 @@
+=== command 0 ===
+$ /home/zhuhe/.cargo/bin/cargo +1.95.0 test --manifest-path /home/zhuhe/litchi-performance-0959/source-candidate-arc-v1/Cargo.toml --locked --offline -p litchi-xlsx --lib cell::tests:: -- --nocapture
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running unittests src/lib.rs (/home/zhuhe/litchi-performance-0959/target-arc-v1/debug/deps/litchi_xlsx-45ca481a8206a055)
+
+running 12 tests
+layout_probe_0959 category=integrated type=Number size=16 align=8
+layout_probe_0959 category=integrated type=Value size=24 align=8
+layout_probe_0959 category=integrated type=Cell size=72 align=8
+layout_probe_0959 category=integrated type=Stored size=184 align=8
+layout_probe_0959 category=integrated type=Formula size=72 align=8
+layout_probe_0959 category=integrated type=Content size=72 align=8
+layout_probe_0959 category=integrated type=Option<Number> size=16 align=8
+layout_probe_0959 category=integrated type=Option<Value> size=24 align=8
+layout_probe_0959 category=integrated type=Option<Cell> size=72 align=8
+layout_probe_0959 category=integrated type=Option<Stored> size=184 align=8
+layout_probe_0959 category=integrated type=Option<Formula> size=72 align=8
+layout_probe_0959 category=integrated type=Option<Content> size=72 align=8
+layout_probe_0959 category=alternative_nonintegrated type=Inline15 size=16 align=1
+layout_probe_0959 category=alternative_nonintegrated type=Inline23 size=24 align=1
+layout_probe_0959 category=alternative_nonintegrated type=BoxArc(Box+Arc<str>) size=24 align=8
+layout_probe_0959 category=alternative_nonintegrated type=Option<Inline15> size=16 align=1
+layout_probe_0959 category=alternative_nonintegrated type=Option<Inline23> size=24 align=1
+layout_probe_0959 category=alternative_nonintegrated type=Option<BoxArc> size=24 align=8
+test cell::tests::cloned_numbers_share_arc_storage ... ok
+test cell::tests::dates_are_checked_and_keep_their_lexical_form ... ok
+test cell::tests::borrowed_number_validation_matches_owned_constructor_errors ... ok
+test cell::tests::borrowed_number_construction_preserves_traits_and_unicode_whitespace ... ok
+test cell::tests::layout_probe_0959 ... ok
+test cell::tests::producer_unknown_error_values_are_read_only ... ok
+test cell::tests::edit_content_keeps_text_inert_and_formulas_explicit ... ok
+test cell::tests::short_integer_fast_path_matches_the_float_validation ... ok
+test cell::tests::numbers_preserve_lexemes_and_convert_explicitly ... ok
+test cell::tests::omitted_range_collisions_are_detected ... ok
+test cell::tests::range_cells_skip_columns_outside_each_selected_row ... ok
+test cell::tests::range_cells_handle_sparse_rows_and_grid_edges ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 1388 filtered out; finished in 0.00s
+
+command_0_returncode=0
+=== command 1 ===
+$ /home/zhuhe/.cargo/bin/cargo +1.95.0 test --manifest-path /home/zhuhe/litchi-performance-0959/source-candidate-arc-v1/Cargo.toml --locked --offline -p litchi-xlsx --lib raw::worksheet::tests::parses_exact_sparse_values_formulas_and_explicit_empty_cells -- --exact --nocapture
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running unittests src/lib.rs (/home/zhuhe/litchi-performance-0959/target-arc-v1/debug/deps/litchi_xlsx-45ca481a8206a055)
+
+running 1 test
+test raw::worksheet::tests::parses_exact_sparse_values_formulas_and_explicit_empty_cells ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1399 filtered out; finished in 0.00s
+
+command_1_returncode=0
+=== command 2 ===
+$ /home/zhuhe/.cargo/bin/cargo +1.95.0 test --manifest-path /home/zhuhe/litchi-performance-0959/source-candidate-arc-v1/Cargo.toml --locked --offline -p litchi-xlsx --lib raw::worksheet::tests::repairs_and_records_malformed_value_lexicals -- --exact --nocapture
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running unittests src/lib.rs (/home/zhuhe/litchi-performance-0959/target-arc-v1/debug/deps/litchi_xlsx-45ca481a8206a055)
+
+running 1 test
+test raw::worksheet::tests::repairs_and_records_malformed_value_lexicals ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1399 filtered out; finished in 0.00s
+
+command_2_returncode=0
+=== command 3 ===
+$ /home/zhuhe/.cargo/bin/cargo +1.95.0 test --manifest-path /home/zhuhe/litchi-performance-0959/source-candidate-arc-v1/Cargo.toml --locked --offline -p litchi-xlsx --lib raw::worksheet::tests::streaming_0362_selected_tests::streaming_0362_selected_payloads_cover_scalar_variants -- --exact --nocapture
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running unittests src/lib.rs (/home/zhuhe/litchi-performance-0959/target-arc-v1/debug/deps/litchi_xlsx-45ca481a8206a055)
+
+running 1 test
+test raw::worksheet::tests::streaming_0362_selected_tests::streaming_0362_selected_payloads_cover_scalar_variants ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1399 filtered out; finished in 0.00s
+
+command_3_returncode=0
+=== command 4 ===
+$ /home/zhuhe/.cargo/bin/cargo +1.95.0 test --manifest-path /home/zhuhe/litchi-performance-0959/source-candidate-arc-v1/Cargo.toml --locked --offline -p litchi-xlsx --lib raw::worksheet::tests::streaming_0362_selected_tests::sparse_bytes_plain_path_matches_baseline_lexical_and_prolog_edges -- --exact --nocapture
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running unittests src/lib.rs (/home/zhuhe/litchi-performance-0959/target-arc-v1/debug/deps/litchi_xlsx-45ca481a8206a055)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1400 filtered out; finished in 0.00s
+
+command_4_returncode=0

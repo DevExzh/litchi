@@ -1,0 +1,19 @@
+{
+  "capture_start": {
+    "bytes": 647,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0959/capture-native-v1/capture-start.json",
+    "sha256": "0713f3305a9b6385f41405d81c9c114b0986feb2980e1bd06663b9d53499584d"
+  },
+  "children_expected": 72,
+  "children_started": 1,
+  "elapsed_seconds": 0.03642091597430408,
+  "ended_utc": "2026-10-07T14:47:56.345149Z",
+  "error": "child terminal failed: rc=1 timeout=False",
+  "lane": "native",
+  "retry_or_replacement": false,
+  "schema": "litchi.performance.0959.capture.v4.capture-terminal",
+  "status": "failed",
+  "terminal_before_parse": true
+}

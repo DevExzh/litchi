@@ -1,0 +1,78 @@
+{
+  "argv": [
+    "/home/zhuhe/.cargo/bin/cargo",
+    "test",
+    "--manifest-path",
+    "/home/zhuhe/litchi-performance-0959/source-baseline/Cargo.toml",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-xlsx",
+    "--lib",
+    "layout_probe_0959",
+    "--",
+    "--nocapture"
+  ],
+  "cargo": {
+    "bytes": 21113232,
+    "executable": true,
+    "mode": 493,
+    "path": "/home/zhuhe/.cargo/bin/rustup",
+    "sha256": "dda7234360b7f578ca8b0ddcb80145646fa61a67c1720a5abc7051b35c9fcb71"
+  },
+  "checkout_head": "3fff4906c4e54382728a7fd64a50445e41d826dc",
+  "created_utc": "2026-10-07T14:11:24.120149+00:00",
+  "cwd": "/home/zhuhe/litchi-performance-0959/source-baseline",
+  "deadline_seconds": 1800,
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_HOME": "/home/zhuhe/.cargo",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-performance-0959/target-v1",
+    "HOME": "/home/zhuhe",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/home/zhuhe/.cargo/bin:/usr/bin:/bin",
+    "RUSTUP_TOOLCHAIN": "1.95.0",
+    "RUST_BACKTRACE": "0",
+    "TEMP": "/home/zhuhe/litchi-performance-0959/tmp/layout-probe",
+    "TMP": "/home/zhuhe/litchi-performance-0959/tmp/layout-probe",
+    "TMPDIR": "/home/zhuhe/litchi-performance-0959/tmp/layout-probe",
+    "TZ": "UTC"
+  },
+  "injected_lock": {
+    "bytes": 138443,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0959/source-baseline/Cargo.lock",
+    "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+  },
+  "no_workload": true,
+  "process_group": true,
+  "root_lock": {
+    "bytes": 138443,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/code/litchi/Cargo.lock",
+    "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+  },
+  "schema": "litchi.performance.0959.layout-probe-start.v2",
+  "source_cell": {
+    "bytes": 46312,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0959/source-baseline/crates/litchi-xlsx/src/cell.rs",
+    "sha256": "3acc82c2371beb7aa6ad7cc87eb546a3ecbfd77ef5e72b9c2f5104d44ba582a3"
+  },
+  "source_manifest": {
+    "bytes": 2267160,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0959/source-manifest-probe-v2.json",
+    "sha256": "6ee0098b77168b21839550089fd2e67923aa85033cefdb4329ed1586401fd25e"
+  },
+  "status": "started",
+  "target": "/home/zhuhe/litchi-performance-0959/target-v1",
+  "tmp": "/home/zhuhe/litchi-performance-0959/tmp/layout-probe"
+}

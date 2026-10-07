@@ -1,0 +1,160 @@
+--- /home/zhuhe/litchi-performance-0959/source-baseline/crates/litchi-xlsx/src/cell.rs	2026-10-07 14:11:02.048188288 +0000
++++ /home/zhuhe/litchi-performance-0959/source-candidate-arc-v1/crates/litchi-xlsx/src/cell.rs	2026-10-07 14:17:57.330874365 +0000
+@@ -6,6 +6,7 @@
+ use std::sync::Arc;
+ 
+ use chrono::{DateTime, NaiveDate, NaiveDateTime};
++use itoa::Buffer as IntegerBuffer;
+ use litchi_sheet::{Cell as Address, Column as ColumnIndex, Rect, Row as RowIndex};
+ 
+ use crate::column;
+@@ -324,7 +325,10 @@
+         $(
+             impl From<$integer> for Value {
+                 fn from(value: $integer) -> Self {
+-                    Self::Number(Number(value.to_string().into_boxed_str()))
++                    let mut buffer = IntegerBuffer::new();
++                    // Every implemented integer type is finite, and `itoa`
++                    // emits its exact valid worksheet lexical form.
++                    Self::Number(Number(Arc::from(buffer.format(value))))
+                 }
+             }
+         )+
+@@ -387,14 +391,24 @@
+ 
+ /// An exact `SpreadsheetML` number.
+ #[derive(Clone, PartialEq, Eq, Hash)]
+-pub struct Number(Box<str>);
++pub struct Number(Arc<str>);
+ 
+ impl Number {
+     /// Validate and retain a numeric lexical form without normalizing it.
+     pub fn new(value: impl Into<Box<str>>) -> Result<Self> {
+         let value = value.into();
+         Self::validate_lexical(&value)?;
+-        Ok(Self(value))
++        Ok(Self(Arc::from(value)))
++    }
++
++    /// Validate and retain a borrowed numeric lexical form.
++    ///
++    /// Parser callsites use this constructor after they have already received
++    /// a borrowed XML value. It performs one owned `Arc<str>` allocation and
++    /// avoids first materializing a temporary `Box<str>`.
++    pub(crate) fn from_lexical(value: &str) -> Result<Self> {
++        Self::validate_lexical(value)?;
++        Ok(Self(Arc::from(value)))
+     }
+ 
+     /// Validate a worksheet number without taking ownership of its lexical
+@@ -420,7 +434,7 @@
+     /// Exact stored lexical form.
+     #[must_use]
+     pub fn as_str(&self) -> &str {
+-        &self.0
++        self.0.as_ref()
+     }
+ 
+     /// Convert the value to IEEE-754 binary64.
+@@ -429,7 +443,7 @@
+     /// numeric lexical form outside Rust's binary64 parser.
+     #[must_use]
+     pub fn as_f64(&self) -> Option<f64> {
+-        self.0
++        self.as_str()
+             .trim()
+             .parse()
+             .ok()
+@@ -437,7 +451,7 @@
+     }
+ 
+     pub(crate) fn validate_for_write(&self) -> Result<()> {
+-        if self.0.chars().count() > MAX_CELL_CHARACTERS {
++        if self.as_str().chars().count() > MAX_CELL_CHARACTERS {
+             return Err(invalid(format!(
+                 "cell number exceeds {MAX_CELL_CHARACTERS} characters"
+             )));
+@@ -482,7 +496,7 @@
+ 
+ impl fmt::Display for Number {
+     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+-        formatter.write_str(&self.0)
++        formatter.write_str(self.as_str())
+     }
+ }
+ 
+@@ -1319,6 +1333,40 @@
+     }
+ 
+     #[test]
++    fn borrowed_number_construction_preserves_traits_and_unicode_whitespace() {
++        let values = [
++            "0",
++            "+1",
++            "  -0.000  ",
++            "6.02E+23",
++            "\u{2003}123456789\u{2003}",
++            "123456789012345678901234567890",
++        ];
++        for value in values {
++            let borrowed = Number::from_lexical(value).expect("valid borrowed number");
++            let owned = Number::new(value).expect("valid owned number");
++            assert_eq!(borrowed, owned, "lexical equality for {value:?}");
++            assert_eq!(borrowed.as_str(), value);
++            assert_eq!(borrowed.as_f64(), owned.as_f64());
++            assert_eq!(format!("{borrowed:?}"), format!("{owned:?}"));
++            assert_eq!(borrowed.to_string(), owned.to_string());
++
++            let mut borrowed_hash = std::collections::hash_map::DefaultHasher::new();
++            borrowed.hash(&mut borrowed_hash);
++            let mut owned_hash = std::collections::hash_map::DefaultHasher::new();
++            owned.hash(&mut owned_hash);
++            assert_eq!(borrowed_hash.finish(), owned_hash.finish());
++        }
++    }
++
++    #[test]
++    fn cloned_numbers_share_arc_storage() {
++        let number = Number::from_lexical("42").expect("valid number");
++        let clone = number.clone();
++        assert!(Arc::ptr_eq(&number.0, &clone.0));
++    }
++
++    #[test]
+     fn short_integer_fast_path_matches_the_float_validation() {
+         fn reference(value: &str) -> bool {
+             value
+--- /home/zhuhe/litchi-performance-0959/source-baseline/crates/litchi-xlsx/src/raw/worksheet/selected.rs	2026-10-07 12:22:26.000000000 +0000
++++ /home/zhuhe/litchi-performance-0959/source-candidate-arc-v1/crates/litchi-xlsx/src/raw/worksheet/selected.rs	2026-10-07 14:15:52.480367434 +0000
+@@ -685,8 +685,7 @@
+             let semantic = if saw_value && !value.trim().is_empty() {
+                 // A malformed lexical is repaired by the materialized parser
+                 // (audit finding 4.3), never by this scanner.
+-                let number =
+-                    Number::new(value.into_boxed_str()).map_err(|_| PlainScanError::Fallback)?;
++                let number = Number::from_lexical(&value).map_err(|_| PlainScanError::Fallback)?;
+                 Cell::Value(Value::Number(number))
+             } else {
+                 Cell::Empty
+@@ -2120,9 +2119,7 @@
+             if value.trim().is_empty() {
+                 Ok(None)
+             } else {
+-                Number::new(value.to_owned().into_boxed_str())
+-                    .map(Value::Number)
+-                    .map(Some)
++                Number::from_lexical(value).map(Value::Number).map(Some)
+             }
+         },
+         CellKind::String => {
+--- /home/zhuhe/litchi-performance-0959/source-baseline/crates/litchi-xlsx/src/raw/worksheet/semantic.rs	2026-10-07 12:22:26.000000000 +0000
++++ /home/zhuhe/litchi-performance-0959/source-candidate-arc-v1/crates/litchi-xlsx/src/raw/worksheet/semantic.rs	2026-10-07 14:15:37.251306086 +0000
+@@ -175,7 +175,7 @@
+     let parsed = |value: Value| Ok(Parsed::Value(Some(value)));
+     match cell_type {
+         None | Some("n") if value.trim().is_empty() => Ok(Parsed::Value(None)),
+-        None | Some("n") => match Number::new(value) {
++        None | Some("n") => match Number::from_lexical(value) {
+             Ok(number) => parsed(Value::Number(number)),
+             Err(error) => {
+                 let tolerance = tolerance.ok_or(error)?;

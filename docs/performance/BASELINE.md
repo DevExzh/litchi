@@ -1,5 +1,20 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0959 — exact owner correction and numeric storage trial
+
+[0959](0959-xlsx-number-ownership-candidate.md) independently reselects the
+0958 raw stacks with both fully qualified timed callsites. All six selected
+totals are unchanged; the earlier commit-core labels arose from frame-first
+matching, not missing exact stage frames. The original packet remains intact.
+An isolated Arc-backed Number candidate retains actual Number/Value/Cell/Stored
+sizes of 16/24/72/184 bytes and passes 1,400 library tests and library Clippy.
+The 72 native and 18 allocator children pass semantic checks, but the candidate
+is rejected: one-edit total p50/p95 ratios are 1.0881/1.1019, and no primary
+latency metric meets the useful-benefit gate. Drained-core allocation calls
+fall 8.2–8.8%, while requested bytes and region peaks rise slightly. Production
+remains unchanged; existing timing, RSS and peak-memory flags remain open.
+
+
 ## 0958 — current serial edit/commit allocation attribution
 
 [0958](0958-xlsx-edit-commit-allocation-attribution.md) records six heaptrack

@@ -1,5 +1,25 @@
 # Performance hotspot inventory
 
+## 0959 — parser backing allocations lead requested bytes
+
+[0959](0959-xlsx-number-ownership-candidate.md) corrects the 0958 owner labels:
+all selected rows have exact stage and timed-iteration frames, and totals are
+unchanged. Concrete owner ranking identifies RawCell vector growth in
+`Parser::finish_cell` as the largest requested-byte source, followed by final
+semantic materialization, omitted-cell merge storage and edit staging. Source
+parsing still establishes required semantic/freshness/error authority. A
+capacity hint needs independent cost and error-precedence qualification.
+
+The shared-numeric-string trial is rejected. It removes 8.2–8.8% of drained-core
+allocation calls without enlarging cell owners, but no primary latency metric
+meets the benefit gate; one-edit total p50/p95 rises 8.8%/10.2%. Commit-drop
+also regresses in all three cases. Public constructor and selected-scanner
+performance remain unqualified; no follow-up query capture was needed to reject
+the candidate. Parser capacity hints are the next bounded hypothesis, not an
+established optimization. Prior rejected attribute shortcuts and all
+ordinary/managed regression flags remain open.
+
+
 ## 0958 — omitted numeric clones are confirmed, with bounded impact
 
 [0958](0958-xlsx-edit-commit-allocation-attribution.md) confirms the source

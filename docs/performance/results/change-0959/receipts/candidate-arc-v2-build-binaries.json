@@ -1,0 +1,50 @@
+{
+  "binaries": {
+    "xlsx_managed_compression_alloc": {
+      "build_id": "17d73922e74ab56140063337ea40ab071f0dcba2",
+      "bytes": 43665688,
+      "exists": true,
+      "path": "/home/zhuhe/litchi-performance-0959/target-candidate-arc-v2/release/xlsx_managed_compression_alloc",
+      "readelf_returncode": 0,
+      "readelf_sha256": "03e6e500a41d53b0cd5c02778c113ce5800428e639a94ad512eeb84156f88213",
+      "sha256": "5a25f0b1a994cac635cfbc36c44b98766924683f688d2ef91764c73ffeb8450a"
+    },
+    "xlsx_managed_compression_benchmark": {
+      "build_id": "cfef136e8491905b38b9047861855dc43edb8c38",
+      "bytes": 43228520,
+      "exists": true,
+      "path": "/home/zhuhe/litchi-performance-0959/target-candidate-arc-v2/release/examples/xlsx_managed_compression_benchmark",
+      "readelf_returncode": 0,
+      "readelf_sha256": "55106d482e8639882ed43a22a57dfa489156d21ca063a772bc50e9ac28a01c14",
+      "sha256": "3cf1714372b376ccdaeaf6a631a5439195694bdfffd4d10c25dc5f06db95f51f"
+    }
+  },
+  "schema": "candidate-arc-v2-build-binaries",
+  "source_files": [
+    {
+      "bytes": 48391,
+      "path": "/home/zhuhe/litchi-performance-0959/source-candidate-arc-v1/crates/litchi-xlsx/src/cell.rs",
+      "sha256": "f345c0ab2101d5dad2b25da4bfbfcb3f1bdafabdeca2ad31f66535887e5c2291"
+    },
+    {
+      "bytes": 86041,
+      "path": "/home/zhuhe/litchi-performance-0959/source-candidate-arc-v1/crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+      "sha256": "3da16a84cf9f3cc8b36eb75baea359c17bcf969bb6f78a702452a74f4fa13a63"
+    },
+    {
+      "bytes": 18321,
+      "path": "/home/zhuhe/litchi-performance-0959/source-candidate-arc-v1/crates/litchi-xlsx/src/raw/worksheet/semantic.rs",
+      "sha256": "bd357cedab881148680fe389e7d4288c954239cfdae5f41dbba09e1327f97ebd"
+    },
+    {
+      "bytes": 138443,
+      "path": "/home/zhuhe/litchi-performance-0959/source-candidate-arc-v1/Cargo.lock",
+      "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+    }
+  ],
+  "terminal_receipt": {
+    "bytes": 1590,
+    "path": "/home/zhuhe/litchi-performance-0959/receipts/candidate-arc-v2-build-terminal.json",
+    "sha256": "c22b6724d2ba9714b09acf81c05b775982a74d108e11cea1c60dc84782a76067"
+  }
+}

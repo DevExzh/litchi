@@ -1,0 +1,18 @@
+{
+  "capture_start": {
+    "bytes": 650,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0959/capture-allocator-v1/capture-start.json",
+    "sha256": "a767c90919e57b39d67a4cb1d74357598cfe76ed9b50bce2c4979efd0060af24"
+  },
+  "children_expected": 18,
+  "children_started": 18,
+  "elapsed_seconds": 33.662480778002646,
+  "ended_utc": "2026-10-07T15:19:08.847724Z",
+  "lane": "allocator",
+  "retry_or_replacement": false,
+  "schema": "litchi.performance.0959.capture.v4.capture-terminal",
+  "status": "completed",
+  "terminal_before_parse": true
+}

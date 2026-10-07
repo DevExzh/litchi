@@ -1,0 +1,38 @@
+{
+  "full_report_external": {
+    "bytes": 623430,
+    "path": "/home/zhuhe/litchi-performance-0959/analysis/owner-ranking-v3.json",
+    "sha256": "d7c61c1cb7a21e4b26ba12ca25a131d4249cf2da260d9ace2fd9e9ac80b1e3fa"
+  },
+  "helper_in_repo": {
+    "bytes": 22650,
+    "path": "/home/zhuhe/litchi-performance-0959/tools/rank_0959_v1.py",
+    "sha256": "3daeaac5269257d60afc1089434c7eaf3d130d85ff6e62cb8bf2194adc0be2be"
+  },
+  "interpretation_limits": [
+    "Nearest meaningful litchi_xlsx frame above allocator/runtime frames, not an inclusive call-tree sum.",
+    "Exact fully qualified stage_timed_commit and timed_iteration callsites select rows; MultiSourceEdit::commit is not a selection surrogate.",
+    "Tag totals overlap and are not additive; no timing, phase-only, speedup, or adoption claim."
+  ],
+  "output_policy": "Use a fresh non-existing external output path; do not copy the 623430-byte full report into the repository.",
+  "raw_inputs": "The owner ranking reads the sealed 0958 input manifest and decoder trace/trace-size artifacts named there; those large artifacts remain external under the 0958 packet.",
+  "receipt_in_repo": {
+    "bytes": 4190,
+    "path": "/home/zhuhe/litchi-performance-0959/review/semantic-owner-ranking-receipt-v3.json",
+    "sha256": "c942c41a1b119240142259bbfdf5fc7d0a0764d62268e70f9c87e172b4c4eb79"
+  },
+  "reference_0958_analysis": {
+    "bytes": 102361,
+    "path": "/home/zhuhe/litchi-performance-0958/analysis-v1/attribute-v3.json",
+    "sha256": "9fb5ae3b1b484e2fc8294c66d4712d8f818c1aed60a974fbe51bcd03173cf983"
+  },
+  "replay_command": "python3 -B /home/zhuhe/litchi-performance-0959/tools/rank_0959_v1.py --manifest /home/zhuhe/litchi-performance-0958/analysis-input-manifest-v1.json --reference-analysis /home/zhuhe/litchi-performance-0958/analysis-v1/attribute-v3.json --output <fresh-external-owner-ranking-v3.json>",
+  "schema": "litchi.performance.0959.owner-ranking-artifact-descriptor.v1",
+  "scope": "Bounded semantic-owner ranking only; layout and candidate evidence remain pending.",
+  "status": "external_full_report_bound",
+  "summary_in_repo": {
+    "bytes": 176734,
+    "path": "/home/zhuhe/litchi-performance-0959/analysis/owner-ranking-summary-v3.json",
+    "sha256": "f50bb1f2ce39f50d5488d9c8a6a95855fcc98dfc526bbd447e58c871b0f359b4"
+  }
+}

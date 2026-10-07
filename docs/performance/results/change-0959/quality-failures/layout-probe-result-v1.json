@@ -1,0 +1,59 @@
+{
+  "alternative_types": [],
+  "expected_alternative_types": [
+    "BoxArc(Box+Arc<str>)",
+    "Inline15",
+    "Inline23",
+    "Option<BoxArc>",
+    "Option<Inline15>",
+    "Option<Inline23>"
+  ],
+  "expected_integrated_types": [
+    "Cell",
+    "Content",
+    "Formula",
+    "Number",
+    "Option<Cell>",
+    "Option<Content>",
+    "Option<Formula>",
+    "Option<Number>",
+    "Option<Stored>",
+    "Option<Value>",
+    "Stored",
+    "Value"
+  ],
+  "integrated_types": [],
+  "lock_cleanup": {
+    "bytes": 692,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0959/receipts/layout-probe-lock-cleanup-v1.json",
+    "sha256": "7e11360a7bd71cadf73692458aafd9b21c5fb6927f0577e53555c3532c03f659"
+  },
+  "no_production_candidate": true,
+  "no_workload": true,
+  "rows": [],
+  "schema": "litchi.performance.0959.layout-probe-result.v1",
+  "status": "fail",
+  "stderr": {
+    "bytes": 5754,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0959/review/layout-probe.stderr",
+    "sha256": "ca08545953254d7d82470572b11806e29280299bef0a9d5efd8d200db0931749"
+  },
+  "stdout": {
+    "bytes": 0,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0959/review/layout-probe.stdout",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "terminal": {
+    "bytes": 1353,
+    "executable": false,
+    "mode": 436,
+    "path": "/home/zhuhe/litchi-performance-0959/receipts/layout-probe-terminal-v1.json",
+    "sha256": "43375b3de61274804c9678d25f7e11c6e9f9fb3384e9465c914529190127cda8"
+  }
+}

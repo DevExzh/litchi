@@ -1,0 +1,75 @@
+{
+  "build_dir": "/home/zhuhe/litchi-performance-0959/builds/candidate-arc-v2",
+  "command": [
+    "/home/zhuhe/.cargo/bin/cargo",
+    "+1.95.0",
+    "build",
+    "--release",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "/home/zhuhe/litchi-performance-0959/source-candidate-arc-v1/tools/perf-baseline/Cargo.toml",
+    "--features",
+    "allocator-metrics",
+    "--bin",
+    "xlsx_managed_compression_alloc",
+    "--example",
+    "xlsx_managed_compression_benchmark"
+  ],
+  "cwd": "/home/zhuhe/litchi-performance-0959/source-candidate-arc-v1",
+  "deadline_seconds": 1800,
+  "env": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_PROFILE_RELEASE_LTO": "fat",
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-performance-0959/target-candidate-arc-v2",
+    "CARGO_TERM_COLOR": "never",
+    "HOME": "/home/zhuhe",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PATH": "/home/zhuhe/.cargo/bin:/usr/bin:/bin",
+    "RUSTUP_TOOLCHAIN": "1.95.0",
+    "RUST_BACKTRACE": "0",
+    "TMPDIR": "/home/zhuhe/litchi-performance-0959/tmp/candidate-arc-v2",
+    "TZ": "UTC"
+  },
+  "roles": [
+    "xlsx_managed_compression_alloc",
+    "xlsx_managed_compression_benchmark"
+  ],
+  "schema": "candidate-arc-v2-build-start",
+  "source_files": [
+    {
+      "bytes": 48391,
+      "path": "/home/zhuhe/litchi-performance-0959/source-candidate-arc-v1/crates/litchi-xlsx/src/cell.rs",
+      "sha256": "f345c0ab2101d5dad2b25da4bfbfcb3f1bdafabdeca2ad31f66535887e5c2291"
+    },
+    {
+      "bytes": 86041,
+      "path": "/home/zhuhe/litchi-performance-0959/source-candidate-arc-v1/crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+      "sha256": "3da16a84cf9f3cc8b36eb75baea359c17bcf969bb6f78a702452a74f4fa13a63"
+    },
+    {
+      "bytes": 18321,
+      "path": "/home/zhuhe/litchi-performance-0959/source-candidate-arc-v1/crates/litchi-xlsx/src/raw/worksheet/semantic.rs",
+      "sha256": "bd357cedab881148680fe389e7d4288c954239cfdae5f41dbba09e1327f97ebd"
+    },
+    {
+      "bytes": 138443,
+      "path": "/home/zhuhe/litchi-performance-0959/source-candidate-arc-v1/Cargo.lock",
+      "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+    }
+  ],
+  "source_manifest": {
+    "bytes": 2266853,
+    "path": "/home/zhuhe/litchi-performance-0959/source-manifest-candidate-arc-v1.json",
+    "sha256": "77ec8f3efe5c0dfb9aebf6a66ddcd061718c45c532388e7c26297fee9dc508cc"
+  },
+  "source_root": "/home/zhuhe/litchi-performance-0959/source-candidate-arc-v1",
+  "started_utc": "2026-10-07T14:24:52.111832Z",
+  "target_dir": "/home/zhuhe/litchi-performance-0959/target-candidate-arc-v2"
+}
