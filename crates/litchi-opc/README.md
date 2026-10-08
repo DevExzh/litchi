@@ -172,3 +172,19 @@ their payload reservations alive, while successive revisions do not retain an
 ancestor chain. Physical replacement checks still use the original archive
 bytes and source identity. This per-part primitive does not yet supply chained
 package-wide effective catalogs.
+
+`PreparedTopology::part`, `iter_parts` and `main_document_part` provide owned,
+lazy `PreparedPartView` handles for both unchanged and edited candidates.
+Their `data()` handles retain the complete candidate and managed admissions,
+so views and payloads survive owner drop and stay on their captured revision.
+Added Parts and replacement bytes come from the effective catalog; removed
+Parts are absent. Metadata access is a captured read, while new payload/XML
+proof captures recheck base and transfer sources and execution contexts.
+Already captured bytes remain readable after a later physical source change.
+
+`physical_source_lineage`, `physical_source_version` and
+`physical_source_artifact` deliberately describe the original archive, excluding
+candidate edits. Use `publish_to_stream` for effective output; physical identity
+must not key caches of edited XML. `read_limits`, `execution_context`,
+`check_source` and `is_noop` let higher-level owners consume this state without
+retaining a second raw package for those duties.

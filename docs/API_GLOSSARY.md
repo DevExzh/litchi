@@ -331,3 +331,14 @@ archive, with no parent-candidate chain. This is a low-level publication
 primitive, not a registered six-type transaction family. General topology
 application, added/authored XML provenance and canonical source DOCX owner
 integration remain required.
+
+## 19. Owned effective read foundation (record 0026)
+
+`PreparedTopology::part`, `iter_parts` and `main_document_part` return owned
+`PreparedPartView` values. `data()` returns `PreparedPartData`, which retains
+its candidate and payload admissions. Source XML proof capture reads the
+current effective payload and shares the edit path's provenance checks.
+`physical_source_*` accessors explicitly expose original archive identity;
+that identity is not a logical revision/cache key. These are low-level OPC
+owner facilities. Canonical source DOCX projections/commits and complete
+transaction-family registration remain pending.

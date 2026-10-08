@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0026 | Owned reads and physical identity access for retained OPC candidates | effective read adapter foundation; DOCX owner migration pending |
 | 0025 | Immutable XML edits of retained effective OPC candidates | flat chained source-Part candidates; canonical DOCX owner migration pending |
 | 0024 | Revision-bound source XML edits over retained payloads | per-part chaining foundation; package overlay revisions pending |
 | 0023 | Retained OPC prepared topology and shared ZIP appended members | source-overlay ownership foundation; chained source package commits pending |
@@ -278,3 +279,17 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
   cancellation and managed admission. Swapped callback transactions are refused.
 - Added/unproven XML targets, general topology application and canonical source
   DOCX commits remain open. Record 0025 covers evidence and performance limits.
+
+## 0026 — owned effective Part and payload reads
+
+- Retained candidates expose owned lazy Part views and payload handles, including
+  unchanged candidates, plus effective iteration and main-document resolution.
+- Added/removed Parts, effective relationships and changed payloads route through
+  the captured catalog. Views survive owner drop and remain stable across edits.
+- New captures recheck base/transfer sources and execution contexts; captured
+  metadata and bytes remain immutable readable snapshots. Payloads retain their
+  managed admissions and the complete candidate, without a detachable Arc.
+- XML proof capture is shared with `edit_xml`. Narrow physical identity, artifact,
+  limits and execution accessors avoid requiring a parallel raw package owner.
+- Canonical source DOCX integration still needs one effective read/publish adapter
+  and logical cache keys. Record 0026 documents those requirements and evidence.

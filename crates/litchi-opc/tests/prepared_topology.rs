@@ -54,6 +54,7 @@ struct VersionedSource {
     reads: AtomicU64,
     denied_start: AtomicU64,
     denied_end: AtomicU64,
+    checks_before_change: AtomicU64,
 }
 
 impl VersionedSource {
@@ -64,6 +65,7 @@ impl VersionedSource {
             reads: AtomicU64::new(0),
             denied_start: AtomicU64::new(0),
             denied_end: AtomicU64::new(0),
+            checks_before_change: AtomicU64::new(0),
         }
     }
 
@@ -109,6 +111,13 @@ impl ReadAt for VersionedSource {
     }
 
     fn version(&self) -> io::Result<SourceVersion> {
+        if self
+            .checks_before_change
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1))
+            == Ok(1)
+        {
+            self.bump();
+        }
         Ok(SourceVersion::new(
             0x5052_4550,
             self.revision.load(Ordering::SeqCst),
@@ -1771,7 +1780,18 @@ fn retained_preparation_rechecks_a_transfer_source_on_every_publication() {
         zip_member(&first, "custom/transferred.xml"),
         b"<untouched source='yes'/>"
     );
+    let transferred = prepared.part(&pack("/custom/transferred.xml")).unwrap();
+    let captured = transferred.data().unwrap();
     foreign_handle.bump();
+    assert!(matches!(
+        transferred.data(),
+        Err(OpcError::SourceChanged { .. })
+    ));
+    assert!(matches!(
+        prepared.main_document_part(),
+        Err(OpcError::SourceChanged { .. })
+    ));
+    assert_eq!(captured.as_bytes(), b"<untouched source='yes'/>");
     let mut second = Vec::new();
     assert!(matches!(
         prepared.publish_to_stream(&mut second),
@@ -1782,4 +1802,232 @@ fn retained_preparation_rechecks_a_transfer_source_on_every_publication() {
         prepared.with_candidate(|_| Ok(())),
         Err(OpcError::SourceChanged { .. })
     ));
+}
+
+#[test]
+fn owned_effective_views_are_lazy_and_outlive_an_unchanged_candidate() {
+    fn send_sync<T: Send + Sync>() {}
+    send_sync::<litchi_opc::PreparedPartView>();
+    send_sync::<litchi_opc::PreparedPartData>();
+    let (generated, _) = source_bytes_with_large_untouched_part();
+    let reader = litchi_opc::phys_pkg::PhysPkgReader::new(&generated).unwrap();
+    let mut writer = StreamingArchiveWriter::new();
+    for name in reader.member_names().unwrap() {
+        writer
+            .write_stored(&name, &reader.read_member(&name).unwrap())
+            .unwrap();
+    }
+    let bytes = writer.finish_to_bytes().unwrap();
+    let denied = stored_member_data_range(&bytes, "custom/large.bin");
+    let source = Arc::new(VersionedSource::new(bytes));
+    let candidate = open(Arc::clone(&source))
+        .prepare_topology(SourceTopologyPlan::new())
+        .unwrap();
+    source.deny_reads_in(denied);
+    let before = source.read_count();
+    let main = candidate.main_document_part().unwrap();
+    let parts = candidate.iter_parts().unwrap();
+    assert_eq!(main.partname(), &pack(DOCUMENT));
+    assert_eq!(main.content_type(), ct::WML_DOCUMENT);
+    assert_eq!(
+        main.declared_uncompressed_size().unwrap(),
+        b"<before/>".len() as u64
+    );
+    assert!(candidate.is_noop());
+    assert_eq!(candidate.read_limits(), litchi_opc::ReadLimits::default());
+    assert!(candidate.execution_context().is_none());
+    assert_eq!(
+        source.read_count(),
+        before,
+        "capturing metadata must not decode payloads"
+    );
+    drop(candidate);
+    let names: Vec<_> = parts.map(|part| part.partname().clone()).collect();
+    assert!(names.contains(&pack(DOCUMENT)));
+    assert!(names.contains(&pack(UNTOUCHED)));
+    let data = main.data().unwrap();
+    assert_eq!(data.as_bytes(), b"<before/>");
+    let cloned = data.clone();
+    assert_eq!(data.as_bytes().as_ptr(), cloned.as_bytes().as_ptr());
+    drop(main);
+    drop(data);
+    assert_eq!(cloned.as_bytes(), b"<before/>");
+}
+
+#[test]
+fn owned_effective_views_read_changes_additions_removals_and_relationships() {
+    let package = open(Arc::new(VersionedSource::new(source_bytes())));
+    let mut plan = mutation_plan();
+    plan.try_remove_relationship(pack(DOCUMENT), "rId1")
+        .unwrap();
+    plan.try_remove_part(pack(UNTOUCHED)).unwrap();
+    let candidate = package.prepare_topology(plan).unwrap();
+    assert!(matches!(
+        candidate.part(&pack(UNTOUCHED)),
+        Err(OpcError::PartNotFound(_))
+    ));
+    let main = candidate.main_document_part().unwrap();
+    assert!(main.rels().get("rId1").is_none());
+    assert!(main.rels().get("rIdAdded").is_some());
+    assert!(candidate.rels().get("rIdAdded").is_some());
+    assert_eq!(main.data().unwrap().as_bytes(), b"<after/>");
+    assert!(
+        main.source_xml().is_err(),
+        "authored bytes are readable but have no physical XML proof"
+    );
+    let added = candidate.part(&pack(ADDED)).unwrap();
+    assert_eq!(added.content_type(), "application/example+xml");
+    assert_eq!(
+        added.declared_uncompressed_size().unwrap(),
+        b"<added/>".len() as u64
+    );
+    assert_eq!(
+        main.declared_uncompressed_size().unwrap(),
+        b"<after/>".len() as u64
+    );
+    let data = added.data().unwrap();
+    assert!(added.source_xml().is_err());
+    drop(candidate);
+    drop(main);
+    drop(added);
+    assert_eq!(data.as_bytes(), b"<added/>");
+    assert!(!format!("{data:?}").contains("<added/>"));
+}
+
+#[test]
+fn owned_main_view_resolves_the_effective_root_relationship() {
+    let package = open(Arc::new(VersionedSource::new(source_bytes())));
+    let mut plan = mutation_plan();
+    plan.try_replace_internal_relationship(pack("/"), "rId1", rt::OFFICE_DOCUMENT, pack(ADDED))
+        .unwrap();
+    let candidate = package.prepare_topology(plan).unwrap();
+    assert_eq!(
+        candidate.main_document_part().unwrap().partname(),
+        &pack(ADDED)
+    );
+}
+
+#[test]
+fn owned_effective_views_keep_prior_revisions_and_capture_current_xml_provenance() {
+    let root = open(Arc::new(VersionedSource::new(source_bytes())))
+        .prepare_topology(SourceTopologyPlan::new())
+        .unwrap();
+    let first = root
+        .edit_xml(&pack(DOCUMENT), |xml, edit| {
+            edit.replace(
+                xml.checked_range(0..xml.bytes().len(), xml.bytes())?,
+                AuthoredXmlFragment::markup(b"<first/>".to_vec())?,
+            )
+        })
+        .unwrap();
+    let prior = first.main_document_part().unwrap();
+    let second = first
+        .edit_xml(&pack(DOCUMENT), |xml, edit| {
+            edit.replace(
+                xml.checked_range(0..xml.bytes().len(), xml.bytes())?,
+                AuthoredXmlFragment::markup(b"<second/>".to_vec())?,
+            )
+        })
+        .unwrap();
+    let current = second.main_document_part().unwrap();
+    assert!(!second.is_noop());
+    assert_eq!(
+        second.physical_source_lineage(),
+        root.physical_source_lineage()
+    );
+    assert_eq!(
+        second.physical_source_version().unwrap(),
+        root.physical_source_version().unwrap()
+    );
+    assert_eq!(
+        second.physical_source_artifact().fingerprint().unwrap(),
+        root.physical_source_artifact().fingerprint().unwrap()
+    );
+    assert_eq!(prior.data().unwrap().as_bytes(), b"<first/>");
+    assert_eq!(current.data().unwrap().as_bytes(), b"<second/>");
+    assert_eq!(current.source_xml().unwrap().bytes(), b"<second/>");
+    let old = prior.source_xml().unwrap();
+    let stale = old.checked_range(0..0, b"").unwrap();
+    assert!(
+        second
+            .edit_xml(&pack(DOCUMENT), |_, edit| edit
+                .replace(stale, AuthoredXmlFragment::empty()))
+            .is_err()
+    );
+    drop(root);
+    drop(first);
+    drop(second);
+    let result = std::thread::spawn(move || current.data().unwrap())
+        .join()
+        .unwrap();
+    assert_eq!(result.as_bytes(), b"<second/>");
+}
+
+#[test]
+fn owned_payloads_pin_reservations_and_new_reads_recheck_source_and_cancellation() {
+    let (budget, _cancel, context) = managed_context();
+    let source = Arc::new(VersionedSource::new(source_bytes()));
+    let package = SourceBackedPackage::from_read_at_with_execution_context(
+        source.clone(),
+        litchi_opc::ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    let candidate = package.prepare_topology(mutation_plan()).unwrap();
+    let main = candidate.main_document_part().unwrap();
+    let untouched = candidate.part(&pack(UNTOUCHED)).unwrap();
+    let data = main.data().unwrap();
+    let original = untouched.data().unwrap();
+    let used = budget.used(Resource::Memory);
+    let clone = main.clone();
+    let data_clone = data.clone();
+    assert_eq!(budget.used(Resource::Memory), used);
+    drop(candidate);
+    drop(main);
+    drop(untouched);
+    source.bump();
+    assert!(matches!(clone.data(), Err(OpcError::SourceChanged { .. })));
+    assert!(matches!(
+        clone.source_xml(),
+        Err(OpcError::SourceChanged { .. })
+    ));
+    assert_eq!(data_clone.as_bytes(), b"<after/>");
+    drop(clone);
+    drop(data);
+    drop(data_clone);
+    assert!(budget.used(Resource::Memory) > 0);
+    drop(original);
+    assert_eq!(budget.used(Resource::Memory), 0);
+    assert_eq!(budget.used(Resource::Objects), 0);
+
+    let (budget, cancel, context) = managed_context();
+    let package = SourceBackedPackage::from_read_at_with_execution_context(
+        Arc::new(VersionedSource::new(source_bytes())),
+        litchi_opc::ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    let candidate = package.prepare_topology(SourceTopologyPlan::new()).unwrap();
+    let part = candidate.main_document_part().unwrap();
+    cancel.cancel();
+    assert!(part.data().is_err());
+    assert!(part.source_xml().is_err());
+    assert!(candidate.iter_parts().is_err());
+    drop(part);
+    drop(candidate);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn owned_missing_lookup_rechecks_source_before_reporting_absence() {
+    let source = Arc::new(VersionedSource::new(source_bytes()));
+    let candidate = open(Arc::clone(&source))
+        .prepare_topology(SourceTopologyPlan::new())
+        .unwrap();
+    source.checks_before_change.store(2, Ordering::SeqCst);
+    assert!(matches!(
+        candidate.part(&pack("/missing.xml")),
+        Err(OpcError::SourceChanged { .. })
+    ));
+    assert!(candidate.check_source().is_err());
 }

@@ -49,7 +49,9 @@ use std::time::Duration;
 
 mod artifact_restore;
 mod revision;
+mod view;
 pub use artifact_restore::SourceArtifactRestoreProof;
+pub use view::{PreparedPartData, PreparedPartView};
 mod read_ahead;
 use read_ahead::{ArchiveReadAhead, StructuralPrefetch};
 pub use read_ahead::{SourceReadDiagnostics, SourceReadPolicy, SourceReadPolicyError};
@@ -7765,30 +7767,7 @@ impl SourceBackedPackage {
     /// Return the unique main document part without reading its payload.
     pub fn main_document_part(&self) -> Result<PartView<'_>> {
         self.source.ensure_current()?;
-        let mut matching = self
-            .catalog
-            .package_relationships
-            .iter()
-            .filter(|relationship| {
-                matches!(
-                    relationship.reltype(),
-                    relationship_type::OFFICE_DOCUMENT | relationship_type::STRICT_OFFICE_DOCUMENT
-                )
-            });
-        let relationship = matching.next().ok_or_else(|| {
-            OpcError::InvalidRelationship("main-document relationship is missing".to_string())
-        })?;
-        if matching.next().is_some() {
-            return Err(OpcError::InvalidRelationship(
-                "package has multiple main-document relationships".to_string(),
-            ));
-        }
-        if relationship.is_external() {
-            return Err(OpcError::InvalidRelationship(
-                "main-document relationship cannot be external".to_string(),
-            ));
-        }
-        let partname = relationship.target_partname()?;
+        let partname = main_document_partname(&self.catalog.package_relationships)?;
         self.part(&partname)
     }
 
@@ -13362,6 +13341,29 @@ fn adjusted_overlay_total(
             actual: u64::MAX,
             maximum,
         })
+}
+
+fn main_document_partname(relationships: &Relationships) -> Result<PackURI> {
+    let mut matching = relationships.iter().filter(|relationship| {
+        matches!(
+            relationship.reltype(),
+            relationship_type::OFFICE_DOCUMENT | relationship_type::STRICT_OFFICE_DOCUMENT
+        )
+    });
+    let relationship = matching.next().ok_or_else(|| {
+        OpcError::InvalidRelationship("main-document relationship is missing".to_string())
+    })?;
+    if matching.next().is_some() {
+        return Err(OpcError::InvalidRelationship(
+            "package has multiple main-document relationships".to_string(),
+        ));
+    }
+    if relationship.is_external() {
+        return Err(OpcError::InvalidRelationship(
+            "main-document relationship cannot be external".to_string(),
+        ));
+    }
+    relationship.target_partname()
 }
 
 fn overlay_unavailable(reason: impl Into<String>) -> OpcError {

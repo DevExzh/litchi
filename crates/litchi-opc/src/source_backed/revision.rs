@@ -52,31 +52,10 @@ impl PreparedTopology {
                 .consume(Resource::Work, self.package.catalog.parts.len() as u64)
                 .map_err(map_execution_error)?;
         }
-        let (effective_index, source) = if self.state.no_op {
-            (None, self.package.part(partname)?.source_xml()?)
-        } else {
-            let data = self.state.effective_data();
-            let index = data
-                .parts
-                .iter()
-                .position(|part| part.partname(&self.package).is_equivalent_to(partname))
-                .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
-            let part = &data.parts[index];
-            let physical = part.source_index.ok_or_else(|| {
-                overlay_unavailable("logical XML editing requires an existing physical source Part")
-            })?;
-            let source = match (&part.replacement, &part.source_xml) {
-                (Some(bytes), Some(source)) if bytes.as_slice() == source.bytes() => source.clone(),
-                (Some(_), _) => {
-                    return Err(overlay_unavailable(
-                        "effective XML replacement has no retained source provenance",
-                    ));
-                },
-                (None, _) => self.package.source_xml_part(physical)?,
-            };
-            (Some(index), source)
-        };
-        let revision = source.begin_revision()?;
+        let part = self.part(partname)?;
+        let effective_index = (!self.state.no_op).then_some(part.index);
+        let source = part.source_xml()?;
+        let revision = source.clone();
         let mut publication = revision.clone().into_publication()?;
         edit(&revision, &mut publication)?;
         publication.check_edit_base(&revision)?;
