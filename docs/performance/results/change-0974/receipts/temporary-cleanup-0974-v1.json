@@ -1,0 +1,429 @@
+{
+  "authorization": {
+    "basis": "explicit parent cleanup task; confirmed unbound pycache and no in-use handle",
+    "main_checkout_touched": false,
+    "no_build_or_workload": true,
+    "root_go_required": false
+  },
+  "bound_sentinel_temp_dirs": {
+    "all_already_absent_before_cleanup": true,
+    "deleted_by_this_cleanup": false,
+    "paths": [
+      "/tmp/litchi-0974-launch-boundary-unki9ryq",
+      "/tmp/litchi-0974-launch-boundary-qktgzf6t",
+      "/tmp/litchi-0974-launch-boundary-kmzvp2td"
+    ]
+  },
+  "cleanup_commands": [
+    "PYTHONDONTWRITEBYTECODE=1 Python 3: verify exact pycache inventory, hashes, process classification, and lsof quiescence.",
+    "PYTHONDONTWRITEBYTECODE=1 Python 3: remove only /home/zhuhe/litchi-performance-0974/tools/__pycache__.",
+    "PYTHONDONTWRITEBYTECODE=1 Python 3: verify all preserved controls, failed capture manifest, self-tests, capability/negative-control data, and retained-tree manifest."
+  ],
+  "deleted_candidate": {
+    "after": {
+      "allocated_bytes": 0,
+      "apparent_bytes": 0,
+      "exists": false,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/__pycache__"
+    },
+    "allocated_bytes_freed": 28672,
+    "apparent_bytes_freed": 21476,
+    "before": {
+      "allocated_bytes": 28672,
+      "apparent_bytes": 21476,
+      "entries": [
+        {
+          "bytes": 21476,
+          "inode": 10859440,
+          "rel": "launch_boundary_regression_0974_v1.cpython-314.pyc",
+          "sha256": "4ac8e1048832f4ef35e3306e5b01d03d750f778a965682e45bc016b42ee267ef",
+          "type": "file"
+        }
+      ],
+      "entry_count": 1,
+      "logical_bytes": 21476,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/__pycache__"
+    },
+    "logical_bytes_freed": 21476
+  },
+  "preflight": {
+    "candidate_validation": {
+      "exactly_one_regular_pyc": true,
+      "symlink_count": 0
+    },
+    "open_file_check": {
+      "candidate_before": {
+        "exists": true,
+        "path": "/home/zhuhe/litchi-performance-0974/tools/__pycache__",
+        "records": 0,
+        "returncode": 1,
+        "warnings": [
+          "lsof: WARNING: can't stat() overlay file system /var/lib/docker/rootfs/overlayfs/26a68ec01941e4aa53e6a51ba7effee610db5a50716e8f127549c38e3eb0febd",
+          "      Output information may be incomplete.",
+          "lsof: WARNING: can't stat() nsfs file system /run/docker/netns/e41d5a8804a6",
+          "      Output information may be incomplete."
+        ]
+      },
+      "candidate_records_before": 0,
+      "preserved_perf_after": [
+        {
+          "exists": true,
+          "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/true.perf.data",
+          "records": 0,
+          "returncode": 1,
+          "warnings": [
+            "lsof: WARNING: can't stat() overlay file system /var/lib/docker/rootfs/overlayfs/26a68ec01941e4aa53e6a51ba7effee610db5a50716e8f127549c38e3eb0febd",
+            "      Output information may be incomplete.",
+            "lsof: WARNING: can't stat() nsfs file system /run/docker/netns/e41d5a8804a6",
+            "      Output information may be incomplete."
+          ]
+        },
+        {
+          "exists": true,
+          "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/lifecycle.perf.data",
+          "records": 0,
+          "returncode": 1,
+          "warnings": [
+            "lsof: WARNING: can't stat() overlay file system /var/lib/docker/rootfs/overlayfs/26a68ec01941e4aa53e6a51ba7effee610db5a50716e8f127549c38e3eb0febd",
+            "      Output information may be incomplete.",
+            "lsof: WARNING: can't stat() nsfs file system /run/docker/netns/e41d5a8804a6",
+            "      Output information may be incomplete."
+          ]
+        }
+      ]
+    },
+    "process_check": {
+      "all_matches_after": [
+        {
+          "cmdline": "/bin/bash -c rg -l '79eebd90694c528356fc42cdc6754af69c11e318ec4e2a6f6ad5abeea0489569' /home/zhuhe 2>/dev/null | head -50; find /home/zhuhe -type f -name 'launch_boundary_regression_0974_v1.py' -printf '%T@ %s %p\\n' 2>/dev/null | sort -nr | head -30",
+          "comm": "bash",
+          "pid": 3753635
+        }
+      ],
+      "all_matches_before": [
+        {
+          "cmdline": "/bin/bash -c rg -l '79eebd90694c528356fc42cdc6754af69c11e318ec4e2a6f6ad5abeea0489569' /home/zhuhe 2>/dev/null | head -50; find /home/zhuhe -type f -name 'launch_boundary_regression_0974_v1.py' -printf '%T@ %s %p\\n' 2>/dev/null | sort -nr | head -30",
+          "comm": "bash",
+          "pid": 3753635
+        }
+      ],
+      "read_only_audit_matches_allowed": true,
+      "workload_matches_after": [],
+      "workload_matches_before": []
+    }
+  },
+  "preserved_controls": {
+    "after": [
+      {
+        "bytes": 1352,
+        "inode": 10608957,
+        "path": "/home/zhuhe/litchi-performance-0974/analysis/protocol-selftest-v1.json",
+        "sha256": "a8129bad7b5ee57f788e651ead58cdaa5cf6848c91d025a5daf002592d8d2af6"
+      },
+      {
+        "bytes": 130,
+        "inode": 10608966,
+        "path": "/home/zhuhe/litchi-performance-0974/analysis/reducer-selftest-v1.json",
+        "sha256": "25136d67a563c0529a7a220b63a5d6311f1b948a5a0aa6f3f519e026ff49668c"
+      },
+      {
+        "bytes": 1352,
+        "inode": 10608965,
+        "path": "/home/zhuhe/litchi-performance-0974/analysis/runner-selftest-v1.json",
+        "sha256": "a8129bad7b5ee57f788e651ead58cdaa5cf6848c91d025a5daf002592d8d2af6"
+      },
+      {
+        "bytes": 2191,
+        "inode": 10609006,
+        "path": "/home/zhuhe/litchi-performance-0974/analysis/native-record-spec-v2.json",
+        "sha256": "3d9f5bd12c2d20b4853f5601359d18c6051a4da2b8d3b7e87b25112cbb2dcb9d"
+      },
+      {
+        "bytes": 531,
+        "inode": 10859439,
+        "path": "/home/zhuhe/litchi-performance-0974/capture/instruction-profile-v1/capture-manifest-v2.json",
+        "sha256": "19889cf44b3e5582ff1b3355238787cd27c3c0c4032dda05fb674ddd75e27e0a"
+      },
+      {
+        "bytes": 9989,
+        "inode": 10608985,
+        "path": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/capability-receipt-v1.json",
+        "sha256": "70b64d1f18a13c59492777cb8bca8d5a4e461436a9fed65cea0ff4c4e1021145"
+      },
+      {
+        "bytes": 0,
+        "inode": 10608978,
+        "path": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/true.perf.data",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "bytes": 7774,
+        "inode": 10608949,
+        "path": "/home/zhuhe/litchi-performance-0974/capability-mmap16m-v1/capability-receipt-v2.json",
+        "sha256": "eb7e8873cdb7b2a2ead8edd1f476150efad11d79a5142fcc7a0492051cbb4786"
+      },
+      {
+        "bytes": 11596,
+        "inode": 10609003,
+        "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/capability-receipt-v1.json",
+        "sha256": "503cacc304daf95d8e7254feb1bf074d01cf707bfbeb6c11b049a857522705fd"
+      },
+      {
+        "bytes": 44336,
+        "inode": 10608994,
+        "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/true.perf.data",
+        "sha256": "f9ad6ffbc3d05305fc6e7bda4c00a8ba539a51ed0dbcfa959504499b6f455f4c"
+      },
+      {
+        "bytes": 14157,
+        "inode": 10609037,
+        "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/lifecycle-negative-control-receipt-v1.json",
+        "sha256": "852e22aadbebb43d75075f9f1749343b50f4008d6a8c37b6a1f35cf954895ec8"
+      },
+      {
+        "bytes": 5832656,
+        "inode": 10609022,
+        "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/lifecycle.perf.data",
+        "sha256": "d5f9c4cc8e3145caa5fbe054c34a8fb2fa4db7a2a939ff0a8100af4c0f63edf9"
+      },
+      {
+        "bytes": 19568,
+        "inode": 10609052,
+        "path": "/home/zhuhe/litchi-performance-0974/plans/plan-0974-pre-capture-v5.json",
+        "sha256": "dddd126895d04cd1738719d99aa00ff1b68dcd551233a5c2391f37f7c30e71ee"
+      },
+      {
+        "bytes": 1174,
+        "inode": 10609049,
+        "path": "/home/zhuhe/litchi-performance-0974/receipts/root-terminal-0974-v1.json",
+        "sha256": "403d58e6471a5f2afbfa8da4eb019904e7cdc46da3ad5f2677ee43cd9bad73de"
+      },
+      {
+        "bytes": 7605,
+        "inode": 10609057,
+        "path": "/home/zhuhe/litchi-performance-0974/receipts/independent-repair-review-0974-v5-v1.json",
+        "sha256": "b74e7fb3c04f88ea57a4c9b2f6fd73d8ebbc5894c7b80bbaf9c3af93c4826c97"
+      },
+      {
+        "bytes": 10344,
+        "inode": 10609044,
+        "path": "/home/zhuhe/litchi-performance-0974/receipts/independent-review-0974-v4.json",
+        "sha256": "86688588f55d80274b906f092d31b82c01e05f137ea86f536e7ac2b4c6fc0cca"
+      },
+      {
+        "bytes": 5741,
+        "inode": 10609050,
+        "path": "/home/zhuhe/litchi-performance-0974/receipts/corrective-audit-0974-prelaunch-no-admission-v1.json",
+        "sha256": "078cfefe0694486d3b0100044b37c494862fa27d12e2a5d51636f5491e318ecd"
+      },
+      {
+        "bytes": 12807,
+        "inode": 10609053,
+        "path": "/home/zhuhe/litchi-performance-0974/tools/launch_boundary_regression_0974_v1.py",
+        "sha256": "7831e9b7ae5d6dc32b64e078e8f09a4e263ec364634ea03d0dc74ec13965124d"
+      },
+      {
+        "bytes": 35075,
+        "inode": 10609046,
+        "path": "/home/zhuhe/litchi-performance-0974/tools/protocol_adapter_0974_v5.py",
+        "sha256": "e3725cbc027d2a063f32b926e3fb4024d640aab2a2fbd7493ed5325de9ea2ac6"
+      },
+      {
+        "bytes": 12565,
+        "inode": 10609010,
+        "path": "/home/zhuhe/litchi-performance-0974/tools/reduce_0974_v4.py",
+        "sha256": "7c6e7162e406aecf13868b264da29f2d5b6e07f0212bed1099298a464bb9ade5"
+      },
+      {
+        "bytes": 1841,
+        "inode": 10609047,
+        "path": "/home/zhuhe/litchi-performance-0974/tools/run_0974_v5.py",
+        "sha256": "519a7b88cf6df7688d1b4555fbd3b2d682c2459bc6c070817308ba38031d4fe1"
+      }
+    ],
+    "before": [
+      {
+        "bytes": 1352,
+        "inode": 10608957,
+        "path": "/home/zhuhe/litchi-performance-0974/analysis/protocol-selftest-v1.json",
+        "sha256": "a8129bad7b5ee57f788e651ead58cdaa5cf6848c91d025a5daf002592d8d2af6"
+      },
+      {
+        "bytes": 130,
+        "inode": 10608966,
+        "path": "/home/zhuhe/litchi-performance-0974/analysis/reducer-selftest-v1.json",
+        "sha256": "25136d67a563c0529a7a220b63a5d6311f1b948a5a0aa6f3f519e026ff49668c"
+      },
+      {
+        "bytes": 1352,
+        "inode": 10608965,
+        "path": "/home/zhuhe/litchi-performance-0974/analysis/runner-selftest-v1.json",
+        "sha256": "a8129bad7b5ee57f788e651ead58cdaa5cf6848c91d025a5daf002592d8d2af6"
+      },
+      {
+        "bytes": 2191,
+        "inode": 10609006,
+        "path": "/home/zhuhe/litchi-performance-0974/analysis/native-record-spec-v2.json",
+        "sha256": "3d9f5bd12c2d20b4853f5601359d18c6051a4da2b8d3b7e87b25112cbb2dcb9d"
+      },
+      {
+        "bytes": 531,
+        "inode": 10859439,
+        "path": "/home/zhuhe/litchi-performance-0974/capture/instruction-profile-v1/capture-manifest-v2.json",
+        "sha256": "19889cf44b3e5582ff1b3355238787cd27c3c0c4032dda05fb674ddd75e27e0a"
+      },
+      {
+        "bytes": 9989,
+        "inode": 10608985,
+        "path": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/capability-receipt-v1.json",
+        "sha256": "70b64d1f18a13c59492777cb8bca8d5a4e461436a9fed65cea0ff4c4e1021145"
+      },
+      {
+        "bytes": 0,
+        "inode": 10608978,
+        "path": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/true.perf.data",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "bytes": 7774,
+        "inode": 10608949,
+        "path": "/home/zhuhe/litchi-performance-0974/capability-mmap16m-v1/capability-receipt-v2.json",
+        "sha256": "eb7e8873cdb7b2a2ead8edd1f476150efad11d79a5142fcc7a0492051cbb4786"
+      },
+      {
+        "bytes": 11596,
+        "inode": 10609003,
+        "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/capability-receipt-v1.json",
+        "sha256": "503cacc304daf95d8e7254feb1bf074d01cf707bfbeb6c11b049a857522705fd"
+      },
+      {
+        "bytes": 44336,
+        "inode": 10608994,
+        "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/true.perf.data",
+        "sha256": "f9ad6ffbc3d05305fc6e7bda4c00a8ba539a51ed0dbcfa959504499b6f455f4c"
+      },
+      {
+        "bytes": 14157,
+        "inode": 10609037,
+        "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/lifecycle-negative-control-receipt-v1.json",
+        "sha256": "852e22aadbebb43d75075f9f1749343b50f4008d6a8c37b6a1f35cf954895ec8"
+      },
+      {
+        "bytes": 5832656,
+        "inode": 10609022,
+        "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/lifecycle.perf.data",
+        "sha256": "d5f9c4cc8e3145caa5fbe054c34a8fb2fa4db7a2a939ff0a8100af4c0f63edf9"
+      },
+      {
+        "bytes": 19568,
+        "inode": 10609052,
+        "path": "/home/zhuhe/litchi-performance-0974/plans/plan-0974-pre-capture-v5.json",
+        "sha256": "dddd126895d04cd1738719d99aa00ff1b68dcd551233a5c2391f37f7c30e71ee"
+      },
+      {
+        "bytes": 1174,
+        "inode": 10609049,
+        "path": "/home/zhuhe/litchi-performance-0974/receipts/root-terminal-0974-v1.json",
+        "sha256": "403d58e6471a5f2afbfa8da4eb019904e7cdc46da3ad5f2677ee43cd9bad73de"
+      },
+      {
+        "bytes": 7605,
+        "inode": 10609057,
+        "path": "/home/zhuhe/litchi-performance-0974/receipts/independent-repair-review-0974-v5-v1.json",
+        "sha256": "b74e7fb3c04f88ea57a4c9b2f6fd73d8ebbc5894c7b80bbaf9c3af93c4826c97"
+      },
+      {
+        "bytes": 10344,
+        "inode": 10609044,
+        "path": "/home/zhuhe/litchi-performance-0974/receipts/independent-review-0974-v4.json",
+        "sha256": "86688588f55d80274b906f092d31b82c01e05f137ea86f536e7ac2b4c6fc0cca"
+      },
+      {
+        "bytes": 5741,
+        "inode": 10609050,
+        "path": "/home/zhuhe/litchi-performance-0974/receipts/corrective-audit-0974-prelaunch-no-admission-v1.json",
+        "sha256": "078cfefe0694486d3b0100044b37c494862fa27d12e2a5d51636f5491e318ecd"
+      },
+      {
+        "bytes": 12807,
+        "inode": 10609053,
+        "path": "/home/zhuhe/litchi-performance-0974/tools/launch_boundary_regression_0974_v1.py",
+        "sha256": "7831e9b7ae5d6dc32b64e078e8f09a4e263ec364634ea03d0dc74ec13965124d"
+      },
+      {
+        "bytes": 35075,
+        "inode": 10609046,
+        "path": "/home/zhuhe/litchi-performance-0974/tools/protocol_adapter_0974_v5.py",
+        "sha256": "e3725cbc027d2a063f32b926e3fb4024d640aab2a2fbd7493ed5325de9ea2ac6"
+      },
+      {
+        "bytes": 12565,
+        "inode": 10609010,
+        "path": "/home/zhuhe/litchi-performance-0974/tools/reduce_0974_v4.py",
+        "sha256": "7c6e7162e406aecf13868b264da29f2d5b6e07f0212bed1099298a464bb9ade5"
+      },
+      {
+        "bytes": 1841,
+        "inode": 10609047,
+        "path": "/home/zhuhe/litchi-performance-0974/tools/run_0974_v5.py",
+        "sha256": "519a7b88cf6df7688d1b4555fbd3b2d682c2459bc6c070817308ba38031d4fe1"
+      }
+    ],
+    "differences": [],
+    "unchanged": true
+  },
+  "preserved_tree_manifest": {
+    "after_count": 116,
+    "after_digest": "033dd0900783d1097d7e6d9598ffd92ca2d122db6119aede26cc2d8f83bfd984",
+    "before_count": 116,
+    "before_digest": "033dd0900783d1097d7e6d9598ffd92ca2d122db6119aede26cc2d8f83bfd984",
+    "differences": [],
+    "unchanged_outside_deleted_path": true
+  },
+  "recorded_utc": "2026-10-08T05:21:33.749223Z",
+  "remaining_cache_temp_scan": {
+    "count": 0,
+    "paths": [],
+    "patterns": [
+      "cache",
+      "tmp",
+      "temp",
+      "scratch",
+      "*.pyc",
+      "*.pyo",
+      "*.swp",
+      "*.swo",
+      "*~",
+      "*.bak",
+      "*.part",
+      "*.lock"
+    ]
+  },
+  "schema": "litchi.performance.0974.temporary_cleanup.v1",
+  "scope": {
+    "bound_sentinel_dirs_deleted": false,
+    "deleted_path_count": 1,
+    "deleted_paths": [
+      "/home/zhuhe/litchi-performance-0974/tools/__pycache__"
+    ],
+    "deleted_regular_file_count": 1,
+    "deleted_symlink_count": 0,
+    "no_other_0974_paths_deleted": true,
+    "outside_tmp_files_deleted": false,
+    "requested_paths": [
+      "/home/zhuhe/litchi-performance-0974/tools/__pycache__"
+    ]
+  },
+  "status": "completed",
+  "updated_utc": "2026-10-08T05:21:33.857368Z",
+  "verification": {
+    "all_receipts_seals_plans_helpers_preserved": true,
+    "capability_probe_perf_preserved": true,
+    "failed_capture_emptydir_and_manifest_preserved": true,
+    "negative_control_preserved": true,
+    "no_repo_edits": true,
+    "selftest_analysis_preserved": true,
+    "synthetic_and_regression_artifacts_preserved": true,
+    "unrelated_tmp_files_untouched": true
+  }
+}

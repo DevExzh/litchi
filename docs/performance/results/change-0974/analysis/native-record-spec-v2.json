@@ -1,0 +1,89 @@
+{
+  "schema": "litchi.performance.0974.native_record_spec.v1",
+  "status": "independent_final_spec",
+  "source": {
+    "design": {
+      "path": "/home/zhuhe/litchi-performance-0974/design-v2.md",
+      "sha256": "6d9b4f6b1bc2f407da2b62b742cf3ae76213f9e4626bf20afba3cfcf8511b06f"
+    },
+    "capability": {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/capability-receipt-v1.json",
+      "sha256": "503cacc304daf95d8e7254feb1bf074d01cf707bfbeb6c11b049a857522705fd"
+    }
+  },
+  "record_memory": {
+    "tokens": [
+      "-m",
+      "16M"
+    ],
+    "bytes": 16777216,
+    "position": "immediately before --call-graph"
+  },
+  "record_mode": {
+    "required_tokens": [
+      "--per-thread"
+    ],
+    "forbidden_tokens": [
+      "-a",
+      "--all-cpus",
+      "-C",
+      "--cpu",
+      "--inherit"
+    ],
+    "inheritance": "disabled_by_per_thread",
+    "scope": "one launcher/native exec PID and one native thread; task/FORK audit required per child"
+  },
+  "cpu_selector": {
+    "tokens": [],
+    "affinity_scope": "outer taskset --cpu-list 31"
+  },
+  "event": "instructions:u",
+  "period": 1000000,
+  "callgraph": "dwarf,32768",
+  "stack_cap": 32768,
+  "argv_template": [
+    "/usr/bin/taskset",
+    "--cpu-list",
+    "31",
+    "/usr/bin/perf",
+    "record",
+    "--per-thread",
+    "-e",
+    "instructions:u",
+    "-c",
+    "1000000",
+    "-m",
+    "16M",
+    "--call-graph",
+    "dwarf,32768",
+    "--period",
+    "--timestamp",
+    "--sample-cpu",
+    "--buildid-all",
+    "--no-buildid-cache",
+    "--user-callchains",
+    "-o",
+    "<child_dir>/child-01.perf.data",
+    "--",
+    "/usr/bin/python3.14",
+    "/home/zhuhe/litchi-performance-0970/tools/launch_baseline_v2.py",
+    "--metadata",
+    "<child_dir>/child-01.launch.json",
+    "--requested-affinity",
+    "[31]",
+    "--",
+    "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+    "--case",
+    "docfloat",
+    "--input",
+    "/home/zhuhe/litchi-performance-0969/qa-core/test-data/ole/doc/FloatingPictures.doc",
+    "--edits",
+    "1",
+    "--retention",
+    "default",
+    "--warmup",
+    "5",
+    "--samples",
+    "80"
+  ]
+}

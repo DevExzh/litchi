@@ -1,0 +1,517 @@
+{
+  "argv": {
+    "actual_argv": [
+      "/usr/bin/taskset",
+      "--cpu-list",
+      "31",
+      "/usr/bin/perf",
+      "record",
+      "--per-thread",
+      "-e",
+      "instructions:u",
+      "-c",
+      "1000000",
+      "-m",
+      "16M",
+      "--call-graph",
+      "dwarf,32768",
+      "--period",
+      "--timestamp",
+      "--sample-cpu",
+      "--buildid-all",
+      "--no-buildid-cache",
+      "--user-callchains",
+      "-o",
+      "<child_dir>/child-01.perf.data",
+      "--",
+      "/usr/bin/python3.14",
+      "/home/zhuhe/litchi-performance-0970/tools/launch_baseline_v2.py",
+      "--metadata",
+      "<child_dir>/child-01.launch.json",
+      "--requested-affinity",
+      "[31]",
+      "--",
+      "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "--case",
+      "docfloat",
+      "--input",
+      "/home/zhuhe/litchi-performance-0969/qa-core/test-data/ole/doc/FloatingPictures.doc",
+      "--edits",
+      "1",
+      "--retention",
+      "default",
+      "--warmup",
+      "5",
+      "--samples",
+      "80"
+    ],
+    "cpu_selector_tokens": [],
+    "forbidden_record_mode_tokens": [
+      "-a",
+      "--all-cpus",
+      "-C",
+      "--cpu",
+      "--inherit"
+    ],
+    "inheritance": "disabled_by_per_thread",
+    "record_memory": {
+      "bytes": 16777216,
+      "position": "immediately before --call-graph",
+      "tokens": [
+        "-m",
+        "16M"
+      ]
+    },
+    "required_record_mode_tokens": [
+      "--per-thread"
+    ],
+    "spec": {
+      "bytes": 2191,
+      "path": "/home/zhuhe/litchi-performance-0974/analysis/native-record-spec-v2.json",
+      "sha256": "3d9f5bd12c2d20b4853f5601359d18c6051a4da2b8d3b7e87b25112cbb2dcb9d"
+    },
+    "template_checked": true
+  },
+  "build_started": false,
+  "created_utc": "2026-10-08T05:14:08.031235+00:00",
+  "helper": {
+    "bytes": 34265,
+    "path": "/home/zhuhe/litchi-performance-0974/tools/synthetic_continuation_gate_0974_v1.py",
+    "sha256": "5bf18b45e45dc5f600c187fc3f6b67277f21aa154b068a9de411aa68068764ab"
+  },
+  "loss_policy": {
+    "both_zero_required": true,
+    "nonadditive": true,
+    "raw_field": "raw_lost_sum",
+    "raw_rule": "sum PERF_RECORD_LOST fields only",
+    "terminal_field": "lost_samples_summary",
+    "terminal_rule": "PERF_RECORD_LOST_SAMPLES terminal summary only"
+  },
+  "mock_boundary": {
+    "direct_require_zero_loss_call": false,
+    "native_perf_or_workload": false,
+    "real_packet_loss_admission": true,
+    "real_serial_runner_loop": true,
+    "scope": "offline perf/decoder boundary mock; no native sample bytes"
+  },
+  "native_capture_started": false,
+  "offline_only": true,
+  "production_helpers_after": {
+    "helper_seal_v4": {
+      "bytes": 4182,
+      "path": "/home/zhuhe/litchi-performance-0974/receipts/helper-seal-0974-v4.json",
+      "sha256": "bb61c9c98c8080e0d6b769079dcd2e3904f82a0645edd6661255e861f13420c7"
+    },
+    "plan_generator_v4": {
+      "bytes": 8475,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/prepare_plan_0974_v4.py",
+      "sha256": "488fb1cb66af1eacb25abfa567b9c6a855ca87b4ba70ba75c61cb7f92e273eaf"
+    },
+    "plan_v4": {
+      "bytes": 19568,
+      "path": "/home/zhuhe/litchi-performance-0974/plans/plan-0974-pre-capture-v4.json",
+      "sha256": "85e14a9cf4e630ad2c75b8697b236fb7bb1dc08fed8ba76877a9dd15127f09ea"
+    },
+    "protocol_v1_lineage": {
+      "bytes": 25841,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/protocol_adapter_0974_v1.py",
+      "sha256": "6c2032e2d1cc04990f6f4be0df4542d393ce55f1c1c7d45b97ea62eb5f05269e"
+    },
+    "protocol_v3": {
+      "bytes": 30542,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/protocol_adapter_0974_v3.py",
+      "sha256": "e798f3e5628cab21c019f90d793754ef5930a0ce9e222569f53861eed83e8dd6"
+    },
+    "reducer_v4": {
+      "bytes": 12565,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/reduce_0974_v4.py",
+      "sha256": "7c6e7162e406aecf13868b264da29f2d5b6e07f0212bed1099298a464bb9ade5"
+    },
+    "runner_v3": {
+      "bytes": 1841,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/run_0974_v3.py",
+      "sha256": "74cb0d5ff37f08004f460430d3a4c651286473431ecdca67ef8b2b47e49c64a4"
+    }
+  },
+  "production_helpers_before": {
+    "helper_seal_v4": {
+      "bytes": 4182,
+      "path": "/home/zhuhe/litchi-performance-0974/receipts/helper-seal-0974-v4.json",
+      "sha256": "bb61c9c98c8080e0d6b769079dcd2e3904f82a0645edd6661255e861f13420c7"
+    },
+    "plan_generator_v4": {
+      "bytes": 8475,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/prepare_plan_0974_v4.py",
+      "sha256": "488fb1cb66af1eacb25abfa567b9c6a855ca87b4ba70ba75c61cb7f92e273eaf"
+    },
+    "plan_v4": {
+      "bytes": 19568,
+      "path": "/home/zhuhe/litchi-performance-0974/plans/plan-0974-pre-capture-v4.json",
+      "sha256": "85e14a9cf4e630ad2c75b8697b236fb7bb1dc08fed8ba76877a9dd15127f09ea"
+    },
+    "protocol_v1_lineage": {
+      "bytes": 25841,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/protocol_adapter_0974_v1.py",
+      "sha256": "6c2032e2d1cc04990f6f4be0df4542d393ce55f1c1c7d45b97ea62eb5f05269e"
+    },
+    "protocol_v3": {
+      "bytes": 30542,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/protocol_adapter_0974_v3.py",
+      "sha256": "e798f3e5628cab21c019f90d793754ef5930a0ce9e222569f53861eed83e8dd6"
+    },
+    "reducer_v4": {
+      "bytes": 12565,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/reduce_0974_v4.py",
+      "sha256": "7c6e7162e406aecf13868b264da29f2d5b6e07f0212bed1099298a464bb9ade5"
+    },
+    "runner_v3": {
+      "bytes": 1841,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/run_0974_v3.py",
+      "sha256": "74cb0d5ff37f08004f460430d3a4c651286473431ecdca67ef8b2b47e49c64a4"
+    }
+  },
+  "reducer_admission": {
+    "retained_0973_arithmetic_receipt": {
+      "bytes": 22118,
+      "path": "/home/zhuhe/litchi-performance-0973/receipts/synthetic-packet-pipeline-author-v2-v4.json",
+      "sha256": "d908603da0167a52450982c3d2ceb8f9277d5960e51c1883999a78a0555a494a"
+    },
+    "scenario_count": 11,
+    "scenarios": [
+      {
+        "accepted_packet_count": 12,
+        "loader_boundary": "retained BASE_REDUCER._load_packets stub; frozen v3 postchecks real",
+        "mutation": "none",
+        "name": "control_zero_loss",
+        "rejection": null,
+        "status": "pass",
+        "target_child": null
+      },
+      {
+        "accepted_packet_count": null,
+        "loader_boundary": "retained BASE_REDUCER._load_packets stub; frozen v3 postchecks real",
+        "mutation": "argv_memory",
+        "name": "argv_memory_child02",
+        "rejection": "child-02: recorded native argv does not match bound per-thread/memory command",
+        "status": "pass",
+        "target_child": 2
+      },
+      {
+        "accepted_packet_count": null,
+        "loader_boundary": "retained BASE_REDUCER._load_packets stub; frozen v3 postchecks real",
+        "mutation": "argv_perthread",
+        "name": "argv_perthread_child08",
+        "rejection": "child-08: recorded native argv does not match bound per-thread/memory command",
+        "status": "pass",
+        "target_child": 8
+      },
+      {
+        "accepted_packet_count": null,
+        "loader_boundary": "retained BASE_REDUCER._load_packets stub; frozen v3 postchecks real",
+        "mutation": "cwd_relative",
+        "name": "cwd_relative_child02",
+        "rejection": "child-02: command cwd binding missing or malformed",
+        "status": "pass",
+        "target_child": 2
+      },
+      {
+        "accepted_packet_count": null,
+        "loader_boundary": "retained BASE_REDUCER._load_packets stub; frozen v3 postchecks real",
+        "mutation": "cwd_missing",
+        "name": "cwd_missing_child08",
+        "rejection": "child-08: command cwd binding missing or malformed",
+        "status": "pass",
+        "target_child": 8
+      },
+      {
+        "accepted_packet_count": null,
+        "loader_boundary": "retained BASE_REDUCER._load_packets stub; frozen v3 postchecks real",
+        "mutation": "environment",
+        "name": "environment_child02",
+        "rejection": "child-02: native environment/LD_PRELOAD custody mismatch",
+        "status": "pass",
+        "target_child": 2
+      },
+      {
+        "accepted_packet_count": null,
+        "loader_boundary": "retained BASE_REDUCER._load_packets stub; frozen v3 postchecks real",
+        "mutation": "terminal_preload",
+        "name": "terminal_preload_child08",
+        "rejection": "child-08: native environment/LD_PRELOAD custody mismatch",
+        "status": "pass",
+        "target_child": 8
+      },
+      {
+        "accepted_packet_count": null,
+        "loader_boundary": "retained BASE_REDUCER._load_packets stub; frozen v3 postchecks real",
+        "mutation": "raw_loss",
+        "name": "raw_loss_child08",
+        "rejection": "raw PERF_RECORD_LOST sum is nonzero: 1",
+        "status": "pass",
+        "target_child": 8
+      },
+      {
+        "accepted_packet_count": null,
+        "loader_boundary": "retained BASE_REDUCER._load_packets stub; frozen v3 postchecks real",
+        "mutation": "terminal_loss",
+        "name": "terminal_loss_child02",
+        "rejection": "terminal LOST_SAMPLES summary is nonzero: 1",
+        "status": "pass",
+        "target_child": 2
+      },
+      {
+        "accepted_packet_count": null,
+        "loader_boundary": "retained BASE_REDUCER._load_packets stub; frozen v3 postchecks real",
+        "mutation": "fork",
+        "name": "fork_task_child02",
+        "rejection": "immutable raw task/lifecycle audit failed: ['unexpected_task_creation_record', 'fork_pid=390003/390003']",
+        "status": "pass",
+        "target_child": 2
+      },
+      {
+        "accepted_packet_count": null,
+        "loader_boundary": "retained BASE_REDUCER._load_packets stub; frozen v3 postchecks real",
+        "mutation": "tid",
+        "name": "tid_task_child08",
+        "rejection": "immutable raw task/lifecycle audit failed: ['thread_map_not_single_expected_pid']",
+        "status": "pass",
+        "target_child": 8
+      }
+    ],
+    "scope": "frozen v3 _load_packets postchecks with a mocked retained-loader boundary; no native or decoder execution",
+    "status": "pass"
+  },
+  "retained_0973_arithmetic_owner_control": {
+    "all_twelve_marker_physical_unknown_conservation": true,
+    "binding": {
+      "bytes": 22118,
+      "path": "/home/zhuhe/litchi-performance-0973/receipts/synthetic-packet-pipeline-author-v2-v4.json",
+      "sha256": "d908603da0167a52450982c3d2ceb8f9277d5960e51c1883999a78a0555a494a"
+    },
+    "inclusive_owner_no_double_counting": true,
+    "nonmarker_owner_excluded": true,
+    "packet_count": 12,
+    "status": "pass"
+  },
+  "scenarios": [
+    {
+      "failure": null,
+      "launched_children": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "manifest_packet_count": 12,
+      "manifest_sha256": "76776155033d90d1d3401021bab8919cf41f8d3658f93f466a6fbf694d0795e7",
+      "name": "control_zero_loss",
+      "returncode": 0,
+      "runner_stdout_sha256": "bbad73372c4f4f116427f18ad6aa20e3e2cc24b97546cefa024d5b30c0162d71",
+      "status": "complete"
+    },
+    {
+      "failure": {
+        "child": 2,
+        "error": "raw PERF_RECORD_LOST sum is nonzero: 1",
+        "reason": "child_failed",
+        "type": "ProtocolError"
+      },
+      "launched_children": [
+        1,
+        2
+      ],
+      "manifest_packet_count": 1,
+      "manifest_sha256": "6ea86317b10ec80467ae6aa52c36b4d202ce09aa21c58a391ab0986e1778c774",
+      "name": "raw_loss_child02",
+      "returncode": 2,
+      "runner_stdout_sha256": "79a40d2b35ebe55db19b134c5a7dab1db6ef93953cb8cc9693e85b3ff3208e5a",
+      "status": "failed"
+    },
+    {
+      "failure": {
+        "child": 8,
+        "error": "raw PERF_RECORD_LOST sum is nonzero: 1",
+        "reason": "child_failed",
+        "type": "ProtocolError"
+      },
+      "launched_children": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "manifest_packet_count": 7,
+      "manifest_sha256": "d574a0bf6b6d1d7bf2cc1a77fab7e712f7fd472a3de2c2d4f4f7ffbce13a9950",
+      "name": "raw_loss_child08",
+      "returncode": 2,
+      "runner_stdout_sha256": "f53d3c80857ad628e69b8322f519a27cfb5194556b215aeece1ba1945480998c",
+      "status": "failed"
+    },
+    {
+      "failure": {
+        "child": 2,
+        "error": "terminal LOST_SAMPLES summary is nonzero: 1",
+        "reason": "child_failed",
+        "type": "ProtocolError"
+      },
+      "launched_children": [
+        1,
+        2
+      ],
+      "manifest_packet_count": 1,
+      "manifest_sha256": "737784aca5a618c6cc01801583ba7b250f0ffebabcb30749038bfefd522d98a8",
+      "name": "terminal_loss_child02",
+      "returncode": 2,
+      "runner_stdout_sha256": "1205a50a64ba2d3bb66460e7515e5bdbe5b620206d2f1c72ad3735798d9a3d72",
+      "status": "failed"
+    },
+    {
+      "failure": {
+        "child": 8,
+        "error": "terminal LOST_SAMPLES summary is nonzero: 1",
+        "reason": "child_failed",
+        "type": "ProtocolError"
+      },
+      "launched_children": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "manifest_packet_count": 7,
+      "manifest_sha256": "8f2c1d4ad1ffbfec0398b510bafb294fab8e17b86a3e7eceed3aed29f9146482",
+      "name": "terminal_loss_child08",
+      "returncode": 2,
+      "runner_stdout_sha256": "043d1da8fd4275dfd0df32e95360373138d0a8a08c3c25d04cabe0441b324190",
+      "status": "failed"
+    },
+    {
+      "failure": {
+        "child": 8,
+        "error": "raw PERF_RECORD_LOST sum is nonzero: 2",
+        "reason": "child_failed",
+        "type": "ProtocolError"
+      },
+      "launched_children": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "manifest_packet_count": 7,
+      "manifest_sha256": "83566a5323978f123b9056e069e8467f50e15c42eed285e47a0323469834c57c",
+      "name": "both_loss_child08",
+      "returncode": 2,
+      "runner_stdout_sha256": "5105fe62b4cd5548cf7f33481cae62dfa39ae419fe6fe3f347d84554b17ee0c3",
+      "status": "failed"
+    },
+    {
+      "failure": {
+        "child": 2,
+        "error": "raw task/lifecycle audit failed: ['unexpected_task_creation_record', 'fork_pid=390003/390003']",
+        "reason": "child_failed",
+        "type": "ProtocolError"
+      },
+      "launched_children": [
+        1,
+        2
+      ],
+      "manifest_packet_count": 1,
+      "manifest_sha256": "660b0dd49a41f15c59cbfd9392e8e47cd023abb0b20f3effe32f0f74addf6ded",
+      "name": "fork_task_child02",
+      "returncode": 2,
+      "runner_stdout_sha256": "9a590599dc2fe3038f0bb72c0100109b0f5f48030496afbbd20bb2a4b22d0679",
+      "status": "failed"
+    },
+    {
+      "failure": {
+        "child": 2,
+        "error": "raw task/lifecycle audit failed: ['thread_map_not_single_expected_pid']",
+        "reason": "child_failed",
+        "type": "ProtocolError"
+      },
+      "launched_children": [
+        1,
+        2
+      ],
+      "manifest_packet_count": 1,
+      "manifest_sha256": "22ca87aeef45ef92d7bccdb2499274b7be5749e95f8632f07391f3c390bdb59f",
+      "name": "tid_task_child02",
+      "returncode": 2,
+      "runner_stdout_sha256": "030e73ddb351ce115f043993d137d99a96f3bb026658c5b9f45e024ba6f66ea4",
+      "status": "failed"
+    },
+    {
+      "failure": {
+        "child": 8,
+        "error": "raw task/lifecycle audit failed: ['unexpected_task_creation_record', 'fork_pid=390009/390009']",
+        "reason": "child_failed",
+        "type": "ProtocolError"
+      },
+      "launched_children": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "manifest_packet_count": 7,
+      "manifest_sha256": "1b75a45e9aa29029ed9af05f79d678db29c8d8593fe6a94f5c9075a4fcd28b10",
+      "name": "fork_task_child08",
+      "returncode": 2,
+      "runner_stdout_sha256": "32bc1017016db55a4596c46106ddc6d37fb0475da76a701456a8535ae9620276",
+      "status": "failed"
+    },
+    {
+      "failure": {
+        "child": 8,
+        "error": "raw task/lifecycle audit failed: ['thread_map_not_single_expected_pid']",
+        "reason": "child_failed",
+        "type": "ProtocolError"
+      },
+      "launched_children": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "manifest_packet_count": 7,
+      "manifest_sha256": "f48a65af63415dd22cb3a388d9d80b050dca4a5fbff8a2ed4289e80b24261664",
+      "name": "tid_task_child08",
+      "returncode": 2,
+      "runner_stdout_sha256": "06b66ba74d7e68cafe0703864139d44de7ac906f3a5be2f9eb943f11af08aa79",
+      "status": "failed"
+    }
+  ],
+  "schema": "litchi.performance.0974.synthetic_continuation_gate.v1",
+  "scope": "real retained serial loop and packet admission with mocked native perf/decoder boundary",
+  "status": "pass",
+  "workload_started": false
+}

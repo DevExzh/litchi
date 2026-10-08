@@ -1,0 +1,42 @@
+{
+  "basis": "run_child creates directory then constructs command before opening files or calling Popen; RecursionError occurred in command builder and directory is empty",
+  "capture_reduction_started": false,
+  "child_directory_entries": [],
+  "children_not_launched": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12
+  ],
+  "completed_packets": 0,
+  "created_utc": "2026-10-08T05:17:12.860246+00:00",
+  "failure": {
+    "child": 1,
+    "error": "maximum recursion depth exceeded",
+    "reason": "child_failed",
+    "type": "RecursionError"
+  },
+  "manifest": {
+    "bytes": 531,
+    "path": "/home/zhuhe/litchi-performance-0974/capture/instruction-profile-v1/capture-manifest-v2.json",
+    "sha256": "19889cf44b3e5582ff1b3355238787cd27c3c0c4032dda05fb674ddd75e27e0a"
+  },
+  "no_retry": true,
+  "office_workload_started": false,
+  "returncode": 2,
+  "root_go": {
+    "bytes": 3430,
+    "path": "/home/zhuhe/litchi-performance-0974/receipts/root-go-0974-v1.json",
+    "sha256": "19539597f779cef4562aa232ba8629cfc5b31394550467930c95909c8cdffcca"
+  },
+  "runner_terminal": true,
+  "schema": "litchi.performance.0974.root_terminal.v1"
+}

@@ -1,0 +1,204 @@
+{
+  "schema": "litchi.performance.0974.packet_manifest.final.v1",
+  "status": "sealed",
+  "scope": "Final bounded prelaunch-failure evidence, offline v5 repair proof, and capability/control receipts; no native 0974 capture, qualification, adoption, or retry claim.",
+  "external_root": "/home/zhuhe/litchi-performance-0974",
+  "source_commit": "8a84cf9f029b233548ea47828a91f61c72953508",
+  "manifest_excludes_self": true,
+  "payload_file_count": 35,
+  "payload_total_bytes": 408338,
+  "constraints": {
+    "all_repository_files_below_1_mib": true,
+    "compiled_binaries_copied": false,
+    "raw_perf_captures_copied": false,
+    "raw_packets_copied": false,
+    "max_payload_file_bytes": 59058
+  },
+  "authoritative_receipts": {
+    "root_go_sha256": "19539597f779cef4562aa232ba8629cfc5b31394550467930c95909c8cdffcca",
+    "root_terminal_sha256": "403d58e6471a5f2afbfa8da4eb019904e7cdc46da3ad5f2677ee43cd9bad73de",
+    "capture_manifest_sha256": "19889cf44b3e5582ff1b3355238787cd27c3c0c4032dda05fb674ddd75e27e0a",
+    "corrective_no_admission_audit_sha256": "078cfefe0694486d3b0100044b37c494862fa27d12e2a5d51636f5491e318ecd",
+    "boundary_regression_v3_sha256": "68c3c2b1df6027218d7407253a255bf770b5d7d875a9e48125c4134fac89cdd4",
+    "independent_repair_review_sha256": "b74e7fb3c04f88ea57a4c9b2f6fd73d8ebbc5894c7b80bbaf9c3af93c4826c97",
+    "cleanup_sha256": "26f41df774234a5df0075325d4268d7c2ddb9bb75268a6efcc9299d670700c54",
+    "descriptor_sha256": "6d1f728fb23ce4dc9589e52010bacc988b8616b43b398c513991fdb92b390598"
+  },
+  "files": [
+    {
+      "path": "docs/performance/results/change-0974/README.md",
+      "bytes": 4205,
+      "sha256": "3ff80b55ccbb326be339c60b2f0279ea612b2248e0429524199ddae19831acb9"
+    },
+    {
+      "path": "docs/performance/results/change-0974/analysis/native-record-spec-v2.json",
+      "bytes": 2191,
+      "sha256": "3d9f5bd12c2d20b4853f5601359d18c6051a4da2b8d3b7e87b25112cbb2dcb9d"
+    },
+    {
+      "path": "docs/performance/results/change-0974/analysis/per-thread-mmap-readonly-v1.md",
+      "bytes": 4395,
+      "sha256": "1ae15da07a1a7f80e92ae84e338c70d41fd9cd18f80dad57a9f442a05d9acc1a"
+    },
+    {
+      "path": "docs/performance/results/change-0974/capture/capture-manifest-v2.json",
+      "bytes": 531,
+      "sha256": "19889cf44b3e5582ff1b3355238787cd27c3c0c4032dda05fb674ddd75e27e0a"
+    },
+    {
+      "path": "docs/performance/results/change-0974/design/design-v2.md",
+      "bytes": 8375,
+      "sha256": "6d9b4f6b1bc2f407da2b62b742cf3ae76213f9e4626bf20afba3cfcf8511b06f"
+    },
+    {
+      "path": "docs/performance/results/change-0974/plans/plan-0974-pre-capture-v4.json",
+      "bytes": 19568,
+      "sha256": "85e14a9cf4e630ad2c75b8697b236fb7bb1dc08fed8ba76877a9dd15127f09ea"
+    },
+    {
+      "path": "docs/performance/results/change-0974/plans/plan-0974-pre-capture-v5.json",
+      "bytes": 19568,
+      "sha256": "dddd126895d04cd1738719d99aa00ff1b68dcd551233a5c2391f37f7c30e71ee"
+    },
+    {
+      "path": "docs/performance/results/change-0974/provenance/external-artifact-descriptor-final-v1.json",
+      "bytes": 59058,
+      "sha256": "6d1f728fb23ce4dc9589e52010bacc988b8616b43b398c513991fdb92b390598"
+    },
+    {
+      "path": "docs/performance/results/change-0974/provenance/reproduction-v1.md",
+      "bytes": 2583,
+      "sha256": "603fe6228c7828fb83ba5bbbbf54e213f713afb11dc89484b7c37b2e58db72d9"
+    },
+    {
+      "path": "docs/performance/results/change-0974/receipts/adr-goal-revalidation-0974-v1.json",
+      "bytes": 7220,
+      "sha256": "fd68bf79fa20096c5542c3429a1266f8d94bd5fdb5907647681370ab8e02ec70"
+    },
+    {
+      "path": "docs/performance/results/change-0974/receipts/capability-cpu31-mmap16m-v1.json",
+      "bytes": 9989,
+      "sha256": "70b64d1f18a13c59492777cb8bca8d5a4e461436a9fed65cea0ff4c4e1021145"
+    },
+    {
+      "path": "docs/performance/results/change-0974/receipts/capability-mmap16m-v1-initial.json",
+      "bytes": 6151,
+      "sha256": "f33f608d4e13849f65875d303428bb21eddfc635e8a401a5ac37f6a48622f325"
+    },
+    {
+      "path": "docs/performance/results/change-0974/receipts/capability-mmap16m-v2.json",
+      "bytes": 7774,
+      "sha256": "eb7e8873cdb7b2a2ead8edd1f476150efad11d79a5142fcc7a0492051cbb4786"
+    },
+    {
+      "path": "docs/performance/results/change-0974/receipts/capability-perthread-mmap16m-v1.json",
+      "bytes": 11596,
+      "sha256": "503cacc304daf95d8e7254feb1bf074d01cf707bfbeb6c11b049a857522705fd"
+    },
+    {
+      "path": "docs/performance/results/change-0974/receipts/corrective-audit-0974-prelaunch-no-admission-v1.json",
+      "bytes": 5741,
+      "sha256": "078cfefe0694486d3b0100044b37c494862fa27d12e2a5d51636f5491e318ecd"
+    },
+    {
+      "path": "docs/performance/results/change-0974/receipts/helper-seal-0974-v4.json",
+      "bytes": 4182,
+      "sha256": "bb61c9c98c8080e0d6b769079dcd2e3904f82a0645edd6661255e861f13420c7"
+    },
+    {
+      "path": "docs/performance/results/change-0974/receipts/helper-seal-0974-v5.json",
+      "bytes": 4177,
+      "sha256": "4cc5ef36a28c6b254a580abd01b21792daef317b383ac5dc718ea544bb3668a3"
+    },
+    {
+      "path": "docs/performance/results/change-0974/receipts/independent-repair-review-0974-v5-v1.json",
+      "bytes": 7605,
+      "sha256": "b74e7fb3c04f88ea57a4c9b2f6fd73d8ebbc5894c7b80bbaf9c3af93c4826c97"
+    },
+    {
+      "path": "docs/performance/results/change-0974/receipts/independent-review-0974-v4.json",
+      "bytes": 10344,
+      "sha256": "86688588f55d80274b906f092d31b82c01e05f137ea86f536e7ac2b4c6fc0cca"
+    },
+    {
+      "path": "docs/performance/results/change-0974/receipts/launch-boundary-regression-0974-v1.json",
+      "bytes": 7044,
+      "sha256": "7e5da9d71647ee4b8cb3625e291da49a671ebb05330457d7acd551d896efdb78"
+    },
+    {
+      "path": "docs/performance/results/change-0974/receipts/launch-boundary-regression-0974-v3.json",
+      "bytes": 15879,
+      "sha256": "68c3c2b1df6027218d7407253a255bf770b5d7d875a9e48125c4134fac89cdd4"
+    },
+    {
+      "path": "docs/performance/results/change-0974/receipts/lifecycle-negative-control-v1.json",
+      "bytes": 14157,
+      "sha256": "852e22aadbebb43d75075f9f1749343b50f4008d6a8c37b6a1f35cf954895ec8"
+    },
+    {
+      "path": "docs/performance/results/change-0974/receipts/root-go-0974-v1.json",
+      "bytes": 3430,
+      "sha256": "19539597f779cef4562aa232ba8629cfc5b31394550467930c95909c8cdffcca"
+    },
+    {
+      "path": "docs/performance/results/change-0974/receipts/root-terminal-0974-v1.json",
+      "bytes": 1174,
+      "sha256": "403d58e6471a5f2afbfa8da4eb019904e7cdc46da3ad5f2677ee43cd9bad73de"
+    },
+    {
+      "path": "docs/performance/results/change-0974/receipts/synthetic-continuation-reducer-author-v4-v1.json",
+      "bytes": 16987,
+      "sha256": "46cb7a7f98fe377ef2a8f76f2283d7392f9190ec63e9b1f65963f5236af30075"
+    },
+    {
+      "path": "docs/performance/results/change-0974/receipts/temporary-cleanup-0974-v1.json",
+      "bytes": 16957,
+      "sha256": "26f41df774234a5df0075325d4268d7c2ddb9bb75268a6efcc9299d670700c54"
+    },
+    {
+      "path": "docs/performance/results/change-0974/tools/launch_boundary_regression_0974_v1.py",
+      "bytes": 12807,
+      "sha256": "7831e9b7ae5d6dc32b64e078e8f09a4e263ec364634ea03d0dc74ec13965124d"
+    },
+    {
+      "path": "docs/performance/results/change-0974/tools/prepare_plan_0974_v4.py",
+      "bytes": 8475,
+      "sha256": "488fb1cb66af1eacb25abfa567b9c6a855ca87b4ba70ba75c61cb7f92e273eaf"
+    },
+    {
+      "path": "docs/performance/results/change-0974/tools/prepare_plan_0974_v5.py",
+      "bytes": 8470,
+      "sha256": "eb5d0f42055b8917078602d1329b1aafdec3eef453370816aec102a9e0ef486e"
+    },
+    {
+      "path": "docs/performance/results/change-0974/tools/protocol_adapter_0974_v1.py",
+      "bytes": 25841,
+      "sha256": "6c2032e2d1cc04990f6f4be0df4542d393ce55f1c1c7d45b97ea62eb5f05269e"
+    },
+    {
+      "path": "docs/performance/results/change-0974/tools/protocol_adapter_0974_v3.py",
+      "bytes": 30542,
+      "sha256": "e798f3e5628cab21c019f90d793754ef5930a0ce9e222569f53861eed83e8dd6"
+    },
+    {
+      "path": "docs/performance/results/change-0974/tools/protocol_adapter_0974_v5.py",
+      "bytes": 35075,
+      "sha256": "e3725cbc027d2a063f32b926e3fb4024d640aab2a2fbd7493ed5325de9ea2ac6"
+    },
+    {
+      "path": "docs/performance/results/change-0974/tools/reduce_0974_v4.py",
+      "bytes": 12565,
+      "sha256": "7c6e7162e406aecf13868b264da29f2d5b6e07f0212bed1099298a464bb9ade5"
+    },
+    {
+      "path": "docs/performance/results/change-0974/tools/run_0974_v3.py",
+      "bytes": 1841,
+      "sha256": "74cb0d5ff37f08004f460430d3a4c651286473431ecdca67ef8b2b47e49c64a4"
+    },
+    {
+      "path": "docs/performance/results/change-0974/tools/run_0974_v5.py",
+      "bytes": 1841,
+      "sha256": "519a7b88cf6df7688d1b4555fbd3b2d682c2459bc6c070817308ba38031d4fe1"
+    }
+  ]
+}

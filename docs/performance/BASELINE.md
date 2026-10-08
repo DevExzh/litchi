@@ -1,5 +1,24 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0974 — per-thread mmap capability and prelaunch failure
+
+[0974](0974-per-thread-profile-prelaunch.md) tests the 0973 loss follow-up
+using explicit `-m 16M` and `--per-thread`. The explicit large per-CPU mapping
+using the default mapping mode fails permission setup, and `-C 31 -m 16M`
+fails `instructions:u` event setup.
+The per-thread probe creates a 16,781,312-byte mapping and a 44,336-byte
+`perf.data` for `/usr/bin/true`, with one tracked thread and CPU map `-1`, but
+the short probe produces no samples. A lifecycle control records 175 samples
+on the main PID/TID and two `PERF_RECORD_FORK` records for a worker thread and
+child, demonstrating the scope gate only.
+
+The authorized native runner attempt stops before command construction reaches
+`Popen`: the v3 adapter recursion raises `RecursionError`, leaves child 01
+empty, launches no children, and performs no retry. A v5 repair proof exercises
+the real boundary with one exact intercepted `Popen` call and no process launch.
+This is setup and tooling evidence, not a timing, owner, speedup, or
+qualification baseline; no native capture or production change follows.
+
 ## 0973 — fresh instruction-profile pilot stops on event loss
 
 [0973](0973-instruction-profile-loss-gate.md) starts the fresh

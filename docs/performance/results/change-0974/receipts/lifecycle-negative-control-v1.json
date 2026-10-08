@@ -1,0 +1,363 @@
+{
+  "adr_goal_binding": {
+    "accepted_adr_count": 32,
+    "receipt_path": "/home/zhuhe/litchi-performance-0974/receipts/adr-goal-revalidation-0974-v1.json",
+    "receipt_sha256": "fd68bf79fa20096c5542c3429a1266f8d94bd5fdb5907647681370ab8e02ec70",
+    "status": "pass"
+  },
+  "artifacts": {
+    "command.txt": {
+      "bytes": 702,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/command.txt",
+      "sha256": "ea391ae6979df461751241743cc4bb7d144e994a28c8289aa6e05c677965aafa"
+    },
+    "environment-and-host.txt": {
+      "bytes": 2261,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/environment-and-host.txt",
+      "sha256": "410015b1af4e6d02d1516ae1730b178874a49e79c5b776d7a6a3cbbe89e1b6ad"
+    },
+    "finished-utc.txt": {
+      "bytes": 21,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/finished-utc.txt",
+      "sha256": "b4646a17ab1f080f391ba075c44533b56132c45d84d9af7528c64e65ad544813"
+    },
+    "input-hashes-after.txt": {
+      "bytes": 329,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/input-hashes-after.txt",
+      "sha256": "1c571c96b28cb2208d0ed953311334e414689e2aa4981fe9ca5dbe749b37fad0"
+    },
+    "input-hashes-before.txt": {
+      "bytes": 329,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/input-hashes-before.txt",
+      "sha256": "1c571c96b28cb2208d0ed953311334e414689e2aa4981fe9ca5dbe749b37fad0"
+    },
+    "lifecycle.perf.data": {
+      "bytes": 5832656,
+      "exists": true,
+      "mode": "0o600",
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/lifecycle.perf.data",
+      "sha256": "d5f9c4cc8e3145caa5fbe054c34a8fb2fa4db7a2a939ff0a8100af4c0f63edf9"
+    },
+    "lifecycle_target.py": {
+      "bytes": 2090,
+      "exists": true,
+      "mode": "0o755",
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/lifecycle_target.py",
+      "sha256": "dbfa4a6f1c21d14a23be1db22dd4ad4ee76ed98411a42c2ba6c34d0f9a29b9f2"
+    },
+    "perf-header.stderr": {
+      "bytes": 0,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/perf-header.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "perf-header.txt": {
+      "bytes": 1716,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/perf-header.txt",
+      "sha256": "b25781f472b4400b52e1be846e0535fefeb559e37a0a3ba251474be54ce38007"
+    },
+    "perf-rawdump.stderr": {
+      "bytes": 0,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/perf-rawdump.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "perf-rawdump.txt": {
+      "bytes": 27714562,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/perf-rawdump.txt",
+      "sha256": "fcf2601293a5ce7748564f87dbb10ffcf384e53b22306aa6d01b819971cb6eba"
+    },
+    "perf-record.stderr": {
+      "bytes": 523,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/perf-record.stderr",
+      "sha256": "f98aaa96bed5ba6d29faed6b72a4ca61a6d7882b688a2955e8e2b88486d9f672"
+    },
+    "perf-record.stdout": {
+      "bytes": 0,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/perf-record.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "perf-script.stderr": {
+      "bytes": 0,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/perf-script.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "perf-script.txt": {
+      "bytes": 414996,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/perf-script.txt",
+      "sha256": "9025fb9d009dc729c917182cf38391f1be03f3a42550857fd86d24c97cc1c46e"
+    },
+    "return-code.txt": {
+      "bytes": 2,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/return-code.txt",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    "started-utc.txt": {
+      "bytes": 21,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/started-utc.txt",
+      "sha256": "b4646a17ab1f080f391ba075c44533b56132c45d84d9af7528c64e65ad544813"
+    },
+    "target-lifecycle.json": {
+      "bytes": 1912,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/target-lifecycle.json",
+      "sha256": "c475fccc51f6f27cb070379732d4750b39a4270cca009543c364a7fd130c52c1"
+    },
+    "target-source-hash-after.txt": {
+      "bytes": 86,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/target-source-hash-after.txt",
+      "sha256": "f2752ab3bda9d42728f709906d5ed7b307c9bf4da6f968e7eb8325b93241ffa7"
+    },
+    "target-source-hash-before.txt": {
+      "bytes": 86,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/target-source-hash-before.txt",
+      "sha256": "f2752ab3bda9d42728f709906d5ed7b307c9bf4da6f968e7eb8325b93241ffa7"
+    },
+    "terminal.txt": {
+      "bytes": 3308,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/terminal.txt",
+      "sha256": "00842977d546b2984b35004f8d4d1b912eae2be77b23a7cfce4704b26d2ae889"
+    }
+  },
+  "command": {
+    "argv": [
+      "/usr/bin/taskset",
+      "--cpu-list",
+      "31",
+      "/usr/bin/perf",
+      "record",
+      "-v",
+      "--per-thread",
+      "-e",
+      "instructions:u",
+      "-c",
+      "1000000",
+      "-m",
+      "16M",
+      "--call-graph",
+      "dwarf,32768",
+      "--period",
+      "--timestamp",
+      "--sample-cpu",
+      "--buildid-all",
+      "--no-buildid-cache",
+      "--user-callchains",
+      "-o",
+      "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/lifecycle.perf.data",
+      "--",
+      "/usr/bin/python3.14",
+      "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/lifecycle_target.py",
+      "--metadata",
+      "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/target-lifecycle.json"
+    ],
+    "cwd": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1",
+    "environment": {
+      "LANG": "C",
+      "LC_ALL": "C",
+      "PATH": "/usr/bin:/bin",
+      "TZ": "UTC"
+    },
+    "finished_utc": "2026-10-08T05:06:02Z",
+    "returncode": 0,
+    "started_utc": "2026-10-08T05:06:02Z"
+  },
+  "host": {
+    "cpu_online": "0-31",
+    "kernel": "Linux 7.0.0-1013-aws #13-Ubuntu SMP PREEMPT Fri Sep 4 17:02:11 UTC 2026",
+    "outer_taskset_cpu": [
+      31
+    ],
+    "perf_event_mlock_kb": 516,
+    "perf_event_paranoid": 1,
+    "rlimit_memlock_bytes": [
+      8388608,
+      8388608
+    ],
+    "rlimit_stack_bytes": [
+      8388608,
+      8388608
+    ]
+  },
+  "input_hashes": {
+    "after": {
+      "/usr/bin/perf": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b",
+      "/usr/bin/python3.14": "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd",
+      "/usr/bin/taskset": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2",
+      "/usr/bin/true": "deadd5bb984a1153139afd09ee4e01100fbe2196d4f98ec7978674e2c83a4b97"
+    },
+    "before": {
+      "/usr/bin/perf": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b",
+      "/usr/bin/python3.14": "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd",
+      "/usr/bin/taskset": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2",
+      "/usr/bin/true": "deadd5bb984a1153139afd09ee4e01100fbe2196d4f98ec7978674e2c83a4b97"
+    },
+    "target_source_after": {
+      "lifecycle_target.py": "dbfa4a6f1c21d14a23be1db22dd4ad4ee76ed98411a42c2ba6c34d0f9a29b9f2"
+    },
+    "target_source_before": {
+      "lifecycle_target.py": "dbfa4a6f1c21d14a23be1db22dd4ad4ee76ed98411a42c2ba6c34d0f9a29b9f2"
+    },
+    "target_source_unchanged": true,
+    "unchanged": true
+  },
+  "lifecycle_conclusion": {
+    "native_workload_go": false,
+    "negative_gate_demonstrated": "A per-thread raw stream exposes both task creations even though inheritance is disabled; a future native run must reject any FORK/clone/extra-thread event rather than silently treating descendants as unprofiled.",
+    "production_or_office_conclusion": false,
+    "raw_fork_exposed_child": true,
+    "raw_fork_exposed_thread": true,
+    "samples_only_on_main_pid": true,
+    "target_created_expected_child": true,
+    "target_created_expected_thread": true
+  },
+  "limitations": [
+    "This is a lifecycle-negative control, not an Office or retained-native workload.",
+    "It does not validate native marker attribution, performance, or loss-free operation.",
+    "The child EXIT was not decoded separately; no gate may require it to detect descendants when the FORK is present."
+  ],
+  "preserve_instruction": "Keep this control and all raw files immutable; do not rerun or relax the per-thread single-PID gate based on it.",
+  "purpose": "Harmless negative control proving that the per-thread task records expose a joined thread and a waited child; no Office workload.",
+  "raw_decode": {
+    "exit_interpretation": "One PERF_RECORD_EXIT for the profiled main task was present. The short child had no separate decoded EXIT record; the FORK record is sufficient to reject a per-thread native capture that creates descendants. Do not claim complete child-exit coverage.",
+    "fork_interpretation": [
+      "PERF_RECORD_FORK(3744189:3744190):(3744189:3744189) is the Python worker thread creation (same tgid, new tid).",
+      "PERF_RECORD_FORK(3744191:3744191):(3744189:3744189) is the waited /usr/bin/true child process."
+    ],
+    "lifecycle_lines": {
+      "comm": [
+        "0 0 0x198 [0x38]: PERF_RECORD_COMM: perf-exec:3744189/3744189",
+        "31 301640329210055 0x1d8 [0x38]: PERF_RECORD_COMM exec: python3.14:3744189/3744189"
+      ],
+      "exit": [
+        "31 301640514010384 0x5860a0 [0x38]: PERF_RECORD_EXIT(3744189:3744189):(3744188:3744188)"
+      ],
+      "fork": [
+        "31 301640356038295 0x4c48e0 [0x38]: PERF_RECORD_FORK(3744189:3744190):(3744189:3744189)",
+        "31 301640356281944 0x4c4980 [0x38]: PERF_RECORD_FORK(3744191:3744191):(3744189:3744189)"
+      ]
+    },
+    "non_main_sample_count": 0,
+    "raw_lost_records": 0,
+    "raw_lost_samples_records": 0,
+    "rawdump_path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/perf-rawdump.txt",
+    "record_counts": {
+      "PERF_RECORD_COMM": 2,
+      "PERF_RECORD_CPU_MAP": 1,
+      "PERF_RECORD_EVENT_UPDATE": 1,
+      "PERF_RECORD_EXIT": 1,
+      "PERF_RECORD_FINISHED_INIT": 1,
+      "PERF_RECORD_FINISHED_ROUND": 1,
+      "PERF_RECORD_FORK": 2,
+      "PERF_RECORD_ID_INDEX": 1,
+      "PERF_RECORD_MMAP2": 118,
+      "PERF_RECORD_SAMPLE": 175,
+      "PERF_RECORD_THREAD_MAP": 1
+    },
+    "sample_records": 175,
+    "sample_tid_distribution": {
+      "3744189/3744189": 175
+    },
+    "total_events": 304
+  },
+  "ring_evidence": {
+    "mode": "--per-thread",
+    "requested": "-m 16M",
+    "verbose_mmap_size_bytes": 16781312,
+    "verbose_mmap_size_text": "mmap size 16781312B"
+  },
+  "sample_format": {
+    "read_format": "ID|LOST",
+    "sample_stack_user_bytes": 32768,
+    "sample_type": "IP|TID|TIME|CALLCHAIN|CPU|PERIOD|REGS_USER|STACK_USER"
+  },
+  "schema": "litchi.performance.0974.perf_per_thread_lifecycle_negative_control.v1",
+  "scope": {
+    "benchmark_started": false,
+    "build_started": false,
+    "native_workload_started": false,
+    "office_touched": false,
+    "retry": false,
+    "settings_changed": false
+  },
+  "status": "control_passed_lifecycle_exposure",
+  "target": {
+    "child_pid": 3744191,
+    "child_returncode": 0,
+    "event_labels": [
+      "main-start",
+      "thread-start",
+      "thread-created",
+      "child-spawned",
+      "child-waited",
+      "thread-end",
+      "thread-joined",
+      "main-end"
+    ],
+    "main_tid": 3744189,
+    "metadata_path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/target-lifecycle.json",
+    "metadata_sha256": "c475fccc51f6f27cb070379732d4750b39a4270cca009543c364a7fd130c52c1",
+    "pid": 3744189,
+    "schema": "litchi.performance.0974.lifecycle_negative_target.v1",
+    "source_path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/lifecycle_target.py",
+    "source_sha256": "dbfa4a6f1c21d14a23be1db22dd4ad4ee76ed98411a42c2ba6c34d0f9a29b9f2",
+    "thread_joined": true,
+    "thread_tid": 3744190
+  },
+  "tools": {
+    "perf": {
+      "path": "/usr/bin/perf",
+      "sha256": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b",
+      "version": "7.0.14"
+    },
+    "python": {
+      "path": "/usr/bin/python3.14",
+      "sha256": "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd",
+      "version": "Python 3.14.4"
+    },
+    "taskset": {
+      "path": "/usr/bin/taskset",
+      "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2",
+      "version": "util-linux 2.41.3"
+    },
+    "true": {
+      "path": "/usr/bin/true",
+      "sha256": "deadd5bb984a1153139afd09ee4e01100fbe2196d4f98ec7978674e2c83a4b97",
+      "version": "GNU coreutils 9.7"
+    }
+  }
+}

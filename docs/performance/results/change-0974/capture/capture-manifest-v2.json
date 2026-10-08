@@ -1,0 +1,18 @@
+{
+  "children_requested": 12,
+  "created_utc": "2026-10-08T05:15:55.314993+00:00",
+  "failure": {
+    "child": 1,
+    "error": "maximum recursion depth exceeded",
+    "reason": "child_failed",
+    "type": "RecursionError"
+  },
+  "no_retry": true,
+  "packets": [],
+  "plan": {
+    "path": "/home/zhuhe/litchi-performance-0974/plans/plan-0974-pre-capture-v4.json",
+    "sha256": "85e14a9cf4e630ad2c75b8697b236fb7bb1dc08fed8ba76877a9dd15127f09ea"
+  },
+  "schema": "litchi.performance.0973.capture_manifest.v2",
+  "status": "failed"
+}

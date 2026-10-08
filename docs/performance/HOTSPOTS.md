@@ -1,5 +1,20 @@
 # Performance hotspot inventory
 
+## 0974 — per-thread mmap remains unqualified
+
+[0974](0974-per-thread-profile-prelaunch.md) separates perf setup capability
+from native evidence. Explicit `-m 16M` fails per-CPU ring mapping, and the
+CPU-filtered form fails event permission; `--per-thread -m 16M` works only for a
+short `/usr/bin/true` probe. The lifecycle control confirms that fork/thread
+events are visible and must remain hard rejection gates.
+
+The attempted native run never reached `Popen` because of an adapter recursion
+failure, so there is no captured workload, loss diagnosis, or hotspot owner.
+The repaired command boundary passes an exact-argv sentinel without launching
+a process. Preserve the existing zero-loss and single-PID gates; any native
+follow-up requires a fresh reviewed batch and supplies no current performance
+claim.
+
 ## 0973 — capture loss blocks instruction attribution
 
 [0973](0973-instruction-profile-loss-gate.md) stops the first fresh pilot

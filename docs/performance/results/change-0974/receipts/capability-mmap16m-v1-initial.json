@@ -1,0 +1,227 @@
+{
+  "artifacts": {
+    "perf-header.txt": {
+      "bytes": 0,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-mmap16m-v1/perf-header.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "perf-record.stderr": {
+      "bytes": 168,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-mmap16m-v1/perf-record.stderr",
+      "sha256": "014841f7efa1dbd08f83e1883b56f27f0baad509be83e7febcc133d61d27ff10"
+    },
+    "perf-record.stdout": {
+      "bytes": 0,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-mmap16m-v1/perf-record.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "perf-report-header.stderr": {
+      "bytes": 107,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-mmap16m-v1/perf-report-header.stderr",
+      "sha256": "93fd1b52f2332ead591ad31a429fb7c52f50c3e70e08a8a4593537d3367989f9"
+    },
+    "terminal.txt": {
+      "bytes": 760,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-mmap16m-v1/terminal.txt",
+      "sha256": "eb0bd4079774f41ce828a13fede7599f0db88066664f8725f7f2aaf5f4df169a"
+    },
+    "true.perf.data": {
+      "bytes": 0,
+      "exists": true,
+      "mode": "0o600",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-mmap16m-v1/true.perf.data",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "command": {
+    "argv": [
+      "/usr/bin/taskset",
+      "--cpu-list",
+      "31",
+      "/usr/bin/perf",
+      "record",
+      "-e",
+      "instructions:u",
+      "-c",
+      "1000000",
+      "-m",
+      "16M",
+      "--call-graph",
+      "dwarf,32768",
+      "--period",
+      "--timestamp",
+      "--sample-cpu",
+      "--buildid-all",
+      "--no-buildid-cache",
+      "--user-callchains",
+      "-o",
+      "/home/zhuhe/litchi-performance-0974/capability-mmap16m-v1/true.perf.data",
+      "--",
+      "/usr/bin/true"
+    ],
+    "created_utc": "2026-10-08T04:54:11.815380+00:00",
+    "cwd": "/home/zhuhe/litchi-performance-0974/capability-mmap16m-v1",
+    "environment": {
+      "LANG": "C",
+      "LC_ALL": "C",
+      "PATH": "/usr/bin:/bin",
+      "TZ": "UTC"
+    },
+    "host": {
+      "affinity_of_wrapper": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31
+      ],
+      "pid": 3736055,
+      "uname": {
+        "machine": "x86_64",
+        "node": "ip-172-31-39-190",
+        "processor": "",
+        "release": "7.0.0-1013-aws",
+        "system": "Linux",
+        "version": "#13-Ubuntu SMP PREEMPT Fri Sep  4 17:02:11 UTC 2026"
+      }
+    },
+    "proc": {
+      "cpu_online": "0-31",
+      "perf_event_mlock_kb": "516",
+      "perf_event_paranoid": "1"
+    },
+    "rlimits_bytes_or_unlimited": {
+      "RLIMIT_MEMLOCK": [
+        8388608,
+        8388608
+      ],
+      "RLIMIT_STACK": [
+        8388608,
+        -1
+      ]
+    },
+    "tool_versions": {
+      "perf": {
+        "argv": [
+          "/usr/bin/perf",
+          "--version"
+        ],
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "perf version 7.0.14\n"
+      },
+      "taskset": {
+        "argv": [
+          "/usr/bin/taskset",
+          "--version"
+        ],
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "taskset from util-linux 2.41.3\n"
+      },
+      "true": {
+        "argv": [
+          "/usr/bin/true",
+          "--version"
+        ],
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "true (GNU coreutils) 9.7\nPackaged by Ubuntu (9.7-3ubuntu2.1)\nCopyright (C) 2025 Free Software Foundation, Inc.\nLicense GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.\n\nWritten by Jim Meyering.\n"
+      }
+    },
+    "tools": {
+      "perf": {
+        "bytes": 25221960,
+        "exists": true,
+        "mode": "0o755",
+        "path": "/usr/bin/perf",
+        "sha256": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b"
+      },
+      "taskset": {
+        "bytes": 31184,
+        "exists": true,
+        "mode": "0o755",
+        "path": "/usr/bin/taskset",
+        "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2"
+      },
+      "true": {
+        "bytes": 35288,
+        "exists": true,
+        "mode": "0o755",
+        "path": "/usr/bin/true",
+        "sha256": "deadd5bb984a1153139afd09ee4e01100fbe2196d4f98ec7978674e2c83a4b97"
+      }
+    }
+  },
+  "effective_ring_evidence": {
+    "observed": null,
+    "reason": "The header inspection records event/data metadata but does not expose the requested mmap size as an effective ring allocation.",
+    "source": "perf report --header-only output"
+  },
+  "finished_utc": "2026-10-08T04:54:11.881923+00:00",
+  "header_inspection": {
+    "argv": [
+      "/usr/bin/perf",
+      "report",
+      "--header-only",
+      "-i",
+      "/home/zhuhe/litchi-performance-0974/capability-mmap16m-v1/true.perf.data"
+    ],
+    "returncode": 255,
+    "stderr_bytes": 107,
+    "stdout_bytes": 0
+  },
+  "purpose": "Harmless /usr/bin/true validation of the preregistered -m 16M perf setup; no Office workload.",
+  "record_result": {
+    "returncode": 255,
+    "stderr_bytes": 168,
+    "stdout_bytes": 0,
+    "timed_out": false
+  },
+  "schema": "litchi.performance.0974.perf_mmap_capability_probe.v1",
+  "scope": {
+    "benchmark_started": false,
+    "build_started": false,
+    "native_workload_started": false,
+    "retry": false,
+    "settings_changed": false
+  },
+  "status": "completed_no_retry"
+}

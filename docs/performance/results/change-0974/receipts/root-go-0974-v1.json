@@ -1,0 +1,124 @@
+{
+  "authorized": true,
+  "binary": {
+    "build_id": "e5c457384eeebd057932c444efda77618f137399",
+    "bytes": 47909224,
+    "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+    "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+  },
+  "capability": {
+    "bytes": 11596,
+    "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/capability-receipt-v1.json",
+    "sha256": "503cacc304daf95d8e7254feb1bf074d01cf707bfbeb6c11b049a857522705fd"
+  },
+  "created_utc": "2026-10-08T05:15:29.654555+00:00",
+  "cwd": "/home/zhuhe/code/litchi",
+  "diagnostic_only": true,
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "TZ": "UTC"
+  },
+  "fixture": {
+    "bytes": 335360,
+    "path": "/home/zhuhe/litchi-performance-0969/qa-core/test-data/ole/doc/FloatingPictures.doc",
+    "sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d"
+  },
+  "focused_test": {
+    "bytes": 16987,
+    "path": "/home/zhuhe/litchi-performance-0974/receipts/synthetic-continuation-reducer-author-v4-v1.json",
+    "sha256": "46cb7a7f98fe377ef2a8f76f2283d7392f9190ec63e9b1f65963f5236af30075"
+  },
+  "helper_seal": {
+    "bytes": 4182,
+    "path": "/home/zhuhe/litchi-performance-0974/receipts/helper-seal-0974-v4.json",
+    "sha256": "bb61c9c98c8080e0d6b769079dcd2e3904f82a0645edd6661255e861f13420c7"
+  },
+  "host": {
+    "allowed_cpus": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31
+    ],
+    "free_bytes": 361320058880,
+    "minimum_free_bytes": 32000000000,
+    "selected_cpu": 31
+  },
+  "independent_review": {
+    "bytes": 10344,
+    "path": "/home/zhuhe/litchi-performance-0974/receipts/independent-review-0974-v4.json",
+    "sha256": "86688588f55d80274b906f092d31b82c01e05f137ea86f536e7ac2b4c6fc0cca"
+  },
+  "lifecycle_control": {
+    "bytes": 14157,
+    "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/lifecycle-negative-control-receipt-v1.json",
+    "sha256": "852e22aadbebb43d75075f9f1749343b50f4008d6a8c37b6a1f35cf954895ec8"
+  },
+  "no_retry": true,
+  "plan": {
+    "bytes": 19568,
+    "path": "/home/zhuhe/litchi-performance-0974/plans/plan-0974-pre-capture-v4.json",
+    "sha256": "85e14a9cf4e630ad2c75b8697b236fb7bb1dc08fed8ba76877a9dd15127f09ea"
+  },
+  "quiescence": {
+    "active_measurement_processes": [],
+    "agents": "All preparation/test agents completed; final reviewer stopped for native window.",
+    "cooldown_seconds": 10,
+    "status": "pass"
+  },
+  "record_memory": {
+    "bytes": 16777216,
+    "position": "immediately before --call-graph",
+    "tokens": [
+      "-m",
+      "16M"
+    ]
+  },
+  "record_mode": {
+    "forbidden_tokens": [
+      "-a",
+      "--all-cpus",
+      "-C",
+      "--cpu",
+      "--inherit"
+    ],
+    "inheritance": "disabled_by_per_thread",
+    "scope": "one launcher/native exec PID and one native thread; task/FORK audit required per child",
+    "tokens": [
+      "--per-thread"
+    ]
+  },
+  "schema": "litchi.performance.0974.root_go.v3",
+  "source_commit": "8a84cf9f029b233548ea47828a91f61c72953508",
+  "status": "authorized"
+}

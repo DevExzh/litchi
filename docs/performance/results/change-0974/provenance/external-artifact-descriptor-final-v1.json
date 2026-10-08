@@ -1,0 +1,1384 @@
+{
+  "schema": "litchi.performance.0974.external_artifact_descriptor.final.v1",
+  "status": "sealed_final_bounded_prelaunch_evidence",
+  "scope": "Bounded prelaunch-failure evidence, v4 controls, v5 offline repair review, capability probes, and retained 0973 decoder dependency closure. No native 0974 capture exists and no capture admission is asserted.",
+  "source_commit": "8a84cf9f029b233548ea47828a91f61c72953508",
+  "capture": {
+    "root": "/home/zhuhe/litchi-performance-0974/capture/instruction-profile-v1",
+    "manifest_path": "/home/zhuhe/litchi-performance-0974/capture/instruction-profile-v1/capture-manifest-v2.json",
+    "manifest_sha256": "19889cf44b3e5582ff1b3355238787cd27c3c0c4032dda05fb674ddd75e27e0a",
+    "children_requested": 12,
+    "children_launched": 0,
+    "completed_packets": 0,
+    "child_directory_empty": true,
+    "retry_performed": false,
+    "office_workload_started": false,
+    "child_attempted": 1,
+    "children_not_launched": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "offline_repair_reviewed": true,
+    "native_admission": false
+  },
+  "regeneration": {
+    "offline_control_commands": [
+      "PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.14 /home/zhuhe/litchi-performance-0974/tools/run_0974_v3.py --self-test",
+      "PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.14 /home/zhuhe/litchi-performance-0974/tools/run_0974_v3.py --check-plan /home/zhuhe/litchi-performance-0974/plans/plan-0974-pre-capture-v4.json",
+      "PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.14 /home/zhuhe/litchi-performance-0974/tools/reduce_0974_v4.py --self-test",
+      "PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.14 /home/zhuhe/litchi-performance-0974/tools/reduce_0974_v4.py --admission-self-test --plan /home/zhuhe/litchi-performance-0974/plans/plan-0974-pre-capture-v4.json",
+      "replay_dir=$(mktemp -d /tmp/litchi-0974-boundary-replay.XXXXXX); PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.14 /home/zhuhe/litchi-performance-0974/tools/launch_boundary_regression_0974_v1.py --argv-spec /home/zhuhe/litchi-performance-0974/analysis/native-record-spec-v2.json --output \"$replay_dir/launch-boundary-replay.json\""
+    ],
+    "historical_runner_template": "PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.14 /home/zhuhe/litchi-performance-0974/tools/run_0974_v3.py --run --plan /home/zhuhe/litchi-performance-0974/plans/plan-0974-pre-capture-v4.json --go <frozen-root-go-v3.json>",
+    "actual_result": "The recorded --run failed in adapter command construction with RecursionError before perf argv construction or subprocess.Popen. Do not rerun from this packet; the v5 boundary result is offline-only and the corrective audit remains no_admission."
+  },
+  "external_observations": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capture/instruction-profile-v1/child-01",
+      "status": "empty_directory",
+      "entries": [],
+      "native_artifact_bytes": 0
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capture/instruction-profile-v1",
+      "status": "failed_before_child_launch",
+      "children_not_launched": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ]
+    }
+  ],
+  "entries": [
+    {
+      "path": "/home/zhuhe/code/litchi/docs/GOAL.md",
+      "bytes": 35839,
+      "sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0001-priorities-and-api-layers.md",
+      "bytes": 3383,
+      "sha256": "813bf4faf62cedac56fbfa3bf9b7600121b42a3ed5d4cec0028f8c8f2ac2798e",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0002-crate-topology.md",
+      "bytes": 276743,
+      "sha256": "73f4372ef6948f5a36c83fbf27a96f0b1f680225f331f201c470e04913417719",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0003-snapshots-edits-and-patches.md",
+      "bytes": 118544,
+      "sha256": "9200d3546d91f1604d44a9ade7ad0a6bdea50b6442d12a0517b09db5e8e802ef",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0004-semantic-api-design.md",
+      "bytes": 227882,
+      "sha256": "acc23f6b2d334ed1dc1f088d420ddaeee17661cd74a963036935b482b276b393",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0005-io-memory-and-performance.md",
+      "bytes": 150126,
+      "sha256": "8279fd2dc0b074aa104bf0c83df6187d12e18756cd8c8d7f25750b2a997cb0aa",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0006-validation-security-and-compatibility.md",
+      "bytes": 9529,
+      "sha256": "ae21189eda0acc9524a7c5a57e87bb3566405ede5c015c87105e01337666f44b",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0007-office-object-models.md",
+      "bytes": 6199,
+      "sha256": "8808b79dcb35eaeaa6be778b5a9593101dd302f866ef20ff4f8fdf8df5d8b100",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0008-migration-and-verification.md",
+      "bytes": 1145334,
+      "sha256": "5c72d79a7ba78a044471b40ba22ab3f32f7b8f4f878614ab05b416e60b0163a2",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0009-odf-detection-ownership.md",
+      "bytes": 4031,
+      "sha256": "1e9d8a7de81a6d36d03f67acd9887b2b1debbe0727b278a4118d4577c90b5437",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0010-facade-archive-ownership.md",
+      "bytes": 5356,
+      "sha256": "4e1af2c4019842d187804f8356299aa80ba8a6abd8d35a4a021e1bce3c2a6590",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0011-ooxml-physical-package-ownership.md",
+      "bytes": 2969,
+      "sha256": "3a1644536af0b66fed47c1a154e829c0e0008cccb89dec679a0328036d305e04",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0012-biff8-formula-reference-types.md",
+      "bytes": 3728,
+      "sha256": "44cc6b58237288bfc919fc9c8f4b9a0bd89e8c7d611a7c05b7da8ecd3e0d1eae",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0013-pptx-notes-deletion.md",
+      "bytes": 6652,
+      "sha256": "9aba58d68e54bcf75c371ba30ce97f92c46f1fc57a8ca7b06351fbcce10d6600",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0014-core-properties-reader-ownership.md",
+      "bytes": 3560,
+      "sha256": "5667f580efc4650bdb6874143528d237ac04bddd8386e6ff2d2d8b76ca20bdad",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0015-lossless-core-properties-crud.md",
+      "bytes": 9457,
+      "sha256": "dd0b0cd2f9beebee61cb70582ea6c6cac61105a412e5e5929ccfd05af66aef43",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0016-biff8-writer-location-types.md",
+      "bytes": 9715,
+      "sha256": "b9afa735a0b94ea4cedf8a68af9c6a8d2484f17d10e34bc0a464872e8cdc8023",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0017-ooxml-producer-template-ownership.md",
+      "bytes": 3000,
+      "sha256": "0d5e076c1e940f7c35c6c907f2291d4adfb731c64e6fe077af45c922b92be046",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0018-xlsx-calculation-chain-ownership.md",
+      "bytes": 5217,
+      "sha256": "7007d34208fdd2e2072f2126b71a79a369e9ef753cb6905c2677a211e1675f7b",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0019-docx-web-settings-ownership.md",
+      "bytes": 7293,
+      "sha256": "8195cb3c4663d3e503cd58b3fe14cfcf398e812cd56716d2c2b65fc58b49aa63",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0020-pptx-table-style-ownership.md",
+      "bytes": 6654,
+      "sha256": "6d3a23493e12913220a91ba94e6c1cc61e09aed55ea69c03350ad8e0f0829461",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0021-docx-glossary-ownership.md",
+      "bytes": 13220,
+      "sha256": "a6dad467defd96651e8bdc56110dcc85213cc83570c88eaa9aad780188b650e3",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0022-pptx-embedded-font-ownership.md",
+      "bytes": 11309,
+      "sha256": "d2672e0413d93cbb295f57fad45d004645a02b6173875f081975fc12c3c5543c",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0023-odf-family-crate-split.md",
+      "bytes": 5487,
+      "sha256": "e906a090afac6de32c338b190927cc4932e01a138b74f527b14284c78fee40a9",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0024-current-topology.md",
+      "bytes": 282733,
+      "sha256": "cc134b2a4eb8797a3769cf815f1f09618fd26e215bd7305de1c9890093dbb1b6",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0025-ograph-chart-area-transactions.md",
+      "bytes": 1880,
+      "sha256": "a3370829c8ff45d9c54c5347591ae2dbb1c43ae4bb7f5f5c612a8c52e6f8a6ea",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0026-ole-directory-metadata-binding.md",
+      "bytes": 3337,
+      "sha256": "20e1ebef0bbf3ecd7a4e49964e1c90500688f75a537faa21a09dbf46a3ea9532",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0027-xls-sheet-anchor-ownership.md",
+      "bytes": 1416,
+      "sha256": "f5333e1a245ccbfe8391219830359de01e1c40e9609401df2abe061600ac8580",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0028-iwa-monolith-exit.md",
+      "bytes": 771812,
+      "sha256": "d746f84441a6623c8a6e3731701e614c39544467433615ad83af001da4e52023",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0029-iwa-index-foundation.md",
+      "bytes": 6392,
+      "sha256": "d3f246d7cfb61975a703d1cb47b7ec441f506436ec09e2ea3bcf9c29b1b02df2",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0030-lazy-opc-part-decode.md",
+      "bytes": 16844,
+      "sha256": "f0a2a679aeb4578f6ca3c4a762e546a820493d27dd205a462ffe2ba89c9f1561",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0031-execution-context-budgets.md",
+      "bytes": 18858,
+      "sha256": "ce7e16baa101cfdd8abfc6d606dc0a56fad6d86cc79eba997d338f919a063eb3",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/0032-snapshot-derived-value-memos.md",
+      "bytes": 8967,
+      "sha256": "33e68f71a2845132ff53aec30422300194b1bc40caa6dd9503848278e342ed70",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/adr/README.md",
+      "bytes": 5766,
+      "sha256": "2af0e5814378c2765c12213e495d02c2895a27f142bc618ca1f3037824bbe028",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "bytes": 47909224,
+      "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0969/manifests/source-file-manifest-v1.json",
+      "bytes": 362688,
+      "sha256": "99e65d43e0feed89133eec60b095130d68058a071a02e8a15b05dea01209bb6c",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0969/manifests/source-manifest-v1.json",
+      "bytes": 14960,
+      "sha256": "f1818af5c306fb6ea01b59ca8df29710e773386b246071202bd4aa896f4e8e2b",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0969/qa-core/test-data/ole/doc/FloatingPictures.doc",
+      "bytes": 335360,
+      "sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0969/tools/protocol_common_v4.py",
+      "bytes": 39444,
+      "sha256": "5ce0f2ac08fc7909df054a4cc2d5137b3279af4cd726acf5bfb4558d97b05c5c",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0970/tools/launch_baseline_v2.py",
+      "bytes": 3597,
+      "sha256": "3b5b79351883a9b4efb680f47498d8e10bdf77d131a60d11c1ecb54ad95430f5",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0971/receipts/source-content-proof-0971-v2.json",
+      "bytes": 268981,
+      "sha256": "20e0f9fad68da357e2278157a8d1514c8b9b226993e16a91656fddc7ff38edd6",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0972/header-v2/root/usr/include/elfutils/libdwfl.h",
+      "bytes": 39682,
+      "sha256": "6f9dc2c2f9ca8d691f42f78e7634c2e40750a3af134e8226bd7c5aff395a3657",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0972/receipts/dwfl-replay-author-seal-v6.json",
+      "bytes": 4200,
+      "sha256": "a8be68fb63e7460d839ca23ab2457b2415762da76d8a92d26e8640281a7bde1c",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0973/analysis/metric-proposal-v1.md",
+      "bytes": 4133,
+      "sha256": "a09f6535426e5f199c5652d1eec8e4035833f5f4ac0d1b507e2312b70a1c3bcd",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0973/design-precedence-clarification-v1.md",
+      "bytes": 1336,
+      "sha256": "4075b51bc31596a5d5af34a23ffb32faa43941eacef4de9fb034e7904f613a35",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0973/diagnostic-proposal-v1.md",
+      "bytes": 3815,
+      "sha256": "c149b0f5b95b6005b7bea0c513aad376c6a8ab32bfba7c2792a0973696c4117c",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0973/receipts/adr-goal-revalidation-0973-v1.json",
+      "bytes": 8182,
+      "sha256": "80dc8af647aa4992f2281262e7be5bde40ac192aa1d392b0fc5d6525052d7d90",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0973/receipts/aslr-translation-0973-final-v4.json",
+      "bytes": 32356,
+      "sha256": "89a48f57bf35cb556d890bcfd7476a3a6e27601fd030a643c6e3275384bfc74b",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0973/receipts/independent-review-0973-v1.json",
+      "bytes": 7923,
+      "sha256": "2a31dea0857cdcfd6eb77ce4f1352d61fae09c8fde6cdb75daacd53b1fb516d1",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0973/receipts/synthetic-packet-pipeline-author-v2-v4.json",
+      "bytes": 22118,
+      "sha256": "d908603da0167a52450982c3d2ceb8f9277d5960e51c1883999a78a0555a494a",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0973/replay-dwfl-v2/dwfl_dynamic_shim_v2.so",
+      "bytes": 16672,
+      "sha256": "92b256588622a97b0e32a8de2a6149d3e5dce0b2eda3e614ff42daf91279bb03",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/dwfl_dynamic_shim_v2.c",
+      "bytes": 10001,
+      "sha256": "6600804eb94fbb81c6b26facc07ff28dc6df101cc75e7a2d2859eb12167f1551",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/dwfl_dynamic_shim_v2.map",
+      "bytes": 107,
+      "sha256": "d0a7914c5cb02770073db94dc4d2b207a95ae513b436c661d8a9c9a206aefef6",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/prepare_plan_0973_v2.py",
+      "bytes": 7927,
+      "sha256": "c3beab19960e0a7b4d73f252aa015c6b398508f2bf4e33cb6ace4b271129f65f",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/protocol_common_0973_v2.py",
+      "bytes": 39589,
+      "sha256": "56b509fde01bbd66702ac8cd835da0d09d74d332935926078c6545093ed52bf4",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/raw_stack_0973_v2.py",
+      "bytes": 13746,
+      "sha256": "3a8e36ebc5f21f4f0b8293cafa675d722f2264fb1cfd6c7f48271b4f0a5056d2",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/reduce_0973_v2.py",
+      "bytes": 31359,
+      "sha256": "f33f14724f6264d87b2c3a0082c16bca711787140d06f3c7cfdd6e78b6f4c63b",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/run_0973_v2.py",
+      "bytes": 20510,
+      "sha256": "f4f7af4ec8b8bb1818f3ce25dec046c8b8ad7c23d0a2611c76e24bf10b6aef5d",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/analysis/cpu-filter-mmap-readonly-v1/perf-build-options.txt",
+      "bytes": 1793,
+      "sha256": "a2a91b237b60d4b5852d3afc72d88ebe3caf67918bfb5205b368f6cf6905e18c",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/analysis/cpu-filter-mmap-readonly-v1/perf-record-help.txt",
+      "bytes": 7546,
+      "sha256": "7f9d5101c37496de4bd6c0af78869ae399eb36d9c51a7b78e3bcd4e75c3b3200",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/analysis/cpu-filter-mmap-readonly-v1/perf-record-man.txt",
+      "bytes": 48623,
+      "sha256": "38ad97a73c5df417d171bf3ef58358011346f85d9ec89cac77428da70e81afb1",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/analysis/native-record-spec-v2.json",
+      "bytes": 2191,
+      "sha256": "3d9f5bd12c2d20b4853f5601359d18c6051a4da2b8d3b7e87b25112cbb2dcb9d",
+      "kind": "source_or_bounded_receipt",
+      "copied_to_repository": true,
+      "repository_path": "analysis/native-record-spec-v2.json",
+      "status": "repository_copy"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/analysis/per-thread-mmap-readonly-v1.md",
+      "bytes": 4395,
+      "sha256": "1ae15da07a1a7f80e92ae84e338c70d41fd9cd18f80dad57a9f442a05d9acc1a",
+      "kind": "source_or_bounded_receipt",
+      "copied_to_repository": true,
+      "repository_path": "analysis/per-thread-mmap-readonly-v1.md",
+      "status": "repository_copy"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/capability-receipt-v1.json",
+      "bytes": 9989,
+      "sha256": "70b64d1f18a13c59492777cb8bca8d5a4e461436a9fed65cea0ff4c4e1021145",
+      "kind": "source_or_bounded_receipt",
+      "copied_to_repository": true,
+      "repository_path": "receipts/capability-cpu31-mmap16m-v1.json",
+      "status": "repository_copy"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/command.txt",
+      "bytes": 454,
+      "sha256": "7cbf4c4f00b627eacd690223b44ff27939148629bac25f0ab77bc220158bc9d1",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/cwd-observed.txt",
+      "bytes": 24,
+      "sha256": "087367deffeee8c28273c3eaae34a80cb086483701eafcdfc9d6fecd9627b35b",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/environment-and-host.txt",
+      "bytes": 1952,
+      "sha256": "5582018fa3d5cfc2c22b4202347f0c76749c929e5e84df3d12406d7958112bfb",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/finished-utc.txt",
+      "bytes": 21,
+      "sha256": "b50f79563b71ccc42315f1c18c42918aa66ea43bafe8bd9c8924794026182336",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/input-hashes-after.txt",
+      "bytes": 243,
+      "sha256": "11df8c44f5ee9869e6f065d2c6e0abeb2f067b56eb6d6ad3980997e016be0c9a",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/input-hashes-before.txt",
+      "bytes": 243,
+      "sha256": "11df8c44f5ee9869e6f065d2c6e0abeb2f067b56eb6d6ad3980997e016be0c9a",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/return-code.txt",
+      "bytes": 4,
+      "sha256": "ce8bafb38615aeb5d44ebbabe78ec14ac35a5de87bdc5ad5ea82a72656024ce4",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/started-utc.txt",
+      "bytes": 21,
+      "sha256": "b50f79563b71ccc42315f1c18c42918aa66ea43bafe8bd9c8924794026182336",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/terminal-and-artifacts.txt",
+      "bytes": 3057,
+      "sha256": "218d172e22dad492bbcd37d19b74ea8d987bbbf9a7a387a8d5bdc932e68f461d",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/true.perf.data",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/true.stderr",
+      "bytes": 2165,
+      "sha256": "4e9fca1f06bcd13b4b13933eb0b6dece3244ad78c869d4c25ab3aeb1bf69b431",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/true.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-mmap16m-v1/capability-receipt-v1.json",
+      "bytes": 6151,
+      "sha256": "f33f608d4e13849f65875d303428bb21eddfc635e8a401a5ac37f6a48622f325",
+      "kind": "source_or_bounded_receipt",
+      "copied_to_repository": true,
+      "repository_path": "receipts/capability-mmap16m-v1-initial.json",
+      "status": "repository_copy"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-mmap16m-v1/capability-receipt-v2.json",
+      "bytes": 7774,
+      "sha256": "eb7e8873cdb7b2a2ead8edd1f476150efad11d79a5142fcc7a0492051cbb4786",
+      "kind": "source_or_bounded_receipt",
+      "copied_to_repository": true,
+      "repository_path": "receipts/capability-mmap16m-v2.json",
+      "status": "repository_copy"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-mmap16m-v1/perf-header.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-mmap16m-v1/perf-record.stderr",
+      "bytes": 168,
+      "sha256": "014841f7efa1dbd08f83e1883b56f27f0baad509be83e7febcc133d61d27ff10",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-mmap16m-v1/perf-record.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-mmap16m-v1/perf-report-header.stderr",
+      "bytes": 107,
+      "sha256": "93fd1b52f2332ead591ad31a429fb7c52f50c3e70e08a8a4593537d3367989f9",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-mmap16m-v1/terminal.txt",
+      "bytes": 760,
+      "sha256": "eb0bd4079774f41ce828a13fede7599f0db88066664f8725f7f2aaf5f4df169a",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-mmap16m-v1/true.perf.data",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/capability-receipt-v1.json",
+      "bytes": 11596,
+      "sha256": "503cacc304daf95d8e7254feb1bf074d01cf707bfbeb6c11b049a857522705fd",
+      "kind": "source_or_bounded_receipt",
+      "copied_to_repository": true,
+      "repository_path": "receipts/capability-perthread-mmap16m-v1.json",
+      "status": "repository_copy"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/command.txt",
+      "bytes": 469,
+      "sha256": "a6564abc1d773c66a9a05c3f00d962392258b1949488b7c4cf1288da7d0d535b",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/cwd-observed.txt",
+      "bytes": 68,
+      "sha256": "f58d6bbf584c8a4a8e3235e59d07cb15d52588674fd84c09aa0555592adba1a9",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/environment-and-host.txt",
+      "bytes": 1952,
+      "sha256": "c9621ca125be5c5243bf0e80eac0b6790cfd7ff3ea610bd99a573d17a306f131",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/finished-utc.txt",
+      "bytes": 21,
+      "sha256": "771487ec2976124a242bcdea2059f708c27a67a8a4f2ccc2a122dc02acfa2689",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/input-hashes-after.txt",
+      "bytes": 243,
+      "sha256": "11df8c44f5ee9869e6f065d2c6e0abeb2f067b56eb6d6ad3980997e016be0c9a",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/input-hashes-before.txt",
+      "bytes": 243,
+      "sha256": "11df8c44f5ee9869e6f065d2c6e0abeb2f067b56eb6d6ad3980997e016be0c9a",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/perf-data-status.txt",
+      "bytes": 352,
+      "sha256": "468852feb17f4c6615eda4ca83a92fb962a752c8c9d29af1e7ecd66ac8f77cd6",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/perf-report-debug.txt",
+      "bytes": 13981,
+      "sha256": "79f89228670ea218b62bcf42bd280d28ba041531177959e240e3f2406b4e3e4c",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/perf-report-header.txt",
+      "bytes": 1710,
+      "sha256": "4b9965747ec47e51ce1fc9b68a23b93de32ec725f6ba40d13e803b76ec3eec4b",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/return-code.txt",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/started-utc.txt",
+      "bytes": 21,
+      "sha256": "771487ec2976124a242bcdea2059f708c27a67a8a4f2ccc2a122dc02acfa2689",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/terminal-and-artifacts.txt",
+      "bytes": 1031,
+      "sha256": "a2b86a438e6c1bfcf0b6cc54cc4d91c8b3f8ce5b2dcc2b65643d2cfc6972bac6",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/true.perf.data",
+      "bytes": 44336,
+      "sha256": "f9ad6ffbc3d05305fc6e7bda4c00a8ba539a51ed0dbcfa959504499b6f455f4c",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/true.stderr",
+      "bytes": 520,
+      "sha256": "a4d9502b3edb22471865a8b6ed28ce09aaa0614424dac1e057aaad8476c1601e",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/true.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/capture/instruction-profile-v1/capture-manifest-v2.json",
+      "bytes": 531,
+      "sha256": "19889cf44b3e5582ff1b3355238787cd27c3c0c4032dda05fb674ddd75e27e0a",
+      "kind": "source_or_bounded_receipt",
+      "copied_to_repository": true,
+      "repository_path": "capture/capture-manifest-v2.json",
+      "status": "repository_copy"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/design-v2.md",
+      "bytes": 8375,
+      "sha256": "6d9b4f6b1bc2f407da2b62b742cf3ae76213f9e4626bf20afba3cfcf8511b06f",
+      "kind": "source_or_bounded_receipt",
+      "copied_to_repository": true,
+      "repository_path": "design/design-v2.md",
+      "status": "repository_copy"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/command.txt",
+      "bytes": 702,
+      "sha256": "ea391ae6979df461751241743cc4bb7d144e994a28c8289aa6e05c677965aafa",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/environment-and-host.txt",
+      "bytes": 2261,
+      "sha256": "410015b1af4e6d02d1516ae1730b178874a49e79c5b776d7a6a3cbbe89e1b6ad",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/finished-utc.txt",
+      "bytes": 21,
+      "sha256": "b4646a17ab1f080f391ba075c44533b56132c45d84d9af7528c64e65ad544813",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/input-hashes-after.txt",
+      "bytes": 329,
+      "sha256": "1c571c96b28cb2208d0ed953311334e414689e2aa4981fe9ca5dbe749b37fad0",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/input-hashes-before.txt",
+      "bytes": 329,
+      "sha256": "1c571c96b28cb2208d0ed953311334e414689e2aa4981fe9ca5dbe749b37fad0",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/lifecycle-negative-control-receipt-v1.json",
+      "bytes": 14157,
+      "sha256": "852e22aadbebb43d75075f9f1749343b50f4008d6a8c37b6a1f35cf954895ec8",
+      "kind": "source_or_bounded_receipt",
+      "copied_to_repository": true,
+      "repository_path": "receipts/lifecycle-negative-control-v1.json",
+      "status": "repository_copy"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/lifecycle.perf.data",
+      "bytes": 5832656,
+      "sha256": "d5f9c4cc8e3145caa5fbe054c34a8fb2fa4db7a2a939ff0a8100af4c0f63edf9",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/lifecycle_target.py",
+      "bytes": 2090,
+      "sha256": "dbfa4a6f1c21d14a23be1db22dd4ad4ee76ed98411a42c2ba6c34d0f9a29b9f2",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/perf-header.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/perf-header.txt",
+      "bytes": 1716,
+      "sha256": "b25781f472b4400b52e1be846e0535fefeb559e37a0a3ba251474be54ce38007",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/perf-rawdump.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/perf-rawdump.txt",
+      "bytes": 27714562,
+      "sha256": "fcf2601293a5ce7748564f87dbb10ffcf384e53b22306aa6d01b819971cb6eba",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/perf-record.stderr",
+      "bytes": 523,
+      "sha256": "f98aaa96bed5ba6d29faed6b72a4ca61a6d7882b688a2955e8e2b88486d9f672",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/perf-record.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/perf-script.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/perf-script.txt",
+      "bytes": 414996,
+      "sha256": "9025fb9d009dc729c917182cf38391f1be03f3a42550857fd86d24c97cc1c46e",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/return-code.txt",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/started-utc.txt",
+      "bytes": 21,
+      "sha256": "b4646a17ab1f080f391ba075c44533b56132c45d84d9af7528c64e65ad544813",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/target-lifecycle.json",
+      "bytes": 1912,
+      "sha256": "c475fccc51f6f27cb070379732d4750b39a4270cca009543c364a7fd130c52c1",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/target-source-hash-after.txt",
+      "bytes": 86,
+      "sha256": "f2752ab3bda9d42728f709906d5ed7b307c9bf4da6f968e7eb8325b93241ffa7",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/target-source-hash-before.txt",
+      "bytes": 86,
+      "sha256": "f2752ab3bda9d42728f709906d5ed7b307c9bf4da6f968e7eb8325b93241ffa7",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/lifecycle-negative-control-v1/terminal.txt",
+      "bytes": 3308,
+      "sha256": "00842977d546b2984b35004f8d4d1b912eae2be77b23a7cfce4704b26d2ae889",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/plans/plan-0974-pre-capture-v1.json",
+      "bytes": 16093,
+      "sha256": "2710fde102dabd08885aca8021e97620d7fb859376adc3535d8f7b6bc38b4668",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/plans/plan-0974-pre-capture-v4.json",
+      "bytes": 19568,
+      "sha256": "85e14a9cf4e630ad2c75b8697b236fb7bb1dc08fed8ba76877a9dd15127f09ea",
+      "kind": "source_or_bounded_receipt",
+      "copied_to_repository": true,
+      "repository_path": "plans/plan-0974-pre-capture-v4.json",
+      "status": "repository_copy"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/plans/plan-0974-pre-capture-v5.json",
+      "bytes": 19568,
+      "sha256": "dddd126895d04cd1738719d99aa00ff1b68dcd551233a5c2391f37f7c30e71ee",
+      "kind": "offline_repair_lineage",
+      "copied_to_repository": true,
+      "status": "repository_copy_offline_only",
+      "repository_path": "plans/plan-0974-pre-capture-v5.json"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/receipts/adr-goal-revalidation-0974-v1.json",
+      "bytes": 7220,
+      "sha256": "fd68bf79fa20096c5542c3429a1266f8d94bd5fdb5907647681370ab8e02ec70",
+      "kind": "source_or_bounded_receipt",
+      "copied_to_repository": true,
+      "repository_path": "receipts/adr-goal-revalidation-0974-v1.json",
+      "status": "repository_copy"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/receipts/corrective-audit-0974-prelaunch-no-admission-v1.json",
+      "bytes": 5741,
+      "sha256": "078cfefe0694486d3b0100044b37c494862fa27d12e2a5d51636f5491e318ecd",
+      "kind": "source_or_bounded_receipt",
+      "copied_to_repository": true,
+      "repository_path": "receipts/corrective-audit-0974-prelaunch-no-admission-v1.json",
+      "status": "repository_copy"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/receipts/helper-seal-0974-v1.json",
+      "bytes": 3778,
+      "sha256": "3f22b7b069d8c8be0e5db1720b76b1cc0ed50998e26b84fc0b5680994ea41e4b",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/receipts/helper-seal-0974-v4.json",
+      "bytes": 4182,
+      "sha256": "bb61c9c98c8080e0d6b769079dcd2e3904f82a0645edd6661255e861f13420c7",
+      "kind": "source_or_bounded_receipt",
+      "copied_to_repository": true,
+      "repository_path": "receipts/helper-seal-0974-v4.json",
+      "status": "repository_copy"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/receipts/helper-seal-0974-v5.json",
+      "bytes": 4177,
+      "sha256": "4cc5ef36a28c6b254a580abd01b21792daef317b383ac5dc718ea544bb3668a3",
+      "kind": "offline_repair_lineage",
+      "copied_to_repository": true,
+      "status": "repository_copy_offline_only",
+      "repository_path": "receipts/helper-seal-0974-v5.json"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/receipts/independent-repair-review-0974-v5-v1.json",
+      "bytes": 7605,
+      "sha256": "b74e7fb3c04f88ea57a4c9b2f6fd73d8ebbc5894c7b80bbaf9c3af93c4826c97",
+      "kind": "independent_offline_repair_review",
+      "copied_to_repository": true,
+      "status": "repository_copy_offline_only",
+      "repository_path": "receipts/independent-repair-review-0974-v5-v1.json"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/receipts/independent-review-0974-v4.json",
+      "bytes": 10344,
+      "sha256": "86688588f55d80274b906f092d31b82c01e05f137ea86f536e7ac2b4c6fc0cca",
+      "kind": "source_or_bounded_receipt",
+      "copied_to_repository": true,
+      "repository_path": "receipts/independent-review-0974-v4.json",
+      "status": "repository_copy"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/receipts/launch-boundary-regression-0974-v1.json",
+      "bytes": 7044,
+      "sha256": "7e5da9d71647ee4b8cb3625e291da49a671ebb05330457d7acd551d896efdb78",
+      "kind": "source_or_bounded_receipt",
+      "copied_to_repository": true,
+      "repository_path": "receipts/launch-boundary-regression-0974-v1.json",
+      "status": "repository_copy"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/receipts/launch-boundary-regression-0974-v2.json",
+      "bytes": 14979,
+      "sha256": "af713be2400d3c1dc258ba391f93fb65e1f0b3b2e9696f667c1157e498fd07a3",
+      "kind": "historical_boundary_receipt",
+      "copied_to_repository": false,
+      "status": "historical_external_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/receipts/launch-boundary-regression-0974-v3.json",
+      "bytes": 15879,
+      "sha256": "68c3c2b1df6027218d7407253a255bf770b5d7d875a9e48125c4134fac89cdd4",
+      "kind": "offline_repair_receipt",
+      "copied_to_repository": true,
+      "status": "repository_copy_offline_only",
+      "repository_path": "receipts/launch-boundary-regression-0974-v3.json"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/receipts/root-go-0974-v1.json",
+      "bytes": 3430,
+      "sha256": "19539597f779cef4562aa232ba8629cfc5b31394550467930c95909c8cdffcca",
+      "kind": "source_or_bounded_receipt",
+      "copied_to_repository": true,
+      "repository_path": "receipts/root-go-0974-v1.json",
+      "status": "repository_copy"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/receipts/root-terminal-0974-v1.json",
+      "bytes": 1174,
+      "sha256": "403d58e6471a5f2afbfa8da4eb019904e7cdc46da3ad5f2677ee43cd9bad73de",
+      "kind": "source_or_bounded_receipt",
+      "copied_to_repository": true,
+      "repository_path": "receipts/root-terminal-0974-v1.json",
+      "status": "repository_copy"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/receipts/synthetic-continuation-reducer-author-v3-failure-v1.json",
+      "bytes": 3302,
+      "sha256": "1fc91cd52a70ee621f94eeeb8ce5f437c58b1f3fdeba0594493514d80a607989",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/receipts/synthetic-continuation-reducer-author-v4-v1.json",
+      "bytes": 16987,
+      "sha256": "46cb7a7f98fe377ef2a8f76f2283d7392f9190ec63e9b1f65963f5236af30075",
+      "kind": "source_or_bounded_receipt",
+      "copied_to_repository": true,
+      "repository_path": "receipts/synthetic-continuation-reducer-author-v4-v1.json",
+      "status": "repository_copy"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/receipts/temporary-cleanup-0974-v1.json",
+      "bytes": 16957,
+      "sha256": "26f41df774234a5df0075325d4268d7c2ddb9bb75268a6efcc9299d670700c54",
+      "kind": "cleanup_receipt",
+      "copied_to_repository": true,
+      "status": "repository_copy",
+      "repository_path": "receipts/temporary-cleanup-0974-v1.json"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/tools/launch_boundary_regression_0974_v1.py",
+      "bytes": 12807,
+      "sha256": "7831e9b7ae5d6dc32b64e078e8f09a4e263ec364634ea03d0dc74ec13965124d",
+      "kind": "offline_repair_lineage",
+      "copied_to_repository": true,
+      "status": "repository_copy_offline_only",
+      "repository_path": "tools/launch_boundary_regression_0974_v1.py"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/tools/prepare_plan_0974_v4.py",
+      "bytes": 8475,
+      "sha256": "488fb1cb66af1eacb25abfa567b9c6a855ca87b4ba70ba75c61cb7f92e273eaf",
+      "kind": "source_or_bounded_receipt",
+      "copied_to_repository": true,
+      "repository_path": "tools/prepare_plan_0974_v4.py",
+      "status": "repository_copy"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/tools/prepare_plan_0974_v5.py",
+      "bytes": 8470,
+      "sha256": "eb5d0f42055b8917078602d1329b1aafdec3eef453370816aec102a9e0ef486e",
+      "kind": "offline_repair_lineage",
+      "copied_to_repository": true,
+      "status": "repository_copy_offline_only",
+      "repository_path": "tools/prepare_plan_0974_v5.py"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/tools/protocol_adapter_0974_v1.py",
+      "bytes": 25841,
+      "sha256": "6c2032e2d1cc04990f6f4be0df4542d393ce55f1c1c7d45b97ea62eb5f05269e",
+      "kind": "source_or_bounded_receipt",
+      "copied_to_repository": true,
+      "repository_path": "tools/protocol_adapter_0974_v1.py",
+      "status": "repository_copy"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/tools/protocol_adapter_0974_v3.py",
+      "bytes": 30542,
+      "sha256": "e798f3e5628cab21c019f90d793754ef5930a0ce9e222569f53861eed83e8dd6",
+      "kind": "source_or_bounded_receipt",
+      "copied_to_repository": true,
+      "repository_path": "tools/protocol_adapter_0974_v3.py",
+      "status": "repository_copy"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/tools/protocol_adapter_0974_v5.py",
+      "bytes": 35075,
+      "sha256": "e3725cbc027d2a063f32b926e3fb4024d640aab2a2fbd7493ed5325de9ea2ac6",
+      "kind": "offline_repair_lineage",
+      "copied_to_repository": true,
+      "status": "repository_copy_offline_only",
+      "repository_path": "tools/protocol_adapter_0974_v5.py"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/tools/reduce_0974_v4.py",
+      "bytes": 12565,
+      "sha256": "7c6e7162e406aecf13868b264da29f2d5b6e07f0212bed1099298a464bb9ade5",
+      "kind": "source_or_bounded_receipt",
+      "copied_to_repository": true,
+      "repository_path": "tools/reduce_0974_v4.py",
+      "status": "repository_copy"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/tools/run_0974_v3.py",
+      "bytes": 1841,
+      "sha256": "74cb0d5ff37f08004f460430d3a4c651286473431ecdca67ef8b2b47e49c64a4",
+      "kind": "source_or_bounded_receipt",
+      "copied_to_repository": true,
+      "repository_path": "tools/run_0974_v3.py",
+      "status": "repository_copy"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/tools/run_0974_v5.py",
+      "bytes": 1841,
+      "sha256": "519a7b88cf6df7688d1b4555fbd3b2d682c2459bc6c070817308ba38031d4fe1",
+      "kind": "offline_repair_lineage",
+      "copied_to_repository": true,
+      "status": "repository_copy_offline_only",
+      "repository_path": "tools/run_0974_v5.py"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0974/tools/synthetic_continuation_gate_0974_v1.py",
+      "bytes": 34265,
+      "sha256": "5bf18b45e45dc5f600c187fc3f6b67277f21aa154b068a9de411aa68068764ab",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/usr/bin/cc",
+      "bytes": 1305304,
+      "sha256": "864711037b900acdb7a449cf48d912cefa935b527fb60c767ccb956779e66136",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/usr/bin/perf",
+      "bytes": 25221960,
+      "sha256": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/usr/bin/python3.14",
+      "bytes": 7468968,
+      "sha256": "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/usr/bin/taskset",
+      "bytes": 31184,
+      "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/usr/bin/true",
+      "bytes": 35288,
+      "sha256": "deadd5bb984a1153139afd09ee4e01100fbe2196d4f98ec7978674e2c83a4b97",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/usr/lib/x86_64-linux-gnu/libdw-0.194.so",
+      "bytes": 823824,
+      "sha256": "86a59c8071ab57c25daacb275cedae072de83151bd358d4ffdc7844afbd31109",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    },
+    {
+      "path": "/usr/lib/x86_64-linux-gnu/libelf-0.194.so",
+      "bytes": 154408,
+      "sha256": "d1e1539cc36403b603deb0d4558711e50bc8144eec1d833ece69df81ce01b527",
+      "kind": "external_probe_or_dependency",
+      "copied_to_repository": false,
+      "status": "external_reference_only"
+    }
+  ],
+  "missing_paths": [],
+  "notes": [
+    "The v4 independent review and focused continuation test are historical pre-capture PASS evidence. The actual runner boundary failure remains the execution-admission result for this attempt.",
+    "The v3 boundary regression and independent v5 review pass only an offline Popen-sentinel command-boundary test; they start no process, capture no data, and do not authorize a retry.",
+    "Large capability perf files, lifecycle perf.data/dumps, retained 0973 decoder/executable artifacts, and all system/compiled objects remain external.",
+    "The packet contains no native 0974 sample, packet, report, or reduction. The v2 boundary receipt is retained externally as historical lineage."
+  ]
+}

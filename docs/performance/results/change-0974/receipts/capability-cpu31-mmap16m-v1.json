@@ -1,0 +1,213 @@
+{
+  "artifacts": {
+    "command.txt": {
+      "bytes": 454,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/command.txt",
+      "sha256": "7cbf4c4f00b627eacd690223b44ff27939148629bac25f0ab77bc220158bc9d1"
+    },
+    "cwd-observed.txt": {
+      "bytes": 24,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/cwd-observed.txt",
+      "sha256": "087367deffeee8c28273c3eaae34a80cb086483701eafcdfc9d6fecd9627b35b"
+    },
+    "environment-and-host.txt": {
+      "bytes": 1952,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/environment-and-host.txt",
+      "sha256": "5582018fa3d5cfc2c22b4202347f0c76749c929e5e84df3d12406d7958112bfb"
+    },
+    "finished-utc.txt": {
+      "bytes": 21,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/finished-utc.txt",
+      "sha256": "b50f79563b71ccc42315f1c18c42918aa66ea43bafe8bd9c8924794026182336"
+    },
+    "input-hashes-after.txt": {
+      "bytes": 243,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/input-hashes-after.txt",
+      "sha256": "11df8c44f5ee9869e6f065d2c6e0abeb2f067b56eb6d6ad3980997e016be0c9a"
+    },
+    "input-hashes-before.txt": {
+      "bytes": 243,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/input-hashes-before.txt",
+      "sha256": "11df8c44f5ee9869e6f065d2c6e0abeb2f067b56eb6d6ad3980997e016be0c9a"
+    },
+    "return-code.txt": {
+      "bytes": 4,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/return-code.txt",
+      "sha256": "ce8bafb38615aeb5d44ebbabe78ec14ac35a5de87bdc5ad5ea82a72656024ce4"
+    },
+    "started-utc.txt": {
+      "bytes": 21,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/started-utc.txt",
+      "sha256": "b50f79563b71ccc42315f1c18c42918aa66ea43bafe8bd9c8924794026182336"
+    },
+    "terminal-and-artifacts.txt": {
+      "bytes": 3057,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/terminal-and-artifacts.txt",
+      "sha256": "218d172e22dad492bbcd37d19b74ea8d987bbbf9a7a387a8d5bdc932e68f461d"
+    },
+    "true.perf.data": {
+      "bytes": 0,
+      "exists": true,
+      "mode": "0o600",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/true.perf.data",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "true.stderr": {
+      "bytes": 2165,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/true.stderr",
+      "sha256": "4e9fca1f06bcd13b4b13933eb0b6dece3244ad78c869d4c25ab3aeb1bf69b431"
+    },
+    "true.stdout": {
+      "bytes": 0,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/true.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "command": {
+    "argv": [
+      "/usr/bin/taskset",
+      "--cpu-list",
+      "31",
+      "/usr/bin/perf",
+      "record",
+      "-v",
+      "-C",
+      "31",
+      "-e",
+      "instructions:u",
+      "-c",
+      "1000000",
+      "-m",
+      "16M",
+      "--call-graph",
+      "dwarf,32768",
+      "--period",
+      "--timestamp",
+      "--sample-cpu",
+      "--buildid-all",
+      "--no-buildid-cache",
+      "--user-callchains",
+      "-o",
+      "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/true.perf.data",
+      "--",
+      "/usr/bin/true"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "environment": {
+      "LANG": "C",
+      "LC_ALL": "C",
+      "PATH": "/usr/bin:/bin",
+      "TZ": "UTC"
+    },
+    "finished_utc": "2026-10-08T04:58:20Z",
+    "started_utc": "2026-10-08T04:58:20Z"
+  },
+  "constraint": "Do not retry, lower -m, change sysctls/rlimits, or start native workload from this receipt.",
+  "host": {
+    "cpu_online": "0-31",
+    "kernel": "Linux 7.0.0-1013-aws #13-Ubuntu SMP PREEMPT Fri Sep 4 17:02:11 UTC 2026",
+    "outer_taskset_cpu": [
+      31
+    ],
+    "perf_event_mlock_kb": 516,
+    "perf_event_paranoid": 1,
+    "rlimit_memlock_bytes": [
+      8388608,
+      8388608
+    ],
+    "rlimit_stack_bytes": [
+      8388608,
+      8388608
+    ]
+  },
+  "input_hashes": {
+    "after": {
+      "/usr/bin/perf": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b",
+      "/usr/bin/taskset": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2",
+      "/usr/bin/true": "deadd5bb984a1153139afd09ee4e01100fbe2196d4f98ec7978674e2c83a4b97"
+    },
+    "after_file": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/input-hashes-after.txt",
+    "before": {
+      "/usr/bin/perf": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b",
+      "/usr/bin/taskset": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2",
+      "/usr/bin/true": "deadd5bb984a1153139afd09ee4e01100fbe2196d4f98ec7978674e2c83a4b97"
+    },
+    "before_file": "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/input-hashes-before.txt",
+    "unchanged": true
+  },
+  "observed_event_setup": {
+    "dummy_sideband_event": "perf verbose output: Failure to open event dummy:u on PMU software; removed",
+    "instructions_event": "perf verbose output: Failure to open event instructions:u on PMU cpu; removed",
+    "interpretation": "-C31 caused perf to attempt the dummy sideband event, but setup failed under perf_event_paranoid=1. This does not prove ring allocation or validate the measured event filter."
+  },
+  "prior_failed_probe_preserved": "/home/zhuhe/litchi-performance-0974/capability-mmap16m-v1/capability-receipt-v2.json",
+  "purpose": "Single harmless /usr/bin/true capability probe for -C31 plus the preregistered -m16M setup; no Office workload.",
+  "result": {
+    "header_inspection": "not available: zero-byte perf.data; no samples/header/loss records",
+    "loss_record_basis": "no perf.data; not an observed zero-loss result",
+    "loss_record_count": 0,
+    "perf_data_bytes": 0,
+    "perf_data_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "returncode": 255,
+    "stderr_bytes": 2165,
+    "stderr_exact": "Using CPUID AuthenticAMD-26-2-1\ninstructions -> cpu/instructions/\ncallchain: type DWARF\ncallchain: stack dump size 32768\nDEBUGINFOD_URLS=\nnr_cblocks: 0\naffinity: SYS\nmmap flush: 1\ncomp level: 0\nProblems creating module maps, continuing anyway...\nError:\nFailure to open event 'instructions:u' on PMU 'cpu' which will be removed.\nAccess to performance monitoring and observability operations is limited.\nConsider adjusting /proc/sys/kernel/perf_event_paranoid setting to open\naccess to performance monitoring and observability operations for processes\nwithout CAP_PERFMON, CAP_SYS_PTRACE or CAP_SYS_ADMIN Linux capability.\nMore information can be found at 'Perf events and tool security' document:\nhttps://www.kernel.org/doc/html/latest/admin-guide/perf-security.html\nperf_event_paranoid setting is 1:\n  -1: Allow use of (almost) all events by all users\n      Ignore mlock limit after perf_event_mlock_kb without CAP_IPC_LOCK\n>= 0: Disallow raw and ftrace function tracepoint access\n>= 1: Disallow CPU event access\n>= 2: Disallow kernel profiling\nTo make the adjusted perf_event_paranoid setting permanent preserve it\nin /etc/sysctl.conf (e.g. kernel.perf_event_paranoid = <setting>)\nError:\nFailure to open event 'dummy:u' on PMU 'software' which will be removed.\nAccess to performance monitoring and observability operations is limited.\nConsider adjusting /proc/sys/kernel/perf_event_paranoid setting to open\naccess to performance monitoring and observability operations for processes\nwithout CAP_PERFMON, CAP_SYS_PTRACE or CAP_SYS_ADMIN Linux capability.\nMore information can be found at 'Perf events and tool security' document:\nhttps://www.kernel.org/doc/html/latest/admin-guide/perf-security.html\nperf_event_paranoid setting is 1:\n  -1: Allow use of (almost) all events by all users\n      Ignore mlock limit after perf_event_mlock_kb without CAP_IPC_LOCK\n>= 0: Disallow raw and ftrace function tracepoint access\n>= 1: Disallow CPU event access\n>= 2: Disallow kernel profiling\nTo make the adjusted perf_event_paranoid setting permanent preserve it\nin /etc/sysctl.conf (e.g. kernel.perf_event_paranoid = <setting>)\nError:\nFailure to open any events for recording.\n",
+    "stderr_sha256": "4e9fca1f06bcd13b4b13933eb0b6dece3244ad78c869d4c25ab3aeb1bf69b431",
+    "stdout_bytes": 0,
+    "workload_launch_evidence": "none; perf rejected both events before recording"
+  },
+  "schema": "litchi.performance.0974.perf_mmap_cpu_filter_probe.v1",
+  "scope": {
+    "benchmark_started": false,
+    "build_started": false,
+    "native_workload_started": false,
+    "office_touched": false,
+    "retry": false,
+    "settings_changed": false
+  },
+  "status": "setup_failed_no_retry",
+  "tools": {
+    "perf": {
+      "bytes": 25221960,
+      "exists": true,
+      "mode": "0o755",
+      "path": "/usr/bin/perf",
+      "sha256": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b"
+    },
+    "taskset": {
+      "bytes": 31184,
+      "exists": true,
+      "mode": "0o755",
+      "path": "/usr/bin/taskset",
+      "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2"
+    },
+    "true": {
+      "bytes": 35288,
+      "exists": true,
+      "mode": "0o755",
+      "path": "/usr/bin/true",
+      "sha256": "deadd5bb984a1153139afd09ee4e01100fbe2196d4f98ec7978674e2c83a4b97"
+    }
+  }
+}

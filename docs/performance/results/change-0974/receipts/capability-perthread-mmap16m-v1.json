@@ -1,0 +1,277 @@
+{
+  "artifacts": {
+    "command.txt": {
+      "bytes": 469,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/command.txt",
+      "sha256": "a6564abc1d773c66a9a05c3f00d962392258b1949488b7c4cf1288da7d0d535b"
+    },
+    "cwd-observed.txt": {
+      "bytes": 68,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/cwd-observed.txt",
+      "sha256": "f58d6bbf584c8a4a8e3235e59d07cb15d52588674fd84c09aa0555592adba1a9"
+    },
+    "environment-and-host.txt": {
+      "bytes": 1952,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/environment-and-host.txt",
+      "sha256": "c9621ca125be5c5243bf0e80eac0b6790cfd7ff3ea610bd99a573d17a306f131"
+    },
+    "finished-utc.txt": {
+      "bytes": 21,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/finished-utc.txt",
+      "sha256": "771487ec2976124a242bcdea2059f708c27a67a8a4f2ccc2a122dc02acfa2689"
+    },
+    "input-hashes-after.txt": {
+      "bytes": 243,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/input-hashes-after.txt",
+      "sha256": "11df8c44f5ee9869e6f065d2c6e0abeb2f067b56eb6d6ad3980997e016be0c9a"
+    },
+    "input-hashes-before.txt": {
+      "bytes": 243,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/input-hashes-before.txt",
+      "sha256": "11df8c44f5ee9869e6f065d2c6e0abeb2f067b56eb6d6ad3980997e016be0c9a"
+    },
+    "perf-data-status.txt": {
+      "bytes": 352,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/perf-data-status.txt",
+      "sha256": "468852feb17f4c6615eda4ca83a92fb962a752c8c9d29af1e7ecd66ac8f77cd6"
+    },
+    "perf-report-debug.txt": {
+      "bytes": 13981,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/perf-report-debug.txt",
+      "sha256": "79f89228670ea218b62bcf42bd280d28ba041531177959e240e3f2406b4e3e4c"
+    },
+    "perf-report-header.txt": {
+      "bytes": 1710,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/perf-report-header.txt",
+      "sha256": "4b9965747ec47e51ce1fc9b68a23b93de32ec725f6ba40d13e803b76ec3eec4b"
+    },
+    "return-code.txt": {
+      "bytes": 2,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/return-code.txt",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    "started-utc.txt": {
+      "bytes": 21,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/started-utc.txt",
+      "sha256": "771487ec2976124a242bcdea2059f708c27a67a8a4f2ccc2a122dc02acfa2689"
+    },
+    "terminal-and-artifacts.txt": {
+      "bytes": 1031,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/terminal-and-artifacts.txt",
+      "sha256": "a2b86a438e6c1bfcf0b6cc54cc4d91c8b3f8ce5b2dcc2b65643d2cfc6972bac6"
+    },
+    "true.perf.data": {
+      "bytes": 44336,
+      "exists": true,
+      "mode": "0o600",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/true.perf.data",
+      "sha256": "f9ad6ffbc3d05305fc6e7bda4c00a8ba539a51ed0dbcfa959504499b6f455f4c"
+    },
+    "true.stderr": {
+      "bytes": 520,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/true.stderr",
+      "sha256": "a4d9502b3edb22471865a8b6ed28ce09aaa0614424dac1e057aaad8476c1601e"
+    },
+    "true.stdout": {
+      "bytes": 0,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/true.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "command": {
+    "argv": [
+      "/usr/bin/taskset",
+      "--cpu-list",
+      "31",
+      "/usr/bin/perf",
+      "record",
+      "-v",
+      "--per-thread",
+      "-e",
+      "instructions:u",
+      "-c",
+      "1000000",
+      "-m",
+      "16M",
+      "--call-graph",
+      "dwarf,32768",
+      "--period",
+      "--timestamp",
+      "--sample-cpu",
+      "--buildid-all",
+      "--no-buildid-cache",
+      "--user-callchains",
+      "-o",
+      "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/true.perf.data",
+      "--",
+      "/usr/bin/true"
+    ],
+    "cwd": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1",
+    "environment": {
+      "LANG": "C",
+      "LC_ALL": "C",
+      "PATH": "/usr/bin:/bin",
+      "TZ": "UTC"
+    },
+    "finished_utc": "2026-10-08T04:59:38Z",
+    "started_utc": "2026-10-08T04:59:38Z"
+  },
+  "constraint": "This receipt authorizes no Office workload, no retry, no sysctl/rlimit change, and no claim that a future cohort will be loss-free.",
+  "decoded_records": {
+    "counts": {
+      "PERF_RECORD_COMM": 2,
+      "PERF_RECORD_CPU_MAP": 1,
+      "PERF_RECORD_EVENT_UPDATE": 1,
+      "PERF_RECORD_FINISHED_INIT": 1,
+      "PERF_RECORD_FINISHED_ROUND": 1,
+      "PERF_RECORD_ID_INDEX": 1,
+      "PERF_RECORD_MMAP2": 11,
+      "PERF_RECORD_THREAD_MAP": 1
+    },
+    "interpretation": "Header and metadata records are present; no sample or loss record was generated by /usr/bin/true.",
+    "lost_records": 0,
+    "sample_records": 0,
+    "source": "perf-report-debug.txt generated by /usr/bin/perf report -D"
+  },
+  "host": {
+    "cpu_online": "0-31",
+    "kernel": "Linux 7.0.0-1013-aws #13-Ubuntu SMP PREEMPT Fri Sep 4 17:02:11 UTC 2026",
+    "outer_taskset_cpu": [
+      31
+    ],
+    "perf_event_mlock_kb": 516,
+    "perf_event_paranoid": 1,
+    "rlimit_memlock_bytes": [
+      8388608,
+      8388608
+    ],
+    "rlimit_stack_bytes": [
+      8388608,
+      8388608
+    ]
+  },
+  "input_hashes": {
+    "after": {
+      "/usr/bin/perf": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b",
+      "/usr/bin/taskset": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2",
+      "/usr/bin/true": "deadd5bb984a1153139afd09ee4e01100fbe2196d4f98ec7978674e2c83a4b97"
+    },
+    "after_file": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/input-hashes-after.txt",
+    "before": {
+      "/usr/bin/perf": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b",
+      "/usr/bin/taskset": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2",
+      "/usr/bin/true": "deadd5bb984a1153139afd09ee4e01100fbe2196d4f98ec7978674e2c83a4b97"
+    },
+    "before_file": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/input-hashes-before.txt",
+    "unchanged": true
+  },
+  "per_thread_scope": {
+    "installed_man_excerpt": "--per-thread uses per-thread mmaps; inheritance is automatically disabled; ignored with -a or -C",
+    "not_yet_validated": "the retained Office workload has not been run under this mode",
+    "required_audit": "record launcher PID/exec_pid and raw FORK/EXIT/COMM/task-creation evidence; reject or stop if descendants or additional threads appear",
+    "required_future_runner": "same-PID exec from the existing launcher into the native binary, with one thread and no fork/clone/child workload"
+  },
+  "prior_failures_preserved": [
+    "/home/zhuhe/litchi-performance-0974/capability-mmap16m-v1/capability-receipt-v2.json",
+    "/home/zhuhe/litchi-performance-0974/capability-cpu31-mmap16m-v1/capability-receipt-v1.json"
+  ],
+  "purpose": "Single harmless /usr/bin/true validation of --per-thread with the prior instructions:u, dwarf,32768, period 1M, and -m16M setup; no Office workload.",
+  "result": {
+    "loss_samples_basis": "no PERF_RECORD_LOST_SAMPLES present; this is a short capability probe, not a workload loss gate",
+    "loss_samples_value": 0,
+    "perf_data_bytes": 44336,
+    "perf_data_sha256": "f9ad6ffbc3d05305fc6e7bda4c00a8ba539a51ed0dbcfa959504499b6f455f4c",
+    "raw_loss_record_basis": "decoded perf report -D output; no PERF_RECORD_LOST present",
+    "raw_loss_record_count": 0,
+    "returncode": 0,
+    "sample_count": 0,
+    "stderr_bytes": 520,
+    "stderr_exact": "Using CPUID AuthenticAMD-26-2-1\ninstructions -> cpu/instructions/\ncallchain: type DWARF\ncallchain: stack dump size 32768\nDEBUGINFOD_URLS=\nnr_cblocks: 0\naffinity: SYS\nmmap flush: 1\ncomp level: 0\nProblems creating module maps, continuing anyway...\nmmap size 16781312B\nControl descriptor is not initialized\n[ perf record: Woken up 1 times to write data ]\nfailed to write feature HYBRID_TOPOLOGY\n[ perf record: Captured and wrote 0.003 MB /home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/true.perf.data ]\n",
+    "stderr_sha256": "a4d9502b3edb22471865a8b6ed28ce09aaa0614424dac1e057aaad8476c1601e",
+    "stdout_bytes": 0,
+    "workload_command": "/usr/bin/true",
+    "workload_observation": "perf created a valid nonzero perf.data and exited 0; true is too short for an instructions period-1M sample"
+  },
+  "ring_evidence": {
+    "calculation": "(4096 data pages + 1 metadata page) * 4096 bytes = 16781312 bytes",
+    "caveat": "The probe proves setup and records a ring-size log, not sustained workload capacity or loss-free operation.",
+    "dummy_event_present": false,
+    "header_cpu_map": "-1",
+    "header_event": "instructions:u",
+    "header_event_count": 1,
+    "header_thread_map_nr": 1,
+    "mapping_mode": "--per-thread",
+    "requested": "-m 16M",
+    "source_expected_ring_count": "one per tracked thread; this command had one thread-map entry and no system-wide CPU event",
+    "verbose_mmap_size_bytes": 16781312,
+    "verbose_mmap_size_text": "mmap size 16781312B"
+  },
+  "sample_format": {
+    "event_flags": "disabled=1, enable_on_exec=1, exclude_kernel=1, exclude_hv=1, mmap=1, comm=1, task=1, mmap_data=1, sample_id_all=1, mmap2=1, comm_exec=1, ksymbol=1, bpf_event=1, build_id=1",
+    "format_note": "--per-thread changes mmap/topology and inheritance behavior; it does not change this event sample payload. No sample record existed in this probe.",
+    "read_format": "ID|LOST",
+    "sample_stack_user_bytes": 32768,
+    "sample_type": "IP|TID|TIME|CALLCHAIN|CPU|PERIOD|REGS_USER|STACK_USER"
+  },
+  "schema": "litchi.performance.0974.perf_per_thread_capability_probe.v1",
+  "scope": {
+    "benchmark_started": false,
+    "build_started": false,
+    "native_workload_started": false,
+    "office_touched": false,
+    "retry": false,
+    "settings_changed": false
+  },
+  "status": "setup_succeeded_no_workload_samples",
+  "tools": {
+    "perf": {
+      "bytes": 25221960,
+      "exists": true,
+      "mode": "0o755",
+      "path": "/usr/bin/perf",
+      "sha256": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b"
+    },
+    "taskset": {
+      "bytes": 31184,
+      "exists": true,
+      "mode": "0o755",
+      "path": "/usr/bin/taskset",
+      "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2"
+    },
+    "true": {
+      "bytes": 35288,
+      "exists": true,
+      "mode": "0o755",
+      "path": "/usr/bin/true",
+      "sha256": "deadd5bb984a1153139afd09ee4e01100fbe2196d4f98ec7978674e2c83a4b97"
+    }
+  }
+}

@@ -1,0 +1,172 @@
+{
+  "authoritative_repair_evidence": {
+    "argv_match": true,
+    "clear_restoration": {
+      "patch_state_cleared": true,
+      "runner_child_restored": true,
+      "runner_scan_restored": true,
+      "runner_write_restored": true
+    },
+    "idempotent_install": {
+      "raw_scanner_aliases_valid": true,
+      "second_install_aliases_valid": true,
+      "second_install_child_reused": true,
+      "second_install_scan_reused": true
+    },
+    "launch_reached": true,
+    "native_process_started": false,
+    "popen_calls": 1,
+    "production_helpers_unchanged": true,
+    "receipt": {
+      "bytes": 15879,
+      "path": "/home/zhuhe/litchi-performance-0974/receipts/launch-boundary-regression-0974-v3.json",
+      "sha256": "68c3c2b1df6027218d7407253a255bf770b5d7d875a9e48125c4134fac89cdd4"
+    },
+    "receipt_schema": "litchi.performance.0974.launch_boundary_regression.v3",
+    "receipt_status": "pass",
+    "recursion_gap": false,
+    "regression_script": {
+      "bytes": 12807,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/launch_boundary_regression_0974_v1.py",
+      "sha256": "7831e9b7ae5d6dc32b64e078e8f09a4e263ec364634ea03d0dc74ec13965124d"
+    }
+  },
+  "created_utc": "2026-10-08T05:20:29.481351+00:00",
+  "findings": [
+    {
+      "evidence": "The authoritative v3 regression reaches exactly one Popen sentinel and its argv exactly matches the independently derived per-thread/16MiB command.",
+      "finding": "The v4 adapter recursion occurred before Popen; v5 captures the retained child-record function from a fresh retained runner and calls that immutable function directly.",
+      "id": "repair-boundary",
+      "status": "resolved"
+    },
+    {
+      "evidence": "The receipt records reused scanner/child aliases and successful restoration of child, scanner, writer, and patch-state bindings.",
+      "finding": "Repeated installation and cleanup are covered at the actual run_child boundary.",
+      "id": "patch-lifecycle",
+      "status": "resolved"
+    },
+    {
+      "binding": {
+        "adapter_v1": {
+          "bytes": 25841,
+          "path": "/home/zhuhe/litchi-performance-0974/tools/protocol_adapter_0974_v1.py",
+          "sha256": "6c2032e2d1cc04990f6f4be0df4542d393ce55f1c1c7d45b97ea62eb5f05269e"
+        },
+        "adapter_v3": {
+          "bytes": 30542,
+          "path": "/home/zhuhe/litchi-performance-0974/tools/protocol_adapter_0974_v3.py",
+          "sha256": "e798f3e5628cab21c019f90d793754ef5930a0ce9e222569f53861eed83e8dd6"
+        },
+        "reducer_v4": {
+          "bytes": 12565,
+          "path": "/home/zhuhe/litchi-performance-0974/tools/reduce_0974_v4.py",
+          "sha256": "7c6e7162e406aecf13868b264da29f2d5b6e07f0212bed1099298a464bb9ade5"
+        }
+      },
+      "constraint": "Any future offline reduction must preserve and bind these dependency hashes; this note does not invalidate the v5 launch-boundary repair.",
+      "finding": "The sealed v4 offline reducer imports protocol_adapter_0974_v3, whose native command helper remains the immutable-v1 delegation path.",
+      "id": "offline-reducer-dependency",
+      "status": "custody-note"
+    },
+    {
+      "constraint": "Any future native batch requires a fresh plan and fresh exclusive output paths; this repair receipt does not authorize a retry.",
+      "finding": "The existing capture/output path is occupied by the failed prelaunch attempt.",
+      "id": "capture-reuse",
+      "status": "constraint"
+    }
+  ],
+  "production_bindings_verified_independently": {
+    "helper_seal_v5": {
+      "bytes": 4177,
+      "path": "/home/zhuhe/litchi-performance-0974/receipts/helper-seal-0974-v5.json",
+      "sha256": "4cc5ef36a28c6b254a580abd01b21792daef317b383ac5dc718ea544bb3668a3"
+    },
+    "plan_generator_v5": {
+      "bytes": 8470,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/prepare_plan_0974_v5.py",
+      "sha256": "eb5d0f42055b8917078602d1329b1aafdec3eef453370816aec102a9e0ef486e"
+    },
+    "plan_v5": {
+      "bytes": 19568,
+      "path": "/home/zhuhe/litchi-performance-0974/plans/plan-0974-pre-capture-v5.json",
+      "sha256": "dddd126895d04cd1738719d99aa00ff1b68dcd551233a5c2391f37f7c30e71ee"
+    },
+    "protocol_v5": {
+      "bytes": 35075,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/protocol_adapter_0974_v5.py",
+      "sha256": "e3725cbc027d2a063f32b926e3fb4024d640aab2a2fbd7493ed5325de9ea2ac6"
+    },
+    "reducer_v4": {
+      "bytes": 12565,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/reduce_0974_v4.py",
+      "sha256": "7c6e7162e406aecf13868b264da29f2d5b6e07f0212bed1099298a464bb9ade5"
+    },
+    "runner_v5": {
+      "bytes": 1841,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/run_0974_v5.py",
+      "sha256": "519a7b88cf6df7688d1b4555fbd3b2d682c2459bc6c070817308ba38031d4fe1"
+    }
+  },
+  "reviewer": "/root/cpu_review",
+  "schema": "litchi.performance.0974.independent_repair_review.v1",
+  "scope": {
+    "build_started": false,
+    "capture_admission": false,
+    "native_capture_started": false,
+    "native_workload_started": false,
+    "prior_prelaunch_failure_retained": true,
+    "reviewed": "v5 command-boundary repair and its offline sentinel regression",
+    "sealed_artifacts_mutated_by_reviewer": false
+  },
+  "sealed_v5_bindings": {
+    "helper_seal_v5": {
+      "bytes": 4177,
+      "path": "/home/zhuhe/litchi-performance-0974/receipts/helper-seal-0974-v5.json",
+      "sha256": "4cc5ef36a28c6b254a580abd01b21792daef317b383ac5dc718ea544bb3668a3"
+    },
+    "plan_generator_v5": {
+      "bytes": 8470,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/prepare_plan_0974_v5.py",
+      "sha256": "eb5d0f42055b8917078602d1329b1aafdec3eef453370816aec102a9e0ef486e"
+    },
+    "plan_v5": {
+      "bytes": 19568,
+      "path": "/home/zhuhe/litchi-performance-0974/plans/plan-0974-pre-capture-v5.json",
+      "sha256": "dddd126895d04cd1738719d99aa00ff1b68dcd551233a5c2391f37f7c30e71ee"
+    },
+    "protocol_v5": {
+      "bytes": 35075,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/protocol_adapter_0974_v5.py",
+      "sha256": "e3725cbc027d2a063f32b926e3fb4024d640aab2a2fbd7493ed5325de9ea2ac6"
+    },
+    "reducer_v4": {
+      "bytes": 12565,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/reduce_0974_v4.py",
+      "sha256": "7c6e7162e406aecf13868b264da29f2d5b6e07f0212bed1099298a464bb9ade5"
+    },
+    "runner_v5": {
+      "bytes": 1841,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/run_0974_v5.py",
+      "sha256": "519a7b88cf6df7688d1b4555fbd3b2d682c2459bc6c070817308ba38031d4fe1"
+    }
+  },
+  "status": "offline_repair_pass_not_capture_admission",
+  "supersession": {
+    "corrective_no_admission": {
+      "bytes": 5741,
+      "path": "/home/zhuhe/litchi-performance-0974/receipts/corrective-audit-0974-prelaunch-no-admission-v1.json",
+      "sha256": "078cfefe0694486d3b0100044b37c494862fa27d12e2a5d51636f5491e318ecd"
+    },
+    "historical_v3_boundary_failure": {
+      "bytes": 7044,
+      "path": "/home/zhuhe/litchi-performance-0974/receipts/launch-boundary-regression-0974-v1.json",
+      "sha256": "7e5da9d71647ee4b8cb3625e291da49a671ebb05330457d7acd551d896efdb78"
+    },
+    "historical_v4_pass": {
+      "bytes": 10344,
+      "path": "/home/zhuhe/litchi-performance-0974/receipts/independent-review-0974-v4.json",
+      "sha256": "86688588f55d80274b906f092d31b82c01e05f137ea86f536e7ac2b4c6fc0cca"
+    },
+    "interpretation": "The v4 PASS remains historical tooling evidence and is superseded for execution admission by the prelaunch corrective audit; the v5 repair pass is offline-only and does not admit capture."
+  }
+}
