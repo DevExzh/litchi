@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0017 | W0 rustdoc API glossary gate, scoped rules, six-type family checks and CI | complete; profiles for leaf migration waves pending |
 | 0016 | Rebase onto current base; adopt API glossary as ADR 0034; preserve shared fingerprint memo | kickoff; W0 checker and leaf migrations pending |
 | 0001 | Owner override: read + write for every claimed format; tiers OOXML → OLE → (RTF, ODF, iWork) | recorded in the goal (2026-10-04) |
 | 0002 | Leaf write-capability inventory (deep: OOXML + OLE; brief: tier 3) | merged (`cfe7681627`) |
@@ -159,3 +160,15 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
   are recorded for its owners; no iWork implementation changes here.
 - No performance, parity, all-format CRUD or milestone-completion claim is
   made by this kickoff. Verification and remaining gates are in record 0016.
+
+## 0017 — W0 glossary enforcement
+
+- Added the rustdoc public-API checker, explicit feature-profile policy, real
+  compiler fixtures and CI integration. W0 inspects `litchi-core` with empty
+  bans/families; pending API migrations are not claimed conformant.
+- Scoped bans cover public names, aliases/methods and public signature type
+  names. Registered transaction modules require all six canonical type names.
+- 19 tests and the current-tree W0 profile pass. Review findings and rustdoc
+  limitations are recorded in 0017; unresolved external globs fail closed.
+- Next: DOCX W2 migration with consumer updates and behavior gates. W1 iWork
+  ownership and the original all-format CRUD goal remain unchanged.

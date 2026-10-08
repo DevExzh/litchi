@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "profiles": [
+    {
+      "id": "core-minimal",
+      "package": "litchi-core",
+      "default_features": false,
+      "features": [],
+      "banned_names": [],
+      "families": []
+    }
+  ]
+}

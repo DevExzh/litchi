@@ -159,8 +159,8 @@ slide names — exact (Keynote semantics).
 
 - `tools/check_api_glossary.py` (W0): rustdoc JSON banned-name lint over
   public items + transaction-family six-piece shape check; generalizes the
-  `check_iwork_public_api.py` pattern workspace-wide. Each wave registers its
-  banned names; an unlisted old name in any public API fails CI.
+  `check_iwork_public_api.py` pattern workspace-wide. Each wave registers exact banned names and public path scopes in
+  `tools/api_glossary.json`; registered old names in that surface fail CI.
 - Waves: **W0** governance (ADR 0034, this table, checker skeleton) ·
   **W1** iWork renames · **W2** OOXML in docx → pptx → xlsx order ·
   **W3** ODF (package split, atomic save, limits coverage) · **W4** legacy
@@ -173,8 +173,72 @@ slide names — exact (Keynote semantics).
 
 ## 10. Adoption status (2026-10-08)
 
-W0 is started: the ADR and glossary are tracked. The rustdoc checker and CI
-integration are pending; this table is not yet machine-enforced. M0a and M0b
+W0 is complete: the ADR, glossary, rustdoc checker, real-rustdoc regression
+tests and CI entry are tracked. The `core-minimal` profile inspects the current
+`litchi-core` tree with no bans or registered families, as required for W0.
+This verifies the gate mechanism; it does not certify any pending rename or
+policy migration in the table above. M0a and M0b
 already landed, so the leaf waves adapt the existing facade in the same
 changes as leaf renames. iWork remains independently owned and must be
 coordinated through API requests. See [record 0016](unified-ops/0016-rebase-and-glossary-adoption.md).
+
+
+## 11. Registering and running a migration gate
+
+Run `python3 tools/check_api_glossary.py` to build and inspect every registered
+profile. By default it uses a temporary build directory outside the checkout
+and removes that directory on exit. Pass `--target-dir target/api-glossary`
+to keep a local/CI cache. Cargo may create the ordinary root lockfile if absent.
+The checker does not remove a caller's lockfile.
+
+`tools/api_glossary.json` has version 1 and an explicit `profiles` array. Each
+profile contains `id`, `package`, `default_features`, `features`,
+`banned_names`, and `families`. Feature combinations are separate profiles;
+results are checked immediately after each build, before the next profile
+can overwrite its rustdoc JSON. Register every feature surface affected by a
+migration in the same commit as the code and glossary status update.
+
+A banned-name rule contains `name`, a fully qualified `scope`, and a
+`replacement` explanation. For example, a future completed selector migration
+could ban `Id` within `litchi_core::selector::Selector`; that does not ban a
+format's semantic `glossary::Id`. Names and path segments match exactly, with
+no substring matching or implicit exceptions. A scope must exist in the
+exported surface or in the nominal defining paths of types reached through
+that surface; a misspelled or vanished scope fails rather than disabling a
+rule. Private siblings of those nominal types are not inspected. Methods are checked beneath
+their public owner paths, including type aliases and re-exports. Public fields,
+variants, trait members and `#[doc(hidden)]` APIs are included; private items,
+function argument names, documentation and generated blanket impl methods are
+not exported vocabulary. Nominal types reached through public signatures are
+also inspected, so a public alias cannot hide a banned nominal type.
+Dependency type names are attributed to the public signature that exposes
+them. Rustdoc sometimes omits opaque/generated types from both its index and
+path table; their use-site spelling is checked, but their unavailable members
+are not invented. Known-local paths with missing items and missing public
+child relations fail as malformed input.
+
+`families` lists fully qualified public module paths that have completed the
+shape migration. Each must expose types named `Edit`, `Patch`, `Commit`,
+`Diagnostics`, `Error` and `LimitKind` directly; nested or private names and
+functions with those names do not count. Re-exported modules and local globs
+are resolved. This six-name check does not prove commit signatures, immutable
+behavior, diagnostics contents, reversibility or strict default policies;
+those still need Rust and CRUD scenario tests. Unregistered families remain
+pending work, not implicitly conformant.
+
+An unresolved public glob (for example a dependency module whose children
+rustdoc omits) refuses the profile instead of claiming to have checked its
+contents. Such profiles need dependency export data support before activation.
+This is not an exemption for dependency APIs or a claim of whole-workspace
+coverage. The W0 profile has no such unresolved glob.
+
+For an already generated document, use
+`python3 tools/check_api_glossary.py --profile core-minimal --json /path/to/litchi_core.json`.
+This mode checks the document's crate identity but relies on the caller for
+feature/build provenance. Exit codes are 0 for a checked pass, 1 for vocabulary
+or family violations, and 2 for invalid policy/input or a failed build.
+
+Regression tests: `python3 -m unittest tools.test_check_api_glossary`.
+They compile a small temporary Rust library with the installed rustdoc; no
+compiled fixture or rustdoc JSON is committed. CI runs the tests and checker
+in the Rust-toolchain job. See [record 0017](unified-ops/0017-glossary-gate.md).

@@ -22,6 +22,7 @@ on:
       - 'crates/**/docs/**'
       - 'docs/FEATURE_MATRIX.md'
       - 'docs/OFFICE_API_GUIDE.md'
+      - 'docs/API_GLOSSARY.md'
       - 'docs/adr/**'
       - 'test-data/libreoffice-core/**'
       - 'test-data/odf/**'
@@ -65,6 +66,7 @@ on:
       - 'crates/**/docs/**'
       - 'docs/FEATURE_MATRIX.md'
       - 'docs/OFFICE_API_GUIDE.md'
+      - 'docs/API_GLOSSARY.md'
       - 'docs/adr/**'
       - 'test-data/libreoffice-core/**'
       - 'test-data/odf/**'
@@ -275,6 +277,12 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-sort
+
+      - name: Test API glossary gate against real rustdoc graphs
+        run: python3 -m unittest tools.test_check_api_glossary
+
+      - name: Check registered API glossary waves
+        run: python3 tools/check_api_glossary.py --target-dir target/api-glossary
 
       - name: Check formatting
         run: cargo fmt --all -- --check
