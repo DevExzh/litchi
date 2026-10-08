@@ -1,0 +1,48 @@
+{
+  "path": "/slide[1]",
+  "type": "slide",
+  "preview": "Q4 Report",
+  "childCount": 2,
+  "format": {
+    "layout": "Title Slide"
+  },
+  "children": [
+    {
+      "path": "/slide[1]/shape[@id=2]",
+      "type": "title",
+      "text": "Q4 Report",
+      "preview": "Q4 Report",
+      "childCount": 1,
+      "format": {
+        "name": "Title 1",
+        "id": 2,
+        "isTitle": true,
+        "x": "2cm",
+        "y": "1.5cm",
+        "width": "29.87cm",
+        "height": "3.18cm"
+      },
+      "children": []
+    },
+    {
+      "path": "/slide[1]/shape[@id=3]",
+      "type": "textbox",
+      "text": "Revenue grew 25%",
+      "preview": "Revenue grew 25%",
+      "childCount": 1,
+      "format": {
+        "name": "TextBox 2",
+        "alt": "Revenue callout",
+        "id": 3,
+        "isTitle": false,
+        "x": "2cm",
+        "y": "5cm",
+        "width": "300pt",
+        "height": "2.54cm",
+        "fill": "accent1+lumMod75+lumOff25",
+        "rotation": 15.5
+      },
+      "children": []
+    }
+  ]
+}

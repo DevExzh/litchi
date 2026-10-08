@@ -501,3 +501,23 @@ Public transactions retain the existing `commit().into_package()` and immutable
 bound for property plans and generated markup. Managed formatting operations
 currently refuse; caller-selected semantic limits and managed retention remain
 required before the primary transaction family can be registered complete.
+
+
+## 28. Unified node and value primitives (record 0047)
+
+`node::{Node, View, ViewOptions, NodePath, PathStep}` provide borrowed generic
+projection and typed paths. Numeric navigation uses `Position`; native identity
+construction is explicit in `node::raw::{Ident, identity_step}`. There is no
+ordinary native identity constructor. Test-support fixtures may exercise raw
+paths; production property registries must not advertise native identity fields.
+
+`value::{Length, Color, ValueType, Scalar, Test}` share coercion and canonical
+rendering between future registry writes and query compilation. `WordSpacing`
+reads bare unsigned twips and rounds unit conversions at the twip boundary.
+Diagnostics and Debug omit authored values; explicit rendering/serialization
+produces content. Excessive view depth and non-finite JSON values are refused.
+
+These are format-independent prerequisites, exercised through test-only fake
+nodes. Concrete format node payloads remain uninhabited; File query, registry
+and write dispatch are not implemented by this record. Grouped Word spacing
+input and long grouped-number allocation remain documented follow-up work.

@@ -1,0 +1,46 @@
+{
+  "path": "/body/p[@paraId=1A2B3C4D]",
+  "type": "paragraph",
+  "text": "Quarterly report: revenue grew 25% year over year, led by the APAC region.",
+  "preview": "Quarterly report: revenue grew 25% year over year,...",
+  "style": "Heading1",
+  "childCount": 2,
+  "format": {
+    "paraId": "1A2B3C4D",
+    "style": "Heading1",
+    "styleId": "Heading1",
+    "align": "center",
+    "spaceBefore": "12pt",
+    "keepNext": true,
+    "numId": "3",
+    "numLevel": "0",
+    "outlineLvl": 0
+  },
+  "children": [
+    {
+      "path": "/body/p[@paraId=1A2B3C4D]/r[1]",
+      "type": "run",
+      "text": "Quarterly report: ",
+      "childCount": 0,
+      "format": {
+        "font.latin": "Calibri",
+        "size": "14pt",
+        "bold": true,
+        "color": "#1F4E79"
+      },
+      "children": []
+    },
+    {
+      "path": "/body/p[@paraId=1A2B3C4D]/r[2]",
+      "type": "run",
+      "text": "revenue grew 25% year over year, led by the APAC region.",
+      "childCount": 0,
+      "format": {
+        "size": "10.5pt",
+        "italic": false,
+        "underline": "single"
+      },
+      "children": []
+    }
+  ]
+}

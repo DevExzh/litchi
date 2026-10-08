@@ -1,0 +1,28 @@
+[package]
+name = "litchi-ops-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+litchi-ops = { path = "..", default-features = false }
+
+[[bin]]
+name = "values"
+path = "fuzz_targets/values.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "smoke_values"
+path = "fuzz_targets/smoke_values.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]

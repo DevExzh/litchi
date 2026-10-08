@@ -1,0 +1,39 @@
+[
+  {
+    "path": "/Sheet1/B2",
+    "type": "cell",
+    "text": "6",
+    "preview": "B2",
+    "childCount": 0,
+    "format": {
+      "type": "Number",
+      "formula": "SUM(A1:A3)",
+      "cachedValue": "6",
+      "evaluated": true,
+      "font.size": "11pt",
+      "font.color": "accent1"
+    },
+    "children": []
+  },
+  {
+    "path": "/Sheet1/A1",
+    "type": "cell",
+    "text": "Région",
+    "preview": "A1",
+    "childCount": 0,
+    "format": {
+      "type": "SharedString",
+      "font.color": "#FF000080"
+    },
+    "children": []
+  },
+  {
+    "path": "/Sheet1/Z99",
+    "type": "cell",
+    "text": "(empty)",
+    "preview": "Z99",
+    "childCount": 0,
+    "format": {},
+    "children": []
+  }
+]

@@ -80,7 +80,9 @@
 //! ([`DocumentView`], [`PresentationView`], [`WorkbookView`]), the
 //! [`ToleranceReport`], Markdown output, and [`detect`]. The element
 //! wrappers in [`compat`] are scheduled for deletion in M1, when the node
-//! view replaces them. Edit verbs, the property registry, batches and saving
+//! view replaces them. The generic [`node`] projection and [`value`] coercion
+//! primitives are now available; concrete node adapters and File query/read
+//! entry points remain pending. Edit verbs, the property registry, batches and saving
 //! arrive in later milestones.
 
 #![forbid(unsafe_code)]
@@ -95,7 +97,7 @@ mod handler;
 mod locked;
 #[cfg(feature = "markdown")]
 mod markdown;
-mod node;
+pub mod node;
 #[cfg(any(
     feature = "doc",
     feature = "docx",
@@ -118,6 +120,7 @@ mod path;
 mod registry;
 mod signed;
 mod tolerance;
+pub mod value;
 mod view;
 
 #[cfg(test)]

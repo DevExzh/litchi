@@ -550,3 +550,15 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 - Corpus, owner publication, inverse and policy tests are recorded in 0046.
   This advances the DOCX write kernel; the property registry, managed formatting,
   caller semantic limits, performance acceptance and all-format goal remain open.
+
+
+## 0047 — node projection and shared value coercion cores
+
+- Added borrowed node views, typed paths, static property specifications and
+  streaming JSON projection, with one shared length/color coercion model.
+- Adapted earlier source-only candidates to explicit raw identity construction,
+  content-free diagnostics, strict depth/non-finite refusal and Word twips.
+- Added golden, allocation, minimal-feature and bounded parser fuzz checks;
+  record 0047 lists validation and explicit parity/allocation limitations.
+- Format adapters remain placeholders. Registry dispatch, File query/write APIs,
+  M1/M2 integration and the complete all-format goal remain active.
