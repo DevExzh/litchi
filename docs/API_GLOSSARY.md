@@ -321,3 +321,13 @@ archive identity and original bytes remain separate publication authority.
 This enables per-part chaining without archive materialization. It does not
 supply package-wide effective catalog revisions or migrate source DOCX commits;
 no complete transaction family is registered by this step.
+
+## 18. Retained effective XML application (record 0025)
+
+`PreparedTopology::edit_xml(&self, partname, callback)` returns another retained
+candidate. Its checked transaction reads the effective source XML and preserves
+previous topology changes. The resulting state is flat against the original
+archive, with no parent-candidate chain. This is a low-level publication
+primitive, not a registered six-type transaction family. General topology
+application, added/authored XML provenance and canonical source DOCX owner
+integration remain required.

@@ -1019,3 +1019,296 @@ fn revision_holder_refuses_exhausted_memory_and_cancelled_contexts() {
     drop(package);
     assert_eq!(budget.used(Resource::Memory), 0);
 }
+
+fn append_candidate(
+    candidate: &litchi_opc::PreparedTopology,
+    text: &[u8],
+) -> litchi_opc::PreparedTopology {
+    candidate
+        .edit_xml(&document_uri(), |source, edit| {
+            let at = insertion_range(source.bytes());
+            edit.replace(
+                source.checked_range(at..at, b"")?,
+                AuthoredXmlFragment::markup(text.to_vec())?,
+            )
+        })
+        .unwrap()
+}
+
+fn candidate_xml(candidate: &litchi_opc::PreparedTopology) -> Vec<u8> {
+    candidate
+        .with_candidate(|view| Ok(view.part(&document_uri())?.data()?.as_bytes().to_vec()))
+        .unwrap()
+}
+
+#[test]
+fn retained_candidates_chain_fork_and_restore_the_original_archive() {
+    let package = open(FORMATTED_DOCUMENT);
+    let root = package
+        .clone()
+        .prepare_topology(SourceTopologyPlan::new())
+        .unwrap();
+    let first = append_candidate(&root, b"<first/>");
+    let second = append_candidate(&first, b"<second/>");
+    let sibling = append_candidate(&first, b"<sibling/>");
+    drop(package);
+    assert!(
+        !candidate_xml(&first)
+            .windows(9)
+            .any(|bytes| bytes == b"<second/>")
+    );
+    assert!(
+        candidate_xml(&second)
+            .windows(9)
+            .any(|bytes| bytes == b"<second/>")
+    );
+    assert!(
+        !candidate_xml(&sibling)
+            .windows(9)
+            .any(|bytes| bytes == b"<second/>")
+    );
+    let noop = second.edit_xml(&document_uri(), |_, _| Ok(())).unwrap();
+    assert_eq!(candidate_xml(&noop), candidate_xml(&second));
+    let restored = second
+        .edit_xml(&document_uri(), |source, edit| {
+            let start = insertion_range(FORMATTED_DOCUMENT);
+            edit.replace(
+                source.checked_range(start..start + 17, b"<first/><second/>")?,
+                AuthoredXmlFragment::empty(),
+            )
+        })
+        .unwrap();
+    let mut bytes = Vec::new();
+    restored.publish_to_stream(&mut bytes).unwrap();
+    assert_eq!(bytes, archive_bytes(FORMATTED_DOCUMENT));
+    let mut bytes = Vec::new();
+    second.publish_to_stream(&mut bytes).unwrap();
+    let reopened = SourceBackedPackage::from_vec(bytes).unwrap();
+    assert_eq!(
+        reopened
+            .part(&document_uri())
+            .unwrap()
+            .data()
+            .unwrap()
+            .as_bytes(),
+        candidate_xml(&second)
+    );
+}
+
+#[test]
+fn retained_xml_edits_preserve_added_removed_and_relationship_topology() {
+    let package =
+        SourceBackedPackage::from_vec(archive_bytes_with_sibling(FORMATTED_DOCUMENT, b"<styles/>"))
+            .unwrap();
+    let mut plan = SourceTopologyPlan::new();
+    plan.try_remove_part(PackURI::new("/word/styles.xml").unwrap())
+        .unwrap();
+    let addition = PackURI::new("/word/extra.xml").unwrap();
+    plan.try_add_part(addition.clone(), "application/xml", b"<extra/>".to_vec())
+        .unwrap();
+    plan.try_add_internal_relationship(document_uri(), "rExtra", "urn:extra", addition.clone())
+        .unwrap();
+    let root = package.prepare_topology(plan).unwrap();
+    let first = append_candidate(&root, b"<first/>");
+    let second = append_candidate(&first, b"<second/>");
+    drop(root);
+    drop(first);
+    second
+        .with_candidate(|view| {
+            assert!(
+                view.part(&PackURI::new("/word/styles.xml").unwrap())
+                    .is_err()
+            );
+            assert_eq!(view.part(&addition)?.data()?.as_bytes(), b"<extra/>");
+            assert!(
+                view.part(&document_uri())?
+                    .relationships()
+                    .get("rExtra")
+                    .is_some()
+            );
+            Ok(())
+        })
+        .unwrap();
+    assert!(second.edit_xml(&addition, |_, _| Ok(())).is_err());
+    let mut bytes = Vec::new();
+    second.publish_to_stream(&mut bytes).unwrap();
+    let reopened = SourceBackedPackage::from_vec(bytes).unwrap();
+    assert!(
+        reopened
+            .part(&PackURI::new("/word/styles.xml").unwrap())
+            .is_err()
+    );
+    assert_eq!(
+        reopened.part(&addition).unwrap().data().unwrap().as_bytes(),
+        b"<extra/>"
+    );
+}
+
+#[test]
+fn retained_xml_edits_refuse_swapped_transactions_and_roll_back_failed_callbacks() {
+    let root = open(FORMATTED_DOCUMENT)
+        .prepare_topology(SourceTopologyPlan::new())
+        .unwrap();
+    let first = append_candidate(&root, b"<first/>");
+    let before = candidate_xml(&first);
+    let foreign = open(FORMATTED_DOCUMENT)
+        .part(&document_uri())
+        .unwrap()
+        .source_xml()
+        .unwrap()
+        .begin_revision()
+        .unwrap();
+    assert!(
+        first
+            .edit_xml(&document_uri(), |_, edit| {
+                *edit = foreign.into_publication()?;
+                Ok(())
+            })
+            .is_err()
+    );
+    assert!(
+        first
+            .edit_xml(&document_uri(), |source, edit| {
+                let at = insertion_range(source.bytes());
+                edit.replace(
+                    source.checked_range(at..at, b"")?,
+                    AuthoredXmlFragment::markup(b"<rolledBack/>".to_vec())?,
+                )?;
+                Err(OpcError::PartNotFound("intentional failure".to_owned()))
+            })
+            .is_err()
+    );
+    assert_eq!(candidate_xml(&first), before);
+}
+
+#[test]
+fn managed_retained_candidates_release_intermediate_revisions() {
+    let (budget, _, context) = managed_context(4 * 1024 * 1024);
+    let package = SourceBackedPackage::from_read_at_with_execution_context(
+        Arc::new(OwnedSource::new(archive_bytes(FORMATTED_DOCUMENT))),
+        ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    let mut current = package.prepare_topology(SourceTopologyPlan::new()).unwrap();
+    let mut stable = None;
+    for iteration in 0..32 {
+        current = current
+            .edit_xml(&document_uri(), |source, edit| {
+                let range = before_range(FORMATTED_DOCUMENT);
+                let replacement = if iteration % 2 == 0 {
+                    b"<before attr=\"two\"/>"
+                } else {
+                    b"<before attr=\"six\"/>"
+                };
+                edit.replace(
+                    source.checked_range(range.clone(), &source.bytes()[range])?,
+                    AuthoredXmlFragment::markup(replacement.to_vec())?,
+                )
+            })
+            .unwrap();
+        if iteration > 1 {
+            assert_eq!(
+                *stable.get_or_insert(budget.used(Resource::Memory)),
+                budget.used(Resource::Memory)
+            );
+        }
+    }
+    let clone = current.clone();
+    drop(current);
+    assert!(budget.used(Resource::Memory) > 0);
+    drop(clone);
+    assert_eq!(budget.used(Resource::Memory), 0);
+    assert_eq!(budget.used(Resource::Objects), 0);
+}
+
+#[test]
+fn retained_xml_revisions_enforce_aggregate_limits_and_memory_admission() {
+    let limit = FORMATTED_DOCUMENT.len() as u64 + b"<first/>".len() as u64;
+    let limits = ReadLimits::builder()
+        .max_total_part_bytes(limit)
+        .unwrap()
+        .build()
+        .unwrap();
+    let package =
+        SourceBackedPackage::from_vec_with_limits(archive_bytes(FORMATTED_DOCUMENT), limits)
+            .unwrap();
+    let root = package.prepare_topology(SourceTopologyPlan::new()).unwrap();
+    let first = append_candidate(&root, b"<first/>");
+    assert!(matches!(
+        first.edit_xml(&document_uri(), |source, edit| {
+            let at = insertion_range(source.bytes());
+            edit.replace(
+                source.checked_range(at..at, b"")?,
+                AuthoredXmlFragment::markup(b"<second/>".to_vec())?,
+            )
+        }),
+        Err(OpcError::ReadLimit {
+            resource: ReadResource::TotalPartBytes,
+            ..
+        })
+    ));
+    assert_eq!(candidate_xml(&first).len() as u64, limit);
+
+    let memory = 4 * 1024 * 1024;
+    let (budget, cancel, context) = managed_context(memory);
+    let package = SourceBackedPackage::from_read_at_with_execution_context(
+        Arc::new(OwnedSource::new(archive_bytes(FORMATTED_DOCUMENT))),
+        ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    let first = append_candidate(
+        &package.prepare_topology(SourceTopologyPlan::new()).unwrap(),
+        b"<first/>",
+    );
+    let before = candidate_xml(&first);
+    let held = budget
+        .reserve(Resource::Memory, memory - budget.used(Resource::Memory))
+        .unwrap();
+    assert!(matches!(
+        first.edit_xml(&document_uri(), |_, _| Ok(())),
+        Err(OpcError::Execution(
+            litchi_core::ExecutionError::ResourceLimit(_)
+        ))
+    ));
+    drop(held);
+    assert_eq!(candidate_xml(&first), before);
+    cancel.cancel();
+    assert!(first.edit_xml(&document_uri(), |_, _| Ok(())).is_err());
+    drop(first);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn retained_xml_revisions_enforce_effective_archive_byte_limits() {
+    let bytes = archive_bytes(FORMATTED_DOCUMENT);
+    let archive = litchi_opc::phys_pkg::PhysPkgReader::new(&bytes).unwrap();
+    let total: u64 = archive
+        .member_names()
+        .unwrap()
+        .iter()
+        .map(|name| archive.read_member(name).unwrap().len() as u64)
+        .sum();
+    let limits = ReadLimits::builder()
+        .max_archive_total_bytes(total + 8)
+        .unwrap()
+        .build()
+        .unwrap();
+    let package = SourceBackedPackage::from_vec_with_limits(bytes, limits).unwrap();
+    let root = package.prepare_topology(SourceTopologyPlan::new()).unwrap();
+    let first = append_candidate(&root, b"<first/>");
+    assert!(matches!(
+        first.edit_xml(&document_uri(), |source, edit| {
+            let at = insertion_range(source.bytes());
+            edit.replace(
+                source.checked_range(at..at, b"")?,
+                AuthoredXmlFragment::markup(b"<second/>".to_vec())?,
+            )
+        }),
+        Err(OpcError::ReadLimit {
+            resource: ReadResource::ArchiveTotalBytes,
+            ..
+        })
+    ));
+}

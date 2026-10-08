@@ -48,6 +48,7 @@ use std::sync::{Arc, Condvar, Mutex, OnceLock};
 use std::time::Duration;
 
 mod artifact_restore;
+mod revision;
 pub use artifact_restore::SourceArtifactRestoreProof;
 mod read_ahead;
 use read_ahead::{ArchiveReadAhead, StructuralPrefetch};
@@ -2600,12 +2601,13 @@ struct PhysicalMemberLookup {
     by_folded_name: HashMap<String, PhysicalMemberInfo>,
 }
 
+#[derive(Clone)]
 struct ChangedOverlay {
     target: ChangedOverlayTarget,
     replacement: ChangedOverlayPayload,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum ChangedOverlayPayload {
     Shared(Arc<Vec<u8>>),
     Owned(Vec<u8>),
@@ -2624,6 +2626,7 @@ impl ChangedOverlayPayload {
     }
 }
 
+#[derive(Clone)]
 enum ChangedOverlayTarget {
     Part(usize),
     Member(String),
@@ -2667,10 +2670,25 @@ pub struct PreparedTopology {
 // overlay and reservation stays alive until the candidate callback finishes.
 struct PreparedTopologyState {
     changed: Vec<ChangedOverlay>,
+    retained: Option<Arc<PreparedTopologyRetention>>,
+    effective: Option<EffectiveTopologyData>,
+    totals: Option<PreparedTopologyTotals>,
+    _catalog_reservation: Option<Arc<Reservation>>,
+    no_op: bool,
+}
+
+#[derive(Clone, Copy)]
+struct PreparedTopologyTotals {
+    parts: u64,
+    archive: u64,
+    output_bound: u64,
+}
+
+struct PreparedTopologyRetention {
+    _metadata_reservation: Option<Arc<Reservation>>,
     omitted_members: Vec<String>,
     appended: Vec<Arc<soapberry_zip::RegeneratedEntry>>,
     _additions: Vec<TopologyPartAddition>,
-    _source_xml_tokens: Vec<SourceXmlPart>,
     transfer_sources: Option<Arc<Vec<SourceSnapshot>>>,
     /// One monitored-read scope per transfer source (change 0600's counted
     /// scopes). They live exactly as long as the prepared state, so every read
@@ -2681,27 +2699,28 @@ struct PreparedTopologyState {
     _relationship_memory_reservations: Vec<Arc<Reservation>>,
     _content_type_memory_reservations: Vec<Arc<Reservation>>,
     _effective_memory_reservations: Vec<Arc<Reservation>>,
-    effective: Option<EffectiveTopologyData>,
-    no_op: bool,
 }
 
 struct EffectiveTopologyData {
-    package_relationships: Option<Relationships>,
-    parts: Vec<PreparedPart>,
+    package_relationships: Option<Arc<Relationships>>,
+    parts: Vec<Arc<PreparedPart>>,
     // The source catalog already carries the validated content type for every
     // retained Part.  Keep the parsed manifest only when additions/removals
     // can change the effective mapping; replacement-only and relationship-only
     // candidates resolve retained Parts through that source catalog lazily.
-    content_types: Option<ContentTypeMap>,
-    added_member_names: Vec<String>,
+    content_types: Option<Arc<ContentTypeMap>>,
+    added_member_names: Arc<Vec<String>>,
 }
 
+#[derive(Clone)]
 struct PreparedPart {
     source_index: Option<usize>,
     partname: Option<PackURI>,
     content_type: Option<ContentType>,
     replacement: Option<Arc<Vec<u8>>>,
-    relationships: Option<Relationships>,
+    relationships: Option<Arc<Relationships>>,
+    source_xml: Option<SourceXmlPart>,
+    _metadata_reservation: Option<Arc<Reservation>>,
 }
 
 impl PreparedPart {
@@ -2732,7 +2751,7 @@ impl PreparedPart {
         package: &'prepared SourceBackedPackage,
     ) -> &'prepared Relationships {
         self.relationships
-            .as_ref()
+            .as_deref()
             .or_else(|| {
                 self.source_index
                     .and_then(|index| package.catalog.parts.get(index))
@@ -2825,14 +2844,20 @@ impl PreparedTopology {
             self.package.clone(),
             writer,
             &self.state.changed,
-            &self.state.omitted_members,
-            &self.state.appended,
-            self.state.transfer_sources.clone(),
+            &self.state.retained().omitted_members,
+            &self.state.retained().appended,
+            self.state.retained().transfer_sources.clone(),
         )
     }
 }
 
 impl PreparedTopologyState {
+    fn retained(&self) -> &PreparedTopologyRetention {
+        self.retained
+            .as_deref()
+            .expect("changed topology has retained metadata")
+    }
+
     fn effective_data(&self) -> &EffectiveTopologyData {
         self.effective
             .as_ref()
@@ -2842,7 +2867,11 @@ impl PreparedTopologyState {
     fn check_readback_sources(&self, package: &SourceBackedPackage) -> Result<()> {
         package.source.ensure_current()?;
         package.cache.check_context().map_err(map_execution_error)?;
-        if let Some(sources) = &self.transfer_sources {
+        if let Some(sources) = self
+            .retained
+            .as_ref()
+            .and_then(|retained| retained.transfer_sources.as_ref())
+        {
             for source in sources.iter() {
                 source.ensure_current()?;
                 if let Some(context) = &source.context {
@@ -2943,7 +2972,7 @@ impl<'prepared> EffectiveTopology<'prepared> {
         self.prepared
             .effective_data()
             .package_relationships
-            .as_ref()
+            .as_deref()
             .unwrap_or(&self.package.catalog.package_relationships)
     }
 
@@ -3038,6 +3067,7 @@ impl<'prepared> EffectiveTopology<'prepared> {
         }
         if self
             .prepared
+            .retained()
             .omitted_members
             .iter()
             .any(|name| name.eq_ignore_ascii_case(member_name))
@@ -8350,16 +8380,10 @@ impl SourceBackedPackage {
             self.cache.check_context().map_err(map_execution_error)?;
             return Ok(PreparedTopologyState {
                 changed: Vec::new(),
-                omitted_members: Vec::new(),
-                appended: Vec::new(),
-                _additions: Vec::new(),
-                _source_xml_tokens: Vec::new(),
-                transfer_sources: None,
-                _transfer_monitors: Vec::new(),
-                _relationship_memory_reservations: Vec::new(),
-                _content_type_memory_reservations: Vec::new(),
-                _effective_memory_reservations: Vec::new(),
+                retained: None,
                 effective: None,
+                totals: None,
+                _catalog_reservation: None,
                 no_op: true,
             });
         }
@@ -9717,7 +9741,7 @@ impl SourceBackedPackage {
             } else {
                 None
             };
-        self.validate_topology_limits(
+        let totals = self.validate_topology_limits(
             &pending_replacements,
             &pending_removals,
             &additions,
@@ -9894,16 +9918,10 @@ impl SourceBackedPackage {
         {
             return Ok(PreparedTopologyState {
                 changed: Vec::new(),
-                omitted_members: Vec::new(),
-                appended: Vec::new(),
-                _additions: Vec::new(),
-                _source_xml_tokens: Vec::new(),
-                transfer_sources: None,
-                _transfer_monitors: Vec::new(),
-                _relationship_memory_reservations: Vec::new(),
-                _content_type_memory_reservations: Vec::new(),
-                _effective_memory_reservations: Vec::new(),
+                retained: None,
                 effective: None,
+                totals: None,
+                _catalog_reservation: None,
                 no_op: true,
             });
         }
@@ -9956,7 +9974,11 @@ impl SourceBackedPackage {
                 .ok_or_else(|| overlay_unavailable("effective member-name bound overflows"))?;
         }
         let effective_slots = effective_part_count
-            .checked_mul(size_of::<PreparedPart>())
+            .checked_mul(
+                size_of::<PreparedPart>()
+                    + size_of::<Relationships>()
+                    + 2 * size_of::<[usize; 2]>(),
+            )
             .and_then(|bytes| {
                 bytes.checked_add(additions.len().checked_mul(size_of::<Relationships>())?)
             })
@@ -9973,7 +9995,17 @@ impl SourceBackedPackage {
                         )?,
                 )
             })
-            .and_then(|bytes| bytes.checked_add(size_of::<EffectiveTopologyData>()))
+            .and_then(|bytes| {
+                bytes.checked_add(
+                    size_of::<EffectiveTopologyData>()
+                        + size_of::<ContentTypeMap>()
+                        + size_of::<Relationships>()
+                        + size_of::<PreparedTopologyRetention>()
+                        + 5 * size_of::<[usize; 2]>()
+                        + size_of::<Vec<SourceSnapshot>>()
+                        + size_of::<Vec<String>>(),
+                )
+            })
             .ok_or_else(|| overlay_unavailable("effective catalog metadata bound overflows"))?;
         let effective_memory_bound =
             effective_slots
@@ -9995,6 +10027,31 @@ impl SourceBackedPackage {
         {
             effective_memory_reservations.push(reservation);
         }
+        // Catalog slots are local to this candidate; shared Part objects and
+        // graphs have separate retained admissions. A child must not pin an
+        // obsolete parent's catalog-vector reservation.
+        let catalog_memory = effective_part_count
+            .checked_mul(size_of::<Arc<PreparedPart>>())
+            .and_then(|n| {
+                changed
+                    .capacity()
+                    .checked_mul(size_of::<ChangedOverlay>())
+                    .and_then(|slots| n.checked_add(slots))
+            })
+            .ok_or_else(|| overlay_unavailable("candidate catalog slot bound overflows"))?;
+        let catalog_memory = changed.iter().try_fold(catalog_memory, |bytes, overlay| {
+            let name = match &overlay.target {
+                ChangedOverlayTarget::Member(name) => name.capacity(),
+                _ => 0,
+            };
+            bytes
+                .checked_add(name)
+                .ok_or_else(|| overlay_unavailable("candidate member-name bound overflows"))
+        })?;
+        let catalog_reservation = self.reserve_topology_memory(
+            u64::try_from(catalog_memory)
+                .map_err(|_| overlay_unavailable("candidate catalog slot bound exceeds u64"))?,
+        )?;
         let mut effective_parts = Vec::new();
         effective_parts
             .try_reserve_exact(effective_part_count)
@@ -10012,25 +10069,33 @@ impl SourceBackedPackage {
                     Arc::clone(&pending_replacements[*replacement_index].replacement)
                 });
             let relationships = relationship_overrides.remove(&part.partname);
-            effective_parts.push(PreparedPart {
+            effective_parts.push(Arc::new(PreparedPart {
                 source_index: Some(index),
                 partname: None,
                 content_type: None,
                 replacement,
-                relationships,
-            });
+                relationships: relationships.map(Arc::new),
+                source_xml: pending_replacement_indices
+                    .get(&index)
+                    .and_then(|replacement_index| {
+                        pending_replacements[*replacement_index].source_xml.clone()
+                    }),
+                _metadata_reservation: None,
+            }));
         }
         for addition in &additions {
             let relationships = relationship_overrides
                 .remove(&addition.partname)
                 .unwrap_or_else(|| Relationships::for_source(&addition.partname));
-            effective_parts.push(PreparedPart {
+            effective_parts.push(Arc::new(PreparedPart {
                 source_index: None,
                 partname: Some(addition.partname.clone()),
                 content_type: Some(addition.content_type.clone()),
                 replacement: Some(addition.payload.effective_bytes_arc()),
-                relationships: Some(relationships),
-            });
+                relationships: Some(Arc::new(relationships)),
+                source_xml: None,
+                _metadata_reservation: None,
+            }));
         }
         if !relationship_overrides.is_empty() {
             return Err(overlay_unavailable(
@@ -10063,10 +10128,10 @@ impl SourceBackedPackage {
                 .map(|publication| publication.member_name.clone()),
         );
         let effective = EffectiveTopologyData {
-            package_relationships: effective_package_relationships,
+            package_relationships: effective_package_relationships.map(Arc::new),
             parts: effective_parts,
-            content_types: effective_content_types,
-            added_member_names,
+            content_types: effective_content_types.map(Arc::new),
+            added_member_names: Arc::new(added_member_names),
         };
 
         // Added members are deterministic: Parts first, then relationship
@@ -10201,18 +10266,79 @@ impl SourceBackedPackage {
         } else {
             Some(Arc::new(transfer_sources))
         };
+        // These vectors move into shared retention. Admit their backing
+        // allocations separately from the candidate-local catalog/overlays.
+        let mut retention_bytes = 0usize;
+        for (count, slot) in [
+            (additions.capacity(), size_of::<TopologyPartAddition>()),
+            (omitted_members.capacity(), size_of::<String>()),
+            (
+                appended.capacity(),
+                size_of::<Arc<soapberry_zip::RegeneratedEntry>>(),
+            ),
+            (
+                transfer_sources
+                    .as_ref()
+                    .map_or(0, |sources| sources.capacity()),
+                size_of::<SourceSnapshot>(),
+            ),
+            (
+                monitored_transfer_sources.capacity(),
+                size_of::<MonitoredReads>(),
+            ),
+            (
+                topology_relationship_memory_reservations.capacity(),
+                size_of::<Arc<Reservation>>(),
+            ),
+            (
+                content_type_memory_reservations.capacity(),
+                size_of::<Arc<Reservation>>(),
+            ),
+            (
+                effective_memory_reservations.capacity(),
+                size_of::<Arc<Reservation>>(),
+            ),
+        ] {
+            retention_bytes = count
+                .checked_mul(slot)
+                .and_then(|bytes| retention_bytes.checked_add(bytes))
+                .ok_or_else(|| overlay_unavailable("retained topology metadata bound overflows"))?;
+        }
+        for name in &omitted_members {
+            retention_bytes = retention_bytes
+                .checked_add(name.capacity())
+                .ok_or_else(|| overlay_unavailable("retained omission name bound overflows"))?;
+        }
+        for addition in &additions {
+            retention_bytes = addition
+                .partname
+                .as_str()
+                .len()
+                .checked_add(addition.content_type.as_str().len())
+                .and_then(|bytes| bytes.checked_mul(2))
+                .and_then(|bytes| retention_bytes.checked_add(bytes))
+                .ok_or_else(|| overlay_unavailable("retained addition name bound overflows"))?;
+        }
+        let retention_reservation = self.reserve_topology_memory(
+            u64::try_from(retention_bytes)
+                .map_err(|_| overlay_unavailable("retained topology metadata exceeds u64"))?,
+        )?;
         Ok(PreparedTopologyState {
             changed,
-            omitted_members,
-            appended,
-            _additions: additions,
-            _source_xml_tokens: source_xml_tokens,
-            transfer_sources,
-            _transfer_monitors: monitored_transfer_sources,
-            _relationship_memory_reservations: topology_relationship_memory_reservations,
-            _content_type_memory_reservations: content_type_memory_reservations,
-            _effective_memory_reservations: effective_memory_reservations,
+            retained: Some(Arc::new(PreparedTopologyRetention {
+                _metadata_reservation: retention_reservation,
+                omitted_members,
+                appended,
+                _additions: additions,
+                transfer_sources,
+                _transfer_monitors: monitored_transfer_sources,
+                _relationship_memory_reservations: topology_relationship_memory_reservations,
+                _content_type_memory_reservations: content_type_memory_reservations,
+                _effective_memory_reservations: effective_memory_reservations,
+            })),
             effective: Some(effective),
+            totals: Some(totals),
+            _catalog_reservation: catalog_reservation,
             no_op: false,
         })
     }
@@ -11320,7 +11446,7 @@ impl SourceBackedPackage {
         additions: &[TopologyPartAddition],
         relationship_publications: &[P],
         content_types_replacement: Option<ContentTypesPublicationSummary>,
-    ) -> Result<()> {
+    ) -> Result<PreparedTopologyTotals> {
         let mut part_total = 0_u64;
         let mut archive_total = 0_u64;
         let mut relationship_total = 0_u64;
@@ -11723,8 +11849,11 @@ impl SourceBackedPackage {
         }
         // The ZIP writer promotes the output format when ZIP64 is required;
         // retain this checked bound solely as an overflow guard.
-        let _ = output_bound;
-        Ok(())
+        Ok(PreparedTopologyTotals {
+            parts: part_total,
+            archive: archive_total,
+            output_bound,
+        })
     }
 
     fn validate_topology_relationship_graph_nodes(

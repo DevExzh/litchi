@@ -1754,6 +1754,16 @@ fn retained_preparation_rechecks_a_transfer_source_on_every_publication() {
     plan.try_add_precompressed_part(pack("/custom/transferred.xml"), "application/xml", token)
         .unwrap();
     let prepared = package.prepare_topology(plan).unwrap();
+    let next = prepared
+        .edit_xml(&pack(DOCUMENT), |xml, edit| {
+            edit.replace(
+                xml.checked_range(0..xml.bytes().len(), xml.bytes())?,
+                AuthoredXmlFragment::markup(b"<chained/>".to_vec())?,
+            )
+        })
+        .unwrap();
+    drop(prepared);
+    let prepared = next;
     drop(foreign);
     let mut first = Vec::new();
     prepared.publish_to_stream(&mut first).unwrap();

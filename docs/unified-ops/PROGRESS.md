@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0025 | Immutable XML edits of retained effective OPC candidates | flat chained source-Part candidates; canonical DOCX owner migration pending |
 | 0024 | Revision-bound source XML edits over retained payloads | per-part chaining foundation; package overlay revisions pending |
 | 0023 | Retained OPC prepared topology and shared ZIP appended members | source-overlay ownership foundation; chained source package commits pending |
 | 0022 | Eager DOCX package-bound Edit/Commit and removal of mutating publication doors | eager primary commit migrated; source overlays, history and full W2 pending |
@@ -264,3 +265,16 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 - Chained edits, inverse exact-artifact publication, source fences and managed
   limits are covered. Package-wide effective revisions and canonical source
   commits remain required. See record 0024.
+
+## 0025 — immutable edits of retained effective candidates
+
+- `PreparedTopology::edit_xml` applies a checked edit to effective source XML,
+  returning a new flat candidate over the same physical archive.
+- Prior additions, omissions, relationships and content types survive; logical
+  no-ops preserve the current candidate, and exact inverses restore source bytes.
+- Effective parts retain XML provenance. Unchanged metadata and transfer guards
+  share ownership; old candidate vectors and intermediate payloads can release.
+- Revisions enforce physical/transfer fences, aggregate limits, operation bounds,
+  cancellation and managed admission. Swapped callback transactions are refused.
+- Added/unproven XML targets, general topology application and canonical source
+  DOCX commits remain open. Record 0025 covers evidence and performance limits.

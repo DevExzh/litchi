@@ -156,9 +156,12 @@ catalog lazily, and `publish_to_stream(&self, writer)` can publish it repeatedly
 or retry after a sink failure. Each publication rechecks base and transfer
 sources. Retained reservations are released when the last owner drops.
 
-This is a prepared candidate, not a chained editable package: XML range proofs
-remain tied to their admitted revision, and an exact no-op still uses the
-original-artifact path without an effective candidate callback.
+`PreparedTopology::edit_xml` edits an existing source XML Part against the
+retained effective candidate and returns a new flat candidate. Prior topology
+changes survive; exact logical no-ops retain the candidate, and restoring every
+physical payload uses the exact-artifact path when no topology changes remain.
+Added Parts and authored replacements without source XML provenance still
+require further owner integration. General topology application is pending.
 
 `SourceXmlPart::begin_revision()` permits another positional edit over its
 current validated payload without reopening the archive or rescanning XML.

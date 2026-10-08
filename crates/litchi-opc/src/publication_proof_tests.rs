@@ -500,3 +500,32 @@ fn range_proofs_check_content_type_as_well_as_revision() {
             .is_err()
     );
 }
+
+#[test]
+fn retained_candidate_edits_recheck_physical_sources_after_callbacks() {
+    let source = Arc::new(MutableSource::new(archive_bytes(SOURCE_XML)));
+    let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+    let root = package
+        .prepare_topology(crate::SourceTopologyPlan::new())
+        .unwrap();
+    let first = root
+        .edit_xml(&document_uri(), |xml, edit| {
+            edit.replace(
+                xml.checked_range(0..xml.bytes().len(), xml.bytes())?,
+                AuthoredXmlFragment::markup(b"<document/>".to_vec())?,
+            )
+        })
+        .unwrap();
+    let result = first.edit_xml(&document_uri(), |xml, edit| {
+        edit.replace(
+            xml.checked_range(0..xml.bytes().len(), xml.bytes())?,
+            AuthoredXmlFragment::markup(b"<changed/>".to_vec())?,
+        )?;
+        source.replace_bytes(archive_bytes(SOURCE_XML));
+        Ok(())
+    });
+    assert!(matches!(result, Err(OpcError::SourceChanged { .. })));
+    let mut output = Vec::new();
+    assert!(first.publish_to_stream(&mut output).is_err());
+    assert!(output.is_empty());
+}

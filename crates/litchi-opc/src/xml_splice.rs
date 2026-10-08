@@ -552,6 +552,21 @@ struct XmlSpliceEdit {
 }
 
 impl XmlSplicePublication {
+    pub(crate) fn check_edit_base(&self, expected: &SourceXmlPart) -> Result<()> {
+        if self.source.source_lineage != expected.source_lineage
+            || self.source.source_version != expected.source_version
+            || self.source.source_partname != expected.source_partname
+            || self.source.source_content_type != expected.source_content_type
+            || !same_revision(&self.source.revision, &expected.revision)
+            || !Arc::ptr_eq(&self.source.payload, &expected.payload)
+        {
+            return Err(invalid_source(
+                "XML transaction has a different logical edit base",
+            ));
+        }
+        self.source.check_source_state()
+    }
+
     /// Stage one checked replacement or insertion.
     pub fn replace(&mut self, proof: XmlSourceRange, fragment: AuthoredXmlFragment) -> Result<()> {
         self.source.check_source_state()?;
