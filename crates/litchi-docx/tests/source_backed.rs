@@ -469,6 +469,15 @@ fn rolled_back_document_operations_use_the_exact_signed_source_path() {
 
     assert_eq!(commit.patch().operations().len(), 2);
     assert!(commit.patch().is_noop());
+    let retained = package.apply(commit.patch()).unwrap();
+    let mut retained_output = Vec::new();
+    retained.to_stream(&mut retained_output).unwrap();
+    assert_eq!(retained_output, source_bytes);
+    let mut changed = package.edit().unwrap();
+    changed
+        .replace_paragraph_text(Position::new(0), "changed")
+        .unwrap();
+    assert!(package.apply(changed.commit().unwrap().patch()).is_err());
     let mut output = Vec::new();
     package
         .publish_document_commit_to_stream(&mut output, &commit)

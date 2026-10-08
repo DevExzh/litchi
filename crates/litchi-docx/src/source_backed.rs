@@ -2102,6 +2102,15 @@ impl Package {
         source_authorized: bool,
         before: Option<&Snapshot>,
     ) -> TransactionResult<(PackURI, Snapshot)> {
+        if let Some(topology) = &self.effective {
+            return self.effective_document_snapshot(
+                topology,
+                operation,
+                source_authorized,
+                before,
+            );
+        }
+
         self.physical_package()?
             .source_version()
             .map_err(Error::from)?;

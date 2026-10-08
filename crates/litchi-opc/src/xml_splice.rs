@@ -313,6 +313,43 @@ impl SourceXmlPart {
         })
     }
 
+    /// Validate a complete replacement XML document against source-read rules.
+    ///
+    /// This is the full-document counterpart to checked splices: declarations,
+    /// BOMs and producer whitespace are retained, while malformed XML, DTDs and
+    /// resource-limit violations are refused. Format-specific semantic and
+    /// protection checks remain the caller's responsibility.
+    /// The original physical authority is retained without an intermediate
+    /// payload/revision chain. Managed output and parser work retain admissions.
+    ///
+    /// # Errors
+    /// Refuses invalid replacement XML, source changes, cancellation and limits.
+    pub fn with_replacement_xml(&self, bytes: impl Into<Arc<Vec<u8>>>) -> Result<Self> {
+        self.check_source_state()?;
+        let result = (|| {
+            let bytes = bytes.into();
+            self.limits.check(
+                ReadResource::PartBytes,
+                bytes.len() as u64,
+                self.limits.max_part_bytes(),
+            )?;
+            let reservation = reserve_output_memory(&self.source, bytes.capacity())?;
+            validate_source_xml(
+                self.partname(),
+                &bytes,
+                self.limits,
+                self.source.context_ref(),
+            )?;
+            let mut target = self.clone();
+            target.payload = bytes;
+            target.payload_reservation = reservation;
+            target.revision = None;
+            Ok(target)
+        })();
+        self.check_source_state()?;
+        result
+    }
+
     /// Begin a source-preserving edit transaction.
     pub fn into_publication(self) -> Result<XmlSplicePublication> {
         self.check_source_state()?;

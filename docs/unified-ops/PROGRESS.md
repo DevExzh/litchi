@@ -327,3 +327,15 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
   requests. The raw package accessor is fallible; the unified consumer is adapted.
 - Canonical source semantic Edit/Commit and specialized effective routes remain
   open. Record 0029 documents scope, verification and current allocation limits.
+
+## 0030 — immutable retained semantic apply
+
+- Source DOCX `Package::apply` returns a new effective owner without ZIP
+  serialization/reopening. Snapshots and raw edits read effective main XML.
+- Exact source proofs and effective settings policy guard changes; unrelated
+  graph edits survive, no-ops preserve signatures, and inverses restore bytes.
+- OPC full-document replacement/provenance primitives retain managed admission
+  and source fences. Revision direct/replay edits preserve unmanaged identity.
+- Canonical package-owning source Edit/Commit, specialized effective routes and
+  allocation/performance work remain open. Record 0030 documents verification
+  and the exact-byte (rather than strict logical-version) precondition boundary.

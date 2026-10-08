@@ -72,6 +72,61 @@ impl PreparedTopology {
         self.replace_effective_xml(index, result)
     }
 
+    /// Apply a source-authorized XML target with an exact effective precondition.
+    ///
+    /// Both tokens must belong to the destination physical Part. The expected
+    /// token must match the current effective bytes; unrelated retained graph
+    /// changes survive. This low-level operation validates XML provenance, not
+    /// format-specific semantic operations or protection policy.
+    ///
+    /// # Errors
+    /// Refuses foreign/stale tokens, unproven current Parts, invalid XML,
+    /// changed sources, cancellation or admission failures.
+    pub fn apply_source_xml(
+        &self,
+        expected: &SourceXmlPart,
+        target: SourceXmlPart,
+    ) -> Result<Self> {
+        self.check_source()?;
+        let result = (|| {
+            let part = self.part(expected.partname())?;
+            let current = part.source_xml()?;
+            let physical = self.package.part(expected.partname())?;
+            let original = physical.data()?;
+            expected.check_for_replacement(
+                &self.package.source,
+                physical.partname(),
+                physical.content_type(),
+                original.as_bytes(),
+                self.package.limits,
+            )?;
+            if expected.bytes() != current.bytes() {
+                return Err(overlay_unavailable(
+                    "source XML precondition differs from effective Part",
+                ));
+            }
+            target.check_for_replacement(
+                &self.package.source,
+                physical.partname(),
+                physical.content_type(),
+                original.as_bytes(),
+                self.package.limits,
+            )?;
+            if target.bytes() == current.bytes() {
+                return Ok(self.clone());
+            }
+            if self.state.no_op {
+                let mut plan = SourceTopologyPlan::new();
+                plan.try_replace_source_xml_part(expected.partname().clone(), target)?;
+                self.package.clone().prepare_topology(plan)
+            } else {
+                self.replace_effective_xml(part.index, target)
+            }
+        })();
+        self.check_source()?;
+        result
+    }
+
     fn replace_effective_xml(&self, index: usize, result: SourceXmlPart) -> Result<Self> {
         let data = self.state.effective_data();
         let old_part = &data.parts[index];

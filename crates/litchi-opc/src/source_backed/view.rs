@@ -91,6 +91,32 @@ impl PreparedTopology {
         self.package.read_limits()
     }
 
+    /// Whether the physical base or any retained donor requires managed retention.
+    ///
+    /// An unmanaged base can retain managed donors. Such a candidate must not
+    /// detach payloads into unaccounted owning representations.
+    #[must_use]
+    pub fn is_managed(&self) -> bool {
+        self.package.cache.is_managed() || self.has_managed_donors()
+    }
+
+    /// Whether any retained donor carries an execution context.
+    ///
+    /// Payload consumers must retain and check these contexts even when the
+    /// physical base has its own separate execution context.
+    #[must_use]
+    pub fn has_managed_donors(&self) -> bool {
+        self.state
+            .retained
+            .as_ref()
+            .and_then(|retained| retained.transfer_sources.as_ref())
+            .is_some_and(|sources| {
+                sources.iter().any(|source| {
+                    source.context.is_some() && source.lineage != self.package.source.lineage
+                })
+            })
+    }
+
     /// Share the explicit execution context, when this owner is managed.
     #[must_use]
     pub fn execution_context(&self) -> Option<ExecutionContext> {

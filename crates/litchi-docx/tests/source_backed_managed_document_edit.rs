@@ -931,6 +931,21 @@ fn managed_signed_noop_and_equal_setter_preserve_exact_source() {
     package
         .publish_document_commit_to_stream(&mut output, &noop)
         .unwrap();
+    let topology = package
+        .source_backed_package()
+        .unwrap()
+        .clone()
+        .prepare_topology(litchi_opc::SourceTopologyPlan::new())
+        .unwrap();
+    let retained = package.with_prepared_topology(topology).unwrap();
+    let retained_noop = retained.edit().unwrap().commit().unwrap();
+    let applied = retained.apply(retained_noop.patch()).unwrap();
+    let mut retained_output = Vec::new();
+    applied.to_stream(&mut retained_output).unwrap();
+    assert_eq!(retained_output, source);
+    drop(applied);
+    drop(retained_noop);
+    drop(retained);
     drop(package);
     assert_eq!(output, source);
     drop(noop);

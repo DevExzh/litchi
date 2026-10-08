@@ -991,8 +991,8 @@ fn effective_owner_refuses_unmigrated_operations_and_foreign_candidates() {
             .with_prepared_topology(physical.clone().prepare_topology(plan).unwrap())
             .unwrap();
         assert!(effective.source_backed_package().is_err());
-        assert!(effective.document_snapshot().is_err());
-        assert!(effective.edit().is_err());
+        assert!(effective.document_snapshot().is_ok());
+        assert!(effective.edit().is_ok());
         assert!(effective.metadata().is_err());
         assert!(effective.embedded().is_err());
         assert!(effective.ink().is_err());
@@ -1139,6 +1139,13 @@ fn effective_owner_pinned_document_checks_managed_donor_cancellation() {
         .unwrap();
     let view = owner.document().unwrap();
     assert_eq!(view.paragraph_text(0).unwrap().as_deref(), Some("donor"));
+    assert!(matches!(
+        owner.document_snapshot(),
+        Err(litchi_docx::document::Error::Document(Error::Opc(
+            OpcError::ManagedPackageMaterialization
+        )))
+    ));
+    assert!(owner.edit().is_err());
     drop(donor);
     drop(owner);
     assert!(budget.used(litchi_core::Resource::Memory) > 0);
@@ -1153,4 +1160,144 @@ fn effective_owner_pinned_document_checks_managed_donor_cancellation() {
     ));
     drop(view);
     assert_eq!(budget.used(litchi_core::Resource::Memory), 0);
+}
+
+#[test]
+fn retained_semantic_patches_chain_and_inverse_without_reopening() {
+    for managed in [false, true] {
+        let xml = effective_xml("before");
+        let source = if managed {
+            managed_raw_document(&xml)
+        } else {
+            source_backed::Package::from_read_at(Arc::new(OwnedSource::new(package_bytes(
+                xml, None, false,
+            ))))
+            .unwrap()
+        };
+        let mut edit = source.edit().unwrap();
+        edit.replace_paragraph_text(litchi_core::Position::new(0), "first")
+            .unwrap();
+        let first = edit.commit().unwrap();
+        let current = source.apply(first.patch()).unwrap();
+        assert_eq!(current.document().unwrap().extract_text().unwrap(), "first");
+        let mut edit = current.edit().unwrap();
+        edit.replace_paragraph_text(litchi_core::Position::new(0), "second")
+            .unwrap();
+        let second = edit.commit().unwrap();
+        let next = current.apply(second.patch()).unwrap();
+        assert_eq!(next.document().unwrap().extract_text().unwrap(), "second");
+        assert!(next.apply(first.patch()).is_err());
+        let restored = next
+            .apply(&second.patch().inverse())
+            .unwrap()
+            .apply(&first.patch().inverse())
+            .unwrap();
+        let mut before = Vec::new();
+        source.to_stream(&mut before).unwrap();
+        let mut after = Vec::new();
+        restored.to_stream(&mut after).unwrap();
+        assert_eq!(before, after);
+        assert_eq!(current.document().unwrap().extract_text().unwrap(), "first");
+        assert_eq!(source.document().unwrap().extract_text().unwrap(), "before");
+    }
+}
+
+#[test]
+fn retained_semantic_apply_preserves_graph_edits_and_effective_protection() {
+    for policy in [
+        "",
+        "<w:documentProtection w:enforcement=\"1\"/>",
+        "<w:trackRevisions/>",
+    ] {
+        let physical =
+            SourceBackedPackage::from_vec(package_bytes(effective_xml("before"), None, false))
+                .unwrap();
+        let owner = source_backed::Package::from_source_backed_package(physical.clone()).unwrap();
+        let mut plan = litchi_opc::SourceTopologyPlan::new();
+        let settings = PackURI::new("/word/settings.xml").unwrap();
+        plan.try_add_part(
+            settings.clone(),
+            ct::WML_SETTINGS,
+            format!("<w:settings xmlns:w=\"{W}\">{policy}</w:settings>").into_bytes(),
+        )
+        .unwrap();
+        plan.try_add_internal_relationship(
+            PackURI::new("/word/document.xml").unwrap(),
+            "rSettings",
+            rt::SETTINGS,
+            settings.clone(),
+        )
+        .unwrap();
+        plan.try_remove_part(PackURI::new("/word/unrelated.bin").unwrap())
+            .unwrap();
+        let owner = owner
+            .with_prepared_topology(physical.prepare_topology(plan).unwrap())
+            .unwrap();
+        let noop = owner.edit().unwrap().commit().unwrap();
+        owner.apply(noop.patch()).unwrap();
+        let mut edit = owner.edit().unwrap();
+        edit.replace_paragraph_text(litchi_core::Position::new(0), "after")
+            .unwrap();
+        let committed = edit.commit().unwrap();
+        if policy.is_empty() {
+            let next = owner.apply(committed.patch()).unwrap();
+            let mut bytes = Vec::new();
+            next.to_stream(&mut bytes).unwrap();
+            let package = SourceBackedPackage::from_vec(bytes).unwrap();
+            assert!(package.part(&settings).is_ok());
+            assert!(
+                package
+                    .main_document_part()
+                    .unwrap()
+                    .rels()
+                    .get("rSettings")
+                    .is_some()
+            );
+            assert!(
+                package
+                    .part(&PackURI::new("/word/unrelated.bin").unwrap())
+                    .is_err()
+            );
+            assert_eq!(next.document().unwrap().extract_text().unwrap(), "after");
+        } else {
+            assert!(matches!(
+                owner.apply(committed.patch()),
+                Err(litchi_docx::document::Error::Document(
+                    Error::UnsafeEdit { .. }
+                ))
+            ));
+        }
+        assert_eq!(owner.document().unwrap().extract_text().unwrap(), "before");
+    }
+}
+
+#[test]
+fn retained_semantic_apply_preserves_declaration_bom_and_revision_spelling() {
+    use litchi_core::Position;
+    use litchi_docx::document::{RevisionAction, RevisionKind, RevisionSelector};
+    let xml = format!(
+        "\u{feff}<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<w:document xmlns:w=\"{W}\"><w:body>\n<w:p><w:ins w:id=\"1\" w:author=\"A\"><w:r><w:t>inserted</w:t></w:r></w:ins></w:p>\n</w:body></w:document>"
+    );
+    let owner = source_backed::Package::from_read_at(Arc::new(OwnedSource::new(package_bytes(
+        xml.as_bytes().to_vec(),
+        None,
+        false,
+    ))))
+    .unwrap();
+    let mut edit = owner.edit().unwrap();
+    edit.apply_revision(
+        RevisionSelector::new(Position::new(0), RevisionKind::Insertion, Position::new(0)),
+        RevisionAction::Accept,
+    )
+    .unwrap();
+    let committed = edit.commit().unwrap();
+    let next = owner.apply(committed.patch()).unwrap();
+    let snapshot = next.document_snapshot().unwrap();
+    assert!(snapshot.xml_bytes().starts_with(b"\xef\xbb\xbf<?xml"));
+    assert_eq!(snapshot.xml_bytes(), committed.snapshot().xml_bytes());
+    let restored = next.apply(&committed.patch().inverse()).unwrap();
+    assert_eq!(
+        restored.document_snapshot().unwrap().xml_bytes(),
+        xml.as_bytes()
+    );
 }

@@ -3770,8 +3770,8 @@ impl Edit {
     /// Apply one revision disposition for the named public operation.
     ///
     /// The managed refusal comes first. A disposition rebuilds the projection
-    /// with [`Snapshot::from_xml`], which would drop a managed snapshot's
-    /// source identity and budget admission and publish uncharged bytes.
+    /// into owned bytes. The rewrite preserves unmanaged source identity, but
+    /// cannot retain a managed snapshot's budget admission.
     fn apply_revision_as(
         &mut self,
         operation: &'static str,
@@ -3802,7 +3802,7 @@ impl Edit {
         if paragraph_after == paragraph_xml {
             return Ok(self);
         }
-        let candidate = Snapshot::from_xml(replace_range(
+        let candidate = self.projected.with_rewritten_xml(replace_range(
             self.projected.xml_bytes(),
             paragraph_start,
             paragraph_end,
@@ -4773,7 +4773,7 @@ impl Edit {
         if !forward_match && !reverse_match {
             return Err(Error::SemanticPrecondition);
         }
-        let candidate = Snapshot::from_xml(replace_range(
+        let candidate = self.projected.with_rewritten_xml(replace_range(
             self.projected.xml_bytes(),
             start,
             end,

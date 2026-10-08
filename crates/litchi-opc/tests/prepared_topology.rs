@@ -2241,3 +2241,87 @@ fn materialization_refuses_managed_donor_on_unmanaged_base() {
         ));
     }
 }
+
+#[test]
+fn checked_full_xml_replacements_chain_with_exact_preconditions() {
+    let physical = open(Arc::new(VersionedSource::new(source_bytes())));
+    let base = physical
+        .clone()
+        .prepare_topology(SourceTopologyPlan::new())
+        .unwrap();
+    let original = base.main_document_part().unwrap().source_xml().unwrap();
+    let first_xml = original
+        .with_replacement_xml(
+            b"\xef\xbb\xbf<?xml version=\"1.0\"?>\n<first> value </first>".to_vec(),
+        )
+        .unwrap();
+    let first = base.apply_source_xml(&original, first_xml).unwrap();
+    let first_source = first.main_document_part().unwrap().source_xml().unwrap();
+    let second_xml = first_source
+        .with_replacement_xml(b"<second/>".to_vec())
+        .unwrap();
+    let second = first
+        .apply_source_xml(&first_source, second_xml.clone())
+        .unwrap();
+    assert!(
+        second
+            .apply_source_xml(&original, second_xml.clone())
+            .is_err()
+    );
+    let foreign = open(Arc::new(VersionedSource::new(source_bytes())))
+        .main_document_part()
+        .unwrap()
+        .source_xml()
+        .unwrap();
+    assert!(base.apply_source_xml(&foreign, second_xml).is_err());
+    let current = second.main_document_part().unwrap().source_xml().unwrap();
+    assert!(second.apply_source_xml(&current, foreign).is_err());
+    let restored = second.apply_source_xml(&current, original).unwrap();
+    let mut bytes = Vec::new();
+    restored.publish_to_stream(&mut bytes).unwrap();
+    assert_eq!(bytes, source_bytes());
+    assert_eq!(
+        first
+            .main_document_part()
+            .unwrap()
+            .data()
+            .unwrap()
+            .as_bytes(),
+        b"\xef\xbb\xbf<?xml version=\"1.0\"?>\n<first> value </first>"
+    );
+}
+
+#[test]
+fn full_xml_replacement_rejects_invalid_documents_and_releases_managed_output() {
+    let (budget, cancel, context) = managed_context();
+    let physical = SourceBackedPackage::from_read_at_with_execution_context(
+        Arc::new(VersionedSource::new(source_bytes())),
+        litchi_opc::ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    let original = physical.main_document_part().unwrap().source_xml().unwrap();
+    for invalid in [
+        b"<a>".as_slice(),
+        b"<a/><b/>",
+        b"<!DOCTYPE a><a/>",
+        b"<?xml version=\"1.0\" encoding=\"UTF-16\"?><a/>",
+    ] {
+        assert!(original.with_replacement_xml(invalid.to_vec()).is_err());
+    }
+    let baseline = budget.used(Resource::Memory);
+    let replacement = original
+        .with_replacement_xml(b"<replacement/>".to_vec())
+        .unwrap();
+    assert!(budget.used(Resource::Memory) > baseline);
+    let retained = replacement.clone();
+    drop(replacement);
+    assert!(budget.used(Resource::Memory) > baseline);
+    drop(retained);
+    assert_eq!(budget.used(Resource::Memory), baseline);
+    cancel.cancel();
+    assert!(matches!(
+        original.with_replacement_xml(b"<replacement/>".to_vec()),
+        Err(OpcError::Cancelled)
+    ));
+}

@@ -43,9 +43,74 @@ const SETTINGS_TARGET_MEMORY_HEADROOM: u64 = 4_096;
 /// bounded policy scanner run.  Exact no-op callers deliberately do not invoke
 /// this function.
 pub(super) fn validate_changed_document(package: &Package) -> Result<()> {
+    if let Some(topology) = &package.effective {
+        return validate_changed_effective_document(topology);
+    }
     let version = package.physical_package()?.source_version()?;
     let result = validate_changed_document_inner(package);
     finish_source_fence(package, version)?;
+    result
+}
+
+fn validate_changed_effective_document(topology: &litchi_opc::PreparedTopology) -> Result<()> {
+    topology.check_source()?;
+    let result = (|| {
+        let context = topology.execution_context();
+        let main = topology.main_document_part()?;
+        let package_strict = topology
+            .rels()
+            .iter()
+            .find(|relationship| {
+                matches!(
+                    relationship.reltype(),
+                    rt::OFFICE_DOCUMENT | rt::STRICT_OFFICE_DOCUMENT
+                )
+            })
+            .map(|relationship| relationship.reltype() == rt::STRICT_OFFICE_DOCUMENT);
+        let mut settings_relationship = None;
+        for relationship in main.rels().iter().filter(|relationship| {
+            matches!(
+                relationship.reltype(),
+                rt::SETTINGS | STRICT_SETTINGS_RELATIONSHIP
+            )
+        }) {
+            if settings_relationship.replace(relationship).is_some() {
+                return Err(Error::InvalidRelationship(
+                    "document has multiple settings relationships".into(),
+                ));
+            }
+        }
+        let Some(relationship) = settings_relationship else {
+            return Ok(());
+        };
+        if relationship.is_external() {
+            return Err(Error::InvalidRelationship(
+                "settings relationship cannot be external".into(),
+            ));
+        }
+        let strict = relationship.reltype() == STRICT_SETTINGS_RELATIONSHIP;
+        if package_strict != Some(strict) {
+            return Err(Error::InvalidRelationship(
+                "main document and settings relationship use mixed OOXML conformance families"
+                    .into(),
+            ));
+        }
+        let _target = admit_target_metadata(context.as_ref(), relationship.target_path().len())?;
+        let settings = topology.part(&relationship.target_partname()?)?;
+        if settings.content_type() != ct::WML_SETTINGS {
+            return Err(Error::InvalidContentType {
+                expected: ct::WML_SETTINGS.into(),
+                got: settings.content_type().into(),
+            });
+        }
+        let data = settings.data()?;
+        let policy = inspect_settings_source(data.as_bytes(), strict, context.as_ref())?;
+        if policy.protected || policy.track_revisions {
+            return Err(protection_refusal());
+        }
+        Ok(())
+    })();
+    topology.check_source()?;
     result
 }
 

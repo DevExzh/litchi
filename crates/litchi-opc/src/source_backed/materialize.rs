@@ -29,13 +29,7 @@ impl PreparedTopology {
     }
 
     fn materialize_effective(&self) -> Result<OpcPackage> {
-        let managed_transfer = self
-            .state
-            .retained
-            .as_ref()
-            .and_then(|retained| retained.transfer_sources.as_ref())
-            .is_some_and(|sources| sources.iter().any(|source| source.context.is_some()));
-        if self.package.cache.is_managed() || managed_transfer {
+        if self.is_managed() {
             return Err(OpcError::ManagedPackageMaterialization);
         }
         if self.state.no_op {

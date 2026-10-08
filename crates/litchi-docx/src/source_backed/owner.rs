@@ -58,6 +58,144 @@ impl Package {
         }
     }
 
+    /// Apply an exact-source main-document patch into a new immutable owner.
+    ///
+    /// Existing retained graph edits survive. No ZIP is emitted or reopened.
+    /// Paragraph transfers still require their dedicated graph-aware publisher.
+    ///
+    /// # Errors
+    /// Refuses stale patches, protection/tracked revisions, signatures, unsupported
+    /// source provenance, transfers, source changes and resource failures.
+    pub fn apply(&self, patch: &crate::document::Patch) -> TransactionResult<Self> {
+        self.check_source()?;
+        let result = (|| {
+            let (name, current) = self.main_document_snapshot_with_before(
+                "apply",
+                !patch.is_noop(),
+                Some(patch.source()),
+            )?;
+            let target = patch.apply(&current)?;
+            if patch
+                .operations()
+                .iter()
+                .any(|operation| !operation.supports_source_backed_main_document_overlay())
+            {
+                return Err(Error::UnsafeEdit {
+                    format: "DOCX",
+                    operation: "apply",
+                    reason: "paragraph transfers require package-level dependency publication",
+                }
+                .into());
+            }
+            if patch.is_noop() {
+                return Ok(self.clone());
+            }
+            document_policy::validate_changed_document(self)?;
+            let topology = match &self.effective {
+                Some(topology) => topology.clone(),
+                None => self
+                    .physical
+                    .clone()
+                    .prepare_topology(SourceTopologyPlan::new())
+                    .map_err(Error::from)?,
+            };
+            let changed = if let Some(target_xml) = target.source_xml() {
+                let source_xml = current.source_xml().ok_or(Error::UnsafeEdit {
+                    format: "DOCX",
+                    operation: "apply",
+                    reason: "current snapshot lacks XML provenance",
+                })?;
+                topology
+                    .apply_source_xml(&source_xml, target_xml)
+                    .map_err(Error::from)?
+            } else {
+                let bytes = target.shared_xml()?;
+                let source = topology
+                    .part(&name)
+                    .and_then(|part| part.source_xml())
+                    .map_err(Error::from)?;
+                let target = source.with_replacement_xml(bytes).map_err(Error::from)?;
+                topology
+                    .apply_source_xml(&source, target)
+                    .map_err(Error::from)?
+            };
+            self.with_prepared_topology(changed)
+                .map_err(crate::document::Error::from)
+        })();
+        self.check_source()?;
+        result
+    }
+
+    pub(super) fn effective_document_snapshot(
+        &self,
+        topology: &PreparedTopology,
+        operation: &'static str,
+        source_authorized: bool,
+        before: Option<&Snapshot>,
+    ) -> TransactionResult<(PackURI, Snapshot)> {
+        self.check_source()?;
+        let result = (|| {
+            // Raw snapshots retain at most the base execution context. They
+            // cannot carry or check an independent donor's budget/context.
+            if topology.has_managed_donors() {
+                return Err(
+                    Error::from(litchi_opc::OpcError::ManagedPackageMaterialization).into(),
+                );
+            }
+            // Exact-artifact no-ops have no logical overlay. Preserve the
+            // physical path's signed managed snapshot fallback without
+            // weakening the guard on any changed effective owner.
+            if topology.is_noop() {
+                let physical = Self::with_execution(self.physical.clone(), self.execution.clone())?;
+                return physical.main_document_snapshot_with_before(
+                    operation,
+                    source_authorized,
+                    before,
+                );
+            }
+
+            let main = topology.main_document_part().map_err(Error::from)?;
+            validate_document_main_content_type(main.content_type())?;
+            let name = main.partname().clone();
+            let lineage = topology.physical_source_lineage();
+            let version = topology.physical_source_version().map_err(Error::from)?;
+            let snapshot = if let Some(context) = &self.execution {
+                self.paragraph_index_cache.trim_clean();
+                let xml = main.source_xml().map_err(Error::from)?;
+                if let Some(reused) = before.and_then(|before| {
+                    before.reuse_if_source_xml_matches(&xml, &lineage, version, &name)
+                }) {
+                    reused
+                } else {
+                    self.ensure_source_document_xml(xml.bytes(), Some(context))?;
+                    Snapshot::from_source_xml(xml, lineage, version, &name, context.clone())?
+                }
+            } else {
+                let data = main.data().map_err(Error::from)?;
+                self.admit_main_document(data.as_bytes(), version, operation)?;
+                let mut bytes = Vec::new();
+                bytes
+                    .try_reserve_exact(data.as_bytes().len())
+                    .map_err(|source| {
+                        Error::Opc(litchi_opc::OpcError::Allocation {
+                            resource: "effective document snapshot",
+                            source,
+                        })
+                    })?;
+                bytes.extend_from_slice(data.as_bytes());
+                Snapshot::from_shared_xml_with_source_identity(
+                    Arc::new(bytes),
+                    lineage,
+                    version,
+                    &name,
+                )?
+            };
+            Ok((name, snapshot))
+        })();
+        self.check_source()?;
+        result
+    }
+
     pub(super) fn effective_document(&self, topology: &PreparedTopology) -> Result<Document> {
         topology.check_source()?;
         let result = (|| {
