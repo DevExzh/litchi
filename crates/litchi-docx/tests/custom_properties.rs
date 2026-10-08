@@ -345,3 +345,28 @@ fn exact_source_stream_failure_keeps_typed_cause_and_accepted_count() {
         assert_eq!(retry, original);
     }
 }
+
+#[test]
+fn canonical_bytes_publish_pending_edits_and_reopen_exactly() {
+    let mut package = Package::new().unwrap();
+    package
+        .document_mut()
+        .unwrap()
+        .add_paragraph_with_text("canonical byte output");
+    package
+        .custom_props_mut()
+        .insert("ByteMarker", "retained")
+        .unwrap();
+    let bytes = package.to_bytes().unwrap();
+    let mut reopened = Package::from_bytes(&bytes).unwrap();
+    assert_eq!(
+        reopened.document().unwrap().text().unwrap(),
+        "canonical byte output"
+    );
+    assert_eq!(
+        reopened.custom_props().get("ByteMarker"),
+        Some(&Value::Text("retained".into()))
+    );
+    assert_eq!(reopened.to_bytes().unwrap(), bytes);
+    assert_eq!(reopened.to_plain_bytes().unwrap(), bytes);
+}

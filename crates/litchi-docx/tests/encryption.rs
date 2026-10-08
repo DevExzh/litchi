@@ -50,7 +50,13 @@ fn encrypted_sources_require_an_explicit_plaintext_save() {
     let mut package = Package::open_with_password(&source, PASSWORD).unwrap();
 
     std::fs::write(&target, sentinel).unwrap();
-    assert!(package.save(&target).is_err());
+    assert!(matches!(
+        package.save(&target),
+        Err(Error::EncryptionPolicy {
+            operation: "save",
+            ..
+        })
+    ));
     assert_eq!(std::fs::read(&target).unwrap(), sentinel);
     package.save_plain(&target).unwrap();
     assert_eq!(&std::fs::read(&target).unwrap()[..2], b"PK");
@@ -117,4 +123,56 @@ fn cloned_encrypted_package_retains_policy_and_refuses_plain_apply() {
     assert!(output.starts_with(b"PK"));
     assert_eq!(encrypted.encryption(), Some(Mode::Standard));
     assert_eq!(shared.encryption(), Some(Mode::Standard));
+}
+
+#[test]
+fn byte_output_requires_explicit_plaintext_and_retains_provenance() {
+    use litchi_ooxml_common::package_encryption::PolicyError;
+    for mode in [Mode::Standard, Mode::Agile] {
+        let mut source = Package::new().unwrap();
+        source
+            .document_mut()
+            .unwrap()
+            .add_paragraph_with_text("byte output");
+        let plain = source.to_bytes().unwrap();
+        let encrypted = source.to_encrypted(PASSWORD, mode).unwrap();
+        let mut package = Package::from_bytes_with_password(&encrypted, PASSWORD).unwrap();
+        assert!(matches!(package.to_bytes(), Err(Error::EncryptionPolicy {
+            operation: "to_bytes", source: PolicyError::OrdinaryOutputWouldRemoveEncryption { mode: retained }
+        }) if retained == mode));
+        let mut refused = Vec::new();
+        assert!(matches!(
+            package.write_to(&mut refused),
+            Err(Error::EncryptionPolicy {
+                operation: "write_to",
+                ..
+            })
+        ));
+        assert!(refused.is_empty());
+        assert_eq!(package.to_plain_bytes().unwrap(), plain);
+        assert_eq!(package.encryption(), Some(mode));
+        assert!(matches!(
+            package.to_bytes(),
+            Err(Error::EncryptionPolicy { .. })
+        ));
+        let mut cloned = package.clone();
+        assert!(matches!(
+            cloned.to_bytes(),
+            Err(Error::EncryptionPolicy { .. })
+        ));
+        assert_eq!(cloned.to_plain_bytes().unwrap(), plain);
+    }
+}
+
+#[test]
+fn reencrypted_output_without_source_mode_is_a_typed_policy_refusal() {
+    let mut package = Package::new().unwrap();
+    assert!(matches!(
+        package.to_reencrypted(PASSWORD),
+        Err(Error::EncryptionPolicy {
+            operation: "to_reencrypted",
+            source: litchi_ooxml_common::package_encryption::PolicyError::NoRetainedMode,
+        })
+    ));
+    assert!(package.to_bytes().unwrap().starts_with(b"PK"));
 }

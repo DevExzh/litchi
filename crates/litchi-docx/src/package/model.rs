@@ -162,7 +162,7 @@ pub struct Package {
     /// Encryption profile of the opened outer package, retained to prevent an
     /// accidental plaintext downgrade on save.
     #[cfg(feature = "encryption")]
-    pub(super) source_encryption: Option<Mode>,
+    pub(super) source_encryption: litchi_ooxml_common::package_encryption::PackageEncryption,
 }
 
 /// Shared immutable state; legacy mutations detach before writing.

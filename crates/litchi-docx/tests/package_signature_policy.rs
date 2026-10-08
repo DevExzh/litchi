@@ -46,9 +46,7 @@ fn open(bytes: &[u8]) -> Package {
 }
 
 fn bytes(package: &mut Package) -> Vec<u8> {
-    let mut sink = Cursor::new(Vec::new());
-    package.write_to(&mut sink).unwrap();
-    sink.into_inner()
+    package.to_bytes().unwrap()
 }
 
 /// `plain` with an OPC signature graph (origin part, one XML signature and
@@ -479,6 +477,8 @@ mod shared_properties {
     fn assert_save_refused(package: &mut Package) {
         let mut sink = Cursor::new(Vec::new());
         assert_signed(package.write_to(&mut sink));
+        assert_signed(package.to_bytes());
+        assert_signed(package.to_plain_bytes());
         assert!(package.is_signed());
     }
 

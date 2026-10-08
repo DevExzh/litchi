@@ -977,3 +977,19 @@ fn docx_owning_policy_refusal_is_an_unsupported_capability() {
     );
     assert!(matches!(error.leaf(), Source::Docx(_)));
 }
+
+#[cfg(all(feature = "docx", feature = "encryption"))]
+#[test]
+fn docx_encryption_policy_refusal_retains_typed_source() {
+    let error = assert_code(
+        litchi_docx::Error::EncryptionPolicy {
+            operation: "to_bytes",
+            source: litchi_ooxml_common::package_encryption::PolicyError::NoRetainedMode,
+        },
+        Code::UnsupportedCapability,
+    );
+    assert!(matches!(
+        error.leaf(),
+        Source::Docx(litchi_docx::Error::EncryptionPolicy { .. })
+    ));
+}

@@ -14,7 +14,7 @@
     feature = "encryption",
     expect(
         clippy::used_underscore_binding,
-        reason = "the named ignored error records intentional source collapse"
+        reason = "the operation label is used only when encryption is enabled"
     )
 )]
 //! OPC construction, validation, and publication codecs for DOCX packages.
@@ -236,7 +236,7 @@ impl Package {
             #[cfg(feature = "automatic-fonts")]
             font_embedding: None,
             #[cfg(feature = "encryption")]
-            source_encryption: None,
+            source_encryption: Default::default(),
         })
     }
 
@@ -365,7 +365,7 @@ impl Package {
             #[cfg(feature = "automatic-fonts")]
             font_embedding: None,
             #[cfg(feature = "encryption")]
-            source_encryption: None,
+            source_encryption: Default::default(),
         })
     }
 
@@ -496,7 +496,10 @@ impl Package {
         let source_encryption = opened.mode();
         let opc = OpcPackage::from_vec_with_limits(opened.into_bytes(), options.source_limits)?;
         let mut package = Self::from_opc_package(opc)?;
-        package.source_encryption = source_encryption;
+        package.source_encryption = source_encryption.map_or_else(
+            litchi_ooxml_common::package_encryption::PackageEncryption::plain,
+            litchi_ooxml_common::package_encryption::PackageEncryption::encrypted,
+        );
         Ok(package)
     }
 }
@@ -616,6 +619,26 @@ impl Package {
         self.write_plain(writer)
     }
 
+    /// Serialize this package into a new ZIP buffer.
+    ///
+    /// # Errors
+    /// Refuses ordinary output from an encrypted source; use explicit plaintext
+    /// or re-encrypted output. Publication errors retain their typed causes.
+    pub fn to_bytes(&mut self) -> Result<Vec<u8>> {
+        self.ensure_plain_output("to_bytes")?;
+        self.to_plain_bytes()
+    }
+
+    /// Explicitly serialize plaintext bytes without changing encryption provenance.
+    ///
+    /// # Errors
+    /// Returns a typed publication error if the package cannot be serialized.
+    pub fn to_plain_bytes(&mut self) -> Result<Vec<u8>> {
+        let mut output = Vec::new();
+        self.write_plain(&mut output)?;
+        Ok(output)
+    }
+
     /// Explicitly write a plaintext package to a stream.
     ///
     /// # Errors
@@ -632,9 +655,7 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn to_encrypted(&mut self, password: &str, mode: Mode) -> Result<Vec<u8>> {
-        let mut output = std::io::Cursor::new(Vec::new());
-        self.write_plain(&mut output)?;
-        crate::encryption::encrypt(output.into_inner(), password, mode).map_err(Into::into)
+        crate::encryption::encrypt(self.to_plain_bytes()?, password, mode).map_err(Into::into)
     }
 
     /// Serialize and encrypt using the source package's retained profile.
@@ -665,7 +686,7 @@ impl Package {
             temporary.write_all(&output)?;
             Ok(())
         })?;
-        self.source_encryption = Some(mode);
+        self.source_encryption.mark_encrypted(mode);
         Ok(())
     }
 
@@ -684,12 +705,12 @@ impl Package {
     #[cfg(feature = "encryption")]
     #[must_use]
     pub const fn encryption(&self) -> Option<Mode> {
-        self.source_encryption
+        self.source_encryption.mode()
     }
 
     pub(super) fn ensure_opc_current(&self, operation: &'static str) -> Result<()> {
         #[cfg(feature = "encryption")]
-        if self.source_encryption.is_some() {
+        if self.source_encryption.mode().is_some() {
             return Err(Error::UnsafeEdit {
                 format: "DOCX",
                 operation,
@@ -728,23 +749,20 @@ impl Package {
 
     fn ensure_plain_output(&self, _operation: &'static str) -> Result<()> {
         #[cfg(feature = "encryption")]
-        if self.source_encryption.is_some() {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
+        self.source_encryption
+            .ordinary_output()
+            .map_err(|source| Error::EncryptionPolicy {
                 operation: _operation,
-                reason: "the source package was encrypted; use save_reencrypted or save_plain",
-            });
-        }
+                source,
+            })?;
         Ok(())
     }
 
     #[cfg(feature = "encryption")]
     fn preserved_mode(&self, operation: &'static str) -> Result<Mode> {
-        self.source_encryption.ok_or(Error::UnsafeEdit {
-            format: "DOCX",
-            operation,
-            reason: "the source package has no encryption profile; supply an explicit Mode",
-        })
+        self.source_encryption
+            .require_retained_mode()
+            .map_err(|source| Error::EncryptionPolicy { operation, source })
     }
 
     fn write_plain<W: Write>(&mut self, writer: W) -> Result<()> {

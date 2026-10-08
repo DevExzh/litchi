@@ -513,3 +513,15 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
   property staging rolls back and remains retryable.
 - Record 0043 documents verification. Broader error normalization and the
   complete unified goal remain active.
+
+
+## 0044 — owning DOCX bytes and encryption policy
+
+- Added canonical to_bytes and explicit to_plain_bytes over the existing owning
+  publisher. Signed no-op/refusal and pending-edit behavior use the same path.
+- Adopted shared OOXML encryption provenance and typed EncryptionPolicy causes
+  for ordinary output and missing retained modes; explicit plaintext preserves
+  provenance. Unified classification keeps the refusal typed.
+- Added feature-isolated, encryption-mode and byte-publication coverage; see
+  record 0044. Managed lazy bytes, immutable publication, owner consolidation
+  and the full unified-operations goal remain active.

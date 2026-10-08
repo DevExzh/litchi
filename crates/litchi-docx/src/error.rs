@@ -15,6 +15,17 @@ pub enum Error {
         policy: crate::OpenPolicy,
     },
 
+    /// An output would discard encryption provenance or assumes a missing mode.
+    #[cfg(feature = "encryption")]
+    #[error("DOCX encryption policy rejected {operation}: {source}")]
+    EncryptionPolicy {
+        /// Operation rejected at the DOCX boundary.
+        operation: &'static str,
+        /// Shared OOXML provenance policy failure.
+        #[source]
+        source: litchi_ooxml_common::package_encryption::PolicyError,
+    },
+
     /// The underlying OPC graph is malformed or could not be mutated safely.
     #[error("OPC error: {0}")]
     Opc(#[from] litchi_opc::error::OpcError),

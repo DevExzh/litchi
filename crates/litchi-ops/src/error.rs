@@ -840,6 +840,8 @@ impl Classify for litchi_cfb::OleError {
 impl Classify for litchi_docx::Error {
     fn classify(&self) -> Class {
         match self {
+            #[cfg(feature = "encryption")]
+            Self::EncryptionPolicy { .. } => Class::of(Code::UnsupportedCapability),
             Self::UnsupportedOpenPolicy { .. } => Class::of(Code::UnsupportedCapability),
             Self::Opc(error) => error.classify(),
             Self::Io(error) => error.classify(),
