@@ -1410,7 +1410,7 @@ fn managed_scalar_exact_noop_publishes_without_detaching_source() {
     let (budget, _cancellation_source, context) = managed_context(available_memory);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes.clone())),
-        litchi_xlsx::ReadLimits::default(),
+        litchi_xlsx::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -1651,7 +1651,7 @@ fn managed_multi_sheet_exact_noop_publishes_without_detaching_sources() {
     let (budget, _cancellation_source, context) = managed_context(available_memory);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes.clone())),
-        litchi_xlsx::ReadLimits::default(),
+        litchi_xlsx::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -2124,7 +2124,7 @@ fn managed_editor_retains_complete_payload_closure_and_releases_budget() {
     let editor =
         SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
             Arc::new(VersionedSource::new(bytes)),
-            litchi_xlsx::ReadLimits::default(),
+            litchi_xlsx::SourceLimits::default(),
             SourceCacheLimits::new(usize::try_from(exact).unwrap(), 8).unwrap(),
             context,
         )
@@ -2163,7 +2163,7 @@ fn managed_multi_sheet_batch_retains_each_selected_payload_and_streams_once() {
     let editor =
         SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
             Arc::new(VersionedSource::new(bytes.clone())),
-            litchi_xlsx::ReadLimits::default(),
+            litchi_xlsx::SourceLimits::default(),
             SourceCacheLimits::new(usize::try_from(exact).unwrap(), 8).unwrap(),
             context,
         )
@@ -2210,7 +2210,7 @@ fn managed_one_under_budget_refuses_before_selected_worksheet_io() {
     let (budget, _cancellation_source, context) = managed_context(exact - 1);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         source.clone(),
-        litchi_xlsx::ReadLimits::default(),
+        litchi_xlsx::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -2238,7 +2238,7 @@ fn managed_stream_publication_works_and_inverse_materialization_is_explicit() {
     let (budget, _cancellation_source, context) = managed_context(publication_limit);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes.clone())),
-        litchi_xlsx::ReadLimits::default(),
+        litchi_xlsx::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -2293,7 +2293,7 @@ fn managed_cancellation_is_checked_after_snapshot_and_before_stream_output() {
     let (budget, cancellation_source, context) = managed_context(exact);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         source,
-        litchi_xlsx::ReadLimits::default(),
+        litchi_xlsx::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -2316,7 +2316,7 @@ fn managed_cancellation_during_batch_iterators_keeps_staging_atomic() {
     let (budget, cancellation_source, context) = managed_context(exact);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes.clone())),
-        litchi_xlsx::ReadLimits::default(),
+        litchi_xlsx::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -2348,7 +2348,7 @@ fn managed_cancellation_during_batch_iterators_keeps_staging_atomic() {
     let (budget, cancellation_source, context) = managed_context(exact);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes)),
-        litchi_xlsx::ReadLimits::default(),
+        litchi_xlsx::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -2383,7 +2383,7 @@ fn managed_patch_cancellation_during_finalization_does_not_publish_candidate() {
     let (budget, cancellation_source, context) = managed_context(exact);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes.clone())),
-        litchi_xlsx::ReadLimits::default(),
+        litchi_xlsx::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -2416,7 +2416,7 @@ fn managed_patch_cancellation_during_finalization_does_not_publish_candidate() {
     let (budget, cancellation_source, context) = managed_context(exact);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes.clone())),
-        litchi_xlsx::ReadLimits::default(),
+        litchi_xlsx::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -2456,7 +2456,7 @@ fn managed_empty_multi_edit_iterator_reports_cancellation_before_invalid_batch()
     let (budget, cancellation_source, context) = managed_context(exact);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes)),
-        litchi_xlsx::ReadLimits::default(),
+        litchi_xlsx::SourceLimits::default(),
         context,
     )
     .unwrap();

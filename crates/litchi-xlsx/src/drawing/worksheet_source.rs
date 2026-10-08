@@ -113,7 +113,7 @@ impl WorksheetSourceLimits {
     /// relationship, attribute, and member-byte ceilings while keeping the
     /// scanner's hard caps in force.  Callers that scan an already-owned
     /// worksheet member may construct this type directly instead.
-    pub fn from_read_limits(limits: litchi_opc::ReadLimits) -> Self {
+    pub fn from_read_limits(limits: litchi_opc::SourceLimits) -> Self {
         let defaults = Self::default();
         let part_bytes = usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX);
         Self {

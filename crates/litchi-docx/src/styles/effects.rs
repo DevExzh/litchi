@@ -13,8 +13,8 @@ use litchi_opc::constants::content_type as ct;
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::part::{BlobPart, Part};
 use litchi_opc::{
-    ContentTypeEdit, OpcPackage, OwnedContentTypes, OwnedRelationships, PackURI, ReadLimits,
-    ReadResource, RelationshipEdit, TargetMode, validate_source_xml_bytes,
+    ContentTypeEdit, OpcPackage, OwnedContentTypes, OwnedRelationships, PackURI, ReadResource,
+    RelationshipEdit, SourceLimits, TargetMode, validate_source_xml_bytes,
 };
 use quick_xml::events::Event;
 use quick_xml::{Reader, XmlVersion};
@@ -337,7 +337,7 @@ impl Resource {
     pub(crate) fn from_part(
         part: &dyn Part,
         expected: Conformance,
-        limits: ReadLimits,
+        limits: SourceLimits,
     ) -> Result<Self> {
         if part.content_type() != CONTENT_TYPE {
             return Err(Error::ContentType {
@@ -364,7 +364,7 @@ impl Resource {
     pub(crate) fn from_shared_with_conformance_limits(
         xml: Arc<Vec<u8>>,
         expected: Conformance,
-        limits: ReadLimits,
+        limits: SourceLimits,
     ) -> Result<Self> {
         let conformance = validate_xml_with_limits(&xml, Some(expected), limits)?;
         let styles = StyleDefinitions::from_xml(&xml)?;
@@ -622,7 +622,7 @@ impl Commit {
 
 /// A source-checked reversible replacement/removal patch.
 ///
-/// Package-bound patches retain the originating package's [`ReadLimits`]. Applying
+/// Package-bound patches retain the originating package's [`SourceLimits`]. Applying
 /// one to a package opened with a different limit profile fails its source
 /// precondition; create a fresh edit from that package instead.
 #[derive(Debug, Clone)]
@@ -735,7 +735,7 @@ pub(crate) struct GraphToken {
     target_relationships: Option<OwnedRelationships>,
     content_types: OwnedContentTypes,
     aggregate: AggregateMetrics,
-    limits: ReadLimits,
+    limits: SourceLimits,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -770,7 +770,7 @@ struct AggregateEdit {
 
 fn project_aggregate_metrics(
     current: AggregateMetrics,
-    limits: ReadLimits,
+    limits: SourceLimits,
     edit: AggregateEdit,
 ) -> Result<AggregateMetrics> {
     let parts = apply_signed_delta(current.parts, edit.part_delta, "part count")?;
@@ -2046,7 +2046,7 @@ fn validate_resource_for_package(
 fn validate_effects_part_for_package(
     part: &dyn Part,
     conformance: Conformance,
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<()> {
     if part.content_type() != CONTENT_TYPE {
         return Err(Error::ContentType {
@@ -2060,7 +2060,7 @@ fn validate_effects_part_for_package(
 fn validate_effects_part_for_graph(
     part: &dyn Part,
     conformance: Conformance,
-    limits: ReadLimits,
+    limits: SourceLimits,
     validated_resource: Option<&Resource>,
 ) -> Result<()> {
     if let Some(resource) = validated_resource {
@@ -2301,7 +2301,7 @@ fn enqueue_relationship_graph_target(
     target: PackURI,
     visited: &mut HashSet<Vec<u8>>,
     work_queue: &mut Vec<PackURI>,
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<()> {
     let key = canonical_uri_key(&target)?;
     if visited.contains(&key) {
@@ -2861,7 +2861,7 @@ fn invalid(message: impl Into<String>) -> Error {
 }
 
 fn check_limit(
-    _limits: ReadLimits,
+    _limits: SourceLimits,
     resource: ReadResource,
     actual: u64,
     maximum: u64,
@@ -2877,7 +2877,7 @@ fn check_limit(
 }
 
 fn validate_xml(xml: &[u8], expected: Option<Conformance>) -> Result<Conformance> {
-    let bounded_limits = ReadLimits::builder()
+    let bounded_limits = SourceLimits::builder()
         .max_part_bytes(
             u64::try_from(MAX_XML_BYTES)
                 .map_err(|_| invalid("stylesWithEffects XML byte bound overflows u64"))?,
@@ -2891,7 +2891,7 @@ fn validate_xml(xml: &[u8], expected: Option<Conformance>) -> Result<Conformance
 fn validate_xml_with_limits(
     xml: &[u8],
     expected: Option<Conformance>,
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<Conformance> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid(format!(

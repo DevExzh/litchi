@@ -22,10 +22,10 @@ use std::sync::{
 };
 
 use litchi_core::{
-    Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits,
-    OwnedSource, ReadAt, Resource, SourceVersion,
+    Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, ReadAt,
+    Resource, SourceVersion,
 };
-use litchi_opc::{OpcError, ReadLimits, SourceBackedPackage};
+use litchi_opc::{OpcError, SourceBackedPackage, SourceLimits};
 use sha2::{Digest as _, Sha256};
 use soapberry_zip::office::StreamingArchiveWriter;
 
@@ -34,7 +34,9 @@ const ROOT_RELS: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats
 
 fn archive_bytes(payload: &[u8]) -> Vec<u8> {
     let mut writer = StreamingArchiveWriter::new();
-    writer.write_stored("[Content_Types].xml", CONTENT_TYPES).unwrap();
+    writer
+        .write_stored("[Content_Types].xml", CONTENT_TYPES)
+        .unwrap();
     writer.write_stored("_rels/.rels", ROOT_RELS).unwrap();
     writer.write_stored("word/document.xml", payload).unwrap();
     writer.finish_to_bytes().unwrap()
@@ -157,7 +159,7 @@ fn managed_fingerprint_repeated_calls_charge_work_and_input_and_release_memory()
     let (budget, cancellation, context) = managed_context(64 * 1024 * 1024, u64::MAX, u64::MAX);
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(bytes)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -195,7 +197,10 @@ fn generic_stable_version_mutation_is_rehashed_on_every_fingerprint() {
     source.mutate_without_version();
     let second = artifact.fingerprint().unwrap();
 
-    assert_ne!(second, first, "stable version must not authorize stale bytes");
+    assert_ne!(
+        second, first,
+        "stable version must not authorize stale bytes"
+    );
     assert!(source.reads.load(Ordering::Acquire) > reads_after_first);
 }
 

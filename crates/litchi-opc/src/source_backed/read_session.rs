@@ -100,7 +100,7 @@ impl<'package> PartReadSession<'package> {
 )]
 mod tests {
     use super::{OpcError, SourceBackedPackage};
-    use crate::{OpcOperationAccounting, PackURI, ReadLimits};
+    use crate::{OpcOperationAccounting, PackURI, SourceLimits};
     use litchi_core::{
         Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits,
         ReadAt, Resource, SourceVersion,
@@ -421,7 +421,7 @@ mod tests {
         let (budget, cancellation_source, context) = managed_context(4096);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(CountingSource::new(ordinary_archive(DOCUMENT))),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -445,7 +445,7 @@ mod tests {
         let (budget, _cancellation_source, context) = managed_context((DOCUMENT.len() - 1) as u64);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();

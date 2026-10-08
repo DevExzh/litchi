@@ -419,7 +419,7 @@ executed in continuously buildable, dependency-ordered phases per ADR 0008.
    mapper).
 3. Per-variant `#[cfg]` feature gates plus nested unix/windows target gates
    carry over mechanically.
-4. Divergent open options (docx/pptx `ReadLimits`, doc `OpenOptions`, iwork
+4. Divergent open options (docx/pptx `SourceLimits`, doc `OpenOptions`, iwork
    `Options`) converge on one unified `OpenOptions` (enum of per-format
    options; default `open()` covers the common case) — exact shape is an open
    micro-decision.

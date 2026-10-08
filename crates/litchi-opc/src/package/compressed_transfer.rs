@@ -39,7 +39,7 @@ use soapberry_zip::office::{
 
 use super::{OpcPackage, SourcePart};
 use crate::error::{OpcError, Result, map_io_error};
-use crate::limits::{ReadLimits, ReadResource};
+use crate::limits::{ReadResource, SourceLimits};
 use crate::packuri::PackURI;
 use crate::part::Part;
 use crate::payload::{PartPayload, TransferredPayload};
@@ -126,7 +126,7 @@ impl std::fmt::Debug for CompressedPartTransfer {
 struct TransferMember<'package> {
     index: &'package IndexedArchive<Arc<Vec<u8>>>,
     entry_id: EntryId,
-    limits: ReadLimits,
+    limits: SourceLimits,
 }
 
 /// The lazily built ZIP index over an owned package's retained archive.

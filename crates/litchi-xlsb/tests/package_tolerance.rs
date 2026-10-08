@@ -96,7 +96,7 @@ fn duplicate_relationship_id_is_listed_in_the_workbook_report_on_every_route() {
 
     let materialized = SourceBackedPackage::from_reader_with_limits(
         Cursor::new(bytes),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
     )
     .unwrap()
     .into_opc_package()
@@ -128,7 +128,7 @@ fn conformant_package_contributes_no_packaging_repairs() {
     );
     let materialized = SourceBackedPackage::from_reader_with_limits(
         Cursor::new(bytes),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
     )
     .unwrap()
     .into_opc_package()

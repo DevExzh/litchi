@@ -12,7 +12,7 @@ use super::edit::{Commit, Edit, Patch};
 use super::worksheet;
 use super::{codec, package};
 use litchi_core::Selector as CoreSelector;
-use litchi_opc::{OpcPackage, PackURI, ReadLimits};
+use litchi_opc::{OpcPackage, PackURI, SourceLimits};
 use litchi_sheet::{Area, At, ColumnAt, Rect, RowAt};
 use once_cell::sync::OnceCell;
 
@@ -439,12 +439,12 @@ impl Workbook {
 
     /// Open an XLSX-family package from a filesystem path.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::open_with_limits(path, ReadLimits::default())
+        Self::open_with_limits(path, SourceLimits::default())
     }
 
     /// Open an XLSX-family package from a filesystem path with explicit OPC
     /// resource limits.
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
+    pub fn open_with_limits(path: impl AsRef<Path>, limits: SourceLimits) -> Result<Self> {
         Self::from_package(OpcPackage::open_with_limits(path, limits)?)
     }
 
@@ -462,7 +462,7 @@ impl Workbook {
         path: impl AsRef<Path>,
         password: &str,
         encryption_limits: &crate::encryption::Limits,
-        opc_limits: ReadLimits,
+        opc_limits: SourceLimits,
     ) -> Result<Self> {
         crate::Package::open_with_password_and_limits(
             path,
@@ -475,11 +475,11 @@ impl Workbook {
 
     /// Move bytes into the XLSX parser.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, ReadLimits::default())
+        Self::from_bytes_with_limits(bytes, SourceLimits::default())
     }
 
     /// Move bytes into the XLSX parser with explicit OPC resource limits.
-    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: ReadLimits) -> Result<Self> {
+    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: SourceLimits) -> Result<Self> {
         let package = OpcPackage::from_vec_with_limits(bytes, limits)?;
         Self::from_package(package)
     }
@@ -498,7 +498,7 @@ impl Workbook {
         bytes: Vec<u8>,
         password: &str,
         encryption_limits: &crate::encryption::Limits,
-        opc_limits: ReadLimits,
+        opc_limits: SourceLimits,
     ) -> Result<Self> {
         crate::Package::from_bytes_with_password_and_limits(
             bytes,
@@ -511,11 +511,11 @@ impl Workbook {
 
     /// Open a borrowed XLSX byte slice.
     pub fn from_slice(bytes: &[u8]) -> Result<Self> {
-        Self::from_slice_with_limits(bytes, ReadLimits::default())
+        Self::from_slice_with_limits(bytes, SourceLimits::default())
     }
 
     /// Open a borrowed XLSX byte slice with explicit OPC resource limits.
-    pub fn from_slice_with_limits(bytes: &[u8], limits: ReadLimits) -> Result<Self> {
+    pub fn from_slice_with_limits(bytes: &[u8], limits: SourceLimits) -> Result<Self> {
         Self::from_package(OpcPackage::from_bytes_with_limits(bytes, limits)?)
     }
 
@@ -533,7 +533,7 @@ impl Workbook {
         bytes: &[u8],
         password: &str,
         encryption_limits: &crate::encryption::Limits,
-        opc_limits: ReadLimits,
+        opc_limits: SourceLimits,
     ) -> Result<Self> {
         crate::Package::from_slice_with_password_and_limits(
             bytes,
@@ -546,12 +546,12 @@ impl Workbook {
 
     /// Read an XLSX package from a synchronous reader.
     pub fn from_reader(reader: impl Read) -> Result<Self> {
-        Self::from_reader_with_limits(reader, ReadLimits::default())
+        Self::from_reader_with_limits(reader, SourceLimits::default())
     }
 
     /// Read an XLSX package from a synchronous reader with explicit OPC
     /// resource limits.
-    pub fn from_reader_with_limits(reader: impl Read, limits: ReadLimits) -> Result<Self> {
+    pub fn from_reader_with_limits(reader: impl Read, limits: SourceLimits) -> Result<Self> {
         Self::from_package(OpcPackage::from_reader_with_limits(reader, limits)?)
     }
 
@@ -569,7 +569,7 @@ impl Workbook {
         reader: impl Read,
         password: &str,
         encryption_limits: &crate::encryption::Limits,
-        opc_limits: ReadLimits,
+        opc_limits: SourceLimits,
     ) -> Result<Self> {
         crate::Package::from_reader_with_password_and_limits(
             reader,

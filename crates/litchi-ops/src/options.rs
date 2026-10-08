@@ -71,7 +71,7 @@ pub struct OpenOptions {
     pub(crate) retain_source: bool,
     /// OOXML package read limits shared by DOCX, PPTX, XLSX and XLSB.
     #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
-    pub(crate) ooxml_limits: Option<litchi_opc::ReadLimits>,
+    pub(crate) ooxml_limits: Option<litchi_opc::SourceLimits>,
     /// OOXML source-backed part cache policy.
     #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
     pub(crate) ooxml_cache: Option<litchi_opc::SourceCacheLimits>,
@@ -194,12 +194,12 @@ impl OpenOptions {
     ///
     /// ```
     /// let options = litchi_ops::OpenOptions::new()
-    ///     .ooxml_limits(litchi_opc::ReadLimits::default());
+    ///     .ooxml_limits(litchi_opc::SourceLimits::default());
     /// # let _ = options;
     /// ```
     #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
     #[must_use]
-    pub const fn ooxml_limits(mut self, limits: litchi_opc::ReadLimits) -> Self {
+    pub const fn ooxml_limits(mut self, limits: litchi_opc::SourceLimits) -> Self {
         self.ooxml_limits = Some(limits);
         self
     }
@@ -388,7 +388,7 @@ mod tests {
     #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
     #[test]
     fn builder_sets_ooxml_sub_options() {
-        let limits = litchi_opc::ReadLimits::default();
+        let limits = litchi_opc::SourceLimits::default();
         let cache = litchi_opc::SourceCacheLimits::new(4096, 2).expect("non-zero cache");
         let options = OpenOptions::new().ooxml_limits(limits).ooxml_cache(cache);
         assert_eq!(options.ooxml_limits, Some(limits));

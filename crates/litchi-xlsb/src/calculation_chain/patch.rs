@@ -307,7 +307,7 @@ fn restore_lexical_tokens_from_parts(
     workbook_relationships: &litchi_opc::OwnedRelationships,
     owner_relationships: Option<&litchi_opc::OwnedRelationships>,
     content_types: &litchi_opc::OwnedContentTypes,
-    limits: litchi_opc::ReadLimits,
+    limits: litchi_opc::SourceLimits,
 ) -> Result<()> {
     let root_name = PackURIRef::new("/")?;
     let current_root = package.source_relationships_with_limits(&root_name, limits)?;

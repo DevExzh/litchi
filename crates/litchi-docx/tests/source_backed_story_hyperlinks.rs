@@ -10,7 +10,7 @@ use litchi_core::{
 use litchi_docx::package::StoryLimits;
 use litchi_docx::source_backed;
 use litchi_docx::story_hyperlinks::{Limits as StoryHyperlinkLimits, Mode, UnsupportedClass};
-use litchi_docx::{Error, ReadLimits};
+use litchi_docx::{Error, SourceLimits};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part, TargetMode};
 use soapberry_zip::office::StreamingArchiveWriter;
@@ -1098,7 +1098,7 @@ fn managed_story_snapshot_retains_budgeted_part_data() {
     let (budget, context) = managed_context();
     let package = source_backed::Package::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(fixture(false))),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();

@@ -7,7 +7,7 @@ use litchi_core::{
     OwnedSource, Position, TextOutputOptions,
 };
 use litchi_docx::source_backed::{self, StorySelector};
-use litchi_docx::{Error, ReadLimits};
+use litchi_docx::{Error, SourceLimits};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part, TargetMode};
 
@@ -106,7 +106,7 @@ fn managed_open(bytes: Vec<u8>) -> (Budget, CancellationSource, source_backed::P
     .unwrap();
     let package = source_backed::Package::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(bytes)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         ExecutionContext::new(budget.clone(), cancellation, execution_limits),
     )
     .unwrap();

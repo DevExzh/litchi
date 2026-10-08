@@ -29,7 +29,7 @@ use litchi_crypto::ooxml::{self, IntegrityStatus, Kind, Limits as CryptoLimits, 
 use litchi_crypto::spaces;
 use litchi_doc::{Error as DocError, Limits as DocLimits, OpenOptions, Package as DocPackage};
 use litchi_docx::source_backed::Package as DocxSourcePackage;
-use litchi_opc::{OpcError, OpcPackage, ReadLimits, SourceBackedPackage};
+use litchi_opc::{OpcError, OpcPackage, SourceBackedPackage, SourceLimits};
 use litchi_sign::{Policy, Status};
 use litchi_xls::Workbook as XlsWorkbook;
 use litchi_xlsx::Workbook as XlsxWorkbook;
@@ -1265,8 +1265,8 @@ fn admit_zip_archive_entries<R: ReaderAt>(
     Ok(actual)
 }
 
-fn opc_limits() -> Result<ReadLimits> {
-    Ok(ReadLimits::builder()
+fn opc_limits() -> Result<SourceLimits> {
+    Ok(SourceLimits::builder()
         .max_input_bytes(MAX_INPUT_BYTES)?
         .max_archive_members(MAX_MEMBERS)?
         .max_archive_total_entries(MAX_MEMBERS)?
@@ -1565,7 +1565,7 @@ fn profile_json() -> Value {
             "zip": "a bounded Rust central-directory preflight counts every entry, including directories, before ArchiveReader or PreservationIndex ownership; ArchiveLimits::max_files remains the non-directory file limit",
             "cfb": "source length, header counts, 512KiB directory, and 64MiB allocation-table ceilings are checked before CFB index allocation",
             "crypto": "the 512KiB CFB directory and 64MiB allocation-table ceilings are applied through the explicit OOXML encryption profile before DataSpaces inspection or decryption",
-            "opc": "ReadLimits apply an explicit total central-directory entry preflight, then bound the non-directory member index and part payload reads",
+            "opc": "SourceLimits apply an explicit total central-directory entry preflight, then bound the non-directory member index and part payload reads",
         },
         "notes": "Rows are executable correctness operations. ZIP total-entry admission is explicit because ArchiveLimits::max_files excludes directory records. The zero-DataSpaces-block fixture must refuse strict spaces inspection while compatibility OOXML decryption accepts it. Timing is opt-in and intentionally not captured by this candidate.",
     })

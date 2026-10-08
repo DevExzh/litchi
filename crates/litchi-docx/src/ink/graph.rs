@@ -13,7 +13,7 @@ use litchi_drawingml::ink as shared;
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{
     BlobPart, OpcError, OpcPackage, OwnedContentTypes, OwnedRelationships, OwnedXmlPart, PackURI,
-    ReadLimits, Relationships, TargetMode,
+    Relationships, SourceLimits, TargetMode,
 };
 
 use super::{CONTENT_TYPE, Limits};
@@ -305,7 +305,7 @@ impl Delta {
         }
         let content_types_after = content_types_before.without_parts(
             &removed_names,
-            ReadLimits::default().max_content_types_bytes(),
+            SourceLimits::default().max_content_types_bytes(),
         )?;
 
         let mut owner_after = owner_before.clone();

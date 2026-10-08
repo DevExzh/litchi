@@ -9,7 +9,7 @@ use crate::content_type::ContentTypeMap;
 use crate::error::{OpcError, Result};
 use crate::execution::OpenSession;
 use crate::leniency::ToleranceReport;
-use crate::limits::ReadLimits;
+use crate::limits::SourceLimits;
 use crate::members::NonPartMember;
 use crate::packuri::{CONTENT_TYPES_URI, PACKAGE_URI, PackURI, PartNameConflict};
 use crate::part::{Part, PartFactory, PartMetadata};
@@ -146,7 +146,7 @@ impl RelationshipBinding {
 
 fn check_relationship_capture_limits(
     relationships: &Relationships,
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<()> {
     limits.check(
         crate::ReadResource::RelationshipsPerPart,
@@ -201,7 +201,7 @@ fn escaped_relationship_attribute_len(value: &str) -> Result<usize> {
 
 fn check_canonical_relationship_attribute_limits(
     relationships: &Relationships,
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<()> {
     limits.check(
         crate::ReadResource::XmlAttributeBytes,
@@ -241,7 +241,7 @@ fn check_canonical_relationship_attribute_limits(
 fn check_canonical_relationship_structure(
     relationships: &Relationships,
     bytes: usize,
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<()> {
     let events = relationships.len().checked_add(4).ok_or_else(|| {
         OpcError::InvalidRelationship("canonical relationship XML event count overflows".to_owned())
@@ -341,7 +341,10 @@ impl OwnedContentTypes {
         if std::ptr::eq(xml.bytes(), self.xml.bytes()) {
             return Ok(self.clone());
         }
-        let binding = Arc::new(ContentTypeMap::from_xml(&xml.bytes, ReadLimits::default())?);
+        let binding = Arc::new(ContentTypeMap::from_xml(
+            &xml.bytes,
+            SourceLimits::default(),
+        )?);
         Ok(Self { xml, binding })
     }
 
@@ -365,7 +368,10 @@ impl OwnedContentTypes {
         if std::ptr::eq(xml.bytes(), self.xml.bytes()) {
             return Ok(self.clone());
         }
-        let binding = Arc::new(ContentTypeMap::from_xml(&xml.bytes, ReadLimits::default())?);
+        let binding = Arc::new(ContentTypeMap::from_xml(
+            &xml.bytes,
+            SourceLimits::default(),
+        )?);
         Ok(Self { xml, binding })
     }
 }
@@ -382,7 +388,7 @@ impl OwnedContentTypes {
 #[derive(Clone)]
 pub struct OpcPackage {
     /// Read policy captured at ingress, retained for format-level edit checks.
-    read_limits: ReadLimits,
+    read_limits: SourceLimits,
     /// Package-level relationships
     rels: Relationships,
 
@@ -403,7 +409,7 @@ pub struct OpcPackage {
     /// Read limits the owned source archive was admitted under. Meaningful
     /// only while `source_archive` is `Some`; a compressed transfer out of the
     /// archive re-checks the member against the same policy (change 0742).
-    source_limits: ReadLimits,
+    source_limits: SourceLimits,
 
     /// Index of the owned source archive for compressed transfers out of
     /// parts this package materialized eagerly, built on first use and shared
@@ -494,7 +500,7 @@ impl OpcPackage {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            read_limits: ReadLimits::default(),
+            read_limits: SourceLimits::default(),
             rels: Relationships::new(PACKAGE_URI.to_string()),
             parts: HashMap::new(),
             source_xml_parts: HashMap::new(),
@@ -502,7 +508,7 @@ impl OpcPackage {
             source_content_types_xml: None,
             source_content_types: None,
             source_archive: None,
-            source_limits: ReadLimits::default(),
+            source_limits: SourceLimits::default(),
             transfer_index: None,
             exact_source_authorized: false,
             source_ingress: false,
@@ -524,7 +530,7 @@ impl OpcPackage {
     /// the caller's bounds before staging new payloads. This accessor does
     /// not itself validate edits or change publication behavior.
     #[must_use]
-    pub const fn read_limits(&self) -> ReadLimits {
+    pub const fn read_limits(&self) -> SourceLimits {
         self.read_limits
     }
 
@@ -577,7 +583,7 @@ impl OpcPackage {
         name: &PackURI,
         bytes: &[u8],
         source: &ContentTypeMap,
-        limits: ReadLimits,
+        limits: SourceLimits,
     ) -> Result<()> {
         limits.check(
             crate::ReadResource::ContentTypesBytes,
@@ -739,7 +745,7 @@ impl OpcPackage {
     /// arbitrary XML, and replacement is accepted only for the current
     /// expected view.
     pub fn source_content_types(&self) -> Result<OwnedContentTypes> {
-        self.source_content_types_with_limits(ReadLimits::default())
+        self.source_content_types_with_limits(SourceLimits::default())
     }
 
     /// Capture the current `[Content_Types].xml` publication view under an
@@ -748,7 +754,7 @@ impl OpcPackage {
     /// same limits for its two-pass size and mapping preflight.
     pub fn source_content_types_with_limits(
         &self,
-        limits: ReadLimits,
+        limits: SourceLimits,
     ) -> Result<OwnedContentTypes> {
         let name = PackURI::new(CONTENT_TYPES_URI).map_err(OpcError::InvalidPackUri)?;
         crate::OwnedXmlPart::check_capture_member_name(&name, limits)?;
@@ -806,7 +812,7 @@ impl OpcPackage {
         expected: &[u8],
         replacement: &OwnedContentTypes,
     ) -> Result<bool> {
-        self.try_replace_content_types_with_limits(expected, replacement, ReadLimits::default())
+        self.try_replace_content_types_with_limits(expected, replacement, SourceLimits::default())
     }
 
     /// Replace an exact source-manifest snapshot under an explicit bounded
@@ -820,7 +826,7 @@ impl OpcPackage {
         &mut self,
         expected: &[u8],
         replacement: &OwnedContentTypes,
-        limits: ReadLimits,
+        limits: SourceLimits,
     ) -> Result<bool> {
         let current = self.source_content_types_with_limits(limits)?;
         if current.bytes() != expected {
@@ -982,7 +988,7 @@ impl OpcPackage {
     /// to decide something from those bytes alone, can hold them to the
     /// policy the package itself was opened under (change 0742).
     #[must_use]
-    pub fn source_read_limits(&self) -> Option<ReadLimits> {
+    pub fn source_read_limits(&self) -> Option<SourceLimits> {
         self.source_archive
             .as_ref()
             .map(|_archive| self.source_limits)
@@ -1013,7 +1019,7 @@ impl OpcPackage {
     /// # Errors
     /// Returns an error if the file cannot be read or is not a valid OPC package.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        Self::open_with_limits(path, ReadLimits::default())
+        Self::open_with_limits(path, SourceLimits::default())
     }
 
     /// Open an OPC package from a file with explicit resource limits.
@@ -1021,7 +1027,7 @@ impl OpcPackage {
     /// # Errors
     /// Returns an error if the file cannot be read, violates `limits`, or is not
     /// a valid OPC package.
-    pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: ReadLimits) -> Result<Self> {
+    pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: SourceLimits) -> Result<Self> {
         let data = read_owned_path_with_limits(path, limits)?;
         Self::from_owned_bytes_with_limits(data, limits)
     }
@@ -1034,7 +1040,7 @@ impl OpcPackage {
     /// # Errors
     /// Returns an error if the archive cannot be read or is not a valid OPC package.
     pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
-        Self::from_reader_with_limits(reader, ReadLimits::default())
+        Self::from_reader_with_limits(reader, SourceLimits::default())
     }
 
     /// Load an OPC package from a reader with explicit resource limits.
@@ -1042,7 +1048,7 @@ impl OpcPackage {
     /// # Errors
     /// Returns an error if the archive cannot be read, violates `limits`, or is
     /// not a valid OPC package.
-    pub fn from_reader_with_limits<R: Read>(reader: R, limits: ReadLimits) -> Result<Self> {
+    pub fn from_reader_with_limits<R: Read>(reader: R, limits: SourceLimits) -> Result<Self> {
         let data = read_limited(reader, limits)?;
         Self::from_owned_bytes_with_limits(data, limits)
     }
@@ -1054,14 +1060,14 @@ impl OpcPackage {
     /// # Errors
     /// Returns an error if the archive is not a valid OPC package.
     pub fn from_vec(data: Vec<u8>) -> Result<Self> {
-        Self::from_vec_with_limits(data, ReadLimits::default())
+        Self::from_vec_with_limits(data, SourceLimits::default())
     }
 
     /// Move an owned ZIP archive into the package reader with explicit limits.
     ///
     /// # Errors
     /// Returns an error if the archive violates `limits` or is not a valid OPC package.
-    pub fn from_vec_with_limits(data: Vec<u8>, limits: ReadLimits) -> Result<Self> {
+    pub fn from_vec_with_limits(data: Vec<u8>, limits: SourceLimits) -> Result<Self> {
         Self::from_owned_bytes_with_limits(data, limits)
     }
 
@@ -1085,7 +1091,7 @@ impl OpcPackage {
     /// not relax any read or allocation limit.
     pub fn from_vec_reusing_payloads(
         data: Vec<u8>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         donor: &Self,
     ) -> Result<Self> {
         Self::from_shared_vec_reusing_payloads(Arc::new(data), limits, donor)
@@ -1109,7 +1115,7 @@ impl OpcPackage {
     /// relax any read or allocation limit.
     pub fn from_shared_vec_reusing_payloads(
         data: Arc<Vec<u8>>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         donor: &Self,
     ) -> Result<Self> {
         let mut package = {
@@ -1133,7 +1139,7 @@ impl OpcPackage {
     ///
     /// Returns an error if the archive violates `limits` or is not a valid
     /// OPC package.
-    pub fn from_shared_vec_with_limits(data: Arc<Vec<u8>>, limits: ReadLimits) -> Result<Self> {
+    pub fn from_shared_vec_with_limits(data: Arc<Vec<u8>>, limits: SourceLimits) -> Result<Self> {
         Self::from_shared_bytes_with_limits(data, limits)
     }
 
@@ -1149,7 +1155,7 @@ impl OpcPackage {
     /// cannot complete. Cancellation discards the incomplete package.
     pub fn from_vec_with_execution(
         data: Vec<u8>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         execution: &OpenSession,
     ) -> Result<Self> {
         execution.from_vec(data, limits)
@@ -1163,14 +1169,14 @@ impl OpcPackage {
     /// # Errors
     /// Returns an error if the archive is not a valid OPC package.
     pub fn from_bytes(data: &[u8]) -> Result<Self> {
-        Self::from_bytes_with_limits(data, ReadLimits::default())
+        Self::from_bytes_with_limits(data, SourceLimits::default())
     }
 
     /// Load an OPC package from a byte slice with explicit resource limits.
     ///
     /// # Errors
     /// Returns an error if the archive violates `limits` or is not a valid OPC package.
-    pub fn from_bytes_with_limits(data: &[u8], limits: ReadLimits) -> Result<Self> {
+    pub fn from_bytes_with_limits(data: &[u8], limits: SourceLimits) -> Result<Self> {
         let phys_reader = PhysPkgReader::new_with_limits(data, limits)?;
         let pkg_reader = PackageReader::from_phys_reader(&phys_reader)?;
         Self::unmarshal(pkg_reader)
@@ -1187,7 +1193,7 @@ impl OpcPackage {
     /// cannot complete. Cancellation discards the incomplete package.
     pub fn from_bytes_with_execution(
         data: &[u8],
-        limits: ReadLimits,
+        limits: SourceLimits,
         execution: &OpenSession,
     ) -> Result<Self> {
         execution.from_bytes(data, limits)
@@ -2579,11 +2585,11 @@ impl OpcPackage {
         }
     }
 
-    fn from_owned_bytes_with_limits(data: Vec<u8>, limits: ReadLimits) -> Result<Self> {
+    fn from_owned_bytes_with_limits(data: Vec<u8>, limits: SourceLimits) -> Result<Self> {
         Self::from_shared_bytes_with_limits(Arc::new(data), limits)
     }
 
-    fn from_shared_bytes_with_limits(data: Arc<Vec<u8>>, limits: ReadLimits) -> Result<Self> {
+    fn from_shared_bytes_with_limits(data: Arc<Vec<u8>>, limits: SourceLimits) -> Result<Self> {
         let mut package = {
             let phys_reader = PhysPkgReader::new_with_limits(data.as_slice(), limits)?;
             let pkg_reader = PackageReader::from_phys_reader_deferred(&phys_reader, &data)?;
@@ -2595,7 +2601,7 @@ impl OpcPackage {
 
     pub(crate) fn from_bytes_with_open_session(
         data: &[u8],
-        limits: ReadLimits,
+        limits: SourceLimits,
         session: &OpenSession,
     ) -> Result<Self> {
         session.check()?;
@@ -2607,7 +2613,7 @@ impl OpcPackage {
 
     pub(crate) fn from_vec_with_open_session(
         data: Vec<u8>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         session: &OpenSession,
     ) -> Result<Self> {
         session.check()?;
@@ -2622,12 +2628,12 @@ impl OpcPackage {
         Ok(package)
     }
 
-    fn authorize_owned_source(&mut self, source: Vec<u8>, limits: ReadLimits) {
+    fn authorize_owned_source(&mut self, source: Vec<u8>, limits: SourceLimits) {
         self.authorize_shared_owned_source(Arc::new(source), limits);
     }
 
     /// Retain an owned source archive that deferred payloads already share.
-    fn authorize_shared_owned_source(&mut self, source: Arc<Vec<u8>>, limits: ReadLimits) {
+    fn authorize_shared_owned_source(&mut self, source: Arc<Vec<u8>>, limits: SourceLimits) {
         let preservation = PreservationProvenance::from_package(source.as_slice(), self);
         if let Some(preservation) = preservation.as_ref() {
             self.bind_relationship_captures(preservation);
@@ -3118,7 +3124,7 @@ mod tests {
             br#"<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><!--"#,
         );
         content_types.resize(
-            content_types.len() + ReadLimits::default().max_content_types_bytes() + 1,
+            content_types.len() + SourceLimits::default().max_content_types_bytes() + 1,
             b'x',
         );
         content_types.extend_from_slice(
@@ -3238,7 +3244,7 @@ mod tests {
             .write_stored("word/document.xml", b"<document/>")
             .unwrap();
         let source = writer.finish_to_bytes().unwrap();
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_relationship_xml_bytes(relationships.len())
             .unwrap()
             .max_total_relationship_xml_bytes(relationships.len())
@@ -3311,7 +3317,7 @@ mod tests {
         let current_bytes = current.bytes().to_vec();
         let before_bytes = crate::PackageWriter::to_bytes(&package).unwrap();
 
-        let under = ReadLimits::builder()
+        let under = SourceLimits::builder()
             .max_content_types_bytes(current_bytes.len())
             .unwrap()
             .build()
@@ -3333,7 +3339,7 @@ mod tests {
             before_bytes
         );
 
-        let exact = ReadLimits::builder()
+        let exact = SourceLimits::builder()
             .max_content_types_bytes(replacement.bytes().len())
             .unwrap()
             .max_part_bytes(replacement.bytes().len() as u64)
@@ -3419,7 +3425,7 @@ mod tests {
     fn bounded_content_types_capture_checks_retained_and_authored_quota_boundaries() {
         let package = OpcPackage::from_bytes(&create_minimal_docx()).unwrap();
         let retained = package.source_content_types().unwrap();
-        let exact = ReadLimits::builder()
+        let exact = SourceLimits::builder()
             .max_content_types_bytes(retained.bytes().len())
             .unwrap()
             .max_part_bytes(retained.bytes().len() as u64)
@@ -3433,7 +3439,7 @@ mod tests {
                 .bytes(),
             retained.bytes()
         );
-        let under = ReadLimits::builder()
+        let under = SourceLimits::builder()
             .max_content_types_bytes(retained.bytes().len() - 1)
             .unwrap()
             .build()
@@ -3445,7 +3451,7 @@ mod tests {
                 ..
             })
         ));
-        let part_under = ReadLimits::builder()
+        let part_under = SourceLimits::builder()
             .max_content_types_bytes(retained.bytes().len())
             .unwrap()
             .max_part_bytes((retained.bytes().len() - 1) as u64)
@@ -3459,7 +3465,7 @@ mod tests {
                 ..
             })
         ));
-        let over = ReadLimits::builder()
+        let over = SourceLimits::builder()
             .max_content_types_bytes(retained.bytes().len() + 1)
             .unwrap()
             .max_part_bytes((retained.bytes().len() + 1) as u64)
@@ -3475,7 +3481,7 @@ mod tests {
             Vec::new(),
         )));
         let authored_token = authored.source_content_types().unwrap();
-        let authored_exact = ReadLimits::builder()
+        let authored_exact = SourceLimits::builder()
             .max_content_types_bytes(authored_token.bytes().len())
             .unwrap()
             .max_part_bytes(authored_token.bytes().len() as u64)
@@ -3497,7 +3503,7 @@ mod tests {
             .filter(|&&byte| byte == b'<')
             .count()
             + 1;
-        let authored_structure_exact = ReadLimits::builder()
+        let authored_structure_exact = SourceLimits::builder()
             .max_xml_events(authored_events)
             .unwrap()
             .build()
@@ -3507,7 +3513,7 @@ mod tests {
                 .source_content_types_with_limits(authored_structure_exact)
                 .is_ok()
         );
-        let authored_events_under = ReadLimits::builder()
+        let authored_events_under = SourceLimits::builder()
             .max_xml_events(authored_events - 1)
             .unwrap()
             .build()
@@ -3520,7 +3526,7 @@ mod tests {
                 maximum,
             }) if actual == authored_events as u64 && maximum == (authored_events - 1) as u64
         ));
-        let authored_depth_under = ReadLimits::builder()
+        let authored_depth_under = SourceLimits::builder()
             .max_xml_depth(1)
             .unwrap()
             .build()
@@ -3533,7 +3539,7 @@ mod tests {
                 maximum: 1,
             })
         ));
-        let mapping_under = ReadLimits::builder()
+        let mapping_under = SourceLimits::builder()
             .max_content_type_mappings(2)
             .unwrap()
             .build()
@@ -3551,7 +3557,7 @@ mod tests {
     #[test]
     fn ordinary_save_keeps_explicitly_admitted_large_content_types_source() {
         let (archive, content_types) = large_content_types_archive();
-        let explicit = ReadLimits::builder()
+        let explicit = SourceLimits::builder()
             .max_content_types_bytes(content_types.len())
             .unwrap()
             .build()
@@ -3579,7 +3585,7 @@ mod tests {
     #[test]
     fn bounded_content_types_checks_retained_provenance_before_fallback() {
         let (archive, content_types) = large_content_types_archive();
-        let admission = ReadLimits::builder()
+        let admission = SourceLimits::builder()
             .max_content_types_bytes(content_types.len())
             .unwrap()
             .build()
@@ -3596,7 +3602,7 @@ mod tests {
         // caller's reduced bound is sufficient for authored output. Capture
         // still inspects the retained provenance first and must reject its
         // oversized source bytes under that same bound.
-        let fallback_limit = ReadLimits::builder()
+        let fallback_limit = SourceLimits::builder()
             .max_content_types_bytes(content_types.len() - 1)
             .unwrap()
             .build()
@@ -3658,7 +3664,7 @@ mod tests {
         let source_bytes = crate::PackageWriter::to_bytes(&package).unwrap();
         for (limits, resource) in [
             (
-                ReadLimits::builder()
+                SourceLimits::builder()
                     .max_content_types_bytes(content_types.bytes().len() - 1)
                     .unwrap()
                     .build()
@@ -3666,7 +3672,7 @@ mod tests {
                 crate::ReadResource::ContentTypesBytes,
             ),
             (
-                ReadLimits::builder()
+                SourceLimits::builder()
                     .max_relationship_xml_bytes(expected_relationships.bytes().len() - 1)
                     .unwrap()
                     .build()
@@ -3780,7 +3786,7 @@ mod tests {
         let source = b"four".to_vec();
         let file = NamedTempFile::new().unwrap();
         fs::write(file.path(), &source).unwrap();
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_input_bytes(3)
             .unwrap()
             .build()
@@ -3907,15 +3913,15 @@ mod tests {
             OpcPackage::from_vec(bytes.clone()).unwrap(),
             OpcPackage::from_reader(Cursor::new(bytes.clone())).unwrap(),
             OpcPackage::open(file.path()).unwrap(),
-            OpcPackage::from_vec_reusing_payloads(bytes.clone(), ReadLimits::default(), &donor)
+            OpcPackage::from_vec_reusing_payloads(bytes.clone(), SourceLimits::default(), &donor)
                 .unwrap(),
             OpcPackage::from_shared_vec_reusing_payloads(
                 Arc::clone(&shared),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 &donor,
             )
             .unwrap(),
-            OpcPackage::from_shared_vec_with_limits(Arc::clone(&shared), ReadLimits::default())
+            OpcPackage::from_shared_vec_with_limits(Arc::clone(&shared), SourceLimits::default())
                 .unwrap(),
         ];
         for package in &packages {
@@ -3987,16 +3993,16 @@ mod tests {
         let shared = Arc::new(bytes.clone());
 
         let owned =
-            OpcPackage::from_vec_reusing_payloads(bytes.clone(), ReadLimits::default(), &donor)
+            OpcPackage::from_vec_reusing_payloads(bytes.clone(), SourceLimits::default(), &donor)
                 .unwrap();
         let reused = OpcPackage::from_shared_vec_reusing_payloads(
             Arc::clone(&shared),
-            ReadLimits::default(),
+            SourceLimits::default(),
             &donor,
         )
         .unwrap();
         let deferred =
-            OpcPackage::from_shared_vec_with_limits(Arc::clone(&shared), ReadLimits::default())
+            OpcPackage::from_shared_vec_with_limits(Arc::clone(&shared), SourceLimits::default())
                 .unwrap();
         for package in [&reused, &deferred] {
             assert!(package.is_unmodified_owned_source());
@@ -4004,7 +4010,7 @@ mod tests {
                 &package.exact_source_shared().unwrap(),
                 &shared
             ));
-            assert_eq!(package.source_read_limits(), Some(ReadLimits::default()));
+            assert_eq!(package.source_read_limits(), Some(SourceLimits::default()));
             assert_eq!(package.part_count(), owned.part_count());
         }
         for metadata in owned.iter_parts() {
@@ -4029,7 +4035,7 @@ mod tests {
             );
         }
 
-        let tight = ReadLimits::builder()
+        let tight = SourceLimits::builder()
             .max_input_bytes(8)
             .unwrap()
             .build()
@@ -4230,7 +4236,7 @@ mod tests {
 
     #[test]
     fn bounded_package_constructors_reject_oversized_input() {
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_input_bytes(3)
             .unwrap()
             .build()
@@ -4248,7 +4254,7 @@ mod tests {
     #[test]
     fn package_retains_ingress_limits_through_clone_and_edits() {
         let bytes = create_minimal_docx();
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_input_bytes(bytes.len() as u64)
             .unwrap()
             .max_part_bytes(8192)
@@ -4271,7 +4277,7 @@ mod tests {
             assert_eq!(edited.read_limits(), limits);
             assert_eq!(package.read_limits(), limits);
         }
-        assert_eq!(OpcPackage::new().read_limits(), ReadLimits::default());
+        assert_eq!(OpcPackage::new().read_limits(), SourceLimits::default());
     }
 
     #[test]

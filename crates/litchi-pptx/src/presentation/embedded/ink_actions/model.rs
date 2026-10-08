@@ -532,7 +532,7 @@ pub struct Snapshot {
     pub(crate) owner_relationship_source: OwnedRelationships,
     pub(crate) package_relationship_source: OwnedRelationships,
     pub(crate) package_relationships: Arc<[PackageRelationship]>,
-    pub(crate) read_limits: litchi_opc::ReadLimits,
+    pub(crate) read_limits: litchi_opc::SourceLimits,
     pub(crate) revision: u64,
     pub(crate) limits: Limits,
 }
@@ -610,7 +610,7 @@ impl Snapshot {
 
     /// OPC read policy captured with this source snapshot.
     #[must_use]
-    pub const fn read_limits(&self) -> litchi_opc::ReadLimits {
+    pub const fn read_limits(&self) -> litchi_opc::SourceLimits {
         self.read_limits
     }
 
@@ -739,7 +739,7 @@ impl Snapshot {
         owner_relationship_source: OwnedRelationships,
         package_relationship_source: OwnedRelationships,
         package_relationships: Vec<PackageRelationship>,
-        read_limits: litchi_opc::ReadLimits,
+        read_limits: litchi_opc::SourceLimits,
         limits: Limits,
     ) -> Self {
         let revision = revision(

@@ -81,7 +81,7 @@ composition (`join`, `three_way`), durable patch formats beyond pptx/xlsx.
 
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
-| Physical ingress limits | `SourceLimits` | `ReadLimits` (OPC re-exports in docx/pptx/xlsx/xlsb), `SourcePackageLimits` (odt), `package::Limits` (doc), `DocumentSourceLimits` (iWork) | 🔴 all waves |
+| Physical ingress limits | `SourceLimits` | `ReadLimits` (OPC re-exports in docx/pptx/xlsx/xlsb), `SourcePackageLimits` (odt), `package::Limits` (doc), `DocumentSourceLimits` (iWork) | ✅ OPC `SourceLimits`/`SourceLimitsBuilder` and OOXML `SourceLimits` re-exports, record 0035 · 🔴 ODF/legacy/iWork |
 | Semantic limits | `SemanticLimits` | `DocumentLimits` (numbers), `DocumentSemanticLimits` (keynote) | ✅ pages · 🔴 W1 |
 | Open configuration envelope | `OpenOptions` (per format, extensible fields) | `PackageOpenOptions` (doc — merges), `ReadOptions` (numbers), `iwork::Options` (facade) | 🔴 W1–W4 |
 | Construction idiom | consuming builder, fallible `max_<dimension>` setters, fallible `build()` | positional `new(...)` constructors (iWork) | ✅ OPC · 🔴 W1 |
@@ -199,7 +199,10 @@ can overwrite its rustdoc JSON. Register every feature surface affected by a
 migration in the same commit as the code and glossary status update.
 
 A banned-name rule contains `name`, a fully qualified `scope`, and a
-`replacement` explanation. For example, a future completed selector migration
+`replacement` explanation. Optional `recursive: false` restricts the ban to
+direct children of the scope; the default checks all descendants. XLSB uses
+this for its root physical-limit name while nested semantic limits migrate
+separately. For example, a future completed selector migration
 could ban `Id` within `litchi_core::selector::Selector`; that does not ban a
 format's semantic `glossary::Id`. Names and path segments match exactly, with
 no substring matching or implicit exceptions. A scope must exist in the

@@ -21,7 +21,7 @@ use litchi_xlsx::sheet_protection::{
     Metadata, ProtectedRange, ProtectedRangeCollection, ProtectedRangeSource, Protection,
     ProtectionPasswordVerifier, ProtectionRangeSqref, SourceBackedEditor, SourceEdit,
 };
-use litchi_xlsx::{Error, Package, ReadLimits};
+use litchi_xlsx::{Error, Package, SourceLimits};
 
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
@@ -329,7 +329,7 @@ fn managed_snapshot_changed_publication_and_budget_release_are_exact() {
     let editor =
         SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
             Arc::new(VersionedSource::new(source_bytes.clone())),
-            ReadLimits::default(),
+            SourceLimits::default(),
             SourceCacheLimits::new(usize::try_from(exact).unwrap(), 8).unwrap(),
             context,
         )
@@ -524,7 +524,7 @@ fn mce_limits_and_partial_sink_are_checked() {
     assert!(edit.set(target_metadata()).unwrap());
     assert!(edit.commit().is_err());
 
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_part_bytes(1)
         .unwrap()
         .build()

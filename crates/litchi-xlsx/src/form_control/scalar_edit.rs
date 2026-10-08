@@ -8,7 +8,7 @@ use std::sync::Arc;
 use litchi_core::xml::ReaderOrigin;
 use litchi_core::{ExecutionContext, ReadAt, Resource};
 use litchi_opc::{
-    AuthoredXmlFragment, OpcPackage, PackURI, ReadLimits, SourceBackedPackage, SourceCacheLimits,
+    AuthoredXmlFragment, OpcPackage, PackURI, SourceBackedPackage, SourceCacheLimits, SourceLimits,
     SourceTopologyPlan, SourceXmlPart,
 };
 use quick_xml::XmlVersion;
@@ -925,10 +925,10 @@ pub struct SourceBackedFormControlEditor {
 impl SourceBackedFormControlEditor {
     /// Open with standard bounded policies.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, ReadLimits::default())
+        Self::from_read_at_with_limits(source, SourceLimits::default())
     }
     /// Open with explicit OPC read limits.
-    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
+    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: SourceLimits) -> Result<Self> {
         Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_limits(
             source, limits,
         )?)
@@ -945,7 +945,7 @@ impl SourceBackedFormControlEditor {
     /// Open with explicit read and cache policies.
     pub fn from_read_at_with_limits_and_cache_limits(
         source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
+        read_limits: SourceLimits,
         cache_limits: SourceCacheLimits,
     ) -> Result<Self> {
         Self::from_source_backed_package(
@@ -959,7 +959,7 @@ impl SourceBackedFormControlEditor {
     /// Open with a caller-owned execution context.
     pub fn from_read_at_with_execution_context(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_execution_context(

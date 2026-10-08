@@ -193,7 +193,7 @@ impl<'index, 'package> RelationshipClosure<'index, 'package> {
 /// borrowed references for every admitted relationship so an unrelated part
 /// cannot make a selected target fail during the inventory pass.  Aggregate
 /// edge and key allocations are bounded by the package's retained
-/// [`litchi_opc::ReadLimits`], and all fallible collection growth uses
+/// [`litchi_opc::SourceLimits`], and all fallible collection growth uses
 /// `try_reserve`.
 #[derive(Debug)]
 pub(crate) struct RelationshipIndex<'package> {
@@ -523,7 +523,7 @@ impl<'package> RelationshipIndex<'package> {
 
 fn validate_package_part_bytes(
     package: &OpcPackage,
-    read_limits: litchi_opc::ReadLimits,
+    read_limits: litchi_opc::SourceLimits,
 ) -> Result<()> {
     let mut total = 0u64;
     // Every part's inflated byte count is charged, so this pass decodes every
@@ -683,7 +683,7 @@ fn ascii_case_insensitive_cmp(left: &str, right: &str) -> Ordering {
 
 fn check_relationship_fields(
     relationship: &Relationship,
-    read_limits: litchi_opc::ReadLimits,
+    read_limits: litchi_opc::SourceLimits,
 ) -> Result<()> {
     let field_limit = MAX_RELATIONSHIP_FIELD_BYTES.min(read_limits.max_xml_attribute_bytes());
     for (name, value) in [

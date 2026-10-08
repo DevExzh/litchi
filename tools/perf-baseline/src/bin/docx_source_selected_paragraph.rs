@@ -1565,7 +1565,7 @@ fn run_source(corpus: &Corpus, managed: bool) -> AnyResult<SourceRun> {
         memory_before_open = managed_budget.used(Resource::Memory);
         let package = source_backed::Package::from_read_at_with_execution_context(
             source_for_package,
-            litchi_docx::ReadLimits::default(),
+            litchi_docx::SourceLimits::default(),
             context,
         )?;
         budget = Some(managed_budget);

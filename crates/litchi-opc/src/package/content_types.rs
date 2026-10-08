@@ -1,6 +1,6 @@
 //! Source-preserving `[Content_Types].xml` structural edits.
 
-use super::super::{OwnedElementEdit, OwnedElementUpdate, OwnedXmlPart, PackURI, ReadLimits};
+use super::super::{OwnedElementEdit, OwnedElementUpdate, OwnedXmlPart, PackURI, SourceLimits};
 use crate::Result;
 use crate::content_type::validate_content_type;
 use crate::error::OpcError;
@@ -65,7 +65,7 @@ impl<'source> ContentTypesEditPlan<'source> {
 
     /// Materialize one validated replacement XML buffer after caller limits
     /// have admitted the exact plan metrics.
-    pub fn materialize(self, limits: ReadLimits) -> Result<super::OwnedContentTypes> {
+    pub fn materialize(self, limits: SourceLimits) -> Result<super::OwnedContentTypes> {
         let source = self.source;
         limits.check(
             ReadResource::ContentTypesBytes,
@@ -127,7 +127,7 @@ impl super::OwnedContentTypes {
         &'source self,
         additions: &[ContentTypeEdit<'_>],
         removals: &[PackURI],
-        limits: ReadLimits,
+        limits: SourceLimits,
     ) -> Result<ContentTypesEditPlan<'source>> {
         self.plan_edit_with_defaults(additions, removals, &[], limits)
     }
@@ -141,7 +141,7 @@ impl super::OwnedContentTypes {
         additions: &[ContentTypeEdit<'_>],
         removals: &[PackURI],
         default_removals: &[&str],
-        limits: ReadLimits,
+        limits: SourceLimits,
     ) -> Result<ContentTypesEditPlan<'source>> {
         limits.check(
             ReadResource::ContentTypesBytes,
@@ -229,7 +229,7 @@ fn preflight_content_type_edit_inputs(
     additions: &[ContentTypeEdit<'_>],
     removals: &[PackURI],
     default_removals: &[&str],
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<()> {
     if additions.len() > limits.max_content_type_mappings() {
         return Err(OpcError::ReadLimit {
@@ -315,7 +315,7 @@ pub(crate) fn without_part_overrides(
     parts: &[PackURI],
     max_output_bytes: usize,
 ) -> Result<OwnedXmlPart> {
-    let limits = ReadLimits::default();
+    let limits = SourceLimits::default();
     let maximum = max_output_bytes.min(limits.max_content_types_bytes());
     if source.bytes().len() > maximum {
         return Err(OpcError::InvalidContentTypesManifest(
@@ -463,7 +463,7 @@ pub(crate) fn preflight_part_overrides(
     overrides: &[(&PackURI, &str)],
     max_output_bytes: usize,
 ) -> Result<(usize, usize)> {
-    let limits = ReadLimits::default();
+    let limits = SourceLimits::default();
     let maximum = max_output_bytes.min(limits.max_content_types_bytes());
     if source.bytes().len() > maximum {
         return Err(OpcError::InvalidContentTypesManifest(
@@ -839,7 +839,7 @@ mod tests {
         )
         .unwrap();
         let binding = SharedArc::new(
-            crate::content_type::ContentTypeMap::from_xml(source_bytes, ReadLimits::default())
+            crate::content_type::ContentTypeMap::from_xml(source_bytes, SourceLimits::default())
                 .unwrap(),
         );
         let token = super::super::OwnedContentTypes { xml, binding };
@@ -850,11 +850,11 @@ mod tests {
             content_type: "application/octet-stream",
         }];
         let plan = token
-            .plan_edit_with_defaults(&edits, &[dropped], &["svg"], ReadLimits::default())
+            .plan_edit_with_defaults(&edits, &[dropped], &["svg"], SourceLimits::default())
             .unwrap();
         assert_eq!(plan.mapping_count(), 2);
         let exact = plan.final_len().max(token.bytes().len());
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_content_types_bytes(exact)
             .unwrap()
             .max_part_bytes(exact as u64)
@@ -890,7 +890,7 @@ mod tests {
         )
         .unwrap();
         let binding = SharedArc::new(
-            crate::content_type::ContentTypeMap::from_xml(source_bytes, ReadLimits::default())
+            crate::content_type::ContentTypeMap::from_xml(source_bytes, SourceLimits::default())
                 .unwrap(),
         );
         let token = super::super::OwnedContentTypes { xml, binding };
@@ -899,15 +899,19 @@ mod tests {
             part_name: &existing,
             content_type: "application/new",
         }];
-        assert!(token.plan_edit(&edit, &[], ReadLimits::default()).is_err());
+        assert!(
+            token
+                .plan_edit(&edit, &[], SourceLimits::default())
+                .is_err()
+        );
         let after = token
             .plan_edit(
                 &edit,
                 std::slice::from_ref(&existing),
-                ReadLimits::default(),
+                SourceLimits::default(),
             )
             .unwrap()
-            .materialize(ReadLimits::default())
+            .materialize(SourceLimits::default())
             .unwrap();
         let text = std::str::from_utf8(after.bytes()).unwrap();
         assert!(text.contains("ContentType=\"application/new\""));
@@ -925,15 +929,15 @@ mod tests {
         )
         .unwrap();
         let binding = SharedArc::new(
-            crate::content_type::ContentTypeMap::from_xml(source_bytes, ReadLimits::default())
+            crate::content_type::ContentTypeMap::from_xml(source_bytes, SourceLimits::default())
                 .unwrap(),
         );
         let token = super::super::OwnedContentTypes { xml, binding };
         let spaced = [" \tSVG\r\n"];
         let after = token
-            .plan_edit_with_defaults(&[], &[], &spaced, ReadLimits::default())
+            .plan_edit_with_defaults(&[], &[], &spaced, SourceLimits::default())
             .unwrap()
-            .materialize(ReadLimits::default())
+            .materialize(SourceLimits::default())
             .unwrap();
         assert!(
             !std::str::from_utf8(after.bytes())
@@ -944,13 +948,13 @@ mod tests {
         let nbsp = ["\u{00a0}svg"];
         assert!(
             token
-                .plan_edit_with_defaults(&[], &[], &nbsp, ReadLimits::default())
+                .plan_edit_with_defaults(&[], &[], &nbsp, SourceLimits::default())
                 .is_err()
         );
         let duplicate = [" svg ", "SVG\n"];
         assert!(
             token
-                .plan_edit_with_defaults(&[], &[], &duplicate, ReadLimits::default())
+                .plan_edit_with_defaults(&[], &[], &duplicate, SourceLimits::default())
                 .is_err()
         );
     }
@@ -966,7 +970,7 @@ mod tests {
         )
         .unwrap();
         let binding = SharedArc::new(
-            crate::content_type::ContentTypeMap::from_xml(source_bytes, ReadLimits::default())
+            crate::content_type::ContentTypeMap::from_xml(source_bytes, SourceLimits::default())
                 .unwrap(),
         );
         let token = super::super::OwnedContentTypes { xml, binding };
@@ -975,10 +979,12 @@ mod tests {
             part_name: &added,
             content_type: "application/octet-stream",
         }];
-        let plan = token.plan_edit(&edits, &[], ReadLimits::default()).unwrap();
+        let plan = token
+            .plan_edit(&edits, &[], SourceLimits::default())
+            .unwrap();
         assert_eq!(plan.event_count(), 4);
         let exact = plan.final_len().max(token.bytes().len());
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_content_types_bytes(exact)
             .unwrap()
             .max_part_bytes(exact as u64)
@@ -995,7 +1001,7 @@ mod tests {
                 .unwrap()
                 .contains("</ct:Types>")
         );
-        let under = ReadLimits::builder()
+        let under = SourceLimits::builder()
             .max_content_types_bytes(exact - 1)
             .unwrap()
             .max_part_bytes((exact - 1) as u64)

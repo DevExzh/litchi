@@ -4,7 +4,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use litchi_core::{ReadAt, SourceVersion};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, ReadLimits, TargetMode};
+use litchi_opc::{
+    BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, SourceLimits, TargetMode,
+};
 use litchi_pptx::{
     Error, SourceBackedPresentation, SourceBackedPresentationEditor, SourceSvgReplacement,
 };
@@ -450,7 +452,7 @@ fn svg_transaction_requires_the_specified_png_raster_fallback() {
 fn svg_transaction_checks_replacement_limits_before_publication() {
     let source = source_package(false);
     let max_part_bytes = 2048_usize;
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_part_bytes(max_part_bytes as u64)
         .unwrap()
         .build()

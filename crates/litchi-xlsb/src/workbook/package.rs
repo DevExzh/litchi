@@ -1103,7 +1103,7 @@ impl Workbook {
     pub fn new<R: Read + Seek>(reader: R) -> Result<Self> {
         Self::new_with_limits_and_external_link_limits(
             reader,
-            litchi_opc::ReadLimits::default(),
+            litchi_opc::SourceLimits::default(),
             ExternalLinkLimits::default(),
         )
     }
@@ -1120,7 +1120,7 @@ impl Workbook {
     pub fn new_without_drawing_parse<R: Read + Seek>(reader: R) -> Result<Self> {
         Self::new_without_drawing_parse_with_limits_and_external_link_limits(
             reader,
-            litchi_opc::ReadLimits::default(),
+            litchi_opc::SourceLimits::default(),
             ExternalLinkLimits::default(),
         )
     }
@@ -1128,7 +1128,7 @@ impl Workbook {
     /// Read a cell/catalog CRUD projection with explicit OPC resource limits.
     pub fn new_without_drawing_parse_with_limits<R: Read + Seek>(
         reader: R,
-        limits: litchi_opc::ReadLimits,
+        limits: litchi_opc::SourceLimits,
     ) -> Result<Self> {
         Self::new_without_drawing_parse_with_limits_and_external_link_limits(
             reader,
@@ -1141,7 +1141,7 @@ impl Workbook {
     /// resource limits.
     pub fn new_without_drawing_parse_with_limits_and_external_link_limits<R: Read + Seek>(
         reader: R,
-        limits: litchi_opc::ReadLimits,
+        limits: litchi_opc::SourceLimits,
         external_link_limits: ExternalLinkLimits,
     ) -> Result<Self> {
         let package = OpcPackage::from_reader_with_limits(reader, limits)?;
@@ -1155,7 +1155,7 @@ impl Workbook {
     /// Read and validate an XLSB workbook with explicit OPC resource limits.
     pub fn new_with_limits<R: Read + Seek>(
         reader: R,
-        limits: litchi_opc::ReadLimits,
+        limits: litchi_opc::SourceLimits,
     ) -> Result<Self> {
         Self::new_with_limits_and_external_link_limits(
             reader,
@@ -1172,7 +1172,7 @@ impl Workbook {
     ) -> Result<Self> {
         Self::new_with_limits_and_external_link_limits(
             reader,
-            litchi_opc::ReadLimits::default(),
+            litchi_opc::SourceLimits::default(),
             external_link_limits,
         )
     }
@@ -1181,7 +1181,7 @@ impl Workbook {
     /// external-link resource limits.
     pub fn new_with_limits_and_external_link_limits<R: Read + Seek>(
         reader: R,
-        limits: litchi_opc::ReadLimits,
+        limits: litchi_opc::SourceLimits,
         external_link_limits: ExternalLinkLimits,
     ) -> Result<Self> {
         let package = OpcPackage::from_reader_with_limits(reader, limits)?;

@@ -23,8 +23,8 @@ use litchi_core::{
     ReadAt, Resource, SourceVersion,
 };
 use litchi_opc::{
-    OpcOperationAccounting, PackURI, PartBatch, PartData, ReadLimits, SourceBackedPackage,
-    SourceCacheDiagnostics, SourceCacheLimits,
+    OpcOperationAccounting, PackURI, PartBatch, PartData, SourceBackedPackage,
+    SourceCacheDiagnostics, SourceCacheLimits, SourceLimits,
 };
 use sha2::{Digest as _, Sha256};
 use soapberry_zip::office::StreamingArchiveWriter;
@@ -631,14 +631,14 @@ fn run_sample(
         Some(context) => {
             SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
                 source,
-                ReadLimits::default(),
+                SourceLimits::default(),
                 cache_limits,
                 context,
             )?
         },
         None => SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
             source,
-            ReadLimits::default(),
+            SourceLimits::default(),
             cache_limits,
         )?,
     };

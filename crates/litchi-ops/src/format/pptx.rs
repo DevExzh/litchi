@@ -71,7 +71,7 @@ struct PptxState {
     retain_source: bool,
     /// The OPC read limits of the open, which an unsigned copy is opened
     /// under (record 0013).
-    ooxml_limits: opc::ReadLimits,
+    ooxml_limits: opc::SourceLimits,
 }
 
 /// The two states of the PPTX owner (record 0003 §2.3).

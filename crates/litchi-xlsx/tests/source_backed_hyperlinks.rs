@@ -16,9 +16,9 @@ use litchi_core::{
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcError, OpcPackage, PackURI};
 use litchi_xlsx::{
-    Error, Hyperlink, HyperlinkReference, Package, ReadLimits, SourceBackedHyperlinkCommit,
+    Error, Hyperlink, HyperlinkReference, Package, SourceBackedHyperlinkCommit,
     SourceBackedHyperlinkEdit, SourceBackedHyperlinkEditor, SourceBackedHyperlinkPatch,
-    SourceBackedHyperlinkSnapshot,
+    SourceBackedHyperlinkSnapshot, SourceLimits,
 };
 use soapberry_zip::{PreservationIndex, ZipArchive};
 
@@ -667,7 +667,7 @@ fn managed_limits_cancellation_and_partial_sink_are_typed() {
     let (budget, _cancellation_source, context) = managed_context(exact - 1);
     let editor = SourceBackedHyperlinkEditor::from_read_at_with_execution_context(
         Arc::new(CountingSource::new(source_bytes.clone())),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -680,7 +680,7 @@ fn managed_limits_cancellation_and_partial_sink_are_typed() {
     drop(editor);
     assert_eq!(budget.used(Resource::Memory), 0);
 
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_part_bytes(1)
         .unwrap()
         .build()
@@ -696,7 +696,7 @@ fn managed_limits_cancellation_and_partial_sink_are_typed() {
     let (budget, cancellation_source, context) = managed_context(exact);
     let editor = SourceBackedHyperlinkEditor::from_read_at_with_execution_context(
         Arc::new(CountingSource::new(source_bytes.clone())),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();

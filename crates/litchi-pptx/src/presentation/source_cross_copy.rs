@@ -5741,7 +5741,7 @@ fn digest_touched(
 fn reserve_memory(
     context: Option<&ExecutionContext>,
     bytes: usize,
-    limits: litchi_opc::ReadLimits,
+    limits: litchi_opc::SourceLimits,
 ) -> Result<Option<Arc<Reservation>>> {
     let bytes = bytes
         .checked_add(MAX_STAGING_OVERHEAD)
@@ -6223,7 +6223,7 @@ mod tests {
                     )
                     .to_vec(),
                 )),
-                litchi_opc::ReadLimits::default(),
+                litchi_opc::SourceLimits::default(),
                 litchi_opc::SourceCacheLimits::new(1, 1).unwrap(),
                 context.clone(),
             )

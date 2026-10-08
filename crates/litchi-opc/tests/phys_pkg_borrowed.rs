@@ -11,7 +11,7 @@
 //! adapter's public contract and its mapping of those outcomes.
 
 use litchi_opc::phys_pkg::PhysPkgReader;
-use litchi_opc::{OpcError, PackURI, ReadLimits, ReadResource};
+use litchi_opc::{OpcError, PackURI, ReadResource, SourceLimits};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const STORED_MEMBER: &str = "word/media/image.bin";
@@ -272,7 +272,7 @@ fn phys_pkg_borrowed_rejects_corrupt_stored_payload_and_crc() {
 fn phys_pkg_borrowed_enforces_part_limit_without_materialization_charge() {
     let archive = mixed_archive();
     let oversized_maximum = (STORED_PAYLOAD.len() - 1) as u64;
-    let oversized_limits = ReadLimits::builder()
+    let oversized_limits = SourceLimits::builder()
         .max_part_bytes(oversized_maximum)
         .expect("positive part limit must be accepted")
         .build()
@@ -292,7 +292,7 @@ fn phys_pkg_borrowed_enforces_part_limit_without_materialization_charge() {
     ));
 
     let materialization_maximum = STORED_PAYLOAD.len() as u64;
-    let materialization_limits = ReadLimits::builder()
+    let materialization_limits = SourceLimits::builder()
         .max_parts(1)
         .expect("one materialized part must be accepted")
         .max_part_bytes(materialization_maximum)

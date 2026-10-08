@@ -10,7 +10,7 @@ use std::io::Cursor;
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part, Relationships};
 use litchi_pptx::encryption::{self, Kind, Mode};
-use litchi_pptx::{EncryptionLimits, Error, Package, ReadLimits};
+use litchi_pptx::{EncryptionLimits, Error, Package, SourceLimits};
 
 fn plain() -> Vec<u8> {
     Package::new().unwrap().to_bytes().unwrap()
@@ -165,7 +165,7 @@ fn password_aware_ingress_reports_password_and_independent_limits() {
             bytes.clone(),
             "secret",
             crypto_limits,
-            ReadLimits::default(),
+            SourceLimits::default(),
         ),
         Err(Error::Encryption(encryption::Error::Limit {
             resource: "input",
@@ -173,7 +173,7 @@ fn password_aware_ingress_reports_password_and_independent_limits() {
         }))
     ));
 
-    let opc_limits = ReadLimits::builder()
+    let opc_limits = SourceLimits::builder()
         .max_input_bytes(1)
         .unwrap()
         .build()

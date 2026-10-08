@@ -31,7 +31,7 @@ use litchi_core::{
     Resource, SourceVersion,
 };
 use litchi_opc::{
-    OpcError, PackURI, ReadLimits, ReadResource, SourceBackedPackage, SourceCacheLimits,
+    OpcError, PackURI, ReadResource, SourceBackedPackage, SourceCacheLimits, SourceLimits,
 };
 use soapberry_zip::office::StreamingArchiveWriter;
 
@@ -969,7 +969,7 @@ fn managed_context(
 fn package_with_context(source: Arc<dyn ReadAt>, context: ExecutionContext) -> SourceBackedPackage {
     SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
         source,
-        ReadLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::new(PART_BYTES * 8, 16).unwrap(),
         context,
     )
@@ -1167,7 +1167,11 @@ fn batch_missing_and_corrupt_parts_fail_without_partial_results_or_flights() {
 #[test]
 fn batch_request_count_limit_remains_a_typed_read_limit() {
     let (archive, _) = archive_bytes(None);
-    let limits = ReadLimits::builder().max_parts(4).unwrap().build().unwrap();
+    let limits = SourceLimits::builder()
+        .max_parts(4)
+        .unwrap()
+        .build()
+        .unwrap();
     let package = SourceBackedPackage::from_read_at_with_limits(
         Arc::new(litchi_core::OwnedSource::new(archive)),
         limits,

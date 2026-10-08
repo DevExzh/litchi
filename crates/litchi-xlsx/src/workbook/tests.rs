@@ -14,7 +14,7 @@ use crate::Cell;
 use crate::cell::{Extents, Value};
 use crate::error::Error;
 use crate::formula::Cache;
-use crate::{LocalStyle, Package, ReadLimits, Style, Styles};
+use crate::{LocalStyle, Package, SourceLimits, Style, Styles};
 
 const CHARTSHEET_REL: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet";
@@ -125,12 +125,12 @@ fn package_and_workbook_ingress_honor_exact_read_limits() {
         .to_bytes()
         .expect("serialize minimal workbook");
     let input_bytes = u64::try_from(bytes.len()).expect("input length fits u64");
-    let exact = ReadLimits::builder()
+    let exact = SourceLimits::builder()
         .max_input_bytes(input_bytes)
         .expect("exact input limit")
         .build()
         .expect("valid exact limit");
-    let over = ReadLimits::builder()
+    let over = SourceLimits::builder()
         .max_input_bytes(input_bytes - 1)
         .expect("smaller input limit")
         .build()

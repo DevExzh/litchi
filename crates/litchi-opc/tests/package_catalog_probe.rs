@@ -10,7 +10,7 @@ use std::io::{self, Cursor, Read, Seek, SeekFrom};
 use std::ops::Range;
 
 use litchi_opc::{
-    OpcError, OpcPackage, ReadLimits, ReadResource, SourceBackedPackage,
+    OpcError, OpcPackage, ReadResource, SourceBackedPackage, SourceLimits,
     probe_package_catalog_from_reader, probe_package_catalog_from_reader_with_limits,
 };
 use soapberry_zip::office::StreamingArchiveWriter;
@@ -274,8 +274,8 @@ fn directory_entry_fixture() -> Vec<u8> {
     bytes
 }
 
-fn directory_entry_limits(maximum: usize) -> ReadLimits {
-    ReadLimits::builder()
+fn directory_entry_limits(maximum: usize) -> SourceLimits {
+    SourceLimits::builder()
         .max_archive_members(5)
         .unwrap()
         .max_parts(5)
@@ -360,7 +360,7 @@ fn default_probe_reads_zip_metadata_and_structural_members_only() {
 #[test]
 fn limited_probe_matches_eager_and_source_catalog_semantics() {
     let fixture = fixture();
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_input_bytes(fixture.bytes.len() as u64)
         .unwrap()
         .build()
@@ -401,7 +401,7 @@ fn probe_limit_errors_are_typed_and_restore_the_cursor() {
     let fixture = fixture();
     let cases = [
         (
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_input_bytes((fixture.bytes.len() - 1) as u64)
                 .unwrap()
                 .build()
@@ -409,7 +409,7 @@ fn probe_limit_errors_are_typed_and_restore_the_cursor() {
             ReadResource::InputBytes,
         ),
         (
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_content_types_bytes(fixture.content_types_bytes - 1)
                 .unwrap()
                 .build()
@@ -417,7 +417,7 @@ fn probe_limit_errors_are_typed_and_restore_the_cursor() {
             ReadResource::ContentTypesBytes,
         ),
         (
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_relationship_parts(1)
                 .unwrap()
                 .build()
@@ -425,7 +425,7 @@ fn probe_limit_errors_are_typed_and_restore_the_cursor() {
             ReadResource::RelationshipParts,
         ),
         (
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_relationship_xml_bytes(1)
                 .unwrap()
                 .build()

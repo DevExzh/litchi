@@ -32,7 +32,7 @@ use litchi_xlsx::pivot::server_formats::table_data::load as load_pivot_table_dat
 use litchi_xlsx::pivot::server_formats::{
     AttributeEdit, PivotTableSelector, ServerFormat, ServerFormatEdit, apply_patch, edit, load,
 };
-use litchi_xlsx::{Cell, Error, ReadLimits, Value, Workbook};
+use litchi_xlsx::{Cell, Error, SourceLimits, Value, Workbook};
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
 
@@ -1853,7 +1853,7 @@ fn structural_list_aggregate_cap_is_checked_before_publication() {
         .sum::<u64>();
     assert!(final_total > source_total);
 
-    let exact_limits = ReadLimits::builder()
+    let exact_limits = SourceLimits::builder()
         .max_total_part_bytes(final_total)
         .unwrap()
         .build()
@@ -1873,7 +1873,7 @@ fn structural_list_aggregate_cap_is_checked_before_publication() {
         final_total
     );
 
-    let one_under_limits = ReadLimits::builder()
+    let one_under_limits = SourceLimits::builder()
         .max_total_part_bytes(final_total - 1)
         .unwrap()
         .build()
@@ -1949,7 +1949,7 @@ fn stale_signed_and_limited_publications_refuse_before_mutation() {
         .map(|part| part.blob().len())
         .max()
         .unwrap();
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_part_bytes(max_source.saturating_mul(16) as u64)
         .unwrap()
         .build()
@@ -2423,7 +2423,7 @@ fn caller_limits_reject_before_server_format_collection_allocation() {
     let package = fixture.package();
     assert!(load(&package, "Pivot").is_err());
 
-    let tiny = ReadLimits::builder()
+    let tiny = SourceLimits::builder()
         .max_part_bytes(1)
         .unwrap()
         .build()
@@ -2471,7 +2471,7 @@ fn exact_source_aggregate_cap_admits_equal_size_edit_but_rejects_growth() {
         .sum::<u64>();
     assert!(exact_final_total > source_total + 1);
 
-    let exact_limits = ReadLimits::builder()
+    let exact_limits = SourceLimits::builder()
         .max_total_part_bytes(exact_final_total)
         .unwrap()
         .build()
@@ -2497,7 +2497,7 @@ fn exact_source_aggregate_cap_admits_equal_size_edit_but_rejects_growth() {
             .contains(r#"format="&#34;&#10;""#)
     );
 
-    let one_under_limits = ReadLimits::builder()
+    let one_under_limits = SourceLimits::builder()
         .max_total_part_bytes(exact_final_total - 1)
         .unwrap()
         .build()
@@ -2538,7 +2538,7 @@ fn caller_encoded_attribute_limit_admits_exact_output_and_rejects_one_under() {
     assert!(encoded_value.contains("_x005F_x0001_"));
     assert!(generous_xml.contains(r#"format="&#34;&#10;""#));
 
-    let exact_limits = ReadLimits::builder()
+    let exact_limits = SourceLimits::builder()
         .max_xml_attribute_bytes(encoded_attribute_bytes)
         .unwrap()
         .max_relationship_target_bytes(encoded_attribute_bytes)
@@ -2553,7 +2553,7 @@ fn caller_encoded_attribute_limit_admits_exact_output_and_rejects_one_under() {
     exact_edit.commit().unwrap();
     assert_eq!(table_blob(&exact), table_blob(&generous));
 
-    let one_under_limits = ReadLimits::builder()
+    let one_under_limits = SourceLimits::builder()
         .max_xml_attribute_bytes(encoded_attribute_bytes - 1)
         .unwrap()
         .max_relationship_target_bytes(encoded_attribute_bytes - 1)
@@ -2575,7 +2575,7 @@ fn retained_xml_event_depth_and_attribute_limits_are_honored_by_owner_scan() {
         table_children: "<x15:opaque/>".repeat(64),
         ..FixtureOptions::default()
     });
-    let event_limits = ReadLimits::builder()
+    let event_limits = SourceLimits::builder()
         .max_xml_events(64)
         .unwrap()
         .build()
@@ -2595,7 +2595,7 @@ fn retained_xml_event_depth_and_attribute_limits_are_honored_by_owner_scan() {
         table_children: nested,
         ..FixtureOptions::default()
     });
-    let depth_limits = ReadLimits::builder()
+    let depth_limits = SourceLimits::builder()
         .max_xml_depth(4)
         .unwrap()
         .build()
@@ -2608,7 +2608,7 @@ fn retained_xml_event_depth_and_attribute_limits_are_honored_by_owner_scan() {
         table_attrs: format!(r#" opaque="{}""#, "x".repeat(1024)),
         ..FixtureOptions::default()
     });
-    let attribute_limits = ReadLimits::builder()
+    let attribute_limits = SourceLimits::builder()
         .max_xml_attribute_bytes(512)
         .unwrap()
         .max_relationship_target_bytes(512)
@@ -2623,7 +2623,7 @@ fn retained_xml_event_depth_and_attribute_limits_are_honored_by_owner_scan() {
         table_attrs: format!(r#" opaque="{}""#, "&#34;".repeat(110)),
         ..FixtureOptions::default()
     });
-    let escaped_attribute_limits = ReadLimits::builder()
+    let escaped_attribute_limits = SourceLimits::builder()
         .max_xml_attribute_bytes(512)
         .unwrap()
         .max_relationship_target_bytes(512)
@@ -2675,7 +2675,7 @@ fn greater_than_65535_server_format_text_is_allowed_within_caller_limits() {
         server_formats: format!(r#"<x15:serverFormat culture="{long_value}"/><x15:serverFormat/>"#),
         ..FixtureOptions::default()
     });
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_xml_attribute_bytes(128 * 1024)
         .unwrap()
         .build()
@@ -2784,46 +2784,46 @@ fn retained_relationship_limits_account_for_mutated_root_and_unknown_edges() {
     let cases = [
         (
             ReadResource::RelationshipParts,
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_relationship_parts(final_inventory.parts)
                 .unwrap(),
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_relationship_parts(final_inventory.parts - 1)
                 .unwrap(),
         ),
         (
             ReadResource::TotalRelationshipXmlBytes,
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_total_relationship_xml_bytes(final_inventory.total_xml_bytes)
                 .unwrap(),
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_total_relationship_xml_bytes(final_inventory.total_xml_bytes - 1)
                 .unwrap(),
         ),
         (
             ReadResource::TotalRelationshipXmlEvents,
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_total_relationship_xml_events(final_inventory.total_xml_events)
                 .unwrap(),
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_total_relationship_xml_events(final_inventory.total_xml_events - 1)
                 .unwrap(),
         ),
         (
             ReadResource::TotalRelationships,
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_total_relationships(final_inventory.total_edges)
                 .unwrap(),
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_total_relationships(final_inventory.total_edges - 1)
                 .unwrap(),
         ),
         (
             ReadResource::RelationshipGraphNodes,
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_relationship_graph_nodes(final_inventory.graph_nodes)
                 .unwrap(),
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_relationship_graph_nodes(final_inventory.graph_nodes - 1)
                 .unwrap(),
         ),
@@ -2850,10 +2850,10 @@ fn retained_relationship_limits_account_for_mutated_root_and_unknown_edges() {
     // so exact admission and one-byte-under rejection exercise the retained
     // target policy after the mutation.
     let target_exact = final_inventory.max_target_bytes;
-    let target_exact_builder = ReadLimits::builder()
+    let target_exact_builder = SourceLimits::builder()
         .max_relationship_target_bytes(target_exact)
         .unwrap();
-    let target_under_builder = ReadLimits::builder()
+    let target_under_builder = SourceLimits::builder()
         .max_relationship_target_bytes(target_exact - 1)
         .unwrap();
     let mut exact =
@@ -2877,7 +2877,7 @@ fn retained_relationship_xml_part_limit_has_exact_and_one_under_mutation_bounds(
     let final_inventory = relationship_inventory(&final_package);
     assert!(final_inventory.max_xml_bytes > 1);
 
-    let exact = ReadLimits::builder()
+    let exact = SourceLimits::builder()
         .max_relationship_xml_bytes(final_inventory.max_xml_bytes)
         .unwrap()
         .build()
@@ -2886,7 +2886,7 @@ fn retained_relationship_xml_part_limit_has_exact_and_one_under_mutation_bounds(
     add_unknown_relationships(&mut exact_package);
     load(&exact_package, "Pivot").unwrap();
 
-    let under = ReadLimits::builder()
+    let under = SourceLimits::builder()
         .max_relationship_xml_bytes(final_inventory.max_xml_bytes - 1)
         .unwrap()
         .build()
@@ -2912,7 +2912,7 @@ fn retained_relationship_archive_member_bound_uses_public_source_capture() {
     assert!(inventory.max_part_name_bytes >= owner.as_str().len());
     assert!(inventory.max_relationship_member_name_bytes >= member_len);
 
-    let exact = ReadLimits::builder()
+    let exact = SourceLimits::builder()
         .max_archive_member_name_bytes(member_len as u64)
         .unwrap()
         .build()
@@ -2923,7 +2923,7 @@ fn retained_relationship_archive_member_bound_uses_public_source_capture() {
             .is_ok()
     );
 
-    let under = ReadLimits::builder()
+    let under = SourceLimits::builder()
         .max_archive_member_name_bytes((member_len - 1) as u64)
         .unwrap()
         .build()

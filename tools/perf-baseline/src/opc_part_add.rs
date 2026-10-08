@@ -9,7 +9,7 @@ use super::{
     raw_zip_members, record_elapsed, relationship_signatures, sha256_hex, statistics,
 };
 use litchi_core::{OwnedSource, ReadAt, SourceVersion};
-use litchi_opc::{OpcError, ReadLimits, ReadResource, SourceBackedPackage, SourceTopologyPlan};
+use litchi_opc::{OpcError, ReadResource, SourceBackedPackage, SourceLimits, SourceTopologyPlan};
 use serde::Serialize;
 use std::{
     error::Error,
@@ -311,7 +311,7 @@ fn verify_gates(
     }
     let parts = corpus.manifest.entry_count;
     for maximum in [parts, parts + 1] {
-        let limits = ReadLimits::builder().max_parts(maximum)?.build()?;
+        let limits = SourceLimits::builder().max_parts(maximum)?.build()?;
         let package = SourceBackedPackage::from_read_at_with_limits(
             Arc::new(OwnedSource::new(corpus.archive.clone())),
             limits,

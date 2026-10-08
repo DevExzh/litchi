@@ -43,7 +43,8 @@ pub mod incomplete {
     pub mod nested { pub struct Commit; }
 }
 pub enum Selector { Name, Id }
-pub mod domain { pub struct Id; }
+pub mod domain { pub struct Id; pub struct ReadLimits; }
+pub struct ReadLimits;
 pub struct Fields { pub old_field: u8, secret_field: u8 }
 pub enum Variants { Named { old_variant_field: u8 } }
 pub trait Contract {
@@ -85,6 +86,7 @@ class PolicyTests(unittest.TestCase):
             {"version": True, "profiles": []},
             {"version": 1, "profiles": [], "bans": []},
             {"version": 1, "profiles": [profile(unknown=[])]},
+            {"version": 1, "profiles": [profile(banned_names=[{**ban("Id"), "recursive": "false"}])]},
             {"version": 1, "profiles": [profile(), profile()]},
             {"version": 1, "profiles": [profile(default_features="false")]},
             {"version": 1, "profiles": [profile(features=["a", "a"])]},
@@ -157,6 +159,21 @@ class RustdocTests(unittest.TestCase):
         self.assertEqual(len(failures), 1, failures)
         self.assertIn("fixture::Selector::Id", failures[0])
         self.assertIn("missing API scope fixture::Select", self.check("Id", scope="fixture::Select")[0])
+
+    def test_nonrecursive_ban_preserves_nested_domain_names(self):
+        rule = {**ban("Id"), "recursive": False}
+        self.assertEqual(gate.violations(self.document, profile(banned_names=[rule])), [])
+        rule["name"] = "Package"
+        self.assertTrue(gate.violations(self.document, profile(banned_names=[rule])))
+        rule = {**ban("Id", "fixture::Selector"), "recursive": False}
+        self.assertTrue(gate.violations(self.document, profile(banned_names=[rule])))
+
+    def test_nonrecursive_limit_ban_rejects_only_root_name(self):
+        rule = {**ban("ReadLimits"), "recursive": False}
+        failures = gate.violations(self.document, profile(banned_names=[rule]))
+        self.assertEqual(len(failures), 1)
+        self.assertIn("fixture::ReadLimits exposes", failures[0])
+        self.assertEqual(len(self.check("ReadLimits")), 2)
 
     def test_fields_variants_trait_members_and_hidden_public_items(self):
         for name in ("old_field", "old_variant_field", "OldAssociated", "OLD_CONST", "old_trait_method", "hidden_old"):

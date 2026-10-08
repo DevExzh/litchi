@@ -2,8 +2,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, reason = "test assertions")]
 
 use litchi_opc::{
-    ContentTypeEdit, OpcError, OpcPackage, PackURI, ReadLimits, ReadResource, RelationshipEdit,
-    Relationships, TargetMode,
+    ContentTypeEdit, OpcError, OpcPackage, PackURI, ReadResource, RelationshipEdit, Relationships,
+    SourceLimits, TargetMode,
 };
 use quick_xml::{Reader, events::Event};
 
@@ -29,13 +29,13 @@ fn content_type_plan_reports_exact_events_for_default_to_override_replacement() 
         content_type: "application/octet-stream",
     }];
     let plan = before
-        .plan_edit_with_defaults(&additions, &[], &["bin"], ReadLimits::default())
+        .plan_edit_with_defaults(&additions, &[], &["bin"], SourceLimits::default())
         .unwrap();
     assert_eq!(plan.mapping_count(), 2);
     assert!(!plan.is_noop());
     let expected_events = plan.event_count();
     let expected_len = plan.final_len();
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_xml_events(expected_events)
         .unwrap()
         .build()
@@ -52,7 +52,7 @@ fn content_type_plan_reports_exact_events_for_default_to_override_replacement() 
                 &additions,
                 &[],
                 &["bin"],
-                ReadLimits::builder()
+                SourceLimits::builder()
                     .max_xml_events(expected_events - 1)
                     .unwrap()
                     .build()
@@ -89,13 +89,13 @@ fn relationship_plan_admits_exact_events_before_materialization_for_all_root_for
             mode: TargetMode::External,
         }];
         let plan = before
-            .plan_edit(&additions, &[], ReadLimits::default())
+            .plan_edit(&additions, &[], SourceLimits::default())
             .unwrap();
         let planned_events = plan.event_count();
         let planned_bytes = plan.final_len();
         assert_eq!(plan.relationship_count(), 1);
         assert!(plan.member_present());
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_xml_events(planned_events)
             .unwrap()
             .build()
@@ -118,7 +118,7 @@ fn relationship_plan_admits_exact_events_before_materialization_for_all_root_for
                     .contains("<!-- preserved -->")
             );
         }
-        let under = ReadLimits::builder()
+        let under = SourceLimits::builder()
             .max_xml_events(planned_events - 1)
             .unwrap()
             .build()
@@ -147,12 +147,12 @@ fn mixed_relationship_plan_counts_removed_paired_tokens_and_preserves_unrelated_
         mode: TargetMode::External,
     }];
     let plan = before
-        .plan_edit(&additions, &["rId1"], ReadLimits::default())
+        .plan_edit(&additions, &["rId1"], SourceLimits::default())
         .unwrap();
     let final_len = plan.final_len();
     let final_events = plan.event_count();
     assert_eq!(plan.relationship_count(), 2);
-    let after = plan.materialize(ReadLimits::default()).unwrap();
+    let after = plan.materialize(SourceLimits::default()).unwrap();
     assert_eq!(after.bytes().len(), final_len);
     assert_eq!(events(after.bytes()), final_events);
     assert_eq!(final_events + 1, events(source));
@@ -180,15 +180,15 @@ fn relationship_plan_enforces_archive_entry_cap_for_noop_and_changed_output() {
     }];
     for additions in [&[][..], addition.as_slice()] {
         let size = before
-            .plan_edit(additions, &[], ReadLimits::default())
+            .plan_edit(additions, &[], SourceLimits::default())
             .unwrap()
             .final_len();
-        let exact = ReadLimits::builder()
+        let exact = SourceLimits::builder()
             .max_archive_entry_bytes(size as u64)
             .unwrap()
             .build()
             .unwrap();
-        let under = ReadLimits::builder()
+        let under = SourceLimits::builder()
             .max_archive_entry_bytes((size - 1) as u64)
             .unwrap()
             .build()
@@ -203,7 +203,7 @@ fn relationship_plan_enforces_archive_entry_cap_for_noop_and_changed_output() {
             matches!(before.plan_edit(additions, &[], under), Err(OpcError::ReadLimit { resource: ReadResource::ArchiveEntryBytes, actual, maximum }) if actual == size as u64 && maximum == (size - 1) as u64)
         );
         assert!(
-            matches!(before.plan_edit(additions, &[], ReadLimits::default()).unwrap().materialize(under), Err(OpcError::ReadLimit { resource: ReadResource::ArchiveEntryBytes, actual, maximum }) if actual == size as u64 && maximum == (size - 1) as u64)
+            matches!(before.plan_edit(additions, &[], SourceLimits::default()).unwrap().materialize(under), Err(OpcError::ReadLimit { resource: ReadResource::ArchiveEntryBytes, actual, maximum }) if actual == size as u64 && maximum == (size - 1) as u64)
         );
         assert_eq!(before.bytes(), xml);
     }
@@ -219,12 +219,12 @@ fn content_type_override_conflicts_are_refused_during_planning() {
         content_type: "application/octet-stream",
     }];
     let before = initial
-        .plan_edit(&additions, &[], ReadLimits::default())
+        .plan_edit(&additions, &[], SourceLimits::default())
         .unwrap()
-        .materialize(ReadLimits::default())
+        .materialize(SourceLimits::default())
         .unwrap();
     assert!(matches!(
-        before.plan_edit(&additions, &[], ReadLimits::default()),
+        before.plan_edit(&additions, &[], SourceLimits::default()),
         Err(OpcError::InvalidContentTypesManifest(_))
     ));
     let alias = PackURI::new("/CUSTOM/ITEM.BIN").unwrap();
@@ -233,9 +233,9 @@ fn content_type_override_conflicts_are_refused_during_planning() {
         content_type: "application/x-test",
     }];
     let after = before
-        .plan_edit(&replacement, &[part], ReadLimits::default())
+        .plan_edit(&replacement, &[part], SourceLimits::default())
         .unwrap()
-        .materialize(ReadLimits::default())
+        .materialize(SourceLimits::default())
         .unwrap();
     assert!(
         std::str::from_utf8(after.bytes())
@@ -248,7 +248,7 @@ fn content_type_override_conflicts_are_refused_during_planning() {
 fn content_type_default_selectors_use_only_xml_token_whitespace() {
     let package = package(None);
     let before = package.source_content_types().unwrap();
-    let limits = ReadLimits::default();
+    let limits = SourceLimits::default();
     let plain = before
         .plan_edit_with_defaults(&[], &[], &["bin"], limits)
         .unwrap()
@@ -284,11 +284,13 @@ fn new_owner_canonical_plan_reports_actual_output_before_materialization() {
                 )
                 .unwrap();
         }
-        let plan = relationships.plan_canonical(ReadLimits::default()).unwrap();
+        let plan = relationships
+            .plan_canonical(SourceLimits::default())
+            .unwrap();
         let size = plan.final_len();
         let count = plan.event_count();
         assert_eq!(plan.relationship_count(), usize::from(populated));
-        let exact = ReadLimits::builder()
+        let exact = SourceLimits::builder()
             .max_archive_entry_bytes(size as u64)
             .unwrap()
             .max_xml_events(count)
@@ -298,7 +300,7 @@ fn new_owner_canonical_plan_reports_actual_output_before_materialization() {
         let xml = plan.materialize(exact).unwrap();
         assert_eq!(xml.len(), size);
         assert_eq!(events(&xml), count);
-        let under = ReadLimits::builder()
+        let under = SourceLimits::builder()
             .max_archive_entry_bytes((size - 1) as u64)
             .unwrap()
             .build()
@@ -310,7 +312,7 @@ fn new_owner_canonical_plan_reports_actual_output_before_materialization() {
                 ..
             })
         ));
-        let under = ReadLimits::builder()
+        let under = SourceLimits::builder()
             .max_xml_events(count - 1)
             .unwrap()
             .build()

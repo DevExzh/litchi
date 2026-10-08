@@ -3,7 +3,7 @@
 use super::{
     MAX_EDITS, MAX_OWNED_XML_BYTES, OwnedXmlPart, invalid_source, owned_offset, validate_source_xml,
 };
-use crate::{OpcError, ReadLimits, Result};
+use crate::{OpcError, Result, SourceLimits};
 use litchi_core::xml::ReaderOrigin;
 use quick_xml::{events::Event, reader::NsReader};
 use std::{fmt, ops::Range, sync::Arc};
@@ -170,7 +170,7 @@ impl OwnedXmlPart {
                         part: self.name.to_string(),
                         source,
                     })?;
-                    validate_source_xml(&self.name, bytes, ReadLimits::default(), None)?;
+                    validate_source_xml(&self.name, bytes, SourceLimits::default(), None)?;
                     bytes.len()
                 },
             };
@@ -231,7 +231,7 @@ impl OwnedXmlPart {
             bytes.push(b'>');
         }
         bytes.extend_from_slice(&self.bytes[cursor..]);
-        validate_source_xml(&self.name, &bytes, ReadLimits::default(), None)?;
+        validate_source_xml(&self.name, &bytes, SourceLimits::default(), None)?;
         Ok(Self {
             name: self.name.clone(),
             content_type: self.content_type.clone(),

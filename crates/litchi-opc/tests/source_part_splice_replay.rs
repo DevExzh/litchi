@@ -24,7 +24,7 @@ use litchi_core::{
     OwnedSource, ReadAt, Resource, SourceVersion,
 };
 use litchi_opc::{
-    OpcError, PackURI, ReadLimits, SourceArtifactFingerprint, SourceBackedPackage,
+    OpcError, PackURI, SourceArtifactFingerprint, SourceBackedPackage, SourceLimits,
     SourcePartSpliceLimits, SourcePartSpliceProof, SourcePartSpliceReplay,
     SourcePartSpliceReplayError, SourcePartSpliceReplayProof, SpliceResource,
 };
@@ -847,7 +847,7 @@ fn replay_expected_artifact_charges_one_managed_output_artifact() {
             managed_context_with_output(128 * 1024 * 1024, expected_len);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(OwnedSource::new(archive(deflated))),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .expect("managed expected-artifact fixture must open");
@@ -926,7 +926,7 @@ fn replay_expected_artifact_noop_releases_preview_memory_and_charges_once() {
         managed_context_with_output(128 * 1024 * 1024, expected_len);
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(source_archive.clone())),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .expect("managed no-op fixture must open");
@@ -1103,7 +1103,7 @@ fn replay_reader_cancellation_is_reported_as_typed_cancelled() {
     let (_budget, cancellation, context) = managed_context(64 * 1024 * 1024);
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(archive(false))),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .expect("managed replay fixture must open");
@@ -1190,7 +1190,7 @@ fn concurrent_replay_publications_charge_one_window_per_live_reader() {
     let (budget, _cancellation, context) = managed_context(128 * 1024 * 1024);
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(source_archive.clone())),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .expect("managed replay fixture must open");

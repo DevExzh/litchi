@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use litchi_core::{OwnedSource, ReadAt, SourceVersion};
-use litchi_docx::{Error, Package, ReadLimits, source_backed};
+use litchi_docx::{Error, Package, SourceLimits, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, Part, TargetMode};
 
@@ -645,7 +645,7 @@ fn signed_change_source_version_limit_and_partial_sink_fail_before_or_during_out
 
     let limited_bytes = fixture(Fixture::transitional(&xml));
     let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(limited_bytes));
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_part_bytes(1)
         .unwrap()
         .build()

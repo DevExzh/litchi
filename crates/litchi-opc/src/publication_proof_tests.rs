@@ -97,7 +97,7 @@ fn managed_context(
 
 fn managed_package(
     document: &[u8],
-    limits: ReadLimits,
+    limits: SourceLimits,
     scope: &'static str,
 ) -> (SourceBackedPackage, Budget, CancellationSource) {
     let (budget, cancellation_source, context) = managed_context(scope, 128 * 1024 * 1024, 1 << 40);
@@ -149,7 +149,7 @@ fn assert_work_charge(budget: &Budget, before: u64, bytes: &[u8]) {
 #[test]
 fn equal_original_and_derived_proofs_cover_replacement_and_addition() {
     let (package, budget, _cancellation) =
-        managed_package(SOURCE_XML, ReadLimits::default(), "proof-equal");
+        managed_package(SOURCE_XML, SourceLimits::default(), "proof-equal");
     let original = capture(&package);
     let source_partname = original.source_partname.clone();
     let source_content_type = original.source_content_type.clone();
@@ -203,7 +203,7 @@ fn equal_original_and_derived_proofs_cover_replacement_and_addition() {
 #[test]
 fn equal_limit_proof_hit_needs_no_parser_memory_but_keeps_work_bounded() {
     let (package, budget, _cancellation) =
-        managed_package(SOURCE_XML, ReadLimits::default(), "proof-memory");
+        managed_package(SOURCE_XML, SourceLimits::default(), "proof-memory");
     let source = capture(&package);
     let payload_len = source.bytes().len() as u64;
     let before = budget.used(Resource::Work);
@@ -240,9 +240,9 @@ fn equal_limit_proof_hit_needs_no_parser_memory_but_keeps_work_bounded() {
 #[test]
 fn different_limits_still_require_the_validator_memory_reservation() {
     let (package, budget, _cancellation) =
-        managed_package(SOURCE_XML, ReadLimits::default(), "proof-memory-miss");
+        managed_package(SOURCE_XML, SourceLimits::default(), "proof-memory-miss");
     let source = capture(&package);
-    let changed = ReadLimits::builder()
+    let changed = SourceLimits::builder()
         .max_parts(source.limits.max_parts() - 1)
         .expect("changed non-XML limit must be valid")
         .build()
@@ -279,9 +279,9 @@ fn different_limits_still_require_the_validator_memory_reservation() {
 #[test]
 fn lower_xml_limits_take_the_full_validator_path() {
     let (package, budget, _cancellation) =
-        managed_package(SOURCE_XML, ReadLimits::default(), "proof-limits");
+        managed_package(SOURCE_XML, SourceLimits::default(), "proof-limits");
     let source = capture(&package);
-    let lower = ReadLimits::builder()
+    let lower = SourceLimits::builder()
         .max_xml_depth(1)
         .expect("lower depth limit must be valid")
         .build()
@@ -312,7 +312,7 @@ fn lower_xml_limits_take_the_full_validator_path() {
 #[test]
 fn proof_work_refusal_is_typed_and_does_not_partially_charge() {
     let (package, budget, _cancellation) =
-        managed_package(SOURCE_XML, ReadLimits::default(), "proof-work-limit");
+        managed_package(SOURCE_XML, SourceLimits::default(), "proof-work-limit");
     let source = capture(&package);
     let payload_len = source.bytes().len() as u64;
     let remaining = budget
@@ -344,7 +344,7 @@ fn proof_work_refusal_is_typed_and_does_not_partially_charge() {
 #[test]
 fn content_type_and_lineage_guards_precede_proof_reuse() {
     let (package, budget, _cancellation) =
-        managed_package(SOURCE_XML, ReadLimits::default(), "proof-guards");
+        managed_package(SOURCE_XML, SourceLimits::default(), "proof-guards");
     let source = capture(&package);
     let before = budget.used(Resource::Work);
     let content_error = source

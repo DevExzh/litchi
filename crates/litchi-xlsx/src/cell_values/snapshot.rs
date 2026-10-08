@@ -2666,7 +2666,7 @@ mod tests {
         Budget, CancellationSource, ExecutionContext, ExecutionLimits, FileSource,
         Limits as BudgetLimits, Resource,
     };
-    use litchi_opc::{OpcError, PackURI, ReadLimits, SourceBackedPackage, SourceTopologyPlan};
+    use litchi_opc::{OpcError, PackURI, SourceBackedPackage, SourceLimits, SourceTopologyPlan};
 
     use super::{checked_multi_bytes, try_replace_source_payload};
     use crate::error::Error;
@@ -2762,7 +2762,7 @@ mod tests {
         let (budget, context) = managed_context();
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(FileSource::open(&fixture).expect("managed fixture source")),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .expect("managed fixture package");

@@ -11486,7 +11486,7 @@ mod tests {
         .unwrap();
         let package = crate::source_backed::Package::from_read_at_with_execution_context(
             Arc::new(OwnedSource::new(PackageWriter::to_bytes(&opc).unwrap())),
-            crate::ReadLimits::default(),
+            crate::SourceLimits::default(),
             ExecutionContext::new(budget.clone(), cancellation, limits),
         )
         .unwrap();

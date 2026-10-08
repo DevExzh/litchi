@@ -29,7 +29,7 @@ pub(crate) fn preflight_metadata(package: &OpcPackage, limits: super::ReadLimits
             limits.max_graph_parts,
         ));
     }
-    let opc_limits = litchi_opc::ReadLimits::default();
+    let opc_limits = litchi_opc::SourceLimits::default();
     let mut relationship_count = 0_usize;
     let mut metadata_bytes = 0_usize;
     preflight_relationships(
@@ -93,7 +93,7 @@ pub(crate) fn preflight_metadata(package: &OpcPackage, limits: super::ReadLimits
     Ok(())
 }
 
-pub(crate) fn opc_capture_limits(limits: super::ReadLimits) -> Result<litchi_opc::ReadLimits> {
+pub(crate) fn opc_capture_limits(limits: super::ReadLimits) -> Result<litchi_opc::SourceLimits> {
     if limits.max_part_bytes == 0 || limits.max_metadata_bytes == 0 {
         return Err(limit(
             "Data Model source capture bytes",
@@ -125,7 +125,7 @@ pub(crate) fn opc_capture_limits(limits: super::ReadLimits) -> Result<litchi_opc
         })?;
     let content_mappings = parts.max(limits.max_connections);
     let total_relationship_xml = limits.max_metadata_bytes.max(limits.max_part_bytes);
-    litchi_opc::ReadLimits::builder()
+    litchi_opc::SourceLimits::builder()
         .max_archive_members(archive_members)?
         .max_archive_total_entries(archive_members)?
         .max_parts(parts)?
@@ -145,7 +145,7 @@ pub(crate) fn opc_capture_limits(limits: super::ReadLimits) -> Result<litchi_opc
 
 fn preflight_relationships(
     relationships: &litchi_opc::Relationships,
-    opc_limits: &litchi_opc::ReadLimits,
+    opc_limits: &litchi_opc::SourceLimits,
     relationship_count: &mut usize,
     metadata_bytes: &mut usize,
     limits: super::ReadLimits,

@@ -25,8 +25,8 @@ use litchi_core::{
 use litchi_ooxml_common::mce::{Capabilities, Error as MceError, StreamError, StreamLimits};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    PackURI, PartData, PartView, ReadLimits, SourceBackedPackage, SourceCacheDiagnostics,
-    SourceCacheLimits, VerifiedDecodedReaderError,
+    PackURI, PartData, PartView, SourceBackedPackage, SourceCacheDiagnostics, SourceCacheLimits,
+    SourceLimits, VerifiedDecodedReaderError,
 };
 use litchi_sheet::{Area, At, Cell as Address, Rect};
 
@@ -187,12 +187,12 @@ impl SourceBackedWorkbook {
     /// version error on the next operation.
     #[cfg(any(unix, windows))]
     pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_path_with_limits(path, ReadLimits::default())
+        Self::from_path_with_limits(path, SourceLimits::default())
     }
 
     /// Open a filesystem-backed XLSX package with explicit OPC limits.
     #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
+    pub fn from_path_with_limits(path: impl AsRef<Path>, limits: SourceLimits) -> Result<Self> {
         Self::from_read_at_with_limits(file_source(path)?, limits)
     }
 
@@ -211,7 +211,7 @@ impl SourceBackedWorkbook {
     #[cfg(any(unix, windows))]
     pub fn from_path_with_limits_and_cache_limits(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
     ) -> Result<Self> {
         Self::from_read_at_with_limits_and_cache_limits(file_source(path)?, limits, cache_limits)
@@ -222,7 +222,7 @@ impl SourceBackedWorkbook {
     #[cfg(any(unix, windows))]
     pub fn from_path_with_execution_context(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_read_at_with_execution_context(file_source(path)?, limits, context)
@@ -233,7 +233,7 @@ impl SourceBackedWorkbook {
     #[cfg(any(unix, windows))]
     pub fn from_path_with_limits_and_execution_context(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_read_at_with_limits_and_execution_context(file_source(path)?, limits, context)
@@ -244,7 +244,7 @@ impl SourceBackedWorkbook {
     #[cfg(any(unix, windows))]
     pub fn from_path_with_limits_and_cache_limits_and_execution_context(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
@@ -264,7 +264,7 @@ impl SourceBackedWorkbook {
 
     /// Open a filesystem-backed XLSX package with explicit OPC limits.
     #[cfg(any(unix, windows))]
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
+    pub fn open_with_limits(path: impl AsRef<Path>, limits: SourceLimits) -> Result<Self> {
         Self::from_path_with_limits(path, limits)
     }
 
@@ -282,7 +282,7 @@ impl SourceBackedWorkbook {
     #[cfg(any(unix, windows))]
     pub fn open_with_limits_and_cache_limits(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
     ) -> Result<Self> {
         Self::from_path_with_limits_and_cache_limits(path, limits, cache_limits)
@@ -293,7 +293,7 @@ impl SourceBackedWorkbook {
     #[cfg(any(unix, windows))]
     pub fn open_with_execution_context(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_path_with_execution_context(path, limits, context)
@@ -304,7 +304,7 @@ impl SourceBackedWorkbook {
     #[cfg(any(unix, windows))]
     pub fn open_with_limits_and_execution_context(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_path_with_limits_and_execution_context(path, limits, context)
@@ -315,7 +315,7 @@ impl SourceBackedWorkbook {
     #[cfg(any(unix, windows))]
     pub fn open_with_limits_and_cache_limits_and_execution_context(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
@@ -329,7 +329,7 @@ impl SourceBackedWorkbook {
 
     /// Open an ordinary XLSX package from a caller-provided positional source.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, ReadLimits::default())
+        Self::from_read_at_with_limits(source, SourceLimits::default())
     }
 
     /// Open an XLSX package from a sequential reader with the default
@@ -341,7 +341,7 @@ impl SourceBackedWorkbook {
     /// them. The resulting owned source has stable freshness identity for the
     /// lifetime of this immutable snapshot.
     pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
-        Self::from_reader_with_limits(reader, ReadLimits::default())
+        Self::from_reader_with_limits(reader, SourceLimits::default())
     }
 
     /// Open an XLSX package from a sequential reader with explicit OPC limits.
@@ -349,14 +349,14 @@ impl SourceBackedWorkbook {
     /// Input ingestion and all later deferred payload reads use the same
     /// bounded source-backed package policy; unselected worksheets remain
     /// cold until explicitly selected.
-    pub fn from_reader_with_limits<R: Read>(reader: R, limits: ReadLimits) -> Result<Self> {
+    pub fn from_reader_with_limits<R: Read>(reader: R, limits: SourceLimits) -> Result<Self> {
         Self::from_source_backed_package(SourceBackedPackage::from_reader_with_limits(
             reader, limits,
         )?)
     }
 
     /// Open from a positional source with explicit OPC resource limits.
-    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
+    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: SourceLimits) -> Result<Self> {
         Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_limits(
             source, limits,
         )?)
@@ -373,13 +373,17 @@ impl SourceBackedWorkbook {
         source: Arc<dyn ReadAt>,
         cache_limits: SourceCacheLimits,
     ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_cache_limits(source, ReadLimits::default(), cache_limits)
+        Self::from_read_at_with_limits_and_cache_limits(
+            source,
+            SourceLimits::default(),
+            cache_limits,
+        )
     }
 
     /// Open an XLSX source with explicit read and finite cache policies.
     pub fn from_read_at_with_limits_and_cache_limits(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
     ) -> Result<Self> {
         Self::from_source_backed_package(
@@ -400,7 +404,7 @@ impl SourceBackedWorkbook {
     /// allocations through this read-only facade.
     pub fn from_read_at_with_execution_context(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         let package = SourceBackedPackage::from_read_at_with_execution_context(
@@ -415,7 +419,7 @@ impl SourceBackedWorkbook {
     /// policies while retaining the default finite cache.
     pub fn from_read_at_with_limits_and_execution_context(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_read_at_with_execution_context(source, limits, context)
@@ -428,7 +432,7 @@ impl SourceBackedWorkbook {
     /// OPC cache handles; it does not detach managed payloads.
     pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
@@ -460,7 +464,7 @@ impl SourceBackedWorkbook {
     /// [`Self::from_reader`] with the opt-in repairs `leniency` allows.
     pub fn from_reader_with_leniency<R: Read>(reader: R, leniency: Leniency) -> Result<Self> {
         Self::from_source_backed_package_with_leniency(
-            SourceBackedPackage::from_reader_with_limits(reader, ReadLimits::default())?,
+            SourceBackedPackage::from_reader_with_limits(reader, SourceLimits::default())?,
             leniency,
         )
     }
@@ -471,7 +475,7 @@ impl SourceBackedWorkbook {
         Self::from_source_backed_package_with_leniency(
             SourceBackedPackage::from_read_at_with_limits(
                 file_source(path)?,
-                ReadLimits::default(),
+                SourceLimits::default(),
             )?,
             leniency,
         )
@@ -1720,7 +1724,7 @@ mod tests {
     use litchi_opc::{OpcError, OpcPackage, PackURI, SourceBackedPackage, SourceCacheLimits};
     use soapberry_zip::office::StreamingArchiveWriter;
 
-    use super::{ReadLimits, SourceBackedWorkbook, SourceCellView};
+    use super::{SourceBackedWorkbook, SourceCellView, SourceLimits};
     use crate::{Cell, Error, Value};
 
     const FIRST_MARKER: &[u8] = b"source-backed-requested-first-sheet";
@@ -1989,7 +1993,7 @@ mod tests {
         let cache_limits = SourceCacheLimits::new(256 * 1024, 1).unwrap();
         let workbook = SourceBackedWorkbook::from_read_at_with_limits_and_cache_limits(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             cache_limits,
         )
         .unwrap();
@@ -2111,7 +2115,7 @@ mod tests {
         let workbook =
             SourceBackedWorkbook::from_read_at_with_limits_and_cache_limits_and_execution_context(
                 source.clone(),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 cache_limits,
                 context,
             )
@@ -2155,7 +2159,7 @@ mod tests {
         let workbook =
             SourceBackedWorkbook::from_read_at_with_limits_and_cache_limits_and_execution_context(
                 source.clone(),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 cache_limits,
                 context,
             )
@@ -2189,7 +2193,7 @@ mod tests {
         assert!(matches!(
             SourceBackedWorkbook::from_read_at_with_execution_context(
                 source.clone(),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 context,
             ),
             Err(Error::Package(OpcError::Cancelled))
@@ -2202,7 +2206,7 @@ mod tests {
         let (budget, cancellation_source, context) = managed_context(u64::MAX);
         let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -2232,7 +2236,7 @@ mod tests {
         let package =
             SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
                 source.clone(),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 cache_limits,
                 context,
             )
@@ -2267,7 +2271,7 @@ mod tests {
         use soapberry_zip::office::StreamingArchiveWriter;
 
         use super::{
-            CountingSource, ReadLimits, SourceBackedWorkbook, SourceCellView, managed_context,
+            CountingSource, SourceBackedWorkbook, SourceCellView, SourceLimits, managed_context,
             source_backed_xlsx,
         };
         use crate::{Cell, Error, Value};
@@ -2504,7 +2508,7 @@ mod tests {
             let (_budget, cancellation_source, context) = managed_context(u64::MAX);
             let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
                 source,
-                ReadLimits::default(),
+                SourceLimits::default(),
                 context,
             )
             .unwrap();
@@ -2535,7 +2539,7 @@ mod tests {
         use soapberry_zip::office::StreamingArchiveWriter;
 
         use super::{
-            CountingSource, ReadLimits, SourceBackedWorkbook, SourceCellView, VersionFlipSource,
+            CountingSource, SourceBackedWorkbook, SourceCellView, SourceLimits, VersionFlipSource,
             managed_context,
         };
         use crate::{Cell, Error, Value};
@@ -2910,7 +2914,7 @@ mod tests {
             let (_budget, cancellation_source, context) = managed_context(u64::MAX);
             let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
                 source,
-                ReadLimits::default(),
+                SourceLimits::default(),
                 context,
             )
             .unwrap();
@@ -3038,7 +3042,7 @@ mod tests {
         use super::super::SourceCell;
         use super::streaming_0364_tests::{dependency_xlsx, plain_shared_strings, styles};
         use super::{
-            CountingSource, ReadLimits, SourceBackedWorkbook, SourceCellView, managed_context,
+            CountingSource, SourceBackedWorkbook, SourceCellView, SourceLimits, managed_context,
         };
         use crate::{Cell, Error, Value};
 
@@ -3381,7 +3385,7 @@ mod tests {
             let (_budget, cancellation_source, context) = managed_context(u64::MAX);
             let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
                 source,
-                ReadLimits::default(),
+                SourceLimits::default(),
                 context,
             )
             .unwrap();
@@ -3436,7 +3440,7 @@ mod tests {
             let package =
                 SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
                     source,
-                    ReadLimits::default(),
+                    SourceLimits::default(),
                     SourceCacheLimits::new(256 * 1024, 4).unwrap(),
                     context,
                 )
@@ -3469,7 +3473,7 @@ mod tests {
             let (_budget, _cancellation_source, context) = managed_context(u64::MAX);
             let package = SourceBackedPackage::from_read_at_with_execution_context(
                 source.clone(),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 context,
             )
             .unwrap();
@@ -3768,7 +3772,7 @@ mod tests {
         use super::super::SourceCell;
         use super::streaming_0364_tests::dependency_xlsx;
         use super::{
-            CountingSource, ReadLimits, SourceBackedWorkbook, SourceCellView, managed_context,
+            CountingSource, SourceBackedWorkbook, SourceCellView, SourceLimits, managed_context,
         };
         use crate::{Cell, Error, Value};
 
@@ -3987,7 +3991,7 @@ mod tests {
             let (_budget, cancellation_source, context) = managed_context(u64::MAX);
             let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
                 source,
-                ReadLimits::default(),
+                SourceLimits::default(),
                 context,
             )
             .unwrap();

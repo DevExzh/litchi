@@ -11,7 +11,9 @@ use std::{error::Error, ffi::OsString, fs::OpenOptions, io::Write, path::PathBuf
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, ReadAt, Resource,
 };
-use litchi_opc::{ReadLimits, SourceCacheCounterDelta, SourceCacheDiagnostics, SourceCacheLimits};
+use litchi_opc::{
+    SourceCacheCounterDelta, SourceCacheDiagnostics, SourceCacheLimits, SourceLimits,
+};
 use serde::Serialize;
 
 use crate::process_metrics;
@@ -938,7 +940,7 @@ fn calibrate_image_memory(
     let source_read: Arc<dyn ReadAt> = source.clone();
     let view = litchi_pptx::SourceBackedPresentation::from_read_at_with_limits_and_cache_limits_and_execution_context(
         source_read,
-        ReadLimits::default(),
+        SourceLimits::default(),
         cache_limits,
         managed.context,
     )?;
@@ -1047,7 +1049,7 @@ fn run_image_boundary_iteration(
     let source_read: Arc<dyn ReadAt> = source.clone();
     let view = litchi_pptx::SourceBackedPresentation::from_read_at_with_limits_and_cache_limits_and_execution_context(
         source_read,
-        ReadLimits::default(),
+        SourceLimits::default(),
         cache_limits,
         source_context.context.clone(),
     )?;
@@ -1332,7 +1334,7 @@ fn run_pinned_eviction_iteration(
     let source_read: Arc<dyn ReadAt> = source.clone();
     let view = litchi_pptx::SourceBackedPresentation::from_read_at_with_limits_and_cache_limits_and_execution_context(
         source_read,
-        ReadLimits::default(),
+        SourceLimits::default(),
         cache_limits,
         source_context.context.clone(),
     )?;
@@ -1581,7 +1583,7 @@ fn run_repeated_publication_iteration(
     let source_read: Arc<dyn ReadAt> = source.clone();
     let source_view = litchi_pptx::SourceBackedPresentation::from_read_at_with_limits_and_cache_limits_and_execution_context(
         source_read,
-        ReadLimits::default(),
+        SourceLimits::default(),
         cache_limits,
         source_context.context.clone(),
     )?;
@@ -1611,7 +1613,7 @@ fn run_repeated_publication_iteration(
         let destination_read: Arc<dyn ReadAt> = destination.clone();
         let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
             destination_read,
-            ReadLimits::default(),
+            SourceLimits::default(),
             cache_limits,
             destination_context.context.clone(),
         )?;
@@ -1796,7 +1798,7 @@ fn run_repeated_publication_iteration(
     let destination_read: Arc<dyn ReadAt> = destination.clone();
     let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
         destination_read,
-        ReadLimits::default(),
+        SourceLimits::default(),
         cache_limits,
         destination_context.context.clone(),
     )?;
@@ -2145,13 +2147,13 @@ fn run_lifecycle_iteration(
 
     let source_view = litchi_pptx::SourceBackedPresentation::from_read_at_with_limits_and_cache_limits_and_execution_context(
         source_read,
-        ReadLimits::default(),
+        SourceLimits::default(),
         cache_limits,
         source_context.context.clone(),
     )?;
     let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
         destination_read,
-        ReadLimits::default(),
+        SourceLimits::default(),
         cache_limits,
         destination_context.context.clone(),
     )?;

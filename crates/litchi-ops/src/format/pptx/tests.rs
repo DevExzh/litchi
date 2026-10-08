@@ -361,7 +361,7 @@ fn cancellation_is_typed() {
         .expect("valid execution limits");
     let presentation = pptx::SourceBackedPresentation::from_path_with_limits_and_execution_context(
         fixture("backgrounds.pptx"),
-        pptx::ReadLimits::default(),
+        pptx::SourceLimits::default(),
         ExecutionContext::new(budget, cancellation, limits),
     )
     .expect("managed source-backed PPTX");

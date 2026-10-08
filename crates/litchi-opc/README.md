@@ -30,14 +30,14 @@ for part in pkg.iter_parts() {
 
 ## Bounded Ingestion
 
-All ordinary package constructors use bounded `ReadLimits::default()` values.
+All ordinary package constructors use bounded `SourceLimits::default()` values.
 For untrusted or multi-tenant input, build a checked profile from those defaults
 and use an `*_with_limits` constructor:
 
 ```rust
-use litchi_opc::{OpcPackage, ReadLimits};
+use litchi_opc::{OpcPackage, SourceLimits};
 
-let limits = ReadLimits::builder()
+let limits = SourceLimits::builder()
     .max_input_bytes(32 * 1024 * 1024)?
     .max_archive_members(10_000)?
     .build()?;
@@ -61,7 +61,7 @@ relationships described by ECMA-376 Part 2 sections 7.3.6 and 10, and the
 corresponding MS-OI29500 sections 2.1.1749-1752. DOCX and PPTX expose
 `Package::*_with_limits`; XLSX exposes both `Package::*_with_limits` and
 `Workbook::*_with_limits`; XLSB exposes `Workbook::new_with_limits`. Each takes
-the same `ReadLimits` profile so callers can use one contextual policy across
+the same `SourceLimits` profile so callers can use one contextual policy across
 OOXML formats.
 
 OPC readers treat macros, VBA, ActiveX, controls, OLE objects, and embedded
@@ -86,7 +86,7 @@ validating bounded XML. Noncompact XML must match retained source bytes; new XML
 must satisfy the authored compactness audit. The token shares its source buffer.
 
 `source_content_types_with_limits` and `source_relationships_with_limits` capture
-package metadata under a caller-selected `ReadLimits` profile. They check XML
+package metadata under a caller-selected `SourceLimits` profile. They check XML
 bytes, declaration or relationship counts, and XML attributes for both retained
 and regenerated XML. Their existing convenience methods use default limits.
 Relationship capture compares the current graph with borrowed source bindings,

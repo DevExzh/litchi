@@ -4,7 +4,7 @@ use std::io::Write;
 use std::sync::Arc;
 
 use litchi_core::{ExecutionContext, ReadAt, Selector as CoreSelector};
-use litchi_opc::{ReadLimits, SourceBackedPackage, SourceCacheLimits};
+use litchi_opc::{SourceBackedPackage, SourceCacheLimits, SourceLimits};
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
@@ -38,13 +38,13 @@ pub struct SourceEdit<'a> {
 impl SourceBackedEditor {
     /// Open with the standard bounded OPC policy.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, ReadLimits::default())
+        Self::from_read_at_with_limits(source, SourceLimits::default())
     }
 
     /// Open with an explicit bounded OPC policy.
     pub fn from_read_at_with_limits(
         source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
+        read_limits: SourceLimits,
     ) -> Result<Self> {
         Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_limits(
             source,
@@ -66,7 +66,7 @@ impl SourceBackedEditor {
     /// Open with explicit read and finite cache policies.
     pub fn from_read_at_with_limits_and_cache_limits(
         source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
+        read_limits: SourceLimits,
         cache_limits: SourceCacheLimits,
     ) -> Result<Self> {
         Self::from_source_backed_package(
@@ -81,7 +81,7 @@ impl SourceBackedEditor {
     /// Open with an explicit caller-owned execution context and the default cache.
     pub fn from_read_at_with_execution_context(
         source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
+        read_limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_execution_context(
@@ -94,7 +94,7 @@ impl SourceBackedEditor {
     /// Open with explicit read and execution policies.
     pub fn from_read_at_with_limits_and_execution_context(
         source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
+        read_limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_read_at_with_execution_context(source, read_limits, context)
@@ -103,7 +103,7 @@ impl SourceBackedEditor {
     /// Open with explicit read, cache, and caller-owned execution policies.
     pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
         source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
+        read_limits: SourceLimits,
         cache_limits: SourceCacheLimits,
         context: ExecutionContext,
     ) -> Result<Self> {

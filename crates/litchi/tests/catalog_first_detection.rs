@@ -245,8 +245,8 @@ fn malformed_opc_package() -> Vec<u8> {
     ])
 }
 
-fn input_limit_below(fixture: &Fixture) -> litchi::opc::ReadLimits {
-    litchi::opc::ReadLimits::builder()
+fn input_limit_below(fixture: &Fixture) -> litchi::opc::SourceLimits {
+    litchi::opc::SourceLimits::builder()
         .max_input_bytes(u64::try_from(fixture.bytes.len() - 1).expect("fixture length fits u64"))
         .expect("positive input limit")
         .build()

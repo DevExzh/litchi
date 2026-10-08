@@ -730,13 +730,13 @@ fn restore_uses_current_context_for_all_io_work_and_output() {
         managed_context(64 * 1024 * 1024, u64::MAX);
     let current = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(bytes.clone())),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         current_context,
     )
     .expect("managed current package must open");
     let original = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(bytes.clone())),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         original_context,
     )
     .expect("managed original package must open");
@@ -781,13 +781,13 @@ fn restore_observes_original_context_cancellation_after_an_exact_short_prefix() 
         managed_context(64 * 1024 * 1024, u64::MAX);
     let current = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(bytes.clone())),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         current_context,
     )
     .expect("managed current package must open");
     let original = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(bytes)),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         original_context,
     )
     .expect("managed original package must open");
@@ -825,7 +825,7 @@ fn managed_restore_releases_workspace_on_memory_hash_and_sink_failures() {
     let (budget, _cancellation, context) = managed_context(64 * 1024 * 1024, u64::MAX);
     let current = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(bytes.clone())),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         context.clone(),
     )
     .expect("managed current package must open");
@@ -911,13 +911,13 @@ fn managed_restore_charges_shared_output_once_and_releases_memory_lease() {
     let (budget, _cancellation, context) = managed_context(64 * 1024 * 1024, u64::MAX);
     let current = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(bytes.clone())),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         context.clone(),
     )
     .expect("managed current package must open");
     let original = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(bytes.clone())),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         context,
     )
     .expect("managed original package must open");
@@ -954,7 +954,7 @@ fn restore_observes_cancellation_before_output_and_from_sink_callbacks() {
     let (budget, cancellation, context) = managed_context(64 * 1024 * 1024, u64::MAX);
     let current = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(bytes.clone())),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         context,
     )
     .expect("managed package must open");
@@ -982,7 +982,7 @@ fn restore_observes_cancellation_before_output_and_from_sink_callbacks() {
     let (budget, cancellation, context) = managed_context(64 * 1024 * 1024, u64::MAX);
     let current = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(bytes.clone())),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         context,
     )
     .expect("managed package must open");
@@ -1008,7 +1008,7 @@ fn restore_observes_cancellation_before_output_and_from_sink_callbacks() {
     let (budget, cancellation, context) = managed_context(64 * 1024 * 1024, u64::MAX);
     let current = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(bytes.clone())),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         context,
     )
     .expect("managed package must open");

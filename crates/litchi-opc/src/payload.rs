@@ -32,7 +32,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use soapberry_zip::office::{IndexedArchive, VerifiedPrecompressedEntry};
 
 use crate::error::{OpcError, Result, replicate_deferred_error};
-use crate::limits::{ReadLimits, ReadResource};
+use crate::limits::{ReadResource, SourceLimits};
 
 /// The retained owned source archive that deferred payloads inflate from.
 ///
@@ -46,7 +46,7 @@ pub(crate) struct DeferredPartSource {
     /// holds as `source_archive`, so a deferred package retains one copy of
     /// the compressed bytes, not two.
     bytes: Arc<Vec<u8>>,
-    limits: ReadLimits,
+    limits: SourceLimits,
     /// The ZIP index over `bytes`, built on the first decode and never again.
     /// A package that decodes nothing never builds it.
     index: OnceLock<std::result::Result<IndexedArchive<Arc<Vec<u8>>>, OpcError>>,
@@ -60,7 +60,7 @@ pub(crate) struct DeferredPartSource {
 }
 
 impl DeferredPartSource {
-    pub(crate) fn new(bytes: Arc<Vec<u8>>, limits: ReadLimits) -> Self {
+    pub(crate) fn new(bytes: Arc<Vec<u8>>, limits: SourceLimits) -> Self {
         Self {
             bytes,
             limits,
@@ -79,7 +79,7 @@ impl DeferredPartSource {
     }
 
     /// The read limits the retained archive was opened under.
-    pub(crate) const fn limits(&self) -> ReadLimits {
+    pub(crate) const fn limits(&self) -> SourceLimits {
         self.limits
     }
 

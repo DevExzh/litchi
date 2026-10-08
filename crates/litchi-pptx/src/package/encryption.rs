@@ -6,7 +6,7 @@ use std::path::Path;
 
 use litchi_crypto::ooxml::{self, Limits, Mode};
 use litchi_ooxml_common::package_encryption::PackageEncryption;
-use litchi_opc::{PackageWriter, ReadLimits};
+use litchi_opc::{PackageWriter, SourceLimits};
 
 use super::Package;
 use crate::{Error, Result};
@@ -36,7 +36,7 @@ impl Package {
             path,
             password,
             Limits::default(),
-            ReadLimits::default(),
+            SourceLimits::default(),
         )
     }
 
@@ -49,7 +49,7 @@ impl Package {
         path: P,
         password: &str,
         encryption_limits: Limits,
-        opc_limits: ReadLimits,
+        opc_limits: SourceLimits,
     ) -> Result<Self> {
         let input = File::open(path)?;
         Self::from_reader_with_password_and_limits(input, password, encryption_limits, opc_limits)
@@ -65,7 +65,7 @@ impl Package {
             reader,
             password,
             Limits::default(),
-            ReadLimits::default(),
+            SourceLimits::default(),
         )
     }
 
@@ -78,7 +78,7 @@ impl Package {
         reader: R,
         password: &str,
         encryption_limits: Limits,
-        opc_limits: ReadLimits,
+        opc_limits: SourceLimits,
     ) -> Result<Self> {
         let opened = ooxml::load_with(reader, password, &encryption_limits)?;
         Self::from_opened_encryption(opened, opc_limits)
@@ -94,7 +94,7 @@ impl Package {
             bytes,
             password,
             Limits::default(),
-            ReadLimits::default(),
+            SourceLimits::default(),
         )
     }
 
@@ -107,7 +107,7 @@ impl Package {
         bytes: Vec<u8>,
         password: &str,
         encryption_limits: Limits,
-        opc_limits: ReadLimits,
+        opc_limits: SourceLimits,
     ) -> Result<Self> {
         let opened = ooxml::open_with(bytes, password, &encryption_limits)?;
         Self::from_opened_encryption(opened, opc_limits)
@@ -123,7 +123,7 @@ impl Package {
             bytes,
             password,
             Limits::default(),
-            ReadLimits::default(),
+            SourceLimits::default(),
         )
     }
 
@@ -136,7 +136,7 @@ impl Package {
         bytes: &[u8],
         password: &str,
         encryption_limits: Limits,
-        opc_limits: ReadLimits,
+        opc_limits: SourceLimits,
     ) -> Result<Self> {
         let mut owned = Vec::new();
         owned
@@ -336,11 +336,11 @@ impl Package {
     ///
     /// Returns an error if the clear package violates `limits` or is not a
     /// valid PPTX package.
-    pub fn from_decrypted(opened: ooxml::Opened, limits: ReadLimits) -> Result<Self> {
+    pub fn from_decrypted(opened: ooxml::Opened, limits: SourceLimits) -> Result<Self> {
         Self::from_opened_encryption(opened, limits)
     }
 
-    fn from_opened_encryption(opened: ooxml::Opened, limits: ReadLimits) -> Result<Self> {
+    fn from_opened_encryption(opened: ooxml::Opened, limits: SourceLimits) -> Result<Self> {
         let mode = opened.mode();
         let mut package = Self::from_vec_with_limits(opened.into_bytes(), limits)?;
         package.encryption = match mode {

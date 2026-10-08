@@ -27,8 +27,8 @@ use litchi_core::{
     SourceVersion,
 };
 use litchi_opc::{
-    OpcPackage, PackURI, PackageWriter, ReadLimits, SourceBackedPackage, SourceCacheDiagnostics,
-    SourceCacheLimits,
+    OpcPackage, PackURI, PackageWriter, SourceBackedPackage, SourceCacheDiagnostics,
+    SourceCacheLimits, SourceLimits,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -3311,7 +3311,7 @@ fn prepare_xlsx_repeat_store_operation(
     let source_for_workbook: Arc<dyn ReadAt> = source.clone();
     let workbook = litchi_xlsx::SourceBackedWorkbook::from_read_at_with_limits_and_cache_limits_and_execution_context(
         source_for_workbook,
-        ReadLimits::default(),
+        SourceLimits::default(),
         cache_limits,
         xlsx_repeat_store_context(u64::try_from(bytes.len())?)?,
     )?;
@@ -3329,7 +3329,7 @@ fn prepare_xlsx_repeat_store_operation(
         let package =
             SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
                 source_for_package,
-                ReadLimits::default(),
+                SourceLimits::default(),
                 cache_limits,
                 xlsx_repeat_store_context(u64::try_from(bytes.len())?)?,
             )?;

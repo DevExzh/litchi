@@ -25,8 +25,8 @@ use litchi_core::{
     Resource, SourceVersion,
 };
 use litchi_opc::{
-    AuthorizedPrecompressedPart, OpcError, PackURI, ReadLimits, ReadResource, SourceBackedPackage,
-    SourceTopologyPlan,
+    AuthorizedPrecompressedPart, OpcError, PackURI, ReadResource, SourceBackedPackage,
+    SourceLimits, SourceTopologyPlan,
 };
 
 const CONTENT_TYPES_NS: &str = "http://schemas.openxmlformats.org/package/2006/content-types";
@@ -382,7 +382,7 @@ fn authorized_managed_synthetic_transfer()
     let (_budget, context) = managed_context_for_token(64 * 1024 * 1024, cancel_token);
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         source,
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -699,7 +699,7 @@ fn cancellation_during_compressed_capture_returns_cancelled_without_token() {
     let (_budget, context) = managed_context_for_token(64 * 1024 * 1024, cancel_token);
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         source.clone(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -723,7 +723,7 @@ fn output_limit_is_checked_before_any_destination_output() {
     let destination_total =
         u64::try_from(content_types.len() + relationships.len() + b"<destination/>\n".len())
             .unwrap();
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_archive_total_bytes(destination_total)
         .unwrap()
         .build()
@@ -798,7 +798,7 @@ fn exact_managed_capture_budget_succeeds_and_one_byte_less_refuses() {
     let (budget, _cancel_source, context) = managed_context(u64::MAX);
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         source,
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -819,7 +819,7 @@ fn exact_managed_capture_budget_succeeds_and_one_byte_less_refuses() {
     let (_budget, _cancel_source, exact_context) = managed_context(exact);
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(litchi_core::OwnedSource::new(source_bytes.clone())),
-        ReadLimits::default(),
+        SourceLimits::default(),
         exact_context,
     )
     .unwrap();
@@ -837,7 +837,7 @@ fn exact_managed_capture_budget_succeeds_and_one_byte_less_refuses() {
     let (_budget, _cancel_source, under_context) = managed_context(exact - 1);
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(litchi_core::OwnedSource::new(source_bytes)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         under_context,
     );
     let package = match package {
@@ -1128,7 +1128,7 @@ fn combined_capture_pins_decoded_budget_after_package_and_data_drop() {
     let (budget, _cancel, context) = managed_context(65536);
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         TestSource::new(source_bytes),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -1176,7 +1176,7 @@ fn combined_capture_exact_budget_and_one_under_are_transactional() {
         let source = CaptureObservedSource::new(TestSource::new(bytes.clone()), 65536);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -1216,7 +1216,7 @@ fn combined_capture_short_reads_bypass_and_mid_read_refusals_release_reservation
         let package =
             SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
                 source.clone(),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 litchi_opc::SourceCacheLimits::new(1, 1).unwrap(),
                 context,
             )
@@ -1261,7 +1261,7 @@ fn combined_capture_retains_signed_encrypted_and_corrupt_refusals() {
         let (budget, _cancel, context) = managed_context(65536);
         let package = match SourceBackedPackage::from_read_at_with_execution_context(
             TestSource::new(bytes),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         ) {
             Ok(package) => package,
@@ -1300,7 +1300,7 @@ fn combined_native_image_capture_preserves_compressed_member_after_source_drop()
         Arc::new(litchi_core::OwnedSource::new(
             NATIVE_POI_VIDEO_PPTX.to_vec(),
         )),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -1346,7 +1346,7 @@ fn retained_capture_charges_each_writer_and_publishes_concurrently_without_reads
     let (budget, _cancel, context) = managed_context(65536);
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         source.clone(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -1404,7 +1404,7 @@ fn retained_capture_writer_budget_refusal_does_not_consume_capture() {
     let (budget, _cancel, context) = managed_context(exact);
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         source.clone(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -1440,7 +1440,7 @@ fn retained_capture_rechecks_source_and_cancellation_before_writer_admission() {
         let (budget, cancel, context) = managed_context(65536);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -1479,7 +1479,7 @@ fn retained_empty_capture_keeps_metadata_charged_across_repeated_promotion() {
     let (budget, _cancel, context) = managed_context(3 * 4096);
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         source.clone(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -1538,7 +1538,7 @@ fn retained_empty_capture_charges_long_source_metadata() {
     let (budget, _cancel, context) = managed_context(256 * 1024);
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         source.clone(),
-        ReadLimits::builder()
+        SourceLimits::builder()
             .max_archive_member_name_bytes(32768)
             .unwrap()
             .build()

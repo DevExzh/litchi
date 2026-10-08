@@ -11,7 +11,7 @@ use litchi_core::{
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, SourceCacheLimits};
 use litchi_xlsx::calculation_properties::{Properties, Snapshot, SourceBackedEditor};
-use litchi_xlsx::{Error, ReadLimits};
+use litchi_xlsx::{Error, SourceLimits};
 
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
@@ -329,7 +329,7 @@ fn mce_limits_and_partial_sink_are_checked() {
     edit.set_properties(Properties::new().with_calculation_id(Some(91)));
     assert!(edit.commit().is_err());
 
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_part_bytes(1)
         .unwrap()
         .build()
@@ -366,7 +366,7 @@ fn managed_workbook_payload_is_budgeted_streamed_and_released() {
     let editor =
         SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
             Arc::new(VersionedSource::new(bytes.clone())),
-            ReadLimits::default(),
+            SourceLimits::default(),
             SourceCacheLimits::new(usize::try_from(exact).unwrap(), 4).unwrap(),
             litchi_xlsx::calculation_properties::Limits::default(),
             context,
@@ -408,7 +408,7 @@ fn managed_one_under_budget_fails_before_payload_retention_and_cancellation_stop
     assert!(matches!(
         SourceBackedEditor::from_read_at_with_execution_context(
             Arc::new(VersionedSource::new(bytes.clone())),
-            ReadLimits::default(),
+            SourceLimits::default(),
             litchi_xlsx::calculation_properties::Limits::default(),
             context,
         ),
@@ -421,7 +421,7 @@ fn managed_one_under_budget_fails_before_payload_retention_and_cancellation_stop
     let (budget, cancellation_source, context) = managed_context(exact);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes.clone())),
-        ReadLimits::default(),
+        SourceLimits::default(),
         litchi_xlsx::calculation_properties::Limits::default(),
         context,
     )
@@ -438,7 +438,7 @@ fn managed_one_under_budget_fails_before_payload_retention_and_cancellation_stop
     let (budget, cancellation_source, context) = managed_context(exact);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         litchi_xlsx::calculation_properties::Limits::default(),
         context,
     )

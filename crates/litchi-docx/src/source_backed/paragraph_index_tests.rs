@@ -4,7 +4,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, Resource,
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, ReadLimits};
+use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, SourceLimits};
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::{Arc, Barrier};
 use std::thread;
@@ -59,7 +59,7 @@ fn managed_package_with_memory(memory: u64) -> (Budget, CancellationSource, Pack
     .unwrap();
     let package = Package::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(fixture_bytes())),
-        ReadLimits::default(),
+        SourceLimits::default(),
         ExecutionContext::new(budget.clone(), cancellation, execution_limits),
     )
     .unwrap();

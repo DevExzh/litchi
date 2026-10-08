@@ -276,7 +276,7 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        Self::open_with_limits(path, litchi_opc::ReadLimits::default())
+        Self::open_with_limits(path, litchi_opc::SourceLimits::default())
     }
 
     /// Open a DOCX package from a file path with explicit OPC resource limits.
@@ -286,7 +286,7 @@ impl Package {
     /// Returns an error if the operation cannot be completed.
     pub fn open_with_limits<P: AsRef<Path>>(
         path: P,
-        limits: litchi_opc::ReadLimits,
+        limits: litchi_opc::SourceLimits,
     ) -> Result<Self> {
         Self::from_opc_package(OpcPackage::open_with_limits(path, limits)?)
     }
@@ -301,13 +301,13 @@ impl Package {
             path,
             password,
             &Limits::default(),
-            litchi_opc::ReadLimits::default(),
+            litchi_opc::SourceLimits::default(),
         )
     }
 
     /// Open with explicit outer-encryption limits.
     ///
-    /// The decrypted OPC archive uses [`litchi_opc::ReadLimits::default`].
+    /// The decrypted OPC archive uses [`litchi_opc::SourceLimits::default`].
     /// Use [`Self::open_with_password_and_limits`] to select both independent
     /// resource policies.
     #[cfg(feature = "encryption")]
@@ -320,7 +320,7 @@ impl Package {
             path,
             password,
             limits,
-            litchi_opc::ReadLimits::default(),
+            litchi_opc::SourceLimits::default(),
         )
     }
 
@@ -339,7 +339,7 @@ impl Package {
         path: P,
         password: &str,
         encryption_limits: &Limits,
-        opc_limits: litchi_opc::ReadLimits,
+        opc_limits: litchi_opc::SourceLimits,
     ) -> Result<Self> {
         let file = std::fs::File::open(path.as_ref()).map_err(Error::Io)?;
         let opened = crate::encryption::load_with(file, password, encryption_limits)?;
@@ -420,7 +420,7 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
-        Self::from_reader_with_limits(reader, litchi_opc::ReadLimits::default())
+        Self::from_reader_with_limits(reader, litchi_opc::SourceLimits::default())
     }
 
     /// Create a DOCX package from a reader with explicit OPC resource limits.
@@ -430,7 +430,7 @@ impl Package {
     /// Returns an error if the operation cannot be completed.
     pub fn from_reader_with_limits<R: Read>(
         reader: R,
-        limits: litchi_opc::ReadLimits,
+        limits: litchi_opc::SourceLimits,
     ) -> Result<Self> {
         Self::from_opc_package(OpcPackage::from_reader_with_limits(reader, limits)?)
     }
@@ -445,13 +445,13 @@ impl Package {
             reader,
             password,
             &Limits::default(),
-            litchi_opc::ReadLimits::default(),
+            litchi_opc::SourceLimits::default(),
         )
     }
 
     /// Open a reader with explicit outer-encryption limits.
     ///
-    /// The decrypted OPC archive uses [`litchi_opc::ReadLimits::default`].
+    /// The decrypted OPC archive uses [`litchi_opc::SourceLimits::default`].
     /// Use [`Self::from_reader_with_password_and_limits`] to select both
     /// independent resource policies.
     #[cfg(feature = "encryption")]
@@ -464,7 +464,7 @@ impl Package {
             reader,
             password,
             limits,
-            litchi_opc::ReadLimits::default(),
+            litchi_opc::SourceLimits::default(),
         )
     }
 
@@ -479,7 +479,7 @@ impl Package {
         reader: R,
         password: &str,
         encryption_limits: &Limits,
-        opc_limits: litchi_opc::ReadLimits,
+        opc_limits: litchi_opc::SourceLimits,
     ) -> Result<Self> {
         let opened = crate::encryption::load_with(reader, password, encryption_limits)?;
         Self::from_opened_with_limits(opened, opc_limits)
@@ -502,7 +502,7 @@ impl Package {
     #[cfg(feature = "encryption")]
     pub fn from_decrypted(
         opened: crate::encryption::Opened,
-        limits: litchi_opc::ReadLimits,
+        limits: litchi_opc::SourceLimits,
     ) -> Result<Self> {
         Self::from_opened_with_limits(opened, limits)
     }
@@ -510,7 +510,7 @@ impl Package {
     #[cfg(feature = "encryption")]
     fn from_opened_with_limits(
         opened: crate::encryption::Opened,
-        limits: litchi_opc::ReadLimits,
+        limits: litchi_opc::SourceLimits,
     ) -> Result<Self> {
         let source_encryption = opened.mode();
         let opc = OpcPackage::from_vec_with_limits(opened.into_bytes(), limits)?;

@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::result::Result;
 
 use litchi_docx::styles::effects::{Owner, Resource, Snapshot};
-use litchi_docx::{Package, ReadLimits};
+use litchi_docx::{Package, SourceLimits};
 use sha2::{Digest, Sha256};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
@@ -258,8 +258,8 @@ impl MutationCap {
         }
     }
 
-    fn set(self, value: u64) -> FixtureResult<ReadLimits> {
-        let builder = ReadLimits::builder();
+    fn set(self, value: u64) -> FixtureResult<SourceLimits> {
+        let builder = SourceLimits::builder();
         let builder = match self {
             Self::Parts => builder.max_parts(
                 usize::try_from(value)
@@ -447,7 +447,7 @@ fn fixture_without_main_effects_or_owner_relationships(relative: &str) -> Fixtur
 fn assert_effects_add_rejected_under_cap(
     source: &[u8],
     resource: &Resource,
-    limits: ReadLimits,
+    limits: SourceLimits,
     label: &str,
     cap: MutationCap,
 ) -> FixtureResult<()> {
@@ -1185,7 +1185,7 @@ fn signed_effects_noop_preserves_source_and_changed_publication_requires_unsign(
 #[test]
 fn effects_resource_limits_and_malformed_grammar_fail_closed() -> FixtureResult<()> {
     let bytes = fixture_bytes("poi/test-data/document/Bug54849.docx")?;
-    let limit = ReadLimits::builder()
+    let limit = SourceLimits::builder()
         .max_part_bytes(1)
         .map_err(|error| FixtureError(format!("part limit: {error:?}")))?
         .build()
@@ -1327,12 +1327,12 @@ fn native_effects_read_honors_caller_event_and_depth_limits() -> FixtureResult<(
     }
     assert!(maximum_depth > 2);
     let limits = [
-        ReadLimits::builder()
+        SourceLimits::builder()
             .max_xml_events(events - 1)
             .unwrap()
             .build()
             .unwrap(),
-        ReadLimits::builder()
+        SourceLimits::builder()
             .max_xml_depth(maximum_depth - 1)
             .unwrap()
             .build()
@@ -1518,7 +1518,7 @@ fn effects_addition_honors_public_package_caps_atomically() -> FixtureResult<()>
         }
     }
 
-    let exact_limits = ReadLimits::builder()
+    let exact_limits = SourceLimits::builder()
         .max_parts(projected_metrics.parts)
         .map_err(|error| FixtureError(format!("set exact part cap: {error:?}")))?
         .max_total_part_bytes(projected_metrics.total_part_bytes)
@@ -1626,7 +1626,7 @@ fn effects_addition_honors_relationship_part_and_graph_caps_with_source_less_own
         )?;
     }
 
-    let exact_limits = ReadLimits::builder()
+    let exact_limits = SourceLimits::builder()
         .max_relationship_parts(projected_metrics.relationship_parts)
         .map_err(|error| FixtureError(format!("set exact relationship-part cap: {error:?}")))?
         .max_relationship_graph_nodes(projected_metrics.relationship_graph_nodes)
@@ -1733,7 +1733,7 @@ fn assert_replacement_honors_total_part_bytes_cap(
         "one-under replacement cap must still admit the source package"
     );
 
-    let exact_limits = ReadLimits::builder()
+    let exact_limits = SourceLimits::builder()
         .max_total_part_bytes(exact_total)
         .map_err(|error| FixtureError(format!("set exact {owner:?} total-part cap: {error:?}")))?
         .build()
@@ -1783,7 +1783,7 @@ fn assert_replacement_honors_total_part_bytes_cap(
         replacement.xml_bytes()
     );
 
-    let one_under_limits = ReadLimits::builder()
+    let one_under_limits = SourceLimits::builder()
         .max_total_part_bytes(one_under)
         .map_err(|error| {
             FixtureError(format!("set one-under {owner:?} total-part cap: {error:?}"))

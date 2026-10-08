@@ -8,7 +8,7 @@ use litchi_core::{
     SourceVersion, TextOutputError, TextOutputOptions,
 };
 use litchi_docx::source_backed::Package as SourceBackedPackage;
-use litchi_docx::{Defect, Package, ReadLimits, TextDefect};
+use litchi_docx::{Defect, Package, SourceLimits, TextDefect};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
@@ -709,7 +709,7 @@ fn source_cancellation_before_and_after_output_is_document_progress() {
             &document_xml(r#"<w:p><w:r><w:t>cancel</w:t></w:r></w:p>"#),
             false,
         ))),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .expect("managed source package");
@@ -726,7 +726,7 @@ fn source_cancellation_before_and_after_output_is_document_progress() {
             &document_xml(r#"<w:p><w:r><w:t>cancel</w:t></w:r></w:p>"#),
             false,
         ))),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .expect("managed source package");
@@ -1116,7 +1116,7 @@ fn committed_owner_streams_current_text_and_preserves_old_owner() {
             let (_, context) = execution_context();
             SourceBackedPackage::from_read_at_with_execution_context(
                 source,
-                ReadLimits::default(),
+                SourceLimits::default(),
                 context,
             )
             .unwrap()
@@ -1160,7 +1160,7 @@ fn effective_main_donor_cancellation_during_output_keeps_progress() {
             &document_xml(r#"<w:p><w:r><w:t>donor</w:t></w:r></w:p>"#),
             false,
         ))),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();

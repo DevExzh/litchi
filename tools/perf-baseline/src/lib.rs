@@ -98,9 +98,8 @@ use litchi_ooxml_common::xml::{
 };
 use litchi_opc::{
     BlobPart, DiagnosticSnapshot, OpcError, OpcOperationAccounting, OpcPackage, OpenSession,
-    Operation, PackURI, PackageWriter, Part, PartData, ReadLimits, Relationships,
-    SourceBackedPackage, SourceCacheCounterDelta, SourceCacheDiagnostics, SourceCacheLimits,
-    TargetMode,
+    Operation, PackURI, PackageWriter, Part, PartData, Relationships, SourceBackedPackage,
+    SourceCacheCounterDelta, SourceCacheDiagnostics, SourceCacheLimits, SourceLimits, TargetMode,
     constants::{content_type as opc_content_type, relationship_type},
 };
 use litchi_pptx::shape::text::{
@@ -26155,7 +26154,7 @@ fn run_opc_open_session_scaling(
         )?;
         let session = OpenSession::new(context)?;
         let started = Instant::now();
-        let package = session.from_bytes(&corpus.archive, ReadLimits::default())?;
+        let package = session.from_bytes(&corpus.archive, SourceLimits::default())?;
         let duration = started.elapsed();
         verify_opc_scaling_package(&package, corpus, kind)?;
         std::hint::black_box(&package);
@@ -43793,7 +43792,7 @@ fn run_xlsx_cell_values_edit_save(
                 let (budget, context) = xlsx_cell_values_managed_context(payload_budget, maximum)?;
                 let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
                     read_at,
-                    ReadLimits::default(),
+                    SourceLimits::default(),
                     cache_limits,
                     context,
                 )?;
@@ -43801,7 +43800,7 @@ fn run_xlsx_cell_values_edit_save(
             } else {
                 let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at_with_limits_and_cache_limits(
                     read_at,
-                    ReadLimits::default(),
+                    SourceLimits::default(),
                     cache_limits,
                 )?;
                 (editor, None)
@@ -45489,7 +45488,7 @@ fn xlsx_cell_values_output_refusal_replay(
     let probe_editor =
         litchi_xlsx::cell_values::SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
             probe_source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             cache_limits,
             probe_context,
         )?;
@@ -45538,7 +45537,7 @@ fn xlsx_cell_values_output_refusal_replay(
     let refusal_editor =
         litchi_xlsx::cell_values::SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
             refusal_source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             cache_limits,
             refusal_context,
         )?;
@@ -46395,7 +46394,7 @@ fn opc_cache_package(
             Arc::new(
                 SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
                     source,
-                    ReadLimits::default(),
+                    SourceLimits::default(),
                     cache_limits,
                 )?,
             ),
@@ -46406,7 +46405,7 @@ fn opc_cache_package(
             let package =
                 SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
                     source,
-                    ReadLimits::default(),
+                    SourceLimits::default(),
                     cache_limits,
                     context,
                 )?;
@@ -60916,9 +60915,8 @@ mod tests {
         RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES, RangeSimulationConfig, RequestSizeBuckets,
         RtfSemanticVariant, SemanticShape, SimulatedCursor, SimulatedRangeMetrics,
         SimulatedRangeSource, SinkSummary, SourceBackedPackage, TransferDelayPolicy,
-        WindowedHashingSink, WriteSizeBuckets, WriterShape,
-        XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT, XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR,
-        XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR,
+        WindowedHashingSink, WriteSizeBuckets, WriterShape, XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT,
+        XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR, XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR,
         XLSX_ROW_VISIBILITY_SOURCE_EDIT_CORPUS_GENERATOR, XlsbShape, XlsxCellCrudShape,
         XlsxRowVisibilityShape, XlsxShape, build_cfb_corpus, build_cfb_selective_corpus,
         build_detection_corpus, build_docx_section_layout_corpus, build_docx_source_edit_corpus,

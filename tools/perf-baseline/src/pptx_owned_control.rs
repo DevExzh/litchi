@@ -489,14 +489,14 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
         return Err("owning PPTX durable inverse patch failed on a reopened candidate".into());
     }
 
-    let exact_limit = litchi_opc::ReadLimits::builder()
+    let exact_limit = litchi_opc::SourceLimits::builder()
         .max_input_bytes(u64::try_from(source.len())?)?
         .build()?;
     let exact_limited = litchi_pptx::Package::from_vec_with_limits(source.clone(), exact_limit)?;
     if exact_limited.opc()?.exact_source_len() != Some(source.len()) {
         return Err("owning PPTX exact input-byte limit did not admit the source".into());
     }
-    let under_limit = litchi_opc::ReadLimits::builder()
+    let under_limit = litchi_opc::SourceLimits::builder()
         .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)?
         .build()?;
     match litchi_pptx::Package::from_vec_with_limits(source.clone(), under_limit) {

@@ -545,7 +545,7 @@ fn managed_editor_retains_payload_closure_and_releases_budget() {
     let editor =
         SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
             Arc::new(VersionedSource::new(bytes)),
-            litchi_xlsx::ReadLimits::default(),
+            litchi_xlsx::SourceLimits::default(),
             SourceCacheLimits::new(usize::try_from(exact).unwrap(), 8).unwrap(),
             context,
         )
@@ -576,7 +576,7 @@ fn managed_one_under_budget_refuses_before_selected_worksheet_io() {
     let (budget, _cancellation_source, context) = managed_context(exact - 1);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         source.clone(),
-        litchi_xlsx::ReadLimits::default(),
+        litchi_xlsx::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -604,7 +604,7 @@ fn managed_cancellation_is_checked_before_snapshot_and_stream_output() {
     let (budget, cancellation_source, context) = managed_context(exact);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes.clone())),
-        litchi_xlsx::ReadLimits::default(),
+        litchi_xlsx::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -619,7 +619,7 @@ fn managed_cancellation_is_checked_before_snapshot_and_stream_output() {
     let (budget, cancellation_source, context) = managed_context(exact);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes.clone())),
-        litchi_xlsx::ReadLimits::default(),
+        litchi_xlsx::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -639,7 +639,7 @@ fn managed_cancellation_is_checked_before_snapshot_and_stream_output() {
     let (budget, cancellation_source, context) = managed_context(exact);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes.clone())),
-        litchi_xlsx::ReadLimits::default(),
+        litchi_xlsx::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -657,7 +657,7 @@ fn managed_cancellation_is_checked_before_snapshot_and_stream_output() {
     let (budget, cancellation_source, context) = managed_context(exact);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes)),
-        litchi_xlsx::ReadLimits::default(),
+        litchi_xlsx::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -684,7 +684,7 @@ fn managed_exact_noop_publication_is_byte_exact_and_releases_budget() {
     let (budget, _cancellation_source, context) = managed_context(available_memory);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes.clone())),
-        litchi_xlsx::ReadLimits::default(),
+        litchi_xlsx::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -720,7 +720,7 @@ fn managed_changed_publication_preserves_unknown_members_and_releases_budget() {
         managed_context(exact + MANAGED_PUBLICATION_PLANNING_HEADROOM);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes.clone())),
-        litchi_xlsx::ReadLimits::default(),
+        litchi_xlsx::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -782,7 +782,7 @@ fn managed_changed_publication_refuses_without_planning_headroom() {
     let (budget, _cancellation_source, context) = managed_context(exact);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes)),
-        litchi_xlsx::ReadLimits::default(),
+        litchi_xlsx::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -813,7 +813,7 @@ fn managed_editor_adopts_an_indexed_package_and_releases_budget() {
     let (budget, _cancellation_source, context) = managed_context(exact);
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes)),
-        litchi_xlsx::ReadLimits::default(),
+        litchi_xlsx::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -839,7 +839,7 @@ fn managed_signature_noop_and_changed_protection_contracts_remain_fail_closed() 
     let (budget, _cancellation_source, context) = managed_context(signed_noop_memory);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(signed.clone())),
-        litchi_xlsx::ReadLimits::default(),
+        litchi_xlsx::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -853,7 +853,7 @@ fn managed_signature_noop_and_changed_protection_contracts_remain_fail_closed() 
     let (budget, _cancellation_source, context) = managed_context(signed_exact);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(signed)),
-        litchi_xlsx::ReadLimits::default(),
+        litchi_xlsx::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -876,7 +876,7 @@ fn managed_signature_noop_and_changed_protection_contracts_remain_fail_closed() 
     let (budget, _cancellation_source, context) = managed_context(protected_exact);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(protected)),
-        litchi_xlsx::ReadLimits::default(),
+        litchi_xlsx::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -894,7 +894,7 @@ fn managed_source_revision_is_refused_before_output() {
     let (budget, _cancellation_source, context) = managed_context(exact);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         source.clone(),
-        litchi_xlsx::ReadLimits::default(),
+        litchi_xlsx::SourceLimits::default(),
         context,
     )
     .unwrap();

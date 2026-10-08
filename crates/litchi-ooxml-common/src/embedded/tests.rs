@@ -7,7 +7,7 @@ use litchi_core::{
 use litchi_opc::Relationships;
 use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::part::BlobPart;
-use litchi_opc::{OpcPackage, PackURI, Part, ReadLimits, SourceBackedPackage};
+use litchi_opc::{OpcPackage, PackURI, Part, SourceBackedPackage, SourceLimits};
 use std::io;
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::Arc;
@@ -524,7 +524,7 @@ fn source_limits_stale_sources_and_cancellation_fail_closed() {
     let context = ExecutionContext::new(budget, cancellation, execution_limits);
     let cancelled = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(litchi_core::OwnedSource::new(bytes)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .expect("source opens before cancellation");

@@ -460,7 +460,7 @@ fn managed_snapshot_changed_publication_retains_styles_and_releases_budget() {
     let editor =
         SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
             Arc::new(VersionedSource::new(source_bytes.clone())),
-            litchi_xlsx::ReadLimits::default(),
+            litchi_xlsx::SourceLimits::default(),
             SourceCacheLimits::new(usize::try_from(exact).unwrap(), 8).unwrap(),
             context,
         )

@@ -8,7 +8,7 @@ use litchi_core::{
     SourceVersion, TextOutputError, TextOutputOptions,
 };
 use litchi_opc::PackURI;
-use litchi_pptx::{Error, Package, ReadLimits, SourceBackedPresentation};
+use litchi_pptx::{Error, Package, SourceBackedPresentation, SourceLimits};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
@@ -791,7 +791,7 @@ fn source_cancellation_before_output_is_document_progress() {
         Arc::new(OwnedSource::new(package_bytes(&[slide_xml(
             r#"<a:t>before</a:t>"#,
         )]))),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .expect("managed source-backed package");
@@ -814,7 +814,7 @@ fn source_cancellation_after_sink_acceptance_overrides_sink_result() {
         Arc::new(OwnedSource::new(package_bytes(&[slide_xml(
             r#"<a:t>cancel</a:t>"#,
         )]))),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .expect("managed source-backed package");

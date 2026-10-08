@@ -20,7 +20,7 @@ use litchi_opc::{
 use litchi_xlsb::external_link::ExternalLinkLimits;
 use litchi_xlsb::package::PackageError;
 use litchi_xlsb::raw::{Header, Limits as RawLimits, Records, Writer, kind};
-use litchi_xlsb::{ReadLimits, SourceBackedWorkbook, Workbook};
+use litchi_xlsb::{SourceBackedWorkbook, SourceLimits, Workbook};
 
 fn fixture() -> Vec<u8> {
     std::fs::read(concat!(
@@ -464,7 +464,7 @@ fn managed_cancellation_is_checked_for_catalog_selectors_state_and_handles() {
     let (cancellation_source, context) = managed_context();
     let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
         source,
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -509,7 +509,7 @@ fn managed_cancellation_is_checked_before_catalog_construction() {
     assert!(matches!(
         SourceBackedWorkbook::from_read_at_with_execution_context(
             Arc::new(OwnedSource::new(fixture())),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         ),
         Err(PackageError::Opc(OpcError::Cancelled))
@@ -522,7 +522,7 @@ fn managed_cancellation_precedes_stale_source_preflight() {
     let (cancellation_source, context) = managed_context();
     let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
         source.clone(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -538,7 +538,7 @@ fn stale_source_preflight_remains_source_changed_without_cancellation() {
     let (_cancellation_source, context) = managed_context();
     let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
         source.clone(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -556,7 +556,7 @@ fn cancellation_during_selected_materialization_is_typed_and_not_cached() {
     let source = Arc::new(CancelOnArmedRead::new(fixture(), cancellation_source));
     let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
         source.clone(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -600,7 +600,7 @@ fn managed_package_handoff_checks_cancellation_before_catalog_construction() {
     let (cancellation_source, context) = managed_context();
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(fixture())),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -650,7 +650,7 @@ fn declared_part_read_limit_is_forwarded_at_catalog_open() {
     .unwrap();
     let oversized = vec![0xff; dependency_limit.saturating_add(1)];
     let source = rewrite_part("/xl/worksheets/sheet2.bin", oversized);
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_part_bytes(u64::try_from(dependency_limit).unwrap())
         .unwrap()
         .build()
@@ -1526,7 +1526,7 @@ fn source_table_cancellation_does_not_publish_partial_cache() {
     ));
     let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
         source.clone(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -1742,7 +1742,7 @@ fn source_external_link_second_part_cancellation_is_typed() {
     ));
     let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
         source.clone(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();

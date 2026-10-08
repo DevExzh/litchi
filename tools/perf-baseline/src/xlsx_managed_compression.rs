@@ -17,7 +17,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits,
     OwnedSource, ReadAt, Resource,
 };
-use litchi_opc::{OpcPackage, PackageWriter, ReadLimits, SourceCacheLimits};
+use litchi_opc::{OpcPackage, PackageWriter, SourceCacheLimits, SourceLimits};
 use litchi_xlsx::cell_values::{MultiCommit, SourceBackedEditor};
 use serde::Serialize;
 use std::{
@@ -307,7 +307,7 @@ fn open_editor(
     Ok(
         SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
             source,
-            ReadLimits::default(),
+            SourceLimits::default(),
             cache_limits(corpus, updates)?,
             context,
         )?,

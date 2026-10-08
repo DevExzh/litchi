@@ -7,8 +7,8 @@ use std::hint::black_box;
 use std::io::Cursor;
 
 use litchi_opc::{
-    AuthoredXmlFragment, OpcError, OpcPackage, PackURI, ReadLimits, ReadResource,
-    SourceBackedPackage, SourceTopologyPlan, probe_package_catalog_from_reader_with_limits,
+    AuthoredXmlFragment, OpcError, OpcPackage, PackURI, ReadResource, SourceBackedPackage,
+    SourceLimits, SourceTopologyPlan, probe_package_catalog_from_reader_with_limits,
 };
 
 /// Maximum fuzzer input retained by one exercise.
@@ -161,12 +161,12 @@ impl BoundaryKind {
 
 /// The deliberately tight policy used by this harness.
 #[must_use]
-pub fn tight_limits() -> ReadLimits {
+pub fn tight_limits() -> SourceLimits {
     limits_for_input(MAX_INPUT_BYTES as u64)
 }
 
-fn limits_for_input(max_input_bytes: u64) -> ReadLimits {
-    ReadLimits::builder()
+fn limits_for_input(max_input_bytes: u64) -> SourceLimits {
+    SourceLimits::builder()
         .max_input_bytes(max_input_bytes.max(1))
         .expect("nonzero fuzzer input ceiling")
         .max_archive_members(MAX_ARCHIVE_MEMBERS)
@@ -251,7 +251,7 @@ pub fn exercise(data: &[u8]) -> ExerciseStats {
     }
 }
 
-fn probe_package(data: &[u8], limits: ReadLimits) -> bool {
+fn probe_package(data: &[u8], limits: SourceLimits) -> bool {
     let mut reader = Cursor::new(data);
     probe_package_catalog_from_reader_with_limits(&mut reader, limits).is_ok()
 }
@@ -318,7 +318,7 @@ fn eager_main_document_resolves(package: &OpcPackage) -> bool {
         .is_ok_and(|part| part.partname().as_str() == "/word/document.xml")
 }
 
-fn topology_reopens(data: &[u8], limits: ReadLimits) -> bool {
+fn topology_reopens(data: &[u8], limits: SourceLimits) -> bool {
     let Ok(source) = SourceBackedPackage::from_vec_with_limits(data.to_vec(), limits) else {
         return false;
     };
@@ -342,7 +342,7 @@ fn topology_reopens(data: &[u8], limits: ReadLimits) -> bool {
             .is_some_and(|relationship| relationship.is_external())
 }
 
-fn exercise_source_backed(data: &[u8], limits: ReadLimits) -> SourceBackedStats {
+fn exercise_source_backed(data: &[u8], limits: SourceLimits) -> SourceBackedStats {
     let Ok(package) = SourceBackedPackage::from_vec_with_limits(data.to_vec(), limits) else {
         return SourceBackedStats::default();
     };
@@ -419,7 +419,7 @@ fn exercise_source_backed(data: &[u8], limits: ReadLimits) -> SourceBackedStats 
     stats
 }
 
-fn exercise_eager(data: &[u8], limits: ReadLimits) -> EagerStats {
+fn exercise_eager(data: &[u8], limits: SourceLimits) -> EagerStats {
     let Ok(package) = OpcPackage::from_bytes_with_limits(data, limits) else {
         return EagerStats::default();
     };
@@ -436,7 +436,11 @@ fn exercise_eager(data: &[u8], limits: ReadLimits) -> EagerStats {
     for part in package.iter_parts() {
         black_box(part.partname());
         black_box(part.content_type());
-        black_box(part.blob().len());
+        let _ = black_box(
+            package
+                .get_part(part.partname())
+                .map(|part| part.blob().len()),
+        );
         for rel in part.rels().iter() {
             black_box(rel.r_id());
             black_box(rel.reltype());
@@ -457,8 +461,8 @@ fn exercise_eager(data: &[u8], limits: ReadLimits) -> EagerStats {
     }
 }
 
-fn boundary_limits(kind: BoundaryKind, value: usize) -> ReadLimits {
-    let builder = ReadLimits::builder();
+fn boundary_limits(kind: BoundaryKind, value: usize) -> SourceLimits {
+    let builder = SourceLimits::builder();
     let builder = match kind {
         BoundaryKind::InputBytes => builder
             .max_input_bytes(u64::try_from(value).expect("bounded boundary"))
@@ -534,7 +538,7 @@ fn boundary_limits(kind: BoundaryKind, value: usize) -> ReadLimits {
     builder.build().expect("consistent boundary profile")
 }
 
-fn ingress_stats(data: &[u8], limits: ReadLimits) -> ExerciseStats {
+fn ingress_stats(data: &[u8], limits: SourceLimits) -> ExerciseStats {
     let mut reader = Cursor::new(data);
     ExerciseStats {
         source_backed_ok: SourceBackedPackage::from_vec_with_limits(data.to_vec(), limits).is_ok(),

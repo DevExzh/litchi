@@ -900,7 +900,7 @@ fn plan_final_relationship_topology(
     drawing_budget: &SvgDrawingBudget,
     planned_media_uris: &[PackURI],
     cleanup_targets: &[PackURI],
-    limits: litchi_opc::ReadLimits,
+    limits: litchi_opc::SourceLimits,
 ) -> Result<RelationshipTopologyMetrics> {
     if drawing_budget.relationship_additions.len() != planned_media_uris.len() {
         return Err(invalid(
@@ -4911,7 +4911,7 @@ fn materialize_content_types_transition(
     before: &OwnedContentTypes,
     removals: &[PackURI],
     additions: &[PackURI],
-    limits: litchi_opc::ReadLimits,
+    limits: litchi_opc::SourceLimits,
 ) -> Result<OwnedContentTypes> {
     let (has_default_svg, existing_svg_overrides) = manifest_svg_inventory(before.bytes())?;
     let mut selected_removals = Vec::new();

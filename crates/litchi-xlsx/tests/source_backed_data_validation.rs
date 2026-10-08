@@ -15,7 +15,7 @@ use litchi_core::{
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, ReadLimits, SourceCacheLimits,
+    BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, SourceCacheLimits, SourceLimits,
     TargetMode,
 };
 use litchi_xlsx::data_validation::{
@@ -318,7 +318,7 @@ fn managed_snapshot_changed_publication_and_budget_release_are_exact() {
     let editor =
         SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
             Arc::new(VersionedSource::new(source_bytes.clone())),
-            ReadLimits::default(),
+            SourceLimits::default(),
             SourceCacheLimits::new(usize::try_from(exact).unwrap(), 8).unwrap(),
             context,
         )
@@ -368,7 +368,7 @@ fn managed_one_under_budget_refuses_before_selected_payload_retention() {
     let (budget, _cancellation_source, context) = managed_context(exact - 1);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(source_bytes)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -535,7 +535,7 @@ fn mce_selected_collections_and_partial_sinks_are_refused() {
     let error = edit.commit().unwrap_err();
     assert!(error.to_string().contains("selected through MCE"));
 
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_part_bytes(1)
         .unwrap()
         .build()

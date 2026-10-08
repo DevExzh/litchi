@@ -23,7 +23,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as BudgetLimits, ReadAt,
     Resource, SourceVersion,
 };
-use litchi_opc::{OpcError, OpcPackage, PackageWriter, ReadLimits};
+use litchi_opc::{OpcError, OpcPackage, PackageWriter, SourceLimits};
 use litchi_xlsx::form_control::{
     Checked, ControlSelector, FormControlFormula, OwnerLimits, OwnerProfile, ScalarField,
     ScalarValue, SourceBackedFormControlEditor,
@@ -957,7 +957,7 @@ fn source_scalar_stale_version_and_cancellation_leave_output_empty() {
 
     let canceled = SourceBackedFormControlEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(source)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         canceled_context(),
     );
     assert!(canceled.is_err(), "canceled source editor was admitted");
@@ -1197,7 +1197,7 @@ fn source_commit_rechecks_cancellation_after_snapshot() {
     let (context, cancellation) = live_context();
     let editor = SourceBackedFormControlEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(source)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .expect("open managed source scalar editor");
@@ -1236,7 +1236,7 @@ fn managed_scalar_result_handles_retain_and_refund_memory_and_objects() {
         managed_scalar_context(u64::MAX, u64::MAX);
     let probe_editor = SourceBackedFormControlEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(source.clone())),
-        ReadLimits::default(),
+        SourceLimits::default(),
         probe_context,
     )
     .expect("open probe managed scalar editor");
@@ -1291,7 +1291,7 @@ fn managed_scalar_result_handles_retain_and_refund_memory_and_objects() {
     let (budget, _cancellation, context) = managed_scalar_context(probe_limit[0], probe_limit[1]);
     let editor = SourceBackedFormControlEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(source)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .expect("open finite managed scalar editor");

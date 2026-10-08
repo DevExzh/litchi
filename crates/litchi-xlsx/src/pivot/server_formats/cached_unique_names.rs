@@ -1237,7 +1237,7 @@ struct Graph {
     workbook_context: Arc<Vec<u8>>,
     caches: Vec<CacheInfo>,
     connections: Option<ConnectionInfo>,
-    limits: ReadLimits,
+    limits: SourceLimits,
 }
 
 struct CacheInfo {
@@ -1455,7 +1455,7 @@ fn parse_cache_field<'a>(
     cache: &SourcePart,
     cache_id: PivotCacheId,
     selector: PivotCacheFieldSelector<'a>,
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<SelectedField> {
     let scan = scan_xml_with_mce(
         cache.bytes.as_slice(),
@@ -1917,7 +1917,7 @@ fn find_f057_source_connection(
     scan: &XmlScan,
     root: &XmlElement,
     source: &XmlElement,
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<Option<String>> {
     let mut found = None;
     for ext_list in direct_children(scan, source, root.ns.as_ref(), b"extLst")? {
@@ -2058,7 +2058,7 @@ fn source_copy(
     Ok(copy)
 }
 
-fn validate_name_value(value: &str, limits: ReadLimits) -> Result<()> {
+fn validate_name_value(value: &str, limits: SourceLimits) -> Result<()> {
     // ST_Xstring permits SpreadsheetML escape sequences that decode to XML
     // control code points.  The source serializer re-encodes those units as
     // `_xHHHH_`; rejecting them here would make a valid decoded value
@@ -2066,7 +2066,7 @@ fn validate_name_value(value: &str, limits: ReadLimits) -> Result<()> {
     validate_decoded_name(value, limits)
 }
 
-fn validate_decoded_name(value: &str, limits: ReadLimits) -> Result<()> {
+fn validate_decoded_name(value: &str, limits: SourceLimits) -> Result<()> {
     if value.encode_utf16().count() > MAX_UNIQUE_NAME_UTF16 {
         return Err(invalid(
             "cached unique-name exceeds 65,535 decoded UTF-16 units",
@@ -2087,7 +2087,7 @@ fn rewrite_cache(
     maximum_total_bytes: u64,
     maximum_attribute_bytes: usize,
     current_total_bytes: u64,
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<Vec<u8>> {
     if staged.len() != before.entries.len() {
         return Err(invalid("cachedUniqueNames source order changed"));

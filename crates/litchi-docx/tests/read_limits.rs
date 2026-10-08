@@ -1,11 +1,11 @@
 use std::io::Cursor;
 
-use litchi_docx::{Error, Package, ReadLimits};
+use litchi_docx::{Error, Package, SourceLimits};
 use litchi_opc::{OpcError, ReadResource};
 use tempfile::NamedTempFile;
 
-fn input_limit(bytes: usize) -> ReadLimits {
-    ReadLimits::builder()
+fn input_limit(bytes: usize) -> SourceLimits {
+    SourceLimits::builder()
         .max_input_bytes(u64::try_from(bytes).expect("package size fits in u64"))
         .expect("valid input limit")
         .build()

@@ -3841,7 +3841,7 @@ fn transition_content_types(
             additions.push((&entry.part_name, CONTENT_TYPE));
         }
     }
-    let maximum = litchi_opc::ReadLimits::default().max_content_types_bytes();
+    let maximum = litchi_opc::SourceLimits::default().max_content_types_bytes();
     let mut result = before.without_parts(&removed, maximum)?;
     if !additions.is_empty() {
         result = result.with_part_overrides(&additions, maximum)?;

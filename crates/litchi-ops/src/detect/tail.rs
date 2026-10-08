@@ -180,7 +180,7 @@ mod tests {
     #[test]
     fn a_hard_opc_policy_error_does_not_fall_through_to_the_tail() {
         let bytes = zip(&[("Index/Document.iwa", b"not an office part")]);
-        let limits = crate::opc::ReadLimits::builder()
+        let limits = crate::opc::SourceLimits::builder()
             .max_input_bytes(8)
             .unwrap()
             .build()

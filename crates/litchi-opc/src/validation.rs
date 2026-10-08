@@ -19,7 +19,7 @@ use litchi_core::{
 
 use crate::constants::{content_type, relationship_type};
 use crate::pkgreader::ValidationCatalogPhase;
-use crate::{OpcError, ReadLimits, Result, SourceBackedPackage};
+use crate::{OpcError, Result, SourceBackedPackage, SourceLimits};
 
 const INGRESS: &str = "opc.package.ingress";
 const CATALOG: &str = "opc.package.catalog";
@@ -34,7 +34,7 @@ const SIGNATURE_PRESENCE: &str = "opc.package.signature_presence";
 /// resource ceiling is a blocked check. I/O, source mutation, cancellation,
 /// allocation, invalid policy, and report-construction failures remain errors.
 pub fn validate_read_at(source: Arc<dyn ReadAt>) -> Result<ValidateReport> {
-    validate_read_at_with_limits(source, ReadLimits::default(), ValidationLimits::default())
+    validate_read_at_with_limits(source, SourceLimits::default(), ValidationLimits::default())
 }
 
 /// Validate an immutable positional OPC source with explicit finite policies.
@@ -45,7 +45,7 @@ pub fn validate_read_at(source: Arc<dyn ReadAt>) -> Result<ValidateReport> {
 /// mutates the source.
 pub fn validate_read_at_with_limits(
     source: Arc<dyn ReadAt>,
-    read_limits: ReadLimits,
+    read_limits: SourceLimits,
     report_limits: ValidationLimits,
 ) -> Result<ValidateReport> {
     let expected = source.version()?;

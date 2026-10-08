@@ -24,7 +24,7 @@ use litchi_core::{
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::attributes::first_wins;
 use litchi_opc::{
-    OpcError, PartView, ReadLimits, SourceBackedPackage,
+    OpcError, PartView, SourceBackedPackage, SourceLimits,
     constants::{content_type as ct, relationship_type as rt},
 };
 use quick_xml::{
@@ -68,7 +68,7 @@ pub const DEFAULT_DOCX_VALIDATION_LIMITS: DocxValidationLimits = DocxValidationL
 /// Finite bounds for the DOCX-specific semantic validation pass.
 ///
 /// ZIP member, declared-size, content-type, and relationship ceilings remain
-/// owned by [`ReadLimits`]. These bounds only govern the materialized main
+/// owned by [`SourceLimits`]. These bounds only govern the materialized main
 /// document and the XML/MCE work performed after OPC ingress.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DocxValidationLimits {
@@ -239,7 +239,7 @@ pub type Result<T> = std::result::Result<T, DocxValidationError>;
 pub fn validate_read_at(source: Arc<dyn ReadAt>) -> Result<ValidateReport> {
     validate_read_at_with_limits(
         source,
-        ReadLimits::default(),
+        SourceLimits::default(),
         DocxValidationLimits::default(),
         ValidationLimits::default(),
     )
@@ -248,7 +248,7 @@ pub fn validate_read_at(source: Arc<dyn ReadAt>) -> Result<ValidateReport> {
 /// Validate an immutable positional DOCX source with explicit finite limits.
 pub fn validate_read_at_with_limits(
     source: Arc<dyn ReadAt>,
-    read_limits: ReadLimits,
+    read_limits: SourceLimits,
     docx_limits: DocxValidationLimits,
     report_limits: ValidationLimits,
 ) -> Result<ValidateReport> {
@@ -293,7 +293,7 @@ pub fn validate_read_at_with_limits(
 
 fn open_validation_package(
     source: Arc<dyn ReadAt>,
-    read_limits: ReadLimits,
+    read_limits: SourceLimits,
     docx_limits: DocxValidationLimits,
 ) -> std::result::Result<SourceBackedPackage, OpcError> {
     let (_cancellation_source, cancellation) = CancellationSource::pair();

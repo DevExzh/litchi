@@ -18,7 +18,7 @@ use litchi_opc::{
     BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, SourceCacheLimits, TargetMode,
 };
 use litchi_xlsx::print_options::{PrintOptions, SourceBackedEditor};
-use litchi_xlsx::{Error, Package, ReadLimits};
+use litchi_xlsx::{Error, Package, SourceLimits};
 
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
@@ -217,7 +217,7 @@ fn managed_payload_retention_publication_and_owning_escape_are_explicit() {
     let editor =
         SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
             Arc::new(VersionedSource::new(bytes.clone())),
-            ReadLimits::default(),
+            SourceLimits::default(),
             SourceCacheLimits::new(usize::try_from(exact).unwrap(), 8).unwrap(),
             context,
         )
@@ -258,7 +258,7 @@ fn managed_cancellation_is_checked_before_stream_publication() {
     let (budget, cancellation_source, context) = managed_context(exact);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -281,7 +281,7 @@ fn managed_one_under_budget_refuses_before_selected_worksheet_load() {
     let (budget, _cancellation_source, context) = managed_context(exact - 1);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -523,7 +523,7 @@ fn mce_limits_and_partial_sink_are_checked() {
         Some(true)
     );
 
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_part_bytes(1)
         .unwrap()
         .build()

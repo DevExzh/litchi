@@ -14,7 +14,7 @@
 
 use litchi_drawingml::ink::actions::{ActionSelector, ActionType, ChildSelector};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, Part, ReadLimits, ReadResource};
+use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, Part, ReadResource, SourceLimits};
 use litchi_pptx::Package;
 use litchi_pptx::presentation::embedded::ink_actions;
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
@@ -1525,7 +1525,7 @@ fn with_relationship_source_markers(bytes: &[u8], members: &[&str]) -> Vec<u8> {
     writer.finish_to_bytes().unwrap()
 }
 
-fn reopened_action_package(bytes: Vec<u8>, limits: ReadLimits) -> (OpcPackage, PackURI, PackURI) {
+fn reopened_action_package(bytes: Vec<u8>, limits: SourceLimits) -> (OpcPackage, PackURI, PackURI) {
     (
         OpcPackage::from_vec_with_limits(bytes, limits).unwrap(),
         PackURI::new(SLIDE_NAME).unwrap(),
@@ -1537,8 +1537,8 @@ fn bounded_read_limits(
     max_parts: usize,
     max_part_bytes: usize,
     max_total_part_bytes: usize,
-) -> ReadLimits {
-    ReadLimits::builder()
+) -> SourceLimits {
+    SourceLimits::builder()
         .max_parts(max_parts)
         .unwrap()
         .max_part_bytes(max_part_bytes as u64)

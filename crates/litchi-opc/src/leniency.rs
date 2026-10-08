@@ -5,7 +5,7 @@
 //! [`ToleranceReport`]. Nothing is swallowed silently, and nothing outside
 //! the closed enumerations changes: ZIP framing, ZIP encryption, XML
 //! well-formedness, manifest grammar outside the listed defects, part-name
-//! conflicts, and every [`ReadLimits`](crate::ReadLimits) bound remain hard
+//! conflicts, and every [`SourceLimits`](crate::SourceLimits) bound remain hard
 //! errors under every variant.
 //!
 //! **Reference-compatible repairs** are applied under every [`Leniency`]

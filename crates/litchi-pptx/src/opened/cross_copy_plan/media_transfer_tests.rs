@@ -1395,11 +1395,11 @@ fn outgrown(bytes: &[u8]) -> Result<Package> {
         .expect("parse ZIP")
         .entries()
         .count();
-    let limits = litchi_opc::ReadLimits::builder()
+    let limits = litchi_opc::SourceLimits::builder()
         .max_parts(members)
         .and_then(|builder| builder.max_relationship_parts(members))
         .and_then(|builder| builder.max_archive_members(members))
-        .and_then(litchi_opc::ReadLimitsBuilder::build)
+        .and_then(litchi_opc::SourceLimitsBuilder::build)
         .expect("limits");
     let mut package = Package::from_vec_with_limits(bytes.to_vec(), limits)?;
     package

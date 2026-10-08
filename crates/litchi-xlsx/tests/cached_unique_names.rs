@@ -13,7 +13,7 @@
 //! Office interoperability claim.
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, ReadLimits, TargetMode};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, SourceLimits, TargetMode};
 use litchi_xlsx::Error;
 use litchi_xlsx::pivot::cached_unique_names::{
     CacheSelector, CachedUniqueName, DiagnosticStatus, FieldSelector, PivotCacheId, Snapshot,
@@ -1876,7 +1876,7 @@ fn decoded_utf16_name_limit_counts_supplementary_scalars_and_is_atomic() {
         names: vec![(0, at_limit), (1, "other".to_owned())],
         ..FixtureOptions::default()
     });
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_xml_attribute_bytes(256 * 1024)
         .unwrap()
         .build()
@@ -2112,7 +2112,7 @@ fn caller_limits_reject_large_source_or_candidate_before_publication() {
         names: vec![(0, "l".repeat(20_000)), (1, "other".to_owned())],
         ..FixtureOptions::default()
     });
-    let tiny_attribute_limit = ReadLimits::builder()
+    let tiny_attribute_limit = SourceLimits::builder()
         .max_xml_attribute_bytes(4096)
         .unwrap()
         .build()
@@ -2121,7 +2121,7 @@ fn caller_limits_reject_large_source_or_candidate_before_publication() {
         OpcPackage::from_bytes_with_limits(&fixture.bytes, tiny_attribute_limit).unwrap();
     assert!(Snapshot::load(&tiny_package, cache_selector(), field_selector()).is_err());
 
-    let generous_limits = ReadLimits::builder()
+    let generous_limits = SourceLimits::builder()
         .max_xml_attribute_bytes(256 * 1024)
         .unwrap()
         .build()

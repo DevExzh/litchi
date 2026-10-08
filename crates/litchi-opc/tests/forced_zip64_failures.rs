@@ -25,7 +25,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits, ReadAt,
     Resource, SourceVersion,
 };
-use litchi_opc::{OpcError, PackURI, ReadLimits, ReadResource, SourceBackedPackage};
+use litchi_opc::{OpcError, PackURI, ReadResource, SourceBackedPackage, SourceLimits};
 
 const TARGET_URI: &str = "/word/document.xml";
 const SOURCE_FIXTURE: &[u8] = include_bytes!(
@@ -279,7 +279,7 @@ fn forced_zip64_metadata_limit_rejects_source_before_catalog_publication() {
     let source = fixture();
     let metadata_bytes = central_metadata_bytes(source);
     assert!(metadata_bytes > 0);
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_archive_metadata_bytes(metadata_bytes - 1)
         .unwrap()
         .build()
@@ -302,7 +302,7 @@ fn forced_zip64_metadata_limit_rejects_source_before_catalog_publication() {
 #[test]
 fn forced_zip64_overlay_part_limit_rejects_before_sink_output() {
     let source = fixture();
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         // The source's largest ordinary Part is 61 bytes; the replacement is
         // deliberately larger so ingress succeeds and overlay preflight fails.
         .max_part_bytes(61)
@@ -333,7 +333,7 @@ fn forced_zip64_managed_output_limit_rejects_before_first_sink_write() {
     let source_owner = Arc::new(VersionedSource::new(source));
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         source_owner.clone(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -360,7 +360,7 @@ fn forced_zip64_managed_cancellation_rejects_before_first_sink_write() {
     let source_owner = Arc::new(VersionedSource::new(source));
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         source_owner.clone(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();

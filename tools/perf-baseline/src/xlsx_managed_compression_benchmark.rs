@@ -13,7 +13,7 @@ use super::{
     xlsx_spec, xlsx_update_sheet_selectors, xlsx_value,
 };
 use litchi_core::{Budget, OwnedSource, ReadAt, Resource};
-use litchi_opc::{OpcPackage, PackageWriter, ReadLimits, SourceCacheLimits};
+use litchi_opc::{OpcPackage, PackageWriter, SourceCacheLimits, SourceLimits};
 use litchi_xlsx::cell_values::{MultiPatch, SourceBackedEditor};
 use serde::Serialize;
 use std::{
@@ -372,7 +372,7 @@ fn prepare_inverse_patch(
     let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
     let editor = SourceBackedEditor::from_read_at_with_limits_and_cache_limits(
         source,
-        ReadLimits::default(),
+        SourceLimits::default(),
         cache_limits,
     )?;
     let commit = super::stage_commit(&editor, updates)?;
@@ -418,7 +418,7 @@ fn timed_iteration(plan: &CasePlan<'_>, sink: &mut BoundedSink) -> AnyResult<Tim
     let editor =
         SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
             source,
-            ReadLimits::default(),
+            SourceLimits::default(),
             plan.cache_limits,
             context,
         )?;

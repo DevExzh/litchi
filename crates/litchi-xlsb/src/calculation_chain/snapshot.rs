@@ -209,7 +209,7 @@ impl SourceState {
     }
 }
 
-pub(crate) fn opc_capture_limits(limits: ReadLimits) -> Result<litchi_opc::ReadLimits> {
+pub(crate) fn opc_capture_limits(limits: ReadLimits) -> Result<litchi_opc::SourceLimits> {
     if limits.max_part_bytes == 0 {
         return Err(Error::LimitExceeded {
             resource: "Calculation Chain source closure bytes",
@@ -224,7 +224,7 @@ pub(crate) fn opc_capture_limits(limits: ReadLimits) -> Result<litchi_opc::ReadL
             .ok_or(Error::CapacityOverflow {
                 resource: "Calculation Chain relationship source bytes",
             })?;
-    let defaults = litchi_opc::ReadLimits::default();
+    let defaults = litchi_opc::SourceLimits::default();
     let maximum_relationships = limits.max_relationships.max(1);
     let maximum_parts = limits.max_graph_parts.max(1).min(defaults.max_parts());
     let maximum_mappings = limits.max_graph_parts.max(1).min(
@@ -232,7 +232,7 @@ pub(crate) fn opc_capture_limits(limits: ReadLimits) -> Result<litchi_opc::ReadL
             .max_content_type_mappings()
             .max(defaults.max_parts()),
     );
-    let builder = litchi_opc::ReadLimits::builder()
+    let builder = litchi_opc::SourceLimits::builder()
         .max_parts(maximum_parts)?
         .max_content_types_bytes(limits.max_part_bytes)?
         .max_content_type_mappings(maximum_mappings)?

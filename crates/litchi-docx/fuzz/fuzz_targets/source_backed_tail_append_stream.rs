@@ -15,7 +15,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use libfuzzer_sys::fuzz_target;
-use litchi_docx::ReadLimits;
+use litchi_docx::SourceLimits;
 use litchi_docx::source_backed::{
     Package, TailAppendLimits, TailAppendStreamCursor, TailAppendStreamEvent,
     TailAppendStreamLimits, TailAppendStreamSource,
@@ -140,8 +140,8 @@ impl Write for PrefixFailSink {
     }
 }
 
-fn read_limits() -> ReadLimits {
-    ReadLimits::builder()
+fn read_limits() -> SourceLimits {
+    SourceLimits::builder()
         // The fuzz input is capped at 64 KiB, while a successful candidate
         // archive also contains the generated stream and ZIP directory.
         .max_input_bytes(128 * 1024)

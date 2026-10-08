@@ -6,7 +6,7 @@
 //! Uses the high-performance soapberry-zip library for zero-copy ZIP parsing.
 
 use crate::error::{OpcError, Result};
-use crate::limits::{ReadLimits, ReadResource};
+use crate::limits::{ReadResource, SourceLimits};
 use crate::packuri::{PackURI, PartNameConflict};
 use soapberry_zip::CompressionMethod;
 use soapberry_zip::ZipArchive;
@@ -55,7 +55,7 @@ pub struct PhysPkgReader<'data> {
     /// The underlying ZIP archive reader (lazy decompression with caching)
     archive: LazyArchiveReader<'data>,
     /// Validated policy retained for package-level parsing.
-    limits: ReadLimits,
+    limits: SourceLimits,
     /// Shared across readers borrowed from one owned physical package.
     part_budget: Arc<Mutex<PartBudget>>,
     /// Public relationship-manifest reads share one aggregate budget.
@@ -69,7 +69,7 @@ pub struct OwnedPhysPkgReader {
     /// The owned data buffer
     data: Vec<u8>,
     /// Validated policy retained when creating borrowed readers.
-    limits: ReadLimits,
+    limits: SourceLimits,
     /// Shared with each borrowed reader so repeated owned reads cannot reset
     /// materialized-part budgets.
     part_budget: Arc<Mutex<PartBudget>>,
@@ -91,7 +91,7 @@ impl OwnedPhysPkgReader {
     /// Returns an error if the file doesn't exist, isn't a valid ZIP file,
     /// or cannot be opened.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        Self::open_with_limits(path, ReadLimits::default())
+        Self::open_with_limits(path, SourceLimits::default())
     }
 
     /// Open an OPC package from a file path with explicit resource limits.
@@ -99,7 +99,7 @@ impl OwnedPhysPkgReader {
     /// # Errors
     /// Returns an error if the file does not exist, cannot be read, exceeds the
     /// input-byte limit, or is not a valid ZIP archive.
-    pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: ReadLimits) -> Result<Self> {
+    pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: SourceLimits) -> Result<Self> {
         let data = read_owned_path_with_limits(path, limits)?;
         Self::from_bytes_with_limits(data, limits)
     }
@@ -109,7 +109,7 @@ impl OwnedPhysPkgReader {
     /// # Errors
     /// Returns an error if `data` is not a valid ZIP archive under the default limits.
     pub fn from_bytes(data: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(data, ReadLimits::default())
+        Self::from_bytes_with_limits(data, SourceLimits::default())
     }
 
     /// Create a new owned physical reader with explicit resource limits.
@@ -117,7 +117,7 @@ impl OwnedPhysPkgReader {
     /// # Errors
     /// Returns an error if `data` exceeds the input-byte limit or is not a valid
     /// ZIP archive under `limits`.
-    pub fn from_bytes_with_limits(data: Vec<u8>, limits: ReadLimits) -> Result<Self> {
+    pub fn from_bytes_with_limits(data: Vec<u8>, limits: SourceLimits) -> Result<Self> {
         limits.check_input_bytes(data.len() as u64)?;
         admit_total_archive_entries(&data, limits)?;
         // Validate the ZIP archive can be parsed
@@ -143,7 +143,7 @@ impl OwnedPhysPkgReader {
     /// Returns an error if the stream cannot be read or is not a valid ZIP archive
     /// under the default limits.
     pub fn from_reader<R: Read>(mut reader: R) -> Result<Self> {
-        Self::from_reader_with_limits(&mut reader, ReadLimits::default())
+        Self::from_reader_with_limits(&mut reader, SourceLimits::default())
     }
 
     /// Create a new owned physical reader from a stream with explicit limits.
@@ -151,7 +151,7 @@ impl OwnedPhysPkgReader {
     /// # Errors
     /// Returns an error if the stream cannot be read, exceeds `limits`, or is not
     /// a valid ZIP archive.
-    pub fn from_reader_with_limits<R: Read>(reader: R, limits: ReadLimits) -> Result<Self> {
+    pub fn from_reader_with_limits<R: Read>(reader: R, limits: SourceLimits) -> Result<Self> {
         let data = read_limited(reader, limits)?;
         Self::from_bytes_with_limits(data, limits)
     }
@@ -276,14 +276,14 @@ impl<'data> PhysPkgReader<'data> {
     /// # Errors
     /// Returns an error if `data` is not a valid ZIP archive under the default limits.
     pub fn new(data: &'data [u8]) -> Result<Self> {
-        Self::new_with_limits(data, ReadLimits::default())
+        Self::new_with_limits(data, SourceLimits::default())
     }
 
     /// Create a physical reader from a byte slice with explicit resource limits.
     ///
     /// # Errors
     /// Returns an error if `data` exceeds `limits` or is not a valid ZIP archive.
-    pub fn new_with_limits(data: &'data [u8], limits: ReadLimits) -> Result<Self> {
+    pub fn new_with_limits(data: &'data [u8], limits: SourceLimits) -> Result<Self> {
         Self::new_with_limits_and_budget(
             data,
             limits,
@@ -294,7 +294,7 @@ impl<'data> PhysPkgReader<'data> {
 
     fn new_with_limits_and_budget(
         data: &'data [u8],
-        limits: ReadLimits,
+        limits: SourceLimits,
         part_budget: Arc<Mutex<PartBudget>>,
         relationship_budget: Arc<Mutex<RelationshipBudget>>,
     ) -> Result<Self> {
@@ -592,7 +592,7 @@ impl<'data> PhysPkgReader<'data> {
         dead_code,
         reason = "pkgreader consumes the retained profile as parser limits are migrated"
     )]
-    pub(crate) const fn limits(&self) -> ReadLimits {
+    pub(crate) const fn limits(&self) -> SourceLimits {
         self.limits
     }
 
@@ -970,7 +970,7 @@ impl<'data> PhysPkgReader<'data> {
 /// it performs the one retained central-directory parse. `max_archive_members`
 /// is intentionally the non-directory file limit and cannot provide this
 /// guard.
-fn admit_total_archive_entries(data: &[u8], limits: ReadLimits) -> Result<()> {
+fn admit_total_archive_entries(data: &[u8], limits: SourceLimits) -> Result<()> {
     let archive = ZipArchive::from_slice(data)
         .map_err(|error| map_archive_error(&error))?
         .into_zip_archive();
@@ -1772,7 +1772,7 @@ impl Default for PhysPkgWriter<Cursor<Vec<u8>>> {
     }
 }
 
-pub(crate) fn read_limited<R: Read>(mut reader: R, limits: ReadLimits) -> Result<Vec<u8>> {
+pub(crate) fn read_limited<R: Read>(mut reader: R, limits: SourceLimits) -> Result<Vec<u8>> {
     let Ok(maximum) = usize::try_from(limits.max_input_bytes()) else {
         return Err(OpcError::InvalidReadLimit {
             resource: ReadResource::InputBytes,
@@ -1840,7 +1840,7 @@ pub(crate) fn read_limited<R: Read>(mut reader: R, limits: ReadLimits) -> Result
 /// owning package constructor can build its one physical reader directly.
 pub(crate) fn read_owned_path_with_limits<P: AsRef<Path>>(
     path: P,
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<Vec<u8>> {
     let path_ref = path.as_ref();
 
@@ -1994,8 +1994,8 @@ mod tests {
         writer.finish().unwrap()
     }
 
-    fn input_limits(maximum: usize) -> ReadLimits {
-        ReadLimits::builder()
+    fn input_limits(maximum: usize) -> SourceLimits {
+        SourceLimits::builder()
             .max_input_bytes(maximum as u64)
             .unwrap()
             .build()
@@ -2145,7 +2145,7 @@ mod tests {
     #[test]
     fn target_limit_cannot_exceed_the_universal_xml_attribute_limit() {
         assert!(matches!(
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_xml_attribute_bytes(3)
                 .unwrap()
                 .max_relationship_target_bytes(4)
@@ -2166,7 +2166,7 @@ mod tests {
             writer.write_stored(&name, &[]).unwrap();
         }
         let bytes = writer.finish_to_bytes().unwrap();
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_archive_members(4_096)
             .unwrap()
             .max_archive_total_entries(4_096)
@@ -2191,7 +2191,7 @@ mod tests {
     fn dedicated_xml_reads_do_not_consume_generic_part_budgets() {
         let bytes = stored_archive(&[("[Content_Types].xml", b"types"), ("_rels/.rels", b"rels")]);
         let root = PackURI::new("/").unwrap();
-        let independent = ReadLimits::builder()
+        let independent = SourceLimits::builder()
             .max_part_bytes(1)
             .unwrap()
             .max_total_part_bytes(1)
@@ -2206,7 +2206,7 @@ mod tests {
         assert_eq!(reader.content_types_xml().unwrap(), b"types");
         assert_eq!(reader.rels_xml_for(&root).unwrap(), Some(b"rels".to_vec()));
 
-        let content_types_over = ReadLimits::builder()
+        let content_types_over = SourceLimits::builder()
             .max_part_bytes(1)
             .unwrap()
             .max_total_part_bytes(1)
@@ -2226,7 +2226,7 @@ mod tests {
             })
         ));
 
-        let relationships_over = ReadLimits::builder()
+        let relationships_over = SourceLimits::builder()
             .max_part_bytes(1)
             .unwrap()
             .max_total_part_bytes(1)
@@ -2251,7 +2251,7 @@ mod tests {
     fn relationship_reads_share_count_and_byte_budgets_without_charging_failures() {
         let bytes = stored_archive(&[("_rels/.rels", b"rels")]);
         let root = PackURI::new("/").unwrap();
-        let exact = ReadLimits::builder()
+        let exact = SourceLimits::builder()
             .max_relationship_parts(1)
             .unwrap()
             .max_relationship_xml_bytes(4)
@@ -2271,7 +2271,7 @@ mod tests {
             })
         ));
 
-        let aggregate = ReadLimits::builder()
+        let aggregate = SourceLimits::builder()
             .max_relationship_parts(2)
             .unwrap()
             .max_relationship_xml_bytes(4)
@@ -2294,7 +2294,7 @@ mod tests {
             })
         ));
 
-        let byte_over = ReadLimits::builder()
+        let byte_over = SourceLimits::builder()
             .max_relationship_parts(2)
             .unwrap()
             .max_relationship_xml_bytes(4)
@@ -2335,7 +2335,7 @@ mod tests {
             .position(|window| window == payload)
             .unwrap();
         corrupt[offset] ^= 0xff;
-        let rollback = ReadLimits::builder()
+        let rollback = SourceLimits::builder()
             .max_relationship_parts(1)
             .unwrap()
             .max_relationship_xml_bytes(3)
@@ -2963,7 +2963,7 @@ mod tests {
 
     #[test]
     fn bounded_ingress_rejects_before_zip_parsing() {
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_input_bytes(3)
             .unwrap()
             .build()
@@ -3008,7 +3008,7 @@ mod tests {
             .write(&PackURI::new("/second.xml").unwrap(), b"b")
             .unwrap();
         let archive = writer.finish().unwrap();
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_archive_members(1)
             .unwrap()
             .max_parts(1)
@@ -3033,7 +3033,7 @@ mod tests {
         let first = PackURI::new("/first.bin").unwrap();
         let second = PackURI::new("/second.bin").unwrap();
 
-        let exact = ReadLimits::builder()
+        let exact = SourceLimits::builder()
             .max_part_bytes(4)
             .unwrap()
             .max_total_part_bytes(7)
@@ -3044,7 +3044,7 @@ mod tests {
         assert_eq!(reader.blob_for(&first).unwrap(), b"one");
         assert_eq!(reader.blob_for(&second).unwrap(), b"four");
 
-        let per_part = ReadLimits::builder()
+        let per_part = SourceLimits::builder()
             .max_part_bytes(3)
             .unwrap()
             .max_total_part_bytes(7)
@@ -3061,7 +3061,7 @@ mod tests {
             })
         ));
 
-        let total = ReadLimits::builder()
+        let total = SourceLimits::builder()
             .max_total_part_bytes(6)
             .unwrap()
             .build()
@@ -3093,7 +3093,11 @@ mod tests {
         let bytes = stored_archive(&[("first.bin", b"one"), ("second.bin", b"two")]);
         let first = PackURI::new("/first.bin").unwrap();
         let second = PackURI::new("/second.bin").unwrap();
-        let limits = ReadLimits::builder().max_parts(2).unwrap().build().unwrap();
+        let limits = SourceLimits::builder()
+            .max_parts(2)
+            .unwrap()
+            .build()
+            .unwrap();
         let reader = PhysPkgReader::new_with_limits(&bytes, limits).unwrap();
 
         assert_eq!(reader.blob_for(&first).unwrap(), b"one");
@@ -3113,7 +3117,11 @@ mod tests {
         let bytes = stored_archive(&[("first.bin", b"one"), ("second.bin", b"two")]);
         let first = PackURI::new("/first.bin").unwrap();
         let second = PackURI::new("/second.bin").unwrap();
-        let limits = ReadLimits::builder().max_parts(1).unwrap().build().unwrap();
+        let limits = SourceLimits::builder()
+            .max_parts(1)
+            .unwrap()
+            .build()
+            .unwrap();
 
         let reader = PhysPkgReader::new_with_limits(&bytes, limits).unwrap();
         assert_eq!(reader.blob_for(&first).unwrap(), b"one");
@@ -3142,7 +3150,11 @@ mod tests {
     fn repeated_single_item_parallel_batches_charge_max_parts() {
         let bytes = stored_archive(&[("part.bin", b"one")]);
         let part = PackURI::new("/part.bin").unwrap();
-        let limits = ReadLimits::builder().max_parts(1).unwrap().build().unwrap();
+        let limits = SourceLimits::builder()
+            .max_parts(1)
+            .unwrap()
+            .build()
+            .unwrap();
         let reader = PhysPkgReader::new_with_limits(&bytes, limits).unwrap();
 
         assert_eq!(
@@ -3183,7 +3195,7 @@ mod tests {
         bytes[offset] ^= 0xff;
         let good = PackURI::new("/good.bin").unwrap();
         let bad = PackURI::new("/bad.bin").unwrap();
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_parts(2)
             .unwrap()
             .max_total_part_bytes(7)
@@ -3210,7 +3222,11 @@ mod tests {
         let bytes = stored_archive(&[("first.bin", b"one"), ("second.bin", b"two")]);
         let first = PackURI::new("/first.bin").unwrap();
         let second = PackURI::new("/second.bin").unwrap();
-        let limits = ReadLimits::builder().max_parts(1).unwrap().build().unwrap();
+        let limits = SourceLimits::builder()
+            .max_parts(1)
+            .unwrap()
+            .build()
+            .unwrap();
         let owned = OwnedPhysPkgReader::from_bytes_with_limits(bytes, limits).unwrap();
 
         assert_eq!(owned.reader().unwrap().blob_for(&first).unwrap(), b"one");
@@ -3229,7 +3245,7 @@ mod tests {
         let bytes = stored_archive(&[("first.bin", b"one"), ("second.bin", b"four")]);
         let first = PackURI::new("/first.bin").unwrap();
         let second = PackURI::new("/second.bin").unwrap();
-        let exact = ReadLimits::builder()
+        let exact = SourceLimits::builder()
             .max_part_bytes(4)
             .unwrap()
             .max_total_part_bytes(7)
@@ -3243,7 +3259,7 @@ mod tests {
         assert_eq!(blobs.get("first.bin").unwrap(), b"one");
         assert_eq!(blobs.get("second.bin").unwrap(), b"four");
 
-        let over = ReadLimits::builder()
+        let over = SourceLimits::builder()
             .max_total_part_bytes(6)
             .unwrap()
             .build()
@@ -3262,7 +3278,7 @@ mod tests {
     #[test]
     fn post_materialization_failure_releases_its_declared_reservation() {
         let bytes = stored_archive(&[("part.bin", b"one")]);
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_part_bytes(3)
             .unwrap()
             .max_total_part_bytes(3)

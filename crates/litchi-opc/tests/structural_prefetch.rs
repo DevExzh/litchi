@@ -26,7 +26,7 @@ use litchi_core::{
 };
 use litchi_opc::leniency::{Defect, RelationshipDefect};
 use litchi_opc::{
-    OpcError, PackURI, ReadLimits, SourceBackedPackage, SourceCacheLimits, SourceReadPolicy,
+    OpcError, PackURI, SourceBackedPackage, SourceCacheLimits, SourceLimits, SourceReadPolicy,
 };
 use soapberry_zip::office::StreamingArchiveWriter;
 
@@ -208,7 +208,7 @@ fn open_with_policy(
     let dynamic: Arc<dyn ReadAt> = source;
     SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_source_read_policy(
         dynamic,
-        ReadLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         policy,
     )
@@ -286,10 +286,10 @@ struct Verdict {
 }
 
 fn verdict(source: Arc<Recording>) -> Verdict {
-    verdict_with_limits(source, ReadLimits::default())
+    verdict_with_limits(source, SourceLimits::default())
 }
 
-fn verdict_with_limits(source: Arc<Recording>, limits: ReadLimits) -> Verdict {
+fn verdict_with_limits(source: Arc<Recording>, limits: SourceLimits) -> Verdict {
     let dynamic: Arc<dyn ReadAt> = source;
     match SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_source_read_policy(
         dynamic,
@@ -662,7 +662,7 @@ fn a_managed_open_keeps_the_exact_grammar() {
     let context = ExecutionContext::new(budget, cancellation, execution_limits);
     SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
         dynamic,
-        ReadLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         context,
     )
@@ -714,7 +714,7 @@ fn source_observations_do_not_move() {
 fn a_relationship_budget_refuses_identically_inside_a_run() {
     let bytes = run_package(8, None);
     for ceiling in [1usize, 400, 900, 1_400, 2_000] {
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_total_relationship_xml_bytes(ceiling)
             .expect("ceiling")
             .build()

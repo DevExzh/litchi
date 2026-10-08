@@ -17,7 +17,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, Resource,
 };
 use litchi_opc::{
-    AuthoredXmlFragment, OpcError, PackURI, ReadLimits, ReadResource, SourceBackedPackage,
+    AuthoredXmlFragment, OpcError, PackURI, ReadResource, SourceBackedPackage, SourceLimits,
     SourceTopologyPlan, authored_xml_requires_source_proof,
 };
 use soapberry_zip::office::StreamingArchiveWriter;
@@ -69,7 +69,7 @@ fn open(document: &[u8]) -> SourceBackedPackage {
     SourceBackedPackage::from_vec(archive_bytes(document)).expect("fixture package must open")
 }
 
-fn open_with_limits(document: &[u8], limits: ReadLimits) -> SourceBackedPackage {
+fn open_with_limits(document: &[u8], limits: SourceLimits) -> SourceBackedPackage {
     SourceBackedPackage::from_vec_with_limits(archive_bytes(document), limits)
         .expect("fixture package must open with limits")
 }
@@ -433,7 +433,7 @@ fn destination_depth_and_event_limits_refuse_source_xml_additions() {
         .source_xml()
         .expect("source document must be valid");
 
-    let depth_limits = ReadLimits::builder()
+    let depth_limits = SourceLimits::builder()
         .max_xml_depth(1)
         .expect("depth limit must be valid")
         .build()
@@ -456,7 +456,7 @@ fn destination_depth_and_event_limits_refuse_source_xml_additions() {
     ));
     assert!(depth_output.is_empty());
 
-    let event_limits = ReadLimits::builder()
+    let event_limits = SourceLimits::builder()
         .max_xml_events(8)
         .expect("event limit must be valid")
         .build()
@@ -483,7 +483,7 @@ fn managed_source_xml_honors_cancellation_and_releases_memory_gauge() {
     let (budget, cancellation_source, context) = managed_context(memory);
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(archive_bytes(FORMATTED_DOCUMENT))),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .expect("managed fixture package must open");
@@ -502,7 +502,7 @@ fn managed_source_xml_honors_cancellation_and_releases_memory_gauge() {
     {
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(OwnedSource::new(archive_bytes(FORMATTED_DOCUMENT))),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .expect("managed fixture package must open");
@@ -545,7 +545,7 @@ fn managed_source_xml_refuses_retained_fragment_capacity_over_budget() {
     {
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(OwnedSource::new(archive_bytes(FORMATTED_DOCUMENT))),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -692,7 +692,7 @@ fn original_bytes_keep_every_structural_doctype_encoding_and_limit_refusal() {
     }
 
     // The audit's own finite budgets are unchanged and are exercised at the
-    // auditor in `crates/xml-minifier/tests/audit.rs`; `ReadLimits` does not
+    // auditor in `crates/xml-minifier/tests/audit.rs`; `SourceLimits` does not
     // feed them, so there is nothing package-level to narrow here.
 }
 
@@ -947,7 +947,7 @@ fn managed_revisions_pin_payload_admissions_without_retaining_the_revision_chain
     let (budget, _cancel, context) = managed_context(1024 * 1024);
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(archive_bytes(FORMATTED_DOCUMENT))),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -1001,7 +1001,7 @@ fn revision_holder_refuses_exhausted_memory_and_cancelled_contexts() {
     let (budget, cancel, context) = managed_context(memory);
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(archive_bytes(FORMATTED_DOCUMENT))),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -1186,7 +1186,7 @@ fn managed_retained_candidates_release_intermediate_revisions() {
     let (budget, _, context) = managed_context(4 * 1024 * 1024);
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(archive_bytes(FORMATTED_DOCUMENT))),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -1225,7 +1225,7 @@ fn managed_retained_candidates_release_intermediate_revisions() {
 #[test]
 fn retained_xml_revisions_enforce_aggregate_limits_and_memory_admission() {
     let limit = FORMATTED_DOCUMENT.len() as u64 + b"<first/>".len() as u64;
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_total_part_bytes(limit)
         .unwrap()
         .build()
@@ -1254,7 +1254,7 @@ fn retained_xml_revisions_enforce_aggregate_limits_and_memory_admission() {
     let (budget, cancel, context) = managed_context(memory);
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(archive_bytes(FORMATTED_DOCUMENT))),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -1290,7 +1290,7 @@ fn retained_xml_revisions_enforce_effective_archive_byte_limits() {
         .iter()
         .map(|name| archive.read_member(name).unwrap().len() as u64)
         .sum();
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_archive_total_bytes(total + 8)
         .unwrap()
         .build()

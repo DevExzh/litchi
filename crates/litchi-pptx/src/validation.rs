@@ -16,7 +16,7 @@ use litchi_core::{
     ValidationReportError,
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{OpcError, ReadLimits, SourceBackedPackage};
+use litchi_opc::{OpcError, SourceBackedPackage, SourceLimits};
 use quick_xml::XmlVersion;
 use quick_xml::escape::resolve_xml_entity;
 use quick_xml::events::{BytesStart, Event};
@@ -50,12 +50,12 @@ const MAX_SLIDE_ID: u64 = 2_147_483_647;
 /// Finite semantic limits for one PPTX validation pass.
 ///
 /// OPC archive, member, relationship, and ZIP/XML-manifest limits remain
-/// owned by [`ReadLimits`].  These additional ceilings bound the XML parts
+/// owned by [`SourceLimits`].  These additional ceilings bound the XML parts
 /// materialized by this format-level report, the aggregate validated owner
 /// bytes, and the raw relationship graph walk.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PptxValidationLimits {
-    read_limits: ReadLimits,
+    read_limits: SourceLimits,
     max_xml_bytes: usize,
     max_owner_bytes: usize,
     max_slides: usize,
@@ -67,13 +67,13 @@ pub struct PptxValidationLimits {
 impl PptxValidationLimits {
     /// Returns the OPC ingress policy used when opening a positional source.
     #[must_use]
-    pub const fn read_limits(self) -> ReadLimits {
+    pub const fn read_limits(self) -> SourceLimits {
         self.read_limits
     }
 
     /// Return a copy using a caller-provided OPC ingress policy.
     #[must_use]
-    pub const fn with_read_limits(mut self, limits: ReadLimits) -> Self {
+    pub const fn with_read_limits(mut self, limits: SourceLimits) -> Self {
         self.read_limits = limits;
         self
     }
@@ -164,7 +164,7 @@ impl PptxValidationLimits {
 impl Default for PptxValidationLimits {
     fn default() -> Self {
         Self {
-            read_limits: ReadLimits::default(),
+            read_limits: SourceLimits::default(),
             max_xml_bytes: DEFAULT_XML_BYTES,
             max_owner_bytes: DEFAULT_OWNER_BYTES,
             max_slides: DEFAULT_SLIDES,

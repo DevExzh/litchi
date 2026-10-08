@@ -6,6 +6,8 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0035 | OPC/OOXML source-limit vocabulary | shared physical profile and builder renamed; broader limits policy pending |
+| 0034 | Effective source DOCX text streaming | retained main/donor output integrated; specialized routes pending |
 | 0033 | Effective source DOCX metadata reads | shared property graph/decoder integrated; remaining specialized routes pending |
 | 0032 | Typed primary DOCX transaction limits | typed kind/count fields migrated; configurable limits and broader policy pending |
 | 0031 | Canonical source DOCX package-owning Edit/Commit | primary owner migrated; specialized families, limits and performance pending |
@@ -397,3 +399,17 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
   source-failure precedence have integration coverage.
 - Specialized reads/transactions, configurable limits and the wider goal remain
   open. Record 0034 documents verification and allocation boundaries.
+
+
+## 0035 — shared OPC/OOXML SourceLimits vocabulary
+
+- Renamed the physical profile and builder to SourceLimits/SourceLimitsBuilder
+  throughout OPC, OOXML re-exports, unified consumers and active tools, without
+  retaining aliases. Defaults, admission and checked builders are unchanged.
+- Added minimal/full OPC, PPTX, XLSX and XLSB glossary profiles. Exact-scope bans
+  distinguish XLSB's root re-export from unrelated semantic ReadLimits types.
+- Broader tests caught an empty-plan publication regression: the one-shot
+  path now preserves its exact-copy budget without allocating a retained owner.
+- Kind/error names, options envelopes and other limit migrations remain open.
+  Record 0035 documents checks and the unrelated existing iWork example error
+  encountered by the exploratory workspace all-targets build.

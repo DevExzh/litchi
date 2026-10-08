@@ -35,7 +35,7 @@ use std::sync::Arc;
 use litchi_core::xml::ReaderOrigin;
 use litchi_core::{Resource, ResourceLimit};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{OpcPackage, OwnedRelationships, PackURI, Part, ReadLimits};
+use litchi_opc::{OpcPackage, OwnedRelationships, PackURI, Part, SourceLimits};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{LocalName, Prefix, PrefixDeclaration, QName};
 use quick_xml::reader::Reader;
@@ -102,7 +102,7 @@ struct XmlScanLimits {
 }
 
 impl XmlScanLimits {
-    fn from_read_limits(limits: ReadLimits) -> Self {
+    fn from_read_limits(limits: SourceLimits) -> Self {
         let part_bytes = usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX);
         Self {
             part_bytes: MAX_PART_BYTES.min(part_bytes),
@@ -120,7 +120,7 @@ impl XmlScanLimits {
 /// catalog parser is also used by callers outside this owner and therefore
 /// retains its compatibility wrapper, but this graph must never silently use
 /// an unbounded/default policy while admitting a package.
-fn catalog_mce_limits(limits: ReadLimits) -> litchi_ooxml_common::mce::Limits {
+fn catalog_mce_limits(limits: SourceLimits) -> litchi_ooxml_common::mce::Limits {
     let part_bytes = usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX);
     let input = MAX_PART_BYTES.min(part_bytes);
     let aggregate_bytes = usize::try_from(limits.max_total_part_bytes()).unwrap_or(usize::MAX);
@@ -1970,11 +1970,11 @@ fn validate_candidate_limits(package: &OpcPackage) -> Result<()> {
     Ok(())
 }
 
-fn caller_part_limit(limits: ReadLimits) -> usize {
+fn caller_part_limit(limits: SourceLimits) -> usize {
     usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX)
 }
 
-fn caller_attribute_limit(limits: ReadLimits) -> usize {
+fn caller_attribute_limit(limits: SourceLimits) -> usize {
     MAX_ATTRIBUTE_TEXT_BYTES.min(limits.max_xml_attribute_bytes())
 }
 
@@ -4004,7 +4004,7 @@ struct TableMeta {
     owner: Range<usize>,
 }
 
-fn scan_table_metadata(bytes: &[u8], limits: ReadLimits) -> Result<TableMeta> {
+fn scan_table_metadata(bytes: &[u8], limits: SourceLimits) -> Result<TableMeta> {
     let scan = scan_xml(bytes, "pivotTableDefinition", limits)?;
     scan_table_metadata_from_scan(&scan)
 }
@@ -5247,7 +5247,7 @@ struct OpenElement {
     mce_context: bool,
 }
 
-fn scan_xml(bytes: &[u8], expected_root: &str, read_limits: ReadLimits) -> Result<XmlScan> {
+fn scan_xml(bytes: &[u8], expected_root: &str, read_limits: SourceLimits) -> Result<XmlScan> {
     scan_xml_config(bytes, expected_root, read_limits, false)
 }
 
@@ -5257,7 +5257,7 @@ fn scan_xml(bytes: &[u8], expected_root: &str, read_limits: ReadLimits) -> Resul
 fn scan_xml_with_mce(
     bytes: &[u8],
     expected_root: &str,
-    read_limits: ReadLimits,
+    read_limits: SourceLimits,
 ) -> Result<XmlScan> {
     scan_xml_config(bytes, expected_root, read_limits, true)
 }
@@ -5265,7 +5265,7 @@ fn scan_xml_with_mce(
 fn scan_xml_config(
     bytes: &[u8],
     expected_root: &str,
-    read_limits: ReadLimits,
+    read_limits: SourceLimits,
     parse_mce_branches: bool,
 ) -> Result<XmlScan> {
     let limits = XmlScanLimits::from_read_limits(read_limits);

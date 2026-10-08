@@ -51,9 +51,9 @@ Every failure is one `litchi::Error` with a stable `litchi::Code`.
 
 ## Bounded OOXML Ingestion
 
-`docx`, `pptx`, `xlsx`, and `xlsb` re-export `ReadLimits`, the shared checked
+`docx`, `pptx`, `xlsx`, and `xlsb` re-export `SourceLimits`, the shared checked
 OPC package-ingestion policy. Ordinary constructors use bounded defaults.
-Construct a profile from those defaults with `ReadLimits::builder()` and supply
+Construct a profile from those defaults with `SourceLimits::builder()` and supply
 it to the matching contextual API: DOCX and PPTX `Package::*_with_limits`,
 XLSX `Package::*_with_limits` or `Workbook::*_with_limits`, and XLSB
 `Workbook::new_with_limits`.
@@ -66,9 +66,9 @@ MS-OI29500 §2.1.1749-1752 for hostile input; it is a Litchi safety policy,
 not a specification maximum.
 
 ```rust
-use litchi::docx::{Package, ReadLimits};
+use litchi::docx::{Package, SourceLimits};
 
-let limits = ReadLimits::builder()
+let limits = SourceLimits::builder()
     .max_input_bytes(32 * 1024 * 1024)?
     .max_archive_members(10_000)?
     .build()?;

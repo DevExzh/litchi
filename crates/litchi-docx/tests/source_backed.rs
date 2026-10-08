@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use litchi_core::{Position, ReadAt, SourceVersion};
 use litchi_docx::alt::{Data, MAX_DATA_BYTES};
 use litchi_docx::document::{Error as TransactionError, Snapshot};
-use litchi_docx::{Error, Package, ReadLimits, source_backed};
+use litchi_docx::{Error, Package, SourceLimits, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::rel::TargetMode;
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, Part};
@@ -367,7 +367,7 @@ fn source_changes_remain_visible_before_the_first_payload_read() {
 fn read_limits_are_returned_as_the_original_opc_error() {
     let (bytes, main, unused) = fixture();
     let source = Arc::new(ObservedSource::new(bytes, main, unused));
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_part_bytes(1)
         .unwrap()
         .build()

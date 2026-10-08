@@ -3,13 +3,13 @@
 
 use std::sync::Arc;
 
-use litchi_opc::{OpcPackage, PackURI, ReadLimits};
+use litchi_opc::{OpcPackage, PackURI, SourceLimits};
 
 fn source_package() -> OpcPackage {
     let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
     writer.write_stored("[Content_Types].xml", br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/></Types>"#).unwrap();
     writer.write_stored("item.xml", b"<root/>").unwrap();
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_part_bytes(1024)
         .unwrap()
         .build()

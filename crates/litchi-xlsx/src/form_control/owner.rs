@@ -17,8 +17,8 @@ use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    EffectiveTopology, OpcPackage, OwnedRelationships, PackURI, PartData, ReadLimits, ReadResource,
-    Relationships, SourceBackedPackage, TargetMode,
+    EffectiveTopology, OpcPackage, OwnedRelationships, PackURI, PartData, ReadResource,
+    Relationships, SourceBackedPackage, SourceLimits, TargetMode,
 };
 use quick_xml::events::{BytesEnd, BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -397,7 +397,7 @@ impl OwnerLimits {
 
     /// Derive an owner policy from the caller's OPC read policy.
     #[must_use]
-    pub fn from_read_limits(read_limits: ReadLimits) -> Self {
+    pub fn from_read_limits(read_limits: SourceLimits) -> Self {
         let mut limits = Self::default();
         limits.max_drawing_bytes =
             lower_u64(limits.max_drawing_bytes, read_limits.max_part_bytes());

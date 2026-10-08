@@ -99,8 +99,8 @@ impl fmt::Display for ReadResource {
 
 /// Checked resource ceilings for reading one OPC package.
 ///
-/// Create a profile with [`ReadLimits::builder`]. Existing open methods use
-/// [`ReadLimits::default`], while `*_with_limits` constructors let callers
+/// Create a profile with [`SourceLimits::builder`]. Existing open methods use
+/// [`SourceLimits::default`], while `*_with_limits` constructors let callers
 /// select tighter bounds for hostile or multi-tenant input.
 ///
 /// The default profile is intentionally bounded across compressed input, ZIP
@@ -110,10 +110,10 @@ impl fmt::Display for ReadResource {
 /// MS-OI29500 sections 2.1.1749-1752.
 #[allow(
     clippy::module_name_repetitions,
-    reason = "profile type is named for its read-policy domain, mirroring ReadResource"
+    reason = "physical ingress profile follows the shared SourceLimits vocabulary"
 )]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ReadLimits {
+pub struct SourceLimits {
     input_bytes: u64,
     archive_members: usize,
     archive_total_entries: usize,
@@ -140,11 +140,11 @@ pub struct ReadLimits {
     relationship_target_bytes: usize,
 }
 
-impl ReadLimits {
+impl SourceLimits {
     /// Start building a checked read policy from the standard defaults.
     #[must_use]
-    pub fn builder() -> ReadLimitsBuilder {
-        ReadLimitsBuilder {
+    pub fn builder() -> SourceLimitsBuilder {
+        SourceLimitsBuilder {
             limits: Self::default(),
         }
     }
@@ -303,7 +303,7 @@ impl ReadLimits {
     }
 }
 
-impl Default for ReadLimits {
+impl Default for SourceLimits {
     fn default() -> Self {
         Self {
             input_bytes: 512 * MIB as u64,
@@ -334,13 +334,13 @@ impl Default for ReadLimits {
     }
 }
 
-/// Builder for [`ReadLimits`].
+/// Builder for [`SourceLimits`].
 #[derive(Debug, Clone, Copy)]
-pub struct ReadLimitsBuilder {
-    limits: ReadLimits,
+pub struct SourceLimitsBuilder {
+    limits: SourceLimits,
 }
 
-impl ReadLimitsBuilder {
+impl SourceLimitsBuilder {
     /// Finalize this checked profile.
     ///
     /// # Errors
@@ -348,7 +348,7 @@ impl ReadLimitsBuilder {
     /// Returns `Err` if the ceilings are inconsistent: relationship parts
     /// exceed archive members, parts exceed archive members, or relationship
     /// target bytes exceed XML attribute bytes.
-    pub fn build(self) -> Result<ReadLimits> {
+    pub fn build(self) -> Result<SourceLimits> {
         if self.limits.relationship_parts > self.limits.archive_members {
             return Err(invalid(
                 ReadResource::RelationshipParts,
@@ -648,14 +648,14 @@ mod tests {
     #[test]
     fn builder_rejects_zero_and_keeps_defaults_checked() {
         assert!(matches!(
-            ReadLimits::builder().max_input_bytes(0),
+            SourceLimits::builder().max_input_bytes(0),
             Err(OpcError::InvalidReadLimit {
                 resource: ReadResource::InputBytes,
                 value: 0,
             })
         ));
         assert_eq!(
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .build()
                 .unwrap()
                 .max_total_part_bytes(),

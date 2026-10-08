@@ -104,7 +104,7 @@ pub fn opc_probe_count() -> usize {
     any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
 ))]
 pub(crate) fn catalog_probe_limits(
-    limits: crate::opc::ReadLimits,
+    limits: crate::opc::SourceLimits,
 ) -> litchi_odf_common::detect::CatalogProbeLimits {
     litchi_odf_common::detect::CatalogProbeLimits::new(
         limits.max_input_bytes(),

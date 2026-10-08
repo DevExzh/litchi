@@ -178,7 +178,7 @@ impl Package {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        Self::open_with_limits(path, litchi_opc::ReadLimits::default())
+        Self::open_with_limits(path, litchi_opc::SourceLimits::default())
     }
 
     /// Open a PPTX from a filesystem path with explicit OPC resource limits.
@@ -188,7 +188,7 @@ impl Package {
     /// Returns an error if the input cannot be read or is malformed.
     pub fn open_with_limits<P: AsRef<Path>>(
         path: P,
-        limits: litchi_opc::ReadLimits,
+        limits: litchi_opc::SourceLimits,
     ) -> Result<Self> {
         Self::from_opc_package_with_provenance(OpcPackage::open_with_limits(path, limits)?, true)
     }
@@ -199,7 +199,7 @@ impl Package {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
-        Self::from_reader_with_limits(reader, litchi_opc::ReadLimits::default())
+        Self::from_reader_with_limits(reader, litchi_opc::SourceLimits::default())
     }
 
     /// Parse a PPTX from a reader with explicit OPC resource limits.
@@ -209,7 +209,7 @@ impl Package {
     /// Returns an error if the input cannot be read or is malformed.
     pub fn from_reader_with_limits<R: Read>(
         reader: R,
-        limits: litchi_opc::ReadLimits,
+        limits: litchi_opc::SourceLimits,
     ) -> Result<Self> {
         Self::from_opc_package_with_provenance(
             OpcPackage::from_reader_with_limits(reader, limits)?,
@@ -223,7 +223,7 @@ impl Package {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn from_vec(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_vec_with_limits(bytes, litchi_opc::ReadLimits::default())
+        Self::from_vec_with_limits(bytes, litchi_opc::SourceLimits::default())
     }
 
     /// Parse a PPTX from an owned ZIP buffer with explicit OPC resource limits.
@@ -231,7 +231,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_vec_with_limits(bytes: Vec<u8>, limits: litchi_opc::ReadLimits) -> Result<Self> {
+    pub fn from_vec_with_limits(bytes: Vec<u8>, limits: litchi_opc::SourceLimits) -> Result<Self> {
         Self::from_opc_package_with_provenance(
             OpcPackage::from_vec_with_limits(bytes, limits)?,
             true,
@@ -244,7 +244,7 @@ impl Package {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, litchi_opc::ReadLimits::default())
+        Self::from_bytes_with_limits(bytes, litchi_opc::SourceLimits::default())
     }
 
     /// Parse a PPTX from a borrowed ZIP buffer with explicit OPC resource limits.
@@ -252,7 +252,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_bytes_with_limits(bytes: &[u8], limits: litchi_opc::ReadLimits) -> Result<Self> {
+    pub fn from_bytes_with_limits(bytes: &[u8], limits: litchi_opc::SourceLimits) -> Result<Self> {
         Self::from_opc_package(OpcPackage::from_bytes_with_limits(bytes, limits)?)
     }
 

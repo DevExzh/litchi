@@ -17,7 +17,7 @@ use litchi_opc::constants::content_type as ct;
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, Part};
 use litchi_pptx::{
-    Error, Package, ReadLimits, SourceBackedPresentation, SourceBackedPresentationEditor,
+    Error, Package, SourceBackedPresentation, SourceBackedPresentationEditor, SourceLimits,
 };
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -519,12 +519,12 @@ fn source_backed_cross_copy_chart_cancellation_is_fallible() -> TestResult {
     let context = ExecutionContext::new(budget, token, single_execution_limits()?);
     let source = SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
         Arc::new(OwnedSource::new(source_bytes)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context.clone(),
     )?;
     let editor = SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
         Arc::new(OwnedSource::new(destination_bytes)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )?;
     cancellation.cancel();
@@ -544,7 +544,7 @@ fn source_backed_cross_copy_chart_limits_fail_before_materialization() -> TestRe
     assert!(
         SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
             Arc::new(OwnedSource::new(source_bytes)),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .is_err()
@@ -1694,7 +1694,7 @@ fn source_backed_cross_copy_refuses_protection_opaque_and_trailing_data() -> Tes
 fn source_backed_cross_copy_refuses_limits_and_cancellation_before_output() -> TestResult {
     let source_bytes = source_fixture()?;
     let destination_bytes = destination_fixture()?;
-    let too_small = ReadLimits::builder()
+    let too_small = SourceLimits::builder()
         .max_archive_entry_bytes(1)
         .map_err(|error| Error::Invalid(error.to_string()))?
         .build()?;
@@ -1721,12 +1721,12 @@ fn source_backed_cross_copy_refuses_limits_and_cancellation_before_output() -> T
     let context = ExecutionContext::new(budget, cancellation, execution_limits);
     let source = SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
         Arc::new(OwnedSource::new(source_bytes)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context.clone(),
     )?;
     let editor = SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
         Arc::new(OwnedSource::new(destination_bytes)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )?;
     cancellation_source.cancel();
@@ -1753,12 +1753,12 @@ fn source_backed_cross_copy_preserves_typed_cancellation_during_output() -> Test
     let context = ExecutionContext::new(budget, cancellation, execution_limits);
     let source = SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
         Arc::new(OwnedSource::new(source_bytes)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context.clone(),
     )?;
     let editor = SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
         Arc::new(OwnedSource::new(destination_bytes)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )?;
     let plan = editor.plan_cross_slide_copy(&source, 0, 1, 1)?;
@@ -1835,13 +1835,13 @@ fn source_backed_cross_copy_managed_memory_reservation_is_exact_and_bounded() ->
         ExecutionContext::new(measure_budget.clone(), measure_token, execution_limits);
     let measured_source = SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
         Arc::new(OwnedSource::new(source_bytes.clone())),
-        ReadLimits::default(),
+        SourceLimits::default(),
         measure_context.clone(),
     )?;
     let measured_editor =
         SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
             Arc::new(OwnedSource::new(destination_bytes.clone())),
-            ReadLimits::default(),
+            SourceLimits::default(),
             measure_context,
         )?;
     let measured_plan = measured_editor.plan_cross_slide_copy(&measured_source, 0, 1, 1)?;
@@ -1872,13 +1872,13 @@ fn source_backed_cross_copy_managed_memory_reservation_is_exact_and_bounded() ->
         let context = ExecutionContext::new(budget, token, execution_limits);
         let source = SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
             Arc::new(OwnedSource::new(source_bytes.clone())),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context.clone(),
         )?;
         let editor =
             SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
                 Arc::new(OwnedSource::new(destination_bytes.clone())),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 context,
             )?;
         let plan = match editor.plan_cross_slide_copy(&source, 0, 1, 1) {
@@ -2857,13 +2857,13 @@ fn source_backed_cross_copy_reserves_before_reading_picture_media() -> TestResul
         ExecutionContext::new(measure_budget.clone(), measure_token, execution_limits);
     let measured_source = SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
         Arc::new(OwnedSource::new(source_bytes.clone())),
-        ReadLimits::default(),
+        SourceLimits::default(),
         measure_context.clone(),
     )?;
     let measured_editor =
         SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
             Arc::new(OwnedSource::new(destination_bytes.clone())),
-            ReadLimits::default(),
+            SourceLimits::default(),
             measure_context,
         )?;
     let baseline = measure_budget.used(Resource::Memory);
@@ -2899,12 +2899,12 @@ fn source_backed_cross_copy_reserves_before_reading_picture_media() -> TestResul
     let context = ExecutionContext::new(budget, token, execution_limits);
     let source = SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
         Arc::new(source_adapter),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context.clone(),
     )?;
     let editor = SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
         Arc::new(OwnedSource::new(destination_bytes)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )?;
     let error = match editor.plan_cross_slide_copy(&source, 0, 1, 1) {
@@ -3599,13 +3599,13 @@ fn source_backed_cross_copy_aggregates_image_reservation_before_payload_reads() 
     );
     let measured_source = SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
         Arc::new(OwnedSource::new(source_bytes.clone())),
-        ReadLimits::default(),
+        SourceLimits::default(),
         measure_context.clone(),
     )?;
     let measured_editor =
         SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
             Arc::new(OwnedSource::new(destination_bytes.clone())),
-            ReadLimits::default(),
+            SourceLimits::default(),
             measure_context,
         )?;
     let baseline = measure_budget.used(Resource::Memory);
@@ -3637,12 +3637,12 @@ fn source_backed_cross_copy_aggregates_image_reservation_before_payload_reads() 
     let context = ExecutionContext::new(budget, token, single_execution_limits()?);
     let source = SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
         Arc::new(source),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context.clone(),
     )?;
     let editor = SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
         Arc::new(OwnedSource::new(destination_bytes)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )?;
     let error = match editor.plan_cross_slide_copy(&source, 0, 1, 1) {
@@ -3685,12 +3685,12 @@ fn source_backed_cross_copy_preserves_media_read_errors() -> TestResult {
     let context = ExecutionContext::new(budget, token, single_execution_limits()?);
     let source = SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
         Arc::new(source),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context.clone(),
     )?;
     let editor = SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
         Arc::new(OwnedSource::new(destination_fixture()?)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )?;
     armed.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -4145,12 +4145,12 @@ fn source_backed_cross_copy_observes_post_entry_planning_cancellation() -> TestR
     let context = ExecutionContext::new(budget, cancellation, single_execution_limits()?);
     let source = SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
         Arc::new(source_adapter),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context.clone(),
     )?;
     let editor = SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
         Arc::new(OwnedSource::new(destination_bytes)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )?;
     assert_eq!(triggered.load(std::sync::atomic::Ordering::SeqCst), 0);
@@ -5299,7 +5299,7 @@ fn source_backed_cross_copy_lazily_copies_shared_payload_on_writer_memory_refusa
                 MultiRangeCountingSource::new(source_bytes.clone(), vec![range], overlaps.clone());
             let source = SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
                 Arc::new(provider),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 context,
             )?;
             let destination_budget = Budget::root(
@@ -5322,7 +5322,7 @@ fn source_backed_cross_copy_lazily_copies_shared_payload_on_writer_memory_refusa
             let editor =
                 SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
                     Arc::new(OwnedSource::new(destination.clone())),
-                    ReadLimits::default(),
+                    SourceLimits::default(),
                     destination_context,
                 )?;
             let plan = editor.plan_cross_slide_copy(&source, 0, 1, 1)?;

@@ -25,8 +25,8 @@ use litchi_core::{
 };
 use litchi_opc::phys_pkg::PhysPkgReader;
 use litchi_opc::{
-    OpcError, PackURI, ReadLimits, SourceArtifactFingerprint, SourceArtifactRestoreProof,
-    SourceBackedPackage, SourceCacheLimits, SourcePartSpliceLimits, SourcePartSpliceProof,
+    OpcError, PackURI, SourceArtifactFingerprint, SourceArtifactRestoreProof, SourceBackedPackage,
+    SourceCacheLimits, SourceLimits, SourcePartSpliceLimits, SourcePartSpliceProof,
     SourceReadPolicy, SourceTopologyPlan,
 };
 use sha2::{Digest as _, Sha256};
@@ -169,7 +169,7 @@ fn managed_context(memory: u64, input_bytes: u64) -> (Budget, ExecutionContext) 
 fn read_ahead_package(source: Arc<dyn ReadAt>, policy: SourceReadPolicy) -> SourceBackedPackage {
     SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_source_read_policy(
         source,
-        ReadLimits::default(),
+        SourceLimits::default(),
         cache_limits(),
         policy,
     )
@@ -183,7 +183,7 @@ fn managed_read_ahead_package(
 ) -> SourceBackedPackage {
     SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_source_read_policy_and_execution_context(
         source,
-        ReadLimits::default(),
+        SourceLimits::default(),
         cache_limits(),
         policy,
         context,
@@ -463,7 +463,7 @@ fn source_read_policy_is_bounded_and_exact_is_the_default_control() {
     let managed_exact =
         SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
             Arc::new(OwnedSource::new(archive_bytes())),
-            ReadLimits::default(),
+            SourceLimits::default(),
             cache_limits(),
             managed_context,
         )

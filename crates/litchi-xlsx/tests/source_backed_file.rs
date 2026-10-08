@@ -9,7 +9,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, Resource,
 };
 use litchi_opc::constants::content_type as ct;
-use litchi_opc::{OpcError, OpcPackage, PackURI, ReadLimits, SourceCacheLimits};
+use litchi_opc::{OpcError, OpcPackage, PackURI, SourceCacheLimits, SourceLimits};
 use litchi_xlsx::cell_values::SourceBackedEditor;
 use litchi_xlsx::workbook::{SourceBackedWorkbook, SourceCellView};
 use litchi_xlsx::{Address, Cell, Error, Value};
@@ -199,7 +199,7 @@ fn path_managed_editor_releases_payload_budget_after_drop() {
     let (budget, context) = managed_context(workbook_bytes + sheet_bytes + 1024);
     let editor = SourceBackedEditor::from_path_with_execution_context(
         file.path(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -234,7 +234,7 @@ fn path_replacement_and_limits_are_typed_errors() {
     assert!(output.is_empty());
 
     let (file, bytes) = write_fixture();
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_input_bytes((bytes.len() as u64).saturating_sub(1))
         .unwrap()
         .build()
@@ -268,21 +268,21 @@ fn path_policy_variants_accept_explicit_cache_and_execution_options() {
     let (file, _bytes) = write_fixture();
     let cache = SourceCacheLimits::new(1 << 20, 8).unwrap();
     SourceBackedWorkbook::from_path(file.path()).unwrap();
-    SourceBackedWorkbook::from_path_with_limits(file.path(), ReadLimits::default()).unwrap();
+    SourceBackedWorkbook::from_path_with_limits(file.path(), SourceLimits::default()).unwrap();
     SourceBackedWorkbook::from_path_with_cache_limits(file.path(), cache).unwrap();
     SourceBackedWorkbook::from_path_with_limits_and_cache_limits(
         file.path(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         cache,
     )
     .unwrap();
 
     SourceBackedWorkbook::open(file.path()).unwrap();
-    SourceBackedWorkbook::open_with_limits(file.path(), ReadLimits::default()).unwrap();
+    SourceBackedWorkbook::open_with_limits(file.path(), SourceLimits::default()).unwrap();
     SourceBackedWorkbook::open_with_cache_limits(file.path(), cache).unwrap();
     SourceBackedWorkbook::open_with_limits_and_cache_limits(
         file.path(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         cache,
     )
     .unwrap();
@@ -290,7 +290,7 @@ fn path_policy_variants_accept_explicit_cache_and_execution_options() {
     let (_budget, context) = managed_context(1 << 20);
     SourceBackedWorkbook::from_path_with_execution_context(
         file.path(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -298,7 +298,7 @@ fn path_policy_variants_accept_explicit_cache_and_execution_options() {
     let (_budget, context) = managed_context(1 << 20);
     SourceBackedWorkbook::from_path_with_limits_and_execution_context(
         file.path(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -306,18 +306,18 @@ fn path_policy_variants_accept_explicit_cache_and_execution_options() {
     let (_budget, context) = managed_context(1 << 20);
     SourceBackedWorkbook::open_with_limits_and_cache_limits_and_execution_context(
         file.path(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         cache,
         context,
     )
     .unwrap();
 
     SourceBackedEditor::open(file.path()).unwrap();
-    SourceBackedEditor::open_with_limits(file.path(), ReadLimits::default()).unwrap();
+    SourceBackedEditor::open_with_limits(file.path(), SourceLimits::default()).unwrap();
     SourceBackedEditor::open_with_cache_limits(file.path(), cache).unwrap();
     SourceBackedEditor::open_with_limits_and_cache_limits(
         file.path(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         cache,
     )
     .unwrap();
@@ -325,14 +325,14 @@ fn path_policy_variants_accept_explicit_cache_and_execution_options() {
     let (_budget, context) = managed_context(1 << 20);
     SourceBackedEditor::from_path_with_limits_and_execution_context(
         file.path(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
     let (_budget, context) = managed_context(1 << 20);
     SourceBackedEditor::open_with_limits_and_cache_limits_and_execution_context(
         file.path(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         cache,
         context,
     )

@@ -24,7 +24,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits,
     Limits as CoreLimits, OwnedSource, ReadAt, Resource, SourceVersion,
 };
-use litchi_docx::{Error as DocumentError, Package, ReadLimits, source_backed};
+use litchi_docx::{Error as DocumentError, Package, SourceLimits, source_backed};
 use litchi_ooxml_common::mce::Error as MceError;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcError, PackURI, SourceBackedPackage};
@@ -546,7 +546,7 @@ fn managed_package(
     let (budget, cancellation_source, context) = managed_context(memory, work);
     let package = source_backed::Package::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(archive)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .expect("managed source-backed DOCX fixture must open");
@@ -2331,7 +2331,7 @@ fn managed_prepare_charges_semantic_memory_and_releases_plan_workspace() {
     let source_reader: Arc<dyn ReadAt> = source.clone();
     let package = source_backed::Package::from_read_at_with_execution_context(
         source_reader,
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .expect("managed source-backed DOCX fixture must open");

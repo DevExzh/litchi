@@ -5656,7 +5656,7 @@ mod tests {
         Budget, CancellationSource, ExecutionContext, ExecutionLimits, FileSource,
         Limits as CoreLimits,
     };
-    use litchi_opc::{OpcError, PackURI, ReadLimits, SourceBackedPackage};
+    use litchi_opc::{OpcError, PackURI, SourceBackedPackage, SourceLimits};
 
     use super::*;
     use crate::form_control::{
@@ -5774,7 +5774,7 @@ mod tests {
             .join("tests/fixtures/form_control_properties/tdf134769.xlsx");
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(FileSource::open(&fixture).expect("managed fixture source")),
-            ReadLimits::default(),
+            SourceLimits::default(),
             managed_test_context(),
         )
         .expect("managed fixture package");

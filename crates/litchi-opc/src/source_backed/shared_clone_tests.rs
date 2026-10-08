@@ -101,7 +101,7 @@ fn context(workers: usize) -> (Budget, CancellationSource, ExecutionContext) {
 fn managed(source: &Arc<dyn ReadAt>, context: ExecutionContext) -> SourceBackedPackage {
     SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
         Arc::clone(source),
-        ReadLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         context,
     )
@@ -202,7 +202,7 @@ fn a_clone_shares_every_allocation_of_its_opened_package() {
     let windowed =
         SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_source_read_policy(
             Arc::clone(&source),
-            ReadLimits::default(),
+            SourceLimits::default(),
             SourceCacheLimits::default(),
             SourceReadPolicy::forward_start(64 * 1024).unwrap(),
         )
@@ -398,7 +398,7 @@ fn a_publication_from_any_clone_fences_the_shared_read_ahead_window() {
     let original =
         SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_source_read_policy(
             source,
-            ReadLimits::default(),
+            SourceLimits::default(),
             SourceCacheLimits::default(),
             SourceReadPolicy::forward_start(64 * 1024).unwrap(),
         )

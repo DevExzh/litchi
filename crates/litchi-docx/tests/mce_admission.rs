@@ -20,7 +20,7 @@ use litchi_core::{
     Resource,
 };
 use litchi_docx::document::{Error as TransactionError, Snapshot};
-use litchi_docx::{Error, Package, ReadLimits, source_backed};
+use litchi_docx::{Error, Package, SourceLimits, source_backed};
 use litchi_ooxml_common::mce::admission::{Admission, admit};
 use litchi_ooxml_common::mce::{self, Capabilities};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -141,7 +141,7 @@ fn managed(bytes: &[u8]) -> (Budget, CancellationSource, source_backed::Package)
     .unwrap();
     let package = source_backed::Package::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(bytes.to_vec())),
-        ReadLimits::default(),
+        SourceLimits::default(),
         ExecutionContext::new(budget.clone(), cancellation, limits),
     )
     .unwrap();

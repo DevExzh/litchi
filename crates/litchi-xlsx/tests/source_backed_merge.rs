@@ -396,7 +396,7 @@ fn source_merge_managed_inverse_requires_bounded_materialization() {
     let context = ExecutionContext::new(budget, cancellation, execution_limits);
     let editor = SourceBackedMergeEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(source_bytes.clone())),
-        litchi_xlsx::ReadLimits::default(),
+        litchi_xlsx::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -667,7 +667,7 @@ fn source_merge_rejects_stale_and_foreign_lineage_before_output() {
 #[test]
 fn source_merge_limit_refusal_is_typed() {
     let bytes = fixture(&ordinary_sheet());
-    let limits = litchi_xlsx::ReadLimits::builder()
+    let limits = litchi_xlsx::SourceLimits::builder()
         .max_input_bytes(1)
         .unwrap()
         .build()
@@ -699,7 +699,7 @@ fn source_merge_honors_managed_cancellation_before_selected_read() {
     let context = ExecutionContext::new(budget, cancellation, execution_limits);
     let editor = SourceBackedMergeEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes)),
-        litchi_xlsx::ReadLimits::default(),
+        litchi_xlsx::SourceLimits::default(),
         context,
     )
     .unwrap();

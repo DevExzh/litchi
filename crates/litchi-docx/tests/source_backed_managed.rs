@@ -7,7 +7,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits,
     OwnedSource, Position, ReadAt, Resource, SourceVersion,
 };
-use litchi_docx::{Error, ReadLimits, source_backed};
+use litchi_docx::{Error, SourceLimits, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
     BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, Part, SourceCacheLimits, TargetMode,
@@ -190,7 +190,7 @@ fn managed(memory: u64) -> (Budget, CancellationSource, source_backed::Package) 
     let package =
         source_backed::Package::from_read_at_with_limits_and_cache_limits_and_execution_context(
             source(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             SourceCacheLimits::new(1 << 20, 8).unwrap(),
             context,
         )
@@ -202,7 +202,7 @@ fn managed_bytes(bytes: Vec<u8>) -> (Budget, CancellationSource, source_backed::
     let (budget, cancellation_source, context) = context(bytes.len() as u64);
     let package = source_backed::Package::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(bytes)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -288,7 +288,7 @@ fn managed_exact_memory_budget_succeeds_and_one_under_fails_before_publication()
     let exact_source = Arc::new(CountingSource::new(bytes.clone()));
     let exact = source_backed::Package::from_read_at_with_execution_context(
         exact_source.clone(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         exact_context,
     )
     .unwrap();
@@ -308,7 +308,7 @@ fn managed_exact_memory_budget_succeeds_and_one_under_fails_before_publication()
     let one_under_source = Arc::new(CountingSource::new(bytes));
     let one_under = source_backed::Package::from_read_at_with_execution_context(
         one_under_source.clone(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         one_under_context,
     )
     .unwrap();
@@ -362,7 +362,7 @@ fn managed_revisions_query_is_admitted_and_charged_like_extract_text() {
     let (budget, _cancellation_source, context) = context(1 << 20);
     let package = source_backed::Package::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(PackageWriter::to_bytes(&opc).unwrap())),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -415,7 +415,7 @@ fn managed_cancellation_is_checked_at_open_and_before_lazy_read() {
     assert!(matches!(
         source_backed::Package::from_read_at_with_execution_context(
             source(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             open_context,
         ),
         Err(Error::Opc(OpcError::Cancelled))
@@ -425,7 +425,7 @@ fn managed_cancellation_is_checked_at_open_and_before_lazy_read() {
     let (_budget, cancellation_source, context) = context(fixture().len() as u64);
     let package = source_backed::Package::from_read_at_with_execution_context(
         source(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -478,7 +478,7 @@ fn managed_main_document_edits_retain_source_and_candidate_reservations() {
     let (budget, _cancellation_source, context) = context(1 << 20);
     let package = source_backed::Package::from_read_at_with_execution_context(
         source.clone(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();

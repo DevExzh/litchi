@@ -576,7 +576,7 @@ struct SnapshotState {
     relationship_fingerprint: Arc<[RelationshipFingerprint]>,
     content_type_fingerprint: Arc<[ContentTypeFingerprint]>,
     package_budget: Arc<PackageBudget>,
-    limits: litchi_opc::ReadLimits,
+    limits: litchi_opc::SourceLimits,
     lineage: litchi_opc::SourceLineage,
     source_version: SourceVersion,
     /// Exact immutable package source retained for physical inverse tooling.
@@ -1526,7 +1526,7 @@ impl SourceBackedSvgAttachmentBatchEdit<'_> {
         Ok(())
     }
 
-    fn limits(&self) -> litchi_opc::ReadLimits {
+    fn limits(&self) -> litchi_opc::SourceLimits {
         self.current
             .states
             .first()
@@ -3042,7 +3042,7 @@ fn layout_from_picture(picture: &PictureSource<'_>) -> Result<PictureLayout> {
     })
 }
 
-fn scan_story<'a>(bytes: &'a [u8], limits: litchi_opc::ReadLimits) -> Result<SourceDrawing<'a>> {
+fn scan_story<'a>(bytes: &'a [u8], limits: litchi_opc::SourceLimits) -> Result<SourceDrawing<'a>> {
     let max = usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX);
     let mut scan = ScanLimits::default();
     scan.max_xml_bytes = scan.max_xml_bytes.min(max);
@@ -3174,7 +3174,7 @@ fn closure_inventory(
 fn rewrite_story_xml_batch(
     source_xml: &litchi_opc::SourceXmlPart,
     operations: &[BatchOperation],
-    limits: litchi_opc::ReadLimits,
+    limits: litchi_opc::SourceLimits,
 ) -> Result<litchi_opc::SourceXmlPart> {
     let bytes = source_xml.bytes();
     let drawing = scan_story(bytes, limits)?;
@@ -3280,7 +3280,7 @@ fn generated_attachment_replacement(
     picture: &PictureSource<'_>,
     relationship_id: &str,
     source: &[u8],
-    limits: litchi_opc::ReadLimits,
+    limits: litchi_opc::SourceLimits,
 ) -> Result<(ByteRange, Vec<u8>)> {
     let (range, replacement_len) =
         generated_attachment_replacement_bounds(picture, relationship_id)?;
@@ -3327,7 +3327,7 @@ fn generated_attachment_replacement_from_layout(
     layout: &PictureLayout,
     relationship_id: &str,
     source: &[u8],
-    limits: litchi_opc::ReadLimits,
+    limits: litchi_opc::SourceLimits,
 ) -> Result<(ByteRange, Vec<u8>)> {
     let (range, replacement_len) =
         generated_attachment_replacement_bounds_from_layout(layout, relationship_id, source)?;
@@ -4057,7 +4057,7 @@ fn validate_raster_projection(
     Ok(())
 }
 
-fn validate_svg_payload(limits: &litchi_opc::ReadLimits, length: usize) -> Result<()> {
+fn validate_svg_payload(limits: &litchi_opc::SourceLimits, length: usize) -> Result<()> {
     validate_svg_payload_length(length)?;
     if length as u64 > limits.max_part_bytes() {
         return Err(Error::Invalid(

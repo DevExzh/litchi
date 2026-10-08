@@ -17,7 +17,7 @@ use litchi_xlsx::drawing::{
     DrawingAnchor, DrawingDialect, PictureSelector, RelationshipDialect, SourceDrawing,
     SvgOwnerState, WorksheetSourceLimits, WorksheetSourceScan,
 };
-use litchi_xlsx::{Package, ReadLimits, Workbook};
+use litchi_xlsx::{Package, SourceLimits, Workbook};
 
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const XDR: &str = "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing";
@@ -824,7 +824,7 @@ fn caller_part_xml_cap_refuses_mce_heavy_worksheet_before_read_projection() {
         &synthetic_fixture(false, 1, true),
         source.clone().into_bytes(),
     );
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_part_bytes((source.len() - 1) as u64)
         .unwrap();
     assert!(Workbook::from_bytes_with_limits(bytes, limits.build().unwrap()).is_err());

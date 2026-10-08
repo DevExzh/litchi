@@ -31,7 +31,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, ReadAt,
     Resource, SourceVersion,
 };
-use litchi_opc::{OpcError, PackURI, ReadLimits, SourceBackedPackage, SourceCacheLimits};
+use litchi_opc::{OpcError, PackURI, SourceBackedPackage, SourceCacheLimits, SourceLimits};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const CONTENT_TYPES_NS: &str = "http://schemas.openxmlformats.org/package/2006/content-types";
@@ -398,7 +398,7 @@ fn managed_package(source: Arc<dyn ReadAt>) -> (SourceBackedPackage, Budget) {
     let package =
         SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
             source,
-            ReadLimits::default(),
+            SourceLimits::default(),
             cache_limits,
             context,
         )

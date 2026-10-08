@@ -104,7 +104,7 @@ fn each_identity_and_policy_field_is_required_for_a_hint_hit() {
     cases.push(("content type", content_type));
 
     let mut limits = original.clone();
-    limits.limits = ReadLimits::builder()
+    limits.limits = SourceLimits::builder()
         .max_xml_events(expected_limits.max_xml_events() - 1)
         .unwrap()
         .build()
@@ -202,7 +202,7 @@ fn eligible_hint_comparison_consumes_its_bounded_work_charge() {
     );
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(archive)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();

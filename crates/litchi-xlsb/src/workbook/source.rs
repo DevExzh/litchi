@@ -11,8 +11,8 @@ use litchi_core::{
 };
 use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::{
-    PackURI, PartData, PartView, ReadLimits, SourceBackedPackage, SourceCacheDiagnostics,
-    SourceCacheLimits,
+    PackURI, PartData, PartView, SourceBackedPackage, SourceCacheDiagnostics, SourceCacheLimits,
+    SourceLimits,
 };
 use once_cell::sync::OnceCell;
 
@@ -289,14 +289,14 @@ impl SourceBackedWorkbook {
     pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
         Self::from_reader_with_limits_and_external_link_limits(
             reader,
-            ReadLimits::default(),
+            SourceLimits::default(),
             ExternalLinkLimits::default(),
         )
     }
 
     /// Open an XLSB package from a sequential reader with explicit OPC
     /// resource limits.
-    pub fn from_reader_with_limits<R: Read>(reader: R, limits: ReadLimits) -> Result<Self> {
+    pub fn from_reader_with_limits<R: Read>(reader: R, limits: SourceLimits) -> Result<Self> {
         Self::from_reader_with_limits_and_external_link_limits(
             reader,
             limits,
@@ -312,7 +312,7 @@ impl SourceBackedWorkbook {
     ) -> Result<Self> {
         Self::from_reader_with_limits_and_external_link_limits(
             reader,
-            ReadLimits::default(),
+            SourceLimits::default(),
             external_link_limits,
         )
     }
@@ -321,7 +321,7 @@ impl SourceBackedWorkbook {
     /// external-link resource limits.
     pub fn from_reader_with_limits_and_external_link_limits<R: Read>(
         reader: R,
-        limits: ReadLimits,
+        limits: SourceLimits,
         external_link_limits: ExternalLinkLimits,
     ) -> Result<Self> {
         Self::from_source_backed_package_with_external_link_limits(
@@ -331,7 +331,7 @@ impl SourceBackedWorkbook {
     }
 
     /// Open with an explicit bounded OPC read policy.
-    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
+    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: SourceLimits) -> Result<Self> {
         Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_limits(
             source, limits,
         )?)
@@ -352,7 +352,7 @@ impl SourceBackedWorkbook {
     /// Open with explicit bounded OPC and external-link semantic policies.
     pub fn from_read_at_with_limits_and_external_link_limits(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         external_link_limits: ExternalLinkLimits,
     ) -> Result<Self> {
         Self::from_source_backed_package_with_external_link_limits(
@@ -375,7 +375,7 @@ impl SourceBackedWorkbook {
     /// Open with explicit bounded OPC read and cache policies.
     pub fn from_read_at_with_limits_and_cache_limits(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
     ) -> Result<Self> {
         Self::from_source_backed_package(
@@ -390,7 +390,7 @@ impl SourceBackedWorkbook {
     /// Open with explicit read and caller-owned execution policies.
     pub fn from_read_at_with_execution_context(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_execution_context(
@@ -401,7 +401,7 @@ impl SourceBackedWorkbook {
     /// Open with explicit read, cache, and caller-owned execution policies.
     pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
@@ -433,7 +433,7 @@ impl SourceBackedWorkbook {
     /// [`Self::tolerance_report`]).
     pub fn from_reader_with_leniency<R: Read>(reader: R, leniency: Leniency) -> Result<Self> {
         Self::from_source_backed_package_with_leniency(
-            SourceBackedPackage::from_reader_with_limits(reader, ReadLimits::default())?,
+            SourceBackedPackage::from_reader_with_limits(reader, SourceLimits::default())?,
             leniency,
         )
     }

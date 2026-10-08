@@ -302,7 +302,7 @@ fn workbook_contextual_edit_returns_immutable_commit_and_patch() {
 #[test]
 fn scanner_admits_tree_before_resolving_a_second_root() {
     let source = br#"<pivotTableDefinition/><bad:second xmlns:xml="urn:not-xml"/>"#;
-    let error = scan_xml(source, "pivotTableDefinition", ReadLimits::default()).unwrap_err();
+    let error = scan_xml(source, "pivotTableDefinition", SourceLimits::default()).unwrap_err();
     assert!(
         error.to_string().contains("multiple roots"),
         "second-root admission must precede namespace validation: {error}"

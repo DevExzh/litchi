@@ -5,7 +5,7 @@ use std::io::Write;
 use std::sync::Arc;
 
 use litchi_core::{ExecutionContext, ReadAt};
-use litchi_opc::{ReadLimits, SourceBackedPackage, SourceCacheLimits};
+use litchi_opc::{SourceBackedPackage, SourceCacheLimits, SourceLimits};
 use litchi_sheet::Row;
 
 use super::{Commit, Patch, Snapshot, rewrite};
@@ -64,11 +64,11 @@ pub struct SourceEdit {
 impl SourceBackedEditor {
     /// Open with the standard bounded OPC policy.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, ReadLimits::default())
+        Self::from_read_at_with_limits(source, SourceLimits::default())
     }
 
     /// Open with explicit OPC ingress limits.
-    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
+    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: SourceLimits) -> Result<Self> {
         Ok(Self {
             inner: cell_values::SourceBackedEditor::from_read_at_with_limits(source, limits)?,
         })
@@ -81,7 +81,7 @@ impl SourceBackedEditor {
     /// bounded OPC topology-planning memory from that same budget.
     pub fn from_read_at_with_execution_context(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_read_at_with_limits_and_cache_limits_and_execution_context(
@@ -96,7 +96,7 @@ impl SourceBackedEditor {
     /// retaining the default finite deferred-Part cache.
     pub fn from_read_at_with_limits_and_execution_context(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_read_at_with_execution_context(source, limits, context)
@@ -109,7 +109,7 @@ impl SourceBackedEditor {
     /// their existing bounded operations.
     pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
         context: ExecutionContext,
     ) -> Result<Self> {

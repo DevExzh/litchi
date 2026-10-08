@@ -11,7 +11,7 @@ use crate::execution::OpenSession;
 use crate::leniency::{
     CDATA_NODE, ContentTypeDefect, RelationshipDefect, TEXT_NODE, ToleranceReport, bounded_name,
 };
-use crate::limits::{ReadLimits, ReadResource};
+use crate::limits::{ReadResource, SourceLimits};
 use crate::members::{NonPartMember, NonPartReason, PartNameIndex, part_name_for_member};
 use crate::packuri::{CONTENT_TYPES_URI, PACKAGE_URI, PackURI};
 use crate::payload::{DeferredPartSource, PartPayload};
@@ -41,7 +41,7 @@ use std::sync::Arc;
 pub(crate) fn indexed_archive_with_limits<R: soapberry_zip::ReaderAt>(
     reader: R,
     end_offset: u64,
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<soapberry_zip::office::IndexedArchive<R>> {
     let located = soapberry_zip::office::LocatedArchive::locate(reader, end_offset)
         .map_err(OpcError::from)?;
@@ -523,7 +523,7 @@ impl<R: Read + Seek + ?Sized> soapberry_zip::ReaderAt for BorrowedReaderAt<'_, R
 pub fn probe_package_catalog_from_reader<R: Read + Seek + ?Sized>(
     reader: &mut R,
 ) -> Result<PackageCatalog> {
-    probe_package_catalog_from_reader_with_limits(reader, ReadLimits::default())
+    probe_package_catalog_from_reader_with_limits(reader, SourceLimits::default())
 }
 
 /// Probe an OPC package from a mutable seekable reader under explicit limits.
@@ -540,7 +540,7 @@ pub fn probe_package_catalog_from_reader<R: Read + Seek + ?Sized>(
 /// restoration I/O error is returned instead of the catalog.
 pub fn probe_package_catalog_from_reader_with_limits<R: Read + Seek + ?Sized>(
     reader: &mut R,
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<PackageCatalog> {
     let original_position = reader.stream_position().map_err(OpcError::from)?;
     let probe_result = (|| {
@@ -767,7 +767,7 @@ impl SerializedRelationship {
 /// the package structure, resolving relationships, and loading parts efficiently.
 pub struct PackageReader {
     /// Policy used to admit the serialized package.
-    read_limits: ReadLimits,
+    read_limits: SourceLimits,
     /// Exact source bytes for the admitted content-types member. The bytes are
     /// already charged to the structural XML limit before they are retained.
     source_content_types_xml: Arc<Vec<u8>>,
@@ -791,7 +791,7 @@ pub struct PackageReader {
 }
 
 impl PackageReader {
-    pub(crate) const fn read_limits(&self) -> ReadLimits {
+    pub(crate) const fn read_limits(&self) -> SourceLimits {
         self.read_limits
     }
 
@@ -799,13 +799,13 @@ impl PackageReader {
         xml: &[u8],
         owner: &PackURI,
     ) -> Result<crate::Relationships> {
-        Self::parse_owned_relationships_with_limits(xml, owner, ReadLimits::default())
+        Self::parse_owned_relationships_with_limits(xml, owner, SourceLimits::default())
     }
 
     pub(crate) fn parse_owned_relationships_with_limits(
         xml: &[u8],
         owner: &PackURI,
-        limits: ReadLimits,
+        limits: SourceLimits,
     ) -> Result<crate::Relationships> {
         crate::OwnedXmlPart::check_derived_capture_member_name(owner, limits)?;
         let relationship_uri = owner.rels_uri().map_err(OpcError::InvalidPackUri)?;
@@ -1140,7 +1140,7 @@ impl PackageReader {
         rels_xml: &[u8],
         base_uri: &str,
     ) -> Result<SmallVec<[SerializedRelationship; 8]>> {
-        let limits = ReadLimits::default();
+        let limits = SourceLimits::default();
         let mut ledger = RelationshipLedger::default();
         ledger.preflight_xml_bytes(limits, rels_xml.len() as u64)?;
         ledger.retain_xml_bytes(limits, rels_xml.len() as u64)?;
@@ -1160,7 +1160,7 @@ impl PackageReader {
         rels_xml: &[u8],
         base_uri: &str,
         source_uri: Option<&str>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         ledger: &mut RelationshipLedger,
         report: &mut ToleranceReport,
     ) -> Result<SmallVec<[SerializedRelationship; 8]>> {
@@ -1306,7 +1306,7 @@ impl PackageReader {
     fn load_rels_lazy<A: ArchiveAccess + ?Sized>(
         archive: &A,
         source_uri: &PackURI,
-        limits: ReadLimits,
+        limits: SourceLimits,
         ledger: &mut RelationshipLedger,
     ) -> Result<SmallVec<[SerializedRelationship; 8]>> {
         let rels_uri = source_uri.rels_uri().map_err(OpcError::InvalidPackUri)?;
@@ -1381,7 +1381,7 @@ impl PackageReader {
         pkg_srels: &[SerializedRelationship],
         content_types: &ContentTypeMap,
         non_part_members: &mut Vec<NonPartMember>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         ledger: &mut RelationshipLedger,
         read_many: ReadMany,
     ) -> Result<Vec<SerializedPart>>
@@ -1507,7 +1507,7 @@ impl PackageReader {
         pkg_srels: &[SerializedRelationship],
         content_types: &ContentTypeMap,
         non_part_members: &mut Vec<NonPartMember>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         ledger: &mut RelationshipLedger,
         source: &Arc<Vec<u8>>,
     ) -> Result<Vec<SerializedPart>>
@@ -1570,7 +1570,7 @@ impl PackageReader {
         pkg_srels: &[SerializedRelationship],
         content_types: &ContentTypeMap,
         non_part_members: &mut Vec<NonPartMember>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         ledger: &mut RelationshipLedger,
     ) -> Result<Vec<DeferredPart>> {
         let relationships = Self::walk_relationship_graph(archive, pkg_srels, limits, ledger)?;
@@ -1617,7 +1617,7 @@ impl PackageReader {
         relationships: HashMap<String, SmallVec<[SerializedRelationship; 8]>>,
         content_types: &ContentTypeMap,
         non_part_members: &mut Vec<NonPartMember>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         mode: PartClassificationMode,
         report: &mut ToleranceReport,
     ) -> Result<AdmittedParts> {
@@ -1708,7 +1708,7 @@ impl PackageReader {
     fn check_declared_part_bytes<A: ArchiveAccess + ?Sized>(
         archive: &A,
         typed_parts: &[(PackURI, String)],
-        limits: ReadLimits,
+        limits: SourceLimits,
     ) -> Result<u64> {
         let mut declared_part_bytes = 0u64;
         for (partname, _) in typed_parts {
@@ -1726,7 +1726,7 @@ impl PackageReader {
         archive: &A,
         partname: &PackURI,
         declared_part_bytes: &mut u64,
-        limits: ReadLimits,
+        limits: SourceLimits,
     ) -> Result<()> {
         let declared = archive.metadata(partname.membername())?.uncompressed_size();
         limits.check(ReadResource::PartBytes, declared, limits.max_part_bytes())?;
@@ -1745,7 +1745,7 @@ impl PackageReader {
         pkg_srels: &[SerializedRelationship],
         content_types: &ContentTypeMap,
         non_part_members: &mut Vec<NonPartMember>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         ledger: &mut RelationshipLedger,
     ) -> std::result::Result<Vec<DeferredPart>, ValidationCatalogError> {
         let phase = |phase, error| ValidationCatalogError { phase, error };
@@ -1788,7 +1788,7 @@ impl PackageReader {
 
     pub(crate) fn source_catalog<A: ArchiveAccess + ?Sized>(
         archive: &A,
-        limits: ReadLimits,
+        limits: SourceLimits,
     ) -> Result<SourceCatalog> {
         archive
             .validate_unencrypted_entries()
@@ -1853,7 +1853,7 @@ impl PackageReader {
     /// provenance. Ordinary package opens continue to use [`Self::source_catalog`].
     pub(crate) fn source_catalog_for_validation<A: ArchiveAccess + ?Sized>(
         archive: &A,
-        limits: ReadLimits,
+        limits: SourceLimits,
     ) -> std::result::Result<SourceCatalog, ValidationCatalogError> {
         let phase = |phase, error| ValidationCatalogError { phase, error };
         archive
@@ -1942,7 +1942,7 @@ impl PackageReader {
     fn walk_relationship_graph<A: ArchiveAccess + ?Sized>(
         archive: &A,
         pkg_srels: &[SerializedRelationship],
-        limits: ReadLimits,
+        limits: SourceLimits,
         ledger: &mut RelationshipLedger,
     ) -> Result<HashMap<String, SmallVec<[SerializedRelationship; 8]>>> {
         let mut visited: HashMap<String, SmallVec<[SerializedRelationship; 8]>> = HashMap::new();
@@ -2003,7 +2003,7 @@ impl PackageReader {
         srel: &SerializedRelationship,
         visited: &mut HashMap<String, SmallVec<[SerializedRelationship; 8]>>,
         work_queue: &mut Vec<PackURI>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         report: &mut ToleranceReport,
     ) -> Result<()> {
         if srel.is_external() {
@@ -2182,7 +2182,7 @@ impl RelationshipLedger {
         &mut self,
         owner: &PackURI,
         metrics: RelationshipXmlMetrics,
-        limits: ReadLimits,
+        limits: SourceLimits,
     ) -> Result<()> {
         // A relationship owner can be encountered more than once while the
         // graph and typed-part catalog are assembled. Keep one scalar record
@@ -2202,7 +2202,7 @@ impl RelationshipLedger {
         Ok(())
     }
 
-    fn preflight_xml_bytes(&mut self, limits: ReadLimits, bytes: u64) -> Result<()> {
+    fn preflight_xml_bytes(&mut self, limits: SourceLimits, bytes: u64) -> Result<()> {
         limits.check(
             ReadResource::RelationshipXmlBytes,
             bytes,
@@ -2217,7 +2217,7 @@ impl RelationshipLedger {
         Ok(())
     }
 
-    fn retain_xml_bytes(&mut self, limits: ReadLimits, bytes: u64) -> Result<()> {
+    fn retain_xml_bytes(&mut self, limits: SourceLimits, bytes: u64) -> Result<()> {
         limits.check(
             ReadResource::RelationshipXmlBytes,
             bytes,
@@ -2232,7 +2232,7 @@ impl RelationshipLedger {
         Ok(())
     }
 
-    fn add_relationship(&mut self, limits: ReadLimits) -> Result<()> {
+    fn add_relationship(&mut self, limits: SourceLimits) -> Result<()> {
         self.relationships = checked_add(
             self.relationships,
             1,
@@ -2242,7 +2242,7 @@ impl RelationshipLedger {
         Ok(())
     }
 
-    fn add_event(&mut self, limits: ReadLimits) -> Result<()> {
+    fn add_event(&mut self, limits: SourceLimits) -> Result<()> {
         self.xml_events = checked_add(
             self.xml_events,
             1,
@@ -2278,7 +2278,7 @@ fn inspect_relationship_element(
     depth: usize,
     root_seen: &mut bool,
     open_relationship: Option<&str>,
-    limits: ReadLimits,
+    limits: SourceLimits,
     ledger: &mut RelationshipLedger,
     report: &mut ToleranceReport,
 ) -> Result<InspectedRelationship> {
@@ -2658,7 +2658,7 @@ mod tests {
         reader.seek(SeekFrom::Start(3)).unwrap();
         let original_position = reader.stream_position().unwrap();
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            probe_package_catalog_from_reader_with_limits(&mut reader, ReadLimits::default())
+            probe_package_catalog_from_reader_with_limits(&mut reader, SourceLimits::default())
         }))
         .expect("public OPC probe must not panic on a hostile reader");
         let error = result.unwrap_err();
@@ -2763,7 +2763,7 @@ mod tests {
                 <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
             </Types>"#;
 
-        let ct_map = ContentTypeMap::from_xml(xml, ReadLimits::default()).unwrap();
+        let ct_map = ContentTypeMap::from_xml(xml, SourceLimits::default()).unwrap();
 
         let uri = PackURI::new("/test.xml").unwrap();
         assert_eq!(ct_map.get(&uri).unwrap(), "application/xml");
@@ -2786,7 +2786,7 @@ mod tests {
             PackageReader::load_rels_lazy(
                 &archive,
                 &package_uri,
-                ReadLimits::default(),
+                SourceLimits::default(),
                 &mut RelationshipLedger::default(),
             )
             .unwrap()
@@ -2802,7 +2802,7 @@ mod tests {
         let error = PackageReader::load_rels_lazy(
             &malformed_archive,
             &package_uri,
-            ReadLimits::default(),
+            SourceLimits::default(),
             &mut RelationshipLedger::default(),
         )
         .unwrap_err();
@@ -3004,7 +3004,7 @@ mod tests {
         ));
 
         let bytes = package_with_corrupt_deflate_and_later_malformed_relationship();
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_part_bytes(1)
             .unwrap()
             .build()
@@ -3030,18 +3030,19 @@ mod tests {
         let content_types_member = PackageReader::locate_content_types_member(archive).unwrap();
         let content_types_xml = read_structural_member(archive, content_types_member).unwrap();
         let content_types =
-            ContentTypeMap::from_xml(content_types_xml.as_bytes(), ReadLimits::default()).unwrap();
+            ContentTypeMap::from_xml(content_types_xml.as_bytes(), SourceLimits::default())
+                .unwrap();
         let package_uri = PackURI::new(PACKAGE_URI).unwrap();
         let mut ledger = RelationshipLedger::default();
         let pkg_srels = PackageReader::load_rels_lazy(
             archive,
             &package_uri,
-            ReadLimits::default(),
+            SourceLimits::default(),
             &mut ledger,
         )
         .unwrap();
         let mut non_part_members = Vec::new();
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_part_bytes(4)
             .unwrap()
             .build()
@@ -3138,7 +3139,7 @@ mod tests {
             r#"<Relationships xmlns="{}" xmlns:x="urn:vendor">text<x:Wrapper><Relationship Id="rId9" Type="urn:hidden" Target="hidden.xml"/></x:Wrapper><Relationship Id="rId1" Type="urn:test" Target="part.xml" x:hint="1" Extra="y"><x:note>inner</x:note><![CDATA[data]]></Relationship><Relationship Id="rId2" Type="urn:test" Target="other.xml">plain</Relationship></Relationships>"#,
             namespace::OPC_RELATIONSHIPS
         );
-        let limits = ReadLimits::default();
+        let limits = SourceLimits::default();
         let mut ledger = RelationshipLedger::default();
         let mut report = ToleranceReport::default();
         let relationships = PackageReader::parse_rels_xml_with_source(
@@ -3234,7 +3235,7 @@ mod tests {
     <r:Relationship Id="rId1" Type="urn:test:type" Target="document.xml" />
 </r:Relationships>
 "#;
-        let limits = ReadLimits::default();
+        let limits = SourceLimits::default();
         let mut ledger = RelationshipLedger::default();
         ledger
             .preflight_xml_bytes(limits, xml.len() as u64)
@@ -3305,7 +3306,7 @@ mod tests {
                 xml.as_bytes(),
                 "/word",
                 Some("/word/document.xml"),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 &mut ledger,
                 &mut report,
             )
@@ -3356,7 +3357,7 @@ mod tests {
         assert_eq!(parsed[0].reltype, "urn:a");
     }
 
-    fn read_with_limits(bytes: &[u8], limits: ReadLimits) -> Result<PackageReader> {
+    fn read_with_limits(bytes: &[u8], limits: SourceLimits) -> Result<PackageReader> {
         let physical = PhysPkgReader::new_with_limits(bytes, limits)?;
         PackageReader::from_phys_reader(&physical)
     }
@@ -3391,7 +3392,7 @@ mod tests {
         writer.finish_to_bytes().unwrap()
     }
 
-    fn assert_limit(bytes: &[u8], limits: ReadLimits, resource: ReadResource) {
+    fn assert_limit(bytes: &[u8], limits: SourceLimits, resource: ReadResource) {
         match read_with_limits(bytes, limits) {
             Err(OpcError::ReadLimit {
                 resource: actual, ..
@@ -3409,7 +3410,7 @@ mod tests {
         assert!(
             read_with_limits(
                 &exact,
-                ReadLimits::builder()
+                SourceLimits::builder()
                     .max_archive_members(3)
                     .unwrap()
                     .max_relationship_parts(1)
@@ -3428,7 +3429,7 @@ mod tests {
 
         assert_limit(
             &exact,
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_archive_members(2)
                 .unwrap()
                 .max_relationship_parts(1)
@@ -3445,12 +3446,16 @@ mod tests {
                 &[("word/document.xml", b"ok"), ("word/extra.xml", b"ok")],
                 None,
             ),
-            ReadLimits::builder().max_parts(1).unwrap().build().unwrap(),
+            SourceLimits::builder()
+                .max_parts(1)
+                .unwrap()
+                .build()
+                .unwrap(),
             ReadResource::Parts,
         );
         assert_limit(
             &exact,
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_part_bytes(1)
                 .unwrap()
                 .build()
@@ -3463,7 +3468,7 @@ mod tests {
                 &[("word/document.xml", b"ok"), ("word/extra.xml", b"ok")],
                 None,
             ),
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_total_part_bytes(3)
                 .unwrap()
                 .build()
@@ -3479,7 +3484,7 @@ mod tests {
         let internal = relationship("rId1", "urn:x", "word/document.xml");
         let root = relationships_xml(&internal);
         let exact = package_with_extra_parts(root.as_bytes(), &[("word/document.xml", b"x")], None);
-        let exact_limits = ReadLimits::builder()
+        let exact_limits = SourceLimits::builder()
             .max_relationship_parts(1)
             .unwrap()
             .max_relationship_xml_bytes(root.len())
@@ -3514,7 +3519,7 @@ mod tests {
         );
         assert_limit(
             &two_relationship_parts,
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_relationship_parts(1)
                 .unwrap()
                 .build()
@@ -3523,7 +3528,7 @@ mod tests {
         );
         assert_limit(
             &exact,
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_relationship_xml_bytes(root.len() - 1)
                 .unwrap()
                 .build()
@@ -3532,7 +3537,7 @@ mod tests {
         );
         assert_limit(
             &two_relationship_parts,
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_total_relationship_xml_bytes(root.len() + child.len() - 1)
                 .unwrap()
                 .build()
@@ -3552,7 +3557,7 @@ mod tests {
         );
         assert_limit(
             &two_edges,
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_relationships_per_part(1)
                 .unwrap()
                 .build()
@@ -3561,7 +3566,7 @@ mod tests {
         );
         assert_limit(
             &two_edges,
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_relationships_per_part(2)
                 .unwrap()
                 .max_total_relationships(1)
@@ -3572,7 +3577,7 @@ mod tests {
         );
         assert_limit(
             &two_edges,
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_relationship_graph_nodes(1)
                 .unwrap()
                 .build()
@@ -3583,7 +3588,7 @@ mod tests {
         let event_bomb = relationships_xml(&format!("{internal}<!--a--><!--b-->"));
         assert_limit(
             &package_with_extra_parts(event_bomb.as_bytes(), &[("word/document.xml", b"x")], None),
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_xml_events(5)
                 .unwrap()
                 .build()
@@ -3592,7 +3597,7 @@ mod tests {
         );
         assert_limit(
             &two_relationship_parts,
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_total_relationship_xml_events(7)
                 .unwrap()
                 .build()
@@ -3603,7 +3608,7 @@ mod tests {
         let nested = relationships_xml("<Wrapper></Wrapper>");
         assert_limit(
             &package_with_extra_parts(nested.as_bytes(), &[("word/document.xml", b"x")], None),
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_xml_depth(1)
                 .unwrap()
                 .build()
@@ -3618,7 +3623,7 @@ mod tests {
                 &[("word/document.xml", b"x")],
                 None,
             ),
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_xml_attribute_bytes(RELATIONSHIPS_CONTENT_TYPE.len())
                 .unwrap()
                 .max_relationship_target_bytes(RELATIONSHIPS_CONTENT_TYPE.len())
@@ -3632,7 +3637,7 @@ mod tests {
         );
         assert_limit(
             &package_with_extra_parts(external.as_bytes(), &[("word/document.xml", b"x")], None),
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_relationship_target_bytes("https://".len())
                 .unwrap()
                 .build()

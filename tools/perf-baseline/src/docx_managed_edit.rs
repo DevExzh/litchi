@@ -35,7 +35,7 @@ use litchi_core::{
     Position, ReadAt, Resource, SourceVersion,
 };
 use litchi_docx::{document::Error as TransactionError, source_backed};
-use litchi_opc::{ReadLimits, SourceCacheLimits};
+use litchi_opc::{SourceCacheLimits, SourceLimits};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -221,7 +221,7 @@ struct ReadLimitsRecord {
 }
 
 impl ReadLimitsRecord {
-    fn from_limits(limits: ReadLimits) -> Self {
+    fn from_limits(limits: SourceLimits) -> Self {
         Self {
             max_input_bytes: limits.max_input_bytes(),
             max_archive_members: limits.max_archive_members(),
@@ -273,7 +273,7 @@ struct LimitsRecord {
 }
 
 fn limits_record(api: ApiMode) -> LimitsRecord {
-    let read_limits = ReadLimits::default();
+    let read_limits = SourceLimits::default();
     let cache_limits = SourceCacheLimits::default();
     LimitsRecord {
         read_limits: ReadLimitsRecord::from_limits(read_limits),
@@ -1247,7 +1247,7 @@ fn execute_api(
         Some((_budget, context, _before)) => {
             source_backed::Package::from_read_at_with_limits_and_cache_limits_and_execution_context(
                 source,
-                ReadLimits::default(),
+                SourceLimits::default(),
                 SourceCacheLimits::new(CACHE_MAX_BYTES, CACHE_MAX_ENTRIES)?,
                 context.clone(),
             )?
@@ -2129,7 +2129,7 @@ mod tests {
     #[test]
     fn limits_report_uses_package_defaults_without_claiming_managed_budget() {
         let report = limits_record(ApiMode::UnmanagedApi);
-        let read_limits = ReadLimits::default();
+        let read_limits = SourceLimits::default();
         let cache_limits = SourceCacheLimits::default();
         assert_eq!(
             report.read_limits.max_input_bytes,

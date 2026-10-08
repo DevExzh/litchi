@@ -107,7 +107,7 @@ pub fn detect_file_format_with_tail<P: AsRef<Path>, T: ZipTail>(
     any(unix, windows)
 ))]
 pub fn detect_and_prepare<P: AsRef<Path>>(path: P) -> Option<PreparedDetection> {
-    detect_and_prepare_with_limits(path, crate::opc::ReadLimits::default())
+    detect_and_prepare_with_limits(path, crate::opc::SourceLimits::default())
 }
 
 /// Detect a file format and retain the OOXML package, with an explicit OPC
@@ -122,7 +122,7 @@ pub fn detect_and_prepare<P: AsRef<Path>>(path: P) -> Option<PreparedDetection> 
 ))]
 pub fn detect_and_prepare_with_limits<P: AsRef<Path>>(
     path: P,
-    limits: crate::opc::ReadLimits,
+    limits: crate::opc::SourceLimits,
 ) -> Option<PreparedDetection> {
     detect_and_prepare_with_limits_and_tail(path, limits, &NoZipTail)
 }
@@ -137,7 +137,7 @@ pub fn detect_and_prepare_with_limits<P: AsRef<Path>>(
 ))]
 pub fn detect_and_prepare_with_limits_and_tail<P: AsRef<Path>, T: ZipTail>(
     path: P,
-    limits: crate::opc::ReadLimits,
+    limits: crate::opc::SourceLimits,
     tail: &T,
 ) -> Option<PreparedDetection> {
     super::detected::detect_and_prepare_path_with_limits(path.as_ref(), limits, tail)
@@ -266,7 +266,7 @@ pub fn detect_file_format_from_bytes_with_tail<T: ZipTail>(
     any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
 ))]
 fn is_normal_odf_package(bytes: &[u8]) -> bool {
-    let limits = crate::opc::ReadLimits::default();
+    let limits = crate::opc::SourceLimits::default();
     litchi_odf_common::detect::packaged_mime(bytes).is_some()
         && litchi_odf_common::detect::packaged_has_ooxml_catalog_with_limits(
             bytes,
@@ -348,7 +348,8 @@ pub fn detect_format_from_reader_with_tail<R: Read + Seek, T: ZipTail>(
                 any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
             ))]
             {
-                let catalog_limits = super::catalog_probe_limits(crate::opc::ReadLimits::default());
+                let catalog_limits =
+                    super::catalog_probe_limits(crate::opc::SourceLimits::default());
                 match odf::reader_preparation_with_limits(
                     reader,
                     odf::Limits::default(),
@@ -417,7 +418,7 @@ pub fn detect_format_from_reader_with_tail<R: Read + Seek, T: ZipTail>(
             ))]
             let normal_odf = odf::packaged_has_ooxml_catalog_from_reader_with_limits(
                 reader,
-                super::catalog_probe_limits(crate::opc::ReadLimits::default()),
+                super::catalog_probe_limits(crate::opc::SourceLimits::default()),
             ) == Some(false);
             #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
             if !normal_odf {

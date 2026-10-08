@@ -2,7 +2,7 @@
 //!
 //! `OpcPackage::source_relationships` is intentionally a compatibility
 //! convenience and uses the default read profile.  A source-bound XLSX
-//! operation must forward the package's retained [`ReadLimits`] instead.  It
+//! operation must forward the package's retained [`SourceLimits`] instead.  It
 //! also needs package-wide counters: a separate source capture for each
 //! workbook, table, cache, and connections part would otherwise reset the
 //! relationship XML, event, and edge budgets on every call.
@@ -22,7 +22,7 @@ use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 
 use litchi_opc::{
-    OpcError, OpcPackage, OwnedRelationships, PackURI, ReadLimits, RelationshipSourcePlan,
+    OpcError, OpcPackage, OwnedRelationships, PackURI, RelationshipSourcePlan, SourceLimits,
 };
 #[cfg(test)]
 use quick_xml::events::Event;
@@ -68,7 +68,7 @@ impl<'package> RelationshipReference<'package> {
 /// admitted by constructing a fresh index after the mutation.
 #[derive(Debug)]
 pub(super) struct RelationshipIndex<'package> {
-    limits: ReadLimits,
+    limits: SourceLimits,
     part_names: Vec<&'package PackURI>,
     part_indices: HashMap<String, usize>,
     root_source: OwnedRelationships,
@@ -331,7 +331,7 @@ struct RelationshipBudget {
 }
 
 impl RelationshipBudget {
-    fn admit_plan(&mut self, plan: RelationshipSourcePlan, limits: ReadLimits) -> Result<()> {
+    fn admit_plan(&mut self, plan: RelationshipSourcePlan, limits: SourceLimits) -> Result<()> {
         if plan.member_present() {
             self.relationship_parts = checked_add_limit(
                 self.relationship_parts,
@@ -369,7 +369,7 @@ fn index_relationships<'package, I>(
     incoming: &mut [Vec<RelationshipReference<'package>>],
     graph_seen: &mut [bool],
     budget: &mut RelationshipBudget,
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<()>
 where
     I: Iterator<Item = &'package litchi_opc::Relationship>,
@@ -500,7 +500,7 @@ fn relationship_xml_metrics(bytes: &[u8]) -> Result<(usize, usize)> {
     Ok((events, relationships))
 }
 
-fn check_part_name_limit(name: &PackURI, limits: ReadLimits) -> Result<()> {
+fn check_part_name_limit(name: &PackURI, limits: SourceLimits) -> Result<()> {
     let maximum = usize::try_from(limits.max_archive_member_name_bytes()).unwrap_or(usize::MAX);
     check_limit(
         litchi_opc::ReadResource::ArchiveMemberNameBytes,
@@ -509,7 +509,7 @@ fn check_part_name_limit(name: &PackURI, limits: ReadLimits) -> Result<()> {
     )
 }
 
-fn canonical_part_key(name: &PackURI, limits: ReadLimits) -> Result<String> {
+fn canonical_part_key(name: &PackURI, limits: SourceLimits) -> Result<String> {
     check_part_name_limit(name, limits)?;
     canonical_lower_key(name.as_str())
 }
@@ -588,7 +588,7 @@ fn allocation(resource: &'static str, source: std::collections::TryReserveError)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use litchi_opc::{BlobPart, ReadLimits, Relationships};
+    use litchi_opc::{BlobPart, Relationships, SourceLimits};
     use std::cmp::Ordering;
     use std::collections::HashMap;
 
@@ -611,14 +611,14 @@ mod tests {
     #[test]
     fn archive_part_name_budget_excludes_packuri_root_slash() {
         let name = PackURI::new("/abc").unwrap();
-        let exact = ReadLimits::builder()
+        let exact = SourceLimits::builder()
             .max_archive_member_name_bytes(3)
             .unwrap()
             .build()
             .unwrap();
         assert!(check_part_name_limit(&name, exact).is_ok());
 
-        let one_under = ReadLimits::builder()
+        let one_under = SourceLimits::builder()
             .max_archive_member_name_bytes(2)
             .unwrap()
             .build()
@@ -639,7 +639,7 @@ mod tests {
 
     #[test]
     fn graph_node_budget_accepts_exact_cap_and_rejects_one_over_before_mutation() {
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_relationship_graph_nodes(1)
             .unwrap()
             .build()

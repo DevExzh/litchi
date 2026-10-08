@@ -23,7 +23,7 @@ use litchi_docx::document::{
     Error as TransactionError, RevisionAction, RevisionKind, RevisionSelector,
 };
 use litchi_docx::paragraph::{Collapsed, Inline, Symbols};
-use litchi_docx::{Error, ReadLimits, source_backed};
+use litchi_docx::{Error, SourceLimits, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::rel::Relationships;
 use litchi_opc::{OpcError, OpcPackage, PackURI, SourceCacheLimits};
@@ -303,7 +303,7 @@ fn managed(bytes: Vec<u8>, memory: u64) -> (Budget, CancellationSource, source_b
     let (budget, cancellation_source, context) = managed_context(memory);
     let package = source_backed::Package::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(bytes)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -1970,7 +1970,7 @@ fn managed_reopened_inverse_rejects_source_mutation_before_output() {
     let (inverse_budget, _cancellation_source, context) = managed_context(1 << 20);
     let package = source_backed::Package::from_read_at_with_execution_context(
         mutable.clone(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -2003,7 +2003,7 @@ fn managed_reopened_inverse_cancellation_and_output_budget_are_before_output() {
     let (limited_budget, _cancellation_source, context) = managed_context_with_output(1 << 20, 1);
     let limited_package = source_backed::Package::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(changed)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -2057,7 +2057,7 @@ fn managed_file_source_pins_the_open_source_across_path_replacement() {
     let (budget, _cancellation_source, context) = managed_context(1 << 20);
     let package = source_backed::Package::from_path_with_execution_context(
         &path,
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -2088,7 +2088,7 @@ fn managed_source_change_refuses_publication_before_sink_output() {
     let (budget, _cancellation_source, context) = managed_context(1 << 20);
     let package = source_backed::Package::from_read_at_with_execution_context(
         source.clone(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -2307,7 +2307,7 @@ fn managed_source_change_during_current_part_read_refuses_before_output() {
     let package =
         source_backed::Package::from_read_at_with_limits_and_cache_limits_and_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             cache_limits,
             context,
         )
@@ -2337,7 +2337,7 @@ fn managed_cancellation_during_current_part_read_refuses_before_output() {
     let package =
         source_backed::Package::from_read_at_with_limits_and_cache_limits_and_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             cache_limits,
             context,
         )

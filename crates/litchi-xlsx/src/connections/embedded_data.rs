@@ -10,7 +10,7 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use litchi_core::Resource;
-use litchi_opc::{OpcPackage, OwnedRelationships, PackURI, Part, ReadLimits, TargetMode};
+use litchi_opc::{OpcPackage, OwnedRelationships, PackURI, Part, SourceLimits, TargetMode};
 use quick_xml::events::Event;
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
@@ -97,7 +97,7 @@ impl Bindings {
     pub(crate) fn load_with_limits(
         package: &OpcPackage,
         limits: CustomDataLimits,
-        read_limits: ReadLimits,
+        read_limits: SourceLimits,
     ) -> Result<Self> {
         // Admit the XML projection before the complete typed graph walk. The
         // latter has its own schema parser and therefore must not be allowed
@@ -460,7 +460,7 @@ impl Bindings {
         &self,
         package: &mut OpcPackage,
         limits: CustomDataLimits,
-        read_limits: ReadLimits,
+        read_limits: SourceLimits,
     ) -> Result<()> {
         if let Some(source) = &self.source {
             if source.bytes.len() > limits.max_connections_bytes() {

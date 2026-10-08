@@ -44,7 +44,7 @@ use std::{
 };
 
 use litchi_core::{FileSource, OwnedSource, ReadAt, SourceVersion};
-use litchi_opc::{ReadLimits, SourceCacheLimits};
+use litchi_opc::{SourceCacheLimits, SourceLimits};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -192,7 +192,7 @@ struct ReadLimitsRecord {
 }
 
 impl ReadLimitsRecord {
-    fn from_limits(limits: ReadLimits) -> Self {
+    fn from_limits(limits: SourceLimits) -> Self {
         Self {
             max_input_bytes: limits.max_input_bytes(),
             max_archive_members: limits.max_archive_members(),
@@ -244,7 +244,7 @@ struct LimitsRecord {
 }
 
 fn limits_record() -> LimitsRecord {
-    let read_limits = ReadLimits::default();
+    let read_limits = SourceLimits::default();
     let cache_limits = SourceCacheLimits::default();
     LimitsRecord {
         read_limits: ReadLimitsRecord::from_limits(read_limits),
@@ -1610,7 +1610,7 @@ mod tests {
     #[test]
     fn limits_report_uses_package_defaults_without_claiming_managed_budget() {
         let report = limits_record();
-        let read_limits = ReadLimits::default();
+        let read_limits = SourceLimits::default();
         let cache_limits = SourceCacheLimits::default();
         assert_eq!(
             report.read_limits.max_input_bytes,

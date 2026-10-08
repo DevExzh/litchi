@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """Check registered ADR 0034 vocabulary waves against Rust's public API.
 
-Rules live in api_glossary.json. W0 deliberately registers no bans or families.
+Rules live in api_glossary.json; each migration explicitly registers its bans
+and completed transaction families.
 Each profile builds its own feature-specific rustdoc JSON; --json/--profile
 checks an existing document instead. Names are matched exactly under a public
-path prefix, never by substring. Family checks assert six exported type names,
+path prefix, never by substring. A ban with recursive=false matches direct
+children of its scope, preserving unrelated nested domain vocabulary. Family
+checks assert six exported type names,
 not transaction semantics (which remain Rust/CRUD test obligations).
 """
 from __future__ import annotations
@@ -69,8 +72,12 @@ def checked_policy(value: Any) -> list[dict[str, Any]]:
             raise ValueError("banned_names must be an array")
         keys = set()
         for ban in bans:
-            if not isinstance(ban, dict) or set(ban) != {"name", "scope", "replacement"}:
-                raise ValueError("ban requires exactly name, scope and replacement")
+            required = {"name", "scope", "replacement"}
+            if (not isinstance(ban, dict) or not required <= set(ban)
+                    or set(ban) - (required | {"recursive"})):
+                raise ValueError("ban requires name, scope and replacement, with optional recursive")
+            if "recursive" in ban and type(ban["recursive"]) is not bool:
+                raise ValueError("ban recursive must be boolean")
             if not isinstance(ban["name"], str) or not IDENTIFIER.fullmatch(ban["name"]):
                 raise ValueError("banned name must be one Rust identifier")
             if not isinstance(ban["replacement"], str) or not ban["replacement"].strip():
@@ -286,7 +293,8 @@ def violations(document: Any, profile: dict[str, Any]) -> list[str]:
             failures.add(f"missing API scope {ban['scope']} for banned name {ban['name']}")
             continue
         for path, name in surface.names:
-            if path[:len(scope)] == scope and name == ban["name"]:
+            if (path[:len(scope)] == scope and name == ban["name"]
+                    and (ban.get("recursive", True) or len(path) == len(scope) + 1)):
                 failures.add(f"{'::'.join(path)} exposes banned name {name}; {ban['replacement']}")
     for family in profile["families"]:
         path = tuple(family.split("::"))

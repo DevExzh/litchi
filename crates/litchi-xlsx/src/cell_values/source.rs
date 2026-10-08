@@ -9,7 +9,7 @@ use std::sync::Arc;
 #[cfg(any(unix, windows))]
 use litchi_core::FileSource;
 use litchi_core::{ExecutionContext, ReadAt};
-use litchi_opc::{ReadLimits, SourceBackedPackage, SourceCacheLimits};
+use litchi_opc::{SourceBackedPackage, SourceCacheLimits, SourceLimits};
 use litchi_sheet::Cell as Address;
 
 use super::snapshot::SourceProvenance;
@@ -213,13 +213,13 @@ impl SourceBackedEditor {
     /// constructors below.
     #[cfg(any(unix, windows))]
     pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_path_with_limits(path, ReadLimits::default())
+        Self::from_path_with_limits(path, SourceLimits::default())
     }
 
     /// Open a filesystem-backed XLSX package with explicit OPC ingress
     /// limits.
     #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
+    pub fn from_path_with_limits(path: impl AsRef<Path>, limits: SourceLimits) -> Result<Self> {
         Self::from_read_at_with_limits(file_source(path)?, limits)
     }
 
@@ -238,7 +238,7 @@ impl SourceBackedEditor {
     #[cfg(any(unix, windows))]
     pub fn from_path_with_limits_and_cache_limits(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
     ) -> Result<Self> {
         Self::from_read_at_with_limits_and_cache_limits(file_source(path)?, limits, cache_limits)
@@ -249,7 +249,7 @@ impl SourceBackedEditor {
     #[cfg(any(unix, windows))]
     pub fn from_path_with_execution_context(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_read_at_with_execution_context(file_source(path)?, limits, context)
@@ -260,7 +260,7 @@ impl SourceBackedEditor {
     #[cfg(any(unix, windows))]
     pub fn from_path_with_limits_and_execution_context(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_read_at_with_limits_and_execution_context(file_source(path)?, limits, context)
@@ -271,7 +271,7 @@ impl SourceBackedEditor {
     #[cfg(any(unix, windows))]
     pub fn from_path_with_limits_and_cache_limits_and_execution_context(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
@@ -291,7 +291,7 @@ impl SourceBackedEditor {
 
     /// Open a filesystem-backed XLSX editor with explicit OPC limits.
     #[cfg(any(unix, windows))]
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
+    pub fn open_with_limits(path: impl AsRef<Path>, limits: SourceLimits) -> Result<Self> {
         Self::from_path_with_limits(path, limits)
     }
 
@@ -309,7 +309,7 @@ impl SourceBackedEditor {
     #[cfg(any(unix, windows))]
     pub fn open_with_limits_and_cache_limits(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
     ) -> Result<Self> {
         Self::from_path_with_limits_and_cache_limits(path, limits, cache_limits)
@@ -320,7 +320,7 @@ impl SourceBackedEditor {
     #[cfg(any(unix, windows))]
     pub fn open_with_execution_context(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_path_with_execution_context(path, limits, context)
@@ -331,7 +331,7 @@ impl SourceBackedEditor {
     #[cfg(any(unix, windows))]
     pub fn open_with_limits_and_execution_context(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_path_with_limits_and_execution_context(path, limits, context)
@@ -342,7 +342,7 @@ impl SourceBackedEditor {
     #[cfg(any(unix, windows))]
     pub fn open_with_limits_and_cache_limits_and_execution_context(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
@@ -356,11 +356,11 @@ impl SourceBackedEditor {
 
     /// Open with the standard bounded OPC policy.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, ReadLimits::default())
+        Self::from_read_at_with_limits(source, SourceLimits::default())
     }
 
     /// Open with explicit OPC ingress limits.
-    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
+    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: SourceLimits) -> Result<Self> {
         Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_limits(
             source, limits,
         )?)
@@ -383,7 +383,7 @@ impl SourceBackedEditor {
     /// Open with explicit read and finite payload-cache policies.
     pub fn from_read_at_with_limits_and_cache_limits(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
     ) -> Result<Self> {
         Self::from_source_backed_package(
@@ -401,7 +401,7 @@ impl SourceBackedEditor {
     /// remain outside that payload accounting and use separate bounds.
     pub fn from_read_at_with_execution_context(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_execution_context(
@@ -412,7 +412,7 @@ impl SourceBackedEditor {
     /// Open with explicit read and execution policies.
     pub fn from_read_at_with_limits_and_execution_context(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_read_at_with_execution_context(source, limits, context)
@@ -424,7 +424,7 @@ impl SourceBackedEditor {
     /// output buffers are not charged to it.
     pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
         context: ExecutionContext,
     ) -> Result<Self> {

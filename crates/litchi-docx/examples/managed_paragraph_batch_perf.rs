@@ -30,7 +30,7 @@ use litchi_core::{
     Position, ReadAt, Resource, SourceVersion,
 };
 use litchi_docx::document::ParagraphTextReplacement;
-use litchi_docx::{ReadLimits, source_backed};
+use litchi_docx::{SourceLimits, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, PackURI, SourceCacheDiagnostics, SourceCacheLimits};
 use sha2::{Digest, Sha256};
@@ -546,7 +546,7 @@ fn build_managed_preflight(
     let package =
         source_backed::Package::from_read_at_with_limits_and_cache_limits_and_execution_context(
             Arc::new(OwnedSource::new(fixture.archive.clone())),
-            ReadLimits::default(),
+            SourceLimits::default(),
             SourceCacheLimits::new(CACHE_BYTES, CACHE_ENTRIES)?,
             context,
         )?;
@@ -652,7 +652,7 @@ fn run_sample(
     let package =
         source_backed::Package::from_read_at_with_limits_and_cache_limits_and_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             SourceCacheLimits::new(CACHE_BYTES, CACHE_ENTRIES)?,
             context,
         )?;

@@ -9,7 +9,7 @@
 //! Usage: `pptx_semantic_inventory input.pptx output.json`
 
 use litchi_core::OwnedSource;
-use litchi_pptx::{Package, ReadLimits, SourceBackedPresentation, SourceImageTarget};
+use litchi_pptx::{Package, SourceBackedPresentation, SourceImageTarget, SourceLimits};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::fs::{self, File, OpenOptions};
@@ -237,8 +237,8 @@ fn sha256_hex(bytes: &[u8]) -> String {
     output
 }
 
-fn inventory_read_limits() -> AnyResult<ReadLimits> {
-    Ok(ReadLimits::builder()
+fn inventory_read_limits() -> AnyResult<SourceLimits> {
+    Ok(SourceLimits::builder()
         .max_input_bytes(MAX_INPUT_BYTES)?
         .max_archive_entry_bytes(MAX_ARCHIVE_ENTRY_BYTES)?
         .max_archive_total_bytes(MAX_ARCHIVE_TOTAL_BYTES)?
@@ -497,7 +497,7 @@ fn collect_source_backed(
     })
 }
 
-fn collect_eager(input: Vec<u8>, limits: ReadLimits) -> AnyResult<EagerInventory> {
+fn collect_eager(input: Vec<u8>, limits: SourceLimits) -> AnyResult<EagerInventory> {
     let package = Package::from_vec_with_limits(input, limits)?;
     let presentation = package.presentation()?;
     let slide_count = presentation.slide_count()?;

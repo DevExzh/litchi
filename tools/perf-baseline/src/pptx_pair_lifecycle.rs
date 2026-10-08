@@ -23,7 +23,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, ReadAt,
     Resource,
 };
-use litchi_opc::{ReadLimits, SourceCacheDiagnostics, SourceCacheLimits};
+use litchi_opc::{SourceCacheDiagnostics, SourceCacheLimits, SourceLimits};
 use serde::{Deserialize, Serialize};
 use soapberry_zip::office::{ArchiveLimits, ArchiveReader};
 use soapberry_zip::{PreservationIndex, ZipArchive};
@@ -846,13 +846,13 @@ fn owner_context(
     Ok(OwnerContext { budget, context })
 }
 
-fn read_limits(input_limit: u64, expansion_limit: u64) -> Result<ReadLimits, Box<dyn Error>> {
+fn read_limits(input_limit: u64, expansion_limit: u64) -> Result<SourceLimits, Box<dyn Error>> {
     let expansion_limit = expansion_limit.max(1);
     let metadata_limit = (64 * 1024 * 1024).min(expansion_limit);
     let expansion_usize = usize::try_from(expansion_limit)?;
     let xml_limit = (8 * 1024 * 1024).min(expansion_usize).max(1);
     let attribute_limit = (64 * 1024).min(xml_limit).max(1);
-    Ok(ReadLimits::builder()
+    Ok(SourceLimits::builder()
         .max_input_bytes(input_limit)?
         .max_archive_member_name_bytes(4 * 1024)?
         .max_archive_metadata_bytes(metadata_limit)?

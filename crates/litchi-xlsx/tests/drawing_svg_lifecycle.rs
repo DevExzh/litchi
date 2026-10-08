@@ -20,7 +20,7 @@ use litchi_xlsx::drawing::{
     DrawingAnchor, DrawingDialect, EditAs, PictureSelector, RelationshipDialect, ScanLimits,
     SourceDrawing, SvgInput, SvgOwnerState, parse,
 };
-use litchi_xlsx::{Error, Hyperlink, HyperlinkReference, Package, ReadLimits, Workbook};
+use litchi_xlsx::{Error, Hyperlink, HyperlinkReference, Package, SourceLimits, Workbook};
 use quick_xml::events::Event;
 use quick_xml::reader::Reader;
 
@@ -1139,7 +1139,7 @@ fn edit_attach_with_limits(
     bytes: &[u8],
     selector: PictureSelector,
     svg: &[u8],
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<Vec<u8>, Error> {
     let workbook = Workbook::from_bytes_with_limits(bytes.to_vec(), limits)?;
     let mut edit = workbook.edit()?;
@@ -1149,7 +1149,7 @@ fn edit_attach_with_limits(
     edit.commit()?.into_workbook().to_plain_bytes()
 }
 
-fn edit_attach_two_with_limits(bytes: &[u8], limits: ReadLimits) -> Result<Vec<u8>, Error> {
+fn edit_attach_two_with_limits(bytes: &[u8], limits: SourceLimits) -> Result<Vec<u8>, Error> {
     let workbook = Workbook::from_bytes_with_limits(bytes.to_vec(), limits)?;
     let mut edit = workbook.edit()?;
     {
@@ -1195,8 +1195,8 @@ fn largest_materialized_part_bytes(bytes: &[u8]) -> usize {
         .unwrap_or(1)
 }
 
-fn exact_package_limits(bytes: &[u8]) -> ReadLimits {
-    ReadLimits::builder()
+fn exact_package_limits(bytes: &[u8]) -> SourceLimits {
+    SourceLimits::builder()
         .max_parts(materialized_part_count(bytes))
         .unwrap()
         .max_total_part_bytes(materialized_part_bytes(bytes) as u64)
@@ -1207,8 +1207,8 @@ fn exact_package_limits(bytes: &[u8]) -> ReadLimits {
         .unwrap()
 }
 
-fn exact_part_and_aggregate_limits(source_bytes: &[u8], final_bytes: &[u8]) -> ReadLimits {
-    ReadLimits::builder()
+fn exact_part_and_aggregate_limits(source_bytes: &[u8], final_bytes: &[u8]) -> SourceLimits {
+    SourceLimits::builder()
         .max_parts(materialized_part_count(source_bytes).max(materialized_part_count(final_bytes)))
         .unwrap()
         .max_total_part_bytes(
@@ -1224,10 +1224,10 @@ fn exact_part_and_aggregate_limits(source_bytes: &[u8], final_bytes: &[u8]) -> R
         .unwrap()
 }
 
-fn exact_resource_limits(bytes: &[u8]) -> ReadLimits {
+fn exact_resource_limits(bytes: &[u8]) -> SourceLimits {
     let max_part_bytes =
         largest_materialized_part_bytes(bytes).max(content_types_member(bytes).len());
-    ReadLimits::builder()
+    SourceLimits::builder()
         .max_parts(materialized_part_count(bytes))
         .unwrap()
         .max_total_part_bytes(materialized_part_bytes(bytes) as u64)
@@ -1246,8 +1246,8 @@ fn exact_resource_limits(bytes: &[u8]) -> ReadLimits {
         .unwrap()
 }
 
-fn exact_part_and_relationship_limits(bytes: &[u8]) -> ReadLimits {
-    ReadLimits::builder()
+fn exact_part_and_relationship_limits(bytes: &[u8]) -> SourceLimits {
+    SourceLimits::builder()
         .max_parts(materialized_part_count(bytes))
         .unwrap()
         .max_total_part_bytes(materialized_part_bytes(bytes) as u64)
@@ -1269,8 +1269,8 @@ fn cross_sheet_metadata_limits(
     final_bytes: &[u8],
     max_part_bytes: usize,
     max_content_types_bytes: usize,
-) -> ReadLimits {
-    ReadLimits::builder()
+) -> SourceLimits {
+    SourceLimits::builder()
         .max_parts(materialized_part_count(source_bytes).max(materialized_part_count(final_bytes)))
         .unwrap()
         .max_total_part_bytes(
@@ -1374,7 +1374,7 @@ fn content_type_mapping_count(bytes: &[u8]) -> usize {
     source.matches("<Default ").count() + source.matches("<Override ").count()
 }
 
-fn mixed_detach_attach_with_limits(bytes: &[u8], limits: ReadLimits) -> Result<Vec<u8>, Error> {
+fn mixed_detach_attach_with_limits(bytes: &[u8], limits: SourceLimits) -> Result<Vec<u8>, Error> {
     let workbook = Workbook::from_bytes_with_limits(bytes.to_vec(), limits)?;
     let mut edit = workbook.edit()?;
     edit.sheet("Sheet1")?
@@ -1384,7 +1384,10 @@ fn mixed_detach_attach_with_limits(bytes: &[u8], limits: ReadLimits) -> Result<V
     edit.commit()?.into_workbook().to_plain_bytes()
 }
 
-fn mixed_svg_and_hyperlink_with_limits(bytes: &[u8], limits: ReadLimits) -> Result<Vec<u8>, Error> {
+fn mixed_svg_and_hyperlink_with_limits(
+    bytes: &[u8],
+    limits: SourceLimits,
+) -> Result<Vec<u8>, Error> {
     let workbook = Workbook::from_bytes_with_limits(bytes.to_vec(), limits)?;
     let mut edit = workbook.edit()?;
     {
@@ -1409,7 +1412,7 @@ fn attach_then_detach_with_limits(
     bytes: &[u8],
     selector: PictureSelector,
     svg: &[u8],
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<Vec<u8>, Error> {
     let workbook = Workbook::from_bytes_with_limits(bytes.to_vec(), limits)?;
     let mut edit = workbook.edit()?;
@@ -1422,7 +1425,7 @@ fn attach_then_detach_with_limits(
 
 fn cross_sheet_detach_attach_with_limits(
     bytes: &[u8],
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<Vec<u8>, Error> {
     let workbook = Workbook::from_bytes_with_limits(bytes.to_vec(), limits)?;
     let mut edit = workbook.edit()?;
@@ -1439,7 +1442,7 @@ fn cross_sheet_detach_attach_with_limits(
     edit.commit()?.into_workbook().to_plain_bytes()
 }
 
-fn assert_mixed_limit_rejects(before: &[u8], limits: ReadLimits, label: &str) {
+fn assert_mixed_limit_rejects(before: &[u8], limits: SourceLimits, label: &str) {
     assert!(
         Workbook::from_bytes_with_limits(before.to_vec(), limits).is_ok(),
         "baseline does not open under retained {label} limit"
@@ -1819,7 +1822,7 @@ fn independent_worksheets_share_manifest_and_allocate_distinct_svg_parts() {
 #[test]
 fn cross_worksheet_detach_attach_fits_final_part_budget_after_media_reclamation() {
     let before = two_worksheet_detach_attach_fixture();
-    let attached = cross_sheet_detach_attach_with_limits(&before, ReadLimits::default()).unwrap();
+    let attached = cross_sheet_detach_attach_with_limits(&before, SourceLimits::default()).unwrap();
     assert_eq!(
         materialized_part_count(&attached),
         materialized_part_count(&before)
@@ -1837,7 +1840,7 @@ fn cross_worksheet_detach_attach_fits_final_part_budget_after_media_reclamation(
 #[test]
 fn cross_worksheet_detach_attach_accepts_exact_final_metadata_caps() {
     let before = two_worksheet_detach_attach_fixture();
-    let attached = cross_sheet_detach_attach_with_limits(&before, ReadLimits::default()).unwrap();
+    let attached = cross_sheet_detach_attach_with_limits(&before, SourceLimits::default()).unwrap();
 
     let max_part_bytes =
         largest_materialized_part_bytes(&before).max(largest_materialized_part_bytes(&attached));
@@ -1871,13 +1874,13 @@ fn cross_worksheet_detach_attach_accepts_exact_final_metadata_caps() {
 #[test]
 fn cross_worksheet_detach_attach_accepts_exact_final_relationship_graph_node_cap() {
     let before = two_worksheet_detach_attach_fixture();
-    let attached = cross_sheet_detach_attach_with_limits(&before, ReadLimits::default()).unwrap();
+    let attached = cross_sheet_detach_attach_with_limits(&before, SourceLimits::default()).unwrap();
     let source_nodes = relationship_graph_node_count(&before);
     let final_nodes = relationship_graph_node_count(&attached);
     assert_eq!(source_nodes, final_nodes);
     assert!(final_nodes > 1);
 
-    let exact = ReadLimits::builder()
+    let exact = SourceLimits::builder()
         .max_relationship_graph_nodes(final_nodes)
         .unwrap()
         .build()
@@ -1885,7 +1888,7 @@ fn cross_worksheet_detach_attach_accepts_exact_final_relationship_graph_node_cap
     let repeated = cross_sheet_detach_attach_with_limits(&before, exact).unwrap();
     assert_eq!(repeated, attached);
 
-    let under = ReadLimits::builder()
+    let under = SourceLimits::builder()
         .max_relationship_graph_nodes(final_nodes - 1)
         .unwrap()
         .build()
@@ -2084,7 +2087,7 @@ fn same_picture_detach_then_attach_projects_to_the_new_payload() {
 #[test]
 fn sole_owner_replacement_accepts_exact_final_package_and_relationship_budgets() {
     let before = svg_fixture();
-    let attached = mixed_detach_attach_with_limits(&before, ReadLimits::default()).unwrap();
+    let attached = mixed_detach_attach_with_limits(&before, SourceLimits::default()).unwrap();
     assert_eq!(
         materialized_part_count(&attached),
         materialized_part_count(&before)
@@ -2672,7 +2675,7 @@ fn attach_then_detach_exact_noop_fits_original_resource_budgets() {
 #[test]
 fn single_attach_accepts_exact_generated_drawing_cap_and_rejects_one_byte_under() {
     let before = raster_fixture();
-    let generous = ReadLimits::default();
+    let generous = SourceLimits::default();
     let attached = edit_attach_with_limits(&before, selector(0), NEW_SVG, generous)
         .expect("the fixture must admit one SVG attach under the generous profile");
     let drawing_len = part(&attached, DRAWING).len();
@@ -2688,7 +2691,7 @@ fn single_attach_accepts_exact_generated_drawing_cap_and_rejects_one_byte_under(
         .expect("an exact final drawing budget must admit the deterministic attach");
     assert_eq!(repeated, attached);
 
-    let under = ReadLimits::builder()
+    let under = SourceLimits::builder()
         .max_parts(exact.max_parts())
         .unwrap()
         .max_total_part_bytes(exact.max_total_part_bytes())
@@ -2712,7 +2715,7 @@ fn empty_blip_and_ext_list_attach_accept_exact_part_and_aggregate_caps() {
         ("empty a:extLst", empty_ext_list_fixture()),
     ] {
         let attached =
-            edit_attach_with_limits(&before, selector(0), NEW_SVG, ReadLimits::default())
+            edit_attach_with_limits(&before, selector(0), NEW_SVG, SourceLimits::default())
                 .unwrap_or_else(|error| panic!("{label} fixture must admit SVG attach: {error:?}"));
         let source_part = largest_materialized_part_bytes(&before);
         let final_part = largest_materialized_part_bytes(&attached);
@@ -2734,7 +2737,7 @@ fn empty_blip_and_ext_list_attach_accept_exact_part_and_aggregate_caps() {
             .unwrap_or_else(|error| panic!("{label} exact output caps rejected attach: {error:?}"));
         assert_eq!(repeated, attached);
 
-        let part_under = ReadLimits::builder()
+        let part_under = SourceLimits::builder()
             .max_parts(exact.max_parts())
             .unwrap()
             .max_total_part_bytes(exact.max_total_part_bytes())
@@ -2747,7 +2750,7 @@ fn empty_blip_and_ext_list_attach_accept_exact_part_and_aggregate_caps() {
         assert!(edit_attach_with_limits(&before, selector(0), NEW_SVG, part_under).is_err());
         assert!(Workbook::from_bytes_with_limits(before.clone(), part_under).is_ok());
 
-        let aggregate_under = ReadLimits::builder()
+        let aggregate_under = SourceLimits::builder()
             .max_parts(exact.max_parts())
             .unwrap()
             .max_total_part_bytes((final_total - 1) as u64)
@@ -2765,7 +2768,7 @@ fn empty_blip_and_ext_list_attach_accept_exact_part_and_aggregate_caps() {
 #[test]
 fn generated_svg_relationship_id_decimal_width_fits_exact_xml_budgets() {
     let before = svg_decimal_width_relationship_fixture();
-    let attached = edit_attach_with_limits(&before, selector(0), NEW_SVG, ReadLimits::default())
+    let attached = edit_attach_with_limits(&before, selector(0), NEW_SVG, SourceLimits::default())
         .expect("the decimal-width fixture must admit one SVG attach");
     let drawing = part(&attached, DRAWING);
     assert!(
@@ -2781,7 +2784,7 @@ fn generated_svg_relationship_id_decimal_width_fits_exact_xml_budgets() {
         .expect("exact final drawing and relationship XML budgets must admit the attach");
     assert_eq!(repeated, attached);
 
-    let drawing_under = ReadLimits::builder()
+    let drawing_under = SourceLimits::builder()
         .max_parts(exact.max_parts())
         .unwrap()
         .max_total_part_bytes(exact.max_total_part_bytes())
@@ -2793,7 +2796,7 @@ fn generated_svg_relationship_id_decimal_width_fits_exact_xml_budgets() {
     assert!(Workbook::from_bytes_with_limits(before.clone(), drawing_under).is_ok());
     assert!(edit_attach_with_limits(&before, selector(0), NEW_SVG, drawing_under).is_err());
 
-    let relationship_under = ReadLimits::builder()
+    let relationship_under = SourceLimits::builder()
         .max_parts(exact.max_parts())
         .unwrap()
         .max_total_part_bytes(exact.max_total_part_bytes())
@@ -2817,7 +2820,7 @@ fn generated_svg_relationship_id_decimal_width_fits_exact_xml_budgets() {
 #[test]
 fn same_drawing_multiple_attachments_use_actual_cross_decimal_id_widths() {
     let before = svg_mixed_width_relationship_fixture();
-    let attached = edit_attach_two_with_limits(&before, ReadLimits::default()).unwrap();
+    let attached = edit_attach_two_with_limits(&before, SourceLimits::default()).unwrap();
     let drawing = String::from_utf8(part(&attached, DRAWING)).unwrap();
     assert_eq!(drawing.matches("rIdSvg9").count(), 1);
     assert_eq!(drawing.matches("rIdSvg10").count(), 1);
@@ -2835,7 +2838,7 @@ fn same_drawing_multiple_attachments_use_actual_cross_decimal_id_widths() {
     let repeated = edit_attach_two_with_limits(&before, exact).unwrap();
     assert_eq!(repeated, attached);
 
-    let part_under = ReadLimits::builder()
+    let part_under = SourceLimits::builder()
         .max_parts(exact.max_parts())
         .unwrap()
         .max_total_part_bytes(exact.max_total_part_bytes())
@@ -2848,7 +2851,7 @@ fn same_drawing_multiple_attachments_use_actual_cross_decimal_id_widths() {
     assert!(edit_attach_two_with_limits(&before, part_under).is_err());
     assert!(Workbook::from_bytes_with_limits(before.clone(), part_under).is_ok());
 
-    let aggregate_under = ReadLimits::builder()
+    let aggregate_under = SourceLimits::builder()
         .max_parts(exact.max_parts())
         .unwrap()
         .max_total_part_bytes((final_total - 1) as u64)
@@ -2866,13 +2869,13 @@ fn same_drawing_multiple_attachments_use_actual_cross_decimal_id_widths() {
 fn source_less_relationship_member_accepts_exact_final_event_cap() {
     let before = source_less_sheet2_relationship_fixture();
     assert!(!has_physical_member(&before, SHEET2_RELS_MEMBER));
-    let attached = mixed_svg_and_hyperlink_with_limits(&before, ReadLimits::default()).unwrap();
+    let attached = mixed_svg_and_hyperlink_with_limits(&before, SourceLimits::default()).unwrap();
     assert!(has_physical_member(&attached, SHEET2_RELS_MEMBER));
 
     let source_events = relationship_xml_events(&before);
     let final_events = relationship_xml_events(&attached);
     assert!(final_events > source_events);
-    let exact = ReadLimits::builder()
+    let exact = SourceLimits::builder()
         .max_total_relationship_xml_events(final_events)
         .unwrap()
         .build()
@@ -2880,7 +2883,7 @@ fn source_less_relationship_member_accepts_exact_final_event_cap() {
     let repeated = mixed_svg_and_hyperlink_with_limits(&before, exact).unwrap();
     assert_eq!(repeated, attached);
 
-    let under = ReadLimits::builder()
+    let under = SourceLimits::builder()
         .max_total_relationship_xml_events(final_events - 1)
         .unwrap()
         .build()
@@ -2915,7 +2918,7 @@ fn self_closing_relationship_root_expansion_accepts_exact_final_event_cap() {
         .contains("/>")
     );
 
-    let attached = mixed_svg_and_hyperlink_with_limits(&before, ReadLimits::default()).unwrap();
+    let attached = mixed_svg_and_hyperlink_with_limits(&before, SourceLimits::default()).unwrap();
     let output_sheet2_rels = String::from_utf8(
         PhysPkgReader::new(&attached)
             .unwrap()
@@ -2928,7 +2931,7 @@ fn self_closing_relationship_root_expansion_accepts_exact_final_event_cap() {
     let source_events = relationship_xml_events(&before);
     let final_events = relationship_xml_events(&attached);
     assert!(final_events > source_events);
-    let exact = ReadLimits::builder()
+    let exact = SourceLimits::builder()
         .max_total_relationship_xml_events(final_events)
         .unwrap()
         .build()
@@ -2936,7 +2939,7 @@ fn self_closing_relationship_root_expansion_accepts_exact_final_event_cap() {
     let repeated = mixed_svg_and_hyperlink_with_limits(&before, exact).unwrap();
     assert_eq!(repeated, attached);
 
-    let under = ReadLimits::builder()
+    let under = SourceLimits::builder()
         .max_total_relationship_xml_events(final_events - 1)
         .unwrap()
         .build()
@@ -3033,7 +3036,7 @@ fn invalid_input_selector_and_custom_scan_limits_fail_before_publication() {
     // the authored extension exceed that same per-part output ceiling. The
     // transaction must reject the publication before it can expose a partial
     // drawing, relationship, or content-types change.
-    let output_cap = ReadLimits::builder()
+    let output_cap = SourceLimits::builder()
         .max_part_bytes(drawing.len() as u64)
         .unwrap()
         .build()
@@ -3054,14 +3057,14 @@ fn mixed_svg_replacement_respects_retained_part_and_aggregate_byte_limits() {
     let part_count = materialized_part_count(&before);
     let part_bytes = materialized_part_bytes(&before);
 
-    let max_parts = ReadLimits::builder()
+    let max_parts = SourceLimits::builder()
         .max_parts(part_count)
         .unwrap()
         .build()
         .unwrap();
     assert_mixed_limit_rejects(&before, max_parts, "materialized part count");
 
-    let fits_payload_not_drawing_growth = ReadLimits::builder()
+    let fits_payload_not_drawing_growth = SourceLimits::builder()
         .max_total_part_bytes((part_bytes + NEW_SVG.len()) as u64)
         .unwrap()
         .build()
@@ -3081,14 +3084,14 @@ fn mixed_svg_replacement_respects_relationship_and_content_type_limits() {
     let relationship_events = relationship_xml_events(&before);
     let content_type_mappings = content_type_mapping_count(&before);
 
-    let max_relationships = ReadLimits::builder()
+    let max_relationships = SourceLimits::builder()
         .max_total_relationships(relationships)
         .unwrap()
         .build()
         .unwrap();
     assert_mixed_limit_rejects(&before, max_relationships, "aggregate relationship count");
 
-    let max_relationship_bytes = ReadLimits::builder()
+    let max_relationship_bytes = SourceLimits::builder()
         .max_total_relationship_xml_bytes(relationship_bytes)
         .unwrap()
         .build()
@@ -3099,7 +3102,7 @@ fn mixed_svg_replacement_respects_relationship_and_content_type_limits() {
         "aggregate relationship XML bytes",
     );
 
-    let max_relationship_events = ReadLimits::builder()
+    let max_relationship_events = SourceLimits::builder()
         .max_total_relationship_xml_events(relationship_events)
         .unwrap()
         .build()
@@ -3110,7 +3113,7 @@ fn mixed_svg_replacement_respects_relationship_and_content_type_limits() {
         "aggregate relationship XML events",
     );
 
-    let max_content_types = ReadLimits::builder()
+    let max_content_types = SourceLimits::builder()
         .max_content_type_mappings(content_type_mappings)
         .unwrap()
         .build()

@@ -18,7 +18,7 @@ use soapberry_zip::office::StreamingArchiveWriter;
 use soapberry_zip::time::UtcDateTime;
 use soapberry_zip::{CompressionMethod, Header, ZipArchive, ZipArchiveWriter};
 
-use crate::limits::{ReadLimits, ReadResource};
+use crate::limits::{ReadResource, SourceLimits};
 use crate::packuri::PackURI;
 use crate::part::{BlobPart, Part};
 use crate::pkgwriter::PackageWriter;
@@ -377,8 +377,9 @@ fn an_eager_owned_package_issues_the_same_capture_as_a_deferred_one() {
     let source_bytes = source_archive(Mode::DeflatedDescriptor, false);
     let deferred = OpcPackage::from_vec(source_bytes.clone()).expect("deferred open");
     let donor = OpcPackage::new();
-    let eager = OpcPackage::from_vec_reusing_payloads(source_bytes, ReadLimits::default(), &donor)
-        .expect("eager open");
+    let eager =
+        OpcPackage::from_vec_reusing_payloads(source_bytes, SourceLimits::default(), &donor)
+            .expect("eager open");
     let photo = part_uri(PHOTO);
     assert!(
         eager
@@ -770,7 +771,7 @@ fn the_transfer_capture_never_captures_a_disagreeing_descriptor() {
     // like every positional index, admits the member.
     let capture = |archive: Vec<u8>| {
         let length = archive.len() as u64;
-        let limits = ReadLimits::default();
+        let limits = SourceLimits::default();
         let index = soapberry_zip::office::IndexedArchive::from_reader_with_limits(
             std::sync::Arc::new(archive),
             length,
@@ -805,18 +806,18 @@ fn the_transfer_rechecks_the_read_limits_the_archive_was_admitted_under() {
     let donor = OpcPackage::new();
     for (limits, resource) in [
         (
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_part_bytes(1024)
-                .and_then(crate::ReadLimitsBuilder::build)
+                .and_then(crate::SourceLimitsBuilder::build)
                 .expect("limit"),
             ReadResource::PartBytes,
         ),
         (
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_archive_compressed_bytes(
                     u64::try_from(member.compressed.len()).expect("size") - 1,
                 )
-                .and_then(crate::ReadLimitsBuilder::build)
+                .and_then(crate::SourceLimitsBuilder::build)
                 .expect("limit"),
             ReadResource::ArchiveCompressedBytes,
         ),
@@ -825,7 +826,7 @@ fn the_transfer_rechecks_the_read_limits_the_archive_was_admitted_under() {
         // under test: the transfer must re-check the member against it.
         let mut package = OpcPackage::from_vec_reusing_payloads(
             source_bytes.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             &donor,
         )
         .expect("eager open");
@@ -1158,9 +1159,9 @@ fn members_whose_names_normalize_to_one_name_are_refused_at_open() {
 
 #[test]
 fn the_admitted_read_limits_are_reported_while_the_source_archive_is_retained() {
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_part_bytes(1 << 20)
-        .and_then(crate::ReadLimitsBuilder::build)
+        .and_then(crate::SourceLimitsBuilder::build)
         .expect("limit");
     let mut package =
         OpcPackage::from_vec_with_limits(source_archive(Mode::DeflatedSized, false), limits)

@@ -1402,7 +1402,7 @@ struct ContentTypesItem {
 /// This is used by source-bound snapshots for newly authored packages, where
 /// no admitted source manifest exists to retain.
 pub(crate) fn authored_content_types_xml(package: &OpcPackage) -> Result<Vec<u8>> {
-    authored_content_types_xml_with_limits(package, crate::ReadLimits::default())
+    authored_content_types_xml_with_limits(package, crate::SourceLimits::default())
 }
 
 const AUTHORED_CONTENT_TYPE_DEFAULTS: [(&str, &str); 10] = [
@@ -1422,7 +1422,7 @@ const AUTHORED_CONTENT_TYPE_DEFAULTS: [(&str, &str); 10] = [
 ];
 
 struct AuthoredContentTypesBudget {
-    limits: crate::ReadLimits,
+    limits: crate::SourceLimits,
     bytes: usize,
     mappings: usize,
 }
@@ -1532,7 +1532,7 @@ impl AuthoredContentTypesBudget {
 
 pub(crate) fn authored_content_types_xml_with_limits(
     package: &OpcPackage,
-    limits: crate::ReadLimits,
+    limits: crate::SourceLimits,
 ) -> Result<Vec<u8>> {
     use crate::ReadResource;
 
@@ -1828,7 +1828,7 @@ mod tests {
                 .unwrap();
         }
         let expected = legacy.to_xml().into_bytes();
-        let exact = crate::ReadLimits::builder()
+        let exact = crate::SourceLimits::builder()
             .max_content_types_bytes(expected.len())
             .unwrap()
             .max_content_type_mappings(5)
@@ -1839,7 +1839,7 @@ mod tests {
             authored_content_types_xml_with_limits(&package, exact).unwrap(),
             expected
         );
-        let too_small = crate::ReadLimits::builder()
+        let too_small = crate::SourceLimits::builder()
             .max_content_types_bytes(expected.len() - 1)
             .unwrap()
             .build()
@@ -1851,7 +1851,7 @@ mod tests {
                 ..
             })
         ));
-        let too_few = crate::ReadLimits::builder()
+        let too_few = crate::SourceLimits::builder()
             .max_content_type_mappings(4)
             .unwrap()
             .build()
@@ -1875,7 +1875,7 @@ mod tests {
                 Vec::new(),
             )))
             .unwrap();
-        let limits = crate::ReadLimits::builder()
+        let limits = crate::SourceLimits::builder()
             .max_content_types_bytes(1024)
             .unwrap()
             .build()

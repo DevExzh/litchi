@@ -11,7 +11,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, ReadAt, Resource,
     SourceVersion,
 };
-use litchi_opc::{OpenSession, PackURI, ReadLimits, SourceBackedPackage};
+use litchi_opc::{OpenSession, PackURI, SourceBackedPackage, SourceLimits};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use soapberry_zip::office::StreamingArchiveWriter;
@@ -976,14 +976,14 @@ fn run_opc_sample(config: &Config, corpus: &Corpus, sample: usize) -> AnyResult<
     let (root, context) = make_context(config.workers, config.task_floor)?;
     let session = OpenSession::new(context.clone())?;
     if config.state == State::Primed {
-        let preload = session.from_bytes(&corpus.opc_bytes, ReadLimits::default())?;
+        let preload = session.from_bytes(&corpus.opc_bytes, SourceLimits::default())?;
         let _ = verify_opc(&preload, corpus)?;
         drop(preload);
     }
     let before_operation = resource_snapshot(&root);
     let (package, wall_ns, cpu_ns) = measure(|| {
         session
-            .from_bytes(&corpus.opc_bytes, ReadLimits::default())
+            .from_bytes(&corpus.opc_bytes, SourceLimits::default())
             .map_err(|error| boxed_error(error.to_string()))
     })?;
     let after_operation = resource_snapshot(&root);
@@ -1080,7 +1080,7 @@ fn run_parts_sample(config: &Config, corpus: &Corpus, sample: usize) -> AnyResul
     let source_for_reader: Arc<dyn ReadAt> = source.clone();
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         source_for_reader,
-        ReadLimits::default(),
+        SourceLimits::default(),
         context.clone(),
     )?;
     let uris = part_uris(corpus)?;

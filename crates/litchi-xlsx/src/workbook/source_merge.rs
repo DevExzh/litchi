@@ -14,8 +14,8 @@ use litchi_core::{
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    OpcError, OpcPackage, PackURI, Part, PartView, ReadLimits, Relationship, Relationships,
-    SourceBackedPackage, SourceCacheLimits, SourceLineage, TargetMode,
+    OpcError, OpcPackage, PackURI, Part, PartView, Relationship, Relationships,
+    SourceBackedPackage, SourceCacheLimits, SourceLimits, SourceLineage, TargetMode,
 };
 use litchi_sheet::{Area, At, Cell as Address, Rect};
 use quick_xml::Reader;
@@ -82,13 +82,13 @@ pub struct Diagnostics {
 impl SourceBackedEditor {
     /// Open with the standard bounded OPC policy.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, ReadLimits::default())
+        Self::from_read_at_with_limits(source, SourceLimits::default())
     }
 
     /// Open with an explicit bounded OPC policy.
     pub fn from_read_at_with_limits(
         source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
+        read_limits: SourceLimits,
     ) -> Result<Self> {
         Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_limits(
             source,
@@ -110,7 +110,7 @@ impl SourceBackedEditor {
     /// Open with explicit read and cache policies.
     pub fn from_read_at_with_limits_and_cache_limits(
         source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
+        read_limits: SourceLimits,
         cache_limits: SourceCacheLimits,
     ) -> Result<Self> {
         Self::from_source_backed_package(
@@ -125,7 +125,7 @@ impl SourceBackedEditor {
     /// Open with an explicit managed execution context.
     pub fn from_read_at_with_execution_context(
         source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
+        read_limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_execution_context(
@@ -138,7 +138,7 @@ impl SourceBackedEditor {
     /// Open with explicit read and managed execution policies.
     pub fn from_read_at_with_limits_and_execution_context(
         source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
+        read_limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_read_at_with_execution_context(source, read_limits, context)
@@ -147,7 +147,7 @@ impl SourceBackedEditor {
     /// Open with explicit read, cache, and managed execution policies.
     pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
         source: Arc<dyn ReadAt>,
-        read_limits: ReadLimits,
+        read_limits: SourceLimits,
         cache_limits: SourceCacheLimits,
         context: ExecutionContext,
     ) -> Result<Self> {

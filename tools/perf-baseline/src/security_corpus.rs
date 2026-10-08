@@ -40,7 +40,9 @@ use litchi_core::{
 use litchi_doc::{Error as DocError, Limits as DocLimits, OpenOptions, Package as DocPackage};
 use litchi_docx::source_backed::Package as DocxSourcePackage;
 use litchi_ole_common::object::Limits as ObjectLimits;
-use litchi_opc::{OpcError, OpcPackage, ReadLimits, ReadResource, SourceBackedPackage, TargetMode};
+use litchi_opc::{
+    OpcError, OpcPackage, ReadResource, SourceBackedPackage, SourceLimits, TargetMode,
+};
 use litchi_sign::{Policy, Status};
 use litchi_xls::{Workbook as XlsWorkbook, cell_values::Snapshot as XlsSnapshot};
 use sha2::{Digest, Sha256};
@@ -343,7 +345,7 @@ fn bounded_ingress_and_publication() -> Result<(), Box<dyn Error>> {
         relative_path: EXTERNAL_XLSX_PATH,
         sha256: EXTERNAL_XLSX_SHA256,
     })?;
-    let one_under = ReadLimits::builder()
+    let one_under = SourceLimits::builder()
         .max_input_bytes(u64::try_from(bytes.len().saturating_sub(1))?)?
         .build()?;
     let error = match SourceBackedPackage::from_vec_with_limits(bytes.clone(), one_under) {
@@ -482,8 +484,8 @@ fn open_doc_package(bytes: &[u8]) -> Result<DocPackage<Cursor<Vec<u8>>>, Box<dyn
     )?)
 }
 
-fn security_read_limits() -> Result<ReadLimits, Box<dyn Error>> {
-    Ok(ReadLimits::builder()
+fn security_read_limits() -> Result<SourceLimits, Box<dyn Error>> {
+    Ok(SourceLimits::builder()
         .max_input_bytes(SECURITY_MAX_INPUT_BYTES)?
         .max_archive_members(SECURITY_MAX_MEMBERS)?
         .max_archive_total_entries(SECURITY_MAX_MEMBERS)?

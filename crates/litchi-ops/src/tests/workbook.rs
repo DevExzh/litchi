@@ -341,7 +341,7 @@ mod xlsx {
     #[test]
     fn filesystem_xlsx_propagates_the_opc_input_limit_before_fallback() {
         let temporary = super::super::temporary_with(&valid_package("bounded"), "");
-        let maximum = litchi_opc::ReadLimits::default().max_input_bytes();
+        let maximum = litchi_opc::SourceLimits::default().max_input_bytes();
         temporary.as_file().set_len(maximum + 1).unwrap();
         let error = crate::open(temporary.path()).expect_err("over the default OPC limit");
         assert_eq!(error.code(), Code::LimitExceeded);
@@ -359,7 +359,7 @@ mod xlsx {
     fn filesystem_xlsx_preflights_tight_input_limit_before_reads() {
         let temporary = super::super::temporary_with(&valid_package("bounded sparse"), "");
         temporary.as_file().set_len(1024 * 1024 + 1).unwrap();
-        let limits = litchi_opc::ReadLimits::builder()
+        let limits = litchi_opc::SourceLimits::builder()
             .max_input_bytes(1024)
             .unwrap()
             .build()
@@ -810,7 +810,7 @@ mod polyglot {
 
     fn tight() -> OpenOptions {
         OpenOptions::new().ooxml_limits(
-            litchi_opc::ReadLimits::builder()
+            litchi_opc::SourceLimits::builder()
                 .max_input_bytes(1)
                 .unwrap()
                 .build()

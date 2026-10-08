@@ -48,7 +48,7 @@ use std::{
 use litchi::{OpenOptions as UnifiedOpenOptions, SourceMode};
 use litchi_core::{Metadata, OwnedSource, ReadAt};
 use litchi_ole_common::property_set::PropertySetReader;
-use litchi_opc::{OpcPackage, ReadLimits, SourceBackedPackage};
+use litchi_opc::{OpcPackage, SourceBackedPackage, SourceLimits};
 use serde::Serialize;
 
 use crate::{
@@ -1184,7 +1184,7 @@ pub(crate) fn eager_options() -> UnifiedOpenOptions {
 /// The leaf calls the unified eager DOCX owner makes: one eager OPC parse,
 /// the owning package, and its one-pass text validation.
 pub(crate) fn leaf_docx_eager(bytes: Vec<u8>) -> Result<litchi_docx::Package, Box<dyn Error>> {
-    let opc = OpcPackage::from_bytes_with_limits(&bytes, ReadLimits::default())?;
+    let opc = OpcPackage::from_bytes_with_limits(&bytes, SourceLimits::default())?;
     drop(bytes);
     let package = litchi_docx::Package::from_opc_package(opc)?;
     let document = package.document()?;
@@ -1204,7 +1204,7 @@ pub(crate) struct LeafXlsx {
 /// The leaf calls the unified source-backed XLSX open makes: one OPC index,
 /// the core-properties read, and the deferred workbook catalog.
 pub(crate) fn leaf_xlsx_open(source: Arc<dyn ReadAt>) -> Result<LeafXlsx, Box<dyn Error>> {
-    let package = SourceBackedPackage::from_read_at_with_limits(source, ReadLimits::default())?;
+    let package = SourceBackedPackage::from_read_at_with_limits(source, SourceLimits::default())?;
     let mut repairs = litchi_ooxml_common::leniency::ToleranceReport::default();
     let metadata =
         litchi_ooxml_common::properties::read_source_backed_with_report(&package, &mut repairs)?

@@ -164,7 +164,7 @@ pub use litchi_crypto::ooxml as encryption;
 
 /// OPC resource limits used by XLSX package and workbook ingress.
 pub use litchi_opc::{
-    ReadLimits, SourceCacheDiagnostics, SourceCacheLimitError, SourceCacheLimits,
+    SourceCacheDiagnostics, SourceCacheLimitError, SourceCacheLimits, SourceLimits,
 };
 
 pub use active_x::{

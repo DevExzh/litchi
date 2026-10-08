@@ -13,7 +13,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource,
 };
 use litchi_opc::{
-    OpcError, OpcPackage, PackURI, ReadLimits, SourceBackedPackage, SourceTopologyPlan,
+    OpcError, OpcPackage, PackURI, SourceBackedPackage, SourceLimits, SourceTopologyPlan,
 };
 
 const CONTENT_TYPES_NS: &str = "http://schemas.openxmlformats.org/package/2006/content-types";
@@ -898,7 +898,7 @@ fn topology_publish_rejects_invalid_xml_and_part_byte_limits_before_output() {
     assert!(matches!(error, OpcError::XmlPublication { .. }));
     assert!(output.is_empty());
 
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_part_bytes(64)
         .unwrap()
         .max_total_part_bytes(32)
@@ -1351,7 +1351,7 @@ fn managed_cancellation_before_topology_publication_writes_nothing() {
     let (cancellation_source, context) = managed_context();
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(source)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();

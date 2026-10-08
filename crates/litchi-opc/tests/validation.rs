@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 use litchi_core::{CheckStatus, OwnedSource, ReadAt, SourceVersion, ValidationLimits};
-use litchi_opc::{OpcError, ReadLimits, validate_read_at, validate_read_at_with_limits};
+use litchi_opc::{OpcError, SourceLimits, validate_read_at, validate_read_at_with_limits};
 
 const CONTENT_TYPES: &[u8] = br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#;
 const EMPTY_CONTENT_TYPES: &[u8] =
@@ -130,7 +130,7 @@ fn assert_structural_phase(bytes: Vec<u8>, check: &str, phases: [&str; 4]) {
     assert_eq!(phase_vector(&report), phases);
 }
 
-fn assert_limit_phase(bytes: Vec<u8>, read_limits: ReadLimits, phases: [&str; 4]) {
+fn assert_limit_phase(bytes: Vec<u8>, read_limits: SourceLimits, phases: [&str; 4]) {
     let report = validate_read_at_with_limits(
         Arc::new(OwnedSource::new(bytes)),
         read_limits,
@@ -243,17 +243,17 @@ fn shared_xml_limits_keep_content_type_and_relationship_phase() {
     let relationship_phases = ["complete", "blocked", "blocked", "blocked"];
 
     for limits in [
-        ReadLimits::builder()
+        SourceLimits::builder()
             .max_xml_events(1)
             .unwrap()
             .build()
             .unwrap(),
-        ReadLimits::builder()
+        SourceLimits::builder()
             .max_xml_depth(1)
             .unwrap()
             .build()
             .unwrap(),
-        ReadLimits::builder()
+        SourceLimits::builder()
             .max_xml_attribute_bytes(8)
             .unwrap()
             .max_relationship_target_bytes(8)
@@ -273,10 +273,10 @@ fn shared_xml_limits_keep_content_type_and_relationship_phase() {
         );
     }
 
-    let relationship_documents: [(&[u8], ReadLimits); 3] = [
+    let relationship_documents: [(&[u8], SourceLimits); 3] = [
         (
             ROOT_RELS,
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_xml_events(2)
                 .unwrap()
                 .build()
@@ -284,7 +284,7 @@ fn shared_xml_limits_keep_content_type_and_relationship_phase() {
         ),
         (
             br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Wrapper><Relationship Id="rId1" Type="urn:test" Target="word/document.xml"/></Wrapper></Relationships>"#,
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_xml_depth(1)
                 .unwrap()
                 .build()
@@ -292,7 +292,7 @@ fn shared_xml_limits_keep_content_type_and_relationship_phase() {
         ),
         (
             ROOT_RELS,
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_xml_attribute_bytes(8)
                 .unwrap()
                 .max_relationship_target_bytes(8)
@@ -351,7 +351,7 @@ fn physical_relationship_part_limits_belong_to_catalog_admission() {
 
     assert_limit_phase(
         writer.finish_to_bytes().unwrap(),
-        ReadLimits::builder()
+        SourceLimits::builder()
             .max_relationship_parts(1)
             .unwrap()
             .build()
@@ -419,7 +419,7 @@ fn duplicate_physical_entries_are_reported_as_structural_rejection() {
 #[test]
 fn zip_and_relationship_ceilings_are_blocked_without_issues() {
     let bytes = package_bytes(CONTENT_TYPES, ROOT_RELS, b"document");
-    let input_limits = ReadLimits::builder()
+    let input_limits = SourceLimits::builder()
         .max_input_bytes((bytes.len() - 1) as u64)
         .unwrap()
         .build()
@@ -445,7 +445,7 @@ fn zip_and_relationship_ceilings_are_blocked_without_issues() {
         ]
     );
 
-    let archive_limits = ReadLimits::builder()
+    let archive_limits = SourceLimits::builder()
         .max_archive_members(1)
         .unwrap()
         .max_relationship_parts(1)
@@ -470,7 +470,7 @@ fn zip_and_relationship_ceilings_are_blocked_without_issues() {
         ]
     );
 
-    let declared_size_limits = ReadLimits::builder()
+    let declared_size_limits = SourceLimits::builder()
         .max_archive_total_bytes(32)
         .unwrap()
         .build()
@@ -491,7 +491,7 @@ fn zip_and_relationship_ceilings_are_blocked_without_issues() {
         ]
     );
 
-    let catalog_limits = ReadLimits::builder()
+    let catalog_limits = SourceLimits::builder()
         .max_content_types_bytes(16)
         .unwrap()
         .build()
@@ -512,7 +512,7 @@ fn zip_and_relationship_ceilings_are_blocked_without_issues() {
         ]
     );
 
-    let relationship_limits = ReadLimits::builder()
+    let relationship_limits = SourceLimits::builder()
         .max_relationship_xml_bytes(16)
         .unwrap()
         .build()
@@ -541,7 +541,7 @@ fn report_limits_are_fallible_errors_not_unbounded_retention() {
     assert!(matches!(
         validate_read_at_with_limits(
             Arc::new(OwnedSource::new(bytes)),
-            ReadLimits::default(),
+            SourceLimits::default(),
             tiny,
         ),
         Err(OpcError::ValidationReport(_))
@@ -624,7 +624,7 @@ fn io_and_source_change_failures_remain_errors() {
     assert!(matches!(stale, OpcError::SourceChanged { .. }));
 
     let blocked_bytes = package_bytes(CONTENT_TYPES, ROOT_RELS, b"document");
-    let blocked_limits = ReadLimits::builder()
+    let blocked_limits = SourceLimits::builder()
         .max_input_bytes((blocked_bytes.len() - 1) as u64)
         .unwrap()
         .build()

@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as CoreLimits, Resource,
 };
-use litchi_docx::{Error, Package, ReadLimits, source_backed};
+use litchi_docx::{Error, Package, SourceLimits, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
     BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, Part, SourceCacheLimits, TargetMode,
@@ -167,7 +167,7 @@ fn from_path_variants_forward_limits_and_managed_cache_policy() {
     let directory = tempfile::tempdir().unwrap();
     let (path, bytes) = write_fixture(&directory, "limits");
 
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_input_bytes((bytes.len() - 1) as u64)
         .unwrap()
         .build()
@@ -180,7 +180,7 @@ fn from_path_variants_forward_limits_and_managed_cache_policy() {
     let cache_limits = SourceCacheLimits::new(1 << 20, 8).unwrap();
     let package = source_backed::Package::from_path_with_limits_and_cache_limits(
         &path,
-        ReadLimits::default(),
+        SourceLimits::default(),
         cache_limits,
     )
     .unwrap();
@@ -194,7 +194,7 @@ fn from_path_variants_forward_limits_and_managed_cache_policy() {
     let managed =
         source_backed::Package::from_path_with_limits_and_cache_limits_and_execution_context(
             &path,
-            ReadLimits::default(),
+            SourceLimits::default(),
             cache_limits,
             context,
         )

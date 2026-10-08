@@ -122,12 +122,12 @@ fn workbook_ingress_honors_exact_read_limits() {
     writer.save(&mut output).expect("serialize workbook");
     let bytes = output.into_inner();
     let input_bytes = u64::try_from(bytes.len()).expect("input length fits u64");
-    let exact = crate::ReadLimits::builder()
+    let exact = crate::SourceLimits::builder()
         .max_input_bytes(input_bytes)
         .expect("exact input limit")
         .build()
         .expect("valid exact limit");
-    let over = crate::ReadLimits::builder()
+    let over = crate::SourceLimits::builder()
         .max_input_bytes(input_bytes - 1)
         .expect("smaller input limit")
         .build()

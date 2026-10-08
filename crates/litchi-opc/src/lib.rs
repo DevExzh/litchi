@@ -19,8 +19,8 @@
 //!
 //! # Bounded ingestion
 //!
-//! Every ordinary package constructor uses [`ReadLimits::default`]. Build a
-//! checked, tighter profile with [`ReadLimits::builder`] and pass it to an
+//! Every ordinary package constructor uses [`SourceLimits::default`]. Build a
+//! checked, tighter profile with [`SourceLimits::builder`] and pass it to an
 //! `*_with_limits` constructor. The policy bounds package input; ZIP members,
 //! names, metadata, and declared sizes; materialized OPC parts;
 //! `[Content_Types].xml`; and relationship XML, attributes, targets, events,
@@ -69,7 +69,7 @@ pub use accounting::OpcOperationAccounting;
 pub use content_type::ContentType;
 pub use error::{OpcError, Result, SpliceResource};
 pub use execution::OpenSession;
-pub use limits::{ReadLimits, ReadLimitsBuilder, ReadResource};
+pub use limits::{ReadResource, SourceLimits, SourceLimitsBuilder};
 pub use members::{NonPartMember, NonPartReason};
 pub use package::{
     CanonicalRelationshipsPlan, CompressedPartTransfer, ContentTypeEdit, ContentTypesEditPlan,

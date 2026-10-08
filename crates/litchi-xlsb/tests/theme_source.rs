@@ -17,7 +17,7 @@ use litchi_core::{
 };
 use litchi_opc::{OpcError, OpcPackage, PackURI};
 use litchi_xlsb::package::PackageError;
-use litchi_xlsb::{ReadLimits, SourceBackedWorkbook};
+use litchi_xlsb::{SourceBackedWorkbook, SourceLimits};
 
 #[derive(Debug)]
 struct Source {
@@ -106,7 +106,7 @@ fn cancelled_source_refuses_theme_without_payload_reads() {
     let (cancellation, context) = context();
     let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
         source.clone(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -182,7 +182,7 @@ fn managed_theme_view_retains_captured_data_after_workbook_drop() {
     let (_cancellation, context) = context();
     let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
         source.clone(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();

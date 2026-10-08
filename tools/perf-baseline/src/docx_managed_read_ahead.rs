@@ -30,7 +30,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, ReadAt,
     Resource, SourceVersion,
 };
-use litchi_docx::{ReadLimits, source_backed};
+use litchi_docx::{SourceLimits, source_backed};
 use litchi_opc::SourceCacheLimits;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -299,7 +299,7 @@ struct ReadLimitsRecord {
 }
 
 impl ReadLimitsRecord {
-    fn from_limits(limits: ReadLimits) -> Self {
+    fn from_limits(limits: SourceLimits) -> Self {
         Self {
             max_input_bytes: limits.max_input_bytes(),
             max_archive_members: limits.max_archive_members(),
@@ -569,7 +569,7 @@ fn run_sample(
     config: &Config,
     corpus: &Corpus,
     sample_index: usize,
-    limits: ReadLimits,
+    limits: SourceLimits,
     cache_limits: SourceCacheLimits,
 ) -> Result<SampleRecord, Box<dyn Error>> {
     let provider = provider(config, corpus)?;
@@ -1028,7 +1028,7 @@ fn parse_config(args: &[OsString]) -> Result<Config, Box<dyn Error>> {
     })
 }
 
-fn limits_record(limits: ReadLimits, cache: SourceCacheLimits) -> LimitRecord {
+fn limits_record(limits: SourceLimits, cache: SourceCacheLimits) -> LimitRecord {
     let execution_max_in_flight_bytes = MAX_IN_FLIGHT_BYTES;
     LimitRecord {
         read_limits: ReadLimitsRecord::from_limits(limits),
@@ -1070,7 +1070,7 @@ pub fn run_from_args(args: impl IntoIterator<Item = OsString>) -> Result<(), Box
     }
     let config = parse_config(&args)?;
     let corpus = build_corpus()?;
-    let limits = ReadLimits::default();
+    let limits = SourceLimits::default();
     let cache_limits = SourceCacheLimits::new(CACHE_MAX_BYTES, CACHE_MAX_ENTRIES)?;
     let mut rows = Vec::with_capacity(config.samples);
     for iteration in 0..config.warmup.saturating_add(config.samples) {
@@ -1207,7 +1207,7 @@ mod tests {
         let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(bytes));
         let package = source_backed::Package::from_read_at_with_limits_and_cache_limits_and_source_read_policy_and_execution_context(
             source,
-            ReadLimits::default(),
+            SourceLimits::default(),
             SourceCacheLimits::new(CACHE_MAX_BYTES, CACHE_MAX_ENTRIES).unwrap(),
             source_policy(policy).unwrap(),
             context,

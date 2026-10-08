@@ -110,7 +110,7 @@ fn managed_raw_document(document: &[u8]) -> source_backed::Package {
     .unwrap();
     source_backed::Package::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(bytes)),
-        litchi_docx::ReadLimits::default(),
+        litchi_docx::SourceLimits::default(),
         litchi_core::ExecutionContext::new(budget, cancellation, execution_limits),
     )
     .unwrap()
@@ -597,7 +597,7 @@ fn source_document_is_send_sync_and_managed_arc_views_refuse_consistently() {
     let context = litchi_core::ExecutionContext::new(budget, cancellation, limits);
     let package = source_backed::Package::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(bytes)),
-        litchi_docx::ReadLimits::default(),
+        litchi_docx::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -1121,7 +1121,7 @@ fn effective_owner_pinned_document_checks_managed_donor_cancellation() {
             None,
             false,
         ))),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         litchi_core::ExecutionContext::new(budget.clone(), cancellation, limits),
     )
     .unwrap();
@@ -1542,7 +1542,7 @@ fn effective_metadata_checks_managed_donor_context_and_releases_admissions() {
             Some((&transitional_core("donor-title"), rt::CORE_PROPERTIES)),
             false,
         ))),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         litchi_core::ExecutionContext::new(budget.clone(), cancellation, limits),
     )
     .unwrap();

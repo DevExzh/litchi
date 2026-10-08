@@ -9,7 +9,7 @@
 
 use std::fs;
 
-use litchi_opc::{OpcError, PackURI, ReadLimits, SourceBackedPackage};
+use litchi_opc::{OpcError, PackURI, SourceBackedPackage, SourceLimits};
 use soapberry_zip::office::StreamingArchiveWriter;
 use tempfile::NamedTempFile;
 
@@ -160,7 +160,7 @@ fn path_with_limits_matches_from_vec_and_rejects_exact_too_small_input_and_part_
     let source = archive_bytes(SELECTED_PAYLOAD, &unused);
     let file = write_fixture(&source);
 
-    let exact_input = ReadLimits::builder()
+    let exact_input = SourceLimits::builder()
         .max_input_bytes(source.len() as u64)
         .unwrap()
         .build()
@@ -168,7 +168,7 @@ fn path_with_limits_matches_from_vec_and_rejects_exact_too_small_input_and_part_
     let from_path = SourceBackedPackage::from_path_with_limits(file.path(), exact_input).unwrap();
     let from_vec = SourceBackedPackage::from_vec_with_limits(
         source.clone(),
-        ReadLimits::builder()
+        SourceLimits::builder()
             .max_input_bytes(source.len() as u64)
             .unwrap()
             .build()
@@ -178,7 +178,7 @@ fn path_with_limits_matches_from_vec_and_rejects_exact_too_small_input_and_part_
     assert_eq!(catalog(&from_path), catalog(&from_vec));
     assert_eq!(selected_payload(&from_path), SELECTED_PAYLOAD);
 
-    let too_small_input = ReadLimits::builder()
+    let too_small_input = SourceLimits::builder()
         .max_input_bytes((source.len() - 1) as u64)
         .unwrap()
         .build()
@@ -190,7 +190,7 @@ fn path_with_limits_matches_from_vec_and_rejects_exact_too_small_input_and_part_
     assert!(matches!(
         SourceBackedPackage::from_vec_with_limits(
             source.clone(),
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_input_bytes((source.len() - 1) as u64)
                 .unwrap()
                 .build()
@@ -199,7 +199,7 @@ fn path_with_limits_matches_from_vec_and_rejects_exact_too_small_input_and_part_
         Err(OpcError::ReadLimit { .. })
     ));
 
-    let too_small_part = ReadLimits::builder()
+    let too_small_part = SourceLimits::builder()
         .max_part_bytes((unused.len() - 1) as u64)
         .unwrap()
         .build()
@@ -211,7 +211,7 @@ fn path_with_limits_matches_from_vec_and_rejects_exact_too_small_input_and_part_
     assert!(matches!(
         SourceBackedPackage::from_vec_with_limits(
             source,
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_part_bytes((unused.len() - 1) as u64)
                 .unwrap()
                 .build()

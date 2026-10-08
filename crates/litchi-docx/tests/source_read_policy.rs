@@ -22,7 +22,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as CoreLimits,
     OwnedSource, ReadAt, Resource, SourceVersion,
 };
-use litchi_docx::{Package, ReadLimits, source_backed};
+use litchi_docx::{Package, SourceLimits, source_backed};
 use litchi_opc::SourceCacheLimits;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use soapberry_zip::office::StreamingArchiveWriter;
@@ -147,7 +147,7 @@ fn managed_read_ahead_supports_semantic_read_then_releases_before_docx_publicati
     let exact_package =
         source_backed::Package::from_read_at_with_limits_and_cache_limits_and_execution_context(
             exact_source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             SourceCacheLimits::default(),
             exact_context,
         )
@@ -175,7 +175,7 @@ fn managed_read_ahead_supports_semantic_read_then_releases_before_docx_publicati
         .expect("focused read-ahead policy must be valid");
     let package = source_backed::Package::from_read_at_with_limits_and_cache_limits_and_source_read_policy_and_execution_context(
         candidate_source.clone(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         source_read_policy,
         context,

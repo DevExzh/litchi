@@ -12,7 +12,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use litchi_core::{ReadAt, SourceVersion};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::phys_pkg::{PhysPkgReader, PhysPkgWriter};
-use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, ReadLimits, TargetMode};
+use litchi_opc::{
+    BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, SourceLimits, TargetMode,
+};
 use litchi_pptx::{
     Error, SourceBackedPresentation, SourceBackedPresentationEditor, SourceSvgAttachmentReplacement,
 };
@@ -1247,7 +1249,7 @@ fn stale_and_signed_lifecycle_publication_refuse_before_writer_bytes() {
 #[test]
 fn attachment_limits_are_checked_before_lifecycle_publication() {
     let source = package_from_raster(true, false);
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_part_bytes(4096)
         .unwrap()
         .build()
@@ -1296,7 +1298,7 @@ fn inherited_namespace_context_respects_source_part_limit_and_is_reusable() {
     // the outer slide wrappers are omitted. Keep the accepted budget just
     // above the physical source member and exercise the public source limit
     // at the materialization boundary below it.
-    let source_limit = ReadLimits::builder()
+    let source_limit = SourceLimits::builder()
         .max_part_bytes(u64::try_from(source_slide.len() + 1).unwrap())
         .unwrap()
         .build()
@@ -1315,7 +1317,7 @@ fn inherited_namespace_context_respects_source_part_limit_and_is_reusable() {
             .unwrap();
     assert!(editor.edit_svg_attachment(0, 0).is_ok());
 
-    let tight_limit = ReadLimits::builder()
+    let tight_limit = SourceLimits::builder()
         .max_part_bytes(u64::try_from(source_slide.len() - 1).unwrap())
         .unwrap()
         .build()
@@ -1343,7 +1345,7 @@ fn selfclosing_blip_limit_rejects_the_real_expanded_slide_size() {
     let (attached, _, _) = attach_and_publish(&source, NEW_SVG);
     let attached_slide_len = slide_member(&attached).len();
     assert!(attached_slide_len > slide_member(&source).len());
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_part_bytes(u64::try_from(attached_slide_len - 1).unwrap())
         .unwrap()
         .build()

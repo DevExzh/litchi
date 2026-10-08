@@ -135,7 +135,7 @@ pub struct SourceBackedSvgAttachmentSnapshot {
     default_part_uri: PackURI,
     existing_relationship_ids: Arc<[String]>,
     physical_member_names: Arc<[String]>,
-    limits: litchi_opc::ReadLimits,
+    limits: litchi_opc::SourceLimits,
 }
 
 /// One-shot source-backed attach/detach edit.
@@ -571,7 +571,7 @@ fn same_attachment(
     }
 }
 
-fn validate_svg_payload(limits: &litchi_opc::ReadLimits, bytes: usize) -> Result<()> {
+fn validate_svg_payload(limits: &litchi_opc::SourceLimits, bytes: usize) -> Result<()> {
     if bytes == 0 {
         return Err(Error::Invalid("SVG payload cannot be empty".into()));
     }
@@ -926,7 +926,7 @@ fn rewrite_picture_svg(
     slide_xml: &[u8],
     layout: &PictureLayout,
     attachment: Option<&str>,
-    limits: &litchi_opc::ReadLimits,
+    limits: &litchi_opc::SourceLimits,
 ) -> Result<Vec<u8>> {
     // Keep an unprefixed DrawingML owner unprefixed. A synthetic `a:` name
     // would require an inherited declaration that the source may not have;
@@ -1114,7 +1114,7 @@ fn generated_ext_list_len(drawing_prefix: &[u8], ext_len: usize) -> Result<usize
         .ok_or_else(|| Error::Invalid("generated extLst size overflows".into()))
 }
 
-fn check_slide_output_len(output_len: usize, limits: &litchi_opc::ReadLimits) -> Result<()> {
+fn check_slide_output_len(output_len: usize, limits: &litchi_opc::SourceLimits) -> Result<()> {
     if output_len as u64 > limits.max_part_bytes() {
         return Err(Error::Limit {
             resource: "SVG lifecycle slide XML bytes",
@@ -1344,7 +1344,7 @@ fn ext_list_contains_only_svg(xml: &[u8], ext_list: &ElementRange, svg: ByteRang
 fn splice_checked(
     source: &[u8],
     mut replacements: Vec<(ByteRange, Vec<u8>)>,
-    limits: &litchi_opc::ReadLimits,
+    limits: &litchi_opc::SourceLimits,
 ) -> Result<Vec<u8>> {
     replacements.sort_unstable_by_key(|(range, _)| range.start);
     let mut output_len = source.len();

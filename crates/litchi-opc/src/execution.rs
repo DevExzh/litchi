@@ -5,7 +5,7 @@
 //! session. It is intentionally separate from ordinary [`crate::OpcPackage`]
 //! constructors: those constructors remain synchronous and serial.
 
-use crate::{OpcError, OpcPackage, ReadLimits, Result};
+use crate::{OpcError, OpcPackage, Result, SourceLimits};
 use litchi_core::{
     AffinityPolicy, ExecutionContext, ExecutionError, Reservation, Resource, ScopedWorkers,
 };
@@ -98,7 +98,7 @@ impl OpenSession {
     ///
     /// Returns a typed OPC, execution, or local-session error when opening
     /// cannot complete. Cancellation discards the incomplete package.
-    pub fn from_bytes(&self, data: &[u8], limits: ReadLimits) -> Result<OpcPackage> {
+    pub fn from_bytes(&self, data: &[u8], limits: SourceLimits) -> Result<OpcPackage> {
         OpcPackage::from_bytes_with_open_session(data, limits, self)
     }
 
@@ -111,7 +111,7 @@ impl OpenSession {
     ///
     /// Returns a typed OPC, execution, or local-session error when opening
     /// cannot complete. Cancellation discards the incomplete package.
-    pub fn from_vec(&self, data: Vec<u8>, limits: ReadLimits) -> Result<OpcPackage> {
+    pub fn from_vec(&self, data: Vec<u8>, limits: SourceLimits) -> Result<OpcPackage> {
         OpcPackage::from_vec_with_open_session(data, limits, self)
     }
 
@@ -504,7 +504,7 @@ mod tests {
     fn explicit_opens_match_serial_parts_deterministically() {
         let bytes = archive();
         let expected = package_parts(&OpcPackage::from_bytes(&bytes).unwrap());
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_input_bytes(bytes.len() as u64)
             .unwrap()
             .build()
@@ -542,7 +542,7 @@ mod tests {
         let (_source, context) = execution_context(16 * MIB);
         let session = OpenSession::new(context).unwrap();
         let package =
-            OpcPackage::from_vec_with_execution(bytes.clone(), ReadLimits::default(), &session)
+            OpcPackage::from_vec_with_execution(bytes.clone(), SourceLimits::default(), &session)
                 .unwrap();
 
         assert_eq!(PackageWriter::to_bytes(&package).unwrap(), bytes);
@@ -556,7 +556,7 @@ mod tests {
         source.cancel();
 
         assert!(matches!(
-            session.from_bytes(&bytes, ReadLimits::default()),
+            session.from_bytes(&bytes, SourceLimits::default()),
             Err(OpcError::Cancelled)
         ));
     }
@@ -568,7 +568,7 @@ mod tests {
         let session = OpenSession::new(context).unwrap();
 
         assert!(matches!(
-            session.from_bytes(&bytes, ReadLimits::default()),
+            session.from_bytes(&bytes, SourceLimits::default()),
             Err(OpcError::Execution(ExecutionError::ResourceLimit(limit)))
                 if limit.resource == Resource::Memory
         ));
@@ -742,7 +742,7 @@ mod tests {
         let bytes = archive();
         let (_source, context) = execution_context(16 * MIB);
         let session = OpenSession::new(context).unwrap();
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_input_bytes(3)
             .unwrap()
             .build()
@@ -764,7 +764,7 @@ mod tests {
         let session = OpenSession::new(context).unwrap();
 
         assert!(matches!(
-            session.from_vec(b"not an OPC ZIP".to_vec(), ReadLimits::default()),
+            session.from_vec(b"not an OPC ZIP".to_vec(), SourceLimits::default()),
             Err(OpcError::ZipError(_))
         ));
         assert_eq!(session.context().budget().used(Resource::InputBytes), 0);
@@ -774,7 +774,7 @@ mod tests {
     fn explicit_owned_open_rejects_input_limit_before_zip_and_input_charge() {
         let (_source, context) = execution_context(16 * MIB);
         let session = OpenSession::new(context).unwrap();
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_input_bytes(3)
             .unwrap()
             .build()

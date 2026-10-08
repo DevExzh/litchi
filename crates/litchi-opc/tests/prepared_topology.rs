@@ -226,7 +226,7 @@ fn open(source: Arc<VersionedSource>) -> SourceBackedPackage {
 
 fn open_with_limits(
     source: Arc<VersionedSource>,
-    limits: litchi_opc::ReadLimits,
+    limits: litchi_opc::SourceLimits,
 ) -> litchi_opc::Result<SourceBackedPackage> {
     SourceBackedPackage::from_read_at_with_limits(source, limits)
 }
@@ -307,7 +307,7 @@ fn relationship_limits(
     member_limit: usize,
     total_limit: usize,
     event_limit: usize,
-) -> litchi_opc::ReadLimits {
+) -> litchi_opc::SourceLimits {
     let package_relationships = zip_member(source, PACKAGE_REL_MEMBER);
     let expected_relationships = zip_member(expected, DOCUMENT_REL_MEMBER);
     assert_eq!(expected_relationships.len(), member_limit);
@@ -320,7 +320,7 @@ fn relationship_limits(
             + relationship_event_count(&expected_relationships),
         event_limit
     );
-    litchi_opc::ReadLimits::builder()
+    litchi_opc::SourceLimits::builder()
         .max_relationship_xml_bytes(member_limit)
         .unwrap()
         .max_total_relationship_xml_bytes(total_limit)
@@ -359,7 +359,7 @@ fn remove_noncanonical_plan() -> SourceTopologyPlan {
 
 fn publish_relationship_plan(
     source: &[u8],
-    limits: litchi_opc::ReadLimits,
+    limits: litchi_opc::SourceLimits,
     plan: SourceTopologyPlan,
 ) -> litchi_opc::Result<Vec<u8>> {
     let package = open_with_limits(Arc::new(VersionedSource::new(source.to_vec())), limits)?;
@@ -375,7 +375,7 @@ fn publish_relationship_plan(
 
 fn assert_relationship_limit_boundaries(source: &[u8], plan: fn() -> SourceTopologyPlan) {
     let expected =
-        publish_relationship_plan(source, litchi_opc::ReadLimits::default(), plan()).unwrap();
+        publish_relationship_plan(source, litchi_opc::SourceLimits::default(), plan()).unwrap();
     let expected_member = zip_member(&expected, DOCUMENT_REL_MEMBER);
     let package_relationships = zip_member(source, PACKAGE_REL_MEMBER);
     let exact_member = expected_member.len();
@@ -394,7 +394,7 @@ fn assert_relationship_limit_boundaries(source: &[u8], plan: fn() -> SourceTopol
     let cases = [
         (
             "per-member bytes",
-            litchi_opc::ReadLimits::builder()
+            litchi_opc::SourceLimits::builder()
                 .max_relationship_xml_bytes(exact_member - 1)
                 .unwrap()
                 .max_total_relationship_xml_bytes(exact_total)
@@ -407,7 +407,7 @@ fn assert_relationship_limit_boundaries(source: &[u8], plan: fn() -> SourceTopol
         ),
         (
             "aggregate relationship bytes",
-            litchi_opc::ReadLimits::builder()
+            litchi_opc::SourceLimits::builder()
                 .max_relationship_xml_bytes(exact_member)
                 .unwrap()
                 .max_total_relationship_xml_bytes(exact_total - 1)
@@ -420,7 +420,7 @@ fn assert_relationship_limit_boundaries(source: &[u8], plan: fn() -> SourceTopol
         ),
         (
             "aggregate relationship events",
-            litchi_opc::ReadLimits::builder()
+            litchi_opc::SourceLimits::builder()
                 .max_relationship_xml_bytes(exact_member)
                 .unwrap()
                 .max_total_relationship_xml_bytes(exact_total)
@@ -458,7 +458,7 @@ fn assert_relationship_removal_subtracts_source_usage(
     let source_total_limit = package_relationships.len() + document_relationships.len();
     let source_event_limit = relationship_event_count(&package_relationships)
         + relationship_event_count(&document_relationships);
-    let exact_limits = litchi_opc::ReadLimits::builder()
+    let exact_limits = litchi_opc::SourceLimits::builder()
         .max_relationship_xml_bytes(source_member_limit)
         .unwrap()
         .max_total_relationship_xml_bytes(source_total_limit)
@@ -478,7 +478,7 @@ fn assert_relationship_removal_subtracts_source_usage(
     // One-under caps are rejected at source admission, before a topology
     // candidate exists. This keeps the exact-cap success above distinct from
     // an ingress refusal caused by an actually-too-small source budget.
-    let under_member = litchi_opc::ReadLimits::builder()
+    let under_member = litchi_opc::SourceLimits::builder()
         .max_relationship_xml_bytes(source_member_limit - 1)
         .unwrap()
         .build()
@@ -498,7 +498,7 @@ fn assert_relationship_removal_subtracts_source_usage(
         }
     ));
 
-    let under_total = litchi_opc::ReadLimits::builder()
+    let under_total = litchi_opc::SourceLimits::builder()
         .max_total_relationship_xml_bytes(source_total_limit - 1)
         .unwrap()
         .build()
@@ -720,7 +720,7 @@ fn removed_part_is_absent_from_effective_content_type_lookup() {
 
 #[test]
 fn effective_relationship_graph_cap_rejects_one_new_internal_target_before_candidate() {
-    let limits = litchi_opc::ReadLimits::builder()
+    let limits = litchi_opc::SourceLimits::builder()
         .max_relationship_graph_nodes(2)
         .unwrap()
         .build()
@@ -752,7 +752,7 @@ fn effective_relationship_graph_cap_rejects_one_new_internal_target_before_candi
 #[test]
 fn shrinking_effective_candidate_is_accepted_at_exact_source_caps() {
     let source = source_bytes();
-    let limits = litchi_opc::ReadLimits::builder()
+    let limits = litchi_opc::SourceLimits::builder()
         .max_parts(2)
         .unwrap()
         .max_total_part_bytes((b"<before/>".len() + b"<untouched source='yes'/>".len()) as u64)
@@ -810,7 +810,7 @@ fn shrinking_effective_candidate_is_accepted_at_exact_source_caps() {
 fn content_types_byte_cap_refuses_new_mapping_before_candidate() {
     let source = source_bytes();
     let content_types_bytes = zip_member(&source, "[Content_Types].xml");
-    let limits = litchi_opc::ReadLimits::builder()
+    let limits = litchi_opc::SourceLimits::builder()
         .max_content_types_bytes(content_types_bytes.len())
         .unwrap()
         .build()
@@ -874,7 +874,7 @@ fn archive_uncompressed_total(bytes: &[u8]) -> u64 {
 #[test]
 fn combined_content_types_and_relationship_growth_obeys_exact_archive_total_cap() {
     let source = source_bytes();
-    let expected = publish_relationship_plan(&source, litchi_opc::ReadLimits::default(), {
+    let expected = publish_relationship_plan(&source, litchi_opc::SourceLimits::default(), {
         let mut plan = SourceTopologyPlan::new();
         plan.try_add_part(pack(ADDED), "application/example+xml", b"<added/>".to_vec())
             .unwrap();
@@ -905,7 +905,7 @@ fn combined_content_types_and_relationship_growth_obeys_exact_archive_total_cap(
         .unwrap();
         plan
     };
-    let exact_limits = litchi_opc::ReadLimits::builder()
+    let exact_limits = litchi_opc::SourceLimits::builder()
         .max_archive_total_bytes(exact_total)
         .unwrap()
         .build()
@@ -913,7 +913,7 @@ fn combined_content_types_and_relationship_growth_obeys_exact_archive_total_cap(
     let exact_output = publish_relationship_plan(&source, exact_limits, make_plan()).unwrap();
     assert_eq!(archive_uncompressed_total(&exact_output), exact_total);
 
-    let under_limits = litchi_opc::ReadLimits::builder()
+    let under_limits = litchi_opc::SourceLimits::builder()
         .max_archive_total_bytes(exact_total - 1)
         .unwrap()
         .build()
@@ -1168,7 +1168,7 @@ fn managed_borrowed_candidate_keeps_prepared_payload_reserved_during_callback() 
     let (budget, _cancellation_source, context) = managed_context();
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(source_bytes())),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -1205,7 +1205,7 @@ fn large_unchanged_part_stays_cold_and_publishes_under_smaller_managed_memory_ca
     let source_for_package: Arc<dyn ReadAt> = source_handle.clone();
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         source_for_package,
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -1258,7 +1258,7 @@ fn large_unchanged_part_stays_cold_and_publishes_under_smaller_managed_memory_ca
     let large_read_source: Arc<dyn ReadAt> = source_handle.clone();
     let large_read_package = SourceBackedPackage::from_read_at_with_execution_context(
         large_read_source,
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         large_read_context,
     )
     .unwrap();
@@ -1284,7 +1284,7 @@ fn large_unchanged_part_stays_cold_and_publishes_under_smaller_managed_memory_ca
     let publication_source: Arc<dyn ReadAt> = source_handle.clone();
     let publication_package = SourceBackedPackage::from_read_at_with_execution_context(
         publication_source,
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         publication_context,
     )
     .unwrap();
@@ -1307,7 +1307,7 @@ fn managed_low_memory_refuses_preparation_before_candidate() {
         managed_context_with_resources(64 * 1024, u64::MAX, u64::MAX, u64::MAX, u64::MAX);
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(whitespace_rich_relationship_source())),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -1332,7 +1332,7 @@ fn managed_low_input_limit_refuses_source_open() {
         managed_context_with_resources(16 * 1024 * 1024, 1, u64::MAX, u64::MAX, u64::MAX);
     let result = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(source_bytes())),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         context,
     );
     assert!(matches!(
@@ -1348,7 +1348,7 @@ fn managed_low_work_limit_refuses_candidate_before_callback() {
         managed_context_with_resources(16 * 1024 * 1024, u64::MAX, u64::MAX, u64::MAX, 1);
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(source_bytes())),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -1378,7 +1378,7 @@ fn managed_low_output_limit_reports_sink_accounting() {
     );
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(source_bytes())),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -1521,7 +1521,7 @@ fn managed_prepared_candidate_reads_and_publishes_with_reservations_attached() {
     let source_handle = Arc::new(VersionedSource::new(source));
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         source_handle,
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -1549,7 +1549,7 @@ fn prepared_source_xml_token_keeps_managed_reservation_until_publication_drop() 
     let source_handle = Arc::new(VersionedSource::new(source_bytes()));
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         source_handle,
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -1605,7 +1605,7 @@ fn prepared_precompressed_token_keeps_managed_reservation_until_publication_drop
     let source_handle = Arc::new(VersionedSource::new(source_bytes()));
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         source_handle,
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -1734,7 +1734,7 @@ fn retained_prepared_reservations_release_after_the_last_share() {
     let (budget, _cancellation, context) = managed_context();
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(source_bytes())),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -1842,7 +1842,7 @@ fn owned_effective_views_are_lazy_and_outlive_an_unchanged_candidate() {
         b"<before/>".len() as u64
     );
     assert!(candidate.is_noop());
-    assert_eq!(candidate.read_limits(), litchi_opc::ReadLimits::default());
+    assert_eq!(candidate.read_limits(), litchi_opc::SourceLimits::default());
     assert!(candidate.execution_context().is_none());
     assert_eq!(
         source.read_count(),
@@ -1977,7 +1977,7 @@ fn owned_payloads_pin_reservations_and_new_reads_recheck_source_and_cancellation
     let source = Arc::new(VersionedSource::new(source_bytes()));
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         source.clone(),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -2011,7 +2011,7 @@ fn owned_payloads_pin_reservations_and_new_reads_recheck_source_and_cancellation
     let (budget, cancel, context) = managed_context();
     let package = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(source_bytes())),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -2128,7 +2128,7 @@ fn materialization_refuses_managed_candidates_before_cold_reads() {
         let (_budget, cancel, context) = managed_context();
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source.clone(),
-            litchi_opc::ReadLimits::default(),
+            litchi_opc::SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -2206,7 +2206,7 @@ fn materialization_refuses_managed_donor_on_unmanaged_base() {
         let (_budget, cancel, context) = managed_context();
         let donor = SourceBackedPackage::from_read_at_with_execution_context(
             donor_source.clone(),
-            litchi_opc::ReadLimits::default(),
+            litchi_opc::SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -2296,7 +2296,7 @@ fn full_xml_replacement_rejects_invalid_documents_and_releases_managed_output() 
     let (budget, cancel, context) = managed_context();
     let physical = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(source_bytes())),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -2380,7 +2380,7 @@ fn full_document_byte_replacements_preserve_producer_namespaces_and_chain() {
     let (_budget, _cancel, context) = managed_context();
     let managed = SourceBackedPackage::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(source_bytes())),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         context,
     )
     .unwrap()

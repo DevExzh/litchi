@@ -16,7 +16,7 @@ use std::path::Path;
 
 use litchi_ooxml_common::custom::Host;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, ReadLimits, TargetMode};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, SourceLimits, TargetMode};
 
 use crate::Workbook;
 use crate::custom::Props;
@@ -42,12 +42,12 @@ impl Package {
 
     /// Open and validate an XLSX package from a filesystem path.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::open_with_limits(path, ReadLimits::default())
+        Self::open_with_limits(path, SourceLimits::default())
     }
 
     /// Open and validate an XLSX package from a filesystem path with explicit
     /// OPC resource limits.
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
+    pub fn open_with_limits(path: impl AsRef<Path>, limits: SourceLimits) -> Result<Self> {
         Self::from_opc(OpcPackage::open_with_limits(path, limits)?)
     }
 
@@ -59,7 +59,7 @@ impl Package {
             path,
             password,
             &crate::encryption::Limits::default(),
-            ReadLimits::default(),
+            SourceLimits::default(),
         )
     }
 
@@ -70,7 +70,7 @@ impl Package {
         path: impl AsRef<Path>,
         password: &str,
         encryption_limits: &crate::encryption::Limits,
-        opc_limits: ReadLimits,
+        opc_limits: SourceLimits,
     ) -> Result<Self> {
         let file = std::fs::File::open(path).map_err(crate::encryption::Error::Io)?;
         let opened = crate::encryption::load_with(file, password, encryption_limits)?;
@@ -79,12 +79,12 @@ impl Package {
 
     /// Read and validate an XLSX package from owned bytes.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, ReadLimits::default())
+        Self::from_bytes_with_limits(bytes, SourceLimits::default())
     }
 
     /// Read and validate an XLSX package from owned bytes with explicit OPC
     /// resource limits.
-    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: ReadLimits) -> Result<Self> {
+    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: SourceLimits) -> Result<Self> {
         Self::from_opc(OpcPackage::from_vec_with_limits(bytes, limits)?)
     }
 
@@ -96,7 +96,7 @@ impl Package {
             bytes,
             password,
             &crate::encryption::Limits::default(),
-            ReadLimits::default(),
+            SourceLimits::default(),
         )
     }
 
@@ -107,7 +107,7 @@ impl Package {
         bytes: Vec<u8>,
         password: &str,
         encryption_limits: &crate::encryption::Limits,
-        opc_limits: ReadLimits,
+        opc_limits: SourceLimits,
     ) -> Result<Self> {
         let opened = crate::encryption::open_with(bytes, password, encryption_limits)?;
         Self::from_opened_with_limits(opened, opc_limits)
@@ -115,12 +115,12 @@ impl Package {
 
     /// Read and validate an XLSX package from a borrowed byte slice.
     pub fn from_slice(bytes: &[u8]) -> Result<Self> {
-        Self::from_slice_with_limits(bytes, ReadLimits::default())
+        Self::from_slice_with_limits(bytes, SourceLimits::default())
     }
 
     /// Read and validate an XLSX package from a borrowed byte slice with
     /// explicit OPC resource limits.
-    pub fn from_slice_with_limits(bytes: &[u8], limits: ReadLimits) -> Result<Self> {
+    pub fn from_slice_with_limits(bytes: &[u8], limits: SourceLimits) -> Result<Self> {
         Self::from_opc(OpcPackage::from_bytes_with_limits(bytes, limits)?)
     }
 
@@ -132,7 +132,7 @@ impl Package {
             bytes,
             password,
             &crate::encryption::Limits::default(),
-            ReadLimits::default(),
+            SourceLimits::default(),
         )
     }
 
@@ -143,7 +143,7 @@ impl Package {
         bytes: &[u8],
         password: &str,
         encryption_limits: &crate::encryption::Limits,
-        opc_limits: ReadLimits,
+        opc_limits: SourceLimits,
     ) -> Result<Self> {
         let opened = crate::encryption::load_with(bytes, password, encryption_limits)?;
         Self::from_opened_with_limits(opened, opc_limits)
@@ -151,12 +151,12 @@ impl Package {
 
     /// Read and validate an XLSX package from a synchronous reader.
     pub fn from_reader(reader: impl Read) -> Result<Self> {
-        Self::from_reader_with_limits(reader, ReadLimits::default())
+        Self::from_reader_with_limits(reader, SourceLimits::default())
     }
 
     /// Read and validate an XLSX package from a synchronous reader with
     /// explicit OPC resource limits.
-    pub fn from_reader_with_limits(reader: impl Read, limits: ReadLimits) -> Result<Self> {
+    pub fn from_reader_with_limits(reader: impl Read, limits: SourceLimits) -> Result<Self> {
         Self::from_opc(OpcPackage::from_reader_with_limits(reader, limits)?)
     }
 
@@ -168,7 +168,7 @@ impl Package {
             reader,
             password,
             &crate::encryption::Limits::default(),
-            ReadLimits::default(),
+            SourceLimits::default(),
         )
     }
 
@@ -179,7 +179,7 @@ impl Package {
         reader: impl Read,
         password: &str,
         encryption_limits: &crate::encryption::Limits,
-        opc_limits: ReadLimits,
+        opc_limits: SourceLimits,
     ) -> Result<Self> {
         let opened = crate::encryption::load_with(reader, password, encryption_limits)?;
         Self::from_opened_with_limits(opened, opc_limits)
@@ -219,7 +219,7 @@ impl Package {
     #[cfg(feature = "encryption")]
     pub fn from_decrypted(
         opened: crate::encryption::Opened,
-        opc_limits: ReadLimits,
+        opc_limits: SourceLimits,
     ) -> Result<Self> {
         Self::from_opened_with_limits(opened, opc_limits)
     }
@@ -287,7 +287,7 @@ impl Package {
     #[cfg(feature = "encryption")]
     fn from_opened_with_limits(
         opened: crate::encryption::Opened,
-        opc_limits: ReadLimits,
+        opc_limits: SourceLimits,
     ) -> Result<Self> {
         let provenance = opened
             .mode()

@@ -21,7 +21,7 @@ use litchi_xlsx::pivot::{
     edit_pivot_table_data, edit_pivot_table_data_with_limits, load_pivot_table_data,
     load_pivot_table_data_with_limits,
 };
-use litchi_xlsx::{Error, ReadLimits, Workbook};
+use litchi_xlsx::{Error, SourceLimits, Workbook};
 
 const TRANSITIONAL_MAIN: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_MAIN: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -2108,7 +2108,7 @@ fn utf16_text_limit_counts_code_units_and_rejects_over_limit_source() {
         data_payload: default_data_payload_with(&("😀".repeat(32_767) + "a")),
         ..FixtureOptions::default()
     });
-    let generous_limits = ReadLimits::builder()
+    let generous_limits = SourceLimits::builder()
         .max_xml_attribute_bytes(256 * 1024)
         .unwrap()
         .build()
@@ -2149,7 +2149,7 @@ fn utf16_text_limit_counts_code_units_and_rejects_over_limit_source() {
 #[test]
 fn borrowed_workbook_limit_constructor_accepts_valid_source_and_enforces_event_budget() {
     let fixture = Fixture::build(FixtureOptions::default());
-    let generous = ReadLimits::builder()
+    let generous = SourceLimits::builder()
         .max_xml_attribute_bytes(256 * 1024)
         .unwrap()
         .build()
@@ -2167,7 +2167,7 @@ fn borrowed_workbook_limit_constructor_accepts_valid_source_and_enforces_event_b
         "alpha"
     );
 
-    let event_limits = ReadLimits::builder()
+    let event_limits = SourceLimits::builder()
         .max_xml_events(8)
         .unwrap()
         .build()
@@ -2181,7 +2181,7 @@ fn borrowed_low_level_scalar_setters_preflight_utf16_and_preserve_source() {
         table_exts: r#"<x15:opaqueData keep="yes"><x15:unknown/></x15:opaqueData>"#.to_owned(),
         ..FixtureOptions::default()
     });
-    let generous = ReadLimits::builder()
+    let generous = SourceLimits::builder()
         .max_xml_attribute_bytes(256 * 1024)
         .unwrap()
         .build()
@@ -2239,7 +2239,7 @@ fn borrowed_workbook_scalar_setters_preflight_limits_are_atomic_and_preserve_sou
         table_exts: r#"<x15:opaqueData keep="yes"><x15:unknown/></x15:opaqueData>"#.to_owned(),
         ..FixtureOptions::default()
     });
-    let attribute_limited = ReadLimits::builder()
+    let attribute_limited = SourceLimits::builder()
         .max_xml_attribute_bytes(4_096)
         .unwrap()
         .build()
@@ -2263,7 +2263,7 @@ fn borrowed_workbook_scalar_setters_preflight_limits_are_atomic_and_preserve_sou
     assert!(table.contains(r#"opaqueData keep="yes""#));
     assert!(table.contains(r#"in="+0""#));
 
-    let part_limited = ReadLimits::builder()
+    let part_limited = SourceLimits::builder()
         .max_part_bytes(fixture.table_xml.len() as u64)
         .unwrap()
         .build()
@@ -2358,7 +2358,7 @@ fn retained_byte_limit_has_exact_and_one_under_boundaries_and_failure_is_atomic(
 #[test]
 fn exact_wire_part_cap_does_not_become_semantic_retained_cap() {
     let fixture = Fixture::build(FixtureOptions::default());
-    let wire_limits = ReadLimits::builder()
+    let wire_limits = SourceLimits::builder()
         .max_part_bytes(fixture.table_xml.len() as u64)
         .unwrap()
         .build()
@@ -2384,7 +2384,8 @@ fn exact_wire_part_cap_does_not_become_semantic_retained_cap() {
 #[test]
 fn borrowed_workbook_limits_noop_preserves_source_and_snapshot_clone_is_observable() {
     let fixture = Fixture::build(FixtureOptions::default());
-    let workbook = Workbook::from_slice_with_limits(&fixture.bytes, ReadLimits::default()).unwrap();
+    let workbook =
+        Workbook::from_slice_with_limits(&fixture.bytes, SourceLimits::default()).unwrap();
     let limits = PivotTableDataLimits::new();
     let before = workbook.to_bytes().unwrap();
     let mut edit = workbook
@@ -2670,14 +2671,14 @@ fn low_level_package_ingress_refuses_an_encrypted_pivot_table_entry() {
 #[test]
 fn caller_limits_reject_source_and_candidate_before_publication() {
     let fixture = Fixture::build(FixtureOptions::default());
-    let event_limits = ReadLimits::builder()
+    let event_limits = SourceLimits::builder()
         .max_xml_events(8)
         .unwrap()
         .build()
         .unwrap();
     assert!(Workbook::from_bytes_with_limits(fixture.bytes.clone(), event_limits).is_err());
 
-    let attribute_limits = ReadLimits::builder()
+    let attribute_limits = SourceLimits::builder()
         .max_xml_attribute_bytes(8)
         .unwrap()
         .max_relationship_target_bytes(8)
@@ -2686,7 +2687,7 @@ fn caller_limits_reject_source_and_candidate_before_publication() {
         .unwrap();
     assert!(Workbook::from_bytes_with_limits(fixture.bytes.clone(), attribute_limits).is_err());
 
-    let part_limits = ReadLimits::builder()
+    let part_limits = SourceLimits::builder()
         .max_part_bytes(fixture.table_xml.len() as u64)
         .unwrap()
         .build()

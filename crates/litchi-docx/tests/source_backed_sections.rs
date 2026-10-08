@@ -136,7 +136,7 @@ fn managed_document_fixture_with_memory(
     .unwrap();
     let package = source_backed::Package::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(bytes)),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         ExecutionContext::new(budget.clone(), cancellation, execution_limits),
     )
     .unwrap();

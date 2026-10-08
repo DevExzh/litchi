@@ -20,7 +20,7 @@ use std::{
 };
 
 use litchi_core::{Budget, FileSource, OwnedSource, ReadAt, Resource};
-use litchi_opc::{ReadLimits, SourceCacheLimits};
+use litchi_opc::{SourceCacheLimits, SourceLimits};
 use serde::Serialize;
 
 use crate::{pptx_cache_retention, pptx_range_source};
@@ -780,7 +780,7 @@ fn run_lifecycle_iteration(
     let source_view =
         litchi_pptx::SourceBackedPresentation::from_read_at_with_limits_and_cache_limits_and_execution_context(
             source_read,
-            ReadLimits::default(),
+            SourceLimits::default(),
             cache_limits,
             source_context.context.clone(),
         )?;
@@ -792,7 +792,7 @@ fn run_lifecycle_iteration(
     let editor =
         litchi_pptx::SourceBackedPresentationEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
             destination_read,
-            ReadLimits::default(),
+            SourceLimits::default(),
             cache_limits,
             destination_context.context.clone(),
         )?;

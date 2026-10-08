@@ -178,7 +178,7 @@ mod docx {
         let bytes = minimal_docx(
             br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>bounded</w:t></w:r></w:p></w:body></w:document>"#,
         );
-        let limits = litchi_opc::ReadLimits::builder()
+        let limits = litchi_opc::SourceLimits::builder()
             .max_input_bytes(1)
             .unwrap()
             .build()
@@ -384,7 +384,7 @@ mod docx {
             litchi_core::ExecutionContext::new(budget.clone(), cancellation, execution_limits);
         let package = litchi_docx::source_backed::Package::from_read_at_with_execution_context(
             std::sync::Arc::new(litchi_core::OwnedSource::new(bytes)),
-            litchi_docx::ReadLimits::default(),
+            litchi_docx::SourceLimits::default(),
             context,
         )
         .expect("open managed DOCX source");
@@ -536,7 +536,7 @@ mod docx {
         ));
 
         let oversized = super::super::temporary_with(&[b'x'; 4096], ".docx");
-        let limits = litchi_opc::ReadLimits::builder()
+        let limits = litchi_opc::SourceLimits::builder()
             .max_input_bytes(1)
             .unwrap()
             .build()
@@ -588,7 +588,7 @@ mod docx {
             .write_all(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#)
             .unwrap();
         let parts = super::super::temporary_with(&writer.finish().unwrap().into_inner(), ".docx");
-        let limits = litchi_opc::ReadLimits::builder()
+        let limits = litchi_opc::SourceLimits::builder()
             .max_parts(1)
             .unwrap()
             .build()
@@ -671,7 +671,7 @@ mod docx {
     #[test]
     fn extensionless_non_ooxml_path_uses_the_neutral_fallback_ceiling() {
         let temporary = super::super::temporary_with(&[b'x'; 4096], "");
-        let limits = litchi_opc::ReadLimits::builder()
+        let limits = litchi_opc::SourceLimits::builder()
             .max_input_bytes(1)
             .unwrap()
             .build()
@@ -734,7 +734,7 @@ mod docx {
     #[cfg(feature = "odt")]
     #[test]
     fn owned_odt_bytes_do_not_use_docx_limits() {
-        let limits = litchi_opc::ReadLimits::builder()
+        let limits = litchi_opc::SourceLimits::builder()
             .max_input_bytes(1)
             .unwrap()
             .build()
@@ -795,7 +795,7 @@ mod docx {
     #[test]
     fn filesystem_odt_does_not_use_docx_limits() {
         let temporary = super::super::temporary_with(&odt::minimal_odt(), ".odt");
-        let limits = litchi_opc::ReadLimits::builder()
+        let limits = litchi_opc::SourceLimits::builder()
             .max_input_bytes(1)
             .unwrap()
             .build()

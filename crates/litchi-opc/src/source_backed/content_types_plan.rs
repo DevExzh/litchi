@@ -14,7 +14,7 @@ use super::{
 use crate::constants::namespace;
 use crate::content_type::{ContentType, ContentTypeMap, validate_content_type};
 use crate::error::{OpcError, Result};
-use crate::limits::{ReadLimits, ReadResource};
+use crate::limits::{ReadResource, SourceLimits};
 use crate::packuri::PackURI;
 use crate::xml_attributes::BytesStartExt as _;
 use litchi_core::xml::ReaderOrigin;
@@ -67,7 +67,7 @@ impl<'source> ContentTypesPlan<'source> {
         additions: Vec<ContentTypeOverride>,
         removals: &[PackURI],
         default_removals: Vec<String>,
-        limits: ReadLimits,
+        limits: SourceLimits,
     ) -> Result<Self> {
         Self::plan_with_defaults_owned(
             source,
@@ -80,7 +80,7 @@ impl<'source> ContentTypesPlan<'source> {
         )
     }
 
-    pub(crate) fn materialize_public(self, limits: ReadLimits) -> Result<Vec<u8>> {
+    pub(crate) fn materialize_public(self, limits: SourceLimits) -> Result<Vec<u8>> {
         self.materialize(limits, None, None).map(|(bytes, _)| bytes)
     }
 
@@ -95,7 +95,7 @@ impl<'source> ContentTypesPlan<'source> {
         source: &'source [u8],
         additions: &[ContentTypeOverride],
         removals: &[PackURI],
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: Option<&ExecutionContext>,
         reservation_failures: Option<&DiagnosticCounter>,
     ) -> Result<Self> {
@@ -118,7 +118,7 @@ impl<'source> ContentTypesPlan<'source> {
         source: &'source [u8],
         additions: Vec<ContentTypeOverride>,
         removals: &[PackURI],
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: Option<&ExecutionContext>,
         reservation_failures: Option<&DiagnosticCounter>,
     ) -> Result<Self> {
@@ -142,7 +142,7 @@ impl<'source> ContentTypesPlan<'source> {
         additions: &[ContentTypeOverride],
         removals: &[PackURI],
         default_removals: &[String],
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: Option<&ExecutionContext>,
         reservation_failures: Option<&DiagnosticCounter>,
     ) -> Result<Self> {
@@ -172,7 +172,7 @@ impl<'source> ContentTypesPlan<'source> {
         additions: Vec<ContentTypeOverride>,
         removals: &[PackURI],
         default_removals: Vec<String>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: Option<&ExecutionContext>,
         reservation_failures: Option<&DiagnosticCounter>,
     ) -> Result<Self> {
@@ -626,7 +626,7 @@ impl<'source> ContentTypesPlan<'source> {
     /// typed readback map, including decoded strings and hash tables.
     pub(super) fn materialize(
         self,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: Option<&ExecutionContext>,
         reservation_failures: Option<&DiagnosticCounter>,
     ) -> Result<(Vec<u8>, Option<Arc<Reservation>>)> {
@@ -899,7 +899,7 @@ fn is_xml_name_delimiter(byte: u8) -> bool {
     matches!(byte, b' ' | b'\t' | b'\r' | b'\n' | b'/' | b'>')
 }
 
-fn checked_mapping_count(current: usize, limits: ReadLimits) -> Result<usize> {
+fn checked_mapping_count(current: usize, limits: SourceLimits) -> Result<usize> {
     let next = current.checked_add(1).ok_or(OpcError::ReadLimit {
         resource: ReadResource::ContentTypeMappings,
         actual: u64::MAX,
@@ -913,7 +913,7 @@ fn checked_mapping_count(current: usize, limits: ReadLimits) -> Result<usize> {
     Ok(next)
 }
 
-fn next_depth(depth: usize, limits: ReadLimits) -> Result<usize> {
+fn next_depth(depth: usize, limits: SourceLimits) -> Result<usize> {
     let next = depth.checked_add(1).ok_or(OpcError::ReadLimit {
         resource: ReadResource::XmlDepth,
         actual: u64::MAX,
@@ -1095,7 +1095,7 @@ mod tests {
             SOURCE,
             &additions,
             &[removal],
-            ReadLimits::default(),
+            SourceLimits::default(),
             None,
             None,
         )
@@ -1109,7 +1109,9 @@ mod tests {
                 + expected_fragment.len()
         );
         assert_eq!(plan.mapping_count(), 2);
-        let (output, _) = plan.materialize(ReadLimits::default(), None, None).unwrap();
+        let (output, _) = plan
+            .materialize(SourceLimits::default(), None, None)
+            .unwrap();
         assert!(
             output
                 .windows(b"<!-- preserve -->".len())
@@ -1126,7 +1128,7 @@ mod tests {
                 .any(|window| { window == expected_fragment })
         );
         assert_eq!(
-            ContentTypeMap::from_xml(&output, ReadLimits::default())
+            ContentTypeMap::from_xml(&output, SourceLimits::default())
                 .unwrap()
                 .mapping_count(),
             2
@@ -1140,10 +1142,10 @@ mod tests {
             "application/octet-stream".to_string(),
         )];
         let first =
-            ContentTypesPlan::plan(SOURCE, &additions, &[], ReadLimits::default(), None, None)
+            ContentTypesPlan::plan(SOURCE, &additions, &[], SourceLimits::default(), None, None)
                 .unwrap();
         let final_len = first.final_len();
-        let exact = ReadLimits::builder()
+        let exact = SourceLimits::builder()
             .max_content_types_bytes(final_len)
             .unwrap()
             .max_archive_entry_bytes(final_len as u64)
@@ -1155,7 +1157,7 @@ mod tests {
         let (output, _) = exact_plan.materialize(exact, None, None).unwrap();
         assert_eq!(output.len(), final_len);
 
-        let below = ReadLimits::builder()
+        let below = SourceLimits::builder()
             .max_content_types_bytes(final_len - 1)
             .unwrap()
             .max_archive_entry_bytes((final_len - 1) as u64)
@@ -1174,7 +1176,7 @@ mod tests {
     #[test]
     fn plan_rejects_unknown_direct_children_instead_of_counting_them() {
         let source = br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Future/></Types>"#;
-        let error = ContentTypesPlan::plan(source, &[], &[], ReadLimits::default(), None, None)
+        let error = ContentTypesPlan::plan(source, &[], &[], SourceLimits::default(), None, None)
             .unwrap_err();
         assert!(matches!(error, OpcError::InvalidContentTypesManifest(_)));
     }
@@ -1188,15 +1190,17 @@ mod tests {
             "application/octet-stream".to_string(),
         )];
         let plan =
-            ContentTypesPlan::plan(source, &additions, &[], ReadLimits::default(), None, None)
+            ContentTypesPlan::plan(source, &additions, &[], SourceLimits::default(), None, None)
                 .unwrap();
-        let (output, _) = plan.materialize(ReadLimits::default(), None, None).unwrap();
+        let (output, _) = plan
+            .materialize(SourceLimits::default(), None, None)
+            .unwrap();
         assert_eq!(
             output,
             br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Override PartName="/word/new.bin" ContentType="application/octet-stream"/></Types>"#
         );
         assert_eq!(
-            ContentTypeMap::from_xml(&output, ReadLimits::default())
+            ContentTypeMap::from_xml(&output, SourceLimits::default())
                 .unwrap()
                 .mapping_count(),
             1
@@ -1208,9 +1212,11 @@ mod tests {
         let source =
             br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>"#;
         let plan =
-            ContentTypesPlan::plan(source, &[], &[], ReadLimits::default(), None, None).unwrap();
+            ContentTypesPlan::plan(source, &[], &[], SourceLimits::default(), None, None).unwrap();
         let final_len = plan.final_len();
-        let (output, _) = plan.materialize(ReadLimits::default(), None, None).unwrap();
+        let (output, _) = plan
+            .materialize(SourceLimits::default(), None, None)
+            .unwrap();
         assert_eq!(output, source);
         assert_eq!(final_len, source.len());
     }
@@ -1223,15 +1229,17 @@ mod tests {
             "application/octet-stream".to_string(),
         )];
         let plan =
-            ContentTypesPlan::plan(source, &additions, &[], ReadLimits::default(), None, None)
+            ContentTypesPlan::plan(source, &additions, &[], SourceLimits::default(), None, None)
                 .unwrap();
-        let (output, _) = plan.materialize(ReadLimits::default(), None, None).unwrap();
+        let (output, _) = plan
+            .materialize(SourceLimits::default(), None, None)
+            .unwrap();
         assert_eq!(
             output,
             br#"<ct:Types xmlns:ct="http://schemas.openxmlformats.org/package/2006/content-types"><!-- keep --><ct:Override PartName="/word/new.bin" ContentType="application/octet-stream"/></ct:Types>"#
         );
         assert_eq!(
-            ContentTypeMap::from_xml(&output, ReadLimits::default())
+            ContentTypeMap::from_xml(&output, SourceLimits::default())
                 .unwrap()
                 .mapping_count(),
             1
@@ -1247,15 +1255,17 @@ mod tests {
             "application/octet-stream".to_string(),
         )];
         let plan =
-            ContentTypesPlan::plan(source, &additions, &[], ReadLimits::default(), None, None)
+            ContentTypesPlan::plan(source, &additions, &[], SourceLimits::default(), None, None)
                 .unwrap();
-        let (output, _) = plan.materialize(ReadLimits::default(), None, None).unwrap();
+        let (output, _) = plan
+            .materialize(SourceLimits::default(), None, None)
+            .unwrap();
         assert_eq!(
             output,
             br#"<ct:Types xmlns:ct="http://schemas.openxmlformats.org/package/2006/content-types"><ct:Override PartName="/word/new.bin" ContentType="application/octet-stream"/></ct:Types>"#
         );
         assert_eq!(
-            ContentTypeMap::from_xml(&output, ReadLimits::default())
+            ContentTypeMap::from_xml(&output, SourceLimits::default())
                 .unwrap()
                 .mapping_count(),
             1

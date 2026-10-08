@@ -3,11 +3,11 @@
 use std::io::Cursor;
 
 use libfuzzer_sys::fuzz_target;
-use litchi_docx::ReadLimits;
+use litchi_docx::SourceLimits;
 use litchi_docx::source_backed::{Package, tail_append::Limits};
 
-fn read_limits() -> ReadLimits {
-    ReadLimits::builder()
+fn read_limits() -> SourceLimits {
+    SourceLimits::builder()
         .max_input_bytes(256 * 1024)
         .unwrap()
         .max_archive_members(32)

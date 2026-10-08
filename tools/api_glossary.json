@@ -69,6 +69,16 @@
           "name": "max",
           "scope": "litchi_docx::document::Error::Limit",
           "replacement": "use maximum"
+        },
+        {
+          "name": "ReadLimits",
+          "scope": "litchi_docx",
+          "replacement": "use SourceLimits"
+        },
+        {
+          "name": "ReadLimitsBuilder",
+          "scope": "litchi_docx",
+          "replacement": "use SourceLimitsBuilder"
         }
       ],
       "families": []
@@ -138,6 +148,185 @@
           "name": "max",
           "scope": "litchi_docx::document::Error::Limit",
           "replacement": "use maximum"
+        },
+        {
+          "name": "ReadLimits",
+          "scope": "litchi_docx",
+          "replacement": "use SourceLimits"
+        },
+        {
+          "name": "ReadLimitsBuilder",
+          "scope": "litchi_docx",
+          "replacement": "use SourceLimitsBuilder"
+        }
+      ],
+      "families": []
+    },
+    {
+      "id": "opc-minimal",
+      "package": "litchi-opc",
+      "default_features": false,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "ReadLimits",
+          "scope": "litchi_opc",
+          "replacement": "use SourceLimits"
+        },
+        {
+          "name": "ReadLimitsBuilder",
+          "scope": "litchi_opc",
+          "replacement": "use SourceLimitsBuilder"
+        }
+      ],
+      "families": []
+    },
+    {
+      "id": "opc-full",
+      "package": "litchi-opc",
+      "default_features": false,
+      "features": [
+        "sign",
+        "performance-diagnostics"
+      ],
+      "banned_names": [
+        {
+          "name": "ReadLimits",
+          "scope": "litchi_opc",
+          "replacement": "use SourceLimits"
+        },
+        {
+          "name": "ReadLimitsBuilder",
+          "scope": "litchi_opc",
+          "replacement": "use SourceLimitsBuilder"
+        }
+      ],
+      "families": []
+    },
+    {
+      "id": "pptx-minimal",
+      "package": "litchi-pptx",
+      "default_features": false,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "ReadLimits",
+          "scope": "litchi_pptx",
+          "replacement": "use SourceLimits"
+        },
+        {
+          "name": "ReadLimitsBuilder",
+          "scope": "litchi_pptx",
+          "replacement": "use SourceLimitsBuilder"
+        }
+      ],
+      "families": []
+    },
+    {
+      "id": "pptx-full",
+      "package": "litchi-pptx",
+      "default_features": false,
+      "features": [
+        "automatic-fonts",
+        "encryption",
+        "vba-inspection"
+      ],
+      "banned_names": [
+        {
+          "name": "ReadLimits",
+          "scope": "litchi_pptx",
+          "replacement": "use SourceLimits"
+        },
+        {
+          "name": "ReadLimitsBuilder",
+          "scope": "litchi_pptx",
+          "replacement": "use SourceLimitsBuilder"
+        }
+      ],
+      "families": []
+    },
+    {
+      "id": "xlsx-minimal",
+      "package": "litchi-xlsx",
+      "default_features": false,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "ReadLimits",
+          "scope": "litchi_xlsx",
+          "replacement": "use SourceLimits"
+        },
+        {
+          "name": "ReadLimitsBuilder",
+          "scope": "litchi_xlsx",
+          "replacement": "use SourceLimitsBuilder"
+        }
+      ],
+      "families": []
+    },
+    {
+      "id": "xlsx-full",
+      "package": "litchi-xlsx",
+      "default_features": false,
+      "features": [
+        "encryption",
+        "vba-inspection"
+      ],
+      "banned_names": [
+        {
+          "name": "ReadLimits",
+          "scope": "litchi_xlsx",
+          "replacement": "use SourceLimits"
+        },
+        {
+          "name": "ReadLimitsBuilder",
+          "scope": "litchi_xlsx",
+          "replacement": "use SourceLimitsBuilder"
+        }
+      ],
+      "families": []
+    },
+    {
+      "id": "xlsb-minimal",
+      "package": "litchi-xlsb",
+      "default_features": false,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "ReadLimits",
+          "scope": "litchi_xlsb",
+          "replacement": "use SourceLimits",
+          "recursive": false
+        },
+        {
+          "name": "ReadLimitsBuilder",
+          "scope": "litchi_xlsb",
+          "replacement": "use SourceLimitsBuilder",
+          "recursive": false
+        }
+      ],
+      "families": []
+    },
+    {
+      "id": "xlsb-full",
+      "package": "litchi-xlsb",
+      "default_features": false,
+      "features": [
+        "sign",
+        "vba-inspection"
+      ],
+      "banned_names": [
+        {
+          "name": "ReadLimits",
+          "scope": "litchi_xlsb",
+          "replacement": "use SourceLimits",
+          "recursive": false
+        },
+        {
+          "name": "ReadLimitsBuilder",
+          "scope": "litchi_xlsb",
+          "replacement": "use SourceLimitsBuilder",
+          "recursive": false
         }
       ],
       "families": []

@@ -443,7 +443,7 @@ mod limits {
         use crate::{Code, OpenOptions};
 
         for (extension, bytes) in new_packages() {
-            let limits = litchi_opc::ReadLimits::builder()
+            let limits = litchi_opc::SourceLimits::builder()
                 .max_input_bytes(bytes.len() as u64 - 1)
                 .unwrap()
                 .build()
@@ -480,7 +480,7 @@ mod limits {
             // limit before its ZIP magic is checked.
             let invalid = directory.path().join(format!("oversized.{extension}"));
             std::fs::write(&invalid, [b'x'; 32]).unwrap();
-            let eight = litchi_opc::ReadLimits::builder()
+            let eight = litchi_opc::SourceLimits::builder()
                 .max_input_bytes(8)
                 .unwrap()
                 .build()
@@ -513,7 +513,7 @@ mod limits {
         writer.write_all(b"two").unwrap();
         let temporary =
             super::super::temporary_with(&writer.finish().unwrap().into_inner(), ".pptx");
-        let limits = litchi_opc::ReadLimits::builder()
+        let limits = litchi_opc::SourceLimits::builder()
             .max_parts(1)
             .unwrap()
             .build()
@@ -961,7 +961,7 @@ mod zip_candidates {
             Some(DetectedFormat::Ods(_))
         ));
         assert_eq!(opc_probe_count(), 0);
-        let limits = crate::opc::ReadLimits::builder()
+        let limits = crate::opc::SourceLimits::builder()
             .max_archive_members(1)
             .expect("test member limit")
             .max_parts(1)
@@ -1126,9 +1126,9 @@ mod zip_candidates {
     #[test]
     fn ooxml_limits_refuse_a_zip_candidate_with_the_exact_bound() {
         use crate::error::Source;
-        use crate::opc::{OpcError, ReadLimits, ReadResource};
+        use crate::opc::{OpcError, ReadResource, SourceLimits};
 
-        let input = ReadLimits::builder()
+        let input = SourceLimits::builder()
             .max_input_bytes(1)
             .expect("test input limit")
             .build()
@@ -1151,7 +1151,7 @@ mod zip_candidates {
             "{error:?}"
         );
 
-        let parts = ReadLimits::builder()
+        let parts = SourceLimits::builder()
             .max_parts(1)
             .expect("test part limit")
             .build()

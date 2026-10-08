@@ -1957,7 +1957,7 @@ fn build_candidate(
         CandidateBytes::Owned(bytes) if destination_view.is_unmodified_owned_source() => {
             OpcPackage::from_vec_reusing_payloads(
                 bytes,
-                litchi_opc::ReadLimits::default(),
+                litchi_opc::SourceLimits::default(),
                 &candidate,
             )?
         },
@@ -1965,12 +1965,12 @@ fn build_candidate(
         CandidateBytes::Shared(bytes) if destination_view.is_unmodified_owned_source() => {
             OpcPackage::from_shared_vec_reusing_payloads(
                 bytes,
-                litchi_opc::ReadLimits::default(),
+                litchi_opc::SourceLimits::default(),
                 &candidate,
             )?
         },
         CandidateBytes::Shared(bytes) => {
-            OpcPackage::from_shared_vec_with_limits(bytes, litchi_opc::ReadLimits::default())?
+            OpcPackage::from_shared_vec_with_limits(bytes, litchi_opc::SourceLimits::default())?
         },
     };
     // Owned ingress retains the archive it was opened from and republishes it

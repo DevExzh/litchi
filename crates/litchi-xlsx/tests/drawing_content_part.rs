@@ -18,7 +18,7 @@ use litchi_xlsx::drawing::{
     ContentPartProfile, DrawingAnchor, DrawingDialect, EditAs, Object, RelationshipDialect,
     SourceDrawing, UnknownKind,
 };
-use litchi_xlsx::{Package, ReadLimits, Workbook};
+use litchi_xlsx::{Package, SourceLimits, Workbook};
 
 const XDR: &str = "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing";
 const STRICT_XDR: &str = "http://purl.oclc.org/ooxml/drawingml/spreadsheetDrawing";
@@ -883,7 +883,7 @@ fn worksheet_content_part_payload_xml_contract_is_bounded_and_preserving() {
     );
 
     let empty_root = content_part_package(false, PackageFault::EmptyRootTarget, 1);
-    let root_limit = ReadLimits::builder()
+    let root_limit = SourceLimits::builder()
         // The worksheet/drawing source itself reaches depth four; the empty
         // payload root must still count as an XML element at that boundary.
         .max_xml_depth(4)
@@ -899,7 +899,7 @@ fn worksheet_content_part_payload_xml_contract_is_bounded_and_preserving() {
     );
 
     let nested_empty = content_part_package(false, PackageFault::NestedEmptyTarget, 1);
-    let one_under = ReadLimits::builder()
+    let one_under = SourceLimits::builder()
         // The payload's fifth empty-element depth is one over the shared cap.
         .max_xml_depth(4)
         .unwrap()
@@ -911,7 +911,7 @@ fn worksheet_content_part_payload_xml_contract_is_bounded_and_preserving() {
     assert!(drawing.content_part(0).unwrap().payload().is_err());
 
     let nested = content_part_package(false, PackageFault::NestedDepthTarget, 1);
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_xml_depth(4)
         .unwrap()
         .build()
@@ -974,7 +974,7 @@ fn worksheet_content_part_limit_accepts_exact_and_rejects_one_under() {
     // The worksheet owner maps max_relationships_per_part into the drawing
     // scanner's max_content_parts ceiling as well as its relationship budget.
     let bytes = content_part_package(false, PackageFault::None, 3);
-    let exact = ReadLimits::builder()
+    let exact = SourceLimits::builder()
         .max_relationships_per_part(3)
         .unwrap()
         .build()
@@ -983,7 +983,7 @@ fn worksheet_content_part_limit_accepts_exact_and_rejects_one_under() {
     let worksheet = workbook.sheet("Sheet1").unwrap().unwrap();
     assert_eq!(worksheet.drawing(0).unwrap().content_part_count(), 3);
 
-    let one_under = ReadLimits::builder()
+    let one_under = SourceLimits::builder()
         .max_relationships_per_part(2)
         .unwrap()
         .build()

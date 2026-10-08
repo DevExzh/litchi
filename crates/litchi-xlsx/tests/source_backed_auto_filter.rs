@@ -341,7 +341,7 @@ fn managed_snapshot_changed_publication_and_budget_release_are_exact() {
     let editor =
         SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
             Arc::new(VersionedSource::new(source_bytes.clone())),
-            litchi_xlsx::ReadLimits::default(),
+            litchi_xlsx::SourceLimits::default(),
             SourceCacheLimits::new(usize::try_from(exact).unwrap(), 8).unwrap(),
             context,
         )
@@ -391,7 +391,7 @@ fn managed_cancellation_is_checked_before_stream_output() {
     let (budget, cancellation_source, context) = managed_context(exact);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(source_bytes)),
-        litchi_xlsx::ReadLimits::default(),
+        litchi_xlsx::SourceLimits::default(),
         context,
     )
     .unwrap();

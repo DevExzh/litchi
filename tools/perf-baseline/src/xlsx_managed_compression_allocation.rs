@@ -14,7 +14,7 @@ use super::{
 };
 use crate::allocation_metrics::{self, Sample as AllocationSample, Status as AllocationStatus};
 use litchi_core::{Budget, OwnedSource, ReadAt, Resource};
-use litchi_opc::{OpcPackage, PackageWriter, ReadLimits};
+use litchi_opc::{OpcPackage, PackageWriter, SourceLimits};
 use litchi_xlsx::cell_values::SourceBackedEditor;
 use serde::Serialize;
 use std::{
@@ -675,7 +675,7 @@ fn run_iteration(
     let editor =
         SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
             source,
-            ReadLimits::default(),
+            SourceLimits::default(),
             plan.cache_limits,
             context,
         )?;

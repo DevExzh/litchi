@@ -38,7 +38,7 @@ use litchi_core::sheet::{
     Result as SheetResult, WorkbookTrait, Worksheet as CoreWorksheet, WorksheetIterator,
 };
 use litchi_core::{FileFormat, Metadata};
-use litchi_opc::{OpcPackage, ReadLimits, SourceBackedPackage};
+use litchi_opc::{OpcPackage, SourceBackedPackage, SourceLimits};
 use litchi_xlsb as xlsb;
 
 use super::cell_text;
@@ -86,7 +86,7 @@ struct XlsbState {
     retain_source: bool,
     /// The OPC read limits of the open, which an unsigned copy is opened
     /// under (record 0013).
-    ooxml_limits: ReadLimits,
+    ooxml_limits: SourceLimits,
 }
 
 /// The two owner states of an XLSB handle (record 0003 §2.3).

@@ -337,7 +337,7 @@ fn managed_package(archive: Vec<u8>, memory: u64, output: u64) -> (Budget, sourc
     let (budget, context) = managed_context(memory, output);
     let package = source_backed::Package::from_read_at_with_execution_context(
         Arc::new(VersionedArchiveSource::new(archive)),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         context,
     )
     .expect("managed source-backed DOCX fixture must open");
@@ -353,7 +353,7 @@ fn managed_package_with_cancellation(
         managed_context_with_objects(memory, output, u64::MAX);
     let package = source_backed::Package::from_read_at_with_execution_context(
         Arc::new(VersionedArchiveSource::new(archive)),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         context,
     )
     .expect("managed source-backed DOCX fixture must open");
@@ -2246,7 +2246,7 @@ fn path_publication_cancellation_leaves_destination_and_managed_memory_untouched
         managed_context_with_objects(64 * 1024 * 1024, u64::MAX, u64::MAX);
     let package = source_backed::Package::from_read_at_with_execution_context(
         Arc::new(VersionedArchiveSource::new(source_archive.clone())),
-        litchi_opc::ReadLimits::default(),
+        litchi_opc::SourceLimits::default(),
         context,
     )
     .expect("cancelled managed path source must open");

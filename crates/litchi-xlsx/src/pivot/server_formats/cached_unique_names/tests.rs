@@ -122,7 +122,7 @@ fn mce_payload_requires_choice_or_fallback_ancestry() {
     ];
     let scan = XmlScan {
         elements,
-        limits: XmlScanLimits::from_read_limits(ReadLimits::default()),
+        limits: XmlScanLimits::from_read_limits(SourceLimits::default()),
         ignorable_scopes: Vec::new(),
     };
     assert!(
@@ -140,7 +140,7 @@ fn mce_payload_requires_choice_or_fallback_ancestry() {
     ];
     let scan = XmlScan {
         elements,
-        limits: XmlScanLimits::from_read_limits(ReadLimits::default()),
+        limits: XmlScanLimits::from_read_limits(SourceLimits::default()),
         ignorable_scopes: Vec::new(),
     };
     assert!(

@@ -446,7 +446,7 @@ fn dynamic_owned_bytes_facade_retains_input_after_caller_mutation() {
 fn dynamic_owned_bytes_facade_enforces_exact_input_limit() {
     let bytes = all_worksheet_bytes();
     let input_bytes = u64::try_from(bytes.len()).unwrap();
-    let exact_limits = xlsb::ReadLimits::builder()
+    let exact_limits = xlsb::SourceLimits::builder()
         .max_input_bytes(input_bytes)
         .unwrap()
         .build()
@@ -458,7 +458,7 @@ fn dynamic_owned_bytes_facade_enforces_exact_input_limit() {
     .expect("an input exactly at the configured limit should be accepted");
     assert_eq!(WorkbookTrait::worksheet_count(&file.workbook().unwrap()), 2);
 
-    let below_limit = xlsb::ReadLimits::builder()
+    let below_limit = xlsb::SourceLimits::builder()
         .max_input_bytes(input_bytes - 1)
         .unwrap()
         .build()
@@ -483,7 +483,7 @@ fn dynamic_owned_bytes_facade_enforces_exact_part_limit() {
         .max()
         .expect("generated package must contain ordinary parts");
     let largest_part_bytes = u64::try_from(largest_part_bytes).unwrap();
-    let exact_limits = xlsb::ReadLimits::builder()
+    let exact_limits = xlsb::SourceLimits::builder()
         .max_part_bytes(largest_part_bytes)
         .unwrap()
         .build()
@@ -494,7 +494,7 @@ fn dynamic_owned_bytes_facade_enforces_exact_part_limit() {
     )
     .expect("parts exactly at the configured limit should be accepted");
 
-    let below_limit = xlsb::ReadLimits::builder()
+    let below_limit = xlsb::SourceLimits::builder()
         .max_part_bytes(largest_part_bytes - 1)
         .unwrap()
         .build()

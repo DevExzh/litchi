@@ -10,7 +10,7 @@ use std::sync::Arc;
 use litchi_core::Resource;
 use litchi_opc::{
     BlobPart, ContentTypeEdit, OpcPackage, OwnedContentTypes, OwnedRelationships, PackURI,
-    Part as OpcPart, PartMetadata, ReadLimits, RelationshipEdit, Relationships, TargetMode,
+    Part as OpcPart, PartMetadata, RelationshipEdit, Relationships, SourceLimits, TargetMode,
 };
 use quick_xml::{Reader, events::Event};
 
@@ -436,9 +436,9 @@ fn validate_uid_limit(id: &str, limits: Limits) -> Result<()> {
 /// an unrelated manifest member.  This lets the OPC reader reject an
 /// oversized retained member before it parses or materializes that member for
 /// the host owner.
-fn bounded_read_limits(package: &OpcPackage, limits: Limits) -> Result<ReadLimits> {
+fn bounded_read_limits(package: &OpcPackage, limits: Limits) -> Result<SourceLimits> {
     let current = package.read_limits();
-    let mut builder = ReadLimits::builder();
+    let mut builder = SourceLimits::builder();
     builder = builder.max_input_bytes(current.max_input_bytes())?;
     builder = builder.max_archive_members(current.max_archive_members())?;
     builder = builder.max_archive_total_entries(current.max_archive_total_entries())?;
@@ -1825,7 +1825,7 @@ fn transition_content_types(
     before_entries: &[Part],
     after_entries: &[Part],
     limits: Limits,
-    read_limits: ReadLimits,
+    read_limits: SourceLimits,
 ) -> Result<OwnedContentTypes> {
     let mut before_map = HashMap::new();
     before_map
@@ -1910,7 +1910,7 @@ fn transition_content_types(
 fn existing_content_type_removals(
     source: &OwnedContentTypes,
     candidates: &[PackURI],
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<Vec<PackURI>> {
     let mut selected = Vec::new();
     selected
@@ -2185,7 +2185,7 @@ fn check_final_output_size(total: usize, limits: Limits) -> Result<()> {
 fn staged_workbook_relationship_len(
     before: &Snapshot,
     after: &[Part],
-    read_limits: ReadLimits,
+    read_limits: SourceLimits,
 ) -> Result<usize> {
     let mut removals = Vec::new();
     removals
@@ -2225,7 +2225,7 @@ fn staged_workbook_relationship_len(
     Ok(plan.final_len())
 }
 
-fn canonical_data_relationship_len(entry: &Part, read_limits: ReadLimits) -> Result<usize> {
+fn canonical_data_relationship_len(entry: &Part, read_limits: SourceLimits) -> Result<usize> {
     let mut relationships = Relationships::new(entry.properties_part_name.base_uri().to_owned());
     relationships.add_relationship(
         DATA_RELATIONSHIP_TYPE.into(),

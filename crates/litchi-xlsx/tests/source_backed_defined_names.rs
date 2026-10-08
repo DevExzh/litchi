@@ -15,7 +15,7 @@ use litchi_opc::{
 };
 use litchi_xlsx::defined_names::{Commit, Snapshot, SourceBackedEditor};
 use litchi_xlsx::raw::DefinedName;
-use litchi_xlsx::{Error, ReadLimits};
+use litchi_xlsx::{Error, SourceLimits};
 use soapberry_zip::{PreservationIndex, ZipArchive};
 
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -407,7 +407,7 @@ fn protection_mce_limits_invalid_scopes_and_partial_sink_are_checked() {
     invalid[1].local_sheet_id = Some(1);
     assert!(editor.edit().replace(invalid).is_err());
 
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_part_bytes(1)
         .unwrap()
         .build()
@@ -441,7 +441,7 @@ fn managed_workbook_payload_is_budgeted_streamed_and_released() {
     let editor =
         SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
             Arc::new(VersionedSource::new(bytes.clone())),
-            ReadLimits::default(),
+            SourceLimits::default(),
             SourceCacheLimits::new(usize::try_from(exact).unwrap(), 4).unwrap(),
             context,
         )
@@ -480,7 +480,7 @@ fn managed_one_under_budget_fails_before_payload_retention_and_cancellation_stop
     assert!(matches!(
         SourceBackedEditor::from_read_at_with_execution_context(
             Arc::new(VersionedSource::new(bytes.clone())),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         ),
         Err(Error::Package(OpcError::Execution(
@@ -492,7 +492,7 @@ fn managed_one_under_budget_fails_before_payload_retention_and_cancellation_stop
     let (budget, cancellation_source, context) = managed_context(exact);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes.clone())),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -508,7 +508,7 @@ fn managed_one_under_budget_fails_before_payload_retention_and_cancellation_stop
     let (budget, cancellation_source, context) = managed_context(exact);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();

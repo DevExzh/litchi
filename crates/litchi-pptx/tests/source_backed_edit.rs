@@ -11,9 +11,8 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter};
 use litchi_pptx::transition::{Kind as TransitionKind, Ms, Side, Speed, Transition};
 use litchi_pptx::{
-    Error, MAX_SHAPE_TEXT_REPLACEMENTS, MAX_SOURCE_BACKED_SLIDE_BATCH, ReadLimits,
-    ShapeTextReplacement, SlideOrderRefusal, SourceBackedPresentation,
-    SourceBackedPresentationEditor,
+    Error, MAX_SHAPE_TEXT_REPLACEMENTS, MAX_SOURCE_BACKED_SLIDE_BATCH, ShapeTextReplacement,
+    SlideOrderRefusal, SourceBackedPresentation, SourceBackedPresentationEditor, SourceLimits,
 };
 
 const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
@@ -902,7 +901,7 @@ fn batch_preflight_is_atomic_and_duplicate_identity_is_typed() {
 #[test]
 fn batch_expansion_honors_the_source_part_limit_before_allocation() {
     let source = fixture("", shape_xml(PML, "before"), false);
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_part_bytes(4096)
         .unwrap()
         .build()
@@ -1048,7 +1047,7 @@ fn mce_limits_strict_and_partial_sink_are_checked() {
         Err(Error::UnsafeEdit { .. })
     ));
 
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_part_bytes(1)
         .unwrap()
         .build()
@@ -1811,7 +1810,7 @@ fn direct_transition_rejects_malformed_dtd_limits_stale_source_and_partial_sink(
         &format!("<p:cSld><!--{}-->", "x".repeat(5_000)),
         1,
     );
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_part_bytes(slide.len() as u64)
         .unwrap()
         .build()
@@ -2012,7 +2011,7 @@ fn source_slide_order_refuses_stale_foreign_signed_cancelled_and_partial_output(
     let (cancellation_source, context) = source_order_context();
     let editor = SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
         Arc::new(VersionedSource::new(multi_fixture(3, false))),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -2079,7 +2078,7 @@ fn source_slide_order_refuses_stale_foreign_signed_cancelled_and_partial_output(
 
 #[test]
 fn source_slide_order_rejects_limits_malformed_mce_and_invalid_owners() {
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_part_bytes(1)
         .unwrap()
         .build()

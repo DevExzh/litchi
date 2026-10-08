@@ -23,7 +23,7 @@ use litchi_core::{
     Budget, CancellationSource, EvidenceDigest, ExecutionContext, ExecutionLimits,
     Limits as BudgetLimits, OwnedSource, ReadAt, Resource, SourceVersion,
 };
-use litchi_opc::{OpcError, ReadLimits};
+use litchi_opc::{OpcError, SourceLimits};
 use litchi_xlsx::form_control::{
     ControlSelector, FormControlDiagnosticCode, KnownOrUnknown, OwnerLimits, OwnerProfile,
     Properties,
@@ -2493,7 +2493,7 @@ fn shared_target_and_external_edges_are_refused_before_projection() {
 #[test]
 fn caller_part_limit_refuses_before_form_control_source_projection() {
     let source = fixture_bytes("tdf134769.xlsx");
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_part_bytes(1)
         .unwrap()
         .build()
@@ -2652,7 +2652,7 @@ fn managed_owner_clones_and_read_set_keep_budget_charges_alive() {
     let (budget, _cancellation_source, context) = managed_owner_context(u64::MAX, u64::MAX);
     let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(source)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -2721,7 +2721,7 @@ fn managed_owner_tiny_execution_depth_is_a_typed_resource_refusal() {
     let (budget, _cancellation_source, context) = managed_owner_context(u64::MAX, 0);
     let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(source)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -2739,7 +2739,7 @@ fn mirror_node_caps_refuse_without_retaining_control_shape_charges() {
         let (budget, _cancellation_source, context) = managed_owner_context(u64::MAX, u64::MAX);
         let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
             Arc::new(OwnedSource::new(source.clone())),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();

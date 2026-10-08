@@ -75,7 +75,7 @@ const MAX_MIMETYPE_BYTES: usize = 256;
 ///
 /// The probe is deliberately conservative: a ceiling hit returns `None` so
 /// the caller can run its normal bounded OPC path. The fields mirror the ZIP
-/// portion of the facade's OPC `ReadLimits` but remain owned by this crate to
+/// portion of the facade's OPC `SourceLimits` but remain owned by this crate to
 /// avoid a dependency cycle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CatalogProbeLimits {

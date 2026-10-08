@@ -7,7 +7,7 @@
 
 use crate::content_type::ContentType;
 use crate::error::{OpcError, Result};
-use crate::limits::{ReadLimits, ReadResource};
+use crate::limits::{ReadResource, SourceLimits};
 use crate::packuri::PackURI;
 use crate::pkgreader::is_xml_id;
 use crate::source_backed::{PartData, SourceLineage, SourceSnapshot};
@@ -69,7 +69,7 @@ pub struct SourceXmlPart {
     pub(crate) payload_reservation: Option<Arc<Reservation>>,
     revision: Option<Arc<XmlRevision>>,
     _metadata_reservation: Option<Arc<Reservation>>,
-    pub(crate) limits: ReadLimits,
+    pub(crate) limits: SourceLimits,
 }
 
 // A logical edit base, distinct from the immutable physical archive source.
@@ -110,7 +110,7 @@ impl fmt::Debug for SourceXmlPart {
 impl SourceXmlPart {
     pub(crate) fn new(
         source: SourceSnapshot,
-        limits: ReadLimits,
+        limits: SourceLimits,
         source_partname: &PackURI,
         source_content_type: &str,
         original: PartData,
@@ -375,7 +375,7 @@ impl SourceXmlPart {
     pub(crate) fn check_for_publication(
         &self,
         destination_content_type: &str,
-        destination_limits: ReadLimits,
+        destination_limits: SourceLimits,
     ) -> Result<()> {
         if self.source_content_type.as_str() != destination_content_type {
             return Err(invalid_source(
@@ -417,7 +417,7 @@ impl SourceXmlPart {
         destination_partname: &PackURI,
         destination_content_type: &str,
         destination_original: &[u8],
-        destination_limits: ReadLimits,
+        destination_limits: SourceLimits,
     ) -> Result<()> {
         destination.ensure_current_public()?;
         if self.source_lineage != destination.lineage().clone()
@@ -1052,14 +1052,14 @@ fn reserve_edit_memory(
         .map_err(map_execution_error)
 }
 
-fn limits_range_max(limits: ReadLimits) -> u64 {
+fn limits_range_max(limits: SourceLimits) -> u64 {
     limits.max_xml_attribute_bytes() as u64
 }
 
 fn validate_source_xml(
     partname: &PackURI,
     bytes: &[u8],
-    limits: ReadLimits,
+    limits: SourceLimits,
     context: Option<&ExecutionContext>,
 ) -> Result<()> {
     limits.check(
@@ -1216,7 +1216,7 @@ fn validate_source_xml(
 pub fn validate_source_xml_bytes(
     partname: &PackURI,
     bytes: &[u8],
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<()> {
     validate_source_xml(partname, bytes, limits, None)
 }
@@ -1318,7 +1318,7 @@ pub(crate) fn validate_source_declaration(
 fn validate_source_element(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-    limits: ReadLimits,
+    limits: SourceLimits,
     partname: &PackURI,
 ) -> Result<()> {
     validate_source_qname(reader, element.name().as_ref(), "element")?;
@@ -1616,7 +1616,7 @@ fn map_execution_error(error: ExecutionError) -> OpcError {
 impl SourceXmlPart {
     pub(crate) fn from_source_parts(
         source: SourceSnapshot,
-        limits: ReadLimits,
+        limits: SourceLimits,
         source_partname: &PackURI,
         source_content_type: &str,
         original: PartData,
@@ -1666,7 +1666,7 @@ mod tests {
     }
 
     fn source_is_valid(bytes: &[u8]) -> bool {
-        validate_source_xml(&test_partname(), bytes, ReadLimits::default(), None).is_ok()
+        validate_source_xml(&test_partname(), bytes, SourceLimits::default(), None).is_ok()
     }
 
     #[test]
@@ -1733,7 +1733,7 @@ mod tests {
 
     #[test]
     fn empty_elements_obey_depth_and_attributes_are_limited_individually() {
-        let shallow = ReadLimits::builder()
+        let shallow = SourceLimits::builder()
             .max_xml_depth(1)
             .unwrap()
             .build()
@@ -1742,7 +1742,7 @@ mod tests {
             validate_source_xml(&test_partname(), b"<root><leaf/></root>", shallow, None).is_err()
         );
         assert!(validate_source_xml(&test_partname(), b"<root/>", shallow, None).is_ok());
-        let attributes = ReadLimits::builder()
+        let attributes = SourceLimits::builder()
             .max_xml_attribute_bytes(5)
             .unwrap()
             .max_relationship_target_bytes(5)

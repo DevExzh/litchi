@@ -919,7 +919,7 @@ fn run_case_with_opener(
                 // wrapped (M0a step S9), with the same default read limits.
                 let workbook = litchi_xlsb::Package::from_slice_with_limits(
                     &corpus.bytes,
-                    litchi_xlsb::ReadLimits::default(),
+                    litchi_xlsb::SourceLimits::default(),
                 )?
                 .into_workbook()?;
                 return Ok(RunOutcome::Projection {
@@ -1020,7 +1020,7 @@ fn verify_case(
 ) -> Result<GateReport> {
     let malformed_input_refused = litchi_xlsb::Package::from_bytes(vec![0, 1, 2, 3]).is_err();
     let tight_limits_refused = {
-        let limit = litchi_xlsb::ReadLimits::builder()
+        let limit = litchi_xlsb::SourceLimits::builder()
             .max_input_bytes(u64::try_from(corpus.bytes.len().saturating_sub(1))?)?
             .build()?;
         litchi_xlsb::Package::from_bytes_with_limits(corpus.bytes.clone(), limit).is_err()
@@ -1210,7 +1210,7 @@ fn verify_source_case(
         SourceBackedWorkbook::from_read_at(source).is_err()
     };
     let tight_limits_refused = {
-        let limit = litchi_xlsb::ReadLimits::builder()
+        let limit = litchi_xlsb::SourceLimits::builder()
             .max_input_bytes(u64::try_from(corpus.bytes.len().saturating_sub(1))?)?
             .build()?;
         let source: Arc<dyn ReadAt> = Arc::new(CountingReadAt::new(
@@ -1692,7 +1692,7 @@ mod tests {
     #[test]
     fn malformed_and_tight_limits_are_refused() {
         let corpus = Corpus::load(&fixture_path()).expect("corpus");
-        let limit = litchi_xlsb::ReadLimits::builder()
+        let limit = litchi_xlsb::SourceLimits::builder()
             .max_input_bytes(u64::try_from(corpus.bytes.len().saturating_sub(1)).expect("u64"))
             .expect("limit")
             .build()

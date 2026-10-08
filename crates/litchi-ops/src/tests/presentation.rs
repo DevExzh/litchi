@@ -198,7 +198,7 @@ mod native_ppt_path {
     #[cfg(feature = "pptx")]
     #[test]
     fn native_ppt_source_owner_precedes_tiny_pptx_limit() {
-        let limits = litchi_opc::ReadLimits::builder()
+        let limits = litchi_opc::SourceLimits::builder()
             .max_input_bytes(1)
             .unwrap()
             .build()
@@ -500,7 +500,7 @@ mod source_pptx_path {
     #[test]
     fn bytes_limits_keep_the_source_probe_bounded() {
         let bytes = corrupt_unselected_slide_package();
-        let limits = litchi_opc::ReadLimits::builder()
+        let limits = litchi_opc::SourceLimits::builder()
             .max_input_bytes(bytes.len() as u64 - 1)
             .unwrap()
             .build()
@@ -574,7 +574,7 @@ mod source_pptx_path {
         let presentation =
             litchi_pptx::SourceBackedPresentation::from_path_with_limits_and_execution_context(
                 temporary.path(),
-                litchi_pptx::ReadLimits::default(),
+                litchi_pptx::SourceLimits::default(),
                 litchi_core::ExecutionContext::new(budget, cancellation, limits),
             )
             .unwrap();
@@ -592,7 +592,7 @@ mod source_pptx_path {
     #[test]
     fn generic_non_zip_is_not_an_office_file_under_tight_ooxml_limits() {
         let temporary = super::super::temporary_with(&[b'x'; 4096], "");
-        let limits = litchi_opc::ReadLimits::builder()
+        let limits = litchi_opc::SourceLimits::builder()
             .max_input_bytes(1)
             .unwrap()
             .build()
@@ -606,7 +606,7 @@ mod source_pptx_path {
     #[test]
     fn oversized_ooxml_suffix_non_zip_keeps_the_opc_limit_precedence() {
         let temporary = super::super::temporary_with(&[b'x'; 4096], ".pptx");
-        let limits = litchi_opc::ReadLimits::builder()
+        let limits = litchi_opc::SourceLimits::builder()
             .max_input_bytes(1)
             .unwrap()
             .build()
@@ -672,7 +672,7 @@ mod source_pptx_path {
         zip.write_all(b"not an Office package").unwrap();
         let unknown_bytes = zip.finish().unwrap().into_inner();
         let unknown = super::super::temporary_with(&unknown_bytes, ".zip");
-        let limits = litchi_opc::ReadLimits::builder()
+        let limits = litchi_opc::SourceLimits::builder()
             .max_input_bytes(1)
             .unwrap()
             .build()

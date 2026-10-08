@@ -331,7 +331,7 @@ fn workbook_bytes_changed_with_owner_and_relationships_unchanged_is_stale() {
 
 #[test]
 fn authored_relationship_metadata_exact_opc_attribute_limit_is_accepted() {
-    let maximum = litchi_opc::ReadLimits::default().max_xml_attribute_bytes();
+    let maximum = litchi_opc::SourceLimits::default().max_xml_attribute_bytes();
     let id = "x".repeat(maximum - "Id".len());
     let package = package_with_unrelated_root_relationship(id);
     assert!(package.calculation_chain().is_ok());
@@ -339,7 +339,7 @@ fn authored_relationship_metadata_exact_opc_attribute_limit_is_accepted() {
 
 #[test]
 fn huge_unrelated_authored_relationship_metadata_is_rejected_before_capture() {
-    let maximum = litchi_opc::ReadLimits::default().max_xml_attribute_bytes();
+    let maximum = litchi_opc::SourceLimits::default().max_xml_attribute_bytes();
     let id = "x".repeat(maximum - "Id".len() + 1);
     let package = package_with_unrelated_root_relationship(id);
     assert!(matches!(
@@ -359,7 +359,7 @@ fn public_package_facade_preflights_oversized_stale_metadata_before_clone() {
     transaction.remove().expect("remove");
     let commit = transaction.commit().expect("commit");
 
-    let maximum = litchi_opc::ReadLimits::default().max_xml_attribute_bytes();
+    let maximum = litchi_opc::SourceLimits::default().max_xml_attribute_bytes();
     let stale = package_with_unrelated_root_relationship("x".repeat(maximum - "Id".len() + 1));
     assert!(matches!(
         stale.apply_calculation_chain(&commit),

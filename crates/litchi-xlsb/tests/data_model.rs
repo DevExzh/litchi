@@ -155,7 +155,8 @@ fn package_with_explicit_empty_model_relationships_with_padding(padding: usize) 
         }
     }
     let zip = writer.finish_to_bytes().expect("opened ZIP fixture bytes");
-    let opc = if content_types.len() > litchi_opc::ReadLimits::default().max_content_types_bytes() {
+    let opc = if content_types.len() > litchi_opc::SourceLimits::default().max_content_types_bytes()
+    {
         litchi_opc::OpcPackage::from_bytes_with_limits(
             &zip,
             elevated_opc_limits(content_types.len()),
@@ -179,8 +180,8 @@ fn noncanonical_content_types_with_padding(source: &[u8], padding: usize) -> Vec
     swap_content_type_attributes(xml, "Override", "PartName", "ContentType").into_bytes()
 }
 
-fn elevated_opc_limits(content_types_bytes: usize) -> litchi_opc::ReadLimits {
-    litchi_opc::ReadLimits::builder()
+fn elevated_opc_limits(content_types_bytes: usize) -> litchi_opc::SourceLimits {
+    litchi_opc::SourceLimits::builder()
         .max_content_types_bytes(content_types_bytes)
         .expect("content types limit")
         .build()
@@ -653,7 +654,7 @@ fn elevated_source_tokens_survive_reopened_inverse_with_large_content_types() {
         .read("[Content_Types].xml")
         .expect("large content types member");
     assert!(
-        before_content_types.len() > litchi_opc::ReadLimits::default().max_content_types_bytes()
+        before_content_types.len() > litchi_opc::SourceLimits::default().max_content_types_bytes()
     );
     assert_eq!(
         before_archive

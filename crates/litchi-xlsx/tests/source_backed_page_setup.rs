@@ -19,7 +19,7 @@ use litchi_opc::{
 };
 use litchi_xlsx::page_setup::{SourceBackedEditor, SourceEdit};
 use litchi_xlsx::{
-    Error, Order, Orientation, Package, Paper, ReadLimits, Scale, Setup,
+    Error, Order, Orientation, Package, Paper, Scale, Setup, SourceLimits,
     parse_worksheet_page_setup_relationship_id,
 };
 
@@ -245,7 +245,7 @@ fn managed_payload_retention_publication_and_owning_escape_are_explicit() {
     let editor =
         SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
             Arc::new(VersionedSource::new(bytes.clone())),
-            ReadLimits::default(),
+            SourceLimits::default(),
             SourceCacheLimits::new(usize::try_from(exact).unwrap(), 8).unwrap(),
             context,
         )
@@ -549,7 +549,7 @@ fn mce_limits_and_partial_sink_are_checked() {
     assert!(edit.set(target_setup()));
     assert!(edit.commit().is_err());
 
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_part_bytes(1)
         .unwrap()
         .build()

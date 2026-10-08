@@ -5,7 +5,7 @@ use std::io::Cursor;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part, Relationship, TargetMode};
 use litchi_xlsx::encryption::{Error as CryptoError, Limits, Mode};
-use litchi_xlsx::{Error, Package, ReadLimits, Workbook};
+use litchi_xlsx::{Error, Package, SourceLimits, Workbook};
 
 const PASSWORD: &str = "Litchi XLSX password 42!";
 const NEW_PASSWORD: &str = "Litchi XLSX changed password 7!";
@@ -113,7 +113,7 @@ fn outer_crypto_limit_is_independent_and_typed() {
         Cursor::new(vec![0u8; 5]),
         PASSWORD,
         &limits,
-        ReadLimits::default(),
+        SourceLimits::default(),
     )
     .unwrap_err();
     assert!(matches!(
@@ -159,7 +159,7 @@ fn password_aware_ingress_accepts_plain_zip_without_provenance() {
 fn restrictive_inner_opc_limits_reject_valid_encrypted_xlsx() {
     let plaintext = Package::create().unwrap().to_plain_bytes().unwrap();
     let encrypted = litchi_xlsx::encryption::encrypt(plaintext, PASSWORD, Mode::Standard).unwrap();
-    let opc_limits = ReadLimits::builder()
+    let opc_limits = SourceLimits::builder()
         .max_input_bytes(4)
         .unwrap()
         .build()

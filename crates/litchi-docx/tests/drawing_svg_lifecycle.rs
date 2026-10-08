@@ -14,7 +14,7 @@ use litchi_docx::drawing::{DrawingPlacement, SourceDrawing};
 use litchi_docx::source_backed::{
     self, PictureSelector, StorySelector, SvgInput, SvgPictureOwnerState,
 };
-use litchi_docx::{Package, ReadLimits};
+use litchi_docx::{Package, SourceLimits};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part, TargetMode};
 use soapberry_zip::office::StreamingArchiveWriter;
@@ -544,7 +544,7 @@ fn managed_package(
     .expect("valid managed execution limits");
     let package = source_backed::Package::from_read_at_with_execution_context(
         Arc::new(source),
-        ReadLimits::default(),
+        SourceLimits::default(),
         ExecutionContext::new(budget.clone(), cancellation, execution_limits),
     )
     .expect("open managed source-backed package");
@@ -1196,7 +1196,7 @@ fn case_variant_package_incoming_edge_keeps_detached_svg_leaf() {
 #[test]
 fn lifecycle_read_and_attach_honor_input_and_story_output_limits() {
     let native = read_fixture(INLINE_FIXTURE);
-    let input_limits = ReadLimits::builder()
+    let input_limits = SourceLimits::builder()
         .max_input_bytes((native.len() - 1) as u64)
         .unwrap()
         .build()
@@ -1207,7 +1207,7 @@ fn lifecycle_read_and_attach_honor_input_and_story_output_limits() {
 
     let source = raster_only_fixture("inline", "limits");
     let document_len = part_bytes(&source, "/word/document.xml").len();
-    let output_limits = ReadLimits::builder()
+    let output_limits = SourceLimits::builder()
         .max_part_bytes(document_len as u64)
         .unwrap()
         .build()
@@ -1276,7 +1276,7 @@ fn lifecycle_low_total_part_limit_refuses_before_raster_retention() {
     let source = ObservedSource::new(source_bytes.clone()).with_media_ranges(selected_range, 0..0);
     let source_handle = source.clone();
     let total = total_part_bytes(&source_bytes);
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_total_part_bytes(total.saturating_sub(1))
         .unwrap()
         .build()
@@ -1608,7 +1608,7 @@ fn batch_failed_aggregate_admission_leaves_projection_unchanged() {
         picture("anchor", "2", "rIdRaster1", opaque),
     );
     let source = package_with_two_rasters(document(&pictures, "aggregate-failure"));
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_total_relationships(4)
         .unwrap()
         .build()

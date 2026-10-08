@@ -30,7 +30,7 @@
 use std::io::Cursor;
 use std::sync::Arc;
 
-use litchi_opc::{OpcError, OpcPackage, PackURI, ReadLimits, SourceBackedPackage};
+use litchi_opc::{OpcError, OpcPackage, PackURI, SourceBackedPackage, SourceLimits};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const CONTENT_TYPES: &str = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="bin" ContentType="application/octet-stream"/></Types>"#;
@@ -107,7 +107,7 @@ fn open_all(archive: &[u8]) -> Vec<(&'static str, Result<(), String>)> {
             "from_shared_vec_with_limits (deferred)",
             map(OpcPackage::from_shared_vec_with_limits(
                 Arc::new(archive.to_vec()),
-                ReadLimits::default(),
+                SourceLimits::default(),
             )
             .map(drop)),
         ),

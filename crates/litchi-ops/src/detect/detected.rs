@@ -196,7 +196,7 @@ pub fn detect_format_smart_with_tail<T: ZipTail>(
 ) -> Option<DetectedFormat> {
     #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
     {
-        detect_format_smart_with_limits_and_tail(bytes, crate::opc::ReadLimits::default(), tail)
+        detect_format_smart_with_limits_and_tail(bytes, crate::opc::SourceLimits::default(), tail)
     }
 
     #[cfg(not(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")))]
@@ -380,7 +380,7 @@ fn detect_format_smart_without_ooxml<T: ZipTail>(
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 pub fn detect_format_smart_with_limits(
     bytes: Vec<u8>,
-    limits: crate::opc::ReadLimits,
+    limits: crate::opc::SourceLimits,
 ) -> Option<DetectedFormat> {
     detect_format_smart_with_limits_and_tail(bytes, limits, &NoZipTail)
 }
@@ -392,7 +392,7 @@ pub fn detect_format_smart_with_limits(
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 pub fn detect_format_smart_with_limits_and_tail<T: ZipTail>(
     bytes: Vec<u8>,
-    limits: crate::opc::ReadLimits,
+    limits: crate::opc::SourceLimits,
     tail: &T,
 ) -> Option<DetectedFormat> {
     #[cfg(not(any(feature = "pages", feature = "keynote", feature = "numbers")))]
@@ -689,7 +689,7 @@ impl PreparedDetection {
 ))]
 pub(crate) fn detect_and_prepare_path_with_limits<T: ZipTail>(
     path: &std::path::Path,
-    limits: crate::opc::ReadLimits,
+    limits: crate::opc::SourceLimits,
     tail: &T,
 ) -> Option<PreparedDetection> {
     use litchi_core::ReadAt;
@@ -733,7 +733,7 @@ pub(crate) fn detect_and_prepare_path_with_limits<T: ZipTail>(
     // OpenDocument package is never probed as OPC.
     #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
     {
-        let catalog_limits = super::catalog_probe_limits(crate::opc::ReadLimits::default());
+        let catalog_limits = super::catalog_probe_limits(crate::opc::SourceLimits::default());
         match litchi_odf_common::detect::packaged_mime_read_at(source.as_ref()) {
             Ok(Some(_odf_format)) => {
                 match litchi_odf_common::detect::packaged_has_ooxml_catalog_read_at_with_limits(
@@ -855,7 +855,7 @@ mod short_signature_tests {
 
         #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
         assert!(
-            detect_format_smart_with_limits(zip_polyglot, crate::opc::ReadLimits::default())
+            detect_format_smart_with_limits(zip_polyglot, crate::opc::SourceLimits::default())
                 .is_none()
         );
 
@@ -865,7 +865,7 @@ mod short_signature_tests {
 
         #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
         assert!(
-            detect_format_smart_with_limits(ole_polyglot, crate::opc::ReadLimits::default())
+            detect_format_smart_with_limits(ole_polyglot, crate::opc::SourceLimits::default())
                 .is_none()
         );
     }

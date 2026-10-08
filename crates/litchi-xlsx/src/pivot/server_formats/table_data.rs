@@ -14,7 +14,7 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use litchi_core::{Resource, ResourceLimit};
-use litchi_opc::{OpcPackage, PackURI, ReadLimits};
+use litchi_opc::{OpcPackage, PackURI, SourceLimits};
 
 use super::cached_unique_names::PivotCacheId;
 use super::*;
@@ -50,7 +50,7 @@ const MAX_RETAINED_BYTES: usize = 64 * 1024 * 1024;
 
 /// Resource ceilings for the typed `pivotTableData` owner.
 ///
-/// The package's [`ReadLimits`] remains authoritative for physical Parts,
+/// The package's [`SourceLimits`] remains authoritative for physical Parts,
 /// XML events, attributes, depth, namespaces, and relationship closure.  This
 /// focused policy adds the semantic ceilings that cannot be expressed by an
 /// OPC package profile: authored row and cell elements, logical scalar
@@ -1033,7 +1033,7 @@ fn parse_data_payload(
     scan: &XmlScan,
     source: &[u8],
     expected_cache_id: u32,
-    read_limits: ReadLimits,
+    read_limits: SourceLimits,
     retained: &mut RetainedBudget,
 ) -> Result<ParsedData> {
     let root = scan
@@ -1359,7 +1359,7 @@ fn parse_cell(
     cell: &XmlElement,
     row_index: Option<u32>,
     column_count: u32,
-    read_limits: ReadLimits,
+    read_limits: SourceLimits,
     retained: &mut RetainedBudget,
 ) -> Result<(CellRecord, Option<u32>)> {
     if cell.has_non_whitespace_cdata || cell.has_non_whitespace_text {
@@ -1475,7 +1475,7 @@ fn parse_cell(
     ))
 }
 
-fn parse_extra(element: &XmlElement, limits: ReadLimits) -> Result<ExtraState> {
+fn parse_extra(element: &XmlElement, limits: SourceLimits) -> Result<ExtraState> {
     let mut result = ExtraState {
         format_index: None,
         background_color: None,
@@ -1625,7 +1625,11 @@ fn validate_cell_value(kind: PivotCellType, value: &str) -> Result<()> {
 /// its decoded value.  This is the admission check for the 65,535-unit text
 /// facet; it also keeps a caller-sized source string from becoming a large
 /// temporary `String` before the semantic limit is known.
-fn preflight_xstring_utf16(source: &[u8], element: &XmlElement, limits: ReadLimits) -> Result<()> {
+fn preflight_xstring_utf16(
+    source: &[u8],
+    element: &XmlElement,
+    limits: SourceLimits,
+) -> Result<()> {
     let start_tag = source
         .get(element.start.clone())
         .ok_or_else(|| invalid("pivot value element start range is invalid"))?;
@@ -1927,7 +1931,11 @@ impl XStringCounter {
     }
 }
 
-fn decode_element_text(source: &[u8], element: &XmlElement, limits: ReadLimits) -> Result<String> {
+fn decode_element_text(
+    source: &[u8],
+    element: &XmlElement,
+    limits: SourceLimits,
+) -> Result<String> {
     let start_tag = source
         .get(element.start.clone())
         .ok_or_else(|| invalid("pivot value element start range is invalid"))?;
@@ -2325,7 +2333,7 @@ fn states_equal(snapshot: &Snapshot, staged: &[CellState]) -> bool {
             .all(|(record, state)| record.state == *state)
 }
 
-fn validate_edited_text(value: &str, limits: ReadLimits) -> Result<()> {
+fn validate_edited_text(value: &str, limits: SourceLimits) -> Result<()> {
     if value.len() > caller_attribute_limit(limits) {
         return Err(invalid("pivotTableData text exceeds its caller limit"));
     }
@@ -2346,7 +2354,7 @@ fn validate_edited_text(value: &str, limits: ReadLimits) -> Result<()> {
 fn apply_extra_edit(
     extra: &mut ExtraState,
     edit: PivotValueCellExtraEdit,
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<()> {
     apply_hex_edit(&mut extra.background_color, edit.background_color, limits)?;
     apply_hex_edit(&mut extra.foreground_color, edit.foreground_color, limits)?;
@@ -2360,7 +2368,7 @@ fn apply_extra_edit(
 fn apply_hex_edit(
     slot: &mut Option<u32>,
     edit: PivotValueAttributeEdit<String>,
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<()> {
     match edit {
         PivotValueAttributeEdit::Keep => {},
@@ -2403,7 +2411,7 @@ fn stage_set_value(
     staged_text_bytes: &mut usize,
     address: PivotCellAddress,
     value: PivotCellValueEdit,
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<bool> {
     let position = staged_cell_position(positions, address)?;
     let kind = staged
@@ -2488,7 +2496,7 @@ fn stage_set_borrowed_value(
     address: PivotCellAddress,
     expected_kind: PivotCellType,
     value: &str,
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<bool> {
     let position = staged_cell_position(positions, address)?;
     let kind = staged
@@ -2548,7 +2556,7 @@ fn stage_set_extra(
     positions: &HashMap<PivotCellAddress, CellPosition>,
     address: PivotCellAddress,
     edit: PivotValueCellExtraEdit,
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<bool> {
     let position = staged_cell_position(positions, address)?;
     let slot = staged
@@ -3213,11 +3221,11 @@ fn attribute_insertion(source: &[u8], owner: &Range<usize>, _value_len: usize) -
     ))
 }
 
-fn caller_part_limit(limits: ReadLimits) -> usize {
+fn caller_part_limit(limits: SourceLimits) -> usize {
     MAX_PART_BYTES.min(usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX))
 }
 
-fn caller_attribute_limit(limits: ReadLimits) -> usize {
+fn caller_attribute_limit(limits: SourceLimits) -> usize {
     MAX_ATTRIBUTE_TEXT_BYTES.min(limits.max_xml_attribute_bytes())
 }
 
@@ -3813,11 +3821,11 @@ mod tests {
             r#"</x15:pivotRow></x15:pivotTableData></ext></extLst></pivotTableDefinition>"#,
         );
         let source = xml.into_bytes();
-        let scan = scan_xml(&source, "pivotTableDefinition", ReadLimits::default()).unwrap();
+        let scan = scan_xml(&source, "pivotTableDefinition", SourceLimits::default()).unwrap();
         LOCAL_SUBTREE_BOUNDARY_VISITS.with(|counter| counter.set(0));
         let mut retained = RetainedBudget::new(PivotTableDataLimits::default());
         let parsed =
-            parse_data_payload(&scan, &source, 7, ReadLimits::default(), &mut retained).unwrap();
+            parse_data_payload(&scan, &source, 7, SourceLimits::default(), &mut retained).unwrap();
         assert_eq!(parsed.cells.len(), cell_count);
         LOCAL_SUBTREE_BOUNDARY_VISITS.with(Cell::get)
     }

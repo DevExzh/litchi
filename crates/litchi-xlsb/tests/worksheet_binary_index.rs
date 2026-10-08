@@ -29,7 +29,7 @@ use litchi_xlsb::cell_values::{Reference, StyleIndex, Value};
 use litchi_xlsb::package::PackageError;
 use litchi_xlsb::raw::{Header, Kind, Limits as RawLimits, Records, Writer, kind};
 use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
-use litchi_xlsb::{ReadLimits, SourceBackedWorkbook, Workbook};
+use litchi_xlsb::{SourceBackedWorkbook, SourceLimits, Workbook};
 
 const SHEET1: &str = "/xl/worksheets/sheet1.bin";
 const INDEX1: &str = "/xl/worksheets/binaryIndex1.bin";
@@ -913,7 +913,7 @@ fn indexed_handle_refuses_stale_source_and_cancellation() {
         Arc::new(OwnedSource::new(fixture(
             "test-data/ooxml/xlsb/sample.xlsb",
         ))),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .expect("managed source workbook");
@@ -980,7 +980,7 @@ fn managed_index_handle_keeps_worksheet_part_data_alive() {
     let (_cancellation_source, context) = managed_context();
     let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
         source.clone(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .expect("managed source workbook");

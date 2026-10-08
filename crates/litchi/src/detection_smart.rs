@@ -57,7 +57,7 @@ pub mod detected {
     #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
     pub fn detect_format_smart_with_limits(
         bytes: Vec<u8>,
-        limits: crate::opc::ReadLimits,
+        limits: crate::opc::SourceLimits,
     ) -> Option<DetectedFormat> {
         litchi_ops::detect::detect_format_smart_with_limits_and_tail(bytes, limits, &FacadeTail)
     }
@@ -160,7 +160,7 @@ pub mod functions {
         any(unix, windows)
     ))]
     pub fn detect_and_prepare<P: AsRef<Path>>(path: P) -> Option<PreparedDetection> {
-        detect_and_prepare_with_limits(path, crate::opc::ReadLimits::default())
+        detect_and_prepare_with_limits(path, crate::opc::SourceLimits::default())
     }
 
     /// Detect a file format and retain the OOXML package, with an explicit OPC
@@ -175,7 +175,7 @@ pub mod functions {
     ))]
     pub fn detect_and_prepare_with_limits<P: AsRef<Path>>(
         path: P,
-        limits: crate::opc::ReadLimits,
+        limits: crate::opc::SourceLimits,
     ) -> Option<PreparedDetection> {
         litchi_ops::detect::detect_and_prepare_with_limits_and_tail(path, limits, &FacadeTail)
     }

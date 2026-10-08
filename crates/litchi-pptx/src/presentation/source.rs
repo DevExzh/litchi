@@ -22,8 +22,8 @@ use litchi_core::{
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    PackURI, Part, PartData, PartView, ReadLimits, Relationships, SourceBackedPackage,
-    SourceCacheLimits, SourceLineage, SourceTopologyPlan, TargetMode,
+    PackURI, Part, PartData, PartView, Relationships, SourceBackedPackage, SourceCacheLimits,
+    SourceLimits, SourceLineage, SourceTopologyPlan, TargetMode,
 };
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
@@ -114,7 +114,7 @@ pub(super) struct SourceInner {
     // Retain the pinned mandatory root without relying on the OPC payload cache.
     _presentation: SourcePart,
     pub(super) slides: Box<[Arc<SourceSlideData>]>,
-    pub(super) limits: ReadLimits,
+    pub(super) limits: SourceLimits,
     /// Every non-structural defect repaired while the source was opened, in
     /// discovery order: the OPC manifest repairs folded from `litchi_opc`,
     /// then the slide-list repairs of audit finding 6.7. Repairs a
@@ -694,7 +694,7 @@ pub struct SourceBackedPresentationEditor {
     pub(super) slides: Box<[Arc<SourceSlideData>]>,
     package_relationships: Arc<[RelationshipBinding]>,
     presentation_binding: Arc<PartBinding>,
-    pub(super) limits: ReadLimits,
+    pub(super) limits: SourceLimits,
 }
 
 /// An immutable exact-source snapshot of one slide XML part.
@@ -794,7 +794,7 @@ pub struct SourceBackedSvgSnapshot {
     raster_part_uri: PackURI,
     svg: SourcePayload,
     raster: SourcePayload,
-    limits: ReadLimits,
+    limits: SourceLimits,
 }
 
 /// An exact-source transaction over one embedded PPTX SVG picture and its
@@ -892,12 +892,12 @@ impl SourceBackedPresentation {
     /// remains the source identity for the lifetime of this snapshot.
     #[cfg(any(unix, windows))]
     pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_path_with_limits(path, ReadLimits::default())
+        Self::from_path_with_limits(path, SourceLimits::default())
     }
 
     /// Open a filesystem-backed PPTX with explicit OPC resource limits.
     #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
+    pub fn from_path_with_limits(path: impl AsRef<Path>, limits: SourceLimits) -> Result<Self> {
         Self::from_read_at_with_limits(file_source(path)?, limits)
     }
 
@@ -914,7 +914,7 @@ impl SourceBackedPresentation {
     #[cfg(any(unix, windows))]
     pub fn from_path_with_limits_and_cache_limits(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
     ) -> Result<Self> {
         Self::from_read_at_with_limits_and_cache_limits(file_source(path)?, limits, cache_limits)
@@ -925,7 +925,7 @@ impl SourceBackedPresentation {
     #[cfg(any(unix, windows))]
     pub fn from_path_with_execution_context(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_read_at_with_execution_context(file_source(path)?, limits, context)
@@ -936,7 +936,7 @@ impl SourceBackedPresentation {
     #[cfg(any(unix, windows))]
     pub fn from_path_with_limits_and_execution_context(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_read_at_with_limits_and_execution_context(file_source(path)?, limits, context)
@@ -947,7 +947,7 @@ impl SourceBackedPresentation {
     #[cfg(any(unix, windows))]
     pub fn from_path_with_limits_and_cache_limits_and_execution_context(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
@@ -967,7 +967,7 @@ impl SourceBackedPresentation {
 
     /// Open a filesystem-backed PPTX with explicit OPC resource limits.
     #[cfg(any(unix, windows))]
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
+    pub fn open_with_limits(path: impl AsRef<Path>, limits: SourceLimits) -> Result<Self> {
         Self::from_path_with_limits(path, limits)
     }
 
@@ -984,7 +984,7 @@ impl SourceBackedPresentation {
     #[cfg(any(unix, windows))]
     pub fn open_with_limits_and_cache_limits(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
     ) -> Result<Self> {
         Self::from_path_with_limits_and_cache_limits(path, limits, cache_limits)
@@ -995,7 +995,7 @@ impl SourceBackedPresentation {
     #[cfg(any(unix, windows))]
     pub fn open_with_execution_context(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_path_with_execution_context(path, limits, context)
@@ -1006,7 +1006,7 @@ impl SourceBackedPresentation {
     #[cfg(any(unix, windows))]
     pub fn open_with_limits_and_execution_context(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_path_with_limits_and_execution_context(path, limits, context)
@@ -1017,7 +1017,7 @@ impl SourceBackedPresentation {
     #[cfg(any(unix, windows))]
     pub fn open_with_limits_and_cache_limits_and_execution_context(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
@@ -1036,7 +1036,7 @@ impl SourceBackedPresentation {
     /// Returns an error when the source, OPC catalog, presentation root, or
     /// presentation-to-slide graph is malformed.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, ReadLimits::default())
+        Self::from_read_at_with_limits(source, SourceLimits::default())
     }
 
     /// Open a PPTX source from a sequential reader using the standard bounded
@@ -1047,7 +1047,7 @@ impl SourceBackedPresentation {
     pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
         Self::from_source_backed_package_with_limits(
             SourceBackedPackage::from_reader(reader)?,
-            ReadLimits::default(),
+            SourceLimits::default(),
         )
     }
 
@@ -1055,7 +1055,7 @@ impl SourceBackedPresentation {
     ///
     /// Reader ingestion is bounded by `limits.max_input_bytes()`, and slide
     /// payloads remain deferred after the presentation graph is indexed.
-    pub fn from_reader_with_limits<R: Read>(reader: R, limits: ReadLimits) -> Result<Self> {
+    pub fn from_reader_with_limits<R: Read>(reader: R, limits: SourceLimits) -> Result<Self> {
         Self::from_source_backed_package_with_limits(
             SourceBackedPackage::from_reader_with_limits(reader, limits)?,
             limits,
@@ -1068,7 +1068,7 @@ impl SourceBackedPresentation {
     ///
     /// Returns an error when the source exceeds `limits`, changes while being
     /// read, or does not contain a coherent PresentationML catalog.
-    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
+    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: SourceLimits) -> Result<Self> {
         Self::from_source_backed_package_with_limits(
             SourceBackedPackage::from_read_at_with_limits(source, limits)?,
             limits,
@@ -1085,14 +1085,14 @@ impl SourceBackedPresentation {
     ) -> Result<Self> {
         Self::from_source_backed_package_with_limits(
             SourceBackedPackage::from_read_at_with_cache_limits(source, cache_limits)?,
-            ReadLimits::default(),
+            SourceLimits::default(),
         )
     }
 
     /// Open from a positional source with explicit read and cache policies.
     pub fn from_read_at_with_limits_and_cache_limits(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
     ) -> Result<Self> {
         Self::from_source_backed_package_with_limits(
@@ -1111,7 +1111,7 @@ impl SourceBackedPresentation {
     /// facade.
     pub fn from_read_at_with_execution_context(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_read_at_with_limits_and_execution_context(source, limits, context)
@@ -1121,7 +1121,7 @@ impl SourceBackedPresentation {
     /// policies while retaining the default finite source cache.
     pub fn from_read_at_with_limits_and_execution_context(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_source_backed_package_with_limits(
@@ -1134,7 +1134,7 @@ impl SourceBackedPresentation {
     /// hierarchical execution policies.
     pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
@@ -1164,7 +1164,7 @@ impl SourceBackedPresentation {
 
     fn from_source_backed_package_with_limits(
         package: SourceBackedPackage,
-        limits: ReadLimits,
+        limits: SourceLimits,
     ) -> Result<Self> {
         package.check_execution()?;
         let mut tolerance = crate::leniency::ToleranceReport::default();
@@ -1578,12 +1578,12 @@ impl SourceBackedPresentationEditor {
     /// identity for the lifetime of this owning editor.
     #[cfg(any(unix, windows))]
     pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_path_with_limits(path, ReadLimits::default())
+        Self::from_path_with_limits(path, SourceLimits::default())
     }
 
     /// Open a filesystem-backed PPTX with explicit OPC resource limits.
     #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
+    pub fn from_path_with_limits(path: impl AsRef<Path>, limits: SourceLimits) -> Result<Self> {
         Self::from_read_at_with_limits(file_source(path)?, limits)
     }
 
@@ -1600,7 +1600,7 @@ impl SourceBackedPresentationEditor {
     #[cfg(any(unix, windows))]
     pub fn from_path_with_limits_and_cache_limits(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
     ) -> Result<Self> {
         Self::from_read_at_with_limits_and_cache_limits(file_source(path)?, limits, cache_limits)
@@ -1611,7 +1611,7 @@ impl SourceBackedPresentationEditor {
     #[cfg(any(unix, windows))]
     pub fn from_path_with_execution_context(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_read_at_with_execution_context(file_source(path)?, limits, context)
@@ -1622,7 +1622,7 @@ impl SourceBackedPresentationEditor {
     #[cfg(any(unix, windows))]
     pub fn from_path_with_limits_and_execution_context(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_read_at_with_limits_and_execution_context(file_source(path)?, limits, context)
@@ -1633,7 +1633,7 @@ impl SourceBackedPresentationEditor {
     #[cfg(any(unix, windows))]
     pub fn from_path_with_limits_and_cache_limits_and_execution_context(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
@@ -1653,7 +1653,7 @@ impl SourceBackedPresentationEditor {
 
     /// Open a filesystem-backed PPTX with explicit OPC resource limits.
     #[cfg(any(unix, windows))]
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
+    pub fn open_with_limits(path: impl AsRef<Path>, limits: SourceLimits) -> Result<Self> {
         Self::from_path_with_limits(path, limits)
     }
 
@@ -1670,7 +1670,7 @@ impl SourceBackedPresentationEditor {
     #[cfg(any(unix, windows))]
     pub fn open_with_limits_and_cache_limits(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
     ) -> Result<Self> {
         Self::from_path_with_limits_and_cache_limits(path, limits, cache_limits)
@@ -1681,7 +1681,7 @@ impl SourceBackedPresentationEditor {
     #[cfg(any(unix, windows))]
     pub fn open_with_execution_context(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_path_with_execution_context(path, limits, context)
@@ -1692,7 +1692,7 @@ impl SourceBackedPresentationEditor {
     #[cfg(any(unix, windows))]
     pub fn open_with_limits_and_execution_context(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_path_with_limits_and_execution_context(path, limits, context)
@@ -1703,7 +1703,7 @@ impl SourceBackedPresentationEditor {
     #[cfg(any(unix, windows))]
     pub fn open_with_limits_and_cache_limits_and_execution_context(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
@@ -1720,7 +1720,7 @@ impl SourceBackedPresentationEditor {
     /// Opening validates the OPC catalog, presentation root, and slide graph
     /// without materializing ordinary slide payloads.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, ReadLimits::default())
+        Self::from_read_at_with_limits(source, SourceLimits::default())
     }
 
     /// Open a PPTX source-backed editor from a sequential reader using the
@@ -1729,7 +1729,7 @@ impl SourceBackedPresentationEditor {
     /// The reader is consumed once into the source-backed positional owner;
     /// slide payloads remain deferred until a selected slide is captured.
     pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
-        Self::from_reader_with_limits(reader, ReadLimits::default())
+        Self::from_reader_with_limits(reader, SourceLimits::default())
     }
 
     /// Open a PPTX source-backed editor from a sequential reader with
@@ -1737,7 +1737,7 @@ impl SourceBackedPresentationEditor {
     ///
     /// Reader ingestion is bounded by `limits.max_input_bytes()`, and slide
     /// payloads remain deferred after the presentation graph is indexed.
-    pub fn from_reader_with_limits<R: Read>(reader: R, limits: ReadLimits) -> Result<Self> {
+    pub fn from_reader_with_limits<R: Read>(reader: R, limits: SourceLimits) -> Result<Self> {
         Self::from_source_backed_package(
             SourceBackedPackage::from_reader_with_limits(reader, limits)?,
             limits,
@@ -1745,7 +1745,7 @@ impl SourceBackedPresentationEditor {
     }
 
     /// Open an ordinary PPTX source with explicit OPC resource limits.
-    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
+    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: SourceLimits) -> Result<Self> {
         Self::from_source_backed_package(
             SourceBackedPackage::from_read_at_with_limits(source, limits)?,
             limits,
@@ -1760,14 +1760,14 @@ impl SourceBackedPresentationEditor {
     ) -> Result<Self> {
         Self::from_source_backed_package(
             SourceBackedPackage::from_read_at_with_cache_limits(source, cache_limits)?,
-            ReadLimits::default(),
+            SourceLimits::default(),
         )
     }
 
     /// Open a source-backed editor with explicit read and cache policies.
     pub fn from_read_at_with_limits_and_cache_limits(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
     ) -> Result<Self> {
         Self::from_source_backed_package(
@@ -1785,7 +1785,7 @@ impl SourceBackedPresentationEditor {
     /// edits, and no hidden executor is installed.
     pub fn from_read_at_with_execution_context(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_read_at_with_limits_and_execution_context(source, limits, context)
@@ -1794,7 +1794,7 @@ impl SourceBackedPresentationEditor {
     /// Open a source-backed editor with explicit read and execution policies.
     pub fn from_read_at_with_limits_and_execution_context(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_source_backed_package(
@@ -1807,7 +1807,7 @@ impl SourceBackedPresentationEditor {
     /// execution policies.
     pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
@@ -1825,7 +1825,7 @@ impl SourceBackedPresentationEditor {
     /// Build an owning editor from a validated deferred OPC package.
     fn from_source_backed_package(
         package: SourceBackedPackage,
-        limits: ReadLimits,
+        limits: SourceLimits,
     ) -> Result<Self> {
         package.check_execution()?;
         // The lossless editor keeps the strict slide-list contract.
@@ -3150,7 +3150,7 @@ fn stage_svg_payload(current: &SourcePayload, replacement: Vec<u8>) -> SourcePay
     SourcePayload::Edited(Arc::new(replacement))
 }
 
-fn check_svg_replacement_payload(limits: &ReadLimits, bytes: usize, svg: bool) -> Result<()> {
+fn check_svg_replacement_payload(limits: &SourceLimits, bytes: usize, svg: bool) -> Result<()> {
     if bytes as u64 > limits.max_part_bytes() {
         return Err(Error::Limit {
             resource: if svg {
@@ -5101,7 +5101,7 @@ fn validate_slide_graph(
     Ok(slides.into_boxed_slice())
 }
 
-fn source_slide_output_limit(limits: ReadLimits) -> usize {
+fn source_slide_output_limit(limits: SourceLimits) -> usize {
     let bounded = limits
         .max_part_bytes()
         .min(limits.max_archive_entry_bytes())
@@ -5211,7 +5211,7 @@ mod tests {
         Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, ReadAt, Resource,
         SourceVersion,
     };
-    use litchi_opc::{PackURI, ReadLimits, ReadResource, SourceBackedPackage};
+    use litchi_opc::{PackURI, ReadResource, SourceBackedPackage, SourceLimits};
     use soapberry_zip::office::StreamingArchiveWriter;
     #[cfg(any(unix, windows))]
     use tempfile::NamedTempFile;
@@ -5857,7 +5857,7 @@ mod tests {
         let exact_editor =
             SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
                 exact_source.clone(),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 exact_context,
             )
             .unwrap();
@@ -5880,7 +5880,7 @@ mod tests {
         let under_editor =
             SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
                 under_source.clone(),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 under_context,
             )
             .unwrap();
@@ -5897,7 +5897,7 @@ mod tests {
         let (budget, _cancel, context) = source_backed_context(archive.len() as u64);
         let editor = SourceBackedPresentationEditor::from_read_at_with_execution_context(
             source,
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -6165,7 +6165,7 @@ mod tests {
         let (budget, cancellation_source, context) = source_backed_context(u64::MAX);
         let presentation = SourceBackedPresentation::from_read_at_with_execution_context(
             source,
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -6192,7 +6192,7 @@ mod tests {
         let (budget, _cancel, context) = source_backed_context(u64::MAX);
         let presentation = SourceBackedPresentation::from_read_at_with_execution_context(
             source,
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -6215,7 +6215,7 @@ mod tests {
         let (budget, _cancel, context) = source_backed_context(u64::MAX);
         let presentation = SourceBackedPresentation::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -6264,7 +6264,7 @@ mod tests {
         let (budget, _cancel, context) = source_backed_context(u64::MAX);
         let editor = SourceBackedPresentationEditor::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -6306,7 +6306,7 @@ mod tests {
         let cache_limits = litchi_opc::SourceCacheLimits::new(usize::MAX, 2).unwrap();
         let presentation = SourceBackedPresentation::from_read_at_with_limits_and_cache_limits_and_execution_context(
             source,
-            ReadLimits::default(),
+            SourceLimits::default(),
             cache_limits,
             context,
         )
@@ -6349,7 +6349,7 @@ mod tests {
         let (_budget, cancellation_source, context) = source_backed_context(u64::MAX);
         let editor = SourceBackedPresentationEditor::from_read_at_with_execution_context(
             Arc::new(CountingSource::new(source_backed_pptx())),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -6959,7 +6959,7 @@ mod tests {
         ));
 
         let source = Arc::new(PictureCountingSource::new(embedded_picture_pptx()));
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_part_bytes(1024)
             .unwrap()
             .build()
@@ -6992,7 +6992,7 @@ mod tests {
         assert!(matches!(
             SourceBackedPackage::from_read_at_with_execution_context(
                 source.clone(),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 context,
             ),
             Err(litchi_opc::OpcError::Cancelled)
@@ -7027,7 +7027,7 @@ mod tests {
         let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -7062,7 +7062,7 @@ mod tests {
     #[test]
     fn opening_retains_caller_part_limits_without_reading_slide_payloads() {
         let source = Arc::new(CountingSource::new(source_backed_pptx()));
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_part_bytes(1024)
             .unwrap()
             .build()
@@ -7099,7 +7099,7 @@ mod tests {
             2
         );
         assert_eq!(
-            SourceBackedPresentation::from_path_with_limits(file.path(), ReadLimits::default())
+            SourceBackedPresentation::from_path_with_limits(file.path(), SourceLimits::default())
                 .unwrap()
                 .slide_count(),
             2
@@ -7113,7 +7113,7 @@ mod tests {
         assert_eq!(
             SourceBackedPresentation::from_path_with_limits_and_cache_limits(
                 file.path(),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 cache,
             )
             .unwrap()
@@ -7123,7 +7123,7 @@ mod tests {
         assert_eq!(
             SourceBackedPresentation::open_with_limits_and_cache_limits(
                 file.path(),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 cache,
             )
             .unwrap()
@@ -7135,7 +7135,7 @@ mod tests {
         assert_eq!(
             SourceBackedPresentation::from_path_with_execution_context(
                 file.path(),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 context,
             )
             .unwrap()
@@ -7147,7 +7147,7 @@ mod tests {
         assert_eq!(
             SourceBackedPresentation::from_path_with_limits_and_execution_context(
                 file.path(),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 context,
             )
             .unwrap()
@@ -7159,7 +7159,7 @@ mod tests {
         assert_eq!(
             SourceBackedPresentation::open_with_limits_and_cache_limits_and_execution_context(
                 file.path(),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 cache,
                 context,
             )
@@ -7183,7 +7183,7 @@ mod tests {
         assert_eq!(
             SourceBackedPresentationEditor::from_path_with_limits_and_cache_limits(
                 file.path(),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 cache,
             )
             .unwrap()
@@ -7194,7 +7194,7 @@ mod tests {
         assert_eq!(
             SourceBackedPresentationEditor::open_with_limits_and_cache_limits_and_execution_context(
                 file.path(),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 cache,
                 context,
             )
@@ -7254,7 +7254,7 @@ mod tests {
         let presentation =
             SourceBackedPresentation::from_path_with_limits_and_cache_limits_and_execution_context(
                 file.path(),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 cache,
                 context,
             )
@@ -7335,7 +7335,7 @@ mod tests {
 
         let archive = source_backed_pptx();
         let file = temporary_source(&archive);
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_part_bytes(1024)
             .unwrap()
             .build()
@@ -7406,7 +7406,7 @@ mod picture_fragment_tests {
     fn parse_picture_relationship(xml: &[u8]) -> crate::Result<super::PictureRelationship> {
         super::parse_picture_relationship_with_limit(
             xml,
-            litchi_opc::ReadLimits::default().max_part_bytes(),
+            litchi_opc::SourceLimits::default().max_part_bytes(),
         )
     }
 

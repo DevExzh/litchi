@@ -2,7 +2,7 @@
 
 use super::{invalid_source, validate_source_xml};
 use crate::xml_attributes::BytesStartExt as _;
-use crate::{OpcError, PackURI, ReadLimits, Result};
+use crate::{OpcError, PackURI, Result, SourceLimits};
 use litchi_core::xml::ReaderOrigin;
 use quick_xml::{events::Event, reader::NsReader};
 use std::{collections::HashMap, fmt, ops::Range, sync::Arc};
@@ -76,7 +76,7 @@ impl fmt::Debug for OwnedXmlPart {
 }
 
 impl OwnedXmlPart {
-    pub(crate) fn check_capture_member_name(name: &PackURI, limits: ReadLimits) -> Result<()> {
+    pub(crate) fn check_capture_member_name(name: &PackURI, limits: SourceLimits) -> Result<()> {
         limits.check(
             crate::ReadResource::ArchiveMemberNameBytes,
             name.membername().len() as u64,
@@ -89,7 +89,7 @@ impl OwnedXmlPart {
     /// of the allocation performed by [`PackURI::rels_uri`].
     pub(crate) fn check_derived_capture_member_name(
         owner: &PackURI,
-        limits: ReadLimits,
+        limits: SourceLimits,
     ) -> Result<()> {
         let base_uri = owner.base_uri();
         let prefix_len = if base_uri == "/" {
@@ -127,7 +127,7 @@ impl OwnedXmlPart {
     pub(crate) fn check_capture_size(
         name: &PackURI,
         bytes_len: usize,
-        limits: ReadLimits,
+        limits: SourceLimits,
     ) -> Result<()> {
         Self::check_capture_member_name(name, limits)?;
         Self::check_capture_bytes(bytes_len, limits)
@@ -135,7 +135,7 @@ impl OwnedXmlPart {
 
     /// Check the bounded byte ceilings shared by source and canonical XML
     /// capture before any owned XML buffer is allocated.
-    pub(crate) fn check_capture_bytes(bytes_len: usize, limits: ReadLimits) -> Result<()> {
+    pub(crate) fn check_capture_bytes(bytes_len: usize, limits: SourceLimits) -> Result<()> {
         limits.check(
             crate::ReadResource::PartBytes,
             bytes_len as u64,
@@ -336,7 +336,7 @@ impl OwnedXmlPart {
             cursor = splice.range.end;
         }
         bytes.extend_from_slice(&self.bytes[cursor..]);
-        validate_source_xml(&self.name, &bytes, ReadLimits::default(), None)?;
+        validate_source_xml(&self.name, &bytes, SourceLimits::default(), None)?;
         Ok(Self {
             name: self.name.clone(),
             content_type: self.content_type.clone(),
@@ -349,7 +349,7 @@ impl OwnedXmlPart {
         content_type: String,
         bytes: Arc<Vec<u8>>,
     ) -> Result<Self> {
-        Self::capture_with_limits(name, content_type, bytes, ReadLimits::default())
+        Self::capture_with_limits(name, content_type, bytes, SourceLimits::default())
     }
 
     /// Admit and validate one source XML publication without retaining an
@@ -361,7 +361,7 @@ impl OwnedXmlPart {
         name: &PackURI,
         content_type: &str,
         bytes: &[u8],
-        limits: ReadLimits,
+        limits: SourceLimits,
     ) -> Result<()> {
         Self::check_capture_size(name, bytes.len(), limits)?;
         if !xml_minifier::audit::package::is_xml_part(name.as_str(), content_type) {
@@ -374,7 +374,7 @@ impl OwnedXmlPart {
         name: PackURI,
         content_type: String,
         bytes: Arc<Vec<u8>>,
-        limits: ReadLimits,
+        limits: SourceLimits,
     ) -> Result<Self> {
         Self::preflight_capture_with_limits(&name, &content_type, &bytes, limits)?;
         Ok(Self {
@@ -439,7 +439,7 @@ impl OwnedXmlPart {
                 part: self.name.to_string(),
                 source,
             })?;
-            validate_source_xml(&self.name, element, ReadLimits::default(), None)?;
+            validate_source_xml(&self.name, element, SourceLimits::default(), None)?;
         }
         let value = element.unwrap_or_default();
         let range = if append {
@@ -485,7 +485,7 @@ impl OwnedXmlPart {
             bytes.push(b'>');
         }
         bytes.extend_from_slice(&self.bytes[range.end..]);
-        validate_source_xml(&self.name, &bytes, ReadLimits::default(), None)?;
+        validate_source_xml(&self.name, &bytes, SourceLimits::default(), None)?;
         Ok(Self {
             name: self.name.clone(),
             content_type: self.content_type.clone(),
@@ -635,7 +635,7 @@ impl OwnedXmlPart {
         bytes.extend_from_slice(escaped_value);
         bytes.push(b'"');
         bytes.extend_from_slice(&self.bytes[insertion..]);
-        validate_source_xml(&self.name, &bytes, ReadLimits::default(), None)?;
+        validate_source_xml(&self.name, &bytes, SourceLimits::default(), None)?;
         Ok(Self {
             name: self.name.clone(),
             content_type: self.content_type.clone(),
@@ -735,7 +735,7 @@ impl OwnedXmlPart {
             cursor = range.end;
         }
         bytes.extend_from_slice(&self.bytes[cursor..]);
-        validate_source_xml(&self.name, &bytes, ReadLimits::default(), None)?;
+        validate_source_xml(&self.name, &bytes, SourceLimits::default(), None)?;
         Ok(Self {
             name: self.name.clone(),
             content_type: self.content_type.clone(),
@@ -1436,7 +1436,7 @@ mod tests {
     fn bounded_owned_xml_capture_checks_part_quota_before_malformed_source() {
         let name = PackURI::new("/part.xml").unwrap();
         let malformed = Arc::new(b"<broken".to_vec());
-        let under = ReadLimits::builder()
+        let under = SourceLimits::builder()
             .max_part_bytes((malformed.len() - 1) as u64)
             .unwrap()
             .build()
@@ -1455,7 +1455,7 @@ mod tests {
             }) if actual == malformed.len() as u64 && maximum == (malformed.len() - 1) as u64
         ));
 
-        let exact = ReadLimits::builder()
+        let exact = SourceLimits::builder()
             .max_part_bytes(malformed.len() as u64)
             .unwrap()
             .build()
@@ -1470,7 +1470,7 @@ mod tests {
     fn bounded_owned_xml_capture_checks_member_name_and_fixed_size_before_xml() {
         let name = PackURI::new("/part.xml").unwrap();
         let member_name_bytes = name.membername().len();
-        let exact = ReadLimits::builder()
+        let exact = SourceLimits::builder()
             .max_archive_member_name_bytes(member_name_bytes as u64)
             .unwrap()
             .build()
@@ -1485,7 +1485,7 @@ mod tests {
             .is_ok()
         );
 
-        let under = ReadLimits::builder()
+        let under = SourceLimits::builder()
             .max_archive_member_name_bytes((member_name_bytes - 1) as u64)
             .unwrap()
             .build()
@@ -1508,7 +1508,7 @@ mod tests {
             OwnedXmlPart::check_capture_size(
                 &name,
                 MAX_OWNED_XML_BYTES + 1,
-                ReadLimits::default(),
+                SourceLimits::default(),
             ),
             Err(OpcError::SourceBackedOverlayUnavailable { reason })
                 if reason.contains("32 MiB")

@@ -13,7 +13,7 @@ use std::sync::{
 };
 
 use litchi_core::{OwnedSource, ReadAt};
-use litchi_opc::{OpcError, PackURI, ReadLimits, ReadResource, SourceBackedPackage};
+use litchi_opc::{OpcError, PackURI, ReadResource, SourceBackedPackage, SourceLimits};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const CONTENT_TYPES_NS: &str = "http://schemas.openxmlformats.org/package/2006/content-types";
@@ -132,7 +132,7 @@ impl Read for InvalidCountReader {
 fn reader_ingress_consumes_once_and_keeps_ordinary_payloads_cold() {
     let source = archive_bytes();
     let input_length = source.len();
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_input_bytes(input_length as u64)
         .unwrap()
         .build()
@@ -159,7 +159,7 @@ fn reader_ingress_consumes_once_and_keeps_ordinary_payloads_cold() {
 fn reader_ingress_rejects_input_above_max_input_bytes() {
     let source = archive_bytes();
     let configured_max = source.len() - 1;
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_input_bytes(configured_max as u64)
         .unwrap()
         .build()
@@ -187,7 +187,7 @@ fn reader_ingress_rejects_input_above_max_input_bytes() {
 fn reader_ingress_retries_one_interrupted_read() {
     let source = archive_bytes();
     let input_length = source.len();
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_input_bytes(input_length as u64)
         .unwrap()
         .build()
@@ -206,7 +206,7 @@ fn reader_ingress_retries_one_interrupted_read() {
 #[test]
 fn reader_ingress_rejects_invalid_read_count_without_panicking() {
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        SourceBackedPackage::from_reader_with_limits(InvalidCountReader, ReadLimits::default())
+        SourceBackedPackage::from_reader_with_limits(InvalidCountReader, SourceLimits::default())
     }));
     let result = result.expect("an invalid Read count must not panic public ingress");
     let error = match result {
@@ -222,7 +222,7 @@ fn reader_ingress_rejects_invalid_read_count_without_panicking() {
 
 fn assert_index_limit_is_typed_for_both_sources(
     source: &[u8],
-    limits: ReadLimits,
+    limits: SourceLimits,
     expected: ReadResource,
     expected_actual: u64,
     expected_maximum: u64,
@@ -260,7 +260,7 @@ fn assert_index_limit_is_typed_for_both_sources(
 #[test]
 fn indexed_archive_limits_remain_typed_for_vec_and_read_at_ingress() {
     let source = archive_bytes();
-    let member_limits = ReadLimits::builder()
+    let member_limits = SourceLimits::builder()
         .max_archive_members(1)
         .unwrap()
         .max_parts(1)
@@ -272,7 +272,7 @@ fn indexed_archive_limits_remain_typed_for_vec_and_read_at_ingress() {
     let profiles = [
         (member_limits, ReadResource::ArchiveMembers, 2, 1),
         (
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_archive_metadata_bytes(1)
                 .unwrap()
                 .build()
@@ -282,7 +282,7 @@ fn indexed_archive_limits_remain_typed_for_vec_and_read_at_ingress() {
             1,
         ),
         (
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_archive_member_name_bytes(1)
                 .unwrap()
                 .build()
@@ -292,7 +292,7 @@ fn indexed_archive_limits_remain_typed_for_vec_and_read_at_ingress() {
             1,
         ),
         (
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_archive_compressed_bytes(1)
                 .unwrap()
                 .build()
@@ -302,7 +302,7 @@ fn indexed_archive_limits_remain_typed_for_vec_and_read_at_ingress() {
             1,
         ),
         (
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_archive_entry_bytes(1)
                 .unwrap()
                 .build()
@@ -312,7 +312,7 @@ fn indexed_archive_limits_remain_typed_for_vec_and_read_at_ingress() {
             1,
         ),
         (
-            ReadLimits::builder()
+            SourceLimits::builder()
                 .max_archive_total_bytes(1)
                 .unwrap()
                 .build()

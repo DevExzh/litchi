@@ -17,7 +17,7 @@ use litchi_core::{
     OwnedSource, Position, ReadAt, Resource, SourceVersion,
 };
 use litchi_docx::document::{Error as TransactionError, ParagraphTextReplacement, Refusal};
-use litchi_docx::{Error, ReadLimits, source_backed};
+use litchi_docx::{Error, SourceLimits, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcError, OpcPackage, PackURI};
 use soapberry_zip::office::StreamingArchiveWriter;
@@ -145,7 +145,7 @@ fn managed_with_work(
     let (budget, cancellation_source, context) = managed_context(memory, work);
     let package = source_backed::Package::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(bytes)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -333,7 +333,7 @@ fn managed_batch_forward_and_inverse_are_source_checked() {
     let (mutable_budget, _mutable_cancel, context) = managed_context(FINITE_MEMORY, FINITE_WORK);
     let package = source_backed::Package::from_read_at_with_execution_context(
         mutable.clone(),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();

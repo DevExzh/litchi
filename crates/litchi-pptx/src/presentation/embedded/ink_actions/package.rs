@@ -646,7 +646,7 @@ fn validate_relationship_sources(package: &OpcPackage) -> Result<()> {
 
 fn validate_relationship_source(
     source: &OwnedRelationships,
-    limits: litchi_opc::ReadLimits,
+    limits: litchi_opc::SourceLimits,
     relationship_parts: &mut usize,
     total_xml_bytes: &mut usize,
     total_xml_events: &mut usize,

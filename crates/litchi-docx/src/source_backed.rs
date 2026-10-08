@@ -362,7 +362,7 @@ impl Package {
     #[cfg(any(unix, windows))]
     pub fn from_path_with_limits(
         path: impl AsRef<Path>,
-        limits: litchi_opc::ReadLimits,
+        limits: litchi_opc::SourceLimits,
     ) -> Result<Self> {
         Self::from_read_at_with_limits(file_source(path)?, limits)
     }
@@ -382,7 +382,7 @@ impl Package {
     #[cfg(any(unix, windows))]
     pub fn from_path_with_limits_and_cache_limits(
         path: impl AsRef<Path>,
-        limits: litchi_opc::ReadLimits,
+        limits: litchi_opc::SourceLimits,
         cache_limits: SourceCacheLimits,
     ) -> Result<Self> {
         Self::from_read_at_with_limits_and_cache_limits(file_source(path)?, limits, cache_limits)
@@ -408,7 +408,7 @@ impl Package {
     #[cfg(any(unix, windows))]
     pub fn from_path_with_execution_context(
         path: impl AsRef<Path>,
-        limits: litchi_opc::ReadLimits,
+        limits: litchi_opc::SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_read_at_with_execution_context(file_source(path)?, limits, context)
@@ -419,7 +419,7 @@ impl Package {
     #[cfg(any(unix, windows))]
     pub fn from_path_with_limits_and_execution_context(
         path: impl AsRef<Path>,
-        limits: litchi_opc::ReadLimits,
+        limits: litchi_opc::SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_read_at_with_limits_and_execution_context(file_source(path)?, limits, context)
@@ -430,7 +430,7 @@ impl Package {
     #[cfg(any(unix, windows))]
     pub fn from_path_with_limits_and_cache_limits_and_execution_context(
         path: impl AsRef<Path>,
-        limits: litchi_opc::ReadLimits,
+        limits: litchi_opc::SourceLimits,
         cache_limits: SourceCacheLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
@@ -465,7 +465,7 @@ impl Package {
     /// ordinary package payloads remain deferred after the source is indexed.
     pub fn from_reader_with_limits<R: Read>(
         reader: R,
-        limits: litchi_opc::ReadLimits,
+        limits: litchi_opc::SourceLimits,
     ) -> Result<Self> {
         Self::from_source_backed(SourceBackedPackage::from_reader_with_limits(
             reader, limits,
@@ -478,7 +478,7 @@ impl Package {
     /// does not decompress or materialize the main-document payload.
     pub fn from_read_at_with_limits(
         source: Arc<dyn ReadAt>,
-        limits: litchi_opc::ReadLimits,
+        limits: litchi_opc::SourceLimits,
     ) -> Result<Self> {
         Self::from_source_backed(SourceBackedPackage::from_read_at_with_limits(
             source, limits,
@@ -504,7 +504,7 @@ impl Package {
     /// Open a DOCX source with explicit read and finite cache policies.
     pub fn from_read_at_with_limits_and_cache_limits(
         source: Arc<dyn ReadAt>,
-        limits: litchi_opc::ReadLimits,
+        limits: litchi_opc::SourceLimits,
         cache_limits: SourceCacheLimits,
     ) -> Result<Self> {
         Self::from_source_backed(
@@ -525,7 +525,7 @@ impl Package {
     ) -> Result<Self> {
         Self::from_read_at_with_limits_and_cache_limits_and_execution_context(
             source,
-            litchi_opc::ReadLimits::default(),
+            litchi_opc::SourceLimits::default(),
             cache_limits,
             context,
         )
@@ -539,7 +539,7 @@ impl Package {
     /// executor or global scheduler is installed.
     pub fn from_read_at_with_execution_context(
         source: Arc<dyn ReadAt>,
-        limits: litchi_opc::ReadLimits,
+        limits: litchi_opc::SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_read_at_with_limits_and_cache_limits_and_execution_context(
@@ -554,7 +554,7 @@ impl Package {
     /// retaining the default finite deferred-part cache.
     pub fn from_read_at_with_limits_and_execution_context(
         source: Arc<dyn ReadAt>,
-        limits: litchi_opc::ReadLimits,
+        limits: litchi_opc::SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_read_at_with_execution_context(source, limits, context)
@@ -569,7 +569,7 @@ impl Package {
     /// refusals on this path.
     pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
         source: Arc<dyn ReadAt>,
-        limits: litchi_opc::ReadLimits,
+        limits: litchi_opc::SourceLimits,
         cache_limits: SourceCacheLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
@@ -591,7 +591,7 @@ impl Package {
     /// reads. Existing constructors remain exact.
     pub fn from_read_at_with_limits_and_cache_limits_and_source_read_policy(
         source: Arc<dyn ReadAt>,
-        limits: litchi_opc::ReadLimits,
+        limits: litchi_opc::SourceLimits,
         cache_limits: SourceCacheLimits,
         source_read_policy: SourceReadPolicy,
     ) -> Result<Self> {
@@ -612,7 +612,7 @@ impl Package {
     /// package is dropped. The same context bounds deferred semantic reads.
     pub fn from_read_at_with_limits_and_cache_limits_and_source_read_policy_and_execution_context(
         source: Arc<dyn ReadAt>,
-        limits: litchi_opc::ReadLimits,
+        limits: litchi_opc::SourceLimits,
         cache_limits: SourceCacheLimits,
         source_read_policy: SourceReadPolicy,
         context: ExecutionContext,

@@ -52,7 +52,7 @@ impl RelationshipPublicationSummary for RelationshipPreflight {
         Ok(self.final_bytes)
     }
 
-    fn output_events(&self, _limits: super::ReadLimits) -> Result<u64> {
+    fn output_events(&self, _limits: super::SourceLimits) -> Result<u64> {
         Ok(self.final_events)
     }
 

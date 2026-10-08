@@ -142,7 +142,7 @@ mod document_limit_arbitration {
     #[test]
     fn ordinary_odt_uses_native_policy_but_ooxml_suffix_honors_docx_input_limit() {
         let ordinary = odf_package(ODT_MIME, ODT_CONTENT);
-        let native_limits = litchi::docx::ReadLimits::builder()
+        let native_limits = litchi::docx::SourceLimits::builder()
             .max_input_bytes(1)
             .expect("positive input limit")
             .build()
@@ -185,7 +185,7 @@ mod document_limit_arbitration {
             let bytes = odt_docx_polyglot(catalog_name);
             let observed = u64::try_from(bytes.len()).expect("fixture length fits in u64");
             let maximum = observed - 1;
-            let limits = litchi::docx::ReadLimits::builder()
+            let limits = litchi::docx::SourceLimits::builder()
                 .max_input_bytes(maximum)
                 .expect("positive input limit")
                 .build()
@@ -375,7 +375,7 @@ mod ooxml_odf_arbitration {
     #[test]
     fn ordinary_odp_bytes_use_native_policy_before_pptx_limits() {
         let bytes = odf_package(ODP_MIME, ODP_CONTENT);
-        let limits = litchi::pptx::ReadLimits::builder()
+        let limits = litchi::pptx::SourceLimits::builder()
             .max_input_bytes(1)
             .expect("positive PPTX input limit")
             .build()
@@ -396,12 +396,12 @@ mod ooxml_odf_arbitration {
     #[test]
     fn tight_limits_do_not_fall_back_to_the_odp_marker() {
         let bytes = pptx_odf_polyglot();
-        let input_limits = litchi::pptx::ReadLimits::builder()
+        let input_limits = litchi::pptx::SourceLimits::builder()
             .max_input_bytes(u64::try_from(bytes.len() - 1).expect("fixture length fits in u64"))
             .expect("positive input limit")
             .build()
             .expect("limits are consistent");
-        let catalog_limits = litchi::pptx::ReadLimits::builder()
+        let catalog_limits = litchi::pptx::SourceLimits::builder()
             .max_content_types_bytes(1)
             .expect("positive content-types limit")
             .build()
@@ -452,7 +452,7 @@ mod ooxml_odf_arbitration {
             1
         );
 
-        let limits = litchi::pptx::ReadLimits::builder()
+        let limits = litchi::pptx::SourceLimits::builder()
             .max_input_bytes(1)
             .expect("positive input limit")
             .build()

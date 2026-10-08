@@ -870,10 +870,10 @@ mod standalone_ooxml_facade_tests {
         let _: Option<super::pptx::Package> = None;
         let _: Option<super::xlsx::Workbook> = None;
         let _: Option<super::xlsb::Workbook> = None;
-        let _: Option<super::docx::ReadLimits> = None;
-        let _: Option<super::pptx::ReadLimits> = None;
-        let _: Option<super::xlsx::ReadLimits> = None;
-        let _: Option<super::xlsb::ReadLimits> = None;
+        let _: Option<super::docx::SourceLimits> = None;
+        let _: Option<super::pptx::SourceLimits> = None;
+        let _: Option<super::xlsx::SourceLimits> = None;
+        let _: Option<super::xlsb::SourceLimits> = None;
         let _: Option<super::opc::OpcPackage> = None;
         let _: Option<super::ooxml_common::custom::Props> = None;
     }

@@ -921,7 +921,7 @@ impl Parser {
 }
 
 pub fn parse(xml: &str) -> Result<Option<Drawing>> {
-    parse_with_limits(xml, &litchi_opc::ReadLimits::default())
+    parse_with_limits(xml, &litchi_opc::SourceLimits::default())
 }
 
 /// Parse a worksheet drawing under the caller's retained package read policy.
@@ -932,7 +932,7 @@ pub fn parse(xml: &str) -> Result<Option<Drawing>> {
 /// the caller's part budget before semantic allocations begin.
 pub(crate) fn parse_with_limits(
     xml: &str,
-    caller: &litchi_opc::ReadLimits,
+    caller: &litchi_opc::SourceLimits,
 ) -> Result<Option<Drawing>> {
     let caller_part_bytes = usize::try_from(caller.max_part_bytes()).unwrap_or(usize::MAX);
     let max_xml_bytes = MAX_DRAWING_XML_BYTES.min(caller_part_bytes);
@@ -1260,7 +1260,7 @@ mod tests {
         .xml;
         assert!(expanded.len() > xml.len());
 
-        let caller_limit = litchi_opc::ReadLimits::builder()
+        let caller_limit = litchi_opc::SourceLimits::builder()
             .max_part_bytes((expanded.len() - 1) as u64)
             .expect("positive part limit")
             .build()
@@ -1272,7 +1272,7 @@ mod tests {
     #[test]
     fn exact_part_cap_accepts_unmodified_drawing_without_mce() {
         let xml = format!(r#"<wsDr xmlns="{XDR}"/>"#);
-        let caller_limit = litchi_opc::ReadLimits::builder()
+        let caller_limit = litchi_opc::SourceLimits::builder()
             .max_part_bytes(xml.len() as u64)
             .expect("positive part limit")
             .build()
@@ -1290,7 +1290,7 @@ mod tests {
         assert!(super::Parser::parse(&empty_root, 0, 8).is_err());
 
         let empty_child = format!(r#"<wsDr xmlns="{XDR}"><future/></wsDr>"#);
-        let caller_limit = litchi_opc::ReadLimits::builder()
+        let caller_limit = litchi_opc::SourceLimits::builder()
             .max_xml_depth(1)
             .expect("positive depth limit")
             .build()

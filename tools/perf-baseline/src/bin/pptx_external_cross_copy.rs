@@ -2,7 +2,7 @@
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, Resource,
 };
-use litchi_opc::{ReadLimits, SourceCacheLimits};
+use litchi_opc::{SourceCacheLimits, SourceLimits};
 use litchi_perf_baseline::pptx_range_source::{PptxRangeSource, PptxRangeSourceConfig};
 use litchi_pptx::{SourceBackedPresentation, SourceBackedPresentationEditor};
 use serde_json::{Value, json};
@@ -253,11 +253,11 @@ fn iteration(
     let source =
         SourceBackedPresentation::from_read_at_with_limits_and_cache_limits_and_execution_context(
             source_adapter.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             cache,
             source_context,
         )?;
-    let editor = SourceBackedPresentationEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(destination_adapter.clone(), ReadLimits::default(), cache, destination_context)?;
+    let editor = SourceBackedPresentationEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(destination_adapter.clone(), SourceLimits::default(), cache, destination_context)?;
     let open_ns = u64::try_from(started.elapsed().as_nanos())?;
     let opened =
         json!({"source":source_adapter.snapshot()?,"destination":destination_adapter.snapshot()?});

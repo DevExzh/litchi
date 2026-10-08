@@ -704,7 +704,7 @@ fn edited_relationships_keep_source_ids_verbatim_but_check_authored_ones() {
         .unwrap();
     let relationships = edited.get_part(&document).unwrap().rels();
     relationships
-        .plan_canonical(litchi_opc::ReadLimits::default())
+        .plan_canonical(litchi_opc::SourceLimits::default())
         .expect("a source Id admitted verbatim is carried forward");
     let mut saved = Vec::new();
     edited
@@ -730,7 +730,7 @@ fn edited_relationships_keep_source_ids_verbatim_but_check_authored_ones() {
         .unwrap();
     assert!(
         authored
-            .plan_canonical(litchi_opc::ReadLimits::default())
+            .plan_canonical(litchi_opc::SourceLimits::default())
             .is_err()
     );
 }

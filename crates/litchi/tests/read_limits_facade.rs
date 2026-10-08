@@ -24,7 +24,7 @@
 use std::path::{Path, PathBuf};
 
 use litchi::error::Source;
-use litchi::opc::{OpcError, ReadLimits, ReadResource};
+use litchi::opc::{OpcError, ReadResource, SourceLimits};
 use litchi::{Code, File, OpenOptions};
 
 fn fixture(relative: &str) -> PathBuf {
@@ -43,8 +43,8 @@ fn assert_openers_are_nameable() {
 }
 
 /// Limits whose input ceiling is one byte below `bytes`.
-fn one_byte_short(bytes: &[u8]) -> ReadLimits {
-    ReadLimits::builder()
+fn one_byte_short(bytes: &[u8]) -> SourceLimits {
+    SourceLimits::builder()
         .max_input_bytes(u64::try_from(bytes.len() - 1).expect("fixture length fits u64"))
         .expect("positive input limit")
         .build()
@@ -78,7 +78,7 @@ fn len(bytes: &[u8]) -> u64 {
 #[cfg(feature = "docx")]
 #[test]
 fn docx_limits_are_nameable() {
-    let limits: litchi::docx::ReadLimits = Default::default();
+    let limits: litchi::docx::SourceLimits = Default::default();
     // The DOCX limits are the OPC limits the unified opener takes.
     let _ = OpenOptions::new().ooxml_limits(limits);
     assert_openers_are_nameable();
@@ -116,7 +116,7 @@ fn document_limits_reject_invalid_suffix_and_unknown_extension_ooxml() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let invalid = directory.path().join("oversized.docx");
     std::fs::write(&invalid, vec![b'x'; 32]).expect("write invalid DOCX");
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_input_bytes(8)
         .expect("positive input limit")
         .build()
@@ -147,7 +147,7 @@ fn document_limits_reject_invalid_suffix_and_unknown_extension_ooxml() {
 #[cfg(feature = "pptx")]
 #[test]
 fn pptx_limits_are_nameable() {
-    let limits: litchi::pptx::ReadLimits = Default::default();
+    let limits: litchi::pptx::SourceLimits = Default::default();
     let _ = OpenOptions::new().ooxml_limits(limits);
     assert_openers_are_nameable();
 }
@@ -184,7 +184,7 @@ fn presentation_limits_reject_invalid_suffix_and_unknown_extension_ooxml() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let invalid = directory.path().join("oversized.pptx");
     std::fs::write(&invalid, vec![b'x'; 32]).expect("write invalid PPTX");
-    let limits = ReadLimits::builder()
+    let limits = SourceLimits::builder()
         .max_input_bytes(8)
         .expect("positive input limit")
         .build()
@@ -219,7 +219,7 @@ fn presentation_limits_reject_invalid_suffix_and_unknown_extension_ooxml() {
 #[cfg(feature = "xlsx")]
 #[test]
 fn xlsx_limits_and_bounded_sheet_helpers_are_nameable() {
-    let limits: litchi::xlsx::ReadLimits = Default::default();
+    let limits: litchi::xlsx::SourceLimits = Default::default();
     let _ = OpenOptions::new().ooxml_limits(limits);
     assert_openers_are_nameable();
 
@@ -248,7 +248,7 @@ fn xlsx_limits_and_bounded_sheet_helpers_are_nameable() {
 #[cfg(feature = "xlsb")]
 #[test]
 fn xlsb_limits_and_bounded_sheet_helpers_are_nameable() {
-    let limits: litchi::xlsb::ReadLimits = Default::default();
+    let limits: litchi::xlsb::SourceLimits = Default::default();
     let _ = OpenOptions::new().ooxml_limits(limits);
     assert_openers_are_nameable();
 

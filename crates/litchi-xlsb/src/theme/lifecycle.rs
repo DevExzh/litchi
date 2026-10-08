@@ -28,11 +28,11 @@ const DEFAULT_THEME_STEM: &str = "theme";
 const DEFAULT_THEME_EXTENSION: &str = "xml";
 
 fn relationship_output_limit() -> usize {
-    litchi_opc::ReadLimits::default().max_relationship_xml_bytes()
+    litchi_opc::SourceLimits::default().max_relationship_xml_bytes()
 }
 
 fn content_types_output_limit() -> usize {
-    litchi_opc::ReadLimits::default().max_content_types_bytes()
+    litchi_opc::SourceLimits::default().max_content_types_bytes()
 }
 
 /// An eager snapshot of the optional Workbook-owned Theme part.
@@ -631,7 +631,7 @@ pub(crate) fn read_owner(package: &OpcPackage, limits: Limits) -> Result<OwnerSn
     }
     workbook_relationships.sort_by(|left, right| left.id.cmp(&right.id));
     let part_names = collect_part_names(package)?;
-    let opc_limits = litchi_opc::ReadLimits::default();
+    let opc_limits = litchi_opc::SourceLimits::default();
     let workbook_relationship_xml =
         package.source_relationships_with_limits(workbook.partname(), opc_limits)?;
     let content_types = package.source_content_types_with_limits(opc_limits)?;
@@ -918,7 +918,7 @@ fn materialize(
 }
 
 fn restore_source_tokens(package: &mut OpcPackage, source: &OwnerSource) -> Result<()> {
-    let limits = litchi_opc::ReadLimits::default();
+    let limits = litchi_opc::SourceLimits::default();
     let workbook_name = PackURI::new(&source.workbook_name)
         .map_err(|error| Error::InvalidUri(error.to_string()))?;
     let current_workbook = package.source_relationships_with_limits(&workbook_name, limits)?;

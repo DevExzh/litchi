@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use litchi_core::{FileFormat, OwnedSource, ReadAt};
 use litchi_docx::section::Ownership;
-use litchi_opc::{OpcPackage, ReadLimits};
+use litchi_opc::{OpcPackage, SourceLimits};
 
 use super::{Docx, DocxEditor, DocxOwner};
 use crate::detect::{DetectedFormat, detect_format_smart};
@@ -133,7 +133,7 @@ fn paragraph_lines(paragraphs: &[litchi_docx::Paragraph]) -> String {
 /// report of the open-time text pass.
 fn eager_oracle(bytes: &[u8]) -> Oracle {
     let package = litchi_docx::Package::from_opc_package(
-        OpcPackage::from_bytes_with_limits(bytes, ReadLimits::default()).unwrap(),
+        OpcPackage::from_bytes_with_limits(bytes, SourceLimits::default()).unwrap(),
     )
     .unwrap();
     let document = package.document().unwrap();

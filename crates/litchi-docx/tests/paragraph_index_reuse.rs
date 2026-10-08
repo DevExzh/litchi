@@ -7,7 +7,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, ReadAt,
     Resource, SourceVersion, TextOutputOptions,
 };
-use litchi_docx::{Error, Package, ReadLimits, source_backed};
+use litchi_docx::{Error, Package, SourceLimits, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter};
 
@@ -404,7 +404,7 @@ fn cancellation_after_a_warm_index_is_checked_before_cache_reuse() {
     let (budget, cancellation_source, context) = managed_context(1 << 20);
     let package = source_backed::Package::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(bytes)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -440,7 +440,7 @@ fn managed_clean_index_pressure_does_not_refuse_a_following_text_sink() {
     let (budget, _cancellation_source, context) = managed_context(memory_limit);
     let package = source_backed::Package::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(bytes)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -486,7 +486,7 @@ fn managed_clean_index_pressure_does_not_block_core_metadata_read() {
     let (budget, _cancellation_source, context) = managed_context(memory_limit);
     let package = source_backed::Package::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(bytes)),
-        ReadLimits::default(),
+        SourceLimits::default(),
         context,
     )
     .unwrap();

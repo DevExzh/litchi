@@ -10,7 +10,7 @@
 use std::io::{self, Read};
 
 use litchi_opc::phys_pkg::OwnedPhysPkgReader;
-use litchi_opc::{OpcError, OpcPackage, PackURI, ReadLimits, ReadResource, SourceBackedPackage};
+use litchi_opc::{OpcError, OpcPackage, PackURI, ReadResource, SourceBackedPackage, SourceLimits};
 use soapberry_zip::office::StreamingArchiveWriter;
 use tempfile::NamedTempFile;
 
@@ -23,8 +23,8 @@ const DOCUMENT_CONTENT_TYPE: &str =
 const DOCUMENT_URI: &str = "/word/document.xml";
 const DOCUMENT_PAYLOAD: &[u8] = b"reader ingress parity payload";
 
-fn limits(maximum: usize) -> ReadLimits {
-    ReadLimits::builder()
+fn limits(maximum: usize) -> SourceLimits {
+    SourceLimits::builder()
         .max_input_bytes(maximum as u64)
         .expect("positive test input limit")
         .build()
@@ -142,7 +142,7 @@ fn take_error<T>(result: litchi_opc::Result<T>, message: &str) -> OpcError {
     }
 }
 
-fn document_from_physical(source: Vec<u8>, policy: ReadLimits) -> Vec<u8> {
+fn document_from_physical(source: Vec<u8>, policy: SourceLimits) -> Vec<u8> {
     let reader =
         OwnedPhysPkgReader::from_reader_with_limits(ChunkedReader::new(source, 3, 2), policy)
             .expect("physical reader ingress");
@@ -151,7 +151,7 @@ fn document_from_physical(source: Vec<u8>, policy: ReadLimits) -> Vec<u8> {
         .expect("physical document payload")
 }
 
-fn document_from_package(source: Vec<u8>, policy: ReadLimits) -> Vec<u8> {
+fn document_from_package(source: Vec<u8>, policy: SourceLimits) -> Vec<u8> {
     let package = OpcPackage::from_reader_with_limits(ChunkedReader::new(source, 3, 2), policy)
         .expect("eager package reader ingress");
     package
@@ -161,7 +161,7 @@ fn document_from_package(source: Vec<u8>, policy: ReadLimits) -> Vec<u8> {
         .to_vec()
 }
 
-fn document_from_source_backed(source: Vec<u8>, policy: ReadLimits) -> Vec<u8> {
+fn document_from_source_backed(source: Vec<u8>, policy: SourceLimits) -> Vec<u8> {
     let package =
         SourceBackedPackage::from_reader_with_limits(ChunkedReader::new(source, 3, 2), policy)
             .expect("source-backed reader ingress");
@@ -335,14 +335,14 @@ fn physical_path_ingress_uses_file_size_for_input_limit_precheck() {
 #[test]
 fn input_limit_builder_rejects_zero_and_unaddressable_values() {
     assert!(matches!(
-        ReadLimits::builder().max_input_bytes(0),
+        SourceLimits::builder().max_input_bytes(0),
         Err(OpcError::InvalidReadLimit {
             resource: ReadResource::InputBytes,
             value: 0,
         })
     ));
     assert!(matches!(
-        ReadLimits::builder().max_input_bytes(u64::MAX),
+        SourceLimits::builder().max_input_bytes(u64::MAX),
         Err(OpcError::InvalidReadLimit {
             resource: ReadResource::InputBytes,
             value: u64::MAX,

@@ -1054,7 +1054,7 @@ fn copy_outbound_relationships<'a>(
     Ok(output.into_boxed_slice())
 }
 
-fn validate_content_part_xml(part: &dyn Part, limits: litchi_opc::ReadLimits) -> Result<()> {
+fn validate_content_part_xml(part: &dyn Part, limits: litchi_opc::SourceLimits) -> Result<()> {
     litchi_opc::validate_source_xml_bytes(part.partname(), part.blob(), limits).map_err(|error| {
         invalid(format!(
             "worksheet contentPart target XML is invalid: {error}"

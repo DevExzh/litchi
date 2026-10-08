@@ -49,7 +49,7 @@ use std::sync::{Arc, OnceLock};
 use litchi_core::{FileFormat, Metadata};
 use litchi_docx::section::{Inventory, Limits as SectionLimits};
 use litchi_docx::{ToleranceReport, source_backed};
-use litchi_opc::{OpcPackage, ReadLimits};
+use litchi_opc::{OpcPackage, SourceLimits};
 
 use super::signature::{self, Opened, Signature};
 use crate::error::{Code, Error, Result};
@@ -83,7 +83,7 @@ pub(crate) struct DocxState {
     markdown: OnceLock<Box<litchi_docx::Package>>,
     /// The OPC read limits of the open, which an unsigned copy is opened
     /// under (record 0013).
-    ooxml_limits: ReadLimits,
+    ooxml_limits: SourceLimits,
 }
 
 /// What a DOCX write starts from (M2).

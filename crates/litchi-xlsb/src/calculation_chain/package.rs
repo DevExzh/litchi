@@ -114,7 +114,7 @@ pub(crate) fn preflight_metadata(package: &OpcPackage, limits: ReadLimits) -> Re
     // stream-specific error is reported.  The OPC metadata profile itself is
     // still finite and is the same default profile used for in-memory
     // authored metadata.
-    let opc_limits = litchi_opc::ReadLimits::default();
+    let opc_limits = litchi_opc::SourceLimits::default();
     let part_count = package.part_count();
     if part_count > limits.max_graph_parts {
         return Err(Error::LimitExceeded {
@@ -178,7 +178,7 @@ pub(crate) fn preflight_metadata(package: &OpcPackage, limits: ReadLimits) -> Re
 
 fn preflight_relationship_collection(
     relationships: &litchi_opc::Relationships,
-    opc_limits: &litchi_opc::ReadLimits,
+    opc_limits: &litchi_opc::SourceLimits,
     relationship_count: &mut usize,
     relationship_metadata_bytes: &mut usize,
     limits: ReadLimits,
@@ -217,7 +217,7 @@ fn preflight_relationship_collection(
 
 fn preflight_relationship(
     relationship: &litchi_opc::Relationship,
-    opc_limits: &litchi_opc::ReadLimits,
+    opc_limits: &litchi_opc::SourceLimits,
     relationship_count: &mut usize,
     relationship_metadata_bytes: &mut usize,
     limits: ReadLimits,

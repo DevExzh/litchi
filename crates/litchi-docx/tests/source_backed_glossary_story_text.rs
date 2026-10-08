@@ -1058,7 +1058,7 @@ fn glossary_managed_entry_edit_and_cancellation_are_refused() {
     );
     let package = source_backed::Package::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(source)),
-        litchi_docx::ReadLimits::default(),
+        litchi_docx::SourceLimits::default(),
         context,
     )
     .unwrap();
@@ -1444,7 +1444,7 @@ fn glossary_batch_rejects_stale_foreign_managed_cancelled_signed_and_sink_paths(
 
     let managed = source_backed::Package::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(source.clone())),
-        litchi_docx::ReadLimits::default(),
+        litchi_docx::SourceLimits::default(),
         litchi_core::ExecutionContext::new(
             litchi_core::Budget::root(
                 "source-backed-glossary-batch-test",
@@ -1479,7 +1479,7 @@ fn glossary_batch_rejects_stale_foreign_managed_cancelled_signed_and_sink_paths(
     let (cancel_source, token) = litchi_core::CancellationSource::pair();
     let cancelled = source_backed::Package::from_read_at_with_execution_context(
         Arc::new(OwnedSource::new(source.clone())),
-        litchi_docx::ReadLimits::default(),
+        litchi_docx::SourceLimits::default(),
         litchi_core::ExecutionContext::new(
             litchi_core::Budget::root(
                 "source-backed-glossary-batch-cancel-test",

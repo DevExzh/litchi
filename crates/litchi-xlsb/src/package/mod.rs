@@ -9,7 +9,7 @@ use std::io::{Read, Write};
 use std::path::Path;
 
 use litchi_core::{ExecutionContext, sheet::WorkbookTrait};
-use litchi_opc::{OpcPackage, PackageWriter, ReadLimits};
+use litchi_opc::{OpcPackage, PackageWriter, SourceLimits};
 
 use crate::Workbook;
 use crate::external_link::ExternalLinkLimits;
@@ -226,14 +226,14 @@ impl Package {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         Self::open_with_limits_and_external_link_limits(
             path,
-            ReadLimits::default(),
+            SourceLimits::default(),
             ExternalLinkLimits::default(),
         )
     }
 
     /// Open and validate an XLSB package from a filesystem path with explicit
     /// OPC resource limits.
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
+    pub fn open_with_limits(path: impl AsRef<Path>, limits: SourceLimits) -> Result<Self> {
         Self::open_with_limits_and_external_link_limits(path, limits, ExternalLinkLimits::default())
     }
 
@@ -245,7 +245,7 @@ impl Package {
     ) -> Result<Self> {
         Self::open_with_limits_and_external_link_limits(
             path,
-            ReadLimits::default(),
+            SourceLimits::default(),
             external_link_limits,
         )
     }
@@ -254,7 +254,7 @@ impl Package {
     /// external-link resource limits.
     pub fn open_with_limits_and_external_link_limits(
         path: impl AsRef<Path>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         external_link_limits: ExternalLinkLimits,
     ) -> Result<Self> {
         Self::from_opc_with_external_link_limits(
@@ -267,14 +267,14 @@ impl Package {
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         Self::from_bytes_with_limits_and_external_link_limits(
             bytes,
-            ReadLimits::default(),
+            SourceLimits::default(),
             ExternalLinkLimits::default(),
         )
     }
 
     /// Read and validate an XLSB package from an owned byte vector with
     /// explicit OPC resource limits.
-    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: ReadLimits) -> Result<Self> {
+    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: SourceLimits) -> Result<Self> {
         Self::from_bytes_with_limits_and_external_link_limits(
             bytes,
             limits,
@@ -290,7 +290,7 @@ impl Package {
     ) -> Result<Self> {
         Self::from_bytes_with_limits_and_external_link_limits(
             bytes,
-            ReadLimits::default(),
+            SourceLimits::default(),
             external_link_limits,
         )
     }
@@ -299,7 +299,7 @@ impl Package {
     /// OPC and external-link resource limits.
     pub fn from_bytes_with_limits_and_external_link_limits(
         bytes: Vec<u8>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         external_link_limits: ExternalLinkLimits,
     ) -> Result<Self> {
         Self::from_opc_with_external_link_limits(
@@ -312,14 +312,14 @@ impl Package {
     pub fn from_slice(bytes: &[u8]) -> Result<Self> {
         Self::from_slice_with_limits_and_external_link_limits(
             bytes,
-            ReadLimits::default(),
+            SourceLimits::default(),
             ExternalLinkLimits::default(),
         )
     }
 
     /// Read and validate an XLSB package from a borrowed byte slice with
     /// explicit OPC resource limits.
-    pub fn from_slice_with_limits(bytes: &[u8], limits: ReadLimits) -> Result<Self> {
+    pub fn from_slice_with_limits(bytes: &[u8], limits: SourceLimits) -> Result<Self> {
         Self::from_slice_with_limits_and_external_link_limits(
             bytes,
             limits,
@@ -335,7 +335,7 @@ impl Package {
     ) -> Result<Self> {
         Self::from_slice_with_limits_and_external_link_limits(
             bytes,
-            ReadLimits::default(),
+            SourceLimits::default(),
             external_link_limits,
         )
     }
@@ -344,7 +344,7 @@ impl Package {
     /// independent OPC and external-link resource limits.
     pub fn from_slice_with_limits_and_external_link_limits(
         bytes: &[u8],
-        limits: ReadLimits,
+        limits: SourceLimits,
         external_link_limits: ExternalLinkLimits,
     ) -> Result<Self> {
         Self::from_opc_with_external_link_limits(
@@ -357,14 +357,14 @@ impl Package {
     pub fn from_reader(reader: impl Read) -> Result<Self> {
         Self::from_reader_with_limits_and_external_link_limits(
             reader,
-            ReadLimits::default(),
+            SourceLimits::default(),
             ExternalLinkLimits::default(),
         )
     }
 
     /// Read and validate an XLSB package from a synchronous reader with
     /// explicit OPC resource limits.
-    pub fn from_reader_with_limits(reader: impl Read, limits: ReadLimits) -> Result<Self> {
+    pub fn from_reader_with_limits(reader: impl Read, limits: SourceLimits) -> Result<Self> {
         Self::from_reader_with_limits_and_external_link_limits(
             reader,
             limits,
@@ -380,7 +380,7 @@ impl Package {
     ) -> Result<Self> {
         Self::from_reader_with_limits_and_external_link_limits(
             reader,
-            ReadLimits::default(),
+            SourceLimits::default(),
             external_link_limits,
         )
     }
@@ -389,7 +389,7 @@ impl Package {
     /// and external-link resource limits.
     pub fn from_reader_with_limits_and_external_link_limits(
         reader: impl Read,
-        limits: ReadLimits,
+        limits: SourceLimits,
         external_link_limits: ExternalLinkLimits,
     ) -> Result<Self> {
         Self::from_opc_with_external_link_limits(
@@ -607,12 +607,12 @@ mod tests {
             .to_bytes()
             .expect("serialize package");
         let input_bytes = u64::try_from(bytes.len()).expect("input length fits u64");
-        let exact = ReadLimits::builder()
+        let exact = SourceLimits::builder()
             .max_input_bytes(input_bytes)
             .expect("exact input limit")
             .build()
             .expect("valid exact limit");
-        let over = ReadLimits::builder()
+        let over = SourceLimits::builder()
             .max_input_bytes(input_bytes - 1)
             .expect("smaller input limit")
             .build()

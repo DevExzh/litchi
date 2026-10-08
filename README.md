@@ -31,10 +31,10 @@ semantics, and `litchi-fonts` owns font discovery, subsetting, embedding, and
 obfuscation. The `litchi` facade exposes each namespace only when its matching
 opt-in feature is enabled.
 
-OOXML ingestion is bounded by `litchi_opc::ReadLimits`. The standard profile is
+OOXML ingestion is bounded by `litchi_opc::SourceLimits`. The standard profile is
 used by ordinary open methods; applications that receive untrusted or
 multi-tenant input can derive a tighter checked profile with
-`ReadLimits::builder()` and pass it to the contextual DOCX, PPTX, XLSX, or XLSB
+`SourceLimits::builder()` and pass it to the contextual DOCX, PPTX, XLSX, or XLSB
 `*_with_limits` entry point. The policy covers package input, ZIP members and
 metadata, materialized OPC parts, `[Content_Types].xml`, and relationship XML
 and graph traversal. It implements the defensive-consumer concerns in

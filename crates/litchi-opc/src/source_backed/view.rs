@@ -87,7 +87,7 @@ impl PreparedTopology {
 
     /// Limits captured by the original source and enforced on candidates.
     #[must_use]
-    pub const fn read_limits(&self) -> ReadLimits {
+    pub const fn read_limits(&self) -> SourceLimits {
         self.package.read_limits()
     }
 

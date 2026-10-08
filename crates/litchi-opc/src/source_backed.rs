@@ -9,7 +9,7 @@ use crate::constants::{content_type, namespace, relationship_type};
 use crate::content_type::{ContentType, ContentTypeMap};
 use crate::error::{OpcError, Result};
 use crate::leniency::ToleranceReport;
-use crate::limits::{ReadLimits, ReadResource};
+use crate::limits::{ReadResource, SourceLimits};
 use crate::members::{NonPartMember, PartNameIndex};
 use crate::package::OpcPackage;
 use crate::packuri::{PACKAGE_URI, PackURI};
@@ -466,7 +466,7 @@ pub(crate) fn escaped_xml_attribute_len(value: &str) -> Result<usize> {
     })
 }
 
-fn relationship_xml_event_count(xml: &[u8], limits: ReadLimits) -> Result<u64> {
+fn relationship_xml_event_count(xml: &[u8], limits: SourceLimits) -> Result<u64> {
     let mut reader = NsReader::from_reader(xml);
     // Keep aggregate event accounting identical to the source catalog's
     // relationship parser.  Its ingress parser trims whitespace text events;
@@ -546,7 +546,7 @@ fn relationship_namespace_declaration_name(name: &str) -> bool {
 fn decode_relationship_attribute(
     attribute: &quick_xml::events::attributes::Attribute<'_>,
     decoder: quick_xml::Decoder,
-    limits: ReadLimits,
+    limits: SourceLimits,
     member_name: &str,
 ) -> Result<String> {
     let raw_attribute_bytes = attribute
@@ -740,7 +740,7 @@ fn inspect_relationship_append_root_attributes(
     reader: &NsReader<&[u8]>,
     element: &quick_xml::events::BytesStart<'_>,
     decoder: quick_xml::Decoder,
-    limits: ReadLimits,
+    limits: SourceLimits,
     member_name: &str,
 ) -> Result<()> {
     let mut attribute_count = 0usize;
@@ -844,7 +844,7 @@ fn inspect_relationship_append_child(
     element: &quick_xml::events::BytesStart<'_>,
     opc_namespace: bool,
     decoder: quick_xml::Decoder,
-    limits: ReadLimits,
+    limits: SourceLimits,
     member_name: &str,
 ) -> Result<(String, String, String, TargetMode)> {
     if !opc_namespace || element.local_name().as_ref() != b"Relationship" {
@@ -989,7 +989,7 @@ fn validate_source_relationship_identity(
     relationship_type: String,
     target: String,
     target_mode: TargetMode,
-    limits: ReadLimits,
+    limits: SourceLimits,
 ) -> Result<()> {
     let Some(original) = expected.get(&id) else {
         return Err(relationship_manifest_append_error(
@@ -1192,7 +1192,7 @@ fn parse_noncanonical_relationship_source<F>(
     bytes: &[u8],
     member_name: &str,
     expected: &Relationships,
-    limits: ReadLimits,
+    limits: SourceLimits,
     mut check_progress: F,
 ) -> Result<ParsedSourceRelationshipDocument>
 where
@@ -2554,7 +2554,7 @@ trait RelationshipPublicationSummary {
     fn relationship_count(&self) -> usize;
     fn source_event_count(&self) -> Option<u64>;
     fn output_bytes(&self) -> Result<u64>;
-    fn output_events(&self, limits: ReadLimits) -> Result<u64>;
+    fn output_events(&self, limits: SourceLimits) -> Result<u64>;
 }
 
 #[derive(Clone, Copy)]
@@ -2589,7 +2589,7 @@ impl RelationshipPublicationSummary for TopologyRelationshipPublication {
             .map_err(|_| overlay_unavailable("relationship XML length overflows u64"))
     }
 
-    fn output_events(&self, limits: ReadLimits) -> Result<u64> {
+    fn output_events(&self, limits: SourceLimits) -> Result<u64> {
         relationship_xml_event_count(&self.xml, limits)
     }
 }
@@ -2965,7 +2965,7 @@ fn publish_prepared_topology<W: Write>(
 impl<'prepared> EffectiveTopology<'prepared> {
     /// Return the read and semantic limits captured by the source package.
     #[must_use]
-    pub const fn read_limits(&self) -> ReadLimits {
+    pub const fn read_limits(&self) -> SourceLimits {
         self.package.limits
     }
 
@@ -6668,7 +6668,7 @@ pub struct SourceBackedPackage {
     fingerprint_memo: Option<Arc<OwnedSourceFingerprintMemo>>,
     archive: Arc<IndexedArchive<SourceReader>>,
     read_ahead: Option<Arc<ArchiveReadAhead>>,
-    limits: ReadLimits,
+    limits: SourceLimits,
     catalog: Arc<AdmittedCatalog>,
     cache: Arc<PartCache>,
     catalog_object_reservation: Option<Arc<Reservation>>,
@@ -6686,7 +6686,7 @@ struct AdmittedCatalog {
     /// Positions in `parts`, sorted by ASCII-case-insensitive Part spelling.
     /// When present, this immutable index costs exactly one `usize` per
     /// admitted ordinary Part (logical requested bytes; allocator capacity may
-    /// vary), bounded by `ReadLimits::max_parts()`. It stores no folded-name
+    /// vary), bounded by `SourceLimits::max_parts()`. It stores no folded-name
     /// allocations. Managed opens intentionally leave it absent so their
     /// cancellation-aware path adds no unreserved retained memory or sorting
     /// work; those opens retain the bounded linear fallback instead.
@@ -6744,7 +6744,7 @@ pub(crate) struct ValidationOpenError {
 impl SourceBackedPackage {
     /// Return the bounded read policy captured when this package was opened.
     #[must_use]
-    pub const fn read_limits(&self) -> ReadLimits {
+    pub const fn read_limits(&self) -> SourceLimits {
         self.limits
     }
 
@@ -6752,7 +6752,7 @@ impl SourceBackedPackage {
     /// path; this variant adds phase provenance without changing its hot path.
     pub(crate) fn from_read_at_for_validation(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
     ) -> std::result::Result<Self, ValidationOpenError> {
         let phase = |phase, error| ValidationOpenError { phase, error };
         let version = source
@@ -6934,7 +6934,7 @@ impl SourceBackedPackage {
     /// and all-Part payload allocations, but does not claim a total RSS bound.
     /// [`OpcPackage`] stays the explicit eager CRUD type.
     #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
+    pub fn from_path_with_limits(path: impl AsRef<Path>, limits: SourceLimits) -> Result<Self> {
         Self::from_read_at_with_limits(Arc::new(FileSource::open(path)?), limits)
     }
 
@@ -6946,7 +6946,7 @@ impl SourceBackedPackage {
     /// Opening validates only the ZIP catalog, content types, and relationships;
     /// ordinary part payloads remain deferred until a [`PartView::data`] request.
     pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
-        Self::from_reader_with_limits(reader, ReadLimits::default())
+        Self::from_reader_with_limits(reader, SourceLimits::default())
     }
 
     /// Open a source-backed package from a sequential reader with an explicit
@@ -6956,7 +6956,7 @@ impl SourceBackedPackage {
     /// during ingestion. The resulting byte vector is moved into the existing
     /// owned source without a second copy. Ordinary part payloads remain
     /// deferred until a [`PartView::data`] request.
-    pub fn from_reader_with_limits<R: Read>(reader: R, limits: ReadLimits) -> Result<Self> {
+    pub fn from_reader_with_limits<R: Read>(reader: R, limits: SourceLimits) -> Result<Self> {
         Self::from_vec_with_limits(read_limited(reader, limits)?, limits)
     }
 
@@ -6966,7 +6966,7 @@ impl SourceBackedPackage {
     /// remain deferred until a [`PartView::data`] request, just as with
     /// [`Self::from_read_at`].
     pub fn from_vec(data: Vec<u8>) -> Result<Self> {
-        Self::from_vec_with_limits(data, ReadLimits::default())
+        Self::from_vec_with_limits(data, SourceLimits::default())
     }
 
     /// Open an owned source-backed package with an explicit bounded read
@@ -6976,7 +6976,7 @@ impl SourceBackedPackage {
     /// ZIP catalog, content types, and relationships without materializing
     /// ordinary part payloads; a payload is decompressed only when its
     /// [`PartView::data`] is requested.
-    pub fn from_vec_with_limits(data: Vec<u8>, limits: ReadLimits) -> Result<Self> {
+    pub fn from_vec_with_limits(data: Vec<u8>, limits: SourceLimits) -> Result<Self> {
         let source = Arc::new(OwnedSource::new(data));
         Self::from_read_at_inner(
             SourceInput::Owned(source),
@@ -6991,7 +6991,7 @@ impl SourceBackedPackage {
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
         Self::from_read_at_with_limits_and_cache_limits(
             source,
-            ReadLimits::default(),
+            SourceLimits::default(),
             SourceCacheLimits::default(),
         )
     }
@@ -7000,7 +7000,7 @@ impl SourceBackedPackage {
     ///
     /// The source version is captured before indexing and checked after every
     /// mandatory open read.  A changed source is never silently accepted.
-    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
+    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: SourceLimits) -> Result<Self> {
         Self::from_read_at_with_limits_and_cache_limits(
             source,
             limits,
@@ -7013,7 +7013,11 @@ impl SourceBackedPackage {
         source: Arc<dyn ReadAt>,
         cache_limits: SourceCacheLimits,
     ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_cache_limits(source, ReadLimits::default(), cache_limits)
+        Self::from_read_at_with_limits_and_cache_limits(
+            source,
+            SourceLimits::default(),
+            cache_limits,
+        )
     }
 
     /// Open a source-backed package whose lazy payload cache is charged to an
@@ -7029,7 +7033,7 @@ impl SourceBackedPackage {
     /// path so the reservation cannot be silently detached.
     pub fn from_read_at_with_execution_context(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
         Self::from_read_at_with_limits_and_cache_limits_and_execution_context(
@@ -7044,7 +7048,7 @@ impl SourceBackedPackage {
     /// hierarchical execution policies.
     pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
@@ -7063,7 +7067,7 @@ impl SourceBackedPackage {
     /// mandatory open read. A changed source is never silently accepted.
     pub fn from_read_at_with_limits_and_cache_limits(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
     ) -> Result<Self> {
         Self::from_read_at_inner(
@@ -7085,7 +7089,7 @@ impl SourceBackedPackage {
     /// to a hierarchical budget.
     pub fn from_read_at_with_limits_and_cache_limits_and_source_read_policy(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
         source_read_policy: SourceReadPolicy,
     ) -> Result<Self> {
@@ -7107,7 +7111,7 @@ impl SourceBackedPackage {
     /// every clone to exact reads.
     pub fn from_read_at_with_limits_and_cache_limits_and_source_read_policy_and_execution_context(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
         source_read_policy: SourceReadPolicy,
         context: ExecutionContext,
@@ -7123,7 +7127,7 @@ impl SourceBackedPackage {
 
     fn from_read_at_inner(
         source_input: SourceInput,
-        limits: ReadLimits,
+        limits: SourceLimits,
         cache_limits: SourceCacheLimits,
         context: Option<ExecutionContext>,
         source_read_policy: SourceReadPolicy,
@@ -7413,7 +7417,7 @@ impl SourceBackedPackage {
     /// serial fallback.  Every admitted read still enters the ordinary cache,
     /// source-freshness, ZIP-validation, and budgeted `PartData` path.
     ///
-    /// The request count is capped by [`ReadLimits::max_parts`]; duplicate
+    /// The request count is capped by [`SourceLimits::max_parts`]; duplicate
     /// occurrences count toward that cap.  Managed calls preflight declared
     /// sizes once and reuse them for cache admission and scheduling.  Calls
     /// without a context retain the existing serial one-Part behavior and do
@@ -10325,12 +10329,17 @@ impl SourceBackedPackage {
 
     /// Publish a bounded source-backed OPC topology plan to a sequential
     /// stream.  This compatibility wrapper keeps the historical one-shot API
-    /// while routing all preparation through [`Self::prepare_topology`].
+    /// while routing changed plans through [`Self::prepare_topology`]. An empty
+    /// plan copies the physical source directly without retaining a candidate.
     pub fn write_topology_to_stream<W: Write>(
         self,
         writer: W,
         plan: SourceTopologyPlan,
     ) -> Result<()> {
+        if plan.is_empty() {
+            self.disable_read_ahead_for_publication()?;
+            return self.write_exact_source(writer);
+        }
         self.prepare_topology(plan)?.publish_to_stream(writer)
     }
 
@@ -14894,7 +14903,8 @@ mod tests {
         source.overreport.store(true, Ordering::SeqCst);
 
         let error =
-            match SourceBackedPackage::from_read_at_for_validation(source, ReadLimits::default()) {
+            match SourceBackedPackage::from_read_at_for_validation(source, SourceLimits::default())
+            {
                 Ok(_) => panic!("over-reported source reads must fail archive indexing"),
                 Err(error) => error,
             };
@@ -14916,7 +14926,8 @@ mod tests {
         let source = Arc::new(CatalogReadFailureSource::new(bytes, fail_offset));
 
         let error =
-            match SourceBackedPackage::from_read_at_for_validation(source, ReadLimits::default()) {
+            match SourceBackedPackage::from_read_at_for_validation(source, SourceLimits::default())
+            {
                 Ok(_) => panic!("the catalog-stage source read must fail"),
                 Err(error) => error,
             };
@@ -15014,7 +15025,7 @@ mod tests {
                 b"<document/>",
                 false,
             ))),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -15763,7 +15774,7 @@ mod tests {
         ));
         let source_package = SourceBackedPackage::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -15805,7 +15816,7 @@ mod tests {
                 SOURCE_XML,
                 false,
             ))),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -15912,18 +15923,19 @@ mod tests {
             source,
             &additions,
             &[],
-            ReadLimits::default(),
+            SourceLimits::default(),
             None,
             None,
         )
         .unwrap();
-        let (output, _memory_reservation) =
-            plan.materialize(ReadLimits::default(), None, None).unwrap();
+        let (output, _memory_reservation) = plan
+            .materialize(SourceLimits::default(), None, None)
+            .unwrap();
         assert_eq!(
             output,
             br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/><!-- text that looks like </Types> --><?keep?><Override PartName="/custom/new.bin" ContentType="application/octet-stream"/></Types>"#
         );
-        ContentTypeMap::from_xml(&output, ReadLimits::default()).unwrap();
+        ContentTypeMap::from_xml(&output, SourceLimits::default()).unwrap();
     }
 
     #[test]
@@ -16189,7 +16201,7 @@ mod tests {
         let (budget, _cancellation_source, context) = managed_context_with_cancellation(64 * 1024);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(CountingSource::new(source)),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -16226,7 +16238,7 @@ mod tests {
             .unwrap()
             .checked_sub(1)
             .expect("canonical relationship XML is nonempty");
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_relationship_xml_bytes(limit)
             .unwrap()
             .build()
@@ -16621,7 +16633,7 @@ mod tests {
                     source,
                     "word/_rels/document.xml.rels",
                     &expected,
-                    ReadLimits::default(),
+                    SourceLimits::default(),
                     || Ok(()),
                 )
                 .is_err()
@@ -16633,7 +16645,7 @@ mod tests {
                 canonical.as_bytes(),
                 "word/_rels/document.xml.rels",
                 &expected,
-                ReadLimits::default(),
+                SourceLimits::default(),
                 || Ok(()),
             )
             .is_ok()
@@ -16648,13 +16660,13 @@ mod tests {
                     invalid.as_bytes(),
                     "word/_rels/document.xml.rels",
                     &expected,
-                    ReadLimits::default(),
+                    SourceLimits::default(),
                     || Ok(()),
                 )
                 .is_err()
             );
         }
-        let shallow = ReadLimits::builder()
+        let shallow = SourceLimits::builder()
             .max_xml_depth(1)
             .unwrap()
             .build()
@@ -16679,7 +16691,7 @@ mod tests {
         let relationships = noncanonical_document_relationships();
         let source = topology_relationship_archive(relationships);
         let relationship_limit = relationships.len().max(root_relationships().len());
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_relationship_xml_bytes(relationship_limit)
             .unwrap()
             .build()
@@ -16711,7 +16723,7 @@ mod tests {
             managed_context_with_cancellation((relationships.len() as u64).saturating_mul(2) - 1);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(CountingSource::new(source)),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -16733,7 +16745,7 @@ mod tests {
         let (_budget, cancellation_source, context) = managed_context_with_cancellation(u64::MAX);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(CountingSource::new(source)),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -16753,7 +16765,7 @@ mod tests {
             managed_context_with_all_resources(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(CountingSource::new(source)),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -16781,7 +16793,7 @@ mod tests {
             managed_context_with_all_resources(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(CountingSource::new(source)),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -16823,7 +16835,7 @@ mod tests {
             managed_context_with_all_resources(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(CountingSource::new(source)),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -16847,7 +16859,7 @@ mod tests {
             managed_context_with_all_resources(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(CountingSource::new(source)),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -16891,7 +16903,7 @@ mod tests {
             managed_context_with_all_resources(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(CountingSource::new(source)),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -16930,7 +16942,7 @@ mod tests {
             managed_context_with_all_resources(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(CountingSource::new(source)),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -16962,7 +16974,7 @@ mod tests {
             managed_context_with_all_resources(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -16994,7 +17006,7 @@ mod tests {
             managed_context_with_all_resources(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX);
         let signed = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(CountingSource::new(signed_archive(b"<document/>"))),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -17278,7 +17290,7 @@ mod tests {
         let source = topology_relationship_archive(&relationships);
         let owner = PackURI::new("/word/document.xml").unwrap();
 
-        let target_limits = ReadLimits::builder()
+        let target_limits = SourceLimits::builder()
             .max_relationship_target_bytes(24)
             .unwrap()
             .build()
@@ -17307,7 +17319,7 @@ mod tests {
         ));
         assert!(target_output.is_empty());
 
-        let attribute_limits = ReadLimits::builder()
+        let attribute_limits = SourceLimits::builder()
             .max_xml_attribute_bytes(128)
             .unwrap()
             .max_relationship_target_bytes(128)
@@ -17338,7 +17350,7 @@ mod tests {
         ));
         assert!(attribute_output.is_empty());
 
-        let name_limits = ReadLimits::builder()
+        let name_limits = SourceLimits::builder()
             .max_archive_member_name_bytes(32)
             .unwrap()
             .build()
@@ -17366,12 +17378,12 @@ mod tests {
         ));
         assert!(name_output.is_empty());
 
-        let default_limits = ReadLimits::default();
+        let default_limits = SourceLimits::default();
         let source_events = relationship_xml_event_count(root_relationships(), default_limits)
             .unwrap()
             .checked_add(relationship_xml_event_count(&relationships, default_limits).unwrap())
             .unwrap();
-        let event_limits = ReadLimits::builder()
+        let event_limits = SourceLimits::builder()
             .max_xml_events(5)
             .unwrap()
             .max_total_relationship_xml_events(source_events as usize)
@@ -17824,7 +17836,7 @@ mod tests {
             ("custom/orphan.xml", b"orphan"),
         ]);
 
-        let per_part = ReadLimits::builder()
+        let per_part = SourceLimits::builder()
             .max_part_bytes(b"document".len() as u64 - 1)
             .unwrap()
             .build()
@@ -17840,7 +17852,7 @@ mod tests {
             })
         ));
 
-        let aggregate = ReadLimits::builder()
+        let aggregate = SourceLimits::builder()
             .max_total_part_bytes((b"document".len() + b"orphan".len() - 1) as u64)
             .unwrap()
             .build()
@@ -17856,7 +17868,11 @@ mod tests {
             })
         ));
 
-        let part_count = ReadLimits::builder().max_parts(1).unwrap().build().unwrap();
+        let part_count = SourceLimits::builder()
+            .max_parts(1)
+            .unwrap()
+            .build()
+            .unwrap();
         assert!(matches!(
             SourceBackedPackage::from_read_at_with_limits(
                 Arc::new(CountingSource::new(bytes)),
@@ -17890,7 +17906,7 @@ mod tests {
                 false,
             ),
         ];
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_part_bytes(oversized.len() as u64 - 1)
             .unwrap()
             .build()
@@ -17927,7 +17943,7 @@ mod tests {
             ("word/oversized.xml", oversized),
             ("word/later.xml", b"later"),
         ]);
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_parts(1)
             .unwrap()
             .max_part_bytes(oversized.len() as u64 - 1)
@@ -18027,7 +18043,7 @@ mod tests {
 
         let validation = match SourceBackedPackage::from_read_at_for_validation(
             Arc::new(CountingSource::new(bytes)),
-            ReadLimits::default(),
+            SourceLimits::default(),
         ) {
             Ok(package) => package,
             Err(error) => panic!("validation open failed: {}", error.error),
@@ -18086,7 +18102,7 @@ mod tests {
 
         let validation = match SourceBackedPackage::from_read_at_for_validation(
             Arc::new(CountingSource::new(bytes)),
-            ReadLimits::default(),
+            SourceLimits::default(),
         ) {
             Ok(package) => package,
             Err(error) => panic!("validation open failed: {}", error.error),
@@ -18100,7 +18116,7 @@ mod tests {
         let (budget, _cancellation_source, context) = managed_context_with_cancellation(1);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(CountingSource::new(bytes)),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -18126,7 +18142,7 @@ mod tests {
 
         let validation_error = match SourceBackedPackage::from_read_at_for_validation(
             Arc::new(CountingSource::new(bytes)),
-            ReadLimits::default(),
+            SourceLimits::default(),
         ) {
             Ok(_) => panic!("case-equivalent parts must remain ambiguous"),
             Err(error) => error,
@@ -18193,7 +18209,7 @@ mod tests {
         let (budget, context) = managed_context(1024);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source,
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -18238,7 +18254,7 @@ mod tests {
             managed_context_with_resources(4096, u64::MAX, u64::MAX, u64::MAX);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -18276,7 +18292,7 @@ mod tests {
             managed_context_with_resources(4096, u64::MAX, u64::MAX, u64::MAX);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context.clone(),
         )
         .unwrap();
@@ -18313,7 +18329,7 @@ mod tests {
             managed_context_with_resources(4096, u64::MAX, u64::MAX, (DOCUMENT.len() - 1) as u64);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -18344,7 +18360,7 @@ mod tests {
             managed_context_with_resources(4096, u64::MAX, 5, u64::MAX);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -18377,7 +18393,7 @@ mod tests {
             managed_context_with_resources(4096, u64::MAX, u64::MAX, u64::MAX);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -18408,7 +18424,7 @@ mod tests {
         let (budget, cancellation_source, context) = managed_context_with_cancellation(4096);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -18478,7 +18494,7 @@ mod tests {
         let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -18521,7 +18537,7 @@ mod tests {
         assert!(matches!(
             SourceBackedPackage::from_read_at_with_execution_context(
                 source.clone(),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 context,
             ),
             Err(OpcError::Cancelled)
@@ -18558,7 +18574,7 @@ mod tests {
         let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -18719,7 +18735,7 @@ mod tests {
         let package =
             SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
                 Arc::clone(source),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 SourceCacheLimits::default(),
                 context,
             )
@@ -18747,7 +18763,7 @@ mod tests {
             Some(context) => {
                 SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
                     Arc::clone(source),
-                    ReadLimits::default(),
+                    SourceLimits::default(),
                     SourceCacheLimits::default(),
                     context,
                 )
@@ -18755,7 +18771,7 @@ mod tests {
             },
             None => SourceBackedPackage::from_read_at_with_limits(
                 Arc::clone(source),
-                ReadLimits::default(),
+                SourceLimits::default(),
             )
             .unwrap(),
         };
@@ -18843,7 +18859,7 @@ mod tests {
         let package =
             SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
                 Arc::clone(&source),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 SourceCacheLimits::default(),
                 context,
             )
@@ -18872,7 +18888,7 @@ mod tests {
         let package =
             SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
                 Arc::clone(&source),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 SourceCacheLimits::default(),
                 context,
             )
@@ -18905,7 +18921,7 @@ mod tests {
         let package =
             SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
                 Arc::clone(&source),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 SourceCacheLimits::default(),
                 context,
             )
@@ -18979,7 +18995,7 @@ mod tests {
         let package =
             SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
                 Arc::clone(&source),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 SourceCacheLimits::default(),
                 context,
             )
@@ -19004,7 +19020,7 @@ mod tests {
         let package =
             SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
                 Arc::clone(&source),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 SourceCacheLimits::default(),
                 context,
             )
@@ -19029,7 +19045,7 @@ mod tests {
         let package =
             SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
                 source,
-                ReadLimits::default(),
+                SourceLimits::default(),
                 SourceCacheLimits::new(9, 2).unwrap(),
                 context,
             )
@@ -19066,7 +19082,7 @@ mod tests {
         let package =
             SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
                 source,
-                ReadLimits::default(),
+                SourceLimits::default(),
                 SourceCacheLimits::new(b"document".len(), 1).unwrap(),
                 context,
             )
@@ -19122,7 +19138,7 @@ mod tests {
         let (budget, context) = managed_context((b"payload too large".len() - 1) as u64);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -19177,7 +19193,7 @@ mod tests {
         let context = ExecutionContext::new(child, cancellation, execution_limits);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -19242,13 +19258,13 @@ mod tests {
         )));
         let first_package = SourceBackedPackage::from_read_at_with_execution_context(
             first_source,
-            ReadLimits::default(),
+            SourceLimits::default(),
             first_context,
         )
         .unwrap();
         let second_package = SourceBackedPackage::from_read_at_with_execution_context(
             second_source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             second_context,
         )
         .unwrap();
@@ -19287,7 +19303,7 @@ mod tests {
         let (budget, context) = managed_context(DOCUMENT.len() as u64);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -19347,7 +19363,7 @@ mod tests {
             managed_context_with_cancellation(DOCUMENT.len() as u64);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -19398,7 +19414,7 @@ mod tests {
         let (budget, context) = managed_context(1024);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -19455,7 +19471,7 @@ mod tests {
         let source = Arc::new(CancelOnHitVersionSource::new(bytes, cancellation_source));
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -19495,7 +19511,7 @@ mod tests {
         ));
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source,
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -19521,7 +19537,7 @@ mod tests {
         assert!(matches!(
             SourceBackedPackage::from_read_at_with_execution_context(
                 source.clone(),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 context,
             ),
             Err(OpcError::Cancelled)
@@ -19590,7 +19606,7 @@ mod tests {
         let (budget, context) = managed_context(4096);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -19687,7 +19703,7 @@ mod tests {
             let (budget, context) = managed_context(65536);
             let package = SourceBackedPackage::from_read_at_with_execution_context(
                 source,
-                ReadLimits::default(),
+                SourceLimits::default(),
                 context,
             )
             .unwrap();
@@ -19754,7 +19770,7 @@ mod tests {
             let (budget, cancellation, context) = managed_context_with_cancellation(65536);
             let package = SourceBackedPackage::from_read_at_with_execution_context(
                 source.clone(),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 context,
             )
             .unwrap();
@@ -19806,7 +19822,7 @@ mod tests {
         let (budget, cancellation_source, context) = managed_context_with_cancellation(4096);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source,
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -19867,7 +19883,7 @@ mod tests {
         let (budget, context) = managed_context(DOCUMENT.len() as u64);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -19922,7 +19938,7 @@ mod tests {
         let (budget, context) = managed_context(4096);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source,
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -20323,7 +20339,7 @@ mod tests {
         let (_budget, context) = managed_context(4096);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source,
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -20351,7 +20367,7 @@ mod tests {
         let (_budget, context) = managed_context(4096);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source,
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -20379,7 +20395,7 @@ mod tests {
         let (_budget, context) = managed_context(4096);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source,
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -20793,7 +20809,7 @@ mod tests {
         let (budget, context) = managed_context(4096);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -20861,7 +20877,7 @@ mod tests {
         let (budget, context) = managed_context(4096);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -20889,7 +20905,7 @@ mod tests {
         let (budget, context) = managed_context(4096);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -20953,7 +20969,7 @@ mod tests {
         let (budget, cancellation_source, context) = managed_context_with_cancellation(4096);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -21229,7 +21245,7 @@ mod tests {
         ));
         assert!(output.is_empty());
 
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_part_bytes(10)
             .unwrap()
             .build()
@@ -21385,7 +21401,7 @@ mod tests {
         let mut managed_output = Vec::new();
         SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(CountingSource::new(source_bytes)),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap()
@@ -21462,7 +21478,7 @@ mod tests {
                 second_ids.clone(),
             ),
         ];
-        let part_limits = ReadLimits::builder()
+        let part_limits = SourceLimits::builder()
             .max_total_part_bytes(19)
             .unwrap()
             .build()
@@ -21484,7 +21500,7 @@ mod tests {
             })
         ));
         assert!(output.is_empty());
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_archive_total_bytes(source_total + 1)
             .unwrap()
             .build()
@@ -21534,7 +21550,7 @@ mod tests {
         let published_total = source_archive_total(&published);
         assert!(published_total > source_total);
         drop(published);
-        let exact_limits = ReadLimits::builder()
+        let exact_limits = SourceLimits::builder()
             .max_archive_total_bytes(published_total)
             .unwrap()
             .build()
@@ -21564,7 +21580,7 @@ mod tests {
             .unwrap();
         assert!(!exact_output.is_empty());
 
-        let under_limits = ReadLimits::builder()
+        let under_limits = SourceLimits::builder()
             .max_archive_total_bytes(published_total - 1)
             .unwrap()
             .build()
@@ -21723,7 +21739,7 @@ mod tests {
         ));
         assert!(output.is_empty());
 
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_part_bytes(10)
             .unwrap()
             .build()
@@ -21784,7 +21800,7 @@ mod tests {
         ));
         assert!(output.is_empty());
 
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_part_bytes(20)
             .unwrap()
             .max_total_part_bytes(21)
@@ -22143,7 +22159,7 @@ mod tests {
         let mut package =
             SourceBackedPackage::from_vec(archive_bytes(root_relationships(), b"<before/>", true))
                 .unwrap();
-        package.limits = ReadLimits::builder()
+        package.limits = SourceLimits::builder()
             .max_archive_metadata_bytes(1)
             .unwrap()
             .build()
@@ -22226,7 +22242,7 @@ mod tests {
 
     #[test]
     fn one_part_overlay_enforces_replacement_limits_without_output() {
-        let limits = ReadLimits::builder()
+        let limits = SourceLimits::builder()
             .max_part_bytes(10)
             .unwrap()
             .max_total_part_bytes(19)
@@ -22326,7 +22342,7 @@ mod tests {
             managed_context_with_cancellation(source_bytes.len() as u64);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(CountingSource::new(source_bytes.clone())),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -22343,7 +22359,7 @@ mod tests {
             managed_context_with_cancellation(source_bytes.len() as u64);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(CountingSource::new(source_bytes)),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -22374,7 +22390,7 @@ mod tests {
         let (budget, _cancellation_source, context) = managed_context_with_output(u64::MAX);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(CountingSource::new(source_bytes.clone())),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -22394,7 +22410,7 @@ mod tests {
             managed_context_with_output(source_bytes.len() as u64);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(CountingSource::new(source_bytes.clone())),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -22426,7 +22442,7 @@ mod tests {
             managed_context_with_output((source_bytes.len() as u64).saturating_sub(1));
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(CountingSource::new(source_bytes)),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -22460,7 +22476,7 @@ mod tests {
             );
             let package = SourceBackedPackage::from_read_at_with_execution_context(
                 Arc::new(CountingSource::new(source_bytes.clone())),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 context,
             )
             .unwrap();
@@ -22493,7 +22509,7 @@ mod tests {
         let (budget, _cancellation_source, context) = managed_context_with_output(output_limit);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(CountingSource::new(source_bytes)),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -22559,7 +22575,7 @@ mod tests {
         let context = ExecutionContext::new(child.clone(), cancellation, execution_limits);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(CountingSource::new(source_bytes.clone())),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -22580,7 +22596,7 @@ mod tests {
         let (budget, _cancellation_source, context) = managed_context_with_output(output_bytes);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(CountingSource::new(source_bytes.clone())),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -22607,7 +22623,7 @@ mod tests {
         let (budget, _cancellation_source, context) = managed_context_with_output(u64::MAX);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(CountingSource::new(source_bytes.clone())),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -22640,7 +22656,7 @@ mod tests {
         let (budget, _cancellation_source, context) = managed_context_with_output(u64::MAX);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(CountingSource::new(source_bytes)),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -22665,7 +22681,7 @@ mod tests {
         let (budget, _cancellation_source, context) = managed_context_with_output(0);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source,
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -22694,7 +22710,7 @@ mod tests {
         let (budget, _cancellation_source, context) = managed_context_with_output(u64::MAX);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source,
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -22725,7 +22741,7 @@ mod tests {
         let (budget, _cancellation_source, context) = managed_context_with_output(u64::MAX);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source.clone(),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -22755,7 +22771,7 @@ mod tests {
         let (budget, _cancellation_source, context) = managed_context_with_output(u64::MAX);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(CountingSource::new(source_bytes.clone())),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -22790,7 +22806,7 @@ mod tests {
         let (budget, _cancellation_source, context) = managed_context_with_output(u64::MAX);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source,
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -22843,7 +22859,7 @@ mod tests {
         let package =
             SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
                 Arc::new(CountingSource::new(source_bytes.clone())),
-                ReadLimits::default(),
+                SourceLimits::default(),
                 SourceCacheLimits::new(1, 1).unwrap(),
                 context,
             )
@@ -23095,7 +23111,7 @@ mod tests {
         ));
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             source,
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -23487,8 +23503,8 @@ mod selected_part_stream_api_tests {
 #[cfg(test)]
 mod callback_scoped_verified_reader_tests {
     use super::{
-        OpcError, OpcOperationAccounting, OpcPackage, OwnedSourceFingerprintMemo, ReadLimits,
-        Resource, SourceArtifactRestoreProof, SourceBackedPackage, SourceVersion,
+        OpcError, OpcOperationAccounting, OpcPackage, OwnedSourceFingerprintMemo, Resource,
+        SourceArtifactRestoreProof, SourceBackedPackage, SourceLimits, SourceVersion,
         VerifiedDecodedReaderError,
     };
     use litchi_core::{
@@ -23595,7 +23611,7 @@ mod callback_scoped_verified_reader_tests {
         let (_budget, _cancellation_source, context) = managed_context(8 * 1024 * 1024);
         let managed = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(OwnedSource::new(archive_bytes(PAYLOAD))),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -23655,7 +23671,7 @@ mod callback_scoped_verified_reader_tests {
             .unwrap();
         assert_eq!(inverse, source);
 
-        let limited = ReadLimits::builder()
+        let limited = SourceLimits::builder()
             .max_input_bytes((source.len().saturating_sub(1)) as u64)
             .unwrap()
             .build()
@@ -23815,7 +23831,7 @@ mod callback_scoped_verified_reader_tests {
         let (budget, cancellation_source, context) = managed_context(16 * 1024);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(OwnedSource::new(archive_bytes(PAYLOAD))),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
@@ -23834,7 +23850,7 @@ mod callback_scoped_verified_reader_tests {
     #[test]
     fn verified_reader_enforces_part_limit_before_callback() {
         let mut package = package();
-        package.limits = ReadLimits::builder()
+        package.limits = SourceLimits::builder()
             .max_part_bytes((PAYLOAD.len() - 1) as u64)
             .unwrap()
             .build()
@@ -23874,7 +23890,7 @@ mod callback_scoped_verified_reader_tests {
         let (budget, _cancellation_source, context) = managed_context(reader_memory);
         let package = SourceBackedPackage::from_read_at_with_execution_context(
             Arc::new(OwnedSource::new(source_bytes)),
-            ReadLimits::default(),
+            SourceLimits::default(),
             context,
         )
         .unwrap();
