@@ -19,6 +19,8 @@ use super::{
     TableCellAddress, TransferGraph, TransferPart, TransferRelationship, XmlStorage,
 };
 
+const MAX_TRANSFER_GRAPH_BYTES: usize = 64 * 1024 * 1024;
+
 const FORMAT_NAME: &str = "litchi-docx/document";
 const RESTORE_OPERATION: &str = "document.restore";
 const RESTORE_TRANSFER_INSERT: &str = "document.restore-transfer.insert";
@@ -503,9 +505,9 @@ impl Snapshot {
         }
         if patch.operations().len() > MAX_OPERATIONS {
             return Err(TransactionError::Limit {
-                resource: "durable operations",
-                max: MAX_OPERATIONS,
-                actual: patch.operations().len(),
+                kind: crate::document::LimitKind::DurableOperations,
+                maximum: MAX_OPERATIONS,
+                observed: patch.operations().len(),
             });
         }
         let expected_artifact = BlobId::of(self.xml_bytes()).as_hex();
@@ -687,27 +689,37 @@ impl<'a> TransferGraphDecoder<'a> {
         Ok(Self { bytes, offset: 5 })
     }
 
-    fn count(&mut self, resource: &'static str, max: usize) -> TransactionResult<usize> {
+    fn count(
+        &mut self,
+        kind: crate::document::LimitKind,
+        maximum: usize,
+    ) -> TransactionResult<usize> {
         let count_bytes = self.take(8)?;
         let encoded = u64::from_le_bytes(
             count_bytes
                 .try_into()
                 .map_err(|_error| invalid_durable("invalid transfer graph count"))?,
         );
-        let count = usize::try_from(encoded)
-            .map_err(|_error| invalid_durable("transfer graph count does not fit usize"))?;
-        if count > max {
+        let count = usize::try_from(encoded).map_err(|_error| TransactionError::Limit {
+            kind,
+            observed: usize::MAX,
+            maximum,
+        })?;
+        if count > maximum {
             return Err(TransactionError::Limit {
-                resource,
-                max,
-                actual: count,
+                kind,
+                maximum,
+                observed: count,
             });
         }
         Ok(count)
     }
 
     fn bytes(&mut self) -> TransactionResult<&'a [u8]> {
-        let length = self.count("field bytes", 64 * 1024 * 1024)?;
+        let length = self.count(
+            crate::document::LimitKind::FieldBytes,
+            MAX_TRANSFER_GRAPH_BYTES,
+        )?;
         self.take(length)
     }
 
@@ -786,25 +798,25 @@ pub(crate) fn durable_transfer_operations<Mode>(
 fn history_weight(commit: &Commit) -> TransactionResult<u64> {
     let mut bytes = u64::try_from(commit.snapshot().xml_bytes().len()).map_err(|_error| {
         TransactionError::Limit {
-            resource: "history transition bytes",
-            max: usize::MAX,
-            actual: commit.snapshot().xml_bytes().len(),
+            kind: crate::document::LimitKind::HistoryTransitionBytes,
+            maximum: usize::MAX,
+            observed: commit.snapshot().xml_bytes().len(),
         }
     })?;
     if let Some(transition) = history_graph_transition(commit.patch.operations())? {
         for part in transition.graph.parts.iter() {
             let part_bytes =
                 u64::try_from(part.blob.len()).map_err(|_error| TransactionError::Limit {
-                    resource: "history dependency bytes",
-                    max: usize::MAX,
-                    actual: part.blob.len(),
+                    kind: crate::document::LimitKind::HistoryDependencyBytes,
+                    maximum: usize::MAX,
+                    observed: part.blob.len(),
                 })?;
             bytes = bytes
                 .checked_add(part_bytes)
                 .ok_or(TransactionError::Limit {
-                    resource: "history transition bytes",
-                    max: usize::MAX,
-                    actual: usize::MAX,
+                    kind: crate::document::LimitKind::HistoryTransitionBytes,
+                    maximum: usize::MAX,
+                    observed: usize::MAX,
                 })?;
         }
     }
@@ -1685,7 +1697,7 @@ fn put_transfer_bytes(
 
 fn decode_transfer_graph(bytes: &[u8]) -> TransactionResult<TransferGraph> {
     let mut decoder = TransferGraphDecoder::new(bytes)?;
-    let main_count = decoder.count("main relationships", 64)?;
+    let main_count = decoder.count(crate::document::LimitKind::MainRelationships, 64)?;
     let mut main_relationships = Vec::new();
     main_relationships
         .try_reserve_exact(main_count)
@@ -1693,7 +1705,7 @@ fn decode_transfer_graph(bytes: &[u8]) -> TransactionResult<TransferGraph> {
     for _ in 0..main_count {
         main_relationships.push(decoder.relationship()?);
     }
-    let part_count = decoder.count("parts", 256)?;
+    let part_count = decoder.count(crate::document::LimitKind::Parts, 256)?;
     let mut parts = Vec::new();
     parts
         .try_reserve_exact(part_count)
@@ -1702,14 +1714,11 @@ fn decode_transfer_graph(bytes: &[u8]) -> TransactionResult<TransferGraph> {
     for _ in 0..part_count {
         let name = decoder.string()?;
         let content_type = decoder.string()?;
-        let blob = decoder.bytes()?.to_vec();
-        total_bytes = total_bytes
-            .checked_add(blob.len())
-            .ok_or_else(|| invalid_durable("transfer graph byte count overflowed"))?;
-        if total_bytes > 64 * 1024 * 1024 {
-            return Err(invalid_durable("transfer graph bytes exceed limit"));
-        }
-        let relationship_count = decoder.count("part relationships", 256)?;
+        let blob = decoder.bytes()?;
+        total_bytes = checked_transfer_graph_bytes(total_bytes, blob.len())?;
+        let blob = blob.to_vec();
+        let relationship_count =
+            decoder.count(crate::document::LimitKind::PartRelationships, 256)?;
         let mut relationships = Vec::new();
         relationships
             .try_reserve_exact(relationship_count)
@@ -2164,9 +2173,9 @@ fn restore_snapshot<Mode>(
         .ok_or_else(|| invalid_durable("missing restore artifact"))?;
     if bytes.len() > MAX_DOCUMENT_XML_BYTES {
         return Err(TransactionError::Limit {
-            resource: "restore artifact bytes",
-            max: MAX_DOCUMENT_XML_BYTES,
-            actual: bytes.len(),
+            kind: crate::document::LimitKind::RestoreArtifactBytes,
+            maximum: MAX_DOCUMENT_XML_BYTES,
+            observed: bytes.len(),
         });
     }
     if let Some(identity) = identity {
@@ -2235,9 +2244,9 @@ fn parse_position_path(value: &str) -> TransactionResult<Arc<[Position]>> {
     let components = value.split(',').collect::<Vec<_>>();
     if components.len() > MAX_OPERATIONS {
         return Err(TransactionError::Limit {
-            resource: "durable selector path",
-            max: MAX_OPERATIONS,
-            actual: components.len(),
+            kind: crate::document::LimitKind::DurableSelectorPath,
+            maximum: MAX_OPERATIONS,
+            observed: components.len(),
         });
     }
     components
@@ -2289,9 +2298,9 @@ fn parse_nested_cell_target(
     let steps = path.split(';').collect::<Vec<_>>();
     if steps.len() > MAX_OPERATIONS {
         return Err(TransactionError::Limit {
-            resource: "durable nested table path",
-            max: MAX_OPERATIONS,
-            actual: steps.len(),
+            kind: crate::document::LimitKind::DurableNestedTablePath,
+            maximum: MAX_OPERATIONS,
+            observed: steps.len(),
         });
     }
     let addresses = steps
@@ -2335,4 +2344,52 @@ fn parse_position(value: &str) -> TransactionResult<Position> {
 
 fn invalid_durable(message: &str) -> TransactionError {
     TransactionError::InvalidDurable(message.to_owned())
+}
+
+fn checked_transfer_graph_bytes(current: usize, additional: usize) -> TransactionResult<usize> {
+    let observed = current.saturating_add(additional);
+    if observed > MAX_TRANSFER_GRAPH_BYTES {
+        return Err(TransactionError::Limit {
+            kind: crate::document::LimitKind::TransferGraphBytes,
+            observed,
+            maximum: MAX_TRANSFER_GRAPH_BYTES,
+        });
+    }
+    Ok(observed)
+}
+
+#[cfg(test)]
+mod limit_tests {
+    use super::*;
+
+    #[test]
+    fn transfer_graph_aggregate_limit_reports_boundary_and_overflow() {
+        assert_eq!(
+            checked_transfer_graph_bytes(MAX_TRANSFER_GRAPH_BYTES - 1, 1).unwrap(),
+            MAX_TRANSFER_GRAPH_BYTES
+        );
+        for (current, additional, expected) in [
+            (MAX_TRANSFER_GRAPH_BYTES, 1, MAX_TRANSFER_GRAPH_BYTES + 1),
+            (usize::MAX, 1, usize::MAX),
+        ] {
+            assert!(
+                matches!(checked_transfer_graph_bytes(current, additional), Err(TransactionError::Limit { kind: crate::document::LimitKind::TransferGraphBytes, observed, maximum: MAX_TRANSFER_GRAPH_BYTES }) if observed == expected)
+            );
+        }
+    }
+
+    #[test]
+    fn decoder_reports_typed_relationship_count_before_reading_records() {
+        let mut bytes = b"LDXG1".to_vec();
+        bytes.extend_from_slice(&65u64.to_le_bytes());
+        let mut decoder = TransferGraphDecoder::new(&bytes).unwrap();
+        assert!(matches!(
+            decoder.count(crate::document::LimitKind::MainRelationships, 64),
+            Err(TransactionError::Limit {
+                kind: crate::document::LimitKind::MainRelationships,
+                observed: 65,
+                maximum: 64
+            })
+        ));
+    }
 }

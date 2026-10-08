@@ -260,7 +260,7 @@ complete document family yet: eager `Commit` carries the immutable package
 (0022) and the source owner (0031); legacy history retains transitional XML commits. The eager read-only
 projection is now owned (0019), and eager `apply(&patch) -> Result<Package>`
 is immutable (0020), and eager package-bound commit is implemented (0022).
-Specialized immutable ownership, legacy source publication replacement, `LimitKind`,
+Specialized immutable ownership, legacy source publication replacement, caller-selected semantic limits,
 and mutable-writer removal remain pending. Scoped transactions and other
 formats are not marked migrated by this step.
 
@@ -297,7 +297,7 @@ Standalone XML and source-backed publication explicitly use the transitional
 `document::snapshot::{Edit, Commit}` types. They are distinct nominal types,
 not aliases for the canonical package family. Snapshot composition/history and
 source stream publishers still require owner migration; no complete family is
-registered until that work and `LimitKind` are finished. The root patch still
+registered until that work and the remaining limit/policy contracts are finished. The root patch still
 uses main-XML equality for ordinary eager sources; full package lineage remains
 required for owner-wide conformance. Broad content-safe Debug cleanup remains
 pending beyond the new canonical Edit/Commit implementations.
@@ -387,6 +387,21 @@ never formats the owner or authored content.
 Legacy stream/history publishers explicitly consume raw
 `document::snapshot::Commit`; their callers start with
 `document_snapshot()?.edit()`. This is not a compatibility alias for the ordinary
-owner entry point. Full family registration still needs `LimitKind`, remaining
-policy vocabulary and specialized ownership migration. Managed donor snapshot
+owner entry point. Record 0032 supplies typed `LimitKind`; full family registration still needs
+caller-selected semantic limits, remaining policy vocabulary and specialized ownership migration. Managed donor snapshot
 refusal and unmanaged copy/rescan costs recorded in 0030 remain open.
+
+
+## 24. Primary DOCX typed limit errors (record 0032)
+
+`document::LimitKind` replaces free-form resource strings in the primary
+transaction error. `Error::Limit { kind, observed, maximum }` is canonical;
+`resource`, `actual` and `max` are removed and banned under that variant in both
+DOCX profiles. Durable count/path helpers, history and package transfer adapters
+use typed kinds as well. Aggregate transfer-graph payload limits are checked
+before copying and report the dedicated typed byte kind.
+
+This does not migrate wrapped OPC/source-story errors or add caller-selected
+SemanticLimits. Full family registration and the remaining policy contracts are
+still pending. Existing overflow guards retain their documented saturated
+`usize::MAX` sentinel.

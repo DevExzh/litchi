@@ -482,15 +482,16 @@ pub enum Error {
         /// Stable refusal category.
         reason: Refusal,
     },
-    /// A configured transaction resource ceiling was exceeded.
-    #[error("document transaction {resource} limit exceeded: {actual} > {max}")]
+    /// A transaction resource ceiling or representable size was exceeded.
+    #[error("document transaction {kind} limit exceeded: {observed} > {maximum}")]
     Limit {
         /// Bounded resource.
-        resource: &'static str,
+        kind: super::LimitKind,
+        /// Observed or requested value. Arithmetic overflow saturates to
+        /// `usize::MAX`; equality with `maximum` then means unrepresentable size.
+        observed: usize,
         /// Maximum accepted value.
-        max: usize,
-        /// Observed or requested value.
-        actual: usize,
+        maximum: usize,
     },
     /// The patch target no longer has the exact source bytes captured by the
     /// edit.
@@ -537,9 +538,9 @@ impl ManagedAdmission {
             .checked_mul(3)
             .and_then(|count| count.checked_mul(size_of::<Range>()))
             .ok_or(Error::Limit {
-                resource: "managed snapshot index bytes",
-                max: usize::MAX,
-                actual: usize::MAX,
+                kind: crate::document::LimitKind::ManagedSnapshotIndexBytes,
+                maximum: usize::MAX,
+                observed: usize::MAX,
             })?;
         let metadata_bytes = size_of::<Snapshot>()
             .checked_add(size_of::<ManagedXml>())
@@ -556,24 +557,24 @@ impl ManagedAdmission {
             .and_then(|bytes| bytes.checked_add(partname_len.saturating_mul(2)))
             .and_then(|bytes| bytes.checked_add(4 * size_of::<Arc<[Range]>>()))
             .ok_or(Error::Limit {
-                resource: "managed snapshot metadata bytes",
-                max: usize::MAX,
-                actual: usize::MAX,
+                kind: crate::document::LimitKind::ManagedSnapshotMetadataBytes,
+                maximum: usize::MAX,
+                observed: usize::MAX,
             })?;
         let memory = metadata_bytes
             .checked_add(index_bytes)
             .ok_or(Error::Limit {
-                resource: "managed snapshot memory",
-                max: usize::MAX,
-                actual: usize::MAX,
+                kind: crate::document::LimitKind::ManagedSnapshotMemory,
+                maximum: usize::MAX,
+                observed: usize::MAX,
             })?;
         let objects = xml_len
             .min(MAX_DOCUMENT_NODES)
             .checked_add(4)
             .ok_or(Error::Limit {
-                resource: "managed snapshot objects",
-                max: usize::MAX,
-                actual: usize::MAX,
+                kind: crate::document::LimitKind::ManagedSnapshotObjects,
+                maximum: usize::MAX,
+                observed: usize::MAX,
             })?;
         let memory = reserve_managed(&context, Resource::Memory, memory)?;
         let objects = reserve_managed(&context, Resource::Objects, objects)?;
@@ -597,9 +598,9 @@ impl ManagedAdmission {
                 .checked_mul(MANAGED_SCAN_OBJECT_MULTIPLIER)
                 .and_then(|objects| objects.checked_add(8))
                 .ok_or(Error::Limit {
-                    resource: "managed scan objects",
-                    max: usize::MAX,
-                    actual: usize::MAX,
+                    kind: crate::document::LimitKind::ManagedScanObjects,
+                    maximum: usize::MAX,
+                    observed: usize::MAX,
                 })?,
         )?;
         let depth = reserve_managed(&self.context, Resource::Depth, MAX_DOCUMENT_DEPTH)?;
@@ -609,9 +610,9 @@ impl ManagedAdmission {
             xml_len
                 .checked_mul(MANAGED_SCAN_WORK_MULTIPLIER)
                 .ok_or(Error::Limit {
-                    resource: "managed scan work",
-                    max: usize::MAX,
-                    actual: usize::MAX,
+                    kind: crate::document::LimitKind::ManagedScanWork,
+                    maximum: usize::MAX,
+                    observed: usize::MAX,
                 })?,
         )?;
         Ok(ScanAdmission {
@@ -631,14 +632,14 @@ impl ManagedAdmission {
     fn owner_scan(&self, xml_len: usize) -> Result<ScanAdmission> {
         let scan = self.scan(xml_len)?;
         let units = xml_len.checked_add(1).ok_or(Error::Limit {
-            resource: "managed namespace lookup work",
-            max: usize::MAX,
-            actual: usize::MAX,
+            kind: crate::document::LimitKind::ManagedNamespaceLookupWork,
+            maximum: usize::MAX,
+            observed: usize::MAX,
         })?;
         let namespace_work = units.checked_mul(units).ok_or(Error::Limit {
-            resource: "managed namespace lookup work",
-            max: usize::MAX,
-            actual: usize::MAX,
+            kind: crate::document::LimitKind::ManagedNamespaceLookupWork,
+            maximum: usize::MAX,
+            observed: usize::MAX,
         })?;
         consume_managed(&self.context, Resource::Work, namespace_work)?;
         Ok(scan)
@@ -785,18 +786,18 @@ fn reserve_managed(
     amount: usize,
 ) -> Result<Reservation> {
     let amount = u64::try_from(amount).map_err(|_error| Error::Limit {
-        resource: "managed reservation amount",
-        max: usize::MAX,
-        actual: usize::MAX,
+        kind: crate::document::LimitKind::ManagedReservationAmount,
+        maximum: usize::MAX,
+        observed: usize::MAX,
     })?;
     context.reserve(resource, amount).map_err(managed_execution)
 }
 
 fn consume_managed(context: &ExecutionContext, resource: Resource, amount: usize) -> Result<()> {
     let amount = u64::try_from(amount).map_err(|_error| Error::Limit {
-        resource: "managed work amount",
-        max: usize::MAX,
-        actual: usize::MAX,
+        kind: crate::document::LimitKind::ManagedWorkAmount,
+        maximum: usize::MAX,
+        observed: usize::MAX,
     })?;
     context.consume(resource, amount).map_err(managed_execution)
 }
@@ -829,25 +830,25 @@ fn managed_scan_memory(xml_len: usize) -> Result<usize> {
         .and_then(|bytes| bytes.checked_add(MANAGED_SCAN_SLOT_ALLOCATOR_OVERHEAD))
         .and_then(|bytes| bytes.checked_mul(slot_count))
         .ok_or(Error::Limit {
-            resource: "managed text-slot memory",
-            max: usize::MAX,
-            actual: usize::MAX,
+            kind: crate::document::LimitKind::ManagedTextSlotMemory,
+            maximum: usize::MAX,
+            observed: usize::MAX,
         })?;
     MANAGED_SCAN_FIXED_MEMORY
         .checked_add(
             xml_len
                 .checked_mul(MANAGED_SCAN_INPUT_MEMORY_MULTIPLIER)
                 .ok_or(Error::Limit {
-                    resource: "managed scan parser memory",
-                    max: usize::MAX,
-                    actual: usize::MAX,
+                    kind: crate::document::LimitKind::ManagedScanParserMemory,
+                    maximum: usize::MAX,
+                    observed: usize::MAX,
                 })?,
         )
         .and_then(|bytes| bytes.checked_add(slot_bytes))
         .ok_or(Error::Limit {
-            resource: "managed scan memory",
-            max: usize::MAX,
-            actual: usize::MAX,
+            kind: crate::document::LimitKind::ManagedScanMemory,
+            maximum: usize::MAX,
+            observed: usize::MAX,
         })
 }
 
@@ -856,9 +857,9 @@ fn managed_scan_slot_count(xml_len: usize) -> Result<usize> {
         .checked_add(MANAGED_SCAN_MIN_TEXT_SLOT_BYTES - 1)
         .and_then(|bytes| bytes.checked_div(MANAGED_SCAN_MIN_TEXT_SLOT_BYTES))
         .ok_or(Error::Limit {
-            resource: "managed text-slot count",
-            max: usize::MAX,
-            actual: usize::MAX,
+            kind: crate::document::LimitKind::ManagedTextSlotCount,
+            maximum: usize::MAX,
+            observed: usize::MAX,
         })
 }
 
@@ -961,9 +962,9 @@ impl Snapshot {
         let xml = source_xml.into();
         if xml.len() > MAX_DOCUMENT_XML_BYTES {
             return Err(Error::Limit {
-                resource: "XML bytes",
-                max: MAX_DOCUMENT_XML_BYTES,
-                actual: xml.len(),
+                kind: crate::document::LimitKind::XmlBytes,
+                maximum: MAX_DOCUMENT_XML_BYTES,
+                observed: xml.len(),
             });
         }
         let layout = scan_document(&xml)?;
@@ -983,9 +984,9 @@ impl Snapshot {
     pub(crate) fn from_shared_xml(xml: Arc<Vec<u8>>) -> Result<Self> {
         if xml.len() > MAX_DOCUMENT_XML_BYTES {
             return Err(Error::Limit {
-                resource: "XML bytes",
-                max: MAX_DOCUMENT_XML_BYTES,
-                actual: xml.len(),
+                kind: crate::document::LimitKind::XmlBytes,
+                maximum: MAX_DOCUMENT_XML_BYTES,
+                observed: xml.len(),
             });
         }
         let layout = scan_document(&xml)?;
@@ -1218,9 +1219,9 @@ impl Snapshot {
     ) -> Result<Self> {
         if data.as_bytes().len() > MAX_DOCUMENT_XML_BYTES {
             return Err(Error::Limit {
-                resource: "XML bytes",
-                max: MAX_DOCUMENT_XML_BYTES,
-                actual: data.as_bytes().len(),
+                kind: crate::document::LimitKind::XmlBytes,
+                maximum: MAX_DOCUMENT_XML_BYTES,
+                observed: data.as_bytes().len(),
             });
         }
         let admission =
@@ -1259,9 +1260,9 @@ impl Snapshot {
     ) -> Result<Self> {
         if source_xml.bytes().len() > MAX_DOCUMENT_XML_BYTES {
             return Err(Error::Limit {
-                resource: "XML bytes",
-                max: MAX_DOCUMENT_XML_BYTES,
-                actual: source_xml.bytes().len(),
+                kind: crate::document::LimitKind::XmlBytes,
+                maximum: MAX_DOCUMENT_XML_BYTES,
+                observed: source_xml.bytes().len(),
             });
         }
         let admission =
@@ -1298,9 +1299,9 @@ impl Snapshot {
     ) -> Result<Self> {
         if source_xml.bytes().len() > MAX_DOCUMENT_XML_BYTES {
             return Err(Error::Limit {
-                resource: "XML bytes",
-                max: MAX_DOCUMENT_XML_BYTES,
-                actual: source_xml.bytes().len(),
+                kind: crate::document::LimitKind::XmlBytes,
+                maximum: MAX_DOCUMENT_XML_BYTES,
+                observed: source_xml.bytes().len(),
             });
         }
         let admission = ManagedAdmission::new(
@@ -2214,9 +2215,9 @@ impl Edit {
                     total
                         .checked_add(operation_string_bytes(operation))
                         .ok_or(Error::Limit {
-                            resource: "managed cloned operation string bytes",
-                            max: usize::MAX,
-                            actual: usize::MAX,
+                            kind: crate::document::LimitKind::ManagedClonedOperationStringBytes,
+                            maximum: usize::MAX,
+                            observed: usize::MAX,
                         })
                 })?;
             if string_bytes == 0 {
@@ -2226,9 +2227,9 @@ impl Edit {
                     .checked_add(size_of::<StringAdmission>())
                     .and_then(|bytes| bytes.checked_add(size_of::<Arc<StringAdmission>>()))
                     .ok_or(Error::Limit {
-                        resource: "managed cloned operation string metadata bytes",
-                        max: usize::MAX,
-                        actual: usize::MAX,
+                        kind: crate::document::LimitKind::ManagedClonedOperationStringMetadataBytes,
+                        maximum: usize::MAX,
+                        observed: usize::MAX,
                     })?;
                 Some(Arc::new(StringAdmission {
                     _memory: reserve_managed(&admission.context, Resource::Memory, memory)?,
@@ -2494,15 +2495,15 @@ impl Edit {
             .checked_sub(usize::from(remove_existing))
             .and_then(|count| count.checked_add(usize::from(add_new)))
             .ok_or(Error::Limit {
-                resource: "managed paragraph operation count",
-                max: MAX_OPERATIONS,
-                actual: usize::MAX,
+                kind: crate::document::LimitKind::ManagedParagraphOperationCount,
+                maximum: MAX_OPERATIONS,
+                observed: usize::MAX,
             })?;
         if final_count > MAX_OPERATIONS {
             return Err(Error::Limit {
-                resource: "managed paragraph operation count",
-                max: MAX_OPERATIONS,
-                actual: final_count,
+                kind: crate::document::LimitKind::ManagedParagraphOperationCount,
+                maximum: MAX_OPERATIONS,
+                observed: final_count,
             });
         }
 
@@ -2516,17 +2517,17 @@ impl Edit {
                     .checked_add(base_text.capacity())
                     .and_then(|bytes| bytes.checked_add(authored_text.capacity()))
                     .ok_or(Error::Limit {
-                        resource: "managed operation string bytes",
-                        max: MAX_REPLACEMENT_TEXT_BYTES,
-                        actual: usize::MAX,
+                        kind: crate::document::LimitKind::ManagedOperationStringBytes,
+                        maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                        observed: usize::MAX,
                     })?;
             } else {
                 planned_string_bytes = planned_string_bytes
                     .checked_add(operation_string_bytes(operation))
                     .ok_or(Error::Limit {
-                        resource: "managed operation string bytes",
-                        max: MAX_REPLACEMENT_TEXT_BYTES,
-                        actual: usize::MAX,
+                        kind: crate::document::LimitKind::ManagedOperationStringBytes,
+                        maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                        observed: usize::MAX,
                     })?;
             }
         }
@@ -2535,9 +2536,9 @@ impl Edit {
                 .checked_add(base_text.capacity())
                 .and_then(|bytes| bytes.checked_add(authored_text.capacity()))
                 .ok_or(Error::Limit {
-                    resource: "managed operation string bytes",
-                    max: MAX_REPLACEMENT_TEXT_BYTES,
-                    actual: usize::MAX,
+                    kind: crate::document::LimitKind::ManagedOperationStringBytes,
+                    maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                    observed: usize::MAX,
                 })?;
         }
 
@@ -2680,9 +2681,9 @@ impl Edit {
             .checked_mul(size_of::<ManagedParagraphPlan>())
             .and_then(|bytes| bytes.checked_add(size_of::<Vec<ManagedParagraphPlan>>()));
         let plan_memory = plan_memory.ok_or(Error::Limit {
-            resource: "managed paragraph reconstruction plan memory",
-            max: usize::MAX,
-            actual: usize::MAX,
+            kind: crate::document::LimitKind::ManagedParagraphReconstructionPlanMemory,
+            maximum: usize::MAX,
+            observed: usize::MAX,
         })?;
         let _plan_memory = reserve_managed(&context, Resource::Memory, plan_memory)?;
         let _plan_objects = reserve_managed(&context, Resource::Objects, planned_operations.len())?;
@@ -2738,16 +2739,16 @@ impl Edit {
                 fragment_bytes
                     .checked_add(owner_fragment_bytes)
                     .ok_or(Error::Limit {
-                        resource: "managed paragraph fragment bytes",
-                        max: MAX_DOCUMENT_XML_BYTES,
-                        actual: usize::MAX,
+                        kind: crate::document::LimitKind::ManagedParagraphFragmentBytes,
+                        maximum: MAX_DOCUMENT_XML_BYTES,
+                        observed: usize::MAX,
                     })?;
             fragment_count = fragment_count
                 .checked_add(owner.slots.len())
                 .ok_or(Error::Limit {
-                    resource: "managed paragraph fragment count",
-                    max: MAX_OPERATIONS,
-                    actual: usize::MAX,
+                    kind: crate::document::LimitKind::ManagedParagraphFragmentCount,
+                    maximum: MAX_OPERATIONS,
+                    observed: usize::MAX,
                 })?;
             plans.push(ManagedParagraphPlan {
                 range,
@@ -2789,15 +2790,15 @@ impl Edit {
                         size_of::<Vec<u8>>() + size_of::<litchi_opc::AuthoredXmlFragment>(),
                     )
                     .ok_or(Error::Limit {
-                        resource: "managed paragraph fragment metadata",
-                        max: usize::MAX,
-                        actual: usize::MAX,
+                        kind: crate::document::LimitKind::ManagedParagraphFragmentMetadata,
+                        maximum: usize::MAX,
+                        observed: usize::MAX,
                     })?,
             )
             .ok_or(Error::Limit {
-                resource: "managed paragraph fragment memory",
-                max: usize::MAX,
-                actual: usize::MAX,
+                kind: crate::document::LimitKind::ManagedParagraphFragmentMemory,
+                maximum: usize::MAX,
+                observed: usize::MAX,
             })?;
         let _fragment_memory = reserve_managed(&context, Resource::Memory, fragment_memory)?;
         let reconstruction_work = self
@@ -2812,9 +2813,9 @@ impl Edit {
                     .and_then(|operation_bytes| bytes.checked_add(operation_bytes))
             })
             .ok_or(Error::Limit {
-                resource: "managed paragraph reconstruction work",
-                max: usize::MAX,
-                actual: usize::MAX,
+                kind: crate::document::LimitKind::ManagedParagraphReconstructionWork,
+                maximum: usize::MAX,
+                observed: usize::MAX,
             })?;
         consume_managed(&context, Resource::Work, reconstruction_work)?;
 
@@ -2860,15 +2861,15 @@ impl Edit {
                         byte_cursor
                             .checked_add(character.len_utf8())
                             .ok_or(Error::Limit {
-                                resource: "replacement text bytes",
-                                max: MAX_REPLACEMENT_TEXT_BYTES,
-                                actual: usize::MAX,
+                                kind: crate::document::LimitKind::ReplacementTextBytes,
+                                maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                                observed: usize::MAX,
                             })?;
                 }
                 character_cursor = character_cursor.checked_add(count).ok_or(Error::Limit {
-                    resource: "replacement text characters",
-                    max: MAX_REPLACEMENT_TEXT_BYTES,
-                    actual: usize::MAX,
+                    kind: crate::document::LimitKind::ReplacementTextCharacters,
+                    maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                    observed: usize::MAX,
                 })?;
                 let value = &after[value_start..byte_cursor];
                 let fragment = try_run_content_fragment(&slot.prefix, &slot.local_name, value)?;
@@ -3064,17 +3065,17 @@ impl Edit {
         // any decision or operation vector can grow. Keep each token live
         // until the shared reconstruction either publishes or fails.
         let input_token_capacity = replacements.len().checked_mul(2).ok_or(Error::Limit {
-            resource: "managed batch input admission capacity",
-            max: usize::MAX,
-            actual: usize::MAX,
+            kind: crate::document::LimitKind::ManagedBatchInputAdmissionCapacity,
+            maximum: usize::MAX,
+            observed: usize::MAX,
         })?;
         let input_vector_memory = input_token_capacity
             .checked_mul(size_of::<Arc<StringAdmission>>())
             .and_then(|bytes| bytes.checked_add(size_of::<Vec<Arc<StringAdmission>>>()))
             .ok_or(Error::Limit {
-                resource: "managed batch input admission metadata",
-                max: usize::MAX,
-                actual: usize::MAX,
+                kind: crate::document::LimitKind::ManagedBatchInputAdmissionMetadata,
+                maximum: usize::MAX,
+                observed: usize::MAX,
             })?;
         let _input_vector_memory =
             reserve_managed(&context, Resource::Memory, input_vector_memory)?;
@@ -3108,9 +3109,9 @@ impl Edit {
             .checked_mul(size_of::<ManagedBatchDecision<'_>>())
             .and_then(|bytes| bytes.checked_add(size_of::<Vec<ManagedBatchDecision<'_>>>()))
             .ok_or(Error::Limit {
-                resource: "managed paragraph batch decision metadata",
-                max: usize::MAX,
-                actual: usize::MAX,
+                kind: crate::document::LimitKind::ManagedParagraphBatchDecisionMetadata,
+                maximum: usize::MAX,
+                observed: usize::MAX,
             })?;
         let _decision_memory = reserve_managed(&context, Resource::Memory, decision_memory)?;
         let _decision_objects = reserve_managed(&context, Resource::Objects, replacements.len())?;
@@ -3240,15 +3241,15 @@ impl Edit {
             .checked_sub(remove_count)
             .and_then(|count| count.checked_add(add_count))
             .ok_or(Error::Limit {
-                resource: "managed paragraph operation count",
-                max: MAX_OPERATIONS,
-                actual: usize::MAX,
+                kind: crate::document::LimitKind::ManagedParagraphOperationCount,
+                maximum: MAX_OPERATIONS,
+                observed: usize::MAX,
             })?;
         if final_count > MAX_OPERATIONS {
             return Err(Error::Limit {
-                resource: "managed paragraph operation count",
-                max: MAX_OPERATIONS,
-                actual: final_count,
+                kind: crate::document::LimitKind::ManagedParagraphOperationCount,
+                maximum: MAX_OPERATIONS,
+                observed: final_count,
             });
         }
 
@@ -3285,9 +3286,9 @@ impl Edit {
             .checked_mul(size_of::<Option<usize>>())
             .and_then(|bytes| bytes.checked_add(size_of::<Vec<Option<usize>>>()))
             .ok_or(Error::Limit {
-                resource: "managed paragraph batch decision map metadata",
-                max: usize::MAX,
-                actual: usize::MAX,
+                kind: crate::document::LimitKind::ManagedParagraphBatchDecisionMapMetadata,
+                maximum: usize::MAX,
+                observed: usize::MAX,
             })?;
         let _decision_map_memory =
             reserve_managed(&context, Resource::Memory, decision_map_memory)?;
@@ -3332,17 +3333,17 @@ impl Edit {
                     .checked_add(before.capacity())
                     .and_then(|bytes| bytes.checked_add(decision.replacement.text.capacity()))
                     .ok_or(Error::Limit {
-                        resource: "managed operation string bytes",
-                        max: MAX_REPLACEMENT_TEXT_BYTES,
-                        actual: usize::MAX,
+                        kind: crate::document::LimitKind::ManagedOperationStringBytes,
+                        maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                        observed: usize::MAX,
                     })?;
             } else {
                 planned_string_bytes = planned_string_bytes
                     .checked_add(operation_string_bytes(operation))
                     .ok_or(Error::Limit {
-                        resource: "managed operation string bytes",
-                        max: MAX_REPLACEMENT_TEXT_BYTES,
-                        actual: usize::MAX,
+                        kind: crate::document::LimitKind::ManagedOperationStringBytes,
+                        maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                        observed: usize::MAX,
                     })?;
             }
         }
@@ -3351,9 +3352,9 @@ impl Edit {
                 .checked_add(decision.base_text.capacity())
                 .and_then(|bytes| bytes.checked_add(decision.replacement.text.capacity()))
                 .ok_or(Error::Limit {
-                    resource: "managed operation string bytes",
-                    max: MAX_REPLACEMENT_TEXT_BYTES,
-                    actual: usize::MAX,
+                    kind: crate::document::LimitKind::ManagedOperationStringBytes,
+                    maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                    observed: usize::MAX,
                 })?;
         }
 
@@ -4396,9 +4397,9 @@ impl Edit {
             })?
             .text()?;
         let expected_count = count.checked_add(1).ok_or(Error::Limit {
-            resource: "paragraphs",
-            max: usize::MAX,
-            actual: usize::MAX,
+            kind: crate::document::LimitKind::Paragraphs,
+            maximum: usize::MAX,
+            observed: usize::MAX,
         })?;
         if readback != text || candidate.paragraph_count() != expected_count {
             return Err(crate::Error::InvalidFormat(
@@ -5098,9 +5099,9 @@ impl Edit {
     fn reserve_operation(&mut self) -> Result<()> {
         if self.operations.len() >= MAX_OPERATIONS {
             return Err(Error::Limit {
-                resource: "operations",
-                max: MAX_OPERATIONS,
-                actual: self.operations.len().saturating_add(1),
+                kind: crate::document::LimitKind::Operations,
+                maximum: MAX_OPERATIONS,
+                observed: self.operations.len().saturating_add(1),
             });
         }
         if self.operation_admission.is_none() {
@@ -5173,9 +5174,9 @@ impl Edit {
             .checked_add(size_of::<StringAdmission>())
             .and_then(|bytes| bytes.checked_add(size_of::<Arc<StringAdmission>>()))
             .ok_or(Error::Limit {
-                resource: "operation string metadata bytes",
-                max: usize::MAX,
-                actual: usize::MAX,
+                kind: crate::document::LimitKind::OperationStringMetadataBytes,
+                maximum: usize::MAX,
+                observed: usize::MAX,
             })?;
         Ok(Arc::new(StringAdmission {
             _memory: reserve_managed(&admission.context, Resource::Memory, memory)?,
@@ -5198,15 +5199,15 @@ impl Edit {
             .replacement_text_bytes
             .checked_add(bytes)
             .ok_or(Error::Limit {
-                resource: "replacement text bytes",
-                max: MAX_REPLACEMENT_TEXT_BYTES,
-                actual: usize::MAX,
+                kind: crate::document::LimitKind::ReplacementTextBytes,
+                maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                observed: usize::MAX,
             })?;
         if actual > MAX_REPLACEMENT_TEXT_BYTES {
             return Err(Error::Limit {
-                resource: "replacement text bytes",
-                max: MAX_REPLACEMENT_TEXT_BYTES,
-                actual,
+                kind: crate::document::LimitKind::ReplacementTextBytes,
+                maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                observed: actual,
             });
         }
         Ok(actual)
@@ -5384,9 +5385,9 @@ fn build_inverse_operations(
             total
                 .checked_add(operation_string_bytes(operation))
                 .ok_or(Error::Limit {
-                    resource: "inverse operation string bytes",
-                    max: usize::MAX,
-                    actual: usize::MAX,
+                    kind: crate::document::LimitKind::InverseOperationStringBytes,
+                    maximum: usize::MAX,
+                    observed: usize::MAX,
                 })
         })?;
         let memory = managed_operation_memory_bytes(operations.len())?;
@@ -5403,9 +5404,9 @@ fn build_inverse_operations(
                 .checked_add(size_of::<StringAdmission>())
                 .and_then(|bytes| bytes.checked_add(size_of::<Arc<StringAdmission>>()))
                 .ok_or(Error::Limit {
-                    resource: "inverse operation string metadata bytes",
-                    max: usize::MAX,
-                    actual: usize::MAX,
+                    kind: crate::document::LimitKind::InverseOperationStringMetadataBytes,
+                    maximum: usize::MAX,
+                    observed: usize::MAX,
                 })?;
             Some(Arc::new(StringAdmission {
                 _memory: reserve_managed(context, Resource::Memory, memory)?,
@@ -5470,15 +5471,15 @@ fn managed_replacement_text_bytes(operations: &[Operation]) -> Result<usize> {
             }));
         };
         let total = total.checked_add(after.len()).ok_or(Error::Limit {
-            resource: "replacement text bytes",
-            max: MAX_REPLACEMENT_TEXT_BYTES,
-            actual: usize::MAX,
+            kind: crate::document::LimitKind::ReplacementTextBytes,
+            maximum: MAX_REPLACEMENT_TEXT_BYTES,
+            observed: usize::MAX,
         })?;
         if total > MAX_REPLACEMENT_TEXT_BYTES {
             return Err(Error::Limit {
-                resource: "replacement text bytes",
-                max: MAX_REPLACEMENT_TEXT_BYTES,
-                actual: total,
+                kind: crate::document::LimitKind::ReplacementTextBytes,
+                maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                observed: total,
             });
         }
         Ok(total)
@@ -5528,9 +5529,9 @@ fn managed_operation_memory_bytes(operation_count: usize) -> Result<usize> {
         .and_then(|bytes| bytes.checked_add(size_of::<OperationAdmission>()))
         .and_then(|bytes| bytes.checked_add(size_of::<Arc<OperationAdmission>>()))
         .ok_or(Error::Limit {
-            resource: "managed operation metadata bytes",
-            max: usize::MAX,
-            actual: usize::MAX,
+            kind: crate::document::LimitKind::ManagedOperationMetadataBytes,
+            maximum: usize::MAX,
+            observed: usize::MAX,
         })
 }
 
@@ -6094,9 +6095,9 @@ struct CellSelection<'a> {
 fn validate_hyperlink_replacements(replacements: &[HyperlinkTextReplacement]) -> Result<()> {
     if replacements.len() > MAX_OPERATIONS {
         return Err(Error::Limit {
-            resource: "composite hyperlink replacements",
-            max: MAX_OPERATIONS,
-            actual: replacements.len(),
+            kind: crate::document::LimitKind::CompositeHyperlinkReplacements,
+            maximum: MAX_OPERATIONS,
+            observed: replacements.len(),
         });
     }
     let ambiguous_position = replacements
@@ -6118,9 +6119,9 @@ fn validate_hyperlink_replacements(replacements: &[HyperlinkTextReplacement]) ->
 fn validate_paragraph_replacements(replacements: &[ParagraphTextReplacement]) -> Result<()> {
     if replacements.len() > MAX_OPERATIONS {
         return Err(Error::Limit {
-            resource: "composite paragraph replacements",
-            max: MAX_OPERATIONS,
-            actual: replacements.len(),
+            kind: crate::document::LimitKind::CompositeParagraphReplacements,
+            maximum: MAX_OPERATIONS,
+            observed: replacements.len(),
         });
     }
     let ambiguous_position = replacements
@@ -6271,9 +6272,9 @@ fn scan_document_with_context(xml: &[u8], context: Option<&ExecutionContext>) ->
             let active_namespace_bindings = current_bindings
                 .checked_add(event_namespace_bindings)
                 .ok_or(Error::Limit {
-                    resource: "document namespace binding count",
-                    max: usize::MAX,
-                    actual: usize::MAX,
+                    kind: crate::document::LimitKind::DocumentNamespaceBindingCount,
+                    maximum: usize::MAX,
+                    observed: usize::MAX,
                 })?;
             (event_namespace_bindings, active_namespace_bindings)
         } else {
@@ -6288,9 +6289,9 @@ fn scan_document_with_context(xml: &[u8], context: Option<&ExecutionContext>) ->
             let lookup_work = event_bytes
                 .checked_mul(active_namespace_bindings.saturating_add(1))
                 .ok_or(Error::Limit {
-                    resource: "document namespace lookup work",
-                    max: usize::MAX,
-                    actual: usize::MAX,
+                    kind: crate::document::LimitKind::DocumentNamespaceLookupWork,
+                    maximum: usize::MAX,
+                    observed: usize::MAX,
                 })?;
             consume_managed(context, Resource::Work, lookup_work)?;
         }
@@ -6308,9 +6309,9 @@ fn scan_document_with_context(xml: &[u8], context: Option<&ExecutionContext>) ->
             })?;
             if nodes > MAX_DOCUMENT_NODES {
                 return Err(Error::Limit {
-                    resource: "XML elements",
-                    max: MAX_DOCUMENT_NODES,
-                    actual: nodes,
+                    kind: crate::document::LimitKind::XmlElements,
+                    maximum: MAX_DOCUMENT_NODES,
+                    observed: nodes,
                 });
             }
         }
@@ -6322,9 +6323,9 @@ fn scan_document_with_context(xml: &[u8], context: Option<&ExecutionContext>) ->
                 })?;
                 if depth > MAX_DOCUMENT_DEPTH {
                     return Err(Error::Limit {
-                        resource: "XML depth",
-                        max: MAX_DOCUMENT_DEPTH,
-                        actual: depth,
+                        kind: crate::document::LimitKind::XmlDepth,
+                        maximum: MAX_DOCUMENT_DEPTH,
+                        observed: depth,
                     });
                 }
                 // `QName::local_name` and `QName::prefix` split at the same
@@ -6583,9 +6584,9 @@ fn scan_document_with_context_nsreader_oracle(
             let active_namespace_bindings = current_bindings
                 .checked_add(event_namespace_bindings)
                 .ok_or(Error::Limit {
-                    resource: "document namespace binding count",
-                    max: usize::MAX,
-                    actual: usize::MAX,
+                    kind: crate::document::LimitKind::DocumentNamespaceBindingCount,
+                    maximum: usize::MAX,
+                    observed: usize::MAX,
                 })?;
             (event_namespace_bindings, active_namespace_bindings)
         } else {
@@ -6600,9 +6601,9 @@ fn scan_document_with_context_nsreader_oracle(
             let lookup_work = event_bytes
                 .checked_mul(active_namespace_bindings.saturating_add(1))
                 .ok_or(Error::Limit {
-                    resource: "document namespace lookup work",
-                    max: usize::MAX,
-                    actual: usize::MAX,
+                    kind: crate::document::LimitKind::DocumentNamespaceLookupWork,
+                    maximum: usize::MAX,
+                    observed: usize::MAX,
                 })?;
             consume_managed(context, Resource::Work, lookup_work)?;
         }
@@ -6627,9 +6628,9 @@ fn scan_document_with_context_nsreader_oracle(
             })?;
             if nodes > MAX_DOCUMENT_NODES {
                 return Err(Error::Limit {
-                    resource: "XML elements",
-                    max: MAX_DOCUMENT_NODES,
-                    actual: nodes,
+                    kind: crate::document::LimitKind::XmlElements,
+                    maximum: MAX_DOCUMENT_NODES,
+                    observed: nodes,
                 });
             }
         }
@@ -6641,9 +6642,9 @@ fn scan_document_with_context_nsreader_oracle(
                 })?;
                 if depth > MAX_DOCUMENT_DEPTH {
                     return Err(Error::Limit {
-                        resource: "XML depth",
-                        max: MAX_DOCUMENT_DEPTH,
-                        actual: depth,
+                        kind: crate::document::LimitKind::XmlDepth,
+                        maximum: MAX_DOCUMENT_DEPTH,
+                        observed: depth,
                     });
                 }
                 let is_word = is_wordprocessing_namespace(&namespace);
@@ -8525,15 +8526,15 @@ fn rewrite_text_owner(xml: &[u8], owner: &TextOwner, text: &str) -> Result<Vec<u
             byte_cursor = byte_cursor
                 .checked_add(character.len_utf8())
                 .ok_or(Error::Limit {
-                    resource: "replacement text bytes",
-                    max: MAX_REPLACEMENT_TEXT_BYTES,
-                    actual: usize::MAX,
+                    kind: crate::document::LimitKind::ReplacementTextBytes,
+                    maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                    observed: usize::MAX,
                 })?;
         }
         character_cursor = character_cursor.checked_add(count).ok_or(Error::Limit {
-            resource: "replacement text characters",
-            max: MAX_REPLACEMENT_TEXT_BYTES,
-            actual: usize::MAX,
+            kind: crate::document::LimitKind::ReplacementTextCharacters,
+            maximum: MAX_REPLACEMENT_TEXT_BYTES,
+            observed: usize::MAX,
         })?;
         let value = &text[value_start..byte_cursor];
         let fragment = try_run_content_fragment(&slot.prefix, &slot.local_name, value)?;
@@ -8576,24 +8577,24 @@ fn preflight_text_owner_rewrite(
             byte_cursor = byte_cursor
                 .checked_add(character.len_utf8())
                 .ok_or(Error::Limit {
-                    resource: "replacement text bytes",
-                    max: MAX_REPLACEMENT_TEXT_BYTES,
-                    actual: usize::MAX,
+                    kind: crate::document::LimitKind::ReplacementTextBytes,
+                    maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                    observed: usize::MAX,
                 })?;
         }
         character_cursor = character_cursor.checked_add(count).ok_or(Error::Limit {
-            resource: "replacement text characters",
-            max: MAX_REPLACEMENT_TEXT_BYTES,
-            actual: usize::MAX,
+            kind: crate::document::LimitKind::ReplacementTextCharacters,
+            maximum: MAX_REPLACEMENT_TEXT_BYTES,
+            observed: usize::MAX,
         })?;
         let value = &text[value_start..byte_cursor];
         let replacement_len = run_content_fragment_len(&slot.prefix, &slot.local_name, value)?;
         fragment_bytes = fragment_bytes
             .checked_add(replacement_len)
             .ok_or(Error::Limit {
-                resource: "paragraph replacement XML bytes",
-                max: MAX_DOCUMENT_XML_BYTES,
-                actual: usize::MAX,
+                kind: crate::document::LimitKind::ParagraphReplacementXmlBytes,
+                maximum: MAX_DOCUMENT_XML_BYTES,
+                observed: usize::MAX,
             })?;
         let removed_len = slot.end.checked_sub(slot.start).ok_or_else(|| {
             Error::Document(crate::Error::InvalidFormat(
@@ -8608,16 +8609,16 @@ fn preflight_text_owner_rewrite(
         output_len = output_len
             .checked_add(replacement_len)
             .ok_or(Error::Limit {
-                resource: "XML bytes",
-                max: MAX_DOCUMENT_XML_BYTES,
-                actual: usize::MAX,
+                kind: crate::document::LimitKind::XmlBytes,
+                maximum: MAX_DOCUMENT_XML_BYTES,
+                observed: usize::MAX,
             })?;
     }
     if output_len > MAX_DOCUMENT_XML_BYTES {
         return Err(Error::Limit {
-            resource: "XML bytes",
-            max: MAX_DOCUMENT_XML_BYTES,
-            actual: output_len,
+            kind: crate::document::LimitKind::XmlBytes,
+            maximum: MAX_DOCUMENT_XML_BYTES,
+            observed: output_len,
         });
     }
     Ok((output_len, fragment_bytes))
@@ -9129,7 +9130,7 @@ fn select_cell_in_table<'a>(
     })
 }
 
-fn validate_path_length(length: usize, resource: &'static str) -> Result<()> {
+fn validate_path_length(length: usize, kind: super::LimitKind) -> Result<()> {
     if length == 0 {
         return Err(Error::Refused {
             position: 0,
@@ -9138,9 +9139,9 @@ fn validate_path_length(length: usize, resource: &'static str) -> Result<()> {
     }
     if length > MAX_OPERATIONS {
         return Err(Error::Limit {
-            resource,
-            max: MAX_OPERATIONS,
-            actual: length,
+            kind,
+            maximum: MAX_OPERATIONS,
+            observed: length,
         });
     }
     Ok(())
@@ -9264,7 +9265,7 @@ fn select_nested_inline_control_content(
     paragraph: Position,
     controls: &[Position],
 ) -> Result<(usize, usize)> {
-    validate_path_length(controls.len(), "content control path")?;
+    validate_path_length(controls.len(), super::LimitKind::ContentControlPath)?;
     let paragraph_range =
         snapshot
             .paragraphs
@@ -9322,7 +9323,7 @@ fn select_block_control_content(
     snapshot: &Snapshot,
     controls: &[Position],
 ) -> Result<(usize, usize)> {
-    validate_path_length(controls.len(), "block content control path")?;
+    validate_path_length(controls.len(), super::LimitKind::BlockContentControlPath)?;
     let first = controls[0];
     let range = snapshot
         .block_controls
@@ -9414,7 +9415,7 @@ fn select_nested_cell<'a>(
     snapshot: &'a Snapshot,
     path: &[TableCellAddress],
 ) -> Result<CellSelection<'a>> {
-    validate_path_length(path.len(), "nested table path")?;
+    validate_path_length(path.len(), super::LimitKind::NestedTablePath)?;
     let first = path[0];
     let table_range = snapshot
         .tables
@@ -9838,17 +9839,17 @@ fn replace_ranges(source: &[u8], replacements: &[(usize, usize, Vec<u8>)]) -> Re
             .checked_sub(end - start)
             .and_then(|size| size.checked_add(replacement.len()))
             .ok_or(Error::Limit {
-                resource: "projected XML bytes",
-                max: MAX_DOCUMENT_XML_BYTES,
-                actual: usize::MAX,
+                kind: crate::document::LimitKind::ProjectedXmlBytes,
+                maximum: MAX_DOCUMENT_XML_BYTES,
+                observed: usize::MAX,
             })?;
         previous_end = *end;
     }
     if capacity > MAX_DOCUMENT_XML_BYTES {
         return Err(Error::Limit {
-            resource: "projected XML bytes",
-            max: MAX_DOCUMENT_XML_BYTES,
-            actual: capacity,
+            kind: crate::document::LimitKind::ProjectedXmlBytes,
+            maximum: MAX_DOCUMENT_XML_BYTES,
+            observed: capacity,
         });
     }
     let mut output = Vec::new();
@@ -9925,9 +9926,9 @@ fn run_content_fragment_len(
             plain_start = index
                 .checked_add(character.len_utf8())
                 .ok_or(Error::Limit {
-                    resource: "replacement text bytes",
-                    max: MAX_REPLACEMENT_TEXT_BYTES,
-                    actual: usize::MAX,
+                    kind: crate::document::LimitKind::ReplacementTextBytes,
+                    maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                    observed: usize::MAX,
                 })?;
         }
     }
@@ -9984,9 +9985,9 @@ fn try_run_content_fragment(
             plain_start = index
                 .checked_add(character.len_utf8())
                 .ok_or(Error::Limit {
-                    resource: "replacement text bytes",
-                    max: MAX_REPLACEMENT_TEXT_BYTES,
-                    actual: usize::MAX,
+                    kind: crate::document::LimitKind::ReplacementTextBytes,
+                    maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                    observed: usize::MAX,
                 })?;
         }
     }
@@ -10000,9 +10001,9 @@ fn try_run_content_fragment(
 
 fn replacement_len_add(left: usize, right: usize) -> Result<usize> {
     left.checked_add(right).ok_or(Error::Limit {
-        resource: "replacement XML bytes",
-        max: MAX_DOCUMENT_XML_BYTES,
-        actual: usize::MAX,
+        kind: crate::document::LimitKind::ReplacementXmlBytes,
+        maximum: MAX_DOCUMENT_XML_BYTES,
+        observed: usize::MAX,
     })
 }
 
@@ -10102,9 +10103,9 @@ fn try_plain_paragraph(conformance: Conformance, text: &str) -> Result<Vec<u8>> 
         )?;
         if capacity > MAX_DOCUMENT_XML_BYTES {
             return Err(Error::Limit {
-                resource: "XML bytes",
-                max: MAX_DOCUMENT_XML_BYTES,
-                actual: capacity,
+                kind: crate::document::LimitKind::XmlBytes,
+                maximum: MAX_DOCUMENT_XML_BYTES,
+                observed: capacity,
             });
         }
         let mut paragraph = Vec::new();
@@ -10129,9 +10130,9 @@ fn try_plain_paragraph(conformance: Conformance, text: &str) -> Result<Vec<u8>> 
     )?;
     if capacity > MAX_DOCUMENT_XML_BYTES {
         return Err(Error::Limit {
-            resource: "XML bytes",
-            max: MAX_DOCUMENT_XML_BYTES,
-            actual: capacity,
+            kind: crate::document::LimitKind::XmlBytes,
+            maximum: MAX_DOCUMENT_XML_BYTES,
+            observed: capacity,
         });
     }
     let mut paragraph = Vec::new();
@@ -10159,15 +10160,15 @@ fn replace_range(source: &[u8], start: usize, end: usize, replacement: &[u8]) ->
         .checked_sub(end - start)
         .and_then(|size| size.checked_add(replacement.len()))
         .ok_or(Error::Limit {
-            resource: "projected XML bytes",
-            max: MAX_DOCUMENT_XML_BYTES,
-            actual: usize::MAX,
+            kind: crate::document::LimitKind::ProjectedXmlBytes,
+            maximum: MAX_DOCUMENT_XML_BYTES,
+            observed: usize::MAX,
         })?;
     if capacity > MAX_DOCUMENT_XML_BYTES {
         return Err(Error::Limit {
-            resource: "projected XML bytes",
-            max: MAX_DOCUMENT_XML_BYTES,
-            actual: capacity,
+            kind: crate::document::LimitKind::ProjectedXmlBytes,
+            maximum: MAX_DOCUMENT_XML_BYTES,
+            observed: capacity,
         });
     }
     let mut output = Vec::new();

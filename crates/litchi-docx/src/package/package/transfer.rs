@@ -263,9 +263,9 @@ fn plan_part_closure(
         }
         if seen.len() > MAX_TRANSFER_PARTS {
             return Err(TransactionError::Limit {
-                resource: "transfer dependency parts",
-                max: MAX_TRANSFER_PARTS,
-                actual: seen.len(),
+                kind: crate::document::LimitKind::TransferDependencyParts,
+                maximum: MAX_TRANSFER_PARTS,
+                observed: seen.len(),
             });
         }
         let part = donor.get_part(&name).map_err(crate::Error::from)?;
@@ -273,15 +273,15 @@ fn plan_part_closure(
             total_bytes
                 .checked_add(part.blob().len())
                 .ok_or(TransactionError::Limit {
-                    resource: "transfer dependency bytes",
-                    max: MAX_TRANSFER_BYTES,
-                    actual: usize::MAX,
+                    kind: crate::document::LimitKind::TransferDependencyBytes,
+                    maximum: MAX_TRANSFER_BYTES,
+                    observed: usize::MAX,
                 })?;
         if total_bytes > MAX_TRANSFER_BYTES {
             return Err(TransactionError::Limit {
-                resource: "transfer dependency bytes",
-                max: MAX_TRANSFER_BYTES,
-                actual: total_bytes,
+                kind: crate::document::LimitKind::TransferDependencyBytes,
+                maximum: MAX_TRANSFER_BYTES,
+                observed: total_bytes,
             });
         }
         for relationship in part.rels().iter().filter(|edge| !edge.is_external()) {
@@ -582,9 +582,9 @@ pub(super) fn relationship_graph_digest_opc(
 
 fn put_digest_field(output: &mut Vec<u8>, value: &[u8]) -> Result<(), TransactionError> {
     let length = u64::try_from(value.len()).map_err(|_error| TransactionError::Limit {
-        resource: "transfer dependency field bytes",
-        max: usize::MAX,
-        actual: value.len(),
+        kind: crate::document::LimitKind::TransferDependencyFieldBytes,
+        maximum: usize::MAX,
+        observed: value.len(),
     })?;
     output.extend_from_slice(&length.to_le_bytes());
     output.extend_from_slice(value);

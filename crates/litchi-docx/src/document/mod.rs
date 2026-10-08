@@ -28,6 +28,7 @@
 //! ```
 
 mod codec;
+mod limit;
 mod model;
 mod owned;
 mod package;
@@ -44,6 +45,7 @@ pub mod snapshot {
     pub use super::transaction::{Commit, Edit};
 }
 
+pub use limit::LimitKind;
 pub use owned::{Commit, Edit};
 
 pub(crate) use transaction::MAX_DOCUMENT_XML_BYTES;

@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0032 | Typed primary DOCX transaction limits | typed kind/count fields migrated; configurable limits and broader policy pending |
 | 0031 | Canonical source DOCX package-owning Edit/Commit | primary owner migrated; specialized families, limits and performance pending |
 | 0030 | Immutable retained DOCX semantic apply | main-document apply integrated; independent managed donor snapshots refused |
 | 0029 | Source DOCX effective owner and physical-operation boundary | effective reads/publication integrated; specialized routes pending |
@@ -359,3 +360,15 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 - Earlier pending primary-source-triad notes are superseded by this record.
   Specialized families, history, limits, performance and full acceptance remain
   open. See 0031 for scope and verification.
+
+
+## 0032 — typed primary transaction limits
+
+- `document::LimitKind` and `Error::Limit { kind, observed, maximum }` replace
+  free-form resource strings and legacy count field names across primary paths.
+- Durable aggregate transfer bytes now fail with a typed limit before payload
+  copying; dynamic count/path helpers carry typed dimensions.
+- DOCX glossary profiles ban the retired fields at their precise variant scope.
+  Public boundary/rollback and durable overflow tests accompany the migration.
+- Caller-selected semantic limits, other error families, policy vocabulary and
+  full family registration remain open. See 0032 for verification and scope.

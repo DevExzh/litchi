@@ -133,14 +133,14 @@ impl fmt::Debug for Error {
                 .field("reason", reason)
                 .finish(),
             Self::Limit {
-                resource,
-                max,
-                actual,
+                kind,
+                maximum,
+                observed,
             } => f
                 .debug_struct("Limit")
-                .field("resource", resource)
-                .field("max", max)
-                .field("actual", actual)
+                .field("kind", kind)
+                .field("observed", observed)
+                .field("maximum", maximum)
                 .finish(),
             Self::Document(_) => f.debug_struct("Document").finish_non_exhaustive(),
             Self::Durable(_) => f.debug_struct("Durable").finish_non_exhaustive(),

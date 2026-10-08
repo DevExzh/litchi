@@ -144,9 +144,9 @@ fn validate_replacements(replacements: &[StoryHyperlinkTextReplacement]) -> Tran
     if replacements.is_empty() || replacements.len() > MAX_STORY_HYPERLINK_REPLACEMENTS {
         return if replacements.len() > MAX_STORY_HYPERLINK_REPLACEMENTS {
             Err(TransactionError::Limit {
-                resource: "story hyperlink replacements",
-                max: MAX_STORY_HYPERLINK_REPLACEMENTS,
-                actual: replacements.len(),
+                kind: crate::document::LimitKind::StoryHyperlinkReplacements,
+                maximum: MAX_STORY_HYPERLINK_REPLACEMENTS,
+                observed: replacements.len(),
             })
         } else {
             Err(TransactionError::Refused {

@@ -491,9 +491,9 @@ fn transaction_errors_are_classified_and_typed() {
         ),
         (
             TransactionError::Limit {
-                resource: "test",
-                max: 1,
-                actual: 2,
+                kind: litchi_docx::document::LimitKind::Operations,
+                maximum: 1,
+                observed: 2,
             },
             Code::LimitExceeded,
         ),
