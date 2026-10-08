@@ -1,5 +1,31 @@
 # Performance hotspot inventory
 
+## 0967 — vector-free strict SPRM reject fails latency and RSS guards
+
+[0967](0967-doc-sprm-vector-reject.md) tests a private borrowed SPRM walk that
+skips the owned `Vec<Sprm>` only after complete validation of trigger-free
+groups and retains the existing owned fallback for marker-positive groups.
+The complete 24-cell real capture rejects the candidate: nine
+`FloatingPictures` `e1/e2/e8` cells fail the native p50/p95 upper-CI `1.05`
+bound, and allocator RSS exceeds `1.05` in three real cells plus the
+dense-1024 positive fallback control (`17,952/16,688 = 1.075743`). The
+allocation-call endpoint reductions (`0.809241` and `0.946489`) are
+descriptive and do not override the failed latency/RSS gates. The independent
+v2 custody/oracle audit passes 896/896 packets. Its raw audit is
+[`results/change-0967/review/independent-raw-audit-0967-v2.json`](results/change-0967/review/independent-raw-audit-0967-v2.json),
+SHA-256
+`2712e39c456d7528c4c9347d6f085dd33253bf43d389d265b979ffee606b29ea`; the
+decision receipt is
+[`results/change-0967/review/independent-decision-0967-v2.json`](results/change-0967/review/independent-decision-0967-v2.json),
+SHA-256
+`27ab3f1cdad3262a3d374d0dea83a065c2f15909ede165e96bc06518fc2cb1dd`.
+The timed controls are generated-positive `e1`, `dense1024` `e32`, and
+false-marker `e1`/`e32`. The [custody incident receipt](results/change-0967/review/audit-custody-incident-0967-v1.json)
+records that the sealed v1 derived audit was overwritten and is unavailable
+byte-for-byte; v2 re-audited the unchanged capture without a measurement
+rerun. Production remains unchanged; no global speedup or host-noise
+explanation follows.
+
 ## 0966 — DOC short SPRM inputs are the next bounded review
 
 [0966](0966-doc-sprm-census.md) completes a diagnostic-only census of the

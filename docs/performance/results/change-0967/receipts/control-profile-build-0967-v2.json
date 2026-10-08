@@ -1,0 +1,246 @@
+{
+  "schema": "litchi.performance.0967.control_profile_build.v2",
+  "status": "sealed",
+  "created_utc": "2026-10-07T23:49:09.052546+00:00",
+  "source_revision": "893072657ad8b1d726bfce351b5ec2e98f084e94",
+  "package": "doc-revision-control-profile-0967",
+  "toolchain": "+1.95.0",
+  "build_policy": {
+    "locked": true,
+    "offline": true,
+    "cargo_jobs": 2,
+    "concurrency": 1,
+    "rustflags": "",
+    "one_cargo_process_at_a_time": true
+  },
+  "overlay": {
+    "relative_root": "tools/perf-revision-control-0967",
+    "dependency_root": "../../crates",
+    "identical": true,
+    "files": [
+      {
+        "path": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline/tools/perf-revision-control-0967/Cargo.toml",
+        "relative_path": "tools/perf-revision-control-0967/Cargo.toml",
+        "bytes": 501,
+        "sha256": "e1672b09fa896d0d561b994243466a99ace27d6f93bcf2bd4719933dc036efde"
+      },
+      {
+        "path": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline/tools/perf-revision-control-0967/Cargo.lock",
+        "relative_path": "tools/perf-revision-control-0967/Cargo.lock",
+        "bytes": 33627,
+        "sha256": "0a274917e3f7767a7cac2bd62c10325afa186a57da7e05dd8b6e7a0f4de84223"
+      },
+      {
+        "path": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline/tools/perf-revision-control-0967/src/lib.rs",
+        "relative_path": "tools/perf-revision-control-0967/src/lib.rs",
+        "bytes": 23945,
+        "sha256": "47e77b319d74ea91fc6952ae9e99c2fd43c735710b7f7e10783b90d192265712"
+      },
+      {
+        "path": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline/tools/perf-revision-control-0967/src/main.rs",
+        "relative_path": "tools/perf-revision-control-0967/src/main.rs",
+        "bytes": 123,
+        "sha256": "63ac2dc52077466b30ac6ee4abcfbd59a88789d35731fcf5c7f5a96d2dc95978"
+      },
+      {
+        "path": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline/tools/perf-revision-control-0967/src/bin/alloc.rs",
+        "relative_path": "tools/perf-revision-control-0967/src/bin/alloc.rs",
+        "bytes": 1824,
+        "sha256": "9aa8e131e2810e83de5bff1964b8bdbb0cdd894b6865e26986119c6238c9df08"
+      },
+      {
+        "path": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline/tools/perf-revision-control-0967/src/alloc_metrics.rs",
+        "relative_path": "tools/perf-revision-control-0967/src/alloc_metrics.rs",
+        "bytes": 4912,
+        "sha256": "048680324eff200dead3b37cabb97582b5f76b6e7ca572b7e2bc2c5bb3a7475d"
+      }
+    ],
+    "baseline_files": [
+      {
+        "path": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline/tools/perf-revision-control-0967/Cargo.toml",
+        "relative_path": "tools/perf-revision-control-0967/Cargo.toml",
+        "bytes": 501,
+        "sha256": "e1672b09fa896d0d561b994243466a99ace27d6f93bcf2bd4719933dc036efde"
+      },
+      {
+        "path": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline/tools/perf-revision-control-0967/Cargo.lock",
+        "relative_path": "tools/perf-revision-control-0967/Cargo.lock",
+        "bytes": 33627,
+        "sha256": "0a274917e3f7767a7cac2bd62c10325afa186a57da7e05dd8b6e7a0f4de84223"
+      },
+      {
+        "path": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline/tools/perf-revision-control-0967/src/lib.rs",
+        "relative_path": "tools/perf-revision-control-0967/src/lib.rs",
+        "bytes": 23945,
+        "sha256": "47e77b319d74ea91fc6952ae9e99c2fd43c735710b7f7e10783b90d192265712"
+      },
+      {
+        "path": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline/tools/perf-revision-control-0967/src/main.rs",
+        "relative_path": "tools/perf-revision-control-0967/src/main.rs",
+        "bytes": 123,
+        "sha256": "63ac2dc52077466b30ac6ee4abcfbd59a88789d35731fcf5c7f5a96d2dc95978"
+      },
+      {
+        "path": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline/tools/perf-revision-control-0967/src/bin/alloc.rs",
+        "relative_path": "tools/perf-revision-control-0967/src/bin/alloc.rs",
+        "bytes": 1824,
+        "sha256": "9aa8e131e2810e83de5bff1964b8bdbb0cdd894b6865e26986119c6238c9df08"
+      },
+      {
+        "path": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline/tools/perf-revision-control-0967/src/alloc_metrics.rs",
+        "relative_path": "tools/perf-revision-control-0967/src/alloc_metrics.rs",
+        "bytes": 4912,
+        "sha256": "048680324eff200dead3b37cabb97582b5f76b6e7ca572b7e2bc2c5bb3a7475d"
+      }
+    ],
+    "candidate_files": [
+      {
+        "path": "/home/zhuhe/litchi-performance-0967/source-candidate/tools/perf-revision-control-0967/Cargo.toml",
+        "relative_path": "tools/perf-revision-control-0967/Cargo.toml",
+        "bytes": 501,
+        "sha256": "e1672b09fa896d0d561b994243466a99ace27d6f93bcf2bd4719933dc036efde"
+      },
+      {
+        "path": "/home/zhuhe/litchi-performance-0967/source-candidate/tools/perf-revision-control-0967/Cargo.lock",
+        "relative_path": "tools/perf-revision-control-0967/Cargo.lock",
+        "bytes": 33627,
+        "sha256": "0a274917e3f7767a7cac2bd62c10325afa186a57da7e05dd8b6e7a0f4de84223"
+      },
+      {
+        "path": "/home/zhuhe/litchi-performance-0967/source-candidate/tools/perf-revision-control-0967/src/lib.rs",
+        "relative_path": "tools/perf-revision-control-0967/src/lib.rs",
+        "bytes": 23945,
+        "sha256": "47e77b319d74ea91fc6952ae9e99c2fd43c735710b7f7e10783b90d192265712"
+      },
+      {
+        "path": "/home/zhuhe/litchi-performance-0967/source-candidate/tools/perf-revision-control-0967/src/main.rs",
+        "relative_path": "tools/perf-revision-control-0967/src/main.rs",
+        "bytes": 123,
+        "sha256": "63ac2dc52077466b30ac6ee4abcfbd59a88789d35731fcf5c7f5a96d2dc95978"
+      },
+      {
+        "path": "/home/zhuhe/litchi-performance-0967/source-candidate/tools/perf-revision-control-0967/src/bin/alloc.rs",
+        "relative_path": "tools/perf-revision-control-0967/src/bin/alloc.rs",
+        "bytes": 1824,
+        "sha256": "9aa8e131e2810e83de5bff1964b8bdbb0cdd894b6865e26986119c6238c9df08"
+      },
+      {
+        "path": "/home/zhuhe/litchi-performance-0967/source-candidate/tools/perf-revision-control-0967/src/alloc_metrics.rs",
+        "relative_path": "tools/perf-revision-control-0967/src/alloc_metrics.rs",
+        "bytes": 4912,
+        "sha256": "048680324eff200dead3b37cabb97582b5f76b6e7ca572b7e2bc2c5bb3a7475d"
+      }
+    ]
+  },
+  "design": {
+    "path": "/home/zhuhe/litchi-performance-0967/harness-perf/design-v1.md",
+    "sha256": "f75386a27bedb50de295d6cf37099b1cf6be89c01167baac3c513869ec41b37a",
+    "schema": "litchi.performance.0967.control_profile.v1",
+    "timing_claim": {
+      "native": true,
+      "allocator": false
+    },
+    "allocator_timing_claim": false
+  },
+  "builds": [
+    {
+      "variant": "baseline",
+      "source_root": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline",
+      "overlay_root": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline/tools/perf-revision-control-0967",
+      "target_dir": "/home/zhuhe/litchi-performance-0967/builds/control-target-baseline-revision-v1",
+      "build_receipt_dir": "/home/zhuhe/litchi-performance-0967/builds/control-build-baseline-revision-v1",
+      "source_manifest_v1": "/home/zhuhe/litchi-performance-0967/receipts/source-baseline-manifest-v1.json",
+      "command_file": {
+        "path": "/home/zhuhe/litchi-performance-0967/builds/control-build-baseline-revision-v1/command.txt",
+        "bytes": 463,
+        "sha256": "713b3ca7232186b4ec601856fce46534afcfe9461c37cbb0936030986d498a80"
+      },
+      "environment_file": {
+        "path": "/home/zhuhe/litchi-performance-0967/builds/control-build-baseline-revision-v1/environment.json",
+        "bytes": 368,
+        "sha256": "02491d8c27c1a560ecc7da7b14b922cd53abd6c62404ffa8912796c4cf6cd49f"
+      },
+      "start_utc": "2026-10-07T23:46:16.119535+00:00",
+      "end_utc": "2026-10-07T23:47:25.412440+00:00",
+      "returncode": 0,
+      "stdout_file": {
+        "path": "/home/zhuhe/litchi-performance-0967/builds/control-build-baseline-revision-v1/build.stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr_file": {
+        "path": "/home/zhuhe/litchi-performance-0967/builds/control-build-baseline-revision-v1/build.stderr.log",
+        "bytes": 4499,
+        "sha256": "64e8b83d56da7e3f72c443e5c85984a3744f5c073663d243ab1316e129cc5fa5"
+      },
+      "binaries": [
+        {
+          "name": "doc_revision_control_profile_0967",
+          "kind": "native",
+          "path": "/home/zhuhe/litchi-performance-0967/builds/control-target-baseline-revision-v1/release/doc_revision_control_profile_0967",
+          "bytes": 45856184,
+          "sha256": "e94cb13674a5068d91929b7d61cb588a97187fc98dd4713c8e75f0b3dc0c8290"
+        },
+        {
+          "name": "doc_revision_control_profile_0967_alloc",
+          "kind": "allocator",
+          "path": "/home/zhuhe/litchi-performance-0967/builds/control-target-baseline-revision-v1/release/doc_revision_control_profile_0967_alloc",
+          "bytes": 45859848,
+          "sha256": "fb1f3833c04928c2024610b603cdc8fd7f7775cef5b464c8e3a6d7ee8f4be758"
+        }
+      ]
+    },
+    {
+      "variant": "candidate",
+      "source_root": "/home/zhuhe/litchi-performance-0967/source-candidate",
+      "overlay_root": "/home/zhuhe/litchi-performance-0967/source-candidate/tools/perf-revision-control-0967",
+      "target_dir": "/home/zhuhe/litchi-performance-0967/builds/control-target-candidate-revision-v1",
+      "build_receipt_dir": "/home/zhuhe/litchi-performance-0967/builds/control-build-candidate-revision-v1",
+      "source_manifest_v1": "/home/zhuhe/litchi-performance-0967/receipts/source-candidate-manifest-v1.json",
+      "command_file": {
+        "path": "/home/zhuhe/litchi-performance-0967/builds/control-build-candidate-revision-v1/command.txt",
+        "bytes": 434,
+        "sha256": "2ce9ac74604d3263a8325f9c9c2b9bc54ebf73dec8d57962271598027a6baeee"
+      },
+      "environment_file": {
+        "path": "/home/zhuhe/litchi-performance-0967/builds/control-build-candidate-revision-v1/environment.json",
+        "bytes": 354,
+        "sha256": "5df774d8915ff2e2e88155a5c700103d1a7d8b449f3de7174c0aa1187544d409"
+      },
+      "start_utc": "2026-10-07T23:47:25.412659+00:00",
+      "end_utc": "2026-10-07T23:48:33.767470+00:00",
+      "returncode": 0,
+      "stdout_file": {
+        "path": "/home/zhuhe/litchi-performance-0967/builds/control-build-candidate-revision-v1/build.stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr_file": {
+        "path": "/home/zhuhe/litchi-performance-0967/builds/control-build-candidate-revision-v1/build.stderr.log",
+        "bytes": 4349,
+        "sha256": "2bbff673a50340fdd0d4bb94a909a51903f4a2979d626868190e88645be6d5e0"
+      },
+      "binaries": [
+        {
+          "name": "doc_revision_control_profile_0967",
+          "kind": "native",
+          "path": "/home/zhuhe/litchi-performance-0967/builds/control-target-candidate-revision-v1/release/doc_revision_control_profile_0967",
+          "bytes": 45854952,
+          "sha256": "d45bf5ceea957669235368794e6b544ccd44585be255b128a2a0216224c52eee"
+        },
+        {
+          "name": "doc_revision_control_profile_0967_alloc",
+          "kind": "allocator",
+          "path": "/home/zhuhe/litchi-performance-0967/builds/control-target-candidate-revision-v1/release/doc_revision_control_profile_0967_alloc",
+          "bytes": 45858680,
+          "sha256": "87367bd03fa8d2d947c9835a9569e09bc31ea5e2bb3fc8789ad5a7e4c98f1636"
+        }
+      ]
+    }
+  ],
+  "formal_capture_started": false,
+  "workload_started": false,
+  "smoke_capture_status": "not_run_for_this_build",
+  "source_active_functional_only": true,
+  "note": "Release binaries were built from the immutable identical overlay in each source export. No performance workload or formal control sample was launched by this receipt."
+}

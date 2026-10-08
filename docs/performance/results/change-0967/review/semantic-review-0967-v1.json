@@ -1,0 +1,82 @@
+{
+  "schema": "litchi.performance.0967.semantic-review.v1",
+  "status": "passed_with_retained_baseline_failure",
+  "reviewer": "doc_census_review",
+  "created_utc": "2026-10-07T23:24:00Z",
+  "scope": "Independent sealed-source semantic and quality audit; no source edits, builds, workloads, or performance capture launched by reviewer.",
+  "source": {
+    "root": "/home/zhuhe/litchi-performance-0967/source-candidate",
+    "baseline_commit": "893072657ad8b1d726bfce351b5ec2e98f084e94",
+    "coder_quality_receipt": {
+      "path": "/home/zhuhe/litchi-performance-0967/receipts/quality-0967-coder-v1.json",
+      "sha256": "d26f206e66ae592af32750ced3a227b498fa05b50333e6711cb84493340b86ef"
+    },
+    "production_files": {
+      "crates/litchi-doc/src/sprm.rs": "5ee520882eb73514881fd7a713d2519a1769d6165d9d5e625de3c406db2c5ac6",
+      "crates/litchi-doc/src/tracked_revision/codec.rs": "076c8515b7f9b5d072d324a2e5fa30e85f9578a6dc390514846fab7b38e62e69",
+      "crates/litchi-doc/src/tracked_revision/package.rs": "780134771e4bff0b43f93f6911be6ce1e40cb4ae031a1afee9af66511ebb1d7c"
+    },
+    "main_checkout_status": "candidate paths clean; only pre-existing unrelated status entries observed"
+  },
+  "semantic_findings": {
+    "borrowed_visitor": "pass: private SprmRef visitor shares the complete parser grammar with parse_sprms; only operand materialization changes from SmallVec to borrowed slice.",
+    "original_parser_equivalence": "pass: frozen_parse_sprms test function is byte-identical to baseline parse_sprms_two_byte after function-name and nesting-indent normalization; candidate diff has only visitor materialization/wrapper changes.",
+    "complete_validation": "pass: visitor loops to group end and contains_sprm_opcode has no early return; malformed suffixes remain errors.",
+    "error_order": "pass: cursor checks and error variants/order are preserved; per-run scan occurs before fallback, and CHPX remains before PAPX.",
+    "fallback_semantics": "pass: marker-positive groups use unchanged strict_sprms and metadata loops; marker-negative groups skip owned records only after complete validation.",
+    "trigger_sets": "pass: CHPX set covers insertion/deletion and both character property markers; PAPX set covers all paragraph/table property markers used by unchanged revision logic.",
+    "metadata_precedence": "pass: unchanged reverse-last marker handling, author validation, and PAPX style-index check; tests cover duplicate marker last-record behavior and late error before metadata.",
+    "allocation_scope": "pass: no owned Vec/Sprm operand storage is created for no-trigger groups; no unsafe/cache/global instrumentation introduced."
+  },
+  "independent_controls": {
+    "frozen_rust_matrix": {
+      "status": "passed",
+      "log": "/home/zhuhe/litchi-performance-0967/receipts/frozen-parser-final.log",
+      "sha256": "a45bf17a28c87746fc216794487a00e5e90ca218fe062d6ef55b502cac0ef596",
+      "result": "3 passed, 0 failed, 1145 filtered",
+      "coverage_claim": "all 65,536 opcodes with valid records, every strict prefix, one-byte tail, and variable/C615/D608 boundary cases",
+      "authority": "frozen Rust copy of baseline parser; Python oracle is not used as authority"
+    },
+    "revision_controls": {
+      "status": "passed",
+      "log": "/home/zhuhe/litchi-performance-0967/receipts/revision-scan-final.log",
+      "sha256": "cf467abd73d8fdddd0a6400049fc77c551efec2d5c267c4c69976426dad1945d",
+      "result": "4 passed, 0 failed, 1144 filtered",
+      "cases": [
+        "positive insertion metadata",
+        "late malformed suffix before metadata error",
+        "duplicate property marker last-record semantics",
+        "late error in non-marker group"
+      ]
+    },
+    "full_library": {
+      "status": "passed",
+      "log": "/home/zhuhe/litchi-performance-0967/receipts/full-litchi-doc-lib-all-features-final.log",
+      "sha256": "0a08862bffa49e82bd083052483ef3afa2a2a5cd47c8b87d556f4311aeaa567d",
+      "result": "1146 passed, 0 failed, 2 ignored"
+    },
+    "static_quality": {
+      "cargo_check_lib": "passed; log SHA 208703b764288f9aa7941a79f1948c4f6a6402e42c36250b1eecd35f4f9c089c",
+      "cargo_check_all_targets": "passed; log SHA 67d278e83768f7219aea9f7685885ec66a61b471b1e4e19e18f4450f6f969f41",
+      "clippy_all_targets_d_warnings": "passed; log SHA cffca0a3d024910282ec32286df48a4bb3d7790f9a7882f1d7392b3605486211",
+      "rustfmt_three_candidate_files": "passed; empty log SHA e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "retained_baseline_failure": {
+    "status": "not_candidate_blocker",
+    "command": "cargo doc -p litchi-doc --no-deps --all-features --locked --offline -j2 with RUSTDOCFLAGS=-D warnings",
+    "log": "/home/zhuhe/litchi-performance-0967/receipts/rustdoc-all-features.log",
+    "sha256": "4f89ba97daa612c16665aceab0114c2a3e91363fb581ec59dd75c94d2c82ae03",
+    "diagnostics": [
+      "crates/litchi-doc/src/parts/bookmarks.rs",
+      "crates/litchi-doc/src/parts/comments.rs",
+      "crates/litchi-doc/src/parts/rsids.rs",
+      "crates/litchi-doc/src/parts/sections/codec.rs"
+    ],
+    "candidate_file_diagnostics": [],
+    "baseline_proof": "All four diagnostic files are byte-identical between source-candidate and baseline commit 893072657ad8b1d726bfce351b5ec2e98f084e94; their candidate/baseline SHA-256 pairs match.",
+    "candidate_files_unchanged_in_diagnostics": true
+  },
+  "candidate_blockers": [],
+  "release_boundary": "Semantic candidate is review-passed for matched-build consideration; this receipt makes no timing, CPU-savings, or production-adoption claim."
+}

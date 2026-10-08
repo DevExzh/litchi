@@ -1,0 +1,942 @@
+{
+  "schema": "litchi.performance.0967.plan.v1",
+  "version": 1,
+  "status": "capture_authorized",
+  "created_utc": "2026-10-07T23:55:24.904769+00:00",
+  "timing_claim": false,
+  "protocol_document": {
+    "path": "/home/zhuhe/litchi-performance-0967/protocol-design-v1.md",
+    "sha256": "7237b34ddd674e21f35b37f328118f72ec3e6f9e067d8745da8ac07a4c814d24"
+  },
+  "build_started": false,
+  "workload_started": false,
+  "source": {
+    "revision": "893072657ad8b1d726bfce351b5ec2e98f084e94",
+    "baseline": {
+      "root": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline",
+      "manifest": "/home/zhuhe/litchi-performance-0967/receipts/source-baseline-manifest-v2.json",
+      "manifest_sha256": "369d1f1774d3bf4919ab2fb7cb3fb4c6a3392882dde67fb30fcc9bdb2abccc99",
+      "status": "immutable_staging_export"
+    },
+    "candidate": {
+      "root": "/home/zhuhe/litchi-performance-0967/source-candidate",
+      "manifest": "/home/zhuhe/litchi-performance-0967/receipts/source-candidate-manifest-v2.json",
+      "manifest_sha256": "bf39e1c367d079114990133ea9735a7c5149d6c93bf2768f912ad55d3575fb0c",
+      "status": "sealed_for_matched_build"
+    },
+    "quality_receipt": {
+      "path": "/home/zhuhe/litchi-performance-0967/receipts/quality-0967-coder-v1.json",
+      "sha256": "d26f206e66ae592af32750ced3a227b498fa05b50333e6711cb84493340b86ef",
+      "status": "passed_with_retained_baseline_failure"
+    },
+    "semantic_review": {
+      "path": "/home/zhuhe/litchi-performance-0967/review/semantic-review-0967-v1.json",
+      "sha256": "b164954740cde2710eda313ff750871966917ea2ef7c53959eadf89c54dbdcc6",
+      "status": "passed_with_retained_baseline_failure"
+    },
+    "reproduction_receipt": {
+      "path": "/home/zhuhe/litchi-performance-0967/repro/reproduction-0967-v1.json",
+      "sha256": "46f3c962f95324a5ed2ded014c1451ce6dc6578a67b8a6beadb40d6804b7c865"
+    },
+    "production_allowlist": [
+      "crates/litchi-doc/src/sprm.rs",
+      "crates/litchi-doc/src/tracked_revision/codec.rs",
+      "crates/litchi-doc/src/tracked_revision/package.rs"
+    ],
+    "test_only_allowlist": [
+      "crates/litchi-doc/src/sprm.rs::frozen_original_reference",
+      "crates/litchi-doc/src/tracked_revision/package.rs::revision_scan_tests"
+    ],
+    "unrelated_change_policy": "reject"
+  },
+  "harness": {
+    "relative_root": "tools/perf-cfb-profile",
+    "candidate_files": [
+      {
+        "path": "tools/perf-cfb-profile/Cargo.toml",
+        "bytes": 560,
+        "sha256": "41dee12e4eb7d1e3853a33a7743afdf6b5d6519d5e7456e61ce4978aa9177945"
+      },
+      {
+        "path": "tools/perf-cfb-profile/Cargo.lock",
+        "bytes": 33645,
+        "sha256": "343c5464ae1144cbb72284cbb3e9b52b5dff2b798d09462d3c0d6a74b317bac7"
+      },
+      {
+        "path": "tools/perf-cfb-profile/src/lib.rs",
+        "bytes": 35543,
+        "sha256": "b4893321ac9a9321a9055823a7f05ecb35e59319531913affc49342b8ccd73dc"
+      },
+      {
+        "path": "tools/perf-cfb-profile/src/main.rs",
+        "bytes": 129,
+        "sha256": "13206a810887dfcb4897a265167edc8fa3706ae736a2785a27354c7617eb5ca9"
+      },
+      {
+        "path": "tools/perf-cfb-profile/src/bin/alloc.rs",
+        "bytes": 1833,
+        "sha256": "2542257a9ab68347d3e8133b5f65a2254cc1e439fef665e327e093470f365f5f"
+      },
+      {
+        "path": "tools/perf-cfb-profile/src/oracle_0730.rs",
+        "bytes": 58805,
+        "sha256": "2b7a4d8e41c53690c8abf8d656e4b90942a7b7a0d84f205f93a1ac811f5f61e6"
+      }
+    ],
+    "baseline_files": [
+      {
+        "path": "tools/perf-cfb-profile/Cargo.toml",
+        "bytes": 560,
+        "sha256": "41dee12e4eb7d1e3853a33a7743afdf6b5d6519d5e7456e61ce4978aa9177945"
+      },
+      {
+        "path": "tools/perf-cfb-profile/Cargo.lock",
+        "bytes": 33645,
+        "sha256": "343c5464ae1144cbb72284cbb3e9b52b5dff2b798d09462d3c0d6a74b317bac7"
+      },
+      {
+        "path": "tools/perf-cfb-profile/src/lib.rs",
+        "bytes": 35543,
+        "sha256": "b4893321ac9a9321a9055823a7f05ecb35e59319531913affc49342b8ccd73dc"
+      },
+      {
+        "path": "tools/perf-cfb-profile/src/main.rs",
+        "bytes": 129,
+        "sha256": "13206a810887dfcb4897a265167edc8fa3706ae736a2785a27354c7617eb5ca9"
+      },
+      {
+        "path": "tools/perf-cfb-profile/src/bin/alloc.rs",
+        "bytes": 1833,
+        "sha256": "2542257a9ab68347d3e8133b5f65a2254cc1e439fef665e327e093470f365f5f"
+      },
+      {
+        "path": "tools/perf-cfb-profile/src/oracle_0730.rs",
+        "bytes": 58805,
+        "sha256": "2b7a4d8e41c53690c8abf8d656e4b90942a7b7a0d84f205f93a1ac811f5f61e6"
+      }
+    ],
+    "timed_overlay_relative_root": "tools/perf-revision-control-0967",
+    "candidate_timed_files": [
+      {
+        "path": "tools/perf-revision-control-0967/Cargo.toml",
+        "bytes": 501,
+        "sha256": "e1672b09fa896d0d561b994243466a99ace27d6f93bcf2bd4719933dc036efde"
+      },
+      {
+        "path": "tools/perf-revision-control-0967/Cargo.lock",
+        "bytes": 33627,
+        "sha256": "0a274917e3f7767a7cac2bd62c10325afa186a57da7e05dd8b6e7a0f4de84223"
+      },
+      {
+        "path": "tools/perf-revision-control-0967/src/lib.rs",
+        "bytes": 23945,
+        "sha256": "47e77b319d74ea91fc6952ae9e99c2fd43c735710b7f7e10783b90d192265712"
+      },
+      {
+        "path": "tools/perf-revision-control-0967/src/main.rs",
+        "bytes": 123,
+        "sha256": "63ac2dc52077466b30ac6ee4abcfbd59a88789d35731fcf5c7f5a96d2dc95978"
+      },
+      {
+        "path": "tools/perf-revision-control-0967/src/bin/alloc.rs",
+        "bytes": 1824,
+        "sha256": "9aa8e131e2810e83de5bff1964b8bdbb0cdd894b6865e26986119c6238c9df08"
+      },
+      {
+        "path": "tools/perf-revision-control-0967/src/alloc_metrics.rs",
+        "bytes": 4912,
+        "sha256": "048680324eff200dead3b37cabb97582b5f76b6e7ca572b7e2bc2c5bb3a7475d"
+      }
+    ],
+    "baseline_timed_files": [
+      {
+        "path": "tools/perf-revision-control-0967/Cargo.toml",
+        "bytes": 501,
+        "sha256": "e1672b09fa896d0d561b994243466a99ace27d6f93bcf2bd4719933dc036efde"
+      },
+      {
+        "path": "tools/perf-revision-control-0967/Cargo.lock",
+        "bytes": 33627,
+        "sha256": "0a274917e3f7767a7cac2bd62c10325afa186a57da7e05dd8b6e7a0f4de84223"
+      },
+      {
+        "path": "tools/perf-revision-control-0967/src/lib.rs",
+        "bytes": 23945,
+        "sha256": "47e77b319d74ea91fc6952ae9e99c2fd43c735710b7f7e10783b90d192265712"
+      },
+      {
+        "path": "tools/perf-revision-control-0967/src/main.rs",
+        "bytes": 123,
+        "sha256": "63ac2dc52077466b30ac6ee4abcfbd59a88789d35731fcf5c7f5a96d2dc95978"
+      },
+      {
+        "path": "tools/perf-revision-control-0967/src/bin/alloc.rs",
+        "bytes": 1824,
+        "sha256": "9aa8e131e2810e83de5bff1964b8bdbb0cdd894b6865e26986119c6238c9df08"
+      },
+      {
+        "path": "tools/perf-revision-control-0967/src/alloc_metrics.rs",
+        "bytes": 4912,
+        "sha256": "048680324eff200dead3b37cabb97582b5f76b6e7ca572b7e2bc2c5bb3a7475d"
+      }
+    ],
+    "source_equivalence_required": true,
+    "timer_wrapper": "original 0942 perf-cfb-profile; no added frame pointers or candidate-specific instrumentation"
+  },
+  "build_policy": {
+    "toolchain": "+1.95.0",
+    "locked": true,
+    "offline": true,
+    "cargo_jobs": 2,
+    "concurrency": 1,
+    "no_cargo_parallelism": "one Cargo process at a time; -j2 is the inherited matched-build setting",
+    "rustflags": "",
+    "commands": [
+      {
+        "package": "doc-retention-probe-0942-cfb-profile",
+        "source_root": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline",
+        "target_dir": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb",
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "build",
+          "--release",
+          "--locked",
+          "--offline",
+          "-j2",
+          "--manifest-path",
+          "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline/tools/perf-cfb-profile/Cargo.toml",
+          "--target-dir",
+          "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb",
+          "--bin",
+          "doc_retention_probe_0942_cfb_profile",
+          "--bin",
+          "doc_retention_probe_0942_cfb_profile_alloc"
+        ],
+        "expected_binaries": [
+          "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+          "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile_alloc"
+        ],
+        "env": {
+          "CARGO_INCREMENTAL": "0",
+          "CARGO_TERM_COLOR": "never",
+          "RUSTFLAGS": ""
+        },
+        "launched": false
+      },
+      {
+        "package": "doc-retention-probe-0942-cfb-profile",
+        "source_root": "/home/zhuhe/litchi-performance-0967/source-candidate",
+        "target_dir": "/home/zhuhe/litchi-performance-0967/builds/target-candidate-cfb",
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "build",
+          "--release",
+          "--locked",
+          "--offline",
+          "-j2",
+          "--manifest-path",
+          "/home/zhuhe/litchi-performance-0967/source-candidate/tools/perf-cfb-profile/Cargo.toml",
+          "--target-dir",
+          "/home/zhuhe/litchi-performance-0967/builds/target-candidate-cfb",
+          "--bin",
+          "doc_retention_probe_0942_cfb_profile",
+          "--bin",
+          "doc_retention_probe_0942_cfb_profile_alloc"
+        ],
+        "expected_binaries": [
+          "/home/zhuhe/litchi-performance-0967/builds/target-candidate-cfb/release/doc_retention_probe_0942_cfb_profile",
+          "/home/zhuhe/litchi-performance-0967/builds/target-candidate-cfb/release/doc_retention_probe_0942_cfb_profile_alloc"
+        ],
+        "env": {
+          "CARGO_INCREMENTAL": "0",
+          "CARGO_TERM_COLOR": "never",
+          "RUSTFLAGS": ""
+        },
+        "launched": false
+      }
+    ],
+    "control_commands": [],
+    "control_build_note": "functional control binaries are retained and bound by control-result-v1.md; timed controls require a separate reviewed harness",
+    "control_profile_commands": [
+      {
+        "package": "doc-revision-control-profile-0967",
+        "source_root": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline",
+        "control_source": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline/tools/perf-revision-control-0967",
+        "source_active": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline/tools/perf-revision-control-0967",
+        "source_active_expected_target": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline/tools/perf-revision-control-0967",
+        "target_dir": "/home/zhuhe/litchi-performance-0967/builds/control-target-baseline-revision-v1",
+        "variant": "baseline",
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "build",
+          "--release",
+          "--locked",
+          "--offline",
+          "-j2",
+          "--manifest-path",
+          "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline/tools/perf-revision-control-0967/Cargo.toml",
+          "--target-dir",
+          "/home/zhuhe/litchi-performance-0967/builds/control-target-baseline-revision-v1",
+          "--bin",
+          "doc_revision_control_profile_0967",
+          "--bin",
+          "doc_revision_control_profile_0967_alloc"
+        ],
+        "expected_binaries": [
+          "/home/zhuhe/litchi-performance-0967/builds/control-target-baseline-revision-v1/release/doc_revision_control_profile_0967",
+          "/home/zhuhe/litchi-performance-0967/builds/control-target-baseline-revision-v1/release/doc_revision_control_profile_0967_alloc"
+        ],
+        "env": {
+          "CARGO_INCREMENTAL": "0",
+          "CARGO_TERM_COLOR": "never",
+          "RUSTFLAGS": ""
+        },
+        "source_binding_required": true,
+        "launched": false
+      },
+      {
+        "package": "doc-revision-control-profile-0967",
+        "source_root": "/home/zhuhe/litchi-performance-0967/source-candidate",
+        "control_source": "/home/zhuhe/litchi-performance-0967/source-candidate/tools/perf-revision-control-0967",
+        "source_active": "/home/zhuhe/litchi-performance-0967/source-candidate/tools/perf-revision-control-0967",
+        "source_active_expected_target": "/home/zhuhe/litchi-performance-0967/source-candidate/tools/perf-revision-control-0967",
+        "target_dir": "/home/zhuhe/litchi-performance-0967/builds/control-target-candidate-revision-v1",
+        "variant": "candidate",
+        "argv": [
+          "cargo",
+          "+1.95.0",
+          "build",
+          "--release",
+          "--locked",
+          "--offline",
+          "-j2",
+          "--manifest-path",
+          "/home/zhuhe/litchi-performance-0967/source-candidate/tools/perf-revision-control-0967/Cargo.toml",
+          "--target-dir",
+          "/home/zhuhe/litchi-performance-0967/builds/control-target-candidate-revision-v1",
+          "--bin",
+          "doc_revision_control_profile_0967",
+          "--bin",
+          "doc_revision_control_profile_0967_alloc"
+        ],
+        "expected_binaries": [
+          "/home/zhuhe/litchi-performance-0967/builds/control-target-candidate-revision-v1/release/doc_revision_control_profile_0967",
+          "/home/zhuhe/litchi-performance-0967/builds/control-target-candidate-revision-v1/release/doc_revision_control_profile_0967_alloc"
+        ],
+        "env": {
+          "CARGO_INCREMENTAL": "0",
+          "CARGO_TERM_COLOR": "never",
+          "RUSTFLAGS": ""
+        },
+        "source_binding_required": true,
+        "launched": false
+      }
+    ],
+    "control_profile_receipt": {
+      "path": "/home/zhuhe/litchi-performance-0967/receipts/control-build-0967-v2.json",
+      "sha256": "7aee6b9ddfa1efa68446fbfc09da856b82a9d2028ddabd760b06fba609eeb701",
+      "status": "matched_ordinary_native_and_allocator_control_builds_passed"
+    },
+    "bound_binaries": true
+  },
+  "host_state": {
+    "status": "bound",
+    "before": {
+      "path": "/home/zhuhe/litchi-performance-0967/receipts/host-before-capture-v1.json",
+      "bytes": 7972,
+      "sha256": "b14828c91b6648d638111c6f12b7b24ce98587a61d5c59d84a82a357ca2351c9"
+    },
+    "after": {
+      "path": "/home/zhuhe/litchi-performance-0967/receipts/host-after-capture-v1.json",
+      "status": "pending_post_capture"
+    },
+    "affinity_applied": false
+  },
+  "binaries": {
+    "native_baseline": {
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb",
+      "kind": "ordinary_uninstrumented"
+    },
+    "native_candidate": {
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-candidate-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "sha256": "bc066474e45b95cadc2eb7680fb3236545392e37520bd21666e1cebdfd1d66e2",
+      "kind": "ordinary_uninstrumented"
+    },
+    "allocator_baseline": {
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile_alloc",
+      "sha256": "a520ec154bed62ce26d885f203e2565e756ce618a046b77521db484788c4ccd9",
+      "kind": "counting_allocator"
+    },
+    "allocator_candidate": {
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-candidate-cfb/release/doc_retention_probe_0942_cfb_profile_alloc",
+      "sha256": "0f833a3eb7dd9d87ebb8424922f780d6a6863ce09e0b36e2b6b68207ab651593",
+      "kind": "counting_allocator"
+    },
+    "control_baseline": {
+      "path": "/home/zhuhe/litchi-performance-0967/harness-control/target-baseline/release/doc_revision_positive_control_0967",
+      "sha256": "2227105e81dc43f8e128904818c846955e5d8d1e477611679ebb1246ca3cbe0d",
+      "kind": "correctness_control"
+    },
+    "control_candidate": {
+      "path": "/home/zhuhe/litchi-performance-0967/harness-control/target-candidate/release/doc_revision_positive_control_0967",
+      "sha256": "fed4f00380289030558e56ccd08bdd5a7d524c9a2f648e375cec12b9baa93709",
+      "kind": "correctness_control"
+    },
+    "timed_control_native_baseline": {
+      "path": "/home/zhuhe/litchi-performance-0967/builds/control-target-baseline-revision-v1/release/doc_revision_control_profile_0967",
+      "sha256": "e94cb13674a5068d91929b7d61cb588a97187fc98dd4713c8e75f0b3dc0c8290",
+      "kind": "control_profile_native"
+    },
+    "timed_control_native_candidate": {
+      "path": "/home/zhuhe/litchi-performance-0967/builds/control-target-candidate-revision-v1/release/doc_revision_control_profile_0967",
+      "sha256": "d45bf5ceea957669235368794e6b544ccd44585be255b128a2a0216224c52eee",
+      "kind": "control_profile_native"
+    },
+    "timed_control_allocator_baseline": {
+      "path": "/home/zhuhe/litchi-performance-0967/builds/control-target-baseline-revision-v1/release/doc_revision_control_profile_0967_alloc",
+      "sha256": "fb1f3833c04928c2024610b603cdc8fd7f7775cef5b464c8e3a6d7ee8f4be758",
+      "kind": "control_profile_allocator"
+    },
+    "timed_control_allocator_candidate": {
+      "path": "/home/zhuhe/litchi-performance-0967/builds/control-target-candidate-revision-v1/release/doc_revision_control_profile_0967_alloc",
+      "sha256": "87367bd03fa8d2d947c9835a9569e09bc31ea5e2bb3fc8789ad5a7e4c98f1636",
+      "kind": "control_profile_allocator"
+    }
+  },
+  "fixtures": {
+    "docnohf": {
+      "id": "docnohf",
+      "path": "/home/zhuhe/litchi-performance-0967/source-candidate/test-data/ole/doc/NoHeadFoot.doc",
+      "relative_path": "test-data/ole/doc/NoHeadFoot.doc",
+      "bytes": 26112,
+      "sha256": "45e5df073f34314da6f39d2dad119fb2ef23470878fd2df67f632864cd92ea48"
+    },
+    "docfloat": {
+      "id": "docfloat",
+      "path": "/home/zhuhe/litchi-performance-0967/source-candidate/test-data/ole/doc/FloatingPictures.doc",
+      "relative_path": "test-data/ole/doc/FloatingPictures.doc",
+      "bytes": 335360,
+      "sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d"
+    },
+    "real-bookmark-delete-redline-query": {
+      "path": "/home/zhuhe/litchi-performance-0967/source-candidate/test-data/libreoffice-core/sw/qa/core/doc/data/bookmark-delete-redline.doc",
+      "id": "real-bookmark-delete-redline-query",
+      "relative_path": "test-data/libreoffice-core/sw/qa/core/doc/data/bookmark-delete-redline.doc",
+      "bytes": 66048,
+      "sha256": "f8c19b5712e12244af5e243ab6b996af6bc32193dad208948a155c4a4d5bb3dd",
+      "revision_count": 20,
+      "paragraph_zero_unmarked": false
+    }
+  },
+  "real_matrix": {
+    "cells": [
+      {
+        "cell_id": "docnohf/e1/zero",
+        "case": "docnohf",
+        "edits": 1,
+        "retention": "zero"
+      },
+      {
+        "cell_id": "docnohf/e1/default",
+        "case": "docnohf",
+        "edits": 1,
+        "retention": "default"
+      },
+      {
+        "cell_id": "docnohf/e1/release",
+        "case": "docnohf",
+        "edits": 1,
+        "retention": "release"
+      },
+      {
+        "cell_id": "docnohf/e2/zero",
+        "case": "docnohf",
+        "edits": 2,
+        "retention": "zero"
+      },
+      {
+        "cell_id": "docnohf/e2/default",
+        "case": "docnohf",
+        "edits": 2,
+        "retention": "default"
+      },
+      {
+        "cell_id": "docnohf/e2/release",
+        "case": "docnohf",
+        "edits": 2,
+        "retention": "release"
+      },
+      {
+        "cell_id": "docnohf/e8/zero",
+        "case": "docnohf",
+        "edits": 8,
+        "retention": "zero"
+      },
+      {
+        "cell_id": "docnohf/e8/default",
+        "case": "docnohf",
+        "edits": 8,
+        "retention": "default"
+      },
+      {
+        "cell_id": "docnohf/e8/release",
+        "case": "docnohf",
+        "edits": 8,
+        "retention": "release"
+      },
+      {
+        "cell_id": "docnohf/e32/zero",
+        "case": "docnohf",
+        "edits": 32,
+        "retention": "zero"
+      },
+      {
+        "cell_id": "docnohf/e32/default",
+        "case": "docnohf",
+        "edits": 32,
+        "retention": "default"
+      },
+      {
+        "cell_id": "docnohf/e32/release",
+        "case": "docnohf",
+        "edits": 32,
+        "retention": "release"
+      },
+      {
+        "cell_id": "docfloat/e1/zero",
+        "case": "docfloat",
+        "edits": 1,
+        "retention": "zero"
+      },
+      {
+        "cell_id": "docfloat/e1/default",
+        "case": "docfloat",
+        "edits": 1,
+        "retention": "default"
+      },
+      {
+        "cell_id": "docfloat/e1/release",
+        "case": "docfloat",
+        "edits": 1,
+        "retention": "release"
+      },
+      {
+        "cell_id": "docfloat/e2/zero",
+        "case": "docfloat",
+        "edits": 2,
+        "retention": "zero"
+      },
+      {
+        "cell_id": "docfloat/e2/default",
+        "case": "docfloat",
+        "edits": 2,
+        "retention": "default"
+      },
+      {
+        "cell_id": "docfloat/e2/release",
+        "case": "docfloat",
+        "edits": 2,
+        "retention": "release"
+      },
+      {
+        "cell_id": "docfloat/e8/zero",
+        "case": "docfloat",
+        "edits": 8,
+        "retention": "zero"
+      },
+      {
+        "cell_id": "docfloat/e8/default",
+        "case": "docfloat",
+        "edits": 8,
+        "retention": "default"
+      },
+      {
+        "cell_id": "docfloat/e8/release",
+        "case": "docfloat",
+        "edits": 8,
+        "retention": "release"
+      },
+      {
+        "cell_id": "docfloat/e32/zero",
+        "case": "docfloat",
+        "edits": 32,
+        "retention": "zero"
+      },
+      {
+        "cell_id": "docfloat/e32/default",
+        "case": "docfloat",
+        "edits": 32,
+        "retention": "default"
+      },
+      {
+        "cell_id": "docfloat/e32/release",
+        "case": "docfloat",
+        "edits": 32,
+        "retention": "release"
+      }
+    ],
+    "native": {
+      "pairs_per_cell": 12,
+      "warmups": 5,
+      "samples": 80,
+      "relative_ratio": "candidate_over_baseline",
+      "schedule": [
+        {
+          "pair": 1,
+          "relative_order": "baseline_then_candidate"
+        },
+        {
+          "pair": 2,
+          "relative_order": "baseline_then_candidate"
+        },
+        {
+          "pair": 3,
+          "relative_order": "baseline_then_candidate"
+        },
+        {
+          "pair": 4,
+          "relative_order": "baseline_then_candidate"
+        },
+        {
+          "pair": 5,
+          "relative_order": "baseline_then_candidate"
+        },
+        {
+          "pair": 6,
+          "relative_order": "baseline_then_candidate"
+        },
+        {
+          "pair": 7,
+          "relative_order": "candidate_then_baseline"
+        },
+        {
+          "pair": 8,
+          "relative_order": "candidate_then_baseline"
+        },
+        {
+          "pair": 9,
+          "relative_order": "candidate_then_baseline"
+        },
+        {
+          "pair": 10,
+          "relative_order": "candidate_then_baseline"
+        },
+        {
+          "pair": 11,
+          "relative_order": "candidate_then_baseline"
+        },
+        {
+          "pair": 12,
+          "relative_order": "candidate_then_baseline"
+        }
+      ],
+      "bootstrap_seed": 967001,
+      "bootstrap_resamples": 10000,
+      "confidence": 0.95,
+      "p99_descriptive": {
+        "ratio_median_field": "p99_ratio_median",
+        "flag_field": "p99_descriptive_flag",
+        "flag_if_median_gt": 1.05,
+        "report_only": true
+      }
+    },
+    "allocator": {
+      "pairs_per_cell": 3,
+      "warmups": 0,
+      "samples": 1,
+      "relative_ratio": "candidate_over_baseline",
+      "schedule": [
+        {
+          "pair": 1,
+          "relative_order": "baseline_then_candidate"
+        },
+        {
+          "pair": 2,
+          "relative_order": "candidate_then_baseline"
+        },
+        {
+          "pair": 3,
+          "relative_order": "candidate_then_baseline"
+        }
+      ],
+      "bootstrap_seed": 967002,
+      "bootstrap_resamples": 10000
+    }
+  },
+  "controls": {
+    "status": "bound",
+    "correctness_probe_schema": "litchi.performance.0967.doc_revision_positive_control.v1",
+    "probe_receipt": {
+      "path": "/home/zhuhe/litchi-performance-0967/harness-control/control-result-v1.md",
+      "sha256": "c566adbd1dbb6da18913dea89692088777260ce2ba29e9f7d9de437153e374a3",
+      "status": "passed"
+    },
+    "functional_reports": {
+      "generated-positive": {
+        "baseline": {
+          "path": "/home/zhuhe/litchi-performance-0967/harness-control/receipts/generated-baseline-final.json",
+          "sha256": "ecda6d9d38703c9a0a8dd864e41a8e5c4220156eea1ddfcdf9a731ddd92c06b7"
+        },
+        "candidate": {
+          "path": "/home/zhuhe/litchi-performance-0967/harness-control/receipts/generated-candidate-controls.json",
+          "sha256": "813961f9b61f4be107ba5ba6527fe5695d6ec0434ae11043c30d167dc81d6146"
+        }
+      },
+      "generated-dense-1024": {
+        "baseline": {
+          "path": "/home/zhuhe/litchi-performance-0967/harness-control/receipts/dense-1024-baseline-release.json",
+          "sha256": "95169907e9b560e9eb89cfd1c267a2f8af7b392607786d37f35f09e92aa71886"
+        },
+        "candidate": {
+          "path": "/home/zhuhe/litchi-performance-0967/harness-control/receipts/dense-1024-candidate-release.json",
+          "sha256": "f92abc4f0c4322db4480ba29ed9f914f4ef2987fb5a95ed2b7e2e8d9a6628423"
+        }
+      },
+      "generated-false": {
+        "baseline": {
+          "path": "/home/zhuhe/litchi-performance-0967/harness-control/receipts/false-marker-baseline-release.json",
+          "sha256": "a1ad8ceb269c3f2b5778461433def1a7248cb2ae003cbc9e88e3a783153849e5"
+        },
+        "candidate": {
+          "path": "/home/zhuhe/litchi-performance-0967/harness-control/receipts/false-marker-candidate-release.json",
+          "sha256": "b2f0a20c9e066c3695a38ca6f0f2018f1b1dc2033938c396d6950cbbb45ecd4c"
+        }
+      },
+      "real-bookmark-delete-redline-query": {
+        "baseline": {
+          "path": "/home/zhuhe/litchi-performance-0967/harness-control/receipts/query-baseline-real-final.json",
+          "sha256": "c4fcfc014057d0bb0c2811c07ac48f10b99a7515be32405fc20cfccd472e09bb"
+        },
+        "candidate": {
+          "path": "/home/zhuhe/litchi-performance-0967/harness-control/receipts/query-candidate-real-controls.json",
+          "sha256": "ec9ff3628ab743e7e1ac0f886b0ed30d6917c1e131a360e568ed3f927f45a941"
+        }
+      }
+    },
+    "matrix": [
+      {
+        "id": "generated-positive",
+        "probe_mode": "run-generated",
+        "fixture_pattern": "generated-positive",
+        "edits": 1,
+        "retention": "default",
+        "timed_scope": false,
+        "require_revision_survival": true
+      },
+      {
+        "id": "generated-dense-1024",
+        "probe_mode": "run-dense",
+        "runs": 1024,
+        "fixture_pattern": "generated-dense-1024",
+        "edits": 32,
+        "retention": "default",
+        "timed_scope": false,
+        "require_revision_survival": true
+      },
+      {
+        "id": "generated-false",
+        "probe_mode": "run-false-marker",
+        "fixture_pattern": "generated-false-marker",
+        "edits": 1,
+        "retention": "default",
+        "timed_scope": false,
+        "require_revision_survival": false,
+        "require_false_marker": true
+      },
+      {
+        "id": "real-bookmark-delete-redline-query",
+        "probe_mode": "query-input",
+        "input_fixture": "test-data/libreoffice-core/sw/qa/core/doc/data/bookmark-delete-redline.doc",
+        "timed_scope": false,
+        "query_reopen": true
+      }
+    ],
+    "required_variants": [
+      "baseline",
+      "candidate"
+    ],
+    "scenario_audit": {
+      "path": "/home/zhuhe/litchi-performance-0967/tools/scenario_audit_0967_v1.py",
+      "sha256": "7f11088d14cdcac2e137e33282d0328fcebc2cf814570e48dfbb9a290978a9e0",
+      "output": "/home/zhuhe/litchi-performance-0967/analysis/scenario-audit-v1.json",
+      "status_required": "pass"
+    },
+    "timed_scope": {
+      "status": "bound",
+      "required": true,
+      "schema": "litchi.performance.0967.control_profile.v1",
+      "harness_root": "/home/zhuhe/litchi-performance-0967/harness-perf",
+      "harness_files": [
+        {
+          "path": "design-v1.md",
+          "bytes": 4216,
+          "sha256": "f75386a27bedb50de295d6cf37099b1cf6be89c01167baac3c513869ec41b37a"
+        }
+      ],
+      "source_overlay_relative_root": "tools/perf-revision-control-0967",
+      "native_timing_claim": true,
+      "allocator_timing_claim": false,
+      "allocator_metric_claim": true,
+      "scope_review": {
+        "path": "/home/zhuhe/litchi-performance-0967/review/control-harness-scope-0967-v1.json",
+        "sha256": "141e58bbe04e11606452ec51dc516a096260bc102fa8014f5c919d6ea4b6b9bf",
+        "status": "scope_pass_with_formal_binding_pending"
+      },
+      "inputs": {
+        "generated-positive": {
+          "path": "/home/zhuhe/litchi-performance-0967/harness-perf/inputs/generated-positive.doc",
+          "bytes": 15360,
+          "sha256": "47e6f76319a8086ebc36719bc9f1d894ad907a02856cfb842ac198d7879d8737",
+          "available": true
+        },
+        "dense1024": {
+          "path": "/home/zhuhe/litchi-performance-0967/harness-perf/inputs/dense1024.doc",
+          "bytes": 93696,
+          "sha256": "f29dc1e3e1c05dcf37ce0843551a21ca9423cb283d54599813b21d52fcd76def",
+          "available": true
+        },
+        "false-marker": {
+          "path": "/home/zhuhe/litchi-performance-0967/harness-perf/inputs/false-marker.doc",
+          "bytes": 15360,
+          "sha256": "67cc08d9c17b3e8336327b51ecd78e6f44b14929037e877559b451918159f4ee",
+          "available": true
+        },
+        "real-positive": {
+          "path": "/home/zhuhe/litchi-performance-0967/harness-perf/inputs/real-positive.doc",
+          "bytes": 66048,
+          "sha256": "f8c19b5712e12244af5e243ab6b996af6bc32193dad208948a155c4a4d5bb3dd",
+          "available": true
+        }
+      },
+      "cells": [
+        {
+          "id": "generated-positive-e1-default",
+          "control": "generated-positive",
+          "scope": "edit",
+          "edits": 1,
+          "retention": "default"
+        },
+        {
+          "id": "dense1024-e32-default",
+          "control": "dense1024",
+          "scope": "edit",
+          "edits": 32,
+          "retention": "default"
+        },
+        {
+          "id": "false-marker-e1-default",
+          "control": "false-marker",
+          "scope": "edit",
+          "edits": 1,
+          "retention": "default"
+        },
+        {
+          "id": "false-marker-e32-default",
+          "control": "false-marker",
+          "scope": "edit",
+          "edits": 32,
+          "retention": "default"
+        }
+      ],
+      "native_pairs_per_control": 12,
+      "warmups": 5,
+      "samples": 80,
+      "allocator_pairs_per_control": 3,
+      "allocator_warmups": 0,
+      "allocator_samples": 1,
+      "bootstrap_seed": 967003,
+      "bootstrap_resamples": 10000,
+      "p99_descriptive": {
+        "ratio_median_field": "p99_ratio_median",
+        "flag_field": "p99_descriptive_flag",
+        "flag_if_median_gt": 1.05,
+        "report_only": true
+      },
+      "gate": "same p50/p95 noninferiority upper CI <= 1.05; allocator memory safeguards apply",
+      "note": "The correctness probe's timing_claim is false. This separate profile harness owns the timed control schema: native timing_claim=true, allocator timing_claim=false. Executable hashes remain unbound until binding.",
+      "design_alignment": true
+    }
+  },
+  "tools": {
+    "runner": {
+      "path": "/home/zhuhe/litchi-performance-0967/tools/run_0967_v1.py",
+      "sha256": "8885f36d2e621c26a70a67e7d46823852f8ee32e63727ca199cc512432f816fb"
+    },
+    "reducer": {
+      "path": "/home/zhuhe/litchi-performance-0967/tools/reduce_0967_v1.py",
+      "sha256": "1e84c2d48a64cb4e4e11a6afd585c84e86e9c53a7349c67c5b2329e4c7a352dc"
+    },
+    "scenario_audit": {
+      "path": "/home/zhuhe/litchi-performance-0967/tools/scenario_audit_0967_v1.py",
+      "sha256": "7f11088d14cdcac2e137e33282d0328fcebc2cf814570e48dfbb9a290978a9e0"
+    },
+    "source_binder": {
+      "path": "/home/zhuhe/litchi-performance-0967/tools/bind_source_manifest_0967_v2.py",
+      "sha256": "6b01ace047f8945212737e02954626e02e9bc0d902845296fe609da564643e9c"
+    }
+  },
+  "aa_noise": {
+    "coverage": "endpoint_cells_only",
+    "cells": [
+      "docnohf/e32/default",
+      "docfloat/e32/default"
+    ],
+    "same_binary": "baseline",
+    "order": [
+      "AB",
+      "BA"
+    ],
+    "native_pairs_per_cell": 12,
+    "warmups": 5,
+    "samples": 80,
+    "bootstrap_seed": 967004,
+    "bootstrap_resamples": 10000,
+    "symmetric_ratio": "max(r,1/r)",
+    "upper_ci_limit": 1.05,
+    "interpretation": "readiness only; never pooled into candidate ratios or used to qualify/reject"
+  },
+  "gates": {
+    "native_noninferiority": "every real cell p50 and p95 paired-bootstrap upper CI <= 1.05",
+    "native_review_flag": "any real-cell p50 median > 1.05 is reported for review even when CI passes",
+    "native_p99_descriptive": "report p99_ratio_median and p99_descriptive_flag when median > 1.05; descriptive only, never a gate or waiver",
+    "allocation_branch": {
+      "docfloat/e32/default": 0.9,
+      "docnohf/e32/default": 0.97,
+      "metric": "paired median allocation_calls candidate_over_baseline"
+    },
+    "native_benefit_branch": "at least one endpoint p50 median <= 0.95 and 95% bootstrap upper CI < 1.00",
+    "memory": {
+      "requested_or_allocated_bytes": 1.01,
+      "peak_live_bytes": 1.05,
+      "process_rss": 1.05
+    },
+    "other_allocation_calls_median": 1.01,
+    "controls": "all baseline/candidate positive, dense, false reports pass scenario audit; timed control scope is bound and passes noninferiority",
+    "rejection": "any custody/correctness/missing/duplicate/terminal/metric mismatch, failed real-cell CI, guard violation, absent controls, unbounded positive double walk, or no benefit branch",
+    "aa_failure": "comparison uninterpretable; retain packets and make no adoption/rejection decision",
+    "no_retry": true
+  },
+  "outputs": {
+    "capture_root": "/home/zhuhe/litchi-performance-0967/capture",
+    "reduction": "/home/zhuhe/litchi-performance-0967/analysis/reduction-v1.json",
+    "selection": "/home/zhuhe/litchi-performance-0967/analysis/selection-v1.json",
+    "raw_packets_retained": true
+  },
+  "historical_note": "Quality and semantic receipts retain an unrelated baseline rustdoc failure; no candidate-file diagnostic was reported. This plan makes no adoption claim until builds, controls, and measurements pass.",
+  "parent_plan": {
+    "path": "/home/zhuhe/litchi-performance-0967/plans/plan-0967-bound-final-v5.json",
+    "bytes": 34926,
+    "sha256": "f9989f9ef8b54478b04d30aa90240a87f571e2b7797d810b055626ab43c0776e"
+  },
+  "binding_note": "Executable hashes are bound. Root must bind timed positive/dense/false controls, host state, and GO before setting capture_authorized.",
+  "independent_admission": {
+    "path": "/home/zhuhe/litchi-performance-0967/review/independent-protocol-admission-v5.json",
+    "bytes": 4133,
+    "sha256": "d391b3501409988d4ab5cb734c7f9570f6fa4bc4ad16dfb807a3fd5643b2f81c"
+  },
+  "authorization_note": "Root authorizes this fixed, no-retry capture; A/A readiness gates all timed candidate comparisons. No measurement thresholds changed."
+}

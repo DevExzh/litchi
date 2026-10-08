@@ -1,0 +1,4 @@
+sealed 2026-10-07
+source_sha256 47e77b319d74ea91fc6952ae9e99c2fd43c735710b7f7e10783b90d192265712
+schema litchi.performance.0967.control_profile.v1
+formal_capture false

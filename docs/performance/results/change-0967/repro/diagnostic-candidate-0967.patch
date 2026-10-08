@@ -1,0 +1,558 @@
+--- a/crates/litchi-doc/src/sprm.rs
++++ b/crates/litchi-doc/src/sprm.rs
+@@ -185,6 +185,40 @@
+     let estimated_capacity = (grpprl.len() / 4).max(8);
+     let mut sprms = Vec::with_capacity(estimated_capacity);
+ 
++    visit_sprms_two_byte(grpprl, |sprm| {
++        // Use SmallVec::from_slice for efficient inline storage (no heap
++        // allocation for ≤8 bytes).
++        sprms.push(Sprm {
++            opcode: sprm.opcode,
++            operation: sprm.operation,
++            operand: SmallVec::from_slice(sprm.operand),
++            offset: sprm.offset,
++            size: sprm.size,
++        });
++    })?;
++
++    Ok(sprms)
++}
++
++/// A parsed SPRM record whose operand still borrows the input group.
++///
++/// The owned public collector above is intentionally kept as the stable
++/// result shape. Internal validation paths can instead visit these records
++/// without constructing a `Vec<Sprm>` or any owned operand storage.
++#[derive(Clone, Copy)]
++struct SprmRef<'a> {
++    opcode: u16,
++    operation: SprmOperation,
++    operand: &'a [u8],
++    offset: usize,
++    size: usize,
++}
++
++/// Visit every SPRM in a group using the same complete grammar as the owned
++/// collector. The visitor cannot stop parsing early: callers that only need
++/// to classify a group must still validate every later record and preserve
++/// the parser's first-error ordering.
++fn visit_sprms_two_byte<'a>(grpprl: &'a [u8], mut visit: impl FnMut(SprmRef<'a>)) -> Result<()> {
+     // Extract constant for better optimization
+     const SIZECODE_MASK: u16 = 0xe000;
+     const SIZECODE_SHIFT: u16 = 13;
+@@ -309,13 +343,12 @@
+             });
+         }
+ 
+-        // Use SmallVec::from_slice for efficient inline storage (no heap allocation for ≤8 bytes)
+-        let operand = SmallVec::from_slice(&grpprl[offset..operand_end]);
++        let operand = &grpprl[offset..operand_end];
+         offset = operand_end;
+ 
+         let total_size = offset - sprm_start; // Total size including opcode
+ 
+-        sprms.push(Sprm {
++        visit(SprmRef {
+             opcode,
+             operation,
+             operand,
+@@ -324,7 +357,18 @@
+         });
+     }
+ 
+-    Ok(sprms)
++    Ok(())
++}
++
++/// Validate a complete group while reporting whether any opcode is in the
++/// caller's potential-trigger set. This is crate-private because the public
++/// SPRM API continues to return the owned record shape.
++pub(crate) fn contains_sprm_opcode(grpprl: &[u8], opcodes: &[u16]) -> Result<bool> {
++    let mut found = false;
++    visit_sprms_two_byte(grpprl, |sprm| {
++        found |= opcodes.contains(&sprm.opcode);
++    })?;
++    Ok(found)
+ }
+ 
+ /// Find a specific SPRM by opcode in a list of SPRMs.
+@@ -563,3 +607,288 @@
+         assert!(!get_bool_from_sprm(&sprm_false));
+     }
+ }
++
++#[cfg(test)]
++mod frozen_original_reference {
++    use super::*;
++
++    const TRIGGER_OPCODES: [u16; 4] = [0x0835, 0x4A43, 0xC615, 0xD608];
++
++    fn frozen_parse_sprms(grpprl: &[u8]) -> Result<Vec<Sprm>> {
++        // Pre-allocate: estimate ~4 bytes per SPRM on average (2 opcode + 1-2 operand)
++        // This significantly reduces reallocation overhead for large grpprl arrays
++        let estimated_capacity = (grpprl.len() / 4).max(8);
++        let mut sprms = Vec::with_capacity(estimated_capacity);
++
++        // Extract constant for better optimization
++        const SIZECODE_MASK: u16 = 0xe000;
++        const SIZECODE_SHIFT: u16 = 13;
++
++        let mut offset = 0;
++
++        while offset < grpprl.len() {
++            let sprm_start = offset; // Track start of SPRM for offset field
++
++            // Read SPRM opcode (2 bytes in Word 97+)
++            let remaining = grpprl.len() - offset;
++            if remaining < 2 {
++                return Err(Error::Opcode {
++                    at: offset,
++                    remaining,
++                });
++            }
++            let opcode_end = offset + 2;
++            let opcode = u16::from_le_bytes([grpprl[offset], grpprl[offset + 1]]);
++            offset = opcode_end;
++
++            // Extract size code from opcode (bits 13-15, POI's BITFIELD_SIZECODE = 0xe000)
++            let size_code = ((opcode & SIZECODE_MASK) >> SIZECODE_SHIFT) as u8;
++            let operation = SprmOperation::from(size_code);
++
++            // Determine operand size based on size code (matching POI's initSize method)
++            // From POI SprmOperation.initSize():
++            //   case 0: case 1: return 3;  // 2 byte opcode + 1 byte operand
++            //   case 2: case 4: case 5: return 4;  // 2 byte opcode + 2 byte operand
++            //   case 3: return 6;  // 2 byte opcode + 4 byte operand
++            //   case 6: variable length
++            //   case 7: return 5;  // 2 byte opcode + 3 byte operand
++            let operand_size = match size_code {
++                0 | 1 => 1,     // 1 byte operand
++                2 | 4 | 5 => 2, // 2 byte operand
++                3 => 4,         // 4 byte operand
++                6 => {
++                    // Variable operands have a length prefix that is not part of
++                    // the operand exposed to property decoders.
++                    if opcode == 0xc615 {
++                        let encoded_size = *grpprl
++                            .get(offset)
++                            .ok_or(Error::Length { at: offset, opcode })?
++                            as usize;
++                        if encoded_size == 0 {
++                            return Err(Error::ZeroLength { at: offset, opcode });
++                        }
++                        let size = if encoded_size == 255 {
++                            let delete_count_offset = offset
++                                .checked_add(1)
++                                .ok_or(Error::Overflow { at: offset, opcode })?;
++                            let delete_count = *grpprl
++                                .get(delete_count_offset)
++                                .ok_or(Error::Length { at: offset, opcode })?
++                                as usize;
++                            let deleted_bytes = 4usize
++                                .checked_mul(delete_count)
++                                .ok_or(Error::Overflow { at: offset, opcode })?;
++                            let add_count_offset = offset
++                                .checked_add(2)
++                                .and_then(|value| value.checked_add(deleted_bytes))
++                                .ok_or(Error::Overflow { at: offset, opcode })?;
++                            let add_count = *grpprl
++                                .get(add_count_offset)
++                                .ok_or(Error::Length { at: offset, opcode })?
++                                as usize;
++                            let added_bytes = 3usize
++                                .checked_mul(add_count)
++                                .ok_or(Error::Overflow { at: offset, opcode })?;
++                            2usize
++                                .checked_add(deleted_bytes)
++                                .and_then(|value| value.checked_add(added_bytes))
++                                .ok_or(Error::Overflow { at: offset, opcode })?
++                        } else {
++                            encoded_size
++                        };
++                        offset = offset
++                            .checked_add(1)
++                            .ok_or(Error::Overflow { at: offset, opcode })?;
++                        size
++                    } else if opcode == 0xd608 {
++                        let length_end = offset
++                            .checked_add(2)
++                            .ok_or(Error::Overflow { at: offset, opcode })?;
++                        if length_end > grpprl.len() {
++                            return Err(Error::Length { at: offset, opcode });
++                        }
++                        // For the two long encodings, cb includes one byte beyond
++                        // the actual operand (matching MS-DOC and POI's size rule).
++                        let encoded_size =
++                            u16::from_le_bytes([grpprl[offset], grpprl[offset + 1]]) as usize;
++                        if encoded_size == 0 {
++                            return Err(Error::ZeroLength { at: offset, opcode });
++                        }
++                        offset = length_end;
++                        encoded_size - 1
++                    } else {
++                        let size = *grpprl
++                            .get(offset)
++                            .ok_or(Error::Length { at: offset, opcode })?
++                            as usize;
++                        offset = offset
++                            .checked_add(1)
++                            .ok_or(Error::Overflow { at: offset, opcode })?;
++                        size
++                    }
++                },
++                7 => 3, // 3 byte operand
++                _ => unreachable!(),
++            };
++
++            // Read operand data
++            let operand_end = offset
++                .checked_add(operand_size)
++                .ok_or(Error::Overflow { at: offset, opcode })?;
++            if operand_end > grpprl.len() {
++                return Err(Error::Operand {
++                    at: offset,
++                    opcode,
++                    expected: operand_size,
++                    remaining: grpprl.len() - offset,
++                });
++            }
++
++            // Use SmallVec::from_slice for efficient inline storage (no heap allocation for ≤8 bytes)
++            let operand = SmallVec::from_slice(&grpprl[offset..operand_end]);
++            offset = operand_end;
++
++            let total_size = offset - sprm_start; // Total size including opcode
++
++            sprms.push(Sprm {
++                opcode,
++                operation,
++                operand,
++                offset: sprm_start,
++                size: total_size,
++            });
++        }
++
++        Ok(sprms)
++    }
++
++    fn assert_matches_frozen(bytes: &[u8]) {
++        let frozen = frozen_parse_sprms(bytes);
++        let actual = parse_sprms(bytes);
++        assert_eq!(actual, frozen, "owned parser changed: {bytes:02X?}");
++        if let (Ok(actual), Ok(frozen)) = (&actual, &frozen) {
++            assert_eq!(
++                actual.capacity(),
++                frozen.capacity(),
++                "owned capacity policy changed: {bytes:02X?}"
++            );
++        }
++        let expected_scan = frozen
++            .as_ref()
++            .map(|sprms| {
++                sprms
++                    .iter()
++                    .any(|sprm| TRIGGER_OPCODES.contains(&sprm.opcode))
++            })
++            .map_err(Clone::clone);
++        assert_eq!(
++            contains_sprm_opcode(bytes, &TRIGGER_OPCODES),
++            expected_scan,
++            "borrowed scan changed parser/error behavior: {bytes:02X?}"
++        );
++    }
++
++    fn valid_record(opcode: u16, generic_variable_len: usize) -> Vec<u8> {
++        let mut bytes = opcode.to_le_bytes().to_vec();
++        match (opcode >> 13) & 0x7 {
++            0 | 1 => bytes.push(0xA5),
++            2 | 4 | 5 => bytes.extend_from_slice(&[0x10, 0x20]),
++            3 => bytes.extend_from_slice(&[0x10, 0x20, 0x30, 0x40]),
++            6 if opcode == 0xC615 => bytes.extend_from_slice(&[1, 0xA5]),
++            6 if opcode == 0xD608 => bytes.extend_from_slice(&[1, 0]),
++            6 => {
++                let length =
++                    u8::try_from(generic_variable_len).expect("test variable length fits one byte");
++                bytes.push(length);
++                bytes.extend(std::iter::repeat_n(0xA5, generic_variable_len));
++            },
++            7 => bytes.extend_from_slice(&[0x10, 0x20, 0x30]),
++            _ => unreachable!(),
++        }
++        bytes
++    }
++
++    #[test]
++    fn collector_and_borrowed_scan_match_the_frozen_pre_refactor_parser() {
++        let mut cases = vec![
++            Vec::new(),
++            vec![0x00, 0x00, 0xA5],
++            vec![0x00, 0x20, 0xA5],
++            vec![0x00, 0x40, 0x10, 0x20],
++            vec![0x00, 0x60, 0x10, 0x20, 0x30, 0x40],
++            vec![0x00, 0x80, 0x10, 0x20],
++            vec![0x00, 0xA0, 0x10, 0x20],
++            vec![0x00, 0xC0, 0x02, 0x10, 0x20],
++            vec![0x00, 0xE0, 0x10, 0x20, 0x30],
++            vec![
++                0x15, 0xC6, 2, 0, 0, // normal sprmCDefTable
++                0x35, 0x08, 1,
++            ],
++            vec![
++                0x15, 0xC6, 255, // extended sprmCDefTable
++                1, 100, 0, 25, 0, // one deleted tab
++                1, 200, 0, 0, // one added tab
++                0x35, 0x08, 1,
++            ],
++            vec![
++                0x08, 0xD6, 4, 0, 2, 0x10, 0x20, // long variable SPRM
++                0x43, 0x4A, 0x18, 0x00,
++            ],
++            vec![0x35, 0x08, 1, 0x43], // valid prefix followed by a late tail
++            vec![0x35],
++            vec![0x43, 0x4A, 0x18],
++            vec![0x08, 0xD6, 0x00, 0x00],
++            vec![0x15, 0xC6, 0xFF, 0x01],
++            vec![0x15, 0xC6],
++        ];
++        let mut variable = vec![0x00, 0xC0, 3, 0xAA, 0xBB, 0xCC];
++        variable.extend_from_slice(&[0x35, 0x08, 1]);
++        cases.push(variable);
++
++        for bytes in cases {
++            assert_matches_frozen(&bytes);
++        }
++    }
++
++    #[test]
++    fn every_opcode_and_prefix_matches_the_frozen_parser_on_the_fly() {
++        for opcode in 0..=u16::MAX {
++            let record = valid_record(opcode, 1);
++            assert_matches_frozen(&record);
++            for length in 0..record.len() {
++                assert_matches_frozen(&record[..length]);
++            }
++            let mut trailing = record;
++            trailing.push(0x7F);
++            assert_matches_frozen(&trailing);
++        }
++    }
++
++    #[test]
++    fn variable_length_boundaries_and_special_forms_match_the_frozen_parser() {
++        for length in [0usize, 1, 9] {
++            let encoded_length = match length {
++                0 => 0,
++                1 => 1,
++                9 => 9,
++                _ => unreachable!(),
++            };
++            let mut generic = vec![0x00, 0xC0, encoded_length];
++            generic.extend(std::iter::repeat_n(0xA5, length));
++            assert_matches_frozen(&generic);
++        }
++
++        for bytes in [
++            vec![0x15, 0xC6, 0],
++            vec![0x15, 0xC6, 1, 0xA5],
++            vec![0x15, 0xC6, 255, 1, 100, 0, 25, 0, 1, 200, 0, 0],
++            vec![0x15, 0xC6],
++            vec![0x08, 0xD6, 0, 0],
++            vec![0x08, 0xD6, 1, 0],
++            vec![0x08, 0xD6, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8],
++            vec![0x08, 0xD6, 1],
++        ] {
++            assert_matches_frozen(&bytes);
++        }
++    }
++}
+--- a/crates/litchi-doc/src/tracked_revision/codec.rs
++++ b/crates/litchi-doc/src/tracked_revision/codec.rs
+@@ -4,7 +4,7 @@
+ use crate::DateTime;
+ use crate::package::{Error as PackageError, Result};
+ use crate::parts::fkp::{ChpxFkp, PapxFkp, ParagraphHeight};
+-use crate::sprm::parse_sprms;
++use crate::sprm::{contains_sprm_opcode as scan_sprm_opcodes, parse_sprms};
+ use crate::sprm_operations::{
+     SPRM_C_DTTM_RMARK, SPRM_C_DTTM_RMARK_DEL, SPRM_C_F_RMARK, SPRM_C_F_RMARK_DEL,
+     SPRM_C_IBST_RMARK, SPRM_C_IBST_RMARK_DEL, SPRM_C_IDSL_RMARK, SPRM_C_IDSL_RMARK_DEL,
+@@ -355,6 +355,11 @@
+         .map_err(|error| corrupted(format!("malformed or overlapping SPRM sequence: {error}")))
+ }
+ 
++pub(super) fn contains_sprm_opcode(grp: &[u8], opcodes: &[u16]) -> Result<bool> {
++    scan_sprm_opcodes(grp, opcodes)
++        .map_err(|error| corrupted(format!("malformed or overlapping SPRM sequence: {error}")))
++}
++
+ /// Parse one PAPX group and retain only the final table-membership state.
+ ///
+ /// PAPX carries a two-byte style index before its SPRM body. The reverse
+--- a/crates/litchi-doc/src/tracked_revision/package.rs
++++ b/crates/litchi-doc/src/tracked_revision/package.rs
+@@ -4,13 +4,13 @@
+ use super::codec::{
+     CLX, DOP, FIB_CCP_TEXT, FIB_FC_LCB, MAX_AUTHORS, MAX_REVISIONS, MAX_TEXT_UNITS, PLCFANDREF,
+     PLCFATNBKF, PLCFATNBKL, PLCFBKF, PLCFBKL, PLCFBTE_CHPX, PLCFBTE_PAPX, PLCFFLD_MOM,
+-    ParsedMetadata, STTBFRMARK, align2, align512, append_table_block, build_papx_pages, corrupted,
+-    delete_piece_range, encode_revision, fib_pair, infer_moves, insert_piece, kind_order,
+-    merge_adjacent, metadata_from_sprms, parse_authors, parse_chpx, parse_clx, parse_cp_table,
+-    parse_papx, property_metadata, put_fib_pair, put_u32, read_units, replace_papx_revision_sprms,
+-    replace_revision_sprms, restore_before_wall, retain_sprms, revision_opcodes, serialize_authors,
+-    serialize_clx, slice, split_transform_chpx, split_transform_papx, strict_sprms, u16_at, u32_at,
+-    validate_metadata, validate_range,
++    ParsedMetadata, STTBFRMARK, align2, align512, append_table_block, build_papx_pages,
++    contains_sprm_opcode, corrupted, delete_piece_range, encode_revision, fib_pair, infer_moves,
++    insert_piece, kind_order, merge_adjacent, metadata_from_sprms, parse_authors, parse_chpx,
++    parse_clx, parse_cp_table, parse_papx, property_metadata, put_fib_pair, put_u32, read_units,
++    replace_papx_revision_sprms, replace_revision_sprms, restore_before_wall, retain_sprms,
++    revision_opcodes, serialize_authors, serialize_clx, slice, split_transform_chpx,
++    split_transform_papx, strict_sprms, u16_at, u32_at, validate_metadata, validate_range,
+ };
+ use super::model::{CpTable, FcRun, PapxRun, RawPiece, Revision, RevisionKind, RevisionMetadata};
+ use crate::package::{Error as PackageError, Result};
+@@ -44,6 +44,19 @@
+ use std::io::Cursor;
+ use std::sync::Arc;
+ 
++const CHPX_REVISION_OPCODES: &[u16] = &[
++    SPRM_C_F_RMARK,
++    SPRM_C_F_RMARK_DEL,
++    SPRM_C_PROP_RMARK90,
++    SPRM_C_PROP_RMARK_CURRENT,
++];
++const PAPX_REVISION_OPCODES: &[u16] = &[
++    SPRM_P_PROP_RMARK,
++    SPRM_P_PROP_RMARK90,
++    SPRM_P_PROP_RMARK_CURRENT,
++    SPRM_T_PROP_RMARK,
++];
++
+ /// Exact, deliberately narrow picture dependency closure shared with the
+ /// ordinary body transaction. The wire blocks are accepted only after they
+ /// match the crate's canonical singleton writer graph.
+@@ -2343,6 +2356,9 @@
+     pub fn revisions(&self) -> Result<Vec<Revision>> {
+         let mut output = Vec::new();
+         for run in &self.chpx {
++            if !contains_sprm_opcode(&run.grpprl, CHPX_REVISION_OPCODES)? {
++                continue;
++            }
+             let sprms = strict_sprms(&run.grpprl)?;
+             for (kind, flag, author_op, time_op, reason_op, rsid_op) in [
+                 (
+@@ -2403,6 +2419,9 @@
+                 .grpprl
+                 .get(2..)
+                 .ok_or_else(|| corrupted("PAPX has no style index"))?;
++            if !contains_sprm_opcode(body, PAPX_REVISION_OPCODES)? {
++                continue;
++            }
+             let sprms = strict_sprms(body)?;
+             for (kind, op, rsid) in [
+                 (
+@@ -3660,3 +3679,103 @@
+         );
+     }
+ }
++
++#[cfg(test)]
++mod revision_scan_tests {
++    use super::*;
++    use crate::writer::{CharacterFormatting, ParagraphFormatting, TextRevision, Writer};
++    use std::io::Cursor;
++
++    fn revision_doc() -> Vec<u8> {
++        let mut writer = Writer::new();
++        writer
++            .add_paragraph_runs(
++                vec![
++                    ("plain".to_owned(), CharacterFormatting::default()),
++                    (
++                        "inserted".to_owned(),
++                        CharacterFormatting {
++                            insertion_revision: Some(TextRevision::new("Alice")),
++                            ..CharacterFormatting::default()
++                        },
++                    ),
++                ],
++                ParagraphFormatting::default(),
++            )
++            .expect("revision fixture should be accepted");
++        let mut output = Cursor::new(Vec::new());
++        writer
++            .write_to(&mut output)
++            .expect("revision fixture should serialize");
++        output.into_inner()
++    }
++
++    #[test]
++    fn revision_scan_preserves_positive_metadata() {
++        let editor = RevisionEditor::open(revision_doc(), Limits::default())
++            .expect("revision fixture should open");
++        let revisions = editor.revisions().expect("revision scan should succeed");
++        assert!(revisions.iter().any(|revision| {
++            revision.kind == RevisionKind::Insertion && revision.author == "Alice"
++        }));
++    }
++
++    #[test]
++    fn revision_scan_reports_late_parse_error_before_metadata_error() {
++        let mut editor = RevisionEditor::open(revision_doc(), Limits::default())
++            .expect("revision fixture should open");
++        let mut malformed = Vec::new();
++        malformed.extend_from_slice(&SPRM_C_F_RMARK.to_le_bytes());
++        malformed.push(1);
++        malformed.extend_from_slice(&SPRM_C_IBST_RMARK.to_le_bytes());
++        malformed.extend_from_slice(&u16::MAX.to_le_bytes());
++        malformed.push(0x35); // A valid marker prefix followed by a truncated opcode.
++        editor.chpx[0].grpprl = malformed;
++
++        let error = editor
++            .revisions()
++            .expect_err("late malformed SPRM must be rejected");
++        let message = error.to_string();
++        assert!(message.contains("truncated SPRM opcode"), "{message}");
++        assert!(
++            !message.contains("revision author index exceeds SttbfRMark"),
++            "metadata must not run before whole-group validation: {message}"
++        );
++    }
++
++    #[test]
++    fn revision_scan_keeps_duplicate_property_marker_last_record_semantics() {
++        let mut editor = RevisionEditor::open(revision_doc(), Limits::default())
++            .expect("revision fixture should open");
++        let first = encode_revision(
++            RevisionKind::CharacterFormatting,
++            0,
++            &RevisionMetadata::new("Alice"),
++        )
++        .expect("character property marker should encode");
++        let mut disabled = first.clone();
++        disabled[3] = 0;
++        let mut duplicate = first;
++        duplicate.extend_from_slice(&disabled);
++        editor.chpx[0].grpprl = duplicate;
++
++        let revisions = editor.revisions().expect("duplicate markers should parse");
++        assert!(
++            !revisions
++                .iter()
++                .any(|revision| revision.kind == RevisionKind::CharacterFormatting)
++        );
++    }
++
++    #[test]
++    fn revision_scan_does_not_skip_late_errors_in_a_non_marker_group() {
++        let mut editor = RevisionEditor::open(revision_doc(), Limits::default())
++            .expect("revision fixture should open");
++        editor.chpx[0].grpprl = vec![0x35, 0x08, 1, 0x35];
++
++        let error = editor
++            .revisions()
++            .expect_err("strict parser errors must survive marker filtering");
++        assert!(error.to_string().contains("truncated SPRM opcode"));
++    }
++}

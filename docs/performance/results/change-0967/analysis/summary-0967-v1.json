@@ -1,0 +1,120 @@
+{
+  "schema": "litchi.performance.0967.summary.v2",
+  "status": "authoritative_audit_complete",
+  "source_revision": "893072657ad8b1d726bfce351b5ec2e98f084e94",
+  "candidate_scope": [
+    "crates/litchi-doc/src/sprm.rs",
+    "crates/litchi-doc/src/tracked_revision/codec.rs",
+    "crates/litchi-doc/src/tracked_revision/package.rs"
+  ],
+  "capture": {
+    "terminal_receipt": {
+      "path": "receipts/capture-terminal-v1.json",
+      "sha256": "d36312a1e6cef839a2ed3c67e7fc9b641fc264ed543a30f309300a6ebbfd55cc"
+    },
+    "runner_exit": 0,
+    "exec_session": 66783,
+    "packet_count": 896,
+    "packet_breakdown": {
+      "controls": 128,
+      "aa": 48,
+      "allocator": 144,
+      "native": 576
+    },
+    "aa_readiness": {
+      "path": "analysis/aa-readiness-v1.json",
+      "sha256": "98406aa8f00b406407f88f026438c4bfa5a5dab34a2efba3598912f217bece81",
+      "status": "pass",
+      "threshold": 1.05,
+      "pairs_per_cell": 12
+    }
+  },
+  "authoritative_decision": {
+    "status": "independent_audit_complete_with_overwrite_incident",
+    "decision": "reject_candidate",
+    "candidate_adoption": false,
+    "production_recommendation": "none",
+    "audit": {
+      "path": "review/independent-raw-audit-0967-v2.json",
+      "sha256": "2712e39c456d7528c4c9347d6f085dd33253bf43d389d265b979ffee606b29ea"
+    },
+    "decision_receipt": {
+      "path": "review/independent-decision-0967-v2.json",
+      "sha256": "27ab3f1cdad3262a3d374d0dea83a065c2f15909ede165e96bc06518fc2cb1dd"
+    },
+    "audit_helper": {
+      "path": "review/independent_raw_audit_0967_v2.py",
+      "sha256": "8215eaded6f6b0b6b45e42bf2fef603f5566c1ad0ec9c3a2b8fbfeca63451f77"
+    },
+    "evidence_completeness": {
+      "aa_readiness": true,
+      "all_terminal_reports_and_oracles_valid": true,
+      "binary_files_match_bound_hashes": true,
+      "binary_hashes_checked_postcapture": true,
+      "custody_and_schema_complete": true,
+      "no_retries": true,
+      "packet_count": 896
+    },
+    "performance_gates": {
+      "aa_readiness": true,
+      "allocation_benefit": true,
+      "allocation_calls_guard": true,
+      "allocator_memory": false,
+      "custody_and_schema_complete": true,
+      "native_benefit": false,
+      "native_noninferiority": false,
+      "timed_allocator_guard": false,
+      "timed_controls": false,
+      "timed_native_noninferiority": true
+    },
+    "witness_counts": {
+      "real_native_failed_cells": 9,
+      "real_allocator_memory_failures": 3,
+      "timed_allocator_failures": 1
+    },
+    "overwrite_incident": "review/audit-custody-incident-0967-v1.json",
+    "prior_v1_decision": {
+      "path": "review/independent-decision-0967-v1.json",
+      "sha256": "f69d61f74e3943b9fee4411a1898a70aeb410e61702524b4f73c23bc54cb171f",
+      "status": "superseded_invalid_binding"
+    }
+  },
+  "retained_original_outputs": {
+    "reduction": {
+      "path": "analysis/reduction-v1.json",
+      "sha256": "f6a77df77fa34b4e811a6281c49341825c660faca4106794224c8ecb5fd044ed",
+      "status": "pending_incomplete"
+    },
+    "selection": {
+      "path": "analysis/selection-v1.json",
+      "sha256": "800c1959c276032080d32f654b91e884040049e019f425529bce9d9254573c8e",
+      "status": "no_decision"
+    },
+    "note": "These root outputs are retained unchanged. The authoritative v2 audit and decision classify the completed fixed cohort; the superseded v1 output remains historical and is not used as the decision binding."
+  },
+  "claims": {
+    "timing_claim": false,
+    "adoption_claim": false,
+    "causal_claim": false,
+    "final_decision_claim": true
+  },
+  "raw_evidence": {
+    "summary": "provenance/raw-capture-summary-0967-v1.json",
+    "external_inventory_sha256": "65dc6af75ae993a07890358bf12a1c97b65b365cce9092ad061f972bb9e2f6be"
+  },
+  "cleanup": {
+    "receipt": {
+      "path": "receipts/build-cache-cleanup-v1.json",
+      "bytes": 13017,
+      "sha256": "20857e88b5a4aad99b6baf3725b0b5e81d008d56c3ba505356a2fa62847aa24b"
+    },
+    "plan": {
+      "path": "receipts/cleanup-plan-v1.json",
+      "bytes": 14672,
+      "sha256": "c14f61306e07152f82ca19919e6c1055a876c0e8482eeb038b050ec3fbffa882"
+    },
+    "disk_bytes_freed": 10343804928,
+    "bound_executables_preserved": 14,
+    "identity_changes": false
+  }
+}

@@ -1,0 +1,112 @@
+{
+  "baseline_checkout": "/home/zhuhe/code/litchi",
+  "baseline_commit": "893072657ad8b1d726bfce351b5ec2e98f084e94",
+  "baseline_hashes": {
+    "crates/litchi-doc/src/sprm.rs": {
+      "bytes": 19314,
+      "sha256": "f7a5499cbfb7b97a493c551f4fc33c1518c64beaaf47010f07e3644b4b1baaa0"
+    },
+    "crates/litchi-doc/src/tracked_revision/codec.rs": {
+      "bytes": 47526,
+      "sha256": "2f8b3e155c79b682b4374126fa7391c06f769c7f3e4abe0c7e183cc0286aecd7"
+    },
+    "crates/litchi-doc/src/tracked_revision/package.rs": {
+      "bytes": 146828,
+      "sha256": "a04da643b093ec9724c9ac57ed8fbfdf2c2fedfc16eade105c91c32df7c9a446"
+    }
+  },
+  "binaries_copied": false,
+  "build_invoked": false,
+  "candidate_hashes": {
+    "crates/litchi-doc/src/sprm.rs": {
+      "bytes": 32589,
+      "sha256": "5ee520882eb73514881fd7a713d2519a1769d6165d9d5e625de3c406db2c5ac6"
+    },
+    "crates/litchi-doc/src/tracked_revision/codec.rs": {
+      "bytes": 47788,
+      "sha256": "076c8515b7f9b5d072d324a2e5fa30e85f9578a6dc390514846fab7b38e62e69"
+    },
+    "crates/litchi-doc/src/tracked_revision/package.rs": {
+      "bytes": 151238,
+      "sha256": "780134771e4bff0b43f93f6911be6ce1e40cb4ae031a1afee9af66511ebb1d7c"
+    }
+  },
+  "candidate_root": "/home/zhuhe/litchi-performance-0967/source-candidate",
+  "candidate_scope": [
+    "crates/litchi-doc/src/sprm.rs",
+    "crates/litchi-doc/src/tracked_revision/codec.rs",
+    "crates/litchi-doc/src/tracked_revision/package.rs"
+  ],
+  "isolated_application": {
+    "archive_material": "/usr/bin/git show HEAD:<path> for exactly the three candidate paths",
+    "commands": [
+      {
+        "argv": [
+          "/usr/bin/patch",
+          "--dry-run",
+          "--batch",
+          "--forward",
+          "--fuzz=0",
+          "-p1",
+          "--directory",
+          "/tmp/litchi-0967-repro-dd5a5zdz"
+        ],
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "checking file crates/litchi-doc/src/sprm.rs\nchecking file crates/litchi-doc/src/tracked_revision/codec.rs\nchecking file crates/litchi-doc/src/tracked_revision/package.rs\n"
+      },
+      {
+        "argv": [
+          "/usr/bin/patch",
+          "--batch",
+          "--forward",
+          "--fuzz=0",
+          "-p1",
+          "--directory",
+          "/tmp/litchi-0967-repro-dd5a5zdz"
+        ],
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "patching file crates/litchi-doc/src/sprm.rs\npatching file crates/litchi-doc/src/tracked_revision/codec.rs\npatching file crates/litchi-doc/src/tracked_revision/package.rs\n"
+      }
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "dry_run_and_apply": "/usr/bin/patch --dry-run/then apply --batch --forward --fuzz=0 -p1 --directory <temporary-scratch>",
+    "matched_candidate_hashes": {
+      "crates/litchi-doc/src/sprm.rs": {
+        "bytes": 32589,
+        "sha256": "5ee520882eb73514881fd7a713d2519a1769d6165d9d5e625de3c406db2c5ac6"
+      },
+      "crates/litchi-doc/src/tracked_revision/codec.rs": {
+        "bytes": 47788,
+        "sha256": "076c8515b7f9b5d072d324a2e5fa30e85f9578a6dc390514846fab7b38e62e69"
+      },
+      "crates/litchi-doc/src/tracked_revision/package.rs": {
+        "bytes": 151238,
+        "sha256": "780134771e4bff0b43f93f6911be6ce1e40cb4ae031a1afee9af66511ebb1d7c"
+      }
+    },
+    "scratch_removed": true
+  },
+  "main_checkout": {
+    "after_hashes": {
+      "crates/litchi-doc/src/sprm.rs": "f7a5499cbfb7b97a493c551f4fc33c1518c64beaaf47010f07e3644b4b1baaa0",
+      "crates/litchi-doc/src/tracked_revision/codec.rs": "2f8b3e155c79b682b4374126fa7391c06f769c7f3e4abe0c7e183cc0286aecd7",
+      "crates/litchi-doc/src/tracked_revision/package.rs": "a04da643b093ec9724c9ac57ed8fbfdf2c2fedfc16eade105c91c32df7c9a446"
+    },
+    "before_hashes": {
+      "crates/litchi-doc/src/sprm.rs": "f7a5499cbfb7b97a493c551f4fc33c1518c64beaaf47010f07e3644b4b1baaa0",
+      "crates/litchi-doc/src/tracked_revision/codec.rs": "2f8b3e155c79b682b4374126fa7391c06f769c7f3e4abe0c7e183cc0286aecd7",
+      "crates/litchi-doc/src/tracked_revision/package.rs": "a04da643b093ec9724c9ac57ed8fbfdf2c2fedfc16eade105c91c32df7c9a446"
+    },
+    "unchanged": true
+  },
+  "patch": {
+    "bytes": 23017,
+    "path": "/home/zhuhe/litchi-performance-0967/repro/diagnostic-candidate-0967.patch",
+    "sha256": "10feea837f1f95d4f55cb4220d8a2192d91a89107931cbb9e0a716c433403de2"
+  },
+  "schema": "litchi.performance.0967.candidate_reproduction.v1",
+  "status": "passed",
+  "workload_invoked": false
+}

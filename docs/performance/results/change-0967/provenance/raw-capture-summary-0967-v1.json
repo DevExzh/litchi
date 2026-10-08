@@ -1,0 +1,42 @@
+{
+  "schema": "litchi.performance.0967.raw-capture-summary.v1",
+  "status": "external_raw_inventory_bound",
+  "capture_root": "/home/zhuhe/litchi-performance-0967/capture",
+  "inventory": {
+    "external_path": "/home/zhuhe/litchi-performance-0967/analysis/raw-capture-inventory-0967-v1.json",
+    "bytes": 704038,
+    "sha256": "65dc6af75ae993a07890358bf12a1c97b65b365cce9092ad061f972bb9e2f6be",
+    "file_count": 3563,
+    "total_bytes": 610323073,
+    "max_file_bytes": 762426,
+    "all_files_below_1MiB": true
+  },
+  "runner_manifest": {
+    "external_path": "/home/zhuhe/litchi-performance-0967/capture/capture-manifest-v1.json",
+    "repository_copy": "provenance/capture-manifest-v1.json",
+    "bytes": 94434,
+    "sha256": "273b1de3e0ba8fe53d66a48f6d31a054796deccf404ac048223ad9ad5f6396df",
+    "packet_count": 896,
+    "packet_breakdown": {
+      "controls": 128,
+      "aa": 48,
+      "allocator": 144,
+      "native": 576
+    }
+  },
+  "terminal": {
+    "repository_copy": "receipts/capture-terminal-v1.json",
+    "sha256": "d36312a1e6cef839a2ed3c67e7fc9b641fc264ed543a30f309300a6ebbfd55cc",
+    "runner_exit": 0,
+    "exec_session": 66783
+  },
+  "regeneration": {
+    "plan": "/home/zhuhe/litchi-performance-0967/plans/plan-0967-root-authorized-v1.json",
+    "plan_sha256": "a25c84fce102c51c48ea874816a2a7c2efd9803afd8d6b60ec208f566f175588",
+    "runner": "/home/zhuhe/litchi-performance-0967/tools/run_0967_v1.py",
+    "runner_sha256": "8885f36d2e621c26a70a67e7d46823852f8ee32e63727ca199cc512432f816fb",
+    "command": "/usr/bin/python3 /home/zhuhe/litchi-performance-0967/tools/run_0967_v1.py --plan /home/zhuhe/litchi-performance-0967/plans/plan-0967-root-authorized-v1.json --run --lane all --output-root /home/zhuhe/litchi-performance-0967/capture",
+    "note": "Reference only; the sealed non-empty capture root was not rerun or replaced."
+  },
+  "retention": "Raw JSON/stdout/stderr/RSS files and binaries remain external; this repository packet stores descriptors and bounded receipts only."
+}

@@ -1,0 +1,61 @@
+{
+  "schema": "litchi.performance.0967.audit-custody-incident.v1",
+  "status": "v1_superseded_invalid_binding_v2_pending",
+  "created_utc": "2026-10-08T00:09:39.895701Z",
+  "scope": "The same terminal 896-packet capture; no new workload, build, retry, or threshold change.",
+  "incident": {
+    "sealed_v1_audit_expected": {
+      "external_path": "/home/zhuhe/litchi-performance-0967/review/independent-raw-audit-0967-v1.json",
+      "bytes": 190627,
+      "sha256": "dfb37103d82b076e46c680243eca713b251ffa16aeaf2ee06f7084999a1c6402"
+    },
+    "observed_overwritten_v1_artifact": {
+      "external_path": "/home/zhuhe/litchi-performance-0967/review/independent-raw-audit-0967-v1.json",
+      "bytes": 190627,
+      "sha256": "b756855c7e779901be78d1c3574a5445e1a09078ebe25de0ffd410eb16fa3436",
+      "preserved_external_path": "/home/zhuhe/litchi-performance-0967/review/independent-raw-audit-0967-v1-overwritten-b756855c.json",
+      "preserved_packet_path": "review/incident/independent-raw-audit-0967-v1-overwritten-b756855c.json"
+    },
+    "cause_note": "A reviewer helper invocation without a supported CLI overwrote the v1 audit output after the sealed dfb37103 artifact was reported.",
+    "raw_capture_unchanged": true,
+    "no_measurement_rerun": true
+  },
+  "superseded_decision": {
+    "packet_path": "review/independent-decision-0967-v1.json",
+    "external_path": "/home/zhuhe/litchi-performance-0967/review/independent-decision-0967-v1.json",
+    "bytes": 6368,
+    "sha256": "f69d61f74e3943b9fee4411a1898a70aeb410e61702524b4f73c23bc54cb171f",
+    "expected_sha256": "f69d61f74e3943b9fee4411a1898a70aeb410e61702524b4f73c23bc54cb171f",
+    "binding_invalid_because": "its audit_result.sha256 names the unavailable sealed audit dfb37103d82b076e46c680243eca713b251ffa16aeaf2ee06f7084999a1c6402, while the retained v1 audit path now hashes to b756855c7e779901be78d1c3574a5445e1a09078ebe25de0ffd410eb16fa3436",
+    "decision_status": "superseded_invalid_binding"
+  },
+  "required_next_artifact": {
+    "audit": "fresh read-only v2 audit of the same 896 raw packets with unchanged thresholds",
+    "decision": "new decision receipt explicitly bound to the v2 audit hash"
+  },
+  "resolution": {
+    "status": "resolved_by_authoritative_v2",
+    "v2_scope": "same bound plan, manifest, retained packets, binaries, and declared thresholds; no workload or measurement rerun",
+    "v2_audit": {
+      "external_path": "/home/zhuhe/litchi-performance-0967/review/independent-raw-audit-0967-v2.json",
+      "packet_path": "review/independent-raw-audit-0967-v2.json",
+      "bytes": 191295,
+      "sha256": "2712e39c456d7528c4c9347d6f085dd33253bf43d389d265b979ffee606b29ea"
+    },
+    "v2_decision": {
+      "external_path": "/home/zhuhe/litchi-performance-0967/review/independent-decision-0967-v2.json",
+      "packet_path": "review/independent-decision-0967-v2.json",
+      "bytes": 8000,
+      "sha256": "27ab3f1cdad3262a3d374d0dea83a065c2f15909ede165e96bc06518fc2cb1dd",
+      "decision": "reject_candidate"
+    },
+    "v2_helper": {
+      "external_path": "/home/zhuhe/litchi-performance-0967/review/independent_raw_audit_0967_v2.py",
+      "packet_path": "review/independent_raw_audit_0967_v2.py",
+      "bytes": 38281,
+      "sha256": "8215eaded6f6b0b6b45e42bf2fef603f5566c1ad0ec9c3a2b8fbfeca63451f77"
+    },
+    "v1_sealed_bytes_recovered": false,
+    "v1_remains_historical_invalid_binding": true
+  }
+}

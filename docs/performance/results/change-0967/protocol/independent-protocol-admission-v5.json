@@ -1,0 +1,70 @@
+{
+  "binding_receipt": {
+    "bytes": 6310,
+    "expected_sha256": "303cb8aca9072dc25ea08b4d50d08c2207d607625bbb6afde91d1740d475973d",
+    "matches_expected": true,
+    "mode": "0o664",
+    "path": "/home/zhuhe/litchi-performance-0967/receipts/protocol-binding-0967-v3.json",
+    "sha256": "303cb8aca9072dc25ea08b4d50d08c2207d607625bbb6afde91d1740d475973d"
+  },
+  "checks": {
+    "aa_gate_order": "pass; retained functional controls do not launch, then AA, then timed controls, then real lanes",
+    "aa_noise_schema": "pass; seed 967004, resamples 10000, fixed endpoint cells/AB-BA/12 pairs/80 samples",
+    "aa_terminal_artifacts": "pass; failed AA writes readiness JSON + AA manifest with timed_controls_started=false and real_comparisons_started=false; no comparison manifest",
+    "host_state": "pending_root_before_capture; expected residual root-GO prerequisite, not protocol blocker",
+    "negative_binary_custody": "pass; reducer rejects synthetic wrong hash and wrong path",
+    "p99_descriptive_fields": "pass; real native and timed native bind p99_ratio_median/p99_descriptive_flag at median>1.05, report_only=true",
+    "p99_reducer_output": "pass; reducer emits fields for real native and timed native metrics",
+    "plan_sha_binding_sha_tool_hashes": "pass",
+    "reducer_preflight": "pass",
+    "reducer_self_test": "pass",
+    "runner_ast_and_reducer_ast": "pass",
+    "runner_preflight": "pass; status pending_capture_authorization, host unbound as expected",
+    "runner_self_test": "pass; AA pass proceeds and AA fail stops before candidate",
+    "source_binary_harness_descriptor_checks": "pass via bound runner preflight",
+    "synthetic_aa_pass_fail_integration": "pass; pass calls timed=1 real=2; fail calls timed=0 real=0; fail has no capture-manifest"
+  },
+  "decision": "PASS_FOR_ROOT_GO_ONLY",
+  "immutable_tool_bindings": {
+    "reducer": {
+      "bytes": 38333,
+      "declared_sha256": "1e84c2d48a64cb4e4e11a6afd585c84e86e9c53a7349c67c5b2329e4c7a352dc",
+      "matches_plan": true,
+      "mode": "0o775",
+      "path": "/home/zhuhe/litchi-performance-0967/tools/reduce_0967_v1.py",
+      "sha256": "1e84c2d48a64cb4e4e11a6afd585c84e86e9c53a7349c67c5b2329e4c7a352dc"
+    },
+    "runner": {
+      "bytes": 48891,
+      "declared_sha256": "8885f36d2e621c26a70a67e7d46823852f8ee32e63727ca199cc512432f816fb",
+      "matches_plan": true,
+      "mode": "0o775",
+      "path": "/home/zhuhe/litchi-performance-0967/tools/run_0967_v1.py",
+      "sha256": "8885f36d2e621c26a70a67e7d46823852f8ee32e63727ca199cc512432f816fb"
+    }
+  },
+  "plan": {
+    "bytes": 34926,
+    "expected_sha256": "f9989f9ef8b54478b04d30aa90240a87f571e2b7797d810b055626ab43c0776e",
+    "matches_expected": true,
+    "mode": "0o664",
+    "path": "/home/zhuhe/litchi-performance-0967/plans/plan-0967-bound-final-v5.json",
+    "sha256": "f9989f9ef8b54478b04d30aa90240a87f571e2b7797d810b055626ab43c0776e"
+  },
+  "resolved_findings": [
+    "A/A bootstrap seed and resample count are explicit in plan and validated by runner/reducer.",
+    "A/A readiness is evaluated before timed or real candidate invocation; noisy A/A terminal path is tested.",
+    "P99 descriptive report fields are explicit, bound, emitted, and cannot gate or waive qualification."
+  ],
+  "review_scope": "read-only static v5 review plus helper self-tests and synthetic A/A stage test; no native workload, build, capture, or repository edit",
+  "reviewed_at_utc": "2026-10-07T23:56:52.321203+00:00",
+  "reviewer_role": "independent prospective protocol reviewer",
+  "reviewer_statement": "Prospective package admitted for root GO and host binding; no capture authorization is implied by this review.",
+  "root_capture_prerequisites": [
+    "Bind before/after host state and set the final plan status/explicit root GO.",
+    "Recheck final plan and runner hashes after root-only host/GO metadata derivation; do not mutate the sealed tool or source descriptors.",
+    "Keep A/A failure as AA-only terminal outcome with no B/C comparison decision."
+  ],
+  "schema": "litchi.performance.0967.independent_protocol_admission.v3",
+  "status": "pass_prospective_host_go_pending"
+}

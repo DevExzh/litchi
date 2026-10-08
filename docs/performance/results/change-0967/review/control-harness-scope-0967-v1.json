@@ -1,0 +1,409 @@
+{
+  "artifacts": {
+    "harness-perf/SEALED-v1": {
+      "bytes": 168,
+      "path": "/home/zhuhe/litchi-performance-0967/harness-perf/SEALED-v1",
+      "sha256": "969d7898eb847b29aab7999a201d80691f26444282c9ccc9c1615e8c49058819"
+    },
+    "harness-perf/check_quality_smoke_v1.py": {
+      "bytes": 4541,
+      "path": "/home/zhuhe/litchi-performance-0967/harness-perf/check_quality_smoke_v1.py",
+      "sha256": "d3ea7d59b32b65509a8fdbc834950f9c95f7d9af176ec36977c2e6cf64cb7eb1"
+    },
+    "harness-perf/design-v1.md": {
+      "bytes": 4216,
+      "path": "/home/zhuhe/litchi-performance-0967/harness-perf/design-v1.md",
+      "sha256": "f75386a27bedb50de295d6cf37099b1cf6be89c01167baac3c513869ec41b37a"
+    },
+    "harness-perf/quality-smoke-v1.md": {
+      "bytes": 2874,
+      "path": "/home/zhuhe/litchi-performance-0967/harness-perf/quality-smoke-v1.md",
+      "sha256": "ac22e982449aaca70dd6431a83c1f888514a591667c6a5b5e5bb0a5435bf44e5"
+    },
+    "harness-perf/src/alloc_metrics.rs": {
+      "bytes": 4912,
+      "path": "/home/zhuhe/litchi-performance-0967/harness-perf/src/alloc_metrics.rs",
+      "sha256": "048680324eff200dead3b37cabb97582b5f76b6e7ca572b7e2bc2c5bb3a7475d"
+    },
+    "harness-perf/src/bin/alloc.rs": {
+      "bytes": 1824,
+      "path": "/home/zhuhe/litchi-performance-0967/harness-perf/src/bin/alloc.rs",
+      "sha256": "9aa8e131e2810e83de5bff1964b8bdbb0cdd894b6865e26986119c6238c9df08"
+    },
+    "harness-perf/src/lib.rs": {
+      "bytes": 23945,
+      "path": "/home/zhuhe/litchi-performance-0967/harness-perf/src/lib.rs",
+      "sha256": "47e77b319d74ea91fc6952ae9e99c2fd43c735710b7f7e10783b90d192265712"
+    },
+    "harness-perf/src/main.rs": {
+      "bytes": 123,
+      "path": "/home/zhuhe/litchi-performance-0967/harness-perf/src/main.rs",
+      "sha256": "63ac2dc52077466b30ac6ee4abcfbd59a88789d35731fcf5c7f5a96d2dc95978"
+    },
+    "tools/reduce_0967_v1.py": {
+      "bytes": 37785,
+      "path": "/home/zhuhe/litchi-performance-0967/tools/reduce_0967_v1.py",
+      "sha256": "c1320c4389ccc005581c5c088dadcfde33aca82dedaf4a4c21cc4cfbb3343190"
+    },
+    "tools/run_0967_v1.py": {
+      "bytes": 35250,
+      "path": "/home/zhuhe/litchi-performance-0967/tools/run_0967_v1.py",
+      "sha256": "0f9a58d8a8fec39607ba3e6382498fd41e49413e3134b7442b0d0069b735fa7a"
+    }
+  },
+  "candidate_blockers": [],
+  "checks": {
+    "allocator_counter_boundaries": {
+      "details": [
+        "global allocator records successful alloc, alloc_zeroed, dealloc and realloc events before enable and during the enabled lane",
+        "region snapshots cumulative counters at entry/exit and resets peak baseline to entry live bytes",
+        "retained_bytes equals allocated_bytes minus deallocated_bytes in all 10 allocator smoke reports",
+        "allocator lane reports no elapsed samples; allocator_timing_claim is false"
+      ],
+      "smoke_conservation": "pass (10/10 allocator reports)",
+      "status": "pass"
+    },
+    "checker_limitation": {
+      "detail": "check_quality_smoke_v1.py validates each report against its own reference and does not itself compare baseline/candidate reports",
+      "mitigation": "manual 10-pair comparison above plus reduce_0967_v1 require_timed_variant_identity in both native and allocator reduction paths",
+      "status": "accepted_nonblocking_with_formal_reducer_binding"
+    },
+    "edit_revision_check_closure": {
+      "controls_exercising_route": 4,
+      "evidence": [
+        "run_edit_case opens Snapshot, starts public edit, performs every approved replacement, commits and reopens output",
+        "candidate body_text replacement path calls text_revision_intersects, which scans editor.revisions()",
+        "candidate tracked-revision package open path enforces MAX_REVISIONS through editor.revisions()",
+        "changed commit path reopens with Snapshot::open_bounded_with_policy",
+        "all four edit cells use the same replacement/commit route, including false-marker and dense controls"
+      ],
+      "status": "pass"
+    },
+    "formal_reducer_cross_variant_gate": {
+      "adversarial_checks": {
+        "elapsed_only_difference_accepts": true,
+        "output_difference_rejects": true,
+        "pair_set_difference_rejects": true,
+        "semantic_difference_rejects": true
+      },
+      "formal_capture_run": false,
+      "function": "require_timed_variant_identity",
+      "self_test_command": "python3 tools/reduce_0967_v1.py --self-test",
+      "self_test_result": "litchi.performance.0967.reduction.v1/self_test_pass",
+      "status": "pass_static_and_self_test"
+    },
+    "raw_report_shape_and_identity": {
+      "all_pairs_identity_equal": true,
+      "compared_sample_fields": [
+        "index",
+        "output_sha256",
+        "output_bytes",
+        "logical_vec_capacity_bytes",
+        "exact_output_equal_reference",
+        "revision_count",
+        "paragraph_count",
+        "semantic_change_count",
+        "paragraph_zero_sha256",
+        "public_reopen_succeeded",
+        "source_unchanged"
+      ],
+      "compared_top_fields": [
+        "reference_output_sha256",
+        "reference_output_bytes",
+        "reference_logical_vec_capacity_bytes",
+        "reference_revision_count",
+        "reference_paragraph_count",
+        "reference_semantic_change_count"
+      ],
+      "cross_variant_pairs": [
+        {
+          "baseline": {
+            "bytes": 1479,
+            "path": "/home/zhuhe/litchi-performance-0967/harness-perf/quality-smoke-v1/native-baseline-generated-positive-e1.json",
+            "sha256": "872bf39373e4c4a24e00630dfd78694e56728959495705491da62464ea62ece0"
+          },
+          "candidate": {
+            "bytes": 1480,
+            "path": "/home/zhuhe/litchi-performance-0967/harness-perf/quality-smoke-v1/native-candidate-generated-positive-e1.json",
+            "sha256": "ece650843b10d6eeee0b21e647e9055a4c8698302aa0625df40ed6493d8116cc"
+          },
+          "cell": "e1",
+          "control": "generated-positive",
+          "identity_comparison": "pass",
+          "lane": "native"
+        },
+        {
+          "baseline": {
+            "bytes": 1480,
+            "path": "/home/zhuhe/litchi-performance-0967/harness-perf/quality-smoke-v1/native-baseline-dense1024-e32.json",
+            "sha256": "ae04a957c3a629bbffe4564ea14bce9a027c111e6f275e5c06eb697993a1a9a2"
+          },
+          "candidate": {
+            "bytes": 1481,
+            "path": "/home/zhuhe/litchi-performance-0967/harness-perf/quality-smoke-v1/native-candidate-dense1024-e32.json",
+            "sha256": "68dbc73382811a5013e2421e32953b7504df1f89362f87da0801e203b1817035"
+          },
+          "cell": "e32",
+          "control": "dense1024",
+          "identity_comparison": "pass",
+          "lane": "native"
+        },
+        {
+          "baseline": {
+            "bytes": 1467,
+            "path": "/home/zhuhe/litchi-performance-0967/harness-perf/quality-smoke-v1/native-baseline-false-marker-e1.json",
+            "sha256": "f562d0db80ffdf677a13d2bde2cc718b712b1936b7996dafc22e3fbc9d4825ae"
+          },
+          "candidate": {
+            "bytes": 1468,
+            "path": "/home/zhuhe/litchi-performance-0967/harness-perf/quality-smoke-v1/native-candidate-false-marker-e1.json",
+            "sha256": "679e1b0da845a7545d3a8e1a3e68155afbb935f69f44760b7f6af0a68437849a"
+          },
+          "cell": "e1",
+          "control": "false-marker",
+          "identity_comparison": "pass",
+          "lane": "native"
+        },
+        {
+          "baseline": {
+            "bytes": 1472,
+            "path": "/home/zhuhe/litchi-performance-0967/harness-perf/quality-smoke-v1/native-baseline-false-marker-e32.json",
+            "sha256": "05e0d9b387c5a6aef0f968303c3ada03c8b96937313cc88a940ba53dc3902d01"
+          },
+          "candidate": {
+            "bytes": 1473,
+            "path": "/home/zhuhe/litchi-performance-0967/harness-perf/quality-smoke-v1/native-candidate-false-marker-e32.json",
+            "sha256": "5e9d07da9bdaa0f8e237e6b821b033d04a32ae4e5e4f7880ebe1e70db0e9b762"
+          },
+          "cell": "e32",
+          "control": "false-marker",
+          "identity_comparison": "pass",
+          "lane": "native"
+        },
+        {
+          "baseline": {
+            "bytes": 1383,
+            "path": "/home/zhuhe/litchi-performance-0967/harness-perf/quality-smoke-v1/native-baseline-real-positive.json",
+            "sha256": "30df9812fb2e2f0968a412a6719e457bab0c6f05c6aedd7b374973864bd30f80"
+          },
+          "candidate": {
+            "bytes": 1384,
+            "path": "/home/zhuhe/litchi-performance-0967/harness-perf/quality-smoke-v1/native-candidate-real-positive.json",
+            "sha256": "3a37a7a658965cefb78d433425c4164fd72d9cd7a20ded878a49778fae24e6a2"
+          },
+          "cell": "query",
+          "control": "real-positive",
+          "identity_comparison": "pass",
+          "lane": "native"
+        },
+        {
+          "baseline": {
+            "bytes": 1718,
+            "path": "/home/zhuhe/litchi-performance-0967/harness-perf/quality-smoke-v1/allocator-baseline-generated-positive-e1.json",
+            "sha256": "e85a3e65bda02fc09eb71a4533df0459570524ef4bb402ecf82b753afe8bd471"
+          },
+          "candidate": {
+            "bytes": 1719,
+            "path": "/home/zhuhe/litchi-performance-0967/harness-perf/quality-smoke-v1/allocator-candidate-generated-positive-e1.json",
+            "sha256": "79be89be6cba60cb8da9b22c2778957ea9fa6fb41306604eeb6f8a58cf7fc22e"
+          },
+          "cell": "e1",
+          "control": "generated-positive",
+          "identity_comparison": "pass",
+          "lane": "allocator"
+        },
+        {
+          "baseline": {
+            "bytes": 1735,
+            "path": "/home/zhuhe/litchi-performance-0967/harness-perf/quality-smoke-v1/allocator-baseline-dense1024-e32.json",
+            "sha256": "628b9a0e39612f5060def496872b719f3587bff39270aa1d0eed3c7771118a8f"
+          },
+          "candidate": {
+            "bytes": 1736,
+            "path": "/home/zhuhe/litchi-performance-0967/harness-perf/quality-smoke-v1/allocator-candidate-dense1024-e32.json",
+            "sha256": "65f934ec2b462ba3e5d0c88d110db83210cd9eca3fb155783315db1cef16cbd0"
+          },
+          "cell": "e32",
+          "control": "dense1024",
+          "identity_comparison": "pass",
+          "lane": "allocator"
+        },
+        {
+          "baseline": {
+            "bytes": 1706,
+            "path": "/home/zhuhe/litchi-performance-0967/harness-perf/quality-smoke-v1/allocator-baseline-false-marker-e1.json",
+            "sha256": "06d2986250b6f221b4378e40fb1a0e6b4a13a209c7c75c92e0b234e4e4dfc1b4"
+          },
+          "candidate": {
+            "bytes": 1707,
+            "path": "/home/zhuhe/litchi-performance-0967/harness-perf/quality-smoke-v1/allocator-candidate-false-marker-e1.json",
+            "sha256": "348f4407c9fff46b956fdef2cb47862f22d4a7976121a1c3a40b89711418ff30"
+          },
+          "cell": "e1",
+          "control": "false-marker",
+          "identity_comparison": "pass",
+          "lane": "allocator"
+        },
+        {
+          "baseline": {
+            "bytes": 1719,
+            "path": "/home/zhuhe/litchi-performance-0967/harness-perf/quality-smoke-v1/allocator-baseline-false-marker-e32.json",
+            "sha256": "c38634b8699c0e5dde34e5d17d63a7381d76185f49a841dd9f362d83adb797b8"
+          },
+          "candidate": {
+            "bytes": 1720,
+            "path": "/home/zhuhe/litchi-performance-0967/harness-perf/quality-smoke-v1/allocator-candidate-false-marker-e32.json",
+            "sha256": "dd12c072daaa843c00131b96407ff2c0ff6919dcc6e1c12941e6d4c0700f16d0"
+          },
+          "cell": "e32",
+          "control": "false-marker",
+          "identity_comparison": "pass",
+          "lane": "allocator"
+        },
+        {
+          "baseline": {
+            "bytes": 1626,
+            "path": "/home/zhuhe/litchi-performance-0967/harness-perf/quality-smoke-v1/allocator-baseline-real-positive.json",
+            "sha256": "acc75e7bf80df59e0fbe0eab5dee5778735db63dfe334a85faa1152a49028d08"
+          },
+          "candidate": {
+            "bytes": 1627,
+            "path": "/home/zhuhe/litchi-performance-0967/harness-perf/quality-smoke-v1/allocator-candidate-real-positive.json",
+            "sha256": "da3c90578afa160ef4d9f212f5b8e5cd0559154997d2108a50ca3c0a3d47fb6f"
+          },
+          "cell": "query",
+          "control": "real-positive",
+          "identity_comparison": "pass",
+          "lane": "allocator"
+        }
+      ],
+      "input_identity": "pass (4/4 fixed input files; bytes and SHA-256 match design)",
+      "report_shape": "pass (20/20)",
+      "status": "pass"
+    },
+    "same_operation_region": {
+      "native_and_allocator_share_wrapper": true,
+      "operation": "public Snapshot::open_bounded, one Edit with paragraph-0 replacements, commit and output Vec copy for edit cells; bounded snapshot/revision+paragraph query, output copy and public Package reopen for query control",
+      "status": "pass"
+    },
+    "smoke_checker": {
+      "command": "python3 harness-perf/check_quality_smoke_v1.py harness-perf/quality-smoke-v1",
+      "result": "quality smoke check passed: 20 reports",
+      "status": "pass"
+    },
+    "timer_and_measured_wrapper": {
+      "evidence": [
+        "src/lib.rs:profiled_measured_case is the sole #[inline(never)] operation wrapper",
+        "src/lib.rs:measure_one places Instant::now only around profiled_measured_case in native lane",
+        "src/lib.rs:measure_one places the same profiled_measured_case closure inside alloc_metrics::region in allocator lane"
+      ],
+      "outside_region": [
+        "fixture file read and input hash/identity check",
+        "reference-route preparation",
+        "correctness/reopen/paragraph/revision readers",
+        "per-sample output hashing",
+        "JSON serialization/reporting"
+      ],
+      "post_timer_black_box": true,
+      "status": "pass"
+    },
+    "timing_claim_semantics": {
+      "allocator_timing_claim": false,
+      "claim_scope": "native elapsed_ns identifies the local wrapper measurement only; no host-normalized or cross-variant timing claim is made by this smoke receipt",
+      "native_timing_claim": true,
+      "status": "pass",
+      "unsupported_cpu_savings_claim": false
+    },
+    "unsafe_surface": {
+      "allowed_sites": "src/bin/alloc.rs counting GlobalAlloc delegation to std::alloc::System",
+      "other_harness_unsafe_sites": 0,
+      "status": "pass"
+    }
+  },
+  "formal_capture": false,
+  "plan_binding": {
+    "required_before_formal_go": "refresh immutable plan/build manifest to bind the sealed design and source hashes; this receipt does not authorize formal capture",
+    "semantic_blocker": false,
+    "stale_references": [
+      {
+        "observed_sha256": "f75386a27bedb50de295d6cf37099b1cf6be89c01167baac3c513869ec41b37a",
+        "path": "harness-perf/design-v1.md",
+        "plan_sha256": "450eabab6cf59322ab47c589e7c36b6e44853b97a66dbd2385336d567bf485f4"
+      },
+      {
+        "observed_sha256": "47e77b319d74ea91fc6952ae9e99c2fd43c735710b7f7e10783b90d192265712",
+        "path": "harness-perf/src/lib.rs",
+        "plan_sha256": "a829ce7a277c025253bf3162c8322bce41cacbfe3e92f7fd379d39f6bf77a890"
+      }
+    ],
+    "status": "pending_refresh"
+  },
+  "production_source_edits_by_reviewer": false,
+  "repository_mutated_by_reviewer": false,
+  "review_date": "2026-10-07",
+  "review_id": "control-harness-scope-0967-v1",
+  "reviewer": "/root/doc_census_review",
+  "schema": "litchi.performance.0967.control_harness_review.v1",
+  "scope": {
+    "allocator_defaults": {
+      "samples": 1,
+      "timing_claim": false,
+      "warmup": 0
+    },
+    "native_defaults": {
+      "samples": 80,
+      "timing_claim": true,
+      "warmup": 5
+    },
+    "query_control": {
+      "control": "real-positive",
+      "quality_smoke_only": true,
+      "scope": "query",
+      "timed": false
+    },
+    "smoke_shape": {
+      "expected_reports": 20,
+      "reports": 20,
+      "samples": 1,
+      "warmup": 0
+    },
+    "timed_edit_cells": [
+      {
+        "control": "generated-positive",
+        "edits": 1,
+        "id": "generated-positive-e1-default",
+        "retention": "default",
+        "scope": "edit"
+      },
+      {
+        "control": "dense1024",
+        "edits": 32,
+        "id": "dense1024-e32-default",
+        "retention": "default",
+        "scope": "edit"
+      },
+      {
+        "control": "false-marker",
+        "edits": 1,
+        "id": "false-marker-e1-default",
+        "retention": "default",
+        "scope": "edit"
+      },
+      {
+        "control": "false-marker",
+        "edits": 32,
+        "id": "false-marker-e32-default",
+        "retention": "default",
+        "scope": "edit"
+      }
+    ]
+  },
+  "sealed_source": {
+    "formal_capture_marker": false,
+    "marker": "/home/zhuhe/litchi-performance-0967/harness-perf/SEALED-v1",
+    "schema": "litchi.performance.0967.control_profile.v1",
+    "source_sha256": "47e77b319d74ea91fc6952ae9e99c2fd43c735710b7f7e10783b90d192265712"
+  },
+  "status": "scope_pass_with_formal_binding_pending",
+  "workloads_run_by_reviewer": false
+}

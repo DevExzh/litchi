@@ -1,0 +1,134 @@
+{
+  "schema": "litchi.performance.0967.scenario-audit.v1",
+  "status": "pass",
+  "source_root": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline",
+  "real_fixtures": [
+    {
+      "id": "docnohf",
+      "path": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline/test-data/ole/doc/NoHeadFoot.doc",
+      "relative_path": "test-data/ole/doc/NoHeadFoot.doc",
+      "bytes": 26112,
+      "sha256": "45e5df073f34314da6f39d2dad119fb2ef23470878fd2df67f632864cd92ea48"
+    },
+    {
+      "id": "docfloat",
+      "path": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline/test-data/ole/doc/FloatingPictures.doc",
+      "relative_path": "test-data/ole/doc/FloatingPictures.doc",
+      "bytes": 335360,
+      "sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d"
+    }
+  ],
+  "census": {
+    "path": "/home/zhuhe/litchi-performance-0967/harness-control/receipts/census-baseline.json",
+    "checks": {
+      "docnohf": {
+        "revision_count": 0,
+        "paragraph_zero_unmarked": true,
+        "error": null
+      },
+      "docfloat": {
+        "revision_count": 0,
+        "paragraph_zero_unmarked": true,
+        "error": null
+      },
+      "real-bookmark-delete-redline-query": {
+        "revision_count": 20,
+        "paragraph_zero_unmarked": false,
+        "error": null
+      }
+    }
+  },
+  "required_controls": {
+    "generated-positive": "lifecycle_revision_positive",
+    "generated-dense-1024": "lifecycle_dense_marker",
+    "generated-false": "lifecycle_false_marker",
+    "real-bookmark-delete-redline-query": "query_reopen_refusal"
+  },
+  "controls": {
+    "generated-positive": [
+      {
+        "id": "generated-positive",
+        "path": "/home/zhuhe/litchi-performance-0967/harness-control/receipts/generated-baseline-final.json",
+        "variant": "baseline",
+        "mode": "run",
+        "revision_count": 2,
+        "lifecycle": "lifecycle_revision_positive",
+        "status": "pass"
+      },
+      {
+        "id": "generated-positive",
+        "path": "/home/zhuhe/litchi-performance-0967/harness-control/receipts/generated-candidate-controls.json",
+        "variant": "candidate",
+        "mode": "run",
+        "revision_count": 2,
+        "lifecycle": "lifecycle_revision_positive",
+        "status": "pass"
+      }
+    ],
+    "generated-dense-1024": [
+      {
+        "id": "generated-dense-1024",
+        "path": "/home/zhuhe/litchi-performance-0967/harness-control/receipts/dense-1024-baseline-release.json",
+        "variant": "baseline",
+        "mode": "run",
+        "revision_count": 1024,
+        "lifecycle": "lifecycle_dense_marker",
+        "status": "pass"
+      },
+      {
+        "id": "generated-dense-1024",
+        "path": "/home/zhuhe/litchi-performance-0967/harness-control/receipts/dense-1024-candidate-release.json",
+        "variant": "candidate",
+        "mode": "run",
+        "revision_count": 1024,
+        "lifecycle": "lifecycle_dense_marker",
+        "status": "pass"
+      }
+    ],
+    "generated-false": [
+      {
+        "id": "generated-false",
+        "path": "/home/zhuhe/litchi-performance-0967/harness-control/receipts/false-marker-baseline-release.json",
+        "variant": "baseline",
+        "mode": "run",
+        "revision_count": 1,
+        "lifecycle": "lifecycle_false_marker",
+        "status": "pass"
+      },
+      {
+        "id": "generated-false",
+        "path": "/home/zhuhe/litchi-performance-0967/harness-control/receipts/false-marker-candidate-release.json",
+        "variant": "candidate",
+        "mode": "run",
+        "revision_count": 1,
+        "lifecycle": "lifecycle_false_marker",
+        "status": "pass"
+      }
+    ],
+    "real-bookmark-delete-redline-query": [
+      {
+        "id": "real-bookmark-delete-redline-query",
+        "path": "/home/zhuhe/litchi-performance-0967/harness-control/receipts/query-baseline-real-final.json",
+        "variant": "baseline",
+        "mode": "query",
+        "revision_count": 20,
+        "lifecycle": "query_reopen_refusal",
+        "status": "pass"
+      },
+      {
+        "id": "real-bookmark-delete-redline-query",
+        "path": "/home/zhuhe/litchi-performance-0967/harness-control/receipts/query-candidate-real-controls.json",
+        "variant": "candidate",
+        "mode": "query",
+        "revision_count": 20,
+        "lifecycle": "query_reopen_refusal",
+        "status": "pass"
+      }
+    ]
+  },
+  "missing_controls": [],
+  "incomplete_controls": [],
+  "timing_claim": false,
+  "build_started": false,
+  "workload_started": false
+}

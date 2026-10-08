@@ -1,0 +1,361 @@
+{
+  "schema": "litchi.performance.0967.quality-coder.v1",
+  "status": "passed_with_retained_baseline_failure",
+  "created_utc": "2026-10-07T23:20:03.325809+00:00",
+  "source_root": "/home/zhuhe/litchi-performance-0967/source-candidate",
+  "target_dir": "/home/zhuhe/litchi-performance-0967/target-quality",
+  "source_commit": "893072657ad8b1d726bfce351b5ec2e98f084e94",
+  "source_export": {
+    "method": "git archive HEAD plus byte-identical ignored Cargo.lock copied from the main checkout",
+    "source_head_file": {
+      "path": "/home/zhuhe/litchi-performance-0967/source-head.txt",
+      "bytes": 41,
+      "sha256": "5bbd8803dce35a202eb210d3f98cc92948228ab38016ed618f080f0969984322"
+    },
+    "design_file": {
+      "path": "/home/zhuhe/litchi-performance-0967/design-v1.md",
+      "bytes": 16568,
+      "sha256": "f133dfddae66bf682410e58fe71fe7aa83de15437738b23ebb77cd37d3bb3e7e"
+    },
+    "candidate_isolated_git_worktree": false,
+    "note": "The candidate is an external source export, so it has no .git directory and no commit was created."
+  },
+  "source_hashes": [
+    {
+      "path": "crates/litchi-doc/src/sprm.rs",
+      "bytes": 32589,
+      "sha256": "5ee520882eb73514881fd7a713d2519a1769d6165d9d5e625de3c406db2c5ac6",
+      "baseline_sha256": "f7a5499cbfb7b97a493c551f4fc33c1518c64beaaf47010f07e3644b4b1baaa0"
+    },
+    {
+      "path": "crates/litchi-doc/src/tracked_revision/codec.rs",
+      "bytes": 47788,
+      "sha256": "076c8515b7f9b5d072d324a2e5fa30e85f9578a6dc390514846fab7b38e62e69",
+      "baseline_sha256": "2f8b3e155c79b682b4374126fa7391c06f769c7f3e4abe0c7e183cc0286aecd7"
+    },
+    {
+      "path": "crates/litchi-doc/src/tracked_revision/package.rs",
+      "bytes": 151238,
+      "sha256": "780134771e4bff0b43f93f6911be6ce1e40cb4ae031a1afee9af66511ebb1d7c",
+      "baseline_sha256": "a04da643b093ec9724c9ac57ed8fbfdf2c2fedfc16eade105c91c32df7c9a446"
+    }
+  ],
+  "input_hashes": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0967/source-candidate/Cargo.lock",
+      "bytes": 138443,
+      "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/Cargo.lock",
+      "bytes": 138443,
+      "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+    }
+  ],
+  "candidate_scope": {
+    "production_files": [
+      "crates/litchi-doc/src/sprm.rs",
+      "crates/litchi-doc/src/tracked_revision/codec.rs",
+      "crates/litchi-doc/src/tracked_revision/package.rs"
+    ],
+    "test_only additions": [
+      "crates/litchi-doc/src/sprm.rs::frozen_original_reference",
+      "crates/litchi-doc/src/tracked_revision/package.rs::revision_scan_tests"
+    ],
+    "mechanism": "A single private borrowed SPRM grammar visitor backs the existing owned parser and a complete no-trigger scan. RevisionEditor::revisions scans all CHPX/PAPX bodies to completion; only potential-marker groups take the existing strict owned parse and metadata logic.",
+    "preserved": [
+      "complete malformed-input validation and first-error order",
+      "owned strict fallback and all metadata/revision semantics",
+      "PAPX style-index handling, MAX_REVISIONS, raw grpprl authority, and public APIs",
+      "no unsafe, no cache, no early-stop validation, no workload instrumentation"
+    ],
+    "candidate_anchors": {
+      "borrowed_visitor": "crates/litchi-doc/src/sprm.rs:221",
+      "complete_trigger_scan": "crates/litchi-doc/src/sprm.rs:366",
+      "codec_error_mapping": "crates/litchi-doc/src/tracked_revision/codec.rs:358",
+      "CHPX_PAPX_gates": "crates/litchi-doc/src/tracked_revision/package.rs:2356",
+      "frozen_oracle": "crates/litchi-doc/src/sprm.rs:612",
+      "revision_controls": "crates/litchi-doc/src/tracked_revision/package.rs:3684"
+    }
+  },
+  "commands": [
+    {
+      "name": "frozen-parser-differential",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-doc",
+        "--lib",
+        "frozen_original_reference",
+        "--all-features",
+        "--locked",
+        "--offline",
+        "-j2",
+        "--no-fail-fast"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0967/source-candidate",
+      "target_dir": "/home/zhuhe/litchi-performance-0967/target-quality",
+      "exit_status": 0,
+      "status": "passed",
+      "log": {
+        "path": "/home/zhuhe/litchi-performance-0967/receipts/frozen-parser-final.log",
+        "bytes": 645,
+        "sha256": "a45bf17a28c87746fc216794487a00e5e90ca218fe062d6ef55b502cac0ef596"
+      },
+      "test_counts": {
+        "result_lines": 1,
+        "passed": 3,
+        "failed": 0,
+        "ignored": 0,
+        "filtered_out": 1145
+      },
+      "note": "Independent test-only frozen copy of the pre-refactor Rust parser; includes all 65,536 opcodes with valid records, strict prefixes, and one-byte tails, plus variable-length and C615/D608 boundaries. The scan result and owned capacity are compared to the frozen parser."
+    },
+    {
+      "name": "revision-scan-semantic-and-error-controls",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-doc",
+        "--lib",
+        "revision_scan_tests",
+        "--all-features",
+        "--locked",
+        "--offline",
+        "-j2",
+        "--no-fail-fast"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0967/source-candidate",
+      "target_dir": "/home/zhuhe/litchi-performance-0967/target-quality",
+      "exit_status": 0,
+      "status": "passed",
+      "log": {
+        "path": "/home/zhuhe/litchi-performance-0967/receipts/revision-scan-final.log",
+        "bytes": 788,
+        "sha256": "cf467abd73d8fdddd0a6400049fc77c551efec2d5c267c4c69976426dad1945d"
+      },
+      "test_counts": {
+        "result_lines": 1,
+        "passed": 4,
+        "failed": 0,
+        "ignored": 0,
+        "filtered_out": 1144
+      },
+      "note": "Positive metadata, duplicate-marker last-record semantics, late malformed suffix, and non-marker late-error controls."
+    },
+    {
+      "name": "full-litchi-doc-library-all-features",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-doc",
+        "--lib",
+        "--all-features",
+        "--locked",
+        "--offline",
+        "-j2",
+        "--no-fail-fast"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0967/source-candidate",
+      "target_dir": "/home/zhuhe/litchi-performance-0967/target-quality",
+      "exit_status": 0,
+      "status": "passed",
+      "log": {
+        "path": "/home/zhuhe/litchi-performance-0967/receipts/full-litchi-doc-lib-all-features-final.log",
+        "bytes": 94581,
+        "sha256": "0a08862bffa49e82bd083052483ef3afa2a2a5cd47c8b87d556f4311aeaa567d"
+      },
+      "test_counts": {
+        "result_lines": 1,
+        "passed": 1146,
+        "failed": 0,
+        "ignored": 2,
+        "filtered_out": 0
+      }
+    },
+    {
+      "name": "litchi-doc-check-lib-all-features",
+      "argv": [
+        "cargo",
+        "check",
+        "-p",
+        "litchi-doc",
+        "--lib",
+        "--all-features",
+        "--locked",
+        "--offline",
+        "-j2"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0967/source-candidate",
+      "target_dir": "/home/zhuhe/litchi-performance-0967/target-quality",
+      "exit_status": 0,
+      "status": "passed",
+      "log": {
+        "path": "/home/zhuhe/litchi-performance-0967/receipts/check-lib-all-features-final.log",
+        "bytes": 176,
+        "sha256": "208703b764288f9aa7941a79f1948c4f6a6402e42c36250b1eecd35f4f9c089c"
+      },
+      "test_counts": null
+    },
+    {
+      "name": "litchi-doc-check-all-targets-all-features",
+      "argv": [
+        "cargo",
+        "check",
+        "-p",
+        "litchi-doc",
+        "--all-targets",
+        "--all-features",
+        "--locked",
+        "--offline",
+        "-j2"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0967/source-candidate",
+      "target_dir": "/home/zhuhe/litchi-performance-0967/target-quality",
+      "exit_status": 0,
+      "status": "passed",
+      "log": {
+        "path": "/home/zhuhe/litchi-performance-0967/receipts/check-all-targets.log",
+        "bytes": 176,
+        "sha256": "67d278e83768f7219aea9f7685885ec66a61b471b1e4e19e18f4450f6f969f41"
+      },
+      "test_counts": null
+    },
+    {
+      "name": "litchi-doc-clippy-all-targets-all-features",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "litchi-doc",
+        "--all-targets",
+        "--all-features",
+        "--no-deps",
+        "--locked",
+        "--offline",
+        "-j2",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0967/source-candidate",
+      "target_dir": "/home/zhuhe/litchi-performance-0967/target-quality",
+      "exit_status": 0,
+      "status": "passed",
+      "log": {
+        "path": "/home/zhuhe/litchi-performance-0967/receipts/clippy-all-targets-final.log",
+        "bytes": 176,
+        "sha256": "cffca0a3d024910282ec32286df48a4bb3d7790f9a7882f1d7392b3605486211"
+      },
+      "test_counts": null
+    },
+    {
+      "name": "scoped-rustfmt-check",
+      "argv": [
+        "rustfmt",
+        "--edition",
+        "2024",
+        "--check",
+        "crates/litchi-doc/src/sprm.rs",
+        "crates/litchi-doc/src/tracked_revision/codec.rs",
+        "crates/litchi-doc/src/tracked_revision/package.rs"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0967/source-candidate",
+      "target_dir": "/home/zhuhe/litchi-performance-0967/target-quality",
+      "exit_status": 0,
+      "status": "passed",
+      "log": {
+        "path": "/home/zhuhe/litchi-performance-0967/receipts/scoped-rustfmt-check-final.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "test_counts": null,
+      "note": "Scoped to the three candidate source files; empty output."
+    },
+    {
+      "name": "litchi-doc-rustdoc-all-features",
+      "argv": [
+        "cargo",
+        "doc",
+        "-p",
+        "litchi-doc",
+        "--no-deps",
+        "--all-features",
+        "--locked",
+        "--offline",
+        "-j2"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0967/source-candidate",
+      "target_dir": "/home/zhuhe/litchi-performance-0967/target-quality",
+      "exit_status": 101,
+      "status": "failed",
+      "log": {
+        "path": "/home/zhuhe/litchi-performance-0967/receipts/rustdoc-all-features.log",
+        "bytes": 1716,
+        "sha256": "4f89ba97daa612c16665aceab0114c2a3e91363fb581ec59dd75c94d2c82ae03"
+      },
+      "test_counts": null,
+      "failure": "Existing public-doc links to private Self::parse_recording in parts/bookmarks.rs, parts/comments.rs, parts/rsids.rs, and parts/sections/codec.rs; no candidate file is involved.",
+      "environment": {
+        "RUSTDOCFLAGS": "-D warnings"
+      }
+    }
+  ],
+  "failed_attempts_retained": [
+    {
+      "name": "initial-locked-focused-test-before-Cargo-lock-copy",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-doc",
+        "--lib",
+        "frozen_original",
+        "--locked",
+        "--offline",
+        "-j2",
+        "--no-fail-fast"
+      ],
+      "cwd": "/home/zhuhe/litchi-performance-0967/source-candidate",
+      "target_dir": "/home/zhuhe/litchi-performance-0967/target-quality",
+      "exit_status": 101,
+      "status": "failed",
+      "log": null,
+      "failure": "The git archive export did not contain ignored Cargo.lock; --locked refused to create it. A byte-identical copy from the main checkout was added to the external candidate before the quality runs."
+    },
+    {
+      "name": "litchi-doc-rustdoc-all-features",
+      "exit_status": 101,
+      "log": {
+        "path": "/home/zhuhe/litchi-performance-0967/receipts/rustdoc-all-features.log",
+        "bytes": 1716,
+        "sha256": "4f89ba97daa612c16665aceab0114c2a3e91363fb581ec59dd75c94d2c82ae03"
+      },
+      "failure": "Unrelated pre-existing rustdoc::private-intra-doc-links errors for Self::parse_recording in four existing parts modules; candidate source is not among the diagnostics."
+    }
+  ],
+  "unlogged_development_attempts": "Earlier test-only matrix compile attempts exposed and were corrected for ordinary Rust type/import issues; no failed quality log was retained for those transient source states and they are not reported as passing gates.",
+  "performance": {
+    "build_launched": false,
+    "workload_launched": false,
+    "formal_capture": false,
+    "reason": "This is a semantic/quality candidate only; no performance protocol was authorized."
+  },
+  "main_checkout": {
+    "source_files_modified_by_coder": false,
+    "observed_status": [
+      " M tools/check_iwork_leaf_public_api.py",
+      "?? crates/litchi/examples/bench_word_parse.rs",
+      "?? docs/UNIFIED_OPS_API_DESIGN.md"
+    ],
+    "candidate_source_paths_clean_in_main": true
+  },
+  "notes": [
+    "All quality commands used CARGO_TARGET_DIR outside the repository, locked offline resolution, and -j2.",
+    "The full all-features library result is 1146 passed, 0 failed, 2 ignored; focused frozen and revision suites are included separately for auditability.",
+    "The retained rustdoc failure is a baseline documentation issue and was not fixed in this candidate."
+  ]
+}

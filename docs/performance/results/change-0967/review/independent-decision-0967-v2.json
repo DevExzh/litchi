@@ -1,0 +1,217 @@
+{
+  "audit_helper_v2": {
+    "bytes": 38281,
+    "path": "/home/zhuhe/litchi-performance-0967/review/independent_raw_audit_0967_v2.py",
+    "sha256": "8215eaded6f6b0b6b45e42bf2fef603f5566c1ad0ec9c3a2b8fbfeca63451f77"
+  },
+  "audit_result_v2": {
+    "bytes": 191295,
+    "path": "/home/zhuhe/litchi-performance-0967/review/independent-raw-audit-0967-v2.json",
+    "sha256": "2712e39c456d7528c4c9347d6f085dd33253bf43d389d265b979ffee606b29ea"
+  },
+  "candidate_adoption": false,
+  "capture_manifest": {
+    "bytes": 94434,
+    "path": "/home/zhuhe/litchi-performance-0967/capture/capture-manifest-v1.json",
+    "sha256": "273b1de3e0ba8fe53d66a48f6d31a054796deccf404ac048223ad9ad5f6396df"
+  },
+  "capture_terminal": {
+    "bytes": 985,
+    "path": "/home/zhuhe/litchi-performance-0967/receipts/capture-terminal-v1.json",
+    "sha256": "d36312a1e6cef839a2ed3c67e7fc9b641fc264ed543a30f309300a6ebbfd55cc"
+  },
+  "classification_note": "Independent v2 confirms complete evidence with failed declared performance/control gates, so the fixed cohort is reject_candidate. The staged reducer output remains retained and unchanged; its pending_incomplete/no_decision classification is not used as the authoritative performance decision.",
+  "created_utc": "2026-10-08T00:09:42.766951+00:00",
+  "decision": "reject_candidate",
+  "evidence_completeness": {
+    "aa_readiness": true,
+    "all_terminal_reports_and_oracles_valid": true,
+    "binary_files_match_bound_hashes": true,
+    "binary_hashes_checked_postcapture": true,
+    "custody_and_schema_complete": true,
+    "no_retries": true,
+    "packet_count": 896
+  },
+  "host_after": {
+    "bytes": 7883,
+    "path": "/home/zhuhe/litchi-performance-0967/receipts/host-after-capture-v1.json",
+    "sha256": "9ab36f9fef5284249ea6604d94c3dfe23300c4109cbe0e11d8aeb399900b0221"
+  },
+  "no_adoption_note": "The candidate is not adopted. This v2 receipt does not alter thresholds, raw packets, root reduction, or the overwritten v1 artifact.",
+  "overwrite_incident": {
+    "cause": "independent_raw_audit_0967_v1.py --help invoked after sealing; v1 hardcoded its output path and rewrote it",
+    "observed_overwritten_v1_sha256": "b756855c7e779901be78d1c3574a5445e1a09078ebe25de0ffd410eb16fa3436",
+    "sealed_v1_recovered": false,
+    "sealed_v1_sha256": "dfb37103d82b076e46c680243eca713b251ffa16aeaf2ee06f7084999a1c6402",
+    "superseded_path": "/home/zhuhe/litchi-performance-0967/review/independent-raw-audit-0967-v1.json",
+    "type": "sealed_audit_output_overwritten",
+    "v2_scope": "same bound plan, manifest, retained packets, binaries, and declared thresholds; no workload or measurement rerun"
+  },
+  "overwritten_v1_observed": {
+    "bytes": 190627,
+    "path": "/home/zhuhe/litchi-performance-0967/review/independent-raw-audit-0967-v1.json",
+    "sha256": "b756855c7e779901be78d1c3574a5445e1a09078ebe25de0ffd410eb16fa3436"
+  },
+  "performance_gates": {
+    "aa_readiness": true,
+    "allocation_benefit": true,
+    "allocation_calls_guard": true,
+    "allocator_memory": false,
+    "custody_and_schema_complete": true,
+    "native_benefit": false,
+    "native_noninferiority": false,
+    "timed_allocator_guard": false,
+    "timed_controls": false,
+    "timed_native_noninferiority": true
+  },
+  "plan": {
+    "bytes": 35505,
+    "path": "/home/zhuhe/litchi-performance-0967/plans/plan-0967-root-authorized-v1.json",
+    "sha256": "a25c84fce102c51c48ea874816a2a7c2efd9803afd8d6b60ec208f566f175588"
+  },
+  "prior_decision_v1_unchanged": {
+    "bytes": 6368,
+    "path": "/home/zhuhe/litchi-performance-0967/review/independent-decision-0967-v1.json",
+    "sha256": "f69d61f74e3943b9fee4411a1898a70aeb410e61702524b4f73c23bc54cb171f"
+  },
+  "production_recommendation": "none",
+  "schema": "litchi.performance.0967.independent_decision.v2",
+  "scope": "independent read-only v2 audit of retained raw packets; no workload/build/source/repository mutation or measurement rerun",
+  "semantic_comparison_to_observed_v1": {
+    "all_equal": true,
+    "keys_compared": [
+      "status",
+      "decision",
+      "plan",
+      "manifest",
+      "terminal",
+      "custody",
+      "aa_readiness",
+      "timed_controls",
+      "native",
+      "allocator",
+      "gates",
+      "performance",
+      "warnings",
+      "interpretation"
+    ],
+    "per_key": {
+      "aa_readiness": true,
+      "allocator": true,
+      "custody": true,
+      "decision": true,
+      "gates": true,
+      "interpretation": true,
+      "manifest": true,
+      "native": true,
+      "performance": true,
+      "plan": true,
+      "status": true,
+      "terminal": true,
+      "timed_controls": true,
+      "warnings": true
+    },
+    "qualification": "The observed v1 is the overwritten post-incident file, not the sealed dfb37103... bytes; equality establishes same current facts, not recovery of sealed bytes."
+  },
+  "status": "independent_audit_complete_with_overwrite_incident",
+  "witnesses": {
+    "allocation_benefit": {
+      "float_e32_default_median": 0.8092407713266777,
+      "nohf_e32_default_median": 0.946488645920942
+    },
+    "real_allocator_memory_failures": [
+      {
+        "allocated_max_ratio": 0.9437150609069557,
+        "cell_id": "docfloat/e2/default",
+        "peak_live_max_ratio": 1.0,
+        "rss_max_ratio": 1.0690498014054384
+      },
+      {
+        "allocated_max_ratio": 0.9579091144997586,
+        "cell_id": "docfloat/e32/release",
+        "peak_live_max_ratio": 1.0,
+        "rss_max_ratio": 1.050566236502502
+      },
+      {
+        "allocated_max_ratio": 0.9448955315387706,
+        "cell_id": "docfloat/e8/release",
+        "peak_live_max_ratio": 1.0,
+        "rss_max_ratio": 1.0813153961136024
+      }
+    ],
+    "real_native_failed_cells": [
+      {
+        "cell_id": "docfloat/e1/zero",
+        "p50_median": 0.9592840699533438,
+        "p50_upper": 1.124476943582993,
+        "p95_median": 0.9364415591291232,
+        "p95_upper": 1.0508735160880422
+      },
+      {
+        "cell_id": "docfloat/e1/default",
+        "p50_median": 1.0789090477464396,
+        "p50_upper": 1.1186925745496166,
+        "p95_median": 1.0479622331205731,
+        "p95_upper": 1.119583236850386
+      },
+      {
+        "cell_id": "docfloat/e1/release",
+        "p50_median": 0.9717309142161525,
+        "p50_upper": 1.0427631028680147,
+        "p95_median": 0.9887343625007614,
+        "p95_upper": 1.1016696830644357
+      },
+      {
+        "cell_id": "docfloat/e2/zero",
+        "p50_median": 1.037832838959305,
+        "p50_upper": 1.1630940113400752,
+        "p95_median": 1.0847695652626939,
+        "p95_upper": 1.1446906688733378
+      },
+      {
+        "cell_id": "docfloat/e2/default",
+        "p50_median": 0.9558951895891268,
+        "p50_upper": 1.0946267943809282,
+        "p95_median": 0.9865199708856207,
+        "p95_upper": 1.088374453193493
+      },
+      {
+        "cell_id": "docfloat/e2/release",
+        "p50_median": 1.0006406281963598,
+        "p50_upper": 1.0664308019989888,
+        "p95_median": 0.9847558068075428,
+        "p95_upper": 1.0459181178873957
+      },
+      {
+        "cell_id": "docfloat/e8/zero",
+        "p50_median": 0.9795100779319281,
+        "p50_upper": 1.009646063610243,
+        "p95_median": 0.9461910908523593,
+        "p95_upper": 1.0515932700134143
+      },
+      {
+        "cell_id": "docfloat/e8/default",
+        "p50_median": 1.0003594851962891,
+        "p50_upper": 1.0956442229534002,
+        "p95_median": 1.0080124215641173,
+        "p95_upper": 1.1375353494400524
+      },
+      {
+        "cell_id": "docfloat/e8/release",
+        "p50_median": 1.0186772038704848,
+        "p50_upper": 1.0840429441440738,
+        "p95_median": 0.9560237385364718,
+        "p95_upper": 1.1681353028935237
+      }
+    ],
+    "timed_allocator_failures": [
+      {
+        "allocated_max_ratio": 0.9989066008872048,
+        "allocation_calls_median": 0.9975635791472873,
+        "cell_id": "dense1024-e32-default",
+        "peak_live_max_ratio": 1.0,
+        "rss_max_ratio": 1.0757430488974113
+      }
+    ]
+  }
+}

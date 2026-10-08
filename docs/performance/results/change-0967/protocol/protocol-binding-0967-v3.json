@@ -1,0 +1,149 @@
+{
+  "schema": "litchi.performance.0967.protocol_binding.v3",
+  "status": "sealed_for_staging_review",
+  "created_utc": "2026-10-07T23:55:37.311799+00:00",
+  "source_revision": "893072657ad8b1d726bfce351b5ec2e98f084e94",
+  "plan": {
+    "path": "/home/zhuhe/litchi-performance-0967/plans/plan-0967-bound-final-v5.json",
+    "sha256": "f9989f9ef8b54478b04d30aa90240a87f571e2b7797d810b055626ab43c0776e",
+    "status": "pending_capture_authorization"
+  },
+  "source_manifests": {
+    "baseline": {
+      "path": "/home/zhuhe/litchi-performance-0967/receipts/source-baseline-manifest-v2.json",
+      "sha256": "369d1f1774d3bf4919ab2fb7cb3fb4c6a3392882dde67fb30fcc9bdb2abccc99",
+      "status": "immutable_staging_export"
+    },
+    "candidate": {
+      "path": "/home/zhuhe/litchi-performance-0967/receipts/source-candidate-manifest-v2.json",
+      "sha256": "bf39e1c367d079114990133ea9735a7c5149d6c93bf2768f912ad55d3575fb0c",
+      "status": "sealed_for_matched_build"
+    }
+  },
+  "timed_control_build": {
+    "path": "/home/zhuhe/litchi-performance-0967/receipts/control-build-0967-v2.json",
+    "sha256": "7aee6b9ddfa1efa68446fbfc09da856b82a9d2028ddabd760b06fba609eeb701",
+    "status": "matched_ordinary_native_and_allocator_control_builds_passed"
+  },
+  "timed_control_scope_review": {
+    "path": "/home/zhuhe/litchi-performance-0967/review/control-harness-scope-0967-v1.json",
+    "sha256": "141e58bbe04e11606452ec51dc516a096260bc102fa8014f5c919d6ea4b6b9bf",
+    "status": "scope_pass_with_formal_binding_pending"
+  },
+  "binary_bindings": {
+    "native_baseline": {
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb",
+      "kind": "ordinary_uninstrumented"
+    },
+    "native_candidate": {
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-candidate-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "sha256": "bc066474e45b95cadc2eb7680fb3236545392e37520bd21666e1cebdfd1d66e2",
+      "kind": "ordinary_uninstrumented"
+    },
+    "allocator_baseline": {
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile_alloc",
+      "sha256": "a520ec154bed62ce26d885f203e2565e756ce618a046b77521db484788c4ccd9",
+      "kind": "counting_allocator"
+    },
+    "allocator_candidate": {
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-candidate-cfb/release/doc_retention_probe_0942_cfb_profile_alloc",
+      "sha256": "0f833a3eb7dd9d87ebb8424922f780d6a6863ce09e0b36e2b6b68207ab651593",
+      "kind": "counting_allocator"
+    },
+    "control_baseline": {
+      "path": "/home/zhuhe/litchi-performance-0967/harness-control/target-baseline/release/doc_revision_positive_control_0967",
+      "sha256": "2227105e81dc43f8e128904818c846955e5d8d1e477611679ebb1246ca3cbe0d",
+      "kind": "correctness_control"
+    },
+    "control_candidate": {
+      "path": "/home/zhuhe/litchi-performance-0967/harness-control/target-candidate/release/doc_revision_positive_control_0967",
+      "sha256": "fed4f00380289030558e56ccd08bdd5a7d524c9a2f648e375cec12b9baa93709",
+      "kind": "correctness_control"
+    },
+    "timed_control_native_baseline": {
+      "path": "/home/zhuhe/litchi-performance-0967/builds/control-target-baseline-revision-v1/release/doc_revision_control_profile_0967",
+      "sha256": "e94cb13674a5068d91929b7d61cb588a97187fc98dd4713c8e75f0b3dc0c8290",
+      "kind": "control_profile_native"
+    },
+    "timed_control_native_candidate": {
+      "path": "/home/zhuhe/litchi-performance-0967/builds/control-target-candidate-revision-v1/release/doc_revision_control_profile_0967",
+      "sha256": "d45bf5ceea957669235368794e6b544ccd44585be255b128a2a0216224c52eee",
+      "kind": "control_profile_native"
+    },
+    "timed_control_allocator_baseline": {
+      "path": "/home/zhuhe/litchi-performance-0967/builds/control-target-baseline-revision-v1/release/doc_revision_control_profile_0967_alloc",
+      "sha256": "fb1f3833c04928c2024610b603cdc8fd7f7775cef5b464c8e3a6d7ee8f4be758",
+      "kind": "control_profile_allocator"
+    },
+    "timed_control_allocator_candidate": {
+      "path": "/home/zhuhe/litchi-performance-0967/builds/control-target-candidate-revision-v1/release/doc_revision_control_profile_0967_alloc",
+      "sha256": "87367bd03fa8d2d947c9835a9569e09bc31ea5e2bb3fc8789ad5a7e4c98f1636",
+      "kind": "control_profile_allocator"
+    }
+  },
+  "timed_scope": {
+    "schema": "litchi.performance.0967.control_profile.v1",
+    "cells": [
+      {
+        "id": "generated-positive-e1-default",
+        "control": "generated-positive",
+        "scope": "edit",
+        "edits": 1,
+        "retention": "default"
+      },
+      {
+        "id": "dense1024-e32-default",
+        "control": "dense1024",
+        "scope": "edit",
+        "edits": 32,
+        "retention": "default"
+      },
+      {
+        "id": "false-marker-e1-default",
+        "control": "false-marker",
+        "scope": "edit",
+        "edits": 1,
+        "retention": "default"
+      },
+      {
+        "id": "false-marker-e32-default",
+        "control": "false-marker",
+        "scope": "edit",
+        "edits": 32,
+        "retention": "default"
+      }
+    ],
+    "native_timing_claim": true,
+    "allocator_timing_claim": false,
+    "p99_descriptive": {
+      "ratio_median_field": "p99_ratio_median",
+      "flag_field": "p99_descriptive_flag",
+      "flag_if_median_gt": 1.05,
+      "report_only": true
+    }
+  },
+  "real_native_p99_descriptive": {
+    "ratio_median_field": "p99_ratio_median",
+    "flag_field": "p99_descriptive_flag",
+    "flag_if_median_gt": 1.05,
+    "report_only": true
+  },
+  "aa_readiness": {
+    "bootstrap_seed": 967004,
+    "bootstrap_resamples": 10000,
+    "upper_ci_limit": 1.05,
+    "stage": "before timed or real comparisons"
+  },
+  "verification": {
+    "runner_preflight": "pass",
+    "runner_aa_integration": "pass",
+    "reducer_plan_check": "pass",
+    "reducer_self_test": "pass",
+    "p99_policy": "p99_ratio_median and p99_descriptive_flag are report-only; they do not gate qualification or waive p50/p95 failures"
+  },
+  "capture_authorized": false,
+  "host_state_bound": false,
+  "workload_started": false,
+  "no_retry_policy": true
+}

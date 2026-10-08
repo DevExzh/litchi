@@ -1,0 +1,21 @@
+{
+  "schema": "litchi.performance.0967.root-go.v1",
+  "created_utc": "2026-10-07T23:57:18.111681+00:00",
+  "authorized": true,
+  "plan": {
+    "path": "/home/zhuhe/litchi-performance-0967/plans/plan-0967-root-authorized-v1.json",
+    "bytes": 35505,
+    "sha256": "a25c84fce102c51c48ea874816a2a7c2efd9803afd8d6b60ec208f566f175588"
+  },
+  "independent_admission": {
+    "path": "/home/zhuhe/litchi-performance-0967/review/independent-protocol-admission-v5.json",
+    "bytes": 4133,
+    "sha256": "d391b3501409988d4ab5cb734c7f9570f6fa4bc4ad16dfb807a3fd5643b2f81c"
+  },
+  "host_before": {
+    "path": "/home/zhuhe/litchi-performance-0967/receipts/host-before-capture-v1.json",
+    "bytes": 7972,
+    "sha256": "b14828c91b6648d638111c6f12b7b24ce98587a61d5c59d84a82a357ca2351c9"
+  },
+  "scope": "one fixed capture; no retry or replacement; A/A failure stops before timed candidate comparison"
+}

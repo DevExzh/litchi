@@ -1,5 +1,33 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0967 — DOC vector-free SPRM candidate rejected
+
+[0967](0967-doc-sprm-vector-reject.md) records the bounded borrowed-SPRM
+candidate and its completed v5 matched capture. Independent v2 custody covers
+896/896 terminal packets, all semantic oracles, schedules, binary bindings,
+and both AA readiness cells. The fixed cohort is rejected by the declared
+gates: nine `FloatingPictures` cells (`e1`, `e2`, and `e8`, all retention
+modes) have a native p50 or p95 bootstrap upper limit above `1.05`, and four
+allocator RSS guards exceed `1.05` (three real cells and dense-1024 control
+pair 3 at `17,952/16,688 = 1.075743`). These are hard failures; no RSS-noise
+waiver is applied. Endpoint allocation-call ratios of `0.809241` for
+`FloatingPictures/e32/default` and `0.946489` for `NoHeadFoot/e32/default`
+are descriptive signals only. The timed controls are generated-positive `e1`,
+`dense1024` `e32`, and false-marker `e1`/`e32`. The candidate is not adopted,
+production is unchanged, and no global speedup or slowdown is claimed. The
+v2 raw audit
+[`review/independent-raw-audit-0967-v2.json`](results/change-0967/review/independent-raw-audit-0967-v2.json)
+has SHA-256
+`2712e39c456d7528c4c9347d6f085dd33253bf43d389d265b979ffee606b29ea`; its
+decision receipt
+[`review/independent-decision-0967-v2.json`](results/change-0967/review/independent-decision-0967-v2.json)
+has SHA-256
+`27ab3f1cdad3262a3d374d0dea83a065c2f15909ede165e96bc06518fc2cb1dd`.
+The [custody incident receipt](results/change-0967/review/audit-custody-incident-0967-v1.json)
+records that the sealed v1 derived audit was overwritten and is unavailable
+byte-for-byte; v2 re-audited the unchanged capture without a measurement
+rerun.
+
 ## 0966 — DOC SPRM census completes; short non-empty inputs dominate
 
 [0966](0966-doc-sprm-census.md) completes the bounded current-source DOC SPRM

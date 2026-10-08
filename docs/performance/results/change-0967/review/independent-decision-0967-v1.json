@@ -1,0 +1,172 @@
+{
+  "audit_helper": {
+    "bytes": 36835,
+    "path": "/home/zhuhe/litchi-performance-0967/review/independent_raw_audit_0967_v1.py",
+    "sha256": "6ae5f3b9773577b952a5436fc822ea0fe89a3f1544c9e746669e5049fea2982a"
+  },
+  "audit_result": {
+    "bytes": 190627,
+    "path": "/home/zhuhe/litchi-performance-0967/review/independent-raw-audit-0967-v1.json",
+    "sha256": "dfb37103d82b076e46c680243eca713b251ffa16aeaf2ee06f7084999a1c6402"
+  },
+  "candidate_adoption": false,
+  "capture_manifest": {
+    "bytes": 94434,
+    "path": "/home/zhuhe/litchi-performance-0967/capture/capture-manifest-v1.json",
+    "sha256": "273b1de3e0ba8fe53d66a48f6d31a054796deccf404ac048223ad9ad5f6396df"
+  },
+  "capture_terminal": {
+    "bytes": 985,
+    "path": "/home/zhuhe/litchi-performance-0967/receipts/capture-terminal-v1.json",
+    "sha256": "d36312a1e6cef839a2ed3c67e7fc9b641fc264ed543a30f309300a6ebbfd55cc"
+  },
+  "classification_note": "The staged reducer output is retained unchanged and says pending_incomplete/no_decision solely because it treated the timed allocator guard failure as an incompleteness reason. Independent custody is complete; under the declared performance gates, failed noninferiority/memory/control gates classify this fixed cohort as reject_candidate.",
+  "created_utc": "2026-10-08T00:06:42.678404+00:00",
+  "decision": "reject_candidate",
+  "evidence_completeness": {
+    "aa_readiness": true,
+    "all_terminal_reports_and_oracles_valid": true,
+    "binary_files_match_bound_hashes": true,
+    "binary_hashes_checked_postcapture": true,
+    "custody_and_schema_complete": true,
+    "no_retries": true,
+    "packet_count": 896
+  },
+  "host_after": {
+    "bytes": 7883,
+    "path": "/home/zhuhe/litchi-performance-0967/receipts/host-after-capture-v1.json",
+    "sha256": "9ab36f9fef5284249ea6604d94c3dfe23300c4109cbe0e11d8aeb399900b0221"
+  },
+  "no_adoption_note": "The candidate is not adopted. This decision does not alter thresholds, raw packets, or the staged reduction output.",
+  "performance_gates": {
+    "aa_readiness": true,
+    "allocation_benefit": true,
+    "allocation_calls_guard": true,
+    "allocator_memory": false,
+    "custody_and_schema_complete": true,
+    "native_benefit": false,
+    "native_noninferiority": false,
+    "timed_allocator_guard": false,
+    "timed_controls": false,
+    "timed_native_noninferiority": true
+  },
+  "plan": {
+    "bytes": 35505,
+    "path": "/home/zhuhe/litchi-performance-0967/plans/plan-0967-root-authorized-v1.json",
+    "sha256": "a25c84fce102c51c48ea874816a2a7c2efd9803afd8d6b60ec208f566f175588"
+  },
+  "production_recommendation": "none",
+  "root_reducer_output": {
+    "bytes": 176748,
+    "path": "/home/zhuhe/litchi-performance-0967/analysis/reduction-v1.json",
+    "sha256": "f6a77df77fa34b4e811a6281c49341825c660faca4106794224c8ecb5fd044ed"
+  },
+  "root_selection_output": {
+    "bytes": 396,
+    "path": "/home/zhuhe/litchi-performance-0967/analysis/selection-v1.json",
+    "sha256": "800c1959c276032080d32f654b91e884040049e019f425529bce9d9254573c8e"
+  },
+  "schema": "litchi.performance.0967.independent_decision.v1",
+  "scope": "independent read-only audit of retained raw packets; no workload/build/source/repository mutation by reviewer",
+  "status": "independent_audit_complete",
+  "witnesses": {
+    "allocation_benefit": {
+      "float_e32_default_median": 0.8092407713266777,
+      "nohf_e32_default_median": 0.946488645920942
+    },
+    "real_allocator_memory_failures": [
+      {
+        "allocated_max_ratio": 0.9437150609069557,
+        "cell_id": "docfloat/e2/default",
+        "peak_live_max_ratio": 1.0,
+        "rss_max_ratio": 1.0690498014054384
+      },
+      {
+        "allocated_max_ratio": 0.9579091144997586,
+        "cell_id": "docfloat/e32/release",
+        "peak_live_max_ratio": 1.0,
+        "rss_max_ratio": 1.050566236502502
+      },
+      {
+        "allocated_max_ratio": 0.9448955315387706,
+        "cell_id": "docfloat/e8/release",
+        "peak_live_max_ratio": 1.0,
+        "rss_max_ratio": 1.0813153961136024
+      }
+    ],
+    "real_native_failed_cells": [
+      {
+        "cell_id": "docfloat/e1/zero",
+        "p50_median": 0.9592840699533438,
+        "p50_upper": 1.124476943582993,
+        "p95_median": 0.9364415591291232,
+        "p95_upper": 1.0508735160880422
+      },
+      {
+        "cell_id": "docfloat/e1/default",
+        "p50_median": 1.0789090477464396,
+        "p50_upper": 1.1186925745496166,
+        "p95_median": 1.0479622331205731,
+        "p95_upper": 1.119583236850386
+      },
+      {
+        "cell_id": "docfloat/e1/release",
+        "p50_median": 0.9717309142161525,
+        "p50_upper": 1.0427631028680147,
+        "p95_median": 0.9887343625007614,
+        "p95_upper": 1.1016696830644357
+      },
+      {
+        "cell_id": "docfloat/e2/zero",
+        "p50_median": 1.037832838959305,
+        "p50_upper": 1.1630940113400752,
+        "p95_median": 1.0847695652626939,
+        "p95_upper": 1.1446906688733378
+      },
+      {
+        "cell_id": "docfloat/e2/default",
+        "p50_median": 0.9558951895891268,
+        "p50_upper": 1.0946267943809282,
+        "p95_median": 0.9865199708856207,
+        "p95_upper": 1.088374453193493
+      },
+      {
+        "cell_id": "docfloat/e2/release",
+        "p50_median": 1.0006406281963598,
+        "p50_upper": 1.0664308019989888,
+        "p95_median": 0.9847558068075428,
+        "p95_upper": 1.0459181178873957
+      },
+      {
+        "cell_id": "docfloat/e8/zero",
+        "p50_median": 0.9795100779319281,
+        "p50_upper": 1.009646063610243,
+        "p95_median": 0.9461910908523593,
+        "p95_upper": 1.0515932700134143
+      },
+      {
+        "cell_id": "docfloat/e8/default",
+        "p50_median": 1.0003594851962891,
+        "p50_upper": 1.0956442229534002,
+        "p95_median": 1.0080124215641173,
+        "p95_upper": 1.1375353494400524
+      },
+      {
+        "cell_id": "docfloat/e8/release",
+        "p50_median": 1.0186772038704848,
+        "p50_upper": 1.0840429441440738,
+        "p95_median": 0.9560237385364718,
+        "p95_upper": 1.1681353028935237
+      }
+    ],
+    "timed_allocator_failures": [
+      {
+        "allocated_max_ratio": 0.9989066008872048,
+        "allocation_calls_median": 0.9975635791472873,
+        "cell_id": "dense1024-e32-default",
+        "peak_live_max_ratio": 1.0,
+        "rss_max_ratio": 1.0757430488974113
+      }
+    ]
+  }
+}

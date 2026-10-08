@@ -1,0 +1,10 @@
+{
+  "schema": "litchi.performance.0967.selection.v1",
+  "status": "no_decision",
+  "reduction": "/home/zhuhe/litchi-performance-0967/analysis/reduction-v1.json",
+  "decision_rule": "qualification requires every fixed gate and either allocation or native benefit branch; incomplete evidence is no decision",
+  "reasons": [
+    "timed control allocator guard failed"
+  ],
+  "timing_claim": false
+}

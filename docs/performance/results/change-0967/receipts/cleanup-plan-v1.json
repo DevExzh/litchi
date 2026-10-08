@@ -1,0 +1,327 @@
+{
+  "schema": "litchi.performance.0967.cleanup-plan.v1",
+  "status": "plan_only_no_deletions",
+  "recorded_utc": "2026-10-08T00:09:47Z",
+  "authorization": {
+    "root_go_required_before_mutation": true,
+    "capture_state": "Capture completed rc=0; coordinator reported candidate rejection with production unchanged; raw audit remains pending.",
+    "build_or_workload_started_by_this_plan": false,
+    "no_deletions_performed": true
+  },
+  "binding": {
+    "final_plan": "/home/zhuhe/litchi-performance-0967/plans/plan-0967-root-authorized-v1.json",
+    "final_plan_sha256": "a25c84fce102c51c48ea874816a2a7c2efd9803afd8d6b60ec208f566f175588",
+    "source_revision": "893072657ad8b1d726bfce351b5ec2e98f084e94",
+    "source_baseline_manifest": {
+      "path": "/home/zhuhe/litchi-performance-0967/receipts/source-baseline-manifest-v2.json",
+      "sha256": "369d1f1774d3bf4919ab2fb7cb3fb4c6a3392882dde67fb30fcc9bdb2abccc99",
+      "file_count": 10694,
+      "files_sha256": "75e84ea561e11dc0070610ca54396a6f8a77696222cbb6248b22fb2e91273610"
+    },
+    "source_candidate_manifest": {
+      "path": "/home/zhuhe/litchi-performance-0967/receipts/source-candidate-manifest-v2.json",
+      "sha256": "bf39e1c367d079114990133ea9735a7c5149d6c93bf2768f912ad55d3575fb0c",
+      "status": "sealed_for_matched_build"
+    }
+  },
+  "preflight": {
+    "process_check": {
+      "command": "Python 3 /proc scan for exact cargo/rustc/perf/heaptrack/criterion/hyperfine names, 0967 runner/reducer/audit/binder helpers, and all bound executable names; exclude this process and ancestors.",
+      "matched_processes": 0,
+      "matches": []
+    },
+    "open_file_check": "Defer lsof checks until immediately before a later root GO and mutation.",
+    "source_key_hash_checks": {
+      "checked_files": 28,
+      "mismatches": 0,
+      "source_head": {
+        "path": "/home/zhuhe/litchi-performance-0967/source-head.txt",
+        "bytes": 41,
+        "sha256": "5bbd8803dce35a202eb210d3f98cc92948228ab38016ed618f080f0969984322"
+      }
+    },
+    "preserve_roots": [
+      "/home/zhuhe/litchi-performance-0967/source-candidate",
+      "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline",
+      "/home/zhuhe/litchi-performance-0967/harness-control/source-active",
+      "/home/zhuhe/litchi-performance-0967/harness-perf",
+      "/home/zhuhe/litchi-performance-0967/tools",
+      "/home/zhuhe/litchi-performance-0967/capture",
+      "/home/zhuhe/litchi-performance-0967/analysis",
+      "/home/zhuhe/litchi-performance-0967/repro",
+      "/home/zhuhe/litchi-performance-0967/review",
+      "/home/zhuhe/litchi-performance-0967/receipts"
+    ],
+    "tools_pycache": {
+      "path": "/home/zhuhe/litchi-performance-0967/tools/__pycache__",
+      "disk_bytes": 270336,
+      "apparent_bytes": 250673,
+      "files": 8,
+      "action": "preserve until the final Python call; cleanup is deferred to the later GO receipt"
+    }
+  },
+  "bound_executables": {
+    "final_plan_descriptors": [
+      {
+        "label": "native_baseline",
+        "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+        "bytes": 47909224,
+        "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb",
+        "mode": "0775",
+        "inode": 9349713,
+        "hard_links_before": 2
+      },
+      {
+        "label": "native_candidate",
+        "path": "/home/zhuhe/litchi-performance-0967/builds/target-candidate-cfb/release/doc_retention_probe_0942_cfb_profile",
+        "bytes": 55142144,
+        "sha256": "bc066474e45b95cadc2eb7680fb3236545392e37520bd21666e1cebdfd1d66e2",
+        "mode": "0775",
+        "inode": 9351004,
+        "hard_links_before": 2
+      },
+      {
+        "label": "allocator_baseline",
+        "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile_alloc",
+        "bytes": 47912992,
+        "sha256": "a520ec154bed62ce26d885f203e2565e756ce618a046b77521db484788c4ccd9",
+        "mode": "0775",
+        "inode": 9349714,
+        "hard_links_before": 2
+      },
+      {
+        "label": "allocator_candidate",
+        "path": "/home/zhuhe/litchi-performance-0967/builds/target-candidate-cfb/release/doc_retention_probe_0942_cfb_profile_alloc",
+        "bytes": 55145912,
+        "sha256": "0f833a3eb7dd9d87ebb8424922f780d6a6863ce09e0b36e2b6b68207ab651593",
+        "mode": "0775",
+        "inode": 9351005,
+        "hard_links_before": 2
+      },
+      {
+        "label": "control_baseline",
+        "path": "/home/zhuhe/litchi-performance-0967/harness-control/target-baseline/release/doc_revision_positive_control_0967",
+        "bytes": 5000304,
+        "sha256": "2227105e81dc43f8e128904818c846955e5d8d1e477611679ebb1246ca3cbe0d",
+        "mode": "0775",
+        "inode": 9347405,
+        "hard_links_before": 2
+      },
+      {
+        "label": "control_candidate",
+        "path": "/home/zhuhe/litchi-performance-0967/harness-control/target-candidate/release/doc_revision_positive_control_0967",
+        "bytes": 5002424,
+        "sha256": "fed4f00380289030558e56ccd08bdd5a7d524c9a2f648e375cec12b9baa93709",
+        "mode": "0775",
+        "inode": 9347408,
+        "hard_links_before": 2
+      },
+      {
+        "label": "timed_control_native_baseline",
+        "path": "/home/zhuhe/litchi-performance-0967/builds/control-target-baseline-revision-v1/release/doc_revision_control_profile_0967",
+        "bytes": 45856184,
+        "sha256": "e94cb13674a5068d91929b7d61cb588a97187fc98dd4713c8e75f0b3dc0c8290",
+        "mode": "0775",
+        "inode": 9537510,
+        "hard_links_before": 2
+      },
+      {
+        "label": "timed_control_native_candidate",
+        "path": "/home/zhuhe/litchi-performance-0967/builds/control-target-candidate-revision-v1/release/doc_revision_control_profile_0967",
+        "bytes": 45854952,
+        "sha256": "d45bf5ceea957669235368794e6b544ccd44585be255b128a2a0216224c52eee",
+        "mode": "0775",
+        "inode": 9538800,
+        "hard_links_before": 2
+      },
+      {
+        "label": "timed_control_allocator_baseline",
+        "path": "/home/zhuhe/litchi-performance-0967/builds/control-target-baseline-revision-v1/release/doc_revision_control_profile_0967_alloc",
+        "bytes": 45859848,
+        "sha256": "fb1f3833c04928c2024610b603cdc8fd7f7775cef5b464c8e3a6d7ee8f4be758",
+        "mode": "0775",
+        "inode": 9537511,
+        "hard_links_before": 2
+      },
+      {
+        "label": "timed_control_allocator_candidate",
+        "path": "/home/zhuhe/litchi-performance-0967/builds/control-target-candidate-revision-v1/release/doc_revision_control_profile_0967_alloc",
+        "bytes": 45858680,
+        "sha256": "87367bd03fa8d2d947c9835a9569e09bc31ea5e2bb3fc8789ad5a7e4c98f1636",
+        "mode": "0775",
+        "inode": 9538801,
+        "hard_links_before": 2
+      }
+    ],
+    "prior_cited_harness_binaries": [
+      {
+        "label": "prior_timed_native_baseline",
+        "path": "/home/zhuhe/litchi-performance-0967/harness-perf/target-baseline/release/doc_revision_control_profile_0967",
+        "bytes": 53204240,
+        "sha256": "f98e74774fa9eee63ab18b97b19eb52bc1a1d0b833fe7fa207b852a52ef5d43d",
+        "mode": "0775",
+        "inode": 9354154,
+        "hard_links_before": 2,
+        "binding_receipt": "/home/zhuhe/litchi-performance-0967/receipts/control-profile-build-0967-v1.json"
+      },
+      {
+        "label": "prior_timed_allocator_baseline",
+        "path": "/home/zhuhe/litchi-performance-0967/harness-perf/target-baseline/release/doc_revision_control_profile_0967_alloc",
+        "bytes": 53207904,
+        "sha256": "20f4a7e0562ce4bfcdf1097f6ad88a1d4d69ed614cae3dffea8404108cffc6e9",
+        "mode": "0775",
+        "inode": 9354155,
+        "hard_links_before": 2,
+        "binding_receipt": "/home/zhuhe/litchi-performance-0967/receipts/control-profile-build-0967-v1.json"
+      },
+      {
+        "label": "prior_timed_native_candidate",
+        "path": "/home/zhuhe/litchi-performance-0967/harness-perf/target-candidate/release/doc_revision_control_profile_0967",
+        "bytes": 53190312,
+        "sha256": "c3376ef3f62096270fbd8f8fe68647477f62ddf4c0f9f597e6e88ae536194f7b",
+        "mode": "0775",
+        "inode": 9353014,
+        "hard_links_before": 2,
+        "binding_receipt": "/home/zhuhe/litchi-performance-0967/receipts/control-profile-build-0967-v1.json"
+      },
+      {
+        "label": "prior_timed_allocator_candidate",
+        "path": "/home/zhuhe/litchi-performance-0967/harness-perf/target-candidate/release/doc_revision_control_profile_0967_alloc",
+        "bytes": 53194056,
+        "sha256": "e673b9d28be2c88e3b4b25c7a54ebf69677421e0b2807ef68d7c2d281444df94",
+        "mode": "0775",
+        "inode": 9354162,
+        "hard_links_before": 2,
+        "binding_receipt": "/home/zhuhe/litchi-performance-0967/receipts/control-profile-build-0967-v1.json"
+      }
+    ],
+    "retention_rule": "Keep each listed direct release executable at its exact path; remove its release/deps hardlink copy only with the surrounding cache, leaving the bound path, bytes, mode, and SHA unchanged."
+  },
+  "cache_inventory_and_later_action": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0967/target-quality",
+      "disk_bytes": 3970338816,
+      "apparent_bytes": 4229518705,
+      "files": 6269,
+      "directories": 761,
+      "elf_executables": 47,
+      "later_action": "Remove the cache after QA logs are retained; no plan-bound executable resides here."
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0967/harness-control/probe/target",
+      "disk_bytes": 1403650048,
+      "apparent_bytes": 1602803242,
+      "files": 3443,
+      "directories": 342,
+      "elf_executables": 49,
+      "later_action": "Remove the unbound debug probe cache; preserve harness-control/probe source and control receipts."
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0967/harness-control/target-baseline",
+      "disk_bytes": 573255680,
+      "apparent_bytes": 670055323,
+      "files": 2028,
+      "directories": 442,
+      "elf_executables": 96,
+      "later_action": "Retain only the bound direct release control_baseline executable and its parent directories."
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0967/harness-control/target-candidate",
+      "disk_bytes": 315715584,
+      "apparent_bytes": 327524509,
+      "files": 1065,
+      "directories": 221,
+      "elf_executables": 49,
+      "later_action": "Retain only the bound direct release control_candidate executable and its parent directories."
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0967/harness-perf/target",
+      "disk_bytes": 862195712,
+      "apparent_bytes": 1116604589,
+      "files": 1699,
+      "directories": 326,
+      "elf_executables": 51,
+      "later_action": "Remove the unbound debug target cache; preserve harness-perf source and logs."
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0967/harness-perf/target-baseline",
+      "disk_bytes": 643141632,
+      "apparent_bytes": 839373911,
+      "files": 1083,
+      "directories": 223,
+      "elf_executables": 51,
+      "later_action": "Retain only the two cited prior direct release timed binaries."
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0967/harness-perf/target-candidate",
+      "disk_bytes": 642904064,
+      "apparent_bytes": 839104665,
+      "files": 1083,
+      "directories": 223,
+      "elf_executables": 51,
+      "later_action": "Retain only the two cited prior direct release timed binaries."
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb",
+      "disk_bytes": 637194240,
+      "apparent_bytes": 817599067,
+      "files": 1081,
+      "directories": 223,
+      "elf_executables": 51,
+      "later_action": "Retain only the two final ordinary baseline executables."
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-candidate-cfb",
+      "disk_bytes": 651345920,
+      "apparent_bytes": 846202768,
+      "files": 1081,
+      "directories": 223,
+      "elf_executables": 51,
+      "later_action": "Retain only the two final ordinary candidate executables."
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0967/builds/control-target-baseline-revision-v1",
+      "disk_bytes": 628240384,
+      "apparent_bytes": 804515104,
+      "files": 1081,
+      "directories": 223,
+      "elf_executables": 51,
+      "later_action": "Retain only the two final timed-control baseline executables."
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0967/builds/control-target-candidate-revision-v1",
+      "disk_bytes": 627941376,
+      "apparent_bytes": 804239026,
+      "files": 1081,
+      "directories": 223,
+      "elf_executables": 51,
+      "later_action": "Retain only the two final timed-control candidate executables."
+    }
+  ],
+  "estimated_later_reclaim": {
+    "basis": "Current du allocation and apparent sizes, retaining 14 direct release binaries plus target root/release directories; recompute after final preflight.",
+    "cache_disk_bytes_before": 10955923456,
+    "expected_disk_bytes_freed": 10343501824,
+    "expected_apparent_bytes_freed": 12285201733,
+    "expected_retained_cache_disk_bytes": 612421632,
+    "expected_retained_cache_apparent_bytes": 670721723
+  },
+  "retained_receipts_and_logs": [
+    "/home/zhuhe/litchi-performance-0967/receipts/quality-0967-coder-v1.json",
+    "/home/zhuhe/litchi-performance-0967/review/semantic-review-0967-v1.json",
+    "/home/zhuhe/litchi-performance-0967/repro/reproduction-0967-v1.json",
+    "/home/zhuhe/litchi-performance-0967/receipts/build-0967-cfb-v1.json",
+    "/home/zhuhe/litchi-performance-0967/receipts/control-profile-build-0967-v1.json",
+    "/home/zhuhe/litchi-performance-0967/receipts/control-build-0967-v2.json",
+    "/home/zhuhe/litchi-performance-0967/capture",
+    "/home/zhuhe/litchi-performance-0967/analysis",
+    "/home/zhuhe/litchi-performance-0967/repro",
+    "/home/zhuhe/litchi-performance-0967/tools"
+  ],
+  "future_cleanup_commands": [
+    "Re-run exact process scan and lsof on every listed cache immediately after root GO.",
+    "Hash and stat all 14 retained executable paths before mutation; delete only unlisted target entries and the four retained caches' deps hardlinks; hash/stat retained paths after mutation.",
+    "After the final Python call, remove only /home/zhuhe/litchi-performance-0967/tools/__pycache__ and record actual allocated/apparent bytes freed.",
+    "Do not delete source-candidate/docs evidence, capture/raw packets, receipts, logs, repro, harness source, or any main checkout path."
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "schema": "litchi.performance.0967.root-terminal.v1",
+  "runner_exit": 0,
+  "exec_session": 66783,
+  "created_utc": "2026-10-08T00:04:14.460316+00:00",
+  "host_after": {
+    "path": "/home/zhuhe/litchi-performance-0967/receipts/host-after-capture-v1.json",
+    "bytes": 7883,
+    "sha256": "9ab36f9fef5284249ea6604d94c3dfe23300c4109cbe0e11d8aeb399900b0221"
+  },
+  "stdout": {
+    "path": "/home/zhuhe/litchi-performance-0967/receipts/capture-runner-v1.stdout.log",
+    "bytes": 136,
+    "sha256": "5cd21297f3d199fc2475135cc6f3a2544e003c1236364f64cac17472eb0fd69e"
+  },
+  "stderr": {
+    "path": "/home/zhuhe/litchi-performance-0967/receipts/capture-runner-v1.stderr.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "manifest": {
+    "path": "/home/zhuhe/litchi-performance-0967/capture/capture-manifest-v1.json",
+    "bytes": 94434,
+    "sha256": "273b1de3e0ba8fe53d66a48f6d31a054796deccf404ac048223ad9ad5f6396df"
+  }
+}
