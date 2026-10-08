@@ -46,6 +46,7 @@ Office round trips.
 | [0031](0031-execution-context-budgets.md) | I/O concurrency, CPU task and executor budgets in the execution context |
 | [0032](0032-snapshot-derived-value-memos.md) | Snapshot memos of small derived values of payload bytes (widens ADR 0005's 2026-09-16 digest-memo amendment) |
 | [0033](0033-unified-operations-api.md) | Unified operations API over the per-format owners (`litchi-ops`), with read and write for every claimed format |
+| [0034](0034-unified-api-glossary-and-default-policies.md) | Canonical API vocabulary and strict default policies; owner-directed rollout recorded in unified-ops 0016 |
 
 The OGraph record retains its original 0025 identity. The later XLS record,
 which duplicated that number, is indexed as 0027; its decision text remains

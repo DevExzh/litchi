@@ -19,6 +19,17 @@ of done. Where this goal and the design appear to disagree, the design wins and
 the disagreement is recorded as a finding — with one explicit owner override,
 below.
 
+OWNER DIRECTION (2026-10-08) — API vocabulary and restart:
+
+  Refactor toward the glossary/default-policy draft supplied at the base
+  checkout's docs/adr/0033-unified-api-glossary-and-default-policies.md.
+  It is adopted here as ADR 0034 because ADR 0033 already identifies the
+  accepted unified-operations design. See record 0016 and docs/API_GLOSSARY.md.
+  The glossary governs API shapes and strict default policies; the existing
+  design and all-format read/write owner override still govern coverage.
+  M0a/M0b have already landed: adapt their consumers with each leaf wave,
+  rather than restarting them. iWork ownership constraint 7 remains binding.
+
 OWNER OVERRIDE (2026-10-04) — supersedes design §4, §9, §13 "write OOXML
 first", and §16.6 "legacy package retention":
 

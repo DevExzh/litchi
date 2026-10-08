@@ -111,6 +111,7 @@ fn managed(source: &Arc<dyn ReadAt>, context: ExecutionContext) -> SourceBackedP
 fn assert_shares_everything(original: &SourceBackedPackage, clone: &SourceBackedPackage) {
     let SourceBackedPackage {
         source,
+        fingerprint_memo,
         archive,
         read_ahead,
         limits,
@@ -126,6 +127,11 @@ fn assert_shares_everything(original: &SourceBackedPackage, clone: &SourceBacked
     assert_eq!(original.source.lineage, source.lineage);
     assert_eq!(original.source.version, source.version);
     assert_eq!(original.source.length, source.length);
+    match (&original.fingerprint_memo, fingerprint_memo) {
+        (None, None) => {},
+        (Some(left), Some(right)) => assert!(Arc::ptr_eq(left, right)),
+        _ => panic!("a clone must keep the fingerprint memo of its package"),
+    }
     assert!(Arc::ptr_eq(&original.archive, archive));
     assert!(Arc::ptr_eq(&original.catalog, catalog));
     assert!(Arc::ptr_eq(&original.cache, cache));
@@ -145,6 +151,19 @@ fn assert_shares_everything(original: &SourceBackedPackage, clone: &SourceBacked
     }
     assert!(original.is_same_opened_package(clone));
     assert!(clone.is_same_opened_package(original));
+}
+
+#[test]
+fn owned_ingress_clone_retains_the_shared_fingerprint_after_original_drop() {
+    let original = SourceBackedPackage::from_vec(package_bytes(3, 2 * 1024)).unwrap();
+    let clone = original.clone();
+    assert_shares_everything(&original, &clone);
+    let memo = clone.fingerprint_memo.as_ref().unwrap();
+    assert!(!memo.is_initialized());
+    let fingerprint = original.source_artifact().fingerprint().unwrap();
+    assert!(memo.is_initialized());
+    drop(original);
+    assert_eq!(clone.source_artifact().fingerprint().unwrap(), fingerprint);
 }
 
 #[test]

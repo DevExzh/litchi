@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0016 | Rebase onto current base; adopt API glossary as ADR 0034; preserve shared fingerprint memo | kickoff; W0 checker and leaf migrations pending |
 | 0001 | Owner override: read + write for every claimed format; tiers OOXML → OLE → (RTF, ODF, iWork) | recorded in the goal (2026-10-04) |
 | 0002 | Leaf write-capability inventory (deep: OOXML + OLE; brief: tier 3) | merged (`cfe7681627`) |
 | 0003 | M0a facade migration plan (flat `File`, `litchi::open`) | merged (`45a932ea2e`) |
@@ -142,3 +143,19 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 ## Awaiting owner decision
 
 - ~~ADR 0033 acceptance~~ — accepted 2026-10-04 (record 0006).
+
+## 0016 — restart and glossary adoption (2026-10-08)
+
+- Rebased `feat/unified-ops-api` from `dbe66611f1` onto base `32ad64e320`;
+  rebased tip before this record is `61630e5635`. Existing M0a/M0b work is
+  retained. Historical hashes above are evidence references, not current tips.
+- Adopted the owner-supplied glossary/default-policy draft as ADR 0034;
+  preserved the existing accepted operations ADR 0033 and its citations.
+- Resolved the OPC cheap-clone/fingerprint-memo conflict by sharing the base
+  memo through package clones; added regression coverage for clone survival.
+- W0 next: rustdoc JSON checker with scoped rules, tests and CI integration.
+  Then DOCX → PPTX → XLSX shape waves with simultaneous consumer migrations,
+  followed by the remaining format waves and M1/M2 completion. iWork requests
+  are recorded for its owners; no iWork implementation changes here.
+- No performance, parity, all-format CRUD or milestone-completion claim is
+  made by this kickoff. Verification and remaining gates are in record 0016.

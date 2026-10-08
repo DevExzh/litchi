@@ -70,3 +70,20 @@ Each request is described by intent. The signatures are suggestions; the owners 
     surface is span-based over a flat section or body text.
 13. **Text formatting** on body text spans.
 14. **Document metadata set** (title, author).
+
+## 2026-10-08 glossary coordination request (record 0016)
+
+The owner-directed glossary is adopted as [ADR 0034](../adr/0034-unified-api-glossary-and-default-policies.md).
+Its W1 remains with the iWork owners. Please expose the canonical `Package`
+owner and owned `Workbook` (Numbers) / `Presentation` (Keynote) projections,
+`SourceLimits` / `SemanticLimits` / `OpenOptions`, checked `Position` selectors,
+and complete focused transaction families with required diagnostics. Fresh
+builders need explicit identity input, deterministic fixed-identity output,
+and typed refusal when identity is missing. Audit silent normalization before
+claiming `ToleranceReport::Strict`. The unified layer will consume those public
+APIs at M6; no iWork crate is modified by this adoption.
+
+This contract supersedes the optional diagnostics and provisional create names
+in requests 1–2 above: diagnostics are required and minimal creation is
+`Package::new()`. Existing request evidence remains a historical inventory,
+not a claim that those old facade paths still exist after M0a.
