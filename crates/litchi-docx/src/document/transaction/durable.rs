@@ -13,10 +13,10 @@ use litchi_core::patch::{
 use serde_json::Value;
 
 use super::{
-    Commit, CompositionLimits, Edit, HistoryLimits, MAX_DOCUMENT_XML_BYTES, MAX_OPERATIONS,
-    ManagedAdmission, Operation, Patch, RevisionAction, RevisionKind, Snapshot, SourceIdentity,
-    TableCellAddress, TransactionError, TransactionResult, TransferGraph, TransferPart,
-    TransferRelationship, XmlStorage,
+    Commit, CompositionLimits, Edit, Error as TransactionError, HistoryLimits,
+    MAX_DOCUMENT_XML_BYTES, MAX_OPERATIONS, ManagedAdmission, Operation, Patch,
+    Result as TransactionResult, RevisionAction, RevisionKind, Snapshot, SourceIdentity,
+    TableCellAddress, TransferGraph, TransferPart, TransferRelationship, XmlStorage,
 };
 
 const FORMAT_NAME: &str = "litchi-docx/document";

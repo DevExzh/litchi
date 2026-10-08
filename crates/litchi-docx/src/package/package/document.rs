@@ -33,9 +33,7 @@ impl Package {
     ///
     /// Returns a typed snapshot error when package state is stale, malformed,
     /// or outside the document transaction bounds.
-    pub fn edit_document(
-        &self,
-    ) -> std::result::Result<crate::document::Edit, crate::document::TransactionError> {
+    pub fn edit(&self) -> std::result::Result<crate::document::Edit, crate::document::Error> {
         self.document_snapshot().map(|snapshot| snapshot.edit())
     }
 
@@ -65,7 +63,7 @@ impl Package {
     /// the main document is missing, malformed, or over its resource bounds.
     pub fn document_snapshot(
         &self,
-    ) -> std::result::Result<crate::document::Snapshot, crate::document::TransactionError> {
+    ) -> std::result::Result<crate::document::Snapshot, crate::document::Error> {
         self.ensure_story_opc_current("document_snapshot")?;
         let main = self.opc.main_document_part().map_err(Error::from)?;
         let xml = main.blob_arc();
@@ -83,7 +81,7 @@ impl Package {
         &self,
         xml: &std::sync::Arc<Vec<u8>>,
         operation: &'static str,
-    ) -> std::result::Result<(), crate::document::TransactionError> {
+    ) -> std::result::Result<(), crate::document::Error> {
         let proved = |memo: &std::sync::Weak<Vec<u8>>| {
             memo.upgrade()
                 .is_some_and(|admitted| std::sync::Arc::ptr_eq(&admitted, xml))
@@ -123,7 +121,7 @@ impl Package {
     fn document_patch_source(
         &self,
         patch: &crate::document::Patch,
-    ) -> std::result::Result<DocumentPatchSource, crate::document::TransactionError> {
+    ) -> std::result::Result<DocumentPatchSource, crate::document::Error> {
         self.ensure_story_opc_current("document_snapshot")?;
         let main = self.opc.main_document_part().map_err(Error::from)?;
         if let Some(candidate) = patch.target_for_exact_unmanaged_source(main.blob()) {
@@ -155,7 +153,7 @@ impl Package {
     pub fn apply_document_patch(
         &mut self,
         patch: &crate::document::Patch,
-    ) -> std::result::Result<crate::document::Snapshot, crate::document::TransactionError> {
+    ) -> std::result::Result<crate::document::Snapshot, crate::document::Error> {
         let source = self.document_patch_source(patch)?;
         self.validate_transfer_operations(patch.operations())?;
         let graph_transition = transfer_graph_transition(patch.operations())?;
@@ -201,7 +199,7 @@ impl Package {
         Ok(candidate)
     }
 
-    /// Commit and atomically publish an edit created by [`Self::edit_document`].
+    /// Commit and atomically publish an edit created by [`Self::edit`].
     ///
     /// # Errors
     ///
@@ -210,7 +208,7 @@ impl Package {
     pub fn publish_document_edit(
         &mut self,
         edit: crate::document::Edit,
-    ) -> std::result::Result<crate::document::Commit, crate::document::TransactionError> {
+    ) -> std::result::Result<crate::document::Commit, crate::document::Error> {
         let commit = edit.commit()?;
         self.publish_document_commit(commit)
     }
@@ -227,7 +225,7 @@ impl Package {
     pub fn publish_document_commit(
         &mut self,
         commit: crate::document::Commit,
-    ) -> std::result::Result<crate::document::Commit, crate::document::TransactionError> {
+    ) -> std::result::Result<crate::document::Commit, crate::document::Error> {
         self.apply_document_patch(commit.patch())?;
         Ok(commit)
     }
@@ -244,10 +242,9 @@ impl Package {
         &mut self,
         commit: crate::document::Commit,
         history: &mut crate::document::History,
-    ) -> std::result::Result<Vec<crate::document::Snapshot>, crate::document::TransactionError>
-    {
+    ) -> std::result::Result<Vec<crate::document::Snapshot>, crate::document::Error> {
         if history.current().xml_bytes() != commit.patch().source().xml_bytes() {
-            return Err(crate::document::TransactionError::StaleSource);
+            return Err(crate::document::Error::StaleSource);
         }
         if !commit.patch().changed() {
             self.apply_document_patch(commit.patch())?;
@@ -267,7 +264,7 @@ impl Package {
     pub fn undo_document(
         &mut self,
         history: &mut crate::document::History,
-    ) -> std::result::Result<bool, crate::document::TransactionError> {
+    ) -> std::result::Result<bool, crate::document::Error> {
         self.publish_history_transition(history, false)
     }
 
@@ -280,7 +277,7 @@ impl Package {
     pub fn redo_document(
         &mut self,
         history: &mut crate::document::History,
-    ) -> std::result::Result<bool, crate::document::TransactionError> {
+    ) -> std::result::Result<bool, crate::document::Error> {
         self.publish_history_transition(history, true)
     }
 
@@ -296,7 +293,7 @@ impl Package {
     pub fn apply_durable_document_patch<Mode>(
         &mut self,
         patch: &litchi_core::patch::Patch<Mode>,
-    ) -> std::result::Result<crate::document::Snapshot, crate::document::TransactionError> {
+    ) -> std::result::Result<crate::document::Snapshot, crate::document::Error> {
         let current = self.document_snapshot()?;
         let has_transfer = patch.operations().iter().any(|operation| {
             matches!(
@@ -324,7 +321,7 @@ impl Package {
                     .and_then(serde_json::Value::as_str)
                     != Some(dependency_digest.as_str())
                 {
-                    return Err(crate::document::TransactionError::StaleSource);
+                    return Err(crate::document::Error::StaleSource);
                 }
             }
         }
@@ -359,10 +356,10 @@ impl Package {
         &mut self,
         history: &mut crate::document::History,
         redo: bool,
-    ) -> std::result::Result<bool, crate::document::TransactionError> {
+    ) -> std::result::Result<bool, crate::document::Error> {
         let current = self.document_snapshot()?;
         if current.xml_bytes() != history.current().xml_bytes() {
-            return Err(crate::document::TransactionError::StaleSource);
+            return Err(crate::document::Error::StaleSource);
         }
         let moved = if redo { history.redo() } else { history.undo() };
         if !moved {
@@ -382,7 +379,7 @@ impl Package {
                     let _restored = history.redo();
                 }
                 let _pending = history.take_graph_transition();
-                return Err(crate::document::TransactionError::StaleSource);
+                return Err(crate::document::Error::StaleSource);
             }
         }
         let replacement = history.current().xml_bytes().to_vec();
@@ -419,7 +416,7 @@ impl Package {
                 let _restored = history.redo();
             }
             let _pending = history.take_graph_transition();
-            return Err(crate::document::TransactionError::from(error));
+            return Err(crate::document::Error::from(error));
         }
         Ok(true)
     }
@@ -427,7 +424,7 @@ impl Package {
     fn validate_transfer_operations(
         &self,
         operations: &[crate::document::Operation],
-    ) -> std::result::Result<(), crate::document::TransactionError> {
+    ) -> std::result::Result<(), crate::document::Error> {
         if !operations.iter().any(|operation| {
             matches!(
                 operation,
@@ -450,7 +447,7 @@ impl Package {
                 } if dependency_digest.as_ref() != expected.as_str()
             )
         }) {
-            return Err(crate::document::TransactionError::StaleSource);
+            return Err(crate::document::Error::StaleSource);
         }
         Ok(())
     }
@@ -530,7 +527,7 @@ fn transfer_graph_transition(
         bool,
         std::sync::Arc<str>,
     )>,
-    crate::document::TransactionError,
+    crate::document::Error,
 > {
     let mut selected = None;
     for operation in operations {
@@ -578,7 +575,7 @@ fn transfer_graph_transition(
         };
         if let Some(selected_transition) = candidate {
             if selected.is_some() {
-                return Err(crate::document::TransactionError::InvalidDurable(
+                return Err(crate::document::Error::InvalidDurable(
                     "one commit cannot publish multiple dependency subgraphs".into(),
                 ));
             }

@@ -281,7 +281,7 @@ fn builder_refusal(file: &File) -> Error {
     }
     match file {
         #[cfg(feature = "docx")]
-        File::Docx(handle) => refused(handle.edit_document(), "DOCX"),
+        File::Docx(handle) => refused(handle.edit(), "DOCX"),
         #[cfg(feature = "pptx")]
         File::Pptx(handle) => refused(
             handle
@@ -339,13 +339,12 @@ fn changed_commit(file: &File) -> (Vec<u8>, String) {
     match file {
         #[cfg(feature = "docx")]
         File::Docx(handle) => {
-            let Ok(crate::format::docx::DocxEditor::Unsigned(mut package)) = handle.edit_document()
-            else {
+            let Ok(crate::format::docx::DocxEditor::Unsigned(mut package)) = handle.edit() else {
                 panic!("an unsigned DOCX builds an owning unsigned copy");
             };
             // Append a paragraph: Office's signed fixture keeps its only
             // paragraph in structure the text transaction does not rewrite.
-            let mut edit = package.edit_document().unwrap();
+            let mut edit = package.edit().unwrap();
             let count = edit.source().paragraph_count();
             edit.insert_paragraph(Position::new(count), MARKER).unwrap();
             let commit = edit.commit().unwrap();
@@ -535,7 +534,7 @@ fn assert_exact_noop(input: &Input) {
         #[cfg(feature = "docx")]
         FileFormat::Docx => {
             let package = litchi_docx::source_backed::Package::from_read_at(source()).unwrap();
-            let commit = package.edit_document().unwrap().commit().unwrap();
+            let commit = package.edit().unwrap().commit().unwrap();
             let mut output = Vec::new();
             package
                 .publish_document_commit_to_stream(&mut output, &commit)
@@ -543,7 +542,7 @@ fn assert_exact_noop(input: &Input) {
             assert_eq!(&output, bytes, "{label}: source-backed no-op");
 
             let mut package = litchi_docx::Package::from_reader(Cursor::new(bytes)).unwrap();
-            let commit = package.edit_document().unwrap().commit().unwrap();
+            let commit = package.edit().unwrap().commit().unwrap();
             package.apply_document_patch(commit.patch()).unwrap();
             let mut output = Vec::new();
             package.to_stream(&mut output).unwrap();

@@ -316,7 +316,7 @@ pub enum Source {
     Docx(litchi_docx::Error),
     /// A `WordprocessingML` main-document transaction error.
     #[cfg(feature = "docx")]
-    DocxTransaction(litchi_docx::document::TransactionError),
+    DocxTransaction(litchi_docx::document::Error),
     /// A `PresentationML` error.
     #[cfg(feature = "pptx")]
     Pptx(litchi_pptx::Error),
@@ -858,7 +858,7 @@ impl Classify for litchi_docx::Error {
 }
 
 #[cfg(feature = "docx")]
-impl Classify for litchi_docx::document::TransactionError {
+impl Classify for litchi_docx::document::Error {
     fn classify(&self) -> Class {
         match self {
             Self::Document(error) => error.classify(),
@@ -1230,7 +1230,7 @@ from_leaf!(
 from_leaf!(#[cfg(feature = "docx")] litchi_docx::Error => Docx, Some(FileFormat::Docx));
 from_leaf!(
     #[cfg(feature = "docx")]
-    litchi_docx::document::TransactionError => DocxTransaction, Some(FileFormat::Docx)
+    litchi_docx::document::Error => DocxTransaction, Some(FileFormat::Docx)
 );
 from_leaf!(#[cfg(feature = "pptx")] litchi_pptx::Error => Pptx, Some(FileFormat::Pptx));
 from_leaf!(#[cfg(feature = "xlsx")] litchi_xlsx::Error => Xlsx, Some(FileFormat::Xlsx));

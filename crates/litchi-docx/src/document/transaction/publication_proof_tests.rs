@@ -11,7 +11,7 @@ use super::*;
 
 /// The commit route before change 0754: the source gate first, then the
 /// route it chose.
-fn historical_route(base: &Snapshot, projected: &Snapshot) -> TransactionResult<Snapshot> {
+fn historical_route(base: &Snapshot, projected: &Snapshot) -> Result<Snapshot> {
     if publication_accepts_preserved_xml(base.xml_bytes()) {
         compact_changed_paragraphs(base, projected)
     } else {
@@ -19,7 +19,7 @@ fn historical_route(base: &Snapshot, projected: &Snapshot) -> TransactionResult<
     }
 }
 
-fn outcome(result: &TransactionResult<Snapshot>) -> String {
+fn outcome(result: &Result<Snapshot>) -> String {
     match result {
         Ok(snapshot) => format!("ok {:?}", snapshot.xml_bytes()),
         Err(error) => format!("err {error} | {error:?}"),
@@ -213,7 +213,7 @@ fn saved(package: &mut crate::Package) -> Vec<u8> {
 #[test]
 fn publishing_with_the_proof_emits_what_publishing_without_it_emits() {
     let mut proven_package = generated_package(64);
-    let mut edit = proven_package.edit_document().unwrap();
+    let mut edit = proven_package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(7), "edited")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -230,7 +230,7 @@ fn publishing_with_the_proof_emits_what_publishing_without_it_emits() {
     ));
 
     let mut unproven_package = generated_package(64);
-    let mut edit = unproven_package.edit_document().unwrap();
+    let mut edit = unproven_package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(7), "edited")
         .unwrap();
     let mut commit = edit.commit().unwrap();
@@ -244,7 +244,7 @@ fn publishing_with_the_proof_emits_what_publishing_without_it_emits() {
     // A second edit on the published package, and the inverse of the first,
     // publish the same bytes on both.
     for package in [&mut proven_package, &mut unproven_package] {
-        let mut edit = package.edit_document().unwrap();
+        let mut edit = package.edit().unwrap();
         assert!(edit.projected().publication_proof().is_none());
         edit.replace_paragraph_text(Position::new(9), "second")
             .unwrap();
@@ -266,7 +266,7 @@ fn a_source_with_identity_keeps_the_historical_gate_and_builds_no_proof() {
         litchi_core::OwnedSource::new(archive.into_inner()),
     ))
     .unwrap();
-    let base = source_backed.edit_document().unwrap().source().clone();
+    let base = source_backed.edit().unwrap().source().clone();
     assert!(base.xml.identity().is_some());
     assert_eq!(base.xml_bytes(), plain.xml_bytes());
     let mut edit = base.edit();
@@ -291,7 +291,7 @@ fn a_source_with_identity_keeps_the_historical_gate_and_builds_no_proof() {
 #[test]
 fn a_derived_snapshot_never_inherits_a_proof() {
     let package = generated_package(8);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(1), "edited")
         .unwrap();
     let commit = edit.commit().unwrap();

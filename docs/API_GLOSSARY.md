@@ -42,7 +42,7 @@ transaction is the bare `Package::edit()`.
 
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
-| Edit entry, primary transaction | `Package::edit()` | `edit_document()` (docx), `opened_presentation_transaction()` (pptx), `Workbook::edit()` (xlsx — moves to `Package`) | ✅ iWork/xlsx-name · 🔴 docx/pptx (W2), xlsx (W2), odt already `edit` but moves onto `Package` (W3) |
+| Edit entry, primary transaction | `Package::edit()` | `edit_document()` (docx), `opened_presentation_transaction()` (pptx), `Workbook::edit()` (xlsx — moves to `Package`) | ✅ docx eager/source entry name (0018; package-owning commit still pending) · ✅ iWork/xlsx-name · 🔴 pptx/xlsx (W2), odt already `edit` but moves onto `Package` (W3) |
 | Edit entry, scoped family | `Package::edit_x()` | — | ✅ numbers/keynote/pages families |
 | Transaction type | `Edit` | `Transaction` (pptx), `WorkbookEdit` (xlsb) | 🔴 W2 |
 | Commit | `Edit::commit() -> Result<Commit>` | — | ✅ everywhere; shape fixed by the rows below |
@@ -242,3 +242,21 @@ Regression tests: `python3 -m unittest tools.test_check_api_glossary`.
 They compile a small temporary Rust library with the installed rustdoc; no
 compiled fixture or rustdoc JSON is committed. CI runs the tests and checker
 in the Rust-toolchain job. See [record 0017](unified-ops/0017-glossary-gate.md).
+
+
+## 12. W2 DOCX entry and focused error names (record 0018)
+
+The primary edit entry is now `Package::edit()` on both DOCX owners.
+`document::Error` and `document::Result` replace the prefixed transaction
+error/result names. Old public names are removed, with no compatibility
+aliases. Private imports may use disambiguating local names when a module
+also handles the package ingress error.
+
+`docx-minimal` and `docx-full` enforce these three retired names. The full
+profile enables `automatic-fonts`, `encryption`, `sign` and `vba-inspection`,
+which include every optional DOCX feature. Neither profile registers the
+complete document family yet: `Commit` still carries a document `Snapshot`,
+not the immutable package required by ADR 0034. Package ownership, owned
+read-only projection, primary `apply`, publication replacement, `LimitKind`,
+and mutable-writer removal remain pending. Scoped transactions and other
+formats are not marked migrated by this step.

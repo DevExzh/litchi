@@ -34460,7 +34460,7 @@ fn run_semantic_docx(
                 let mut package =
                     litchi_docx::Package::from_reader(Cursor::new(corpus.archive.clone()))?;
                 let started = Instant::now();
-                let mut edit = package.edit_document()?;
+                let mut edit = package.edit()?;
                 if selected.len() > 1 {
                     let replacements = selected
                         .iter()
@@ -49172,7 +49172,7 @@ fn publish_docx_source_edit<W: Write>(
 ) -> Result<(usize, litchi_docx::document::Commit), Box<dyn Error>> {
     let package = litchi_docx::source_backed::Package::from_read_at(source)?;
     let target = SemanticShape::Medium.docx_paragraphs() / 2;
-    let mut edit = package.edit_document()?;
+    let mut edit = package.edit()?;
     edit.replace_paragraph_text(Position::new(target), semantic_docx_text(target, true))?;
     let commit = edit.commit()?;
     if !commit.patch().changed() || commit.diagnostics().operations() != 1 {

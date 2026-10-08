@@ -173,7 +173,7 @@ fn generate_docx(output: &Path) -> Result<()> {
         .ok_or_else(|| missing("DOCX paragraph 0 is absent"))?
         .text()?;
     println!("docx source paragraph[0]={before}");
-    let mut edit = package.edit_document()?;
+    let mut edit = package.edit()?;
     edit.replace_paragraph_text(position, SENTINEL)?;
     package.publish_document_edit(edit)?;
     package.save(output)?;

@@ -18,7 +18,7 @@ use litchi_core::{
     OwnedSource, Position, ReadAt, Resource, SourceVersion,
 };
 use litchi_docx::document::{
-    Commit, RevisionAction, RevisionKind, RevisionSelector, TransactionError,
+    Commit, Error as TransactionError, RevisionAction, RevisionKind, RevisionSelector,
 };
 use litchi_docx::paragraph::{Collapsed, Inline, Symbols};
 use litchi_docx::{Error, ReadLimits, source_backed};
@@ -578,7 +578,7 @@ fn managed_document_snapshot_and_edit_retain_source_and_candidate_reservations()
     let cloned_snapshot = snapshot.clone();
     assert_eq!(budget.used(Resource::Memory), source_reserved);
 
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "candidate")
         .unwrap();
     let candidate_reserved = budget.used(Resource::Memory);
@@ -922,7 +922,7 @@ fn managed_signed_noop_and_equal_setter_preserve_exact_source() {
     let source = fixture_signed("before", "second");
 
     let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
-    let noop = package.edit_document().unwrap().commit().unwrap();
+    let noop = package.edit().unwrap().commit().unwrap();
     assert!(!noop.diagnostics().changed());
     let mut output = Vec::new();
     package
@@ -933,7 +933,7 @@ fn managed_signed_noop_and_equal_setter_preserve_exact_source() {
     assert_eq!(budget.used(Resource::Memory), 0);
 
     let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "before tail")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -947,7 +947,7 @@ fn managed_signed_noop_and_equal_setter_preserve_exact_source() {
     assert_eq!(budget.used(Resource::Memory), 0);
 
     let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     let result = edit.replace_paragraph_text(Position::new(0), "changed");
     assert!(matches!(
         result,
@@ -958,7 +958,7 @@ fn managed_signed_noop_and_equal_setter_preserve_exact_source() {
     assert_eq!(budget.used(Resource::Memory), 0);
 
     let package = source_backed::Package::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -1010,7 +1010,7 @@ fn managed_revision_dispositions_are_refused_like_revision_text_replacement() {
     for signed in [false, true] {
         let source = tracked_revision_fixture(signed);
         let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
-        let mut edit = package.edit_document().unwrap();
+        let mut edit = package.edit().unwrap();
         let projected = edit.projected().xml_bytes().to_vec();
         let reserved = budget.used(Resource::Memory);
 
@@ -1102,7 +1102,7 @@ fn managed_revision_dispositions_are_refused_like_revision_text_replacement() {
         tracked_revision_fixture(false),
     )))
     .unwrap();
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(0))
         .unwrap();
     edit.apply_revision(deletion, RevisionAction::Reject)
@@ -1116,7 +1116,7 @@ fn managed_revision_dispositions_are_refused_like_revision_text_replacement() {
 fn managed_disjoint_updates_publish_in_arbitrary_order_and_inverse_exact() {
     let source = fixture("before", "second");
     let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(1), "second changed")
         .unwrap();
     edit.replace_paragraph_text(Position::new(0), "first changed")
@@ -1192,7 +1192,7 @@ fn unmanaged_foreign_package_with_equal_main_xml_refuses_stale_commit_before_out
 
     let first_package =
         source_backed::Package::from_read_at(Arc::new(OwnedSource::new(first))).unwrap();
-    let mut edit = first_package.edit_document().unwrap();
+    let mut edit = first_package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "first package change")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -1214,7 +1214,7 @@ fn managed_four_disjoint_updates_release_scan_depth_and_restore_exact_artifact()
         13,
     );
     let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     for (position, replacement) in [
         (3_usize, "three changed"),
         (1_usize, "one changed"),
@@ -1263,7 +1263,7 @@ fn managed_four_disjoint_updates_release_scan_depth_and_restore_exact_artifact()
 #[test]
 fn managed_repeated_position_keeps_final_value_and_collapses_equal_setter() {
     let (budget, _cancellation_source, package) = managed(fixture("before", "second"), 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "first changed")
         .unwrap();
     edit.replace_paragraph_text(Position::new(0), "first final")
@@ -1300,7 +1300,7 @@ fn managed_repeated_position_keeps_final_value_and_collapses_equal_setter() {
 fn managed_reverting_one_operation_preserves_the_other_and_inverse_artifact() {
     let source = fixture("before", "second");
     let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "first changed")
         .unwrap();
     edit.replace_paragraph_text(Position::new(1), "second changed")
@@ -1356,7 +1356,7 @@ fn managed_reverting_one_operation_preserves_the_other_and_inverse_artifact() {
 fn managed_revert_to_original_publishes_exact_noop_bytes() {
     let source = fixture("before", "second");
     let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "temporary")
         .unwrap();
     edit.replace_paragraph_text(Position::new(0), "before tail")
@@ -1376,7 +1376,7 @@ fn managed_revert_to_original_publishes_exact_noop_bytes() {
 #[test]
 fn managed_failed_second_edit_budget_leaves_first_projection_intact() {
     let (budget, _cancellation_source, package) = managed(fixture("before", "second"), 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "first changed")
         .unwrap();
     let first_projected = edit.projected().xml_bytes().to_vec();
@@ -1417,7 +1417,7 @@ fn managed_failed_second_edit_budget_leaves_first_projection_intact() {
 #[test]
 fn managed_failed_second_edit_cancellation_leaves_first_projection_intact() {
     let (budget, cancellation_source, package) = managed(fixture("before", "second"), 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "first changed")
         .unwrap();
     let first_projected = edit.projected().xml_bytes().to_vec();
@@ -1434,7 +1434,7 @@ fn managed_failed_second_edit_cancellation_leaves_first_projection_intact() {
 fn managed_noop_inverse_and_changed_publication_preserve_untouched_media() {
     let source = fixture("before", "second");
     let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
-    let noop = package.edit_document().unwrap().commit().unwrap();
+    let noop = package.edit().unwrap().commit().unwrap();
     assert!(!noop.diagnostics().changed());
     let mut noop_output = Vec::new();
     package
@@ -1445,7 +1445,7 @@ fn managed_noop_inverse_and_changed_publication_preserve_untouched_media() {
     assert_eq!(budget.used(Resource::Memory), 0);
 
     let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     let source_xml = edit.source().xml_bytes().to_vec();
     edit.replace_paragraph_text(Position::new(0), "after")
         .unwrap();
@@ -1489,7 +1489,7 @@ fn managed_protected_settings_noop_preserves_relationship_and_payload_exactly() 
     );
     let source = fixture_with_settings(document_xml("before", "second"), settings.clone(), false);
     let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
-    let commit = package.edit_document().unwrap().commit().unwrap();
+    let commit = package.edit().unwrap().commit().unwrap();
     assert!(!commit.diagnostics().changed());
 
     let mut output = Vec::new();
@@ -1543,7 +1543,7 @@ fn managed_changed_publication_enforces_settings_protection_flags() {
             false,
         );
         let (budget, _cancellation_source, package) = managed(source, 1 << 20);
-        let mut edit = package.edit_document().unwrap();
+        let mut edit = package.edit().unwrap();
         edit.replace_paragraph_text(Position::new(0), "changed")
             .unwrap();
         let commit = edit.commit().unwrap();
@@ -1571,7 +1571,7 @@ fn changed_publication_preserves_standard_ignorable_settings_for_managed_and_unm
     let source = fixture_with_settings(document_xml("before", "second"), settings.clone(), false);
 
     let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "managed changed")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -1585,7 +1585,7 @@ fn changed_publication_preserves_standard_ignorable_settings_for_managed_and_unm
 
     let unmanaged_package =
         source_backed::Package::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
-    let mut edit = unmanaged_package.edit_document().unwrap();
+    let mut edit = unmanaged_package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "unmanaged changed")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -1605,7 +1605,7 @@ fn protected_track_revisions_with_ignorable_extension_remains_refused() {
     let source = fixture_with_settings(document_xml("before", "second"), settings, false);
 
     let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "managed changed")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -1618,7 +1618,7 @@ fn protected_track_revisions_with_ignorable_extension_remains_refused() {
 
     let unmanaged_package =
         source_backed::Package::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
-    let mut edit = unmanaged_package.edit_document().unwrap();
+    let mut edit = unmanaged_package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "unmanaged changed")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -1676,7 +1676,7 @@ fn changed_publication_rejects_unresolved_ignorable_and_active_mce_controls() {
     for (label, settings, refusal) in cases {
         let source = fixture_with_settings(document_xml("before", "second"), settings, false);
         let (budget, _cancellation_source, package) = managed(source, 1 << 20);
-        let mut edit = package.edit_document().unwrap();
+        let mut edit = package.edit().unwrap();
         edit.replace_paragraph_text(Position::new(0), "changed")
             .unwrap();
         let commit = edit.commit().unwrap();
@@ -1698,7 +1698,7 @@ fn managed_changed_publication_rejects_mixed_settings_dialect_before_output() {
     let strict_settings = settings_xml(STRICT_W, r#"<w:docVars/>"#);
     let source = fixture_with_settings(document_xml("before", "second"), strict_settings, true);
     let (budget, _cancellation_source, package) = managed(source, 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -1733,7 +1733,7 @@ fn managed_changed_publication_rejects_settings_mce_and_dtd_before_output() {
     for (label, settings, refusal) in cases {
         let source = fixture_with_settings(document_xml("before", "second"), settings, false);
         let (budget, _cancellation_source, package) = managed(source, 1 << 20);
-        let mut edit = package.edit_document().unwrap();
+        let mut edit = package.edit().unwrap();
         edit.replace_paragraph_text(Position::new(0), "changed")
             .unwrap();
         let commit = edit.commit().unwrap();
@@ -1769,7 +1769,7 @@ fn managed_changed_publication_rejects_settings_mce_and_dtd_before_output() {
         let source = fixture_with_settings(document_xml("before", "second"), settings, false);
         let package =
             source_backed::Package::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
-        let mut edit = package.edit_document().unwrap();
+        let mut edit = package.edit().unwrap();
         edit.replace_paragraph_text(Position::new(0), "changed")
             .unwrap();
         let commit = edit.commit().unwrap();
@@ -1799,7 +1799,7 @@ fn managed_source_document_admits_word_markup_compatibility() {
 
     let unmanaged =
         source_backed::Package::from_read_at(Arc::new(OwnedSource::new(source.clone()))).unwrap();
-    let mut edit = unmanaged.edit_document().unwrap();
+    let mut edit = unmanaged.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "after")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -2027,7 +2027,7 @@ fn managed_source_change_refuses_publication_before_sink_output() {
         context,
     )
     .unwrap();
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -2046,12 +2046,12 @@ fn managed_cancellation_refuses_edit_and_publication_without_output() {
     let source = fixture("before", "second");
     let (budget, cancellation_source, package) = managed(source.clone(), 1 << 20);
     cancellation_source.cancel();
-    assert!(is_cancelled(&package.edit_document().unwrap_err()));
+    assert!(is_cancelled(&package.edit().unwrap_err()));
     drop(package);
     assert_eq!(budget.used(Resource::Memory), 0);
 
     let (budget, cancellation_source, package) = managed(source, 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -2067,7 +2067,7 @@ fn managed_cancellation_refuses_edit_and_publication_without_output() {
 #[test]
 fn managed_cancellation_after_capture_refuses_empty_commit_and_releases_memory() {
     let (budget, cancellation_source, package) = managed(fixture("before", "second"), 1 << 20);
-    let edit = package.edit_document().unwrap();
+    let edit = package.edit().unwrap();
     assert!(budget.used(Resource::Memory) > 0);
     cancellation_source.cancel();
 
@@ -2081,7 +2081,7 @@ fn managed_cancellation_after_capture_refuses_empty_commit_and_releases_memory()
 fn managed_empty_text_slots_refuse_low_scan_memory_before_projection_change() {
     let source = fixture_with_document(empty_text_slot_document(4096), 37, 13);
     let (probe_budget, _cancellation_source, probe_package) = managed(source.clone(), 1 << 24);
-    let probe_edit = probe_package.edit_document().unwrap();
+    let probe_edit = probe_package.edit().unwrap();
     let baseline_memory = probe_budget.used(Resource::Memory);
     assert!(baseline_memory > 0);
     drop(probe_edit);
@@ -2090,7 +2090,7 @@ fn managed_empty_text_slots_refuse_low_scan_memory_before_projection_change() {
 
     let low_memory_limit = baseline_memory.saturating_add(2 * 1024 * 1024);
     let (budget, _cancellation_source, package) = managed(source, low_memory_limit);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     let before = edit.projected().xml_bytes().to_vec();
     let result = edit.replace_paragraph_text(Position::new(0), "x");
     assert!(result.as_ref().is_err_and(is_budget_refusal));
@@ -2104,7 +2104,7 @@ fn managed_empty_text_slots_refuse_low_scan_memory_before_projection_change() {
 fn managed_candidate_budget_failure_happens_before_publication_output() {
     let source = fixture("before", "second");
     let (budget, _cancellation_source, package) = managed(source, 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     let baseline_memory = budget.used(Resource::Memory);
     assert!(baseline_memory > 0);
     let remaining = budget
@@ -2126,7 +2126,7 @@ fn managed_candidate_budget_failure_happens_before_publication_output() {
 fn managed_publication_reports_a_partial_sink_failure() {
     let source = fixture("before", "second");
     let (budget, _cancellation_source, package) = managed(source, 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -2153,7 +2153,7 @@ fn managed_changed_publication_preserves_readback_and_releases_snapshot_budget()
     let original_media = part_bytes(&source, MEDIA);
     let original_opaque = part_bytes(&source, OPAQUE);
     let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -2205,7 +2205,7 @@ fn managed_foreign_equal_main_xml_refuses_commit_before_output() {
     assert_ne!(part_bytes(&first, OPAQUE), part_bytes(&second, OPAQUE));
 
     let (first_budget, _first_cancellation, first_package) = managed(first, 1 << 20);
-    let mut edit = first_package.edit_document().unwrap();
+    let mut edit = first_package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "first package change")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -2237,7 +2237,7 @@ fn managed_source_change_during_current_part_read_refuses_before_output() {
             context,
         )
         .unwrap();
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -2266,7 +2266,7 @@ fn managed_cancellation_during_current_part_read_refuses_before_output() {
             context,
         )
         .unwrap();
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
     let commit = edit.commit().unwrap();

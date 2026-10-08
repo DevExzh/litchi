@@ -13,7 +13,7 @@ use quick_xml::{Writer, XmlVersion};
 
 use super::super::model::Package;
 use crate::document::{
-    ParagraphTransfer, TransactionError, TransferGraph, TransferPart, TransferRefusal,
+    Error as TransactionError, ParagraphTransfer, TransferGraph, TransferPart, TransferRefusal,
     TransferRelationship,
 };
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;

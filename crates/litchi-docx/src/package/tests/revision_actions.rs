@@ -66,7 +66,7 @@ fn authored_revision_actions_round_trip_through_borrowed_package_and_durable_inv
     assert_eq!(source_text.matches("w16du:dateUtc=").count(), 4);
     assert!(source_text.contains("mc:Ignorable=\"w16du\""));
 
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(0))
         .unwrap()
         .reject_revision(Position::new(0), RevisionKind::Insertion, Position::new(0))

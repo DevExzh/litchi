@@ -83,7 +83,7 @@ pub use tail_append_stream::patch::{
 };
 
 use crate::alt::Data;
-use crate::document::{Commit, Edit, Snapshot, TransactionResult};
+use crate::document::{Commit, Edit, Result as TransactionResult, Snapshot};
 use crate::error::{Error, Result};
 use crate::namespace::scan_word_element_ranges;
 use crate::package::validate_document_main_content_type;
@@ -1173,8 +1173,8 @@ impl Package {
     /// # Errors
     ///
     /// Returns the same failures as [`Self::document_snapshot`].
-    pub fn edit_document(&self) -> TransactionResult<Edit> {
-        let (_, snapshot) = self.main_document_snapshot("edit_document", true)?;
+    pub fn edit(&self) -> TransactionResult<Edit> {
+        let (_, snapshot) = self.main_document_snapshot("edit", true)?;
         Ok(snapshot.edit())
     }
 
@@ -2444,9 +2444,9 @@ fn file_source(path: impl AsRef<Path>) -> Result<Arc<dyn ReadAt>> {
     Ok(Arc::new(FileSource::open(path)?))
 }
 
-fn transaction_error_to_document(error: crate::document::TransactionError) -> Error {
+fn transaction_error_to_document(error: crate::document::Error) -> Error {
     match error {
-        crate::document::TransactionError::Document(error) => error,
+        crate::document::Error::Document(error) => error,
         other => Error::InvalidFormat(format!(
             "external hyperlink-wrapper detachment snapshot could not be captured: {other}"
         )),

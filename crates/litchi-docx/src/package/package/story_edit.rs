@@ -5,7 +5,8 @@ use super::super::story::{
     StoryHyperlinkTextReplacement, StoryInventory, StoryKind, StoryLimits, capture,
 };
 use crate::document::{
-    HyperlinkTextReplacement, Refusal, Snapshot, TransactionError, TransactionResult,
+    Error as TransactionError, HyperlinkTextReplacement, Refusal, Result as TransactionResult,
+    Snapshot,
 };
 use litchi_core::xml::ReaderOrigin;
 use litchi_opc::PackURI;

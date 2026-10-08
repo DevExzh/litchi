@@ -373,7 +373,7 @@ fn document_patch_publishes_atomically_and_reopens() {
         })
         .unwrap();
 
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(litchi_core::Position::new(0), "after and longer")
         .unwrap();
     let commit = package.publish_document_edit(edit).unwrap();
@@ -731,7 +731,7 @@ fn package_root_three_way_transfer_history_and_durable_reopen_are_coupled() {
     let stale_plan = stale_receiver
         .plan_paragraph_transfer_from(&donor, litchi_core::Position::new(0))
         .unwrap();
-    let mut stale_edit = stale_receiver.edit_document().unwrap();
+    let mut stale_edit = stale_receiver.edit().unwrap();
     stale_edit
         .insert_paragraph_transfer(litchi_core::Position::new(1), &stale_plan)
         .unwrap();
@@ -757,7 +757,7 @@ fn package_root_three_way_transfer_history_and_durable_reopen_are_coupled() {
         .to_vec();
     assert!(matches!(
         stale_receiver.publish_document_commit(stale_commit),
-        Err(crate::document::TransactionError::StaleSource)
+        Err(crate::document::Error::StaleSource)
     ));
     assert_eq!(
         stale_receiver.document_snapshot().unwrap().xml_bytes(),
@@ -765,7 +765,7 @@ fn package_root_three_way_transfer_history_and_durable_reopen_are_coupled() {
     );
     assert!(matches!(
         stale_receiver.apply_durable_document_patch(&stale_durable),
-        Err(crate::document::TransactionError::StaleSource)
+        Err(crate::document::Error::StaleSource)
     ));
     assert_eq!(
         stale_receiver.document_snapshot().unwrap().xml_bytes(),
@@ -872,7 +872,7 @@ fn package_root_three_way_transfer_history_and_durable_reopen_are_coupled() {
         .unwrap();
     assert!(matches!(
         ambiguous.plan_paragraph_transfer_from(&donor, litchi_core::Position::new(0)),
-        Err(crate::document::TransactionError::Transfer(
+        Err(crate::document::Error::Transfer(
             crate::document::TransferRefusal::AmbiguousEquivalentDependency { .. }
         ))
     ));
@@ -1227,7 +1227,7 @@ fn exact_source_patch_reuse_keeps_noop_arcs_stale_conflicts_and_scan_errors() {
     // An exact no-op publishes the retained source without replacing the
     // main-part payload allocation.
     let main_before = package.opc.main_document_part().unwrap().blob_arc();
-    let noop = package.edit_document().unwrap().commit().unwrap();
+    let noop = package.edit().unwrap().commit().unwrap();
     assert!(!noop.patch().changed());
     let published = package.apply_document_patch(noop.patch()).unwrap();
     let main_after_noop = package.opc.main_document_part().unwrap().blob_arc();
@@ -1244,14 +1244,14 @@ fn exact_source_patch_reuse_keeps_noop_arcs_stale_conflicts_and_scan_errors() {
 
     // A patch whose source no longer matches the package still conflicts, and
     // leaves the package untouched.
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(litchi_core::Position::new(0), "after and longer")
         .unwrap();
     let commit = package.publish_document_edit(edit).unwrap();
     let republished = package.opc.main_document_part().unwrap().blob().to_vec();
     assert!(matches!(
         package.apply_document_patch(commit.patch()),
-        Err(crate::document::TransactionError::StaleSource)
+        Err(crate::document::Error::StaleSource)
     ));
     assert_eq!(
         package.opc.main_document_part().unwrap().blob(),
@@ -1277,7 +1277,7 @@ fn exact_source_patch_reuse_keeps_noop_arcs_stale_conflicts_and_scan_errors() {
         .unwrap();
     assert!(matches!(
         package.apply_document_patch(commit.patch()),
-        Err(crate::document::TransactionError::Document(_))
+        Err(crate::document::Error::Document(_))
     ));
 }
 
@@ -1304,7 +1304,7 @@ fn the_document_snapshot_shares_the_main_part_payload_instead_of_copying_it() {
     // Publishing a different main document replaces the part's `Arc` instead of
     // mutating through it, so the snapshot taken before still reads its own
     // bytes afterwards.
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(litchi_core::Position::new(0), "after and longer")
         .unwrap();
     package.publish_document_edit(edit).unwrap();
@@ -1332,7 +1332,7 @@ fn the_compaction_policy_reaches_publication_through_the_package_route() {
     };
 
     let mut preserving = build();
-    let mut edit = preserving.edit_document().unwrap();
+    let mut edit = preserving.edit().unwrap();
     edit.replace_paragraph_text(litchi_core::Position::new(1), "two edited")
         .unwrap();
     preserving.publish_document_edit(edit).unwrap();
@@ -1340,7 +1340,7 @@ fn the_compaction_policy_reaches_publication_through_the_package_route() {
 
     let mut compacting = build();
     let mut edit = compacting
-        .edit_document()
+        .edit()
         .unwrap()
         .with_compaction_policy(crate::document::CompactionPolicy::WholeDocument);
     edit.replace_paragraph_text(litchi_core::Position::new(1), "two edited")

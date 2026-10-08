@@ -405,7 +405,7 @@ executed in continuously buildable, dependency-ordered phases per ADR 0008.
 - The iwork `Options` / `SourceLimits` / `SnapshotLimits` shapes are the
   design reference for a unified `OpenOptions`.
 - **The mutable owners are already in hand on the primary open paths**:
-  `DocxSource` holds `source_backed::Package` (with `edit_document()`),
+  `DocxSource` holds `source_backed::Package` (with `edit()`),
   `PptxSource` holds `SourceBackedPresentation`, and the xlsx adapter holds
   `WorkbookModel::{Owned, Source}`. Wiring Edit transactions requires no
   re-open.

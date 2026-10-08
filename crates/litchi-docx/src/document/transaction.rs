@@ -78,10 +78,10 @@ const WORD_2023_DATE_UTC_NAMESPACE: &[u8] =
     b"http://schemas.microsoft.com/office/word/2023/wordml/word16du";
 
 /// Result returned by main-document transaction operations.
-pub type TransactionResult<T> = Result<T, TransactionError>;
+pub type Result<T> = std::result::Result<T, Error>;
 
-pub(crate) fn validate_paragraph_text(position: Position, text: &str) -> TransactionResult<()> {
-    validate_authored_text(text).map_err(|reason| TransactionError::Refused {
+pub(crate) fn validate_paragraph_text(position: Position, text: &str) -> Result<()> {
+    validate_authored_text(text).map_err(|reason| Error::Refused {
         position: position.get(),
         reason,
     })
@@ -460,7 +460,7 @@ impl std::fmt::Display for TransferRefusal {
 /// A main-document transaction failure.
 #[derive(Debug, Error)]
 #[non_exhaustive]
-pub enum TransactionError {
+pub enum Error {
     /// The underlying DOCX document or package is invalid.
     #[error(transparent)]
     Document(#[from] crate::Error),
@@ -531,15 +531,11 @@ pub(crate) struct ManagedAdmission {
 }
 
 impl ManagedAdmission {
-    fn new(
-        context: ExecutionContext,
-        xml_len: usize,
-        partname_len: usize,
-    ) -> TransactionResult<Arc<Self>> {
+    fn new(context: ExecutionContext, xml_len: usize, partname_len: usize) -> Result<Arc<Self>> {
         let index_bytes = xml_len
             .checked_mul(3)
             .and_then(|count| count.checked_mul(size_of::<Range>()))
-            .ok_or(TransactionError::Limit {
+            .ok_or(Error::Limit {
                 resource: "managed snapshot index bytes",
                 max: usize::MAX,
                 actual: usize::MAX,
@@ -558,27 +554,26 @@ impl ManagedAdmission {
             .and_then(|bytes| bytes.checked_add(size_of::<Arc<ManagedAdmission>>()))
             .and_then(|bytes| bytes.checked_add(partname_len.saturating_mul(2)))
             .and_then(|bytes| bytes.checked_add(4 * size_of::<Arc<[Range]>>()))
-            .ok_or(TransactionError::Limit {
+            .ok_or(Error::Limit {
                 resource: "managed snapshot metadata bytes",
                 max: usize::MAX,
                 actual: usize::MAX,
             })?;
         let memory = metadata_bytes
             .checked_add(index_bytes)
-            .ok_or(TransactionError::Limit {
+            .ok_or(Error::Limit {
                 resource: "managed snapshot memory",
                 max: usize::MAX,
                 actual: usize::MAX,
             })?;
-        let objects =
-            xml_len
-                .min(MAX_DOCUMENT_NODES)
-                .checked_add(4)
-                .ok_or(TransactionError::Limit {
-                    resource: "managed snapshot objects",
-                    max: usize::MAX,
-                    actual: usize::MAX,
-                })?;
+        let objects = xml_len
+            .min(MAX_DOCUMENT_NODES)
+            .checked_add(4)
+            .ok_or(Error::Limit {
+                resource: "managed snapshot objects",
+                max: usize::MAX,
+                actual: usize::MAX,
+            })?;
         let memory = reserve_managed(&context, Resource::Memory, memory)?;
         let objects = reserve_managed(&context, Resource::Objects, objects)?;
         Ok(Arc::new(Self {
@@ -588,7 +583,7 @@ impl ManagedAdmission {
         }))
     }
 
-    fn scan(&self, xml_len: usize) -> TransactionResult<ScanAdmission> {
+    fn scan(&self, xml_len: usize) -> Result<ScanAdmission> {
         let scan_memory = reserve_managed(
             &self.context,
             Resource::Memory,
@@ -600,7 +595,7 @@ impl ManagedAdmission {
             managed_scan_slot_count(xml_len)?
                 .checked_mul(MANAGED_SCAN_OBJECT_MULTIPLIER)
                 .and_then(|objects| objects.checked_add(8))
-                .ok_or(TransactionError::Limit {
+                .ok_or(Error::Limit {
                     resource: "managed scan objects",
                     max: usize::MAX,
                     actual: usize::MAX,
@@ -612,7 +607,7 @@ impl ManagedAdmission {
             Resource::Work,
             xml_len
                 .checked_mul(MANAGED_SCAN_WORK_MULTIPLIER)
-                .ok_or(TransactionError::Limit {
+                .ok_or(Error::Limit {
                     resource: "managed scan work",
                     max: usize::MAX,
                     actual: usize::MAX,
@@ -632,14 +627,14 @@ impl ManagedAdmission {
     /// number of events and the active namespace bindings are input-sized.
     /// Charge this before the parser grows any owner state; layout scans keep
     /// their observed per-event charge instead of paying this quadratic bound.
-    fn owner_scan(&self, xml_len: usize) -> TransactionResult<ScanAdmission> {
+    fn owner_scan(&self, xml_len: usize) -> Result<ScanAdmission> {
         let scan = self.scan(xml_len)?;
-        let units = xml_len.checked_add(1).ok_or(TransactionError::Limit {
+        let units = xml_len.checked_add(1).ok_or(Error::Limit {
             resource: "managed namespace lookup work",
             max: usize::MAX,
             actual: usize::MAX,
         })?;
-        let namespace_work = units.checked_mul(units).ok_or(TransactionError::Limit {
+        let namespace_work = units.checked_mul(units).ok_or(Error::Limit {
             resource: "managed namespace lookup work",
             max: usize::MAX,
             actual: usize::MAX,
@@ -787,8 +782,8 @@ fn reserve_managed(
     context: &ExecutionContext,
     resource: Resource,
     amount: usize,
-) -> TransactionResult<Reservation> {
-    let amount = u64::try_from(amount).map_err(|_error| TransactionError::Limit {
+) -> Result<Reservation> {
+    let amount = u64::try_from(amount).map_err(|_error| Error::Limit {
         resource: "managed reservation amount",
         max: usize::MAX,
         actual: usize::MAX,
@@ -796,12 +791,8 @@ fn reserve_managed(
     context.reserve(resource, amount).map_err(managed_execution)
 }
 
-fn consume_managed(
-    context: &ExecutionContext,
-    resource: Resource,
-    amount: usize,
-) -> TransactionResult<()> {
-    let amount = u64::try_from(amount).map_err(|_error| TransactionError::Limit {
+fn consume_managed(context: &ExecutionContext, resource: Resource, amount: usize) -> Result<()> {
+    let amount = u64::try_from(amount).map_err(|_error| Error::Limit {
         resource: "managed work amount",
         max: usize::MAX,
         actual: usize::MAX,
@@ -817,26 +808,26 @@ fn managed_error(error: litchi_core::ExecutionError) -> crate::Error {
     crate::Error::Opc(error)
 }
 
-fn managed_execution(error: litchi_core::ExecutionError) -> TransactionError {
-    TransactionError::Document(managed_error(error))
+fn managed_execution(error: litchi_core::ExecutionError) -> Error {
+    Error::Document(managed_error(error))
 }
 
-fn managed_parser_error(error: TransactionError) -> crate::Error {
+fn managed_parser_error(error: Error) -> crate::Error {
     match error {
-        TransactionError::Document(error) => error,
+        Error::Document(error) => error,
         error => crate::Error::Other(format!(
             "managed paragraph parser admission failed: {error}"
         )),
     }
 }
 
-fn managed_scan_memory(xml_len: usize) -> TransactionResult<usize> {
+fn managed_scan_memory(xml_len: usize) -> Result<usize> {
     let slot_count = managed_scan_slot_count(xml_len)?;
     let slot_bytes = size_of::<TextSlot>()
         .checked_mul(2)
         .and_then(|bytes| bytes.checked_add(MANAGED_SCAN_SLOT_ALLOCATOR_OVERHEAD))
         .and_then(|bytes| bytes.checked_mul(slot_count))
-        .ok_or(TransactionError::Limit {
+        .ok_or(Error::Limit {
             resource: "managed text-slot memory",
             max: usize::MAX,
             actual: usize::MAX,
@@ -845,25 +836,25 @@ fn managed_scan_memory(xml_len: usize) -> TransactionResult<usize> {
         .checked_add(
             xml_len
                 .checked_mul(MANAGED_SCAN_INPUT_MEMORY_MULTIPLIER)
-                .ok_or(TransactionError::Limit {
+                .ok_or(Error::Limit {
                     resource: "managed scan parser memory",
                     max: usize::MAX,
                     actual: usize::MAX,
                 })?,
         )
         .and_then(|bytes| bytes.checked_add(slot_bytes))
-        .ok_or(TransactionError::Limit {
+        .ok_or(Error::Limit {
             resource: "managed scan memory",
             max: usize::MAX,
             actual: usize::MAX,
         })
 }
 
-fn managed_scan_slot_count(xml_len: usize) -> TransactionResult<usize> {
+fn managed_scan_slot_count(xml_len: usize) -> Result<usize> {
     xml_len
         .checked_add(MANAGED_SCAN_MIN_TEXT_SLOT_BYTES - 1)
         .and_then(|bytes| bytes.checked_div(MANAGED_SCAN_MIN_TEXT_SLOT_BYTES))
-        .ok_or(TransactionError::Limit {
+        .ok_or(Error::Limit {
             resource: "managed text-slot count",
             max: usize::MAX,
             actual: usize::MAX,
@@ -965,10 +956,10 @@ impl Snapshot {
     ///
     /// Returns a typed document or resource-limit error when the XML is
     /// malformed, unsupported, or exceeds the transaction bounds.
-    pub fn from_xml(source_xml: impl Into<Vec<u8>>) -> TransactionResult<Self> {
+    pub fn from_xml(source_xml: impl Into<Vec<u8>>) -> Result<Self> {
         let xml = source_xml.into();
         if xml.len() > MAX_DOCUMENT_XML_BYTES {
-            return Err(TransactionError::Limit {
+            return Err(Error::Limit {
                 resource: "XML bytes",
                 max: MAX_DOCUMENT_XML_BYTES,
                 actual: xml.len(),
@@ -988,9 +979,9 @@ impl Snapshot {
         })
     }
 
-    pub(crate) fn from_shared_xml(xml: Arc<Vec<u8>>) -> TransactionResult<Self> {
+    pub(crate) fn from_shared_xml(xml: Arc<Vec<u8>>) -> Result<Self> {
         if xml.len() > MAX_DOCUMENT_XML_BYTES {
-            return Err(TransactionError::Limit {
+            return Err(Error::Limit {
                 resource: "XML bytes",
                 max: MAX_DOCUMENT_XML_BYTES,
                 actual: xml.len(),
@@ -1019,7 +1010,7 @@ impl Snapshot {
         lineage: SourceLineage,
         version: SourceVersion,
         partname: &PackURI,
-    ) -> TransactionResult<Self> {
+    ) -> Result<Self> {
         Self::from_owned_xml_with_identity(
             xml,
             Arc::new(SourceIdentity {
@@ -1033,13 +1024,13 @@ impl Snapshot {
     fn from_owned_xml_with_identity(
         xml: Arc<Vec<u8>>,
         identity: Arc<SourceIdentity>,
-    ) -> TransactionResult<Self> {
+    ) -> Result<Self> {
         let mut snapshot = Self::from_shared_xml(Arc::clone(&xml))?;
         snapshot.xml = XmlStorage::OwnedWithIdentity { xml, identity };
         Ok(snapshot)
     }
 
-    fn with_rewritten_xml(&self, xml: Vec<u8>) -> TransactionResult<Self> {
+    fn with_rewritten_xml(&self, xml: Vec<u8>) -> Result<Self> {
         if let Some(identity) = self.source_identity() {
             Self::from_owned_xml_with_identity(Arc::new(xml), identity)
         } else {
@@ -1064,7 +1055,7 @@ impl Snapshot {
         &self,
         xml: Vec<u8>,
         splices: &[ParagraphSplice<'_>],
-    ) -> TransactionResult<Self> {
+    ) -> Result<Self> {
         match self.spliced_layout(xml.len(), splices)? {
             Some(layout) => Ok(self.with_spliced_layout(xml, layout)),
             None => self.with_rewritten_xml(xml),
@@ -1080,7 +1071,7 @@ impl Snapshot {
         &self,
         xml_len: usize,
         splices: &[ParagraphSplice<'_>],
-    ) -> TransactionResult<Option<SplicedLayout>> {
+    ) -> Result<Option<SplicedLayout>> {
         if splices.is_empty() || xml_len > MAX_DOCUMENT_XML_BYTES {
             return Ok(None);
         }
@@ -1223,9 +1214,9 @@ impl Snapshot {
         version: SourceVersion,
         partname: &PackURI,
         context: ExecutionContext,
-    ) -> TransactionResult<Self> {
+    ) -> Result<Self> {
         if data.as_bytes().len() > MAX_DOCUMENT_XML_BYTES {
-            return Err(TransactionError::Limit {
+            return Err(Error::Limit {
                 resource: "XML bytes",
                 max: MAX_DOCUMENT_XML_BYTES,
                 actual: data.as_bytes().len(),
@@ -1264,9 +1255,9 @@ impl Snapshot {
         version: SourceVersion,
         partname: &PackURI,
         context: ExecutionContext,
-    ) -> TransactionResult<Self> {
+    ) -> Result<Self> {
         if source_xml.bytes().len() > MAX_DOCUMENT_XML_BYTES {
-            return Err(TransactionError::Limit {
+            return Err(Error::Limit {
                 resource: "XML bytes",
                 max: MAX_DOCUMENT_XML_BYTES,
                 actual: source_xml.bytes().len(),
@@ -1303,9 +1294,9 @@ impl Snapshot {
         source_xml: SourceXmlPart,
         identity: Arc<SourceIdentity>,
         context: ExecutionContext,
-    ) -> TransactionResult<Self> {
+    ) -> Result<Self> {
         if source_xml.bytes().len() > MAX_DOCUMENT_XML_BYTES {
-            return Err(TransactionError::Limit {
+            return Err(Error::Limit {
                 resource: "XML bytes",
                 max: MAX_DOCUMENT_XML_BYTES,
                 actual: source_xml.bytes().len(),
@@ -1356,12 +1347,12 @@ impl Snapshot {
         self
     }
 
-    pub(crate) fn shared_xml(&self) -> TransactionResult<Arc<Vec<u8>>> {
+    pub(crate) fn shared_xml(&self) -> Result<Arc<Vec<u8>>> {
         match &self.xml {
             XmlStorage::Owned(xml) => Ok(Arc::clone(xml)),
             XmlStorage::OwnedWithIdentity { xml, .. } => Ok(Arc::clone(xml)),
             XmlStorage::Managed(_) | XmlStorage::Source { .. } => {
-                Err(TransactionError::Document(crate::Error::UnsafeEdit {
+                Err(Error::Document(crate::Error::UnsafeEdit {
                     format: "DOCX",
                     operation: "snapshot.shared_xml",
                     reason: "managed document XML cannot escape its retained source owner",
@@ -1382,11 +1373,11 @@ impl Snapshot {
         self.paragraphs.len()
     }
 
-    fn range(&self, position: Position) -> TransactionResult<Range> {
+    fn range(&self, position: Position) -> Result<Range> {
         self.paragraphs
             .get(position.get())
             .copied()
-            .ok_or(TransactionError::OutOfBounds {
+            .ok_or(Error::OutOfBounds {
                 position: position.get(),
                 len: self.paragraph_count(),
             })
@@ -2107,7 +2098,7 @@ impl Operation {
 ///
 /// let mut package = Package::open("input.docx")?;
 /// let mut edit = package
-///     .edit_document()?
+///     .edit()?
 ///     .with_compaction_policy(CompactionPolicy::WholeDocument);
 /// edit.replace_paragraph_text(Position::new(0), "hello")?;
 /// package.publish_document_edit(edit)?;
@@ -2195,7 +2186,7 @@ impl Edit {
     /// allocation against the retained execution context before growing the
     /// vector. Managed clones also admit the copied operation string payloads
     /// before `String::clone` grows them.
-    pub fn try_clone(&self) -> TransactionResult<Self> {
+    pub fn try_clone(&self) -> Result<Self> {
         let mut operations = Vec::new();
         let operation_admission = if let Some(admission) = self.projected.admission.as_ref() {
             if self.operations.is_empty() {
@@ -2220,13 +2211,13 @@ impl Edit {
                 .operations
                 .iter()
                 .try_fold(0usize, |total, operation| {
-                    total.checked_add(operation_string_bytes(operation)).ok_or(
-                        TransactionError::Limit {
+                    total
+                        .checked_add(operation_string_bytes(operation))
+                        .ok_or(Error::Limit {
                             resource: "managed cloned operation string bytes",
                             max: usize::MAX,
                             actual: usize::MAX,
-                        },
-                    )
+                        })
                 })?;
             if string_bytes == 0 {
                 None
@@ -2234,7 +2225,7 @@ impl Edit {
                 let memory = string_bytes
                     .checked_add(size_of::<StringAdmission>())
                     .and_then(|bytes| bytes.checked_add(size_of::<Arc<StringAdmission>>()))
-                    .ok_or(TransactionError::Limit {
+                    .ok_or(Error::Limit {
                         resource: "managed cloned operation string metadata bytes",
                         max: usize::MAX,
                         actual: usize::MAX,
@@ -2282,7 +2273,7 @@ impl Edit {
         &mut self,
         position: Position,
         authored_text: impl Into<String> + AsRef<str>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         if self.projected.is_managed() {
             let input_bytes = authored_text.as_ref().len();
             let input_admission = self.reserve_input_text(input_bytes)?;
@@ -2301,7 +2292,7 @@ impl Edit {
         }
         self.reserve_operation()?;
         let text = authored_text.into();
-        validate_authored_text(&text).map_err(|reason| TransactionError::Refused {
+        validate_authored_text(&text).map_err(|reason| Error::Refused {
             position: position.get(),
             reason,
         })?;
@@ -2319,11 +2310,10 @@ impl Edit {
             .xml_bytes()
             .get(paragraph_start..paragraph_end)
             .ok_or_else(|| crate::Error::InvalidFormat("paragraph range is outside XML".into()))?;
-        let owner =
-            scan_text_owner(paragraph, b"p").map_err(|reason| TransactionError::Refused {
-                position: position.get(),
-                reason,
-            })?;
+        let owner = scan_text_owner(paragraph, b"p").map_err(|reason| Error::Refused {
+            position: position.get(),
+            reason,
+        })?;
         if owner.text == text {
             return Ok(self);
         }
@@ -2345,7 +2335,7 @@ impl Edit {
         )?;
         let readback = candidate
             .paragraph(position)
-            .ok_or(TransactionError::OutOfBounds {
+            .ok_or(Error::OutOfBounds {
                 position: position.get(),
                 len: candidate.paragraph_count(),
             })?
@@ -2372,16 +2362,16 @@ impl Edit {
         authored_text: String,
         input_admission: Option<Arc<StringAdmission>>,
         input_capacity_admission: Option<Arc<StringAdmission>>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         let context = self.base.managed_context().ok_or({
-            TransactionError::Document(crate::Error::UnsafeEdit {
+            Error::Document(crate::Error::UnsafeEdit {
                 format: "DOCX",
                 operation: "replace_paragraph_text",
                 reason: "managed candidate is missing its execution admission",
             })
         })?;
         context.check().map_err(managed_execution)?;
-        validate_authored_text(&authored_text).map_err(|reason| TransactionError::Refused {
+        validate_authored_text(&authored_text).map_err(|reason| Error::Refused {
             position: position.get(),
             reason,
         })?;
@@ -2405,11 +2395,10 @@ impl Edit {
             .as_ref()
             .map(|admission| admission.owner_scan(paragraph.len()))
             .transpose()?;
-        let owner =
-            scan_text_owner(paragraph, b"p").map_err(|reason| TransactionError::Refused {
-                position: position.get(),
-                reason,
-            })?;
+        let owner = scan_text_owner(paragraph, b"p").map_err(|reason| Error::Refused {
+            position: position.get(),
+            reason,
+        })?;
         if let Some(admission) = text_scan_admission.as_mut() {
             admission.release_depth();
         }
@@ -2453,7 +2442,7 @@ impl Edit {
             .map(|admission| admission.owner_scan(base_paragraph.len()))
             .transpose()?;
         let base_owner =
-            scan_text_owner(base_paragraph, b"p").map_err(|reason| TransactionError::Refused {
+            scan_text_owner(base_paragraph, b"p").map_err(|reason| Error::Refused {
                 position: position.get(),
                 reason,
             })?;
@@ -2472,7 +2461,7 @@ impl Edit {
                 ..
             } = operation
             else {
-                return Err(TransactionError::Document(crate::Error::UnsafeEdit {
+                return Err(Error::Document(crate::Error::UnsafeEdit {
                     format: "DOCX",
                     operation: "replace_paragraph_text",
                     reason: "managed transactions only support direct paragraph text operations",
@@ -2486,7 +2475,7 @@ impl Edit {
                     .into());
                 }
                 if before != &base_text {
-                    return Err(TransactionError::StaleSource);
+                    return Err(Error::StaleSource);
                 }
             }
         }
@@ -2504,13 +2493,13 @@ impl Edit {
             .len()
             .checked_sub(usize::from(remove_existing))
             .and_then(|count| count.checked_add(usize::from(add_new)))
-            .ok_or(TransactionError::Limit {
+            .ok_or(Error::Limit {
                 resource: "managed paragraph operation count",
                 max: MAX_OPERATIONS,
                 actual: usize::MAX,
             })?;
         if final_count > MAX_OPERATIONS {
-            return Err(TransactionError::Limit {
+            return Err(Error::Limit {
                 resource: "managed paragraph operation count",
                 max: MAX_OPERATIONS,
                 actual: final_count,
@@ -2526,7 +2515,7 @@ impl Edit {
                 planned_string_bytes = planned_string_bytes
                     .checked_add(base_text.capacity())
                     .and_then(|bytes| bytes.checked_add(authored_text.capacity()))
-                    .ok_or(TransactionError::Limit {
+                    .ok_or(Error::Limit {
                         resource: "managed operation string bytes",
                         max: MAX_REPLACEMENT_TEXT_BYTES,
                         actual: usize::MAX,
@@ -2534,7 +2523,7 @@ impl Edit {
             } else {
                 planned_string_bytes = planned_string_bytes
                     .checked_add(operation_string_bytes(operation))
-                    .ok_or(TransactionError::Limit {
+                    .ok_or(Error::Limit {
                         resource: "managed operation string bytes",
                         max: MAX_REPLACEMENT_TEXT_BYTES,
                         actual: usize::MAX,
@@ -2545,7 +2534,7 @@ impl Edit {
             planned_string_bytes = planned_string_bytes
                 .checked_add(base_text.capacity())
                 .and_then(|bytes| bytes.checked_add(authored_text.capacity()))
-                .ok_or(TransactionError::Limit {
+                .ok_or(Error::Limit {
                     resource: "managed operation string bytes",
                     max: MAX_REPLACEMENT_TEXT_BYTES,
                     actual: usize::MAX,
@@ -2610,7 +2599,7 @@ impl Edit {
                 after,
             } = operation
             else {
-                return Err(TransactionError::Document(crate::Error::UnsafeEdit {
+                return Err(Error::Document(crate::Error::UnsafeEdit {
                     format: "DOCX",
                     operation: "replace_paragraph_text",
                     reason: "managed transactions only support direct paragraph text operations",
@@ -2674,9 +2663,9 @@ impl Edit {
         operation: &'static str,
         (source, identity): (SourceXmlPart, Arc<SourceIdentity>),
         _temporary_admissions: impl Sized,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         let context = self.base.managed_context().ok_or({
-            TransactionError::Document(crate::Error::UnsafeEdit {
+            Error::Document(crate::Error::UnsafeEdit {
                 format: "DOCX",
                 operation,
                 reason: "managed candidate is missing its execution admission",
@@ -2690,7 +2679,7 @@ impl Edit {
             .len()
             .checked_mul(size_of::<ManagedParagraphPlan>())
             .and_then(|bytes| bytes.checked_add(size_of::<Vec<ManagedParagraphPlan>>()));
-        let plan_memory = plan_memory.ok_or(TransactionError::Limit {
+        let plan_memory = plan_memory.ok_or(Error::Limit {
             resource: "managed paragraph reconstruction plan memory",
             max: usize::MAX,
             actual: usize::MAX,
@@ -2713,7 +2702,7 @@ impl Edit {
                 after,
             } = planned_operation
             else {
-                return Err(TransactionError::Document(crate::Error::UnsafeEdit {
+                return Err(Error::Document(crate::Error::UnsafeEdit {
                     format: "DOCX",
                     operation,
                     reason: "managed transactions only support direct paragraph text operations",
@@ -2729,38 +2718,37 @@ impl Edit {
                 "base paragraph",
             )?;
             let base_admission = self.base.admission.as_ref().ok_or({
-                TransactionError::Document(crate::Error::UnsafeEdit {
+                Error::Document(crate::Error::UnsafeEdit {
                     format: "DOCX",
                     operation,
                     reason: "managed base snapshot is missing its execution admission",
                 })
             })?;
             let mut scan_admission = base_admission.owner_scan(paragraph.len())?;
-            let owner =
-                scan_text_owner(paragraph, b"p").map_err(|reason| TransactionError::Refused {
-                    position: operation_position.get(),
-                    reason,
-                })?;
+            let owner = scan_text_owner(paragraph, b"p").map_err(|reason| Error::Refused {
+                position: operation_position.get(),
+                reason,
+            })?;
             scan_admission.release_depth();
             if owner.text != *before {
-                return Err(TransactionError::StaleSource);
+                return Err(Error::StaleSource);
             }
             let (_, owner_fragment_bytes) = preflight_text_owner_rewrite(paragraph, &owner, after)?;
-            fragment_bytes = fragment_bytes.checked_add(owner_fragment_bytes).ok_or(
-                TransactionError::Limit {
-                    resource: "managed paragraph fragment bytes",
-                    max: MAX_DOCUMENT_XML_BYTES,
-                    actual: usize::MAX,
-                },
-            )?;
-            fragment_count =
-                fragment_count
-                    .checked_add(owner.slots.len())
-                    .ok_or(TransactionError::Limit {
-                        resource: "managed paragraph fragment count",
-                        max: MAX_OPERATIONS,
+            fragment_bytes =
+                fragment_bytes
+                    .checked_add(owner_fragment_bytes)
+                    .ok_or(Error::Limit {
+                        resource: "managed paragraph fragment bytes",
+                        max: MAX_DOCUMENT_XML_BYTES,
                         actual: usize::MAX,
                     })?;
+            fragment_count = fragment_count
+                .checked_add(owner.slots.len())
+                .ok_or(Error::Limit {
+                    resource: "managed paragraph fragment count",
+                    max: MAX_OPERATIONS,
+                    actual: usize::MAX,
+                })?;
             plans.push(ManagedParagraphPlan {
                 range,
                 operation_index,
@@ -2800,13 +2788,13 @@ impl Edit {
                     .checked_mul(
                         size_of::<Vec<u8>>() + size_of::<litchi_opc::AuthoredXmlFragment>(),
                     )
-                    .ok_or(TransactionError::Limit {
+                    .ok_or(Error::Limit {
                         resource: "managed paragraph fragment metadata",
                         max: usize::MAX,
                         actual: usize::MAX,
                     })?,
             )
-            .ok_or(TransactionError::Limit {
+            .ok_or(Error::Limit {
                 resource: "managed paragraph fragment memory",
                 max: usize::MAX,
                 actual: usize::MAX,
@@ -2823,7 +2811,7 @@ impl Edit {
                     .checked_mul(size_of::<Operation>())
                     .and_then(|operation_bytes| bytes.checked_add(operation_bytes))
             })
-            .ok_or(TransactionError::Limit {
+            .ok_or(Error::Limit {
                 resource: "managed paragraph reconstruction work",
                 max: usize::MAX,
                 actual: usize::MAX,
@@ -2868,22 +2856,20 @@ impl Edit {
                             "paragraph text slot is outside authored text".into(),
                         )
                     })?;
-                    byte_cursor = byte_cursor.checked_add(character.len_utf8()).ok_or(
-                        TransactionError::Limit {
-                            resource: "replacement text bytes",
-                            max: MAX_REPLACEMENT_TEXT_BYTES,
-                            actual: usize::MAX,
-                        },
-                    )?;
+                    byte_cursor =
+                        byte_cursor
+                            .checked_add(character.len_utf8())
+                            .ok_or(Error::Limit {
+                                resource: "replacement text bytes",
+                                max: MAX_REPLACEMENT_TEXT_BYTES,
+                                actual: usize::MAX,
+                            })?;
                 }
-                character_cursor =
-                    character_cursor
-                        .checked_add(count)
-                        .ok_or(TransactionError::Limit {
-                            resource: "replacement text characters",
-                            max: MAX_REPLACEMENT_TEXT_BYTES,
-                            actual: usize::MAX,
-                        })?;
+                character_cursor = character_cursor.checked_add(count).ok_or(Error::Limit {
+                    resource: "replacement text characters",
+                    max: MAX_REPLACEMENT_TEXT_BYTES,
+                    actual: usize::MAX,
+                })?;
                 let value = &after[value_start..byte_cursor];
                 let fragment = try_run_content_fragment(&slot.prefix, &slot.local_name, value)?;
                 let start = paragraph_start.checked_add(slot.start).ok_or_else(|| {
@@ -2924,7 +2910,7 @@ impl Edit {
             };
             let readback = candidate
                 .paragraph(*operation_position)
-                .ok_or(TransactionError::OutOfBounds {
+                .ok_or(Error::OutOfBounds {
                     position: operation_position.get(),
                     len: candidate.paragraph_count(),
                 })?
@@ -2958,7 +2944,7 @@ impl Edit {
     pub fn replace_body_paragraph_texts(
         &mut self,
         replacements: &[ParagraphTextReplacement],
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         if self.projected.is_managed() {
             validate_paragraph_replacements(replacements)?;
             return self.replace_managed_body_paragraph_texts(replacements);
@@ -2976,11 +2962,9 @@ impl Edit {
             })?;
         for replacement in replacements {
             candidate.reserve_operation()?;
-            validate_authored_text(replacement.text.as_str()).map_err(|reason| {
-                TransactionError::Refused {
-                    position: replacement.position.get(),
-                    reason,
-                }
+            validate_authored_text(replacement.text.as_str()).map_err(|reason| Error::Refused {
+                position: replacement.position.get(),
+                reason,
             })?;
             let replacement_text_bytes = candidate.checked_text_total(replacement.text.len())?;
             let range = candidate.range(replacement.position)?;
@@ -2992,11 +2976,10 @@ impl Edit {
                 paragraph_end,
                 "paragraph",
             )?;
-            let owner =
-                scan_text_owner(paragraph, b"p").map_err(|reason| TransactionError::Refused {
-                    position: replacement.position.get(),
-                    reason,
-                })?;
+            let owner = scan_text_owner(paragraph, b"p").map_err(|reason| Error::Refused {
+                position: replacement.position.get(),
+                reason,
+            })?;
             if owner.text == replacement.text {
                 continue;
             }
@@ -3046,7 +3029,7 @@ impl Edit {
             };
             let readback = projected
                 .paragraph(*position)
-                .ok_or(TransactionError::OutOfBounds {
+                .ok_or(Error::OutOfBounds {
                     position: position.get(),
                     len: projected.paragraph_count(),
                 })?
@@ -3066,9 +3049,9 @@ impl Edit {
     fn replace_managed_body_paragraph_texts(
         &mut self,
         replacements: &[ParagraphTextReplacement],
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         let context = self.base.managed_context().ok_or({
-            TransactionError::Document(crate::Error::UnsafeEdit {
+            Error::Document(crate::Error::UnsafeEdit {
                 format: "DOCX",
                 operation: "replace_body_paragraph_texts",
                 reason: "managed candidate is missing its execution admission",
@@ -3080,19 +3063,15 @@ impl Edit {
         // must still admit every borrowed length and excess capacity before
         // any decision or operation vector can grow. Keep each token live
         // until the shared reconstruction either publishes or fails.
-        let input_token_capacity =
-            replacements
-                .len()
-                .checked_mul(2)
-                .ok_or(TransactionError::Limit {
-                    resource: "managed batch input admission capacity",
-                    max: usize::MAX,
-                    actual: usize::MAX,
-                })?;
+        let input_token_capacity = replacements.len().checked_mul(2).ok_or(Error::Limit {
+            resource: "managed batch input admission capacity",
+            max: usize::MAX,
+            actual: usize::MAX,
+        })?;
         let input_vector_memory = input_token_capacity
             .checked_mul(size_of::<Arc<StringAdmission>>())
             .and_then(|bytes| bytes.checked_add(size_of::<Vec<Arc<StringAdmission>>>()))
-            .ok_or(TransactionError::Limit {
+            .ok_or(Error::Limit {
                 resource: "managed batch input admission metadata",
                 max: usize::MAX,
                 actual: usize::MAX,
@@ -3115,11 +3094,9 @@ impl Edit {
             }
         }
         for replacement in replacements {
-            validate_authored_text(replacement.text.as_str()).map_err(|reason| {
-                TransactionError::Refused {
-                    position: replacement.position.get(),
-                    reason,
-                }
+            validate_authored_text(replacement.text.as_str()).map_err(|reason| Error::Refused {
+                position: replacement.position.get(),
+                reason,
             })?;
         }
 
@@ -3130,7 +3107,7 @@ impl Edit {
             .len()
             .checked_mul(size_of::<ManagedBatchDecision<'_>>())
             .and_then(|bytes| bytes.checked_add(size_of::<Vec<ManagedBatchDecision<'_>>>()))
-            .ok_or(TransactionError::Limit {
+            .ok_or(Error::Limit {
                 resource: "managed paragraph batch decision metadata",
                 max: usize::MAX,
                 actual: usize::MAX,
@@ -3158,18 +3135,16 @@ impl Edit {
             )?;
             let (owner, _projected_scan) = {
                 let admission = self.projected.admission.as_ref().ok_or({
-                    TransactionError::Document(crate::Error::UnsafeEdit {
+                    Error::Document(crate::Error::UnsafeEdit {
                         format: "DOCX",
                         operation: "replace_body_paragraph_texts",
                         reason: "managed projected snapshot is missing its execution admission",
                     })
                 })?;
                 let mut scan = admission.owner_scan(paragraph.len())?;
-                let owner = scan_text_owner(paragraph, b"p").map_err(|reason| {
-                    TransactionError::Refused {
-                        position: replacement.position.get(),
-                        reason,
-                    }
+                let owner = scan_text_owner(paragraph, b"p").map_err(|reason| Error::Refused {
+                    position: replacement.position.get(),
+                    reason,
                 })?;
                 scan.release_depth();
                 (owner, scan)
@@ -3188,19 +3163,18 @@ impl Edit {
                 "base paragraph",
             )?;
             let base_admission = self.base.admission.as_ref().ok_or({
-                TransactionError::Document(crate::Error::UnsafeEdit {
+                Error::Document(crate::Error::UnsafeEdit {
                     format: "DOCX",
                     operation: "replace_body_paragraph_texts",
                     reason: "managed base snapshot is missing its execution admission",
                 })
             })?;
             let mut base_scan = base_admission.owner_scan(base_paragraph.len())?;
-            let base_owner = scan_text_owner(base_paragraph, b"p").map_err(|reason| {
-                TransactionError::Refused {
+            let base_owner =
+                scan_text_owner(base_paragraph, b"p").map_err(|reason| Error::Refused {
                     position: replacement.position.get(),
                     reason,
-                }
-            })?;
+                })?;
             base_scan.release_depth();
             let base_text = base_owner.text;
 
@@ -3212,7 +3186,7 @@ impl Edit {
                     ..
                 } = operation
                 else {
-                    return Err(TransactionError::Document(crate::Error::UnsafeEdit {
+                    return Err(Error::Document(crate::Error::UnsafeEdit {
                         format: "DOCX",
                         operation: "replace_body_paragraph_texts",
                         reason: "managed transactions only support direct paragraph text operations",
@@ -3227,7 +3201,7 @@ impl Edit {
                         .into());
                     }
                     if before != &base_text {
-                        return Err(TransactionError::StaleSource);
+                        return Err(Error::StaleSource);
                     }
                 }
             }
@@ -3265,13 +3239,13 @@ impl Edit {
             .len()
             .checked_sub(remove_count)
             .and_then(|count| count.checked_add(add_count))
-            .ok_or(TransactionError::Limit {
+            .ok_or(Error::Limit {
                 resource: "managed paragraph operation count",
                 max: MAX_OPERATIONS,
                 actual: usize::MAX,
             })?;
         if final_count > MAX_OPERATIONS {
-            return Err(TransactionError::Limit {
+            return Err(Error::Limit {
                 resource: "managed paragraph operation count",
                 max: MAX_OPERATIONS,
                 actual: final_count,
@@ -3310,7 +3284,7 @@ impl Edit {
             .len()
             .checked_mul(size_of::<Option<usize>>())
             .and_then(|bytes| bytes.checked_add(size_of::<Vec<Option<usize>>>()))
-            .ok_or(TransactionError::Limit {
+            .ok_or(Error::Limit {
                 resource: "managed paragraph batch decision map metadata",
                 max: usize::MAX,
                 actual: usize::MAX,
@@ -3348,7 +3322,7 @@ impl Edit {
                     continue;
                 }
                 let Operation::ReplaceParagraphText { before, .. } = operation else {
-                    return Err(TransactionError::Document(crate::Error::UnsafeEdit {
+                    return Err(Error::Document(crate::Error::UnsafeEdit {
                         format: "DOCX",
                         operation: "replace_body_paragraph_texts",
                         reason: "managed transactions only support direct paragraph text operations",
@@ -3357,7 +3331,7 @@ impl Edit {
                 planned_string_bytes = planned_string_bytes
                     .checked_add(before.capacity())
                     .and_then(|bytes| bytes.checked_add(decision.replacement.text.capacity()))
-                    .ok_or(TransactionError::Limit {
+                    .ok_or(Error::Limit {
                         resource: "managed operation string bytes",
                         max: MAX_REPLACEMENT_TEXT_BYTES,
                         actual: usize::MAX,
@@ -3365,7 +3339,7 @@ impl Edit {
             } else {
                 planned_string_bytes = planned_string_bytes
                     .checked_add(operation_string_bytes(operation))
-                    .ok_or(TransactionError::Limit {
+                    .ok_or(Error::Limit {
                         resource: "managed operation string bytes",
                         max: MAX_REPLACEMENT_TEXT_BYTES,
                         actual: usize::MAX,
@@ -3376,7 +3350,7 @@ impl Edit {
             planned_string_bytes = planned_string_bytes
                 .checked_add(decision.base_text.capacity())
                 .and_then(|bytes| bytes.checked_add(decision.replacement.text.capacity()))
-                .ok_or(TransactionError::Limit {
+                .ok_or(Error::Limit {
                     resource: "managed operation string bytes",
                     max: MAX_REPLACEMENT_TEXT_BYTES,
                     actual: usize::MAX,
@@ -3407,7 +3381,7 @@ impl Edit {
                     position, before, ..
                 } = operation
                 else {
-                    return Err(TransactionError::Document(crate::Error::UnsafeEdit {
+                    return Err(Error::Document(crate::Error::UnsafeEdit {
                         format: "DOCX",
                         operation: "replace_body_paragraph_texts",
                         reason: "managed transactions only support direct paragraph text operations",
@@ -3456,11 +3430,11 @@ impl Edit {
         paragraph: Position,
         hyperlink: Position,
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_hyperlink_text")?;
         self.reserve_operation()?;
         let text = authored_text.into();
-        validate_authored_text(&text).map_err(|reason| TransactionError::Refused {
+        validate_authored_text(&text).map_err(|reason| Error::Refused {
             position: paragraph.get(),
             reason,
         })?;
@@ -3481,7 +3455,7 @@ impl Edit {
             hyperlink,
             Refusal::HyperlinkNotFound,
         )
-        .map_err(|reason| TransactionError::Refused {
+        .map_err(|reason| Error::Refused {
             position: paragraph.get(),
             reason,
         })?;
@@ -3493,12 +3467,11 @@ impl Edit {
             hyperlink_end,
             "hyperlink",
         )?;
-        let owner = scan_text_owner(hyperlink_xml, b"hyperlink").map_err(|reason| {
-            TransactionError::Refused {
+        let owner =
+            scan_text_owner(hyperlink_xml, b"hyperlink").map_err(|reason| Error::Refused {
                 position: paragraph.get(),
                 reason,
-            }
-        })?;
+            })?;
         if owner.text == text {
             return Ok(self);
         }
@@ -3544,7 +3517,7 @@ impl Edit {
     pub fn replace_body_hyperlink_texts(
         &mut self,
         replacements: &[HyperlinkTextReplacement],
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_body_hyperlink_texts")?;
         validate_hyperlink_replacements(replacements)?;
         let mut candidate = self.try_clone()?;
@@ -3573,7 +3546,7 @@ impl Edit {
         paragraph: Position,
         run: Position,
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_run_text")?;
         self.replace_direct_paragraph_owner_text(
             paragraph,
@@ -3604,7 +3577,7 @@ impl Edit {
         paragraph: Position,
         field: Position,
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_simple_field_text")?;
         self.replace_direct_paragraph_owner_text(
             paragraph,
@@ -3634,11 +3607,11 @@ impl Edit {
         paragraph: Position,
         field: Position,
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_complex_field_result_text")?;
         self.reserve_operation()?;
         let text = authored_text.into();
-        validate_authored_text(&text).map_err(|reason| TransactionError::Refused {
+        validate_authored_text(&text).map_err(|reason| Error::Refused {
             position: paragraph.get(),
             reason,
         })?;
@@ -3652,12 +3625,11 @@ impl Edit {
             paragraph_end,
             "paragraph",
         )?;
-        let result_range = select_complex_field_result(paragraph_xml, field).map_err(|reason| {
-            TransactionError::Refused {
+        let result_range =
+            select_complex_field_result(paragraph_xml, field).map_err(|reason| Error::Refused {
                 position: paragraph.get(),
                 reason,
-            }
-        })?;
+            })?;
         let start = checked_relative_start(paragraph_start, result_range)?;
         let end = checked_relative_end(paragraph_start, result_range)?;
         let result_xml = checked_slice(
@@ -3667,7 +3639,7 @@ impl Edit {
             "complex field result",
         )?;
         let (before, replacement) =
-            rewrite_run_region(result_xml, &text).map_err(|reason| TransactionError::Refused {
+            rewrite_run_region(result_xml, &text).map_err(|reason| Error::Refused {
                 position: paragraph.get(),
                 reason,
             })?;
@@ -3711,7 +3683,7 @@ impl Edit {
         kind: RevisionKind,
         revision: Position,
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_revision_text")?;
         self.replace_direct_paragraph_owner_text(
             paragraph,
@@ -3755,7 +3727,7 @@ impl Edit {
         &mut self,
         selector: RevisionSelector,
         action: RevisionAction,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.apply_revision_as("apply_revision", selector, action)
     }
 
@@ -3769,7 +3741,7 @@ impl Edit {
         paragraph: Position,
         kind: RevisionKind,
         revision: Position,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.apply_revision_as(
             "accept_revision",
             RevisionSelector::new(paragraph, kind, revision),
@@ -3787,7 +3759,7 @@ impl Edit {
         paragraph: Position,
         kind: RevisionKind,
         revision: Position,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.apply_revision_as(
             "reject_revision",
             RevisionSelector::new(paragraph, kind, revision),
@@ -3805,7 +3777,7 @@ impl Edit {
         operation: &'static str,
         selector: RevisionSelector,
         action: RevisionAction,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged(operation)?;
         self.reserve_operation()?;
         let paragraph_range = self.range(selector.paragraph)?;
@@ -3821,7 +3793,7 @@ impl Edit {
             .projected
             .paragraph_namespaces
             .get(selector.paragraph.get())
-            .ok_or(TransactionError::OutOfBounds {
+            .ok_or(Error::OutOfBounds {
                 position: selector.paragraph.get(),
                 len: self.projected.paragraph_count(),
             })?;
@@ -3869,11 +3841,11 @@ impl Edit {
         paragraph: Position,
         control: Position,
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_content_control_text")?;
         self.reserve_operation()?;
         let text = authored_text.into();
-        validate_authored_text(&text).map_err(|reason| TransactionError::Refused {
+        validate_authored_text(&text).map_err(|reason| Error::Refused {
             position: paragraph.get(),
             reason,
         })?;
@@ -3885,12 +3857,11 @@ impl Edit {
             content.1,
             "content control content",
         )?;
-        let owner = scan_text_owner(content_xml, b"sdtContent").map_err(|reason| {
-            TransactionError::Refused {
+        let owner =
+            scan_text_owner(content_xml, b"sdtContent").map_err(|reason| Error::Refused {
                 position: paragraph.get(),
                 reason,
-            }
-        })?;
+            })?;
         if owner.text == text {
             return Ok(self);
         }
@@ -3933,7 +3904,7 @@ impl Edit {
         paragraph: Position,
         controls: &[Position],
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_nested_content_control_text")?;
         let path: Arc<[Position]> = controls.into();
         let (start, end) = select_nested_inline_control_content(&self.projected, paragraph, &path)?;
@@ -3969,7 +3940,7 @@ impl Edit {
         controls: &[Position],
         hyperlink: Position,
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_nested_content_control_hyperlink_text")?;
         let path: Arc<[Position]> = controls.into();
         let content = select_nested_inline_control_content(&self.projected, paragraph, &path)?;
@@ -4017,7 +3988,7 @@ impl Edit {
         controls: &[Position],
         paragraph: Position,
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_block_content_control_paragraph_text")?;
         let path: Arc<[Position]> = controls.into();
         let (start, end) = select_block_control_paragraph(&self.projected, &path, paragraph)?;
@@ -4052,7 +4023,7 @@ impl Edit {
         paragraph: Position,
         hyperlink: Position,
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_block_content_control_paragraph_hyperlink_text")?;
         let path: Arc<[Position]> = controls.into();
         let owner = select_block_control_paragraph(&self.projected, &path, paragraph)?;
@@ -4100,7 +4071,7 @@ impl Edit {
         &mut self,
         controls: &[Position],
         replacements: &[HyperlinkTextReplacement],
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_block_content_control_paragraph_hyperlink_texts")?;
         validate_hyperlink_replacements(replacements)?;
         let mut candidate = self.try_clone()?;
@@ -4133,11 +4104,11 @@ impl Edit {
         row: Position,
         cell: Position,
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_table_cell_text")?;
         self.reserve_operation()?;
         let text = authored_text.into();
-        validate_authored_text(&text).map_err(|reason| TransactionError::Refused {
+        validate_authored_text(&text).map_err(|reason| Error::Refused {
             position: table.get(),
             reason,
         })?;
@@ -4152,11 +4123,10 @@ impl Edit {
             paragraph_end,
             "table cell paragraph",
         )?;
-        let owner =
-            scan_text_owner(paragraph_xml, b"p").map_err(|reason| TransactionError::Refused {
-                position: table.get(),
-                reason,
-            })?;
+        let owner = scan_text_owner(paragraph_xml, b"p").map_err(|reason| Error::Refused {
+            position: table.get(),
+            reason,
+        })?;
         if owner.text == text {
             return Ok(self);
         }
@@ -4202,11 +4172,11 @@ impl Edit {
         cell: Position,
         paragraph: Position,
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_table_cell_paragraph_text")?;
         self.reserve_operation()?;
         let text = authored_text.into();
-        validate_authored_text(&text).map_err(|reason| TransactionError::Refused {
+        validate_authored_text(&text).map_err(|reason| Error::Refused {
             position: table.get(),
             reason,
         })?;
@@ -4219,7 +4189,7 @@ impl Edit {
             paragraph,
             Refusal::CellNotFound,
         )
-        .map_err(|reason| TransactionError::Refused {
+        .map_err(|reason| Error::Refused {
             position: table.get(),
             reason,
         })?;
@@ -4231,11 +4201,10 @@ impl Edit {
             paragraph_end,
             "table cell paragraph",
         )?;
-        let owner =
-            scan_text_owner(paragraph_xml, b"p").map_err(|reason| TransactionError::Refused {
-                position: table.get(),
-                reason,
-            })?;
+        let owner = scan_text_owner(paragraph_xml, b"p").map_err(|reason| Error::Refused {
+            position: table.get(),
+            reason,
+        })?;
         if owner.text == text {
             return Ok(self);
         }
@@ -4280,7 +4249,7 @@ impl Edit {
         path: &[TableCellAddress],
         paragraph: Position,
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_nested_table_cell_paragraph_text")?;
         let path_arc: Arc<[TableCellAddress]> = path.into();
         let (start, end) = select_nested_cell_paragraph(&self.projected, &path_arc, paragraph)?;
@@ -4315,7 +4284,7 @@ impl Edit {
         paragraph: Position,
         hyperlink: Position,
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_nested_table_cell_paragraph_hyperlink_text")?;
         let path_arc: Arc<[TableCellAddress]> = path.into();
         let owner = select_nested_cell_paragraph(&self.projected, &path_arc, paragraph)?;
@@ -4363,7 +4332,7 @@ impl Edit {
         &mut self,
         path: &[TableCellAddress],
         replacements: &[HyperlinkTextReplacement],
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("replace_nested_table_cell_paragraph_hyperlink_texts")?;
         validate_hyperlink_replacements(replacements)?;
         let mut candidate = self.try_clone()?;
@@ -4391,18 +4360,18 @@ impl Edit {
         &mut self,
         position: Position,
         authored_text: impl Into<String>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("insert_paragraph")?;
         self.reserve_operation()?;
         let text = authored_text.into();
-        validate_authored_text(&text).map_err(|reason| TransactionError::Refused {
+        validate_authored_text(&text).map_err(|reason| Error::Refused {
             position: position.get(),
             reason,
         })?;
         let replacement_text_bytes = self.checked_text_total(text.len())?;
         let count = self.projected.paragraph_count();
         if position.get() > count {
-            return Err(TransactionError::OutOfBounds {
+            return Err(Error::OutOfBounds {
                 position: position.get(),
                 len: count,
             });
@@ -4421,12 +4390,12 @@ impl Edit {
         let candidate = self.projected.with_rewritten_xml(xml)?;
         let readback = candidate
             .paragraph(position)
-            .ok_or(TransactionError::OutOfBounds {
+            .ok_or(Error::OutOfBounds {
                 position: position.get(),
                 len: candidate.paragraph_count(),
             })?
             .text()?;
-        let expected_count = count.checked_add(1).ok_or(TransactionError::Limit {
+        let expected_count = count.checked_add(1).ok_or(Error::Limit {
             resource: "paragraphs",
             max: usize::MAX,
             actual: usize::MAX,
@@ -4458,10 +4427,10 @@ impl Edit {
         &mut self,
         position: Position,
         plan: &ParagraphTransfer,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.ensure_unmanaged("insert_paragraph_transfer")?;
         if plan.target.as_slice() != self.base.xml_bytes() {
-            return Err(TransactionError::StaleSource);
+            return Err(Error::StaleSource);
         }
         self.insert_transferred_paragraph(
             position,
@@ -4472,7 +4441,7 @@ impl Edit {
         )
     }
 
-    fn apply_operation(&mut self, operation: &Operation) -> TransactionResult<&mut Self> {
+    fn apply_operation(&mut self, operation: &Operation) -> Result<&mut Self> {
         match operation {
             Operation::ReplaceParagraphText {
                 position,
@@ -4482,13 +4451,13 @@ impl Edit {
                 let actual = self
                     .projected
                     .paragraph(*position)
-                    .ok_or(TransactionError::OutOfBounds {
+                    .ok_or(Error::OutOfBounds {
                         position: position.get(),
                         len: self.projected.paragraph_count(),
                     })?
                     .text()?;
                 if &actual != before {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_paragraph_text(*position, after.clone())
             },
@@ -4499,7 +4468,7 @@ impl Edit {
                 after,
             } => {
                 if selected_hyperlink_text(&self.projected, *paragraph, *hyperlink)? != *before {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_hyperlink_text(*paragraph, *hyperlink, after.clone())
             },
@@ -4517,7 +4486,7 @@ impl Edit {
                     Refusal::RunNotFound,
                 )? != *before
                 {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_run_text(*paragraph, *run, after.clone())
             },
@@ -4535,7 +4504,7 @@ impl Edit {
                     Refusal::FieldNotFound,
                 )? != *before
                 {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_simple_field_text(*paragraph, *field, after.clone())
             },
@@ -4548,7 +4517,7 @@ impl Edit {
                 if selected_complex_field_result_text(&self.projected, *paragraph, *field)?
                     != *before
                 {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_complex_field_result_text(*paragraph, *field, after.clone())
             },
@@ -4567,7 +4536,7 @@ impl Edit {
                     Refusal::RevisionNotFound,
                 )? != *before
                 {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_revision_text(*paragraph, *kind, *revision, after.clone())
             },
@@ -4585,7 +4554,7 @@ impl Edit {
             } => {
                 if selected_content_control_text(&self.projected, *paragraph, *control)? != *before
                 {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_content_control_text(*paragraph, *control, after.clone())
             },
@@ -4598,7 +4567,7 @@ impl Edit {
                 if selected_nested_inline_control_text(&self.projected, *paragraph, controls)?
                     != *before
                 {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_nested_content_control_text(*paragraph, controls, after.clone())
             },
@@ -4616,7 +4585,7 @@ impl Edit {
                     *hyperlink,
                 )? != *before
                 {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_nested_content_control_hyperlink_text(
                     *paragraph,
@@ -4634,7 +4603,7 @@ impl Edit {
                 if selected_block_control_paragraph_text(&self.projected, controls, *paragraph)?
                     != *before
                 {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_block_content_control_paragraph_text(
                     controls,
@@ -4656,7 +4625,7 @@ impl Edit {
                     *hyperlink,
                 )? != *before
                 {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_block_content_control_paragraph_hyperlink_text(
                     controls,
@@ -4673,7 +4642,7 @@ impl Edit {
                 after,
             } => {
                 if selected_cell_text(&self.projected, *table, *row, *cell)? != *before {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_table_cell_text(*table, *row, *cell, after.clone())
             },
@@ -4688,7 +4657,7 @@ impl Edit {
                 if selected_cell_paragraph_text(&self.projected, *table, *row, *cell, *paragraph)?
                     != *before
                 {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_table_cell_paragraph_text(
                     *table,
@@ -4707,7 +4676,7 @@ impl Edit {
                 if selected_nested_cell_paragraph_text(&self.projected, path, *paragraph)?
                     != *before
                 {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_nested_table_cell_paragraph_text(path, *paragraph, after.clone())
             },
@@ -4725,7 +4694,7 @@ impl Edit {
                     *hyperlink,
                 )? != *before
                 {
-                    return Err(TransactionError::SemanticPrecondition);
+                    return Err(Error::SemanticPrecondition);
                 }
                 self.replace_nested_table_cell_paragraph_hyperlink_text(
                     path,
@@ -4775,7 +4744,7 @@ impl Edit {
         action: RevisionAction,
         before: &Arc<Vec<u8>>,
         after: &Arc<Vec<u8>>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         // Replay rebuilds the projection the same way as `apply_revision_as`,
         // so it carries the same managed refusal.
         self.ensure_unmanaged("apply_revision")?;
@@ -4785,13 +4754,13 @@ impl Edit {
         let end = checked_end(range, "paragraph")?;
         let source = checked_slice(self.projected.xml_bytes(), start, end, "paragraph")?;
         if source != before.as_slice() {
-            return Err(TransactionError::SemanticPrecondition);
+            return Err(Error::SemanticPrecondition);
         }
         let inherited_namespaces = self
             .projected
             .paragraph_namespaces
             .get(selector.paragraph.get())
-            .ok_or(TransactionError::OutOfBounds {
+            .ok_or(Error::OutOfBounds {
                 position: selector.paragraph.get(),
                 len: self.projected.paragraph_count(),
             })?;
@@ -4802,7 +4771,7 @@ impl Edit {
             && rewrite_revision_paragraph(after, selector, action, inherited_namespaces)
                 .is_ok_and(|candidate| candidate.as_slice() == source);
         if !forward_match && !reverse_match {
-            return Err(TransactionError::SemanticPrecondition);
+            return Err(Error::SemanticPrecondition);
         }
         let candidate = Snapshot::from_xml(replace_range(
             self.projected.xml_bytes(),
@@ -4830,7 +4799,7 @@ impl Edit {
         &mut self,
         position: Position,
         expected_text: &str,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.reserve_operation()?;
         let range = self.range(position)?;
         let start = checked_start(range, "paragraph")?;
@@ -4838,7 +4807,7 @@ impl Edit {
         let source = checked_slice(self.projected.xml_bytes(), start, end, "paragraph")?;
         let expected = try_plain_paragraph(self.projected.conformance, expected_text)?;
         if source != expected.as_slice() {
-            return Err(TransactionError::SemanticPrecondition);
+            return Err(Error::SemanticPrecondition);
         }
         let xml = replace_range(self.projected.xml_bytes(), start, end, &[])?;
         let candidate = self.projected.with_rewritten_xml(xml)?;
@@ -4863,11 +4832,11 @@ impl Edit {
         dependency_digest: Arc<str>,
         inverse_dependency_digest: Arc<str>,
         graph: Arc<TransferGraph>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.reserve_operation()?;
         let count = self.projected.paragraph_count();
         if position.get() > count {
-            return Err(TransactionError::OutOfBounds {
+            return Err(Error::OutOfBounds {
                 position: position.get(),
                 len: count,
             });
@@ -4885,12 +4854,10 @@ impl Edit {
             offset,
             xml.as_slice(),
         )?)?;
-        let inserted = candidate
-            .paragraph(position)
-            .ok_or(TransactionError::OutOfBounds {
-                position: position.get(),
-                len: candidate.paragraph_count(),
-            })?;
+        let inserted = candidate.paragraph(position).ok_or(Error::OutOfBounds {
+            position: position.get(),
+            len: candidate.paragraph_count(),
+        })?;
         if inserted.xml_bytes() != xml.as_slice() {
             return Err(crate::Error::InvalidFormat(
                 "transferred paragraph failed exact readback".into(),
@@ -4915,14 +4882,14 @@ impl Edit {
         dependency_digest: &Arc<str>,
         inverse_dependency_digest: &Arc<str>,
         graph: &Arc<TransferGraph>,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.reserve_operation()?;
         let range = self.range(position)?;
         let start = checked_start(range, "paragraph")?;
         let end = checked_end(range, "paragraph")?;
         let source = checked_slice(self.projected.xml_bytes(), start, end, "paragraph")?;
         if source != xml.as_slice() {
-            return Err(TransactionError::SemanticPrecondition);
+            return Err(Error::SemanticPrecondition);
         }
         let candidate = self.projected.with_rewritten_xml(replace_range(
             self.projected.xml_bytes(),
@@ -4949,14 +4916,14 @@ impl Edit {
         missing: Refusal,
         text: String,
         operation: impl FnOnce(String, String) -> Operation,
-    ) -> TransactionResult<&mut Self> {
+    ) -> Result<&mut Self> {
         self.reserve_operation()?;
         let validation = if child_name == b"r" {
             validate_authored_run_content(&text)
         } else {
             validate_authored_text(&text)
         };
-        validation.map_err(|reason| TransactionError::Refused {
+        validation.map_err(|reason| Error::Refused {
             position: paragraph.get(),
             reason,
         })?;
@@ -4971,7 +4938,7 @@ impl Edit {
             "paragraph",
         )?;
         let owner_range = select_direct_child(paragraph_xml, b"p", child_name, owner, missing)
-            .map_err(|reason| TransactionError::Refused {
+            .map_err(|reason| Error::Refused {
                 position: paragraph.get(),
                 reason,
             })?;
@@ -4983,11 +4950,10 @@ impl Edit {
             owner_end,
             "paragraph text owner",
         )?;
-        let scanned =
-            scan_text_owner(owner_xml, child_name).map_err(|reason| TransactionError::Refused {
-                position: paragraph.get(),
-                reason,
-            })?;
+        let scanned = scan_text_owner(owner_xml, child_name).map_err(|reason| Error::Refused {
+            position: paragraph.get(),
+            reason,
+        })?;
         if scanned.text == text {
             return Ok(self);
         }
@@ -5021,21 +4987,20 @@ impl Edit {
         error_position: usize,
         text: String,
         operation: impl FnOnce(String, String) -> Operation,
-        readback: impl FnOnce(&Snapshot) -> TransactionResult<String>,
-    ) -> TransactionResult<&mut Self> {
+        readback: impl FnOnce(&Snapshot) -> Result<String>,
+    ) -> Result<&mut Self> {
         self.reserve_operation()?;
         let (start, end) = range;
-        validate_authored_text(&text).map_err(|reason| TransactionError::Refused {
+        validate_authored_text(&text).map_err(|reason| Error::Refused {
             position: error_position,
             reason,
         })?;
         let replacement_text_bytes = self.checked_text_total(text.len())?;
         let owner_xml = checked_slice(self.projected.xml_bytes(), start, end, "selected owner")?;
-        let owner =
-            scan_text_owner(owner_xml, root_name).map_err(|reason| TransactionError::Refused {
-                position: error_position,
-                reason,
-            })?;
+        let owner = scan_text_owner(owner_xml, root_name).map_err(|reason| Error::Refused {
+            position: error_position,
+            reason,
+        })?;
         if owner.text == text {
             return Ok(self);
         }
@@ -5064,7 +5029,7 @@ impl Edit {
     /// # Errors
     ///
     /// Reserved for commit-time document validation failures.
-    pub fn commit(self) -> TransactionResult<Commit> {
+    pub fn commit(self) -> Result<Commit> {
         let managed_context = self.projected.managed_context();
         if let Some(context) = managed_context.as_ref() {
             context.check().map_err(managed_execution)?;
@@ -5126,13 +5091,13 @@ impl Edit {
         })
     }
 
-    fn range(&self, position: Position) -> TransactionResult<Range> {
+    fn range(&self, position: Position) -> Result<Range> {
         self.projected.range(position)
     }
 
-    fn reserve_operation(&mut self) -> TransactionResult<()> {
+    fn reserve_operation(&mut self) -> Result<()> {
         if self.operations.len() >= MAX_OPERATIONS {
-            return Err(TransactionError::Limit {
+            return Err(Error::Limit {
                 resource: "operations",
                 max: MAX_OPERATIONS,
                 actual: self.operations.len().saturating_add(1),
@@ -5160,7 +5125,7 @@ impl Edit {
             // A managed operation ledger must always cover every retained
             // operation. Multi-paragraph source reconstruction installs a
             // freshly sized ledger atomically before replacing this vector.
-            return Err(TransactionError::Document(crate::Error::UnsafeEdit {
+            return Err(Error::Document(crate::Error::UnsafeEdit {
                 format: "DOCX",
                 operation: "document.edit",
                 reason: "managed operation metadata admission is inconsistent",
@@ -5172,9 +5137,9 @@ impl Edit {
     fn reserve_managed_operation_admission(
         &self,
         operation_count: usize,
-    ) -> TransactionResult<Arc<OperationAdmission>> {
+    ) -> Result<Arc<OperationAdmission>> {
         let admission = self.projected.admission.as_ref().ok_or({
-            TransactionError::Document(crate::Error::UnsafeEdit {
+            Error::Document(crate::Error::UnsafeEdit {
                 format: "DOCX",
                 operation: "document.edit",
                 reason: "managed operation admission is unavailable",
@@ -5189,16 +5154,16 @@ impl Edit {
         }))
     }
 
-    fn reserve_input_text(&self, bytes: usize) -> TransactionResult<Option<Arc<StringAdmission>>> {
+    fn reserve_input_text(&self, bytes: usize) -> Result<Option<Arc<StringAdmission>>> {
         if !self.projected.is_managed() {
             return Ok(None);
         }
         Ok(Some(self.reserve_string_admission(bytes)?))
     }
 
-    fn reserve_string_admission(&self, bytes: usize) -> TransactionResult<Arc<StringAdmission>> {
+    fn reserve_string_admission(&self, bytes: usize) -> Result<Arc<StringAdmission>> {
         let admission = self.projected.admission.as_ref().ok_or({
-            TransactionError::Document(crate::Error::UnsafeEdit {
+            Error::Document(crate::Error::UnsafeEdit {
                 format: "DOCX",
                 operation: "document.edit",
                 reason: "managed string admission is unavailable",
@@ -5207,7 +5172,7 @@ impl Edit {
         let memory = bytes
             .checked_add(size_of::<StringAdmission>())
             .and_then(|bytes| bytes.checked_add(size_of::<Arc<StringAdmission>>()))
-            .ok_or(TransactionError::Limit {
+            .ok_or(Error::Limit {
                 resource: "operation string metadata bytes",
                 max: usize::MAX,
                 actual: usize::MAX,
@@ -5217,9 +5182,9 @@ impl Edit {
         }))
     }
 
-    fn ensure_unmanaged(&self, operation: &'static str) -> TransactionResult<()> {
+    fn ensure_unmanaged(&self, operation: &'static str) -> Result<()> {
         if self.projected.is_managed() {
-            return Err(TransactionError::Document(crate::Error::UnsafeEdit {
+            return Err(Error::Document(crate::Error::UnsafeEdit {
                 format: "DOCX",
                 operation,
                 reason: "this managed transaction operation has no retained source-preserving implementation",
@@ -5228,17 +5193,17 @@ impl Edit {
         Ok(())
     }
 
-    fn checked_text_total(&self, bytes: usize) -> TransactionResult<usize> {
-        let actual =
-            self.replacement_text_bytes
-                .checked_add(bytes)
-                .ok_or(TransactionError::Limit {
-                    resource: "replacement text bytes",
-                    max: MAX_REPLACEMENT_TEXT_BYTES,
-                    actual: usize::MAX,
-                })?;
+    fn checked_text_total(&self, bytes: usize) -> Result<usize> {
+        let actual = self
+            .replacement_text_bytes
+            .checked_add(bytes)
+            .ok_or(Error::Limit {
+                resource: "replacement text bytes",
+                max: MAX_REPLACEMENT_TEXT_BYTES,
+                actual: usize::MAX,
+            })?;
         if actual > MAX_REPLACEMENT_TEXT_BYTES {
-            return Err(TransactionError::Limit {
+            return Err(Error::Limit {
                 resource: "replacement text bytes",
                 max: MAX_REPLACEMENT_TEXT_BYTES,
                 actual,
@@ -5360,11 +5325,11 @@ impl Patch {
     ///
     /// # Errors
     ///
-    /// Returns [`TransactionError::StaleSource`] when `source` does not match
+    /// Returns [`Error::StaleSource`] when `source` does not match
     /// the exact bytes against which this patch was produced.
-    pub fn apply(&self, source: &Snapshot) -> TransactionResult<Snapshot> {
+    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if !source.same_source(&self.before) {
-            return Err(TransactionError::StaleSource);
+            return Err(Error::StaleSource);
         }
         Ok(if self.changed() {
             self.after.clone()
@@ -5403,7 +5368,7 @@ impl Patch {
 fn build_inverse_operations(
     operations: &[Operation],
     context: Option<&ExecutionContext>,
-) -> TransactionResult<(
+) -> Result<(
     OperationList,
     Option<Arc<OperationAdmission>>,
     Option<Arc<StringAdmission>>,
@@ -5415,7 +5380,7 @@ fn build_inverse_operations(
         let string_bytes = operations.iter().try_fold(0usize, |total, operation| {
             total
                 .checked_add(operation_string_bytes(operation))
-                .ok_or(TransactionError::Limit {
+                .ok_or(Error::Limit {
                     resource: "inverse operation string bytes",
                     max: usize::MAX,
                     actual: usize::MAX,
@@ -5434,7 +5399,7 @@ fn build_inverse_operations(
             let memory = string_bytes
                 .checked_add(size_of::<StringAdmission>())
                 .and_then(|bytes| bytes.checked_add(size_of::<Arc<StringAdmission>>()))
-                .ok_or(TransactionError::Limit {
+                .ok_or(Error::Limit {
                     resource: "inverse operation string metadata bytes",
                     max: usize::MAX,
                     actual: usize::MAX,
@@ -5492,24 +5457,22 @@ fn operation_string_bytes(operation: &Operation) -> usize {
     }
 }
 
-fn managed_replacement_text_bytes(operations: &[Operation]) -> TransactionResult<usize> {
+fn managed_replacement_text_bytes(operations: &[Operation]) -> Result<usize> {
     operations.iter().try_fold(0usize, |total, operation| {
         let Operation::ReplaceParagraphText { after, .. } = operation else {
-            return Err(TransactionError::Document(crate::Error::UnsafeEdit {
+            return Err(Error::Document(crate::Error::UnsafeEdit {
                 format: "DOCX",
                 operation: "document.edit",
                 reason: "managed operation ledger contains an unsupported operation",
             }));
         };
-        let total = total
-            .checked_add(after.len())
-            .ok_or(TransactionError::Limit {
-                resource: "replacement text bytes",
-                max: MAX_REPLACEMENT_TEXT_BYTES,
-                actual: usize::MAX,
-            })?;
+        let total = total.checked_add(after.len()).ok_or(Error::Limit {
+            resource: "replacement text bytes",
+            max: MAX_REPLACEMENT_TEXT_BYTES,
+            actual: usize::MAX,
+        })?;
         if total > MAX_REPLACEMENT_TEXT_BYTES {
-            return Err(TransactionError::Limit {
+            return Err(Error::Limit {
                 resource: "replacement text bytes",
                 max: MAX_REPLACEMENT_TEXT_BYTES,
                 actual: total,
@@ -5550,7 +5513,7 @@ impl OperationList {
     }
 }
 
-fn managed_operation_memory_bytes(operation_count: usize) -> TransactionResult<usize> {
+fn managed_operation_memory_bytes(operation_count: usize) -> Result<usize> {
     // A managed edit retains its operation Vec until commit converts it into
     // the patch's Arc slice. The inverse builder has the same Vec-to-Arc
     // overlap, so admit both live representations before either allocation.
@@ -5561,7 +5524,7 @@ fn managed_operation_memory_bytes(operation_count: usize) -> TransactionResult<u
         .and_then(|bytes| bytes.checked_add(size_of::<Arc<[Operation]>>()))
         .and_then(|bytes| bytes.checked_add(size_of::<OperationAdmission>()))
         .and_then(|bytes| bytes.checked_add(size_of::<Arc<OperationAdmission>>()))
-        .ok_or(TransactionError::Limit {
+        .ok_or(Error::Limit {
             resource: "managed operation metadata bytes",
             max: usize::MAX,
             actual: usize::MAX,
@@ -5631,7 +5594,7 @@ struct BodyChildShape {
 fn shift_sibling_ranges(
     ranges: &Arc<[Range]>,
     bounds: &[SpliceBound],
-) -> TransactionResult<Option<Arc<[Range]>>> {
+) -> Result<Option<Arc<[Range]>>> {
     let (Some(first), Some(last)) = (bounds.first(), ranges.last()) else {
         return Ok(Some(Arc::clone(ranges)));
     };
@@ -5746,10 +5709,7 @@ fn publication_accepts_preserved_xml(xml: &[u8]) -> bool {
 /// (`Package::document_snapshot`'s). A snapshot with a source identity is
 /// published by the source-backed writer, which audits its own pair, so for
 /// such a source the historical gate runs alone and no proof is built.
-fn commit_preserving_unmodified(
-    base: &Snapshot,
-    projected: &Snapshot,
-) -> TransactionResult<Snapshot> {
+fn commit_preserving_unmodified(base: &Snapshot, projected: &Snapshot) -> Result<Snapshot> {
     if base.xml.identity().is_some() {
         return if publication_accepts_preserved_xml(base.xml_bytes()) {
             compact_changed_paragraphs(base, projected)
@@ -5792,7 +5752,7 @@ fn commit_preserving_unmodified(
 /// [`CompactionPolicy::WholeDocument`] opt-in, and the preserving policy's
 /// fallback when the source cannot publish preserved — byte for byte what
 /// every committed edit published before the policy existed.
-fn compact_whole_document(projected: &Snapshot) -> TransactionResult<Snapshot> {
+fn compact_whole_document(projected: &Snapshot) -> Result<Snapshot> {
     let source = std::str::from_utf8(projected.xml_bytes()).map_err(|error| {
         crate::Error::InvalidFormat(format!("changed main-document XML is not UTF-8: {error}"))
     })?;
@@ -5807,7 +5767,7 @@ fn compact_whole_document(projected: &Snapshot) -> TransactionResult<Snapshot> {
 /// the original XML bytes as its source of truth, so the fallback publication
 /// route must add the mark back after compaction just as the mutable writer
 /// does. Paragraph-fragment compaction does not call this helper.
-fn compact_changed_document_preserving_bom(source: &str) -> TransactionResult<String> {
+fn compact_changed_document_preserving_bom(source: &str) -> Result<String> {
     let Some(rest) = source.strip_prefix(UTF8_BYTE_ORDER_MARK_TEXT) else {
         return Ok(crate::writer::doc::compact_changed_document_xml(source)?);
     };
@@ -5845,10 +5805,7 @@ const XML_SPACE_ATTRIBUTE: &[u8] = b"xml:space";
 ///
 /// Declining is never a refusal: it publishes the bytes the edit produced,
 /// which is what this policy promises for everything it does not compact.
-fn compact_changed_paragraphs(
-    base: &Snapshot,
-    projected: &Snapshot,
-) -> TransactionResult<Snapshot> {
+fn compact_changed_paragraphs(base: &Snapshot, projected: &Snapshot) -> Result<Snapshot> {
     if base.paragraphs.len() != projected.paragraphs.len() || inherits_xml_space(projected) {
         return Ok(projected.clone());
     }
@@ -6131,11 +6088,9 @@ struct CellSelection<'a> {
     start: usize,
 }
 
-fn validate_hyperlink_replacements(
-    replacements: &[HyperlinkTextReplacement],
-) -> TransactionResult<()> {
+fn validate_hyperlink_replacements(replacements: &[HyperlinkTextReplacement]) -> Result<()> {
     if replacements.len() > MAX_OPERATIONS {
-        return Err(TransactionError::Limit {
+        return Err(Error::Limit {
             resource: "composite hyperlink replacements",
             max: MAX_OPERATIONS,
             actual: replacements.len(),
@@ -6149,7 +6104,7 @@ fn validate_hyperlink_replacements(
             .windows(2)
             .any(|pair| pair[0].address >= pair[1].address)
     {
-        return Err(TransactionError::Refused {
+        return Err(Error::Refused {
             position: ambiguous_position,
             reason: Refusal::AmbiguousCompositeSelector,
         });
@@ -6157,11 +6112,9 @@ fn validate_hyperlink_replacements(
     Ok(())
 }
 
-fn validate_paragraph_replacements(
-    replacements: &[ParagraphTextReplacement],
-) -> TransactionResult<()> {
+fn validate_paragraph_replacements(replacements: &[ParagraphTextReplacement]) -> Result<()> {
     if replacements.len() > MAX_OPERATIONS {
-        return Err(TransactionError::Limit {
+        return Err(Error::Limit {
             resource: "composite paragraph replacements",
             max: MAX_OPERATIONS,
             actual: replacements.len(),
@@ -6175,7 +6128,7 @@ fn validate_paragraph_replacements(
             .windows(2)
             .any(|pair| pair[0].position >= pair[1].position)
     {
-        return Err(TransactionError::Refused {
+        return Err(Error::Refused {
             position: ambiguous_position,
             reason: Refusal::AmbiguousCompositeSelector,
         });
@@ -6183,7 +6136,7 @@ fn validate_paragraph_replacements(
     Ok(())
 }
 
-fn scan_document(xml: &[u8]) -> TransactionResult<Layout> {
+fn scan_document(xml: &[u8]) -> Result<Layout> {
     scan_document_with_context(xml, None)
 }
 
@@ -6203,7 +6156,7 @@ fn event_namespace_binding_count(event: &Event<'_>) -> usize {
             }
             element
                 .unchecked_attributes()
-                .filter_map(Result::ok)
+                .filter_map(std::result::Result::ok)
                 .filter(|attribute| attribute.key.as_namespace_binding().is_some())
                 .count()
         },
@@ -6226,10 +6179,7 @@ fn is_classified_body_child(local: &[u8]) -> bool {
     matches!(local, b"p" | b"tbl" | b"sdt" | b"sectPr")
 }
 
-fn scan_document_with_context(
-    xml: &[u8],
-    context: Option<&ExecutionContext>,
-) -> TransactionResult<Layout> {
+fn scan_document_with_context(xml: &[u8], context: Option<&ExecutionContext>) -> Result<Layout> {
     // A plain `Reader` and the shared binding tracker replace `NsReader`
     // (change 0229's pattern for the paragraph text scanner, applied here by
     // change 0754). `NsReader::from_reader` is `Reader::from_reader` with the
@@ -6317,7 +6267,7 @@ fn scan_document_with_context(
             })?;
             let active_namespace_bindings = current_bindings
                 .checked_add(event_namespace_bindings)
-                .ok_or(TransactionError::Limit {
+                .ok_or(Error::Limit {
                     resource: "document namespace binding count",
                     max: usize::MAX,
                     actual: usize::MAX,
@@ -6334,7 +6284,7 @@ fn scan_document_with_context(
             // prepayment for ordinary documents.
             let lookup_work = event_bytes
                 .checked_mul(active_namespace_bindings.saturating_add(1))
-                .ok_or(TransactionError::Limit {
+                .ok_or(Error::Limit {
                     resource: "document namespace lookup work",
                     max: usize::MAX,
                     actual: usize::MAX,
@@ -6354,7 +6304,7 @@ fn scan_document_with_context(
                 crate::Error::InvalidFormat("document element counter overflow".into())
             })?;
             if nodes > MAX_DOCUMENT_NODES {
-                return Err(TransactionError::Limit {
+                return Err(Error::Limit {
                     resource: "XML elements",
                     max: MAX_DOCUMENT_NODES,
                     actual: nodes,
@@ -6368,7 +6318,7 @@ fn scan_document_with_context(
                     crate::Error::InvalidFormat("document XML nesting is too deep".into())
                 })?;
                 if depth > MAX_DOCUMENT_DEPTH {
-                    return Err(TransactionError::Limit {
+                    return Err(Error::Limit {
                         resource: "XML depth",
                         max: MAX_DOCUMENT_DEPTH,
                         actual: depth,
@@ -6565,7 +6515,7 @@ fn oracle_event_namespace_binding_count(event: &Event<'_>) -> usize {
         Event::Start(element) | Event::Empty(element) => element
             .attributes()
             .with_checks(false)
-            .filter_map(Result::ok)
+            .filter_map(std::result::Result::ok)
             .filter(|attribute| attribute.key.as_namespace_binding().is_some())
             .count(),
         _ => 0,
@@ -6580,7 +6530,7 @@ fn oracle_event_namespace_binding_count(event: &Event<'_>) -> usize {
 fn scan_document_with_context_nsreader_oracle(
     xml: &[u8],
     context: Option<&ExecutionContext>,
-) -> TransactionResult<Layout> {
+) -> Result<Layout> {
     let mut reader = NsReader::from_reader(xml);
     let mut paragraphs = Vec::new();
     let mut paragraph_namespaces = Vec::new();
@@ -6629,7 +6579,7 @@ fn scan_document_with_context_nsreader_oracle(
             })?;
             let active_namespace_bindings = current_bindings
                 .checked_add(event_namespace_bindings)
-                .ok_or(TransactionError::Limit {
+                .ok_or(Error::Limit {
                     resource: "document namespace binding count",
                     max: usize::MAX,
                     actual: usize::MAX,
@@ -6646,7 +6596,7 @@ fn scan_document_with_context_nsreader_oracle(
             // prepayment for ordinary documents.
             let lookup_work = event_bytes
                 .checked_mul(active_namespace_bindings.saturating_add(1))
-                .ok_or(TransactionError::Limit {
+                .ok_or(Error::Limit {
                     resource: "document namespace lookup work",
                     max: usize::MAX,
                     actual: usize::MAX,
@@ -6673,7 +6623,7 @@ fn scan_document_with_context_nsreader_oracle(
                 crate::Error::InvalidFormat("document element counter overflow".into())
             })?;
             if nodes > MAX_DOCUMENT_NODES {
-                return Err(TransactionError::Limit {
+                return Err(Error::Limit {
                     resource: "XML elements",
                     max: MAX_DOCUMENT_NODES,
                     actual: nodes,
@@ -6687,7 +6637,7 @@ fn scan_document_with_context_nsreader_oracle(
                     crate::Error::InvalidFormat("document XML nesting is too deep".into())
                 })?;
                 if depth > MAX_DOCUMENT_DEPTH {
-                    return Err(TransactionError::Limit {
+                    return Err(Error::Limit {
                         resource: "XML depth",
                         max: MAX_DOCUMENT_DEPTH,
                         actual: depth,
@@ -6869,7 +6819,7 @@ fn conformance_from_namespace(namespace: &ResolveResult<'_>) -> Option<Conforman
     }
 }
 
-fn checked_range(start: usize, end: usize) -> TransactionResult<Range> {
+fn checked_range(start: usize, end: usize) -> Result<Range> {
     Ok(Range {
         start: u32::try_from(start).map_err(|_conversion_error| {
             crate::Error::InvalidFormat("paragraph offset exceeds u32".into())
@@ -6898,14 +6848,14 @@ fn rewrite_revision_paragraph(
     selector: RevisionSelector,
     action: RevisionAction,
     inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
-) -> TransactionResult<Vec<u8>> {
+) -> Result<Vec<u8>> {
     if paragraph_has_revision_range_marker(paragraph_xml, inherited_namespaces).map_err(
-        |reason| TransactionError::Refused {
+        |reason| Error::Refused {
             position: selector.paragraph.get(),
             reason,
         },
     )? {
-        return Err(TransactionError::Refused {
+        return Err(Error::Refused {
             position: selector.paragraph.get(),
             reason: Refusal::RevisionDependency,
         });
@@ -6918,23 +6868,23 @@ fn rewrite_revision_paragraph(
         Refusal::RevisionNotFound,
         inherited_namespaces,
     )
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: selector.paragraph.get(),
         reason,
     })?;
     let revision_start = usize::try_from(revision_range.start).map_err(|_error| {
-        TransactionError::Document(crate::Error::InvalidFormat(
+        Error::Document(crate::Error::InvalidFormat(
             "revision offset does not fit usize".into(),
         ))
     })?;
     let revision_end = revision_start
         .checked_add(usize::try_from(revision_range.length).map_err(|_error| {
-            TransactionError::Document(crate::Error::InvalidFormat(
+            Error::Document(crate::Error::InvalidFormat(
                 "revision length does not fit usize".into(),
             ))
         })?)
         .ok_or_else(|| {
-            TransactionError::Document(crate::Error::InvalidFormat(
+            Error::Document(crate::Error::InvalidFormat(
                 "revision range overflows usize".into(),
             ))
         })?;
@@ -6946,7 +6896,7 @@ fn rewrite_revision_paragraph(
     )?;
     let replacement =
         rewrite_revision_fragment(revision_xml, selector.kind, action, inherited_namespaces)
-            .map_err(|reason| TransactionError::Refused {
+            .map_err(|reason| Error::Refused {
                 position: selector.paragraph.get(),
                 reason,
             })?;
@@ -6956,7 +6906,7 @@ fn rewrite_revision_paragraph(
 fn paragraph_has_revision_range_marker(
     paragraph_xml: &[u8],
     inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
-) -> Result<bool, Refusal> {
+) -> std::result::Result<bool, Refusal> {
     if paragraph_xml.len() > MAX_DOCUMENT_XML_BYTES {
         return Err(Refusal::RevisionDependency);
     }
@@ -7052,7 +7002,7 @@ fn rewrite_revision_fragment(
     kind: RevisionKind,
     action: RevisionAction,
     inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
-) -> Result<Vec<u8>, Refusal> {
+) -> std::result::Result<Vec<u8>, Refusal> {
     let info = scan_revision_fragment(xml, kind, inherited_namespaces)?;
     if action.removes_content(kind) {
         return Ok(Vec::new());
@@ -7206,7 +7156,7 @@ fn scan_revision_fragment(
     xml: &[u8],
     kind: RevisionKind,
     inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
-) -> Result<RevisionFragmentInfo, Refusal> {
+) -> std::result::Result<RevisionFragmentInfo, Refusal> {
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
     for (prefix, namespace) in inherited_namespaces {
@@ -7471,7 +7421,7 @@ fn inspect_revision_run_child(
     text_depth: &mut Option<usize>,
     depth: usize,
     deleted_name: Option<(&mut Option<(usize, usize, Vec<u8>)>, usize)>,
-) -> Result<(), Refusal> {
+) -> std::result::Result<(), Refusal> {
     if matches!(namespace, ResolveResult::Unknown(_)) {
         return Err(Refusal::RevisionDependency);
     }
@@ -7523,7 +7473,7 @@ fn inspect_revision_run_child(
     Err(Refusal::RevisionDependency)
 }
 
-fn validate_revision_text_event(event: Event<'_>) -> Result<(), Refusal> {
+fn validate_revision_text_event(event: Event<'_>) -> std::result::Result<(), Refusal> {
     let text = match event {
         Event::Text(text) => {
             let encoded = text
@@ -7552,7 +7502,7 @@ fn validate_revision_element_attributes(
     element: &quick_xml::events::BytesStart<'_>,
     resolver: &quick_xml::name::NamespaceResolver,
     decoder: quick_xml::encoding::Decoder,
-) -> Result<(), Refusal> {
+) -> std::result::Result<(), Refusal> {
     let mut attributes = 0usize;
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|_error| Refusal::RevisionDependency)?;
@@ -7597,7 +7547,7 @@ fn inspect_revision_descendant(
     namespace: &ResolveResult<'_>,
     name: quick_xml::name::QName<'_>,
     depth: usize,
-) -> Result<(), Refusal> {
+) -> std::result::Result<(), Refusal> {
     if matches!(namespace, ResolveResult::Unknown(_)) {
         return Err(Refusal::RevisionDependency);
     }
@@ -7679,7 +7629,7 @@ fn is_word_local(
     is_wordprocessing_namespace(namespace) && name.local_name().as_ref() == local
 }
 
-fn raw_namespace_declarations(open_tag: &[u8]) -> Result<Vec<Vec<u8>>, Refusal> {
+fn raw_namespace_declarations(open_tag: &[u8]) -> std::result::Result<Vec<Vec<u8>>, Refusal> {
     let attributes = raw_tag_attributes(open_tag)?;
     let mut declarations = Vec::new();
     for attribute in attributes.into_iter().filter(|attribute| {
@@ -7698,7 +7648,7 @@ fn raw_revision_scope_attributes(
     element: &quick_xml::events::BytesStart<'_>,
     resolver: &quick_xml::name::NamespaceResolver,
     decoder: quick_xml::encoding::Decoder,
-) -> Result<Vec<Vec<u8>>, Refusal> {
+) -> std::result::Result<Vec<Vec<u8>>, Refusal> {
     let raw_attributes = raw_tag_attributes(open_tag)?;
     let mut raw_attributes = raw_attributes.into_iter();
     let mut scope = Vec::new();
@@ -7839,7 +7789,7 @@ enum RevisionAttributeClass {
 fn validate_revision_metadata(
     attribute: RevisionMetadataAttribute,
     value: &str,
-) -> Result<(), Refusal> {
+) -> std::result::Result<(), Refusal> {
     if value.len() > MAX_REVISION_METADATA_VALUE_BYTES
         || !value.chars().all(is_legal_revision_xml_character)
     {
@@ -7925,7 +7875,9 @@ enum RevisionNamespaceKind {
     Other,
 }
 
-fn raw_attribute_fragments(fragments: &[Vec<u8>]) -> Result<Vec<RawTagAttribute>, Refusal> {
+fn raw_attribute_fragments(
+    fragments: &[Vec<u8>],
+) -> std::result::Result<Vec<RawTagAttribute>, Refusal> {
     let mut attributes = Vec::new();
     attributes
         .try_reserve_exact(fragments.len())
@@ -7953,7 +7905,7 @@ fn raw_attribute_fragments(fragments: &[Vec<u8>]) -> Result<Vec<RawTagAttribute>
 
 fn raw_namespace_bindings(
     declarations: &[RawTagAttribute],
-) -> Result<Vec<(Option<Vec<u8>>, Vec<u8>)>, Refusal> {
+) -> std::result::Result<Vec<(Option<Vec<u8>>, Vec<u8>)>, Refusal> {
     let mut bindings: Vec<(Option<Vec<u8>>, Vec<u8>)> = Vec::new();
     bindings
         .try_reserve_exact(declarations.len())
@@ -7975,7 +7927,7 @@ fn is_namespace_declaration_name(name: &[u8]) -> bool {
     name == b"xmlns" || name.starts_with(b"xmlns:")
 }
 
-fn raw_namespace_declaration_prefix(name: &[u8]) -> Result<Option<&[u8]>, Refusal> {
+fn raw_namespace_declaration_prefix(name: &[u8]) -> std::result::Result<Option<&[u8]>, Refusal> {
     if name == b"xmlns" {
         return Ok(None);
     }
@@ -7986,7 +7938,7 @@ fn raw_namespace_declaration_prefix(name: &[u8]) -> Result<Option<&[u8]>, Refusa
     Ok(Some(prefix))
 }
 
-fn raw_attribute_local_name(name: &[u8]) -> Result<&[u8], Refusal> {
+fn raw_attribute_local_name(name: &[u8]) -> std::result::Result<&[u8], Refusal> {
     let Some(index) = name.iter().position(|byte| *byte == b':') else {
         if name.is_empty() {
             return Err(Refusal::RevisionDependency);
@@ -8000,7 +7952,7 @@ fn raw_attribute_local_name(name: &[u8]) -> Result<&[u8], Refusal> {
     Ok(local)
 }
 
-fn raw_attribute_prefix(name: &[u8]) -> Result<Option<&[u8]>, Refusal> {
+fn raw_attribute_prefix(name: &[u8]) -> std::result::Result<Option<&[u8]>, Refusal> {
     let Some(index) = name.iter().position(|byte| *byte == b':') else {
         return Ok(None);
     };
@@ -8016,7 +7968,7 @@ fn raw_attribute_namespace_kind(
     child_declarations: &[&RawTagAttribute],
     root_bindings: &[(Option<Vec<u8>>, Vec<u8>)],
     inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
-) -> Result<RevisionNamespaceKind, Refusal> {
+) -> std::result::Result<RevisionNamespaceKind, Refusal> {
     let Some(prefix) = raw_attribute_prefix(name)? else {
         raw_attribute_local_name(name)?;
         return Ok(RevisionNamespaceKind::Other);
@@ -8074,7 +8026,7 @@ fn raw_attribute_namespace_kind(
     })
 }
 
-fn raw_tag_name_end(tag: &[u8]) -> Result<usize, Refusal> {
+fn raw_tag_name_end(tag: &[u8]) -> std::result::Result<usize, Refusal> {
     if tag.first() != Some(&b'<') {
         return Err(Refusal::RevisionDependency);
     }
@@ -8092,7 +8044,7 @@ fn raw_tag_name_end(tag: &[u8]) -> Result<usize, Refusal> {
     Ok(end)
 }
 
-fn raw_tag_attributes(tag: &[u8]) -> Result<Vec<RawTagAttribute>, Refusal> {
+fn raw_tag_attributes(tag: &[u8]) -> std::result::Result<Vec<RawTagAttribute>, Refusal> {
     if tag.len() > MAX_REVISION_TAG_ATTRIBUTE_BYTES {
         return Err(Refusal::RevisionDependency);
     }
@@ -8215,7 +8167,7 @@ fn revision_tag_name_replacement(
     xml: &[u8],
     event_start: usize,
     end_tag: bool,
-) -> Result<(usize, usize, Vec<u8>), Refusal> {
+) -> std::result::Result<(usize, usize, Vec<u8>), Refusal> {
     let name_start = event_start
         .checked_add(if end_tag { 2 } else { 1 })
         .ok_or(Refusal::RevisionDependency)?;
@@ -8225,7 +8177,7 @@ fn revision_tag_name_replacement(
 fn revision_tag_name_replacement_at(
     xml: &[u8],
     name_start: usize,
-) -> Result<(usize, usize, Vec<u8>), Refusal> {
+) -> std::result::Result<(usize, usize, Vec<u8>), Refusal> {
     let name_end = xml
         .get(name_start..)
         .and_then(|suffix| {
@@ -8242,7 +8194,7 @@ fn revision_tag_name_replacement_at(
     Ok((local_start, name_end, b"t".to_vec()))
 }
 
-fn scan_text_owner(xml: &[u8], root_name: &[u8]) -> Result<TextOwner, Refusal> {
+fn scan_text_owner(xml: &[u8], root_name: &[u8]) -> std::result::Result<TextOwner, Refusal> {
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
     let mut fragment_prefix = FragmentPrefix::Unseen;
@@ -8478,7 +8430,7 @@ fn is_owner_text_element(
     )
 }
 
-fn decode_text_fragment(xml: &[u8]) -> Result<String, Refusal> {
+fn decode_text_fragment(xml: &[u8]) -> std::result::Result<String, Refusal> {
     let mut reader = Reader::from_reader(xml);
     let mut value = String::new();
     let mut depth = 0usize;
@@ -8532,7 +8484,7 @@ fn decode_text_fragment(xml: &[u8]) -> Result<String, Refusal> {
     Ok(value)
 }
 
-fn rewrite_text_owner(xml: &[u8], owner: &TextOwner, text: &str) -> TransactionResult<Vec<u8>> {
+fn rewrite_text_owner(xml: &[u8], owner: &TextOwner, text: &str) -> Result<Vec<u8>> {
     let _ = preflight_text_owner_rewrite(xml, owner, text)?;
     let total_characters = text.chars().count();
     let mut characters = text.char_indices();
@@ -8542,7 +8494,7 @@ fn rewrite_text_owner(xml: &[u8], owner: &TextOwner, text: &str) -> TransactionR
     replacements
         .try_reserve_exact(owner.slots.len())
         .map_err(|source| {
-            TransactionError::Document(crate::Error::Allocation {
+            Error::Document(crate::Error::Allocation {
                 resource: "paragraph replacements",
                 source,
             })
@@ -8551,7 +8503,7 @@ fn rewrite_text_owner(xml: &[u8], owner: &TextOwner, text: &str) -> TransactionR
         let remaining = total_characters
             .checked_sub(character_cursor)
             .ok_or_else(|| {
-                TransactionError::Document(crate::Error::InvalidFormat(
+                Error::Document(crate::Error::InvalidFormat(
                     "paragraph text slot cursor exceeded authored text".into(),
                 ))
             })?;
@@ -8563,26 +8515,23 @@ fn rewrite_text_owner(xml: &[u8], owner: &TextOwner, text: &str) -> TransactionR
         let value_start = byte_cursor;
         for _ in 0..count {
             let (_, character) = characters.next().ok_or_else(|| {
-                TransactionError::Document(crate::Error::InvalidFormat(
+                Error::Document(crate::Error::InvalidFormat(
                     "paragraph text slot is outside authored text".into(),
                 ))
             })?;
-            byte_cursor =
-                byte_cursor
-                    .checked_add(character.len_utf8())
-                    .ok_or(TransactionError::Limit {
-                        resource: "replacement text bytes",
-                        max: MAX_REPLACEMENT_TEXT_BYTES,
-                        actual: usize::MAX,
-                    })?;
+            byte_cursor = byte_cursor
+                .checked_add(character.len_utf8())
+                .ok_or(Error::Limit {
+                    resource: "replacement text bytes",
+                    max: MAX_REPLACEMENT_TEXT_BYTES,
+                    actual: usize::MAX,
+                })?;
         }
-        character_cursor = character_cursor
-            .checked_add(count)
-            .ok_or(TransactionError::Limit {
-                resource: "replacement text characters",
-                max: MAX_REPLACEMENT_TEXT_BYTES,
-                actual: usize::MAX,
-            })?;
+        character_cursor = character_cursor.checked_add(count).ok_or(Error::Limit {
+            resource: "replacement text characters",
+            max: MAX_REPLACEMENT_TEXT_BYTES,
+            actual: usize::MAX,
+        })?;
         let value = &text[value_start..byte_cursor];
         let fragment = try_run_content_fragment(&slot.prefix, &slot.local_name, value)?;
         replacements.push((slot.start, slot.end, fragment));
@@ -8594,7 +8543,7 @@ fn preflight_text_owner_rewrite(
     xml: &[u8],
     owner: &TextOwner,
     text: &str,
-) -> TransactionResult<(usize, usize)> {
+) -> Result<(usize, usize)> {
     let total_characters = text.chars().count();
     let mut characters = text.char_indices();
     let mut character_cursor = 0usize;
@@ -8605,7 +8554,7 @@ fn preflight_text_owner_rewrite(
         let remaining = total_characters
             .checked_sub(character_cursor)
             .ok_or_else(|| {
-                TransactionError::Document(crate::Error::InvalidFormat(
+                Error::Document(crate::Error::InvalidFormat(
                     "paragraph text slot cursor exceeded authored text".into(),
                 ))
             })?;
@@ -8617,56 +8566,52 @@ fn preflight_text_owner_rewrite(
         let value_start = byte_cursor;
         for _ in 0..count {
             let (_, character) = characters.next().ok_or_else(|| {
-                TransactionError::Document(crate::Error::InvalidFormat(
+                Error::Document(crate::Error::InvalidFormat(
                     "paragraph text slot is outside authored text".into(),
                 ))
             })?;
-            byte_cursor =
-                byte_cursor
-                    .checked_add(character.len_utf8())
-                    .ok_or(TransactionError::Limit {
-                        resource: "replacement text bytes",
-                        max: MAX_REPLACEMENT_TEXT_BYTES,
-                        actual: usize::MAX,
-                    })?;
-        }
-        character_cursor = character_cursor
-            .checked_add(count)
-            .ok_or(TransactionError::Limit {
-                resource: "replacement text characters",
-                max: MAX_REPLACEMENT_TEXT_BYTES,
-                actual: usize::MAX,
-            })?;
-        let value = &text[value_start..byte_cursor];
-        let replacement_len = run_content_fragment_len(&slot.prefix, &slot.local_name, value)?;
-        fragment_bytes =
-            fragment_bytes
-                .checked_add(replacement_len)
-                .ok_or(TransactionError::Limit {
-                    resource: "paragraph replacement XML bytes",
-                    max: MAX_DOCUMENT_XML_BYTES,
+            byte_cursor = byte_cursor
+                .checked_add(character.len_utf8())
+                .ok_or(Error::Limit {
+                    resource: "replacement text bytes",
+                    max: MAX_REPLACEMENT_TEXT_BYTES,
                     actual: usize::MAX,
                 })?;
+        }
+        character_cursor = character_cursor.checked_add(count).ok_or(Error::Limit {
+            resource: "replacement text characters",
+            max: MAX_REPLACEMENT_TEXT_BYTES,
+            actual: usize::MAX,
+        })?;
+        let value = &text[value_start..byte_cursor];
+        let replacement_len = run_content_fragment_len(&slot.prefix, &slot.local_name, value)?;
+        fragment_bytes = fragment_bytes
+            .checked_add(replacement_len)
+            .ok_or(Error::Limit {
+                resource: "paragraph replacement XML bytes",
+                max: MAX_DOCUMENT_XML_BYTES,
+                actual: usize::MAX,
+            })?;
         let removed_len = slot.end.checked_sub(slot.start).ok_or_else(|| {
-            TransactionError::Document(crate::Error::InvalidFormat(
+            Error::Document(crate::Error::InvalidFormat(
                 "paragraph text slot range is inverted".into(),
             ))
         })?;
         output_len = output_len.checked_sub(removed_len).ok_or_else(|| {
-            TransactionError::Document(crate::Error::InvalidFormat(
+            Error::Document(crate::Error::InvalidFormat(
                 "paragraph text slot range exceeds document XML".into(),
             ))
         })?;
         output_len = output_len
             .checked_add(replacement_len)
-            .ok_or(TransactionError::Limit {
+            .ok_or(Error::Limit {
                 resource: "XML bytes",
                 max: MAX_DOCUMENT_XML_BYTES,
                 actual: usize::MAX,
             })?;
     }
     if output_len > MAX_DOCUMENT_XML_BYTES {
-        return Err(TransactionError::Limit {
+        return Err(Error::Limit {
             resource: "XML bytes",
             max: MAX_DOCUMENT_XML_BYTES,
             actual: output_len,
@@ -8739,7 +8684,10 @@ fn structural_run_character(
     })
 }
 
-fn select_complex_field_result(xml: &[u8], position: Position) -> Result<Range, Refusal> {
+fn select_complex_field_result(
+    xml: &[u8],
+    position: Position,
+) -> std::result::Result<Range, Refusal> {
     let mut active = Vec::<(usize, Option<usize>)>::new();
     let mut field_index = 0usize;
     for run_index in 0..MAX_OPERATIONS {
@@ -8786,7 +8734,7 @@ fn select_complex_field_result(xml: &[u8], position: Position) -> Result<Range, 
     Err(Refusal::ComplexFieldNotFound)
 }
 
-fn complex_field_marker(xml: &[u8]) -> Result<Option<ComplexFieldMarker>, Refusal> {
+fn complex_field_marker(xml: &[u8]) -> std::result::Result<Option<ComplexFieldMarker>, Refusal> {
     let mut reader = NsReader::from_reader(xml);
     let mut fragment_prefix = FragmentPrefix::Unseen;
     loop {
@@ -8850,7 +8798,7 @@ fn complex_field_marker(xml: &[u8]) -> Result<Option<ComplexFieldMarker>, Refusa
     }
 }
 
-fn rewrite_run_region(xml: &[u8], text: &str) -> Result<(String, Vec<u8>), Refusal> {
+fn rewrite_run_region(xml: &[u8], text: &str) -> std::result::Result<(String, Vec<u8>), Refusal> {
     let (wrapper, prefix_length, suffix_length, owner) = scan_run_region(xml)?;
     let replacement =
         rewrite_text_owner(&wrapper, &owner, text).map_err(|_error| Refusal::ComplexContent)?;
@@ -8867,7 +8815,7 @@ fn rewrite_run_region(xml: &[u8], text: &str) -> Result<(String, Vec<u8>), Refus
     ))
 }
 
-fn scan_run_region(xml: &[u8]) -> Result<(Vec<u8>, usize, usize, TextOwner), Refusal> {
+fn scan_run_region(xml: &[u8]) -> std::result::Result<(Vec<u8>, usize, usize, TextOwner), Refusal> {
     let first = xml
         .iter()
         .position(|byte| *byte == b'<')
@@ -8908,7 +8856,7 @@ fn select_direct_child(
     child_name: &[u8],
     position: Position,
     missing: Refusal,
-) -> Result<Range, Refusal> {
+) -> std::result::Result<Range, Refusal> {
     select_direct_child_with_context(xml, root_name, child_name, position, missing, &[])
 }
 
@@ -8919,7 +8867,7 @@ fn select_direct_child_with_context(
     position: Position,
     missing: Refusal,
     inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
-) -> Result<Range, Refusal> {
+) -> std::result::Result<Range, Refusal> {
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
     for (prefix, namespace) in inherited_namespaces {
@@ -9011,18 +8959,18 @@ fn select_direct_child_with_context(
     Err(missing)
 }
 
-fn single_cell_paragraph(xml: &[u8]) -> TransactionResult<Range> {
-    validate_basic_cell_children(xml).map_err(|reason| TransactionError::Refused {
+fn single_cell_paragraph(xml: &[u8]) -> Result<Range> {
+    validate_basic_cell_children(xml).map_err(|reason| Error::Refused {
         position: 0,
         reason,
     })?;
     let first = select_direct_child(xml, b"tc", b"p", Position::new(0), Refusal::ComplexContent)
-        .map_err(|reason| TransactionError::Refused {
+        .map_err(|reason| Error::Refused {
             position: 0,
             reason,
         })?;
     if select_direct_child(xml, b"tc", b"p", Position::new(1), Refusal::CellNotFound).is_ok() {
-        return Err(TransactionError::Refused {
+        return Err(Error::Refused {
             position: 0,
             reason: Refusal::ComplexContent,
         });
@@ -9030,7 +8978,7 @@ fn single_cell_paragraph(xml: &[u8]) -> TransactionResult<Range> {
     Ok(first)
 }
 
-fn validate_basic_cell_children(xml: &[u8]) -> Result<(), Refusal> {
+fn validate_basic_cell_children(xml: &[u8]) -> std::result::Result<(), Refusal> {
     let mut reader = NsReader::from_reader(xml);
     let mut fragment_prefix = FragmentPrefix::Unseen;
     let mut root_depth = None;
@@ -9134,16 +9082,15 @@ fn select_cell(
     table: Position,
     row: Position,
     cell: Position,
-) -> TransactionResult<CellSelection<'_>> {
-    let table_range =
-        snapshot
-            .tables
-            .get(table.get())
-            .copied()
-            .ok_or(TransactionError::Refused {
-                position: table.get(),
-                reason: Refusal::CellNotFound,
-            })?;
+) -> Result<CellSelection<'_>> {
+    let table_range = snapshot
+        .tables
+        .get(table.get())
+        .copied()
+        .ok_or(Error::Refused {
+            position: table.get(),
+            reason: Refusal::CellNotFound,
+        })?;
     let table_start = checked_start(table_range, "table")?;
     let table_end = checked_end(table_range, "table")?;
     let table_xml = checked_slice(snapshot.xml_bytes(), table_start, table_end, "table")?;
@@ -9157,9 +9104,9 @@ fn select_cell_in_table<'a>(
     row: Position,
     cell: Position,
     error_position: usize,
-) -> TransactionResult<CellSelection<'a>> {
+) -> Result<CellSelection<'a>> {
     let row_range = select_direct_child(table_xml, b"tbl", b"tr", row, Refusal::CellNotFound)
-        .map_err(|reason| TransactionError::Refused {
+        .map_err(|reason| Error::Refused {
             position: error_position,
             reason,
         })?;
@@ -9167,7 +9114,7 @@ fn select_cell_in_table<'a>(
     let row_end = checked_relative_end(table_start, row_range)?;
     let row_xml = checked_slice(snapshot.xml_bytes(), row_start, row_end, "table row")?;
     let cell_range = select_direct_child(row_xml, b"tr", b"tc", cell, Refusal::CellNotFound)
-        .map_err(|reason| TransactionError::Refused {
+        .map_err(|reason| Error::Refused {
             position: error_position,
             reason,
         })?;
@@ -9179,15 +9126,15 @@ fn select_cell_in_table<'a>(
     })
 }
 
-fn validate_path_length(length: usize, resource: &'static str) -> TransactionResult<()> {
+fn validate_path_length(length: usize, resource: &'static str) -> Result<()> {
     if length == 0 {
-        return Err(TransactionError::Refused {
+        return Err(Error::Refused {
             position: 0,
             reason: Refusal::ComplexContent,
         });
     }
     if length > MAX_OPERATIONS {
-        return Err(TransactionError::Limit {
+        return Err(Error::Limit {
             resource,
             max: MAX_OPERATIONS,
             actual: length,
@@ -9201,7 +9148,7 @@ fn select_single_control_content(
     control_start: usize,
     control_end: usize,
     error_position: usize,
-) -> TransactionResult<(usize, usize)> {
+) -> Result<(usize, usize)> {
     let control_xml = checked_slice(
         snapshot.xml_bytes(),
         control_start,
@@ -9215,7 +9162,7 @@ fn select_single_control_content(
         Position::new(0),
         Refusal::ComplexContent,
     )
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: error_position,
         reason,
     })?;
@@ -9228,7 +9175,7 @@ fn select_single_control_content(
     )
     .is_ok()
     {
-        return Err(TransactionError::Refused {
+        return Err(Error::Refused {
             position: error_position,
             reason: Refusal::ComplexContent,
         });
@@ -9246,7 +9193,7 @@ fn select_direct_control_content(
     root_name: &[u8],
     control: Position,
     error_position: usize,
-) -> TransactionResult<(usize, usize)> {
+) -> Result<(usize, usize)> {
     let root_xml = checked_slice(snapshot.xml_bytes(), root_start, root_end, "control owner")?;
     let control_range = select_direct_child(
         root_xml,
@@ -9255,7 +9202,7 @@ fn select_direct_control_content(
         control,
         Refusal::ContentControlNotFound,
     )
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: error_position,
         reason,
     })?;
@@ -9270,7 +9217,7 @@ fn select_hyperlink_owner(
     root_name: &[u8],
     hyperlink: Position,
     error_position: usize,
-) -> TransactionResult<(usize, usize)> {
+) -> Result<(usize, usize)> {
     let owner_xml = checked_slice(snapshot.xml_bytes(), owner.0, owner.1, "composite owner")?;
     let hyperlink_range = select_direct_child(
         owner_xml,
@@ -9279,7 +9226,7 @@ fn select_hyperlink_owner(
         hyperlink,
         Refusal::HyperlinkNotFound,
     )
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: error_position,
         reason,
     })?;
@@ -9295,7 +9242,7 @@ fn selected_composite_hyperlink_text(
     root_name: &[u8],
     hyperlink: Position,
     error_position: usize,
-) -> TransactionResult<String> {
+) -> Result<String> {
     let (start, end) =
         select_hyperlink_owner(snapshot, owner, root_name, hyperlink, error_position)?;
     scan_text_owner(
@@ -9303,7 +9250,7 @@ fn selected_composite_hyperlink_text(
         b"hyperlink",
     )
     .map(|scanned| scanned.text)
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: error_position,
         reason,
     })
@@ -9313,14 +9260,14 @@ fn select_nested_inline_control_content(
     snapshot: &Snapshot,
     paragraph: Position,
     controls: &[Position],
-) -> TransactionResult<(usize, usize)> {
+) -> Result<(usize, usize)> {
     validate_path_length(controls.len(), "content control path")?;
     let paragraph_range =
         snapshot
             .paragraphs
             .get(paragraph.get())
             .copied()
-            .ok_or(TransactionError::OutOfBounds {
+            .ok_or(Error::OutOfBounds {
                 position: paragraph.get(),
                 len: snapshot.paragraph_count(),
             })?;
@@ -9345,14 +9292,14 @@ fn selected_nested_inline_control_text(
     snapshot: &Snapshot,
     paragraph: Position,
     controls: &[Position],
-) -> TransactionResult<String> {
+) -> Result<String> {
     let (start, end) = select_nested_inline_control_content(snapshot, paragraph, controls)?;
     scan_text_owner(
         checked_slice(snapshot.xml_bytes(), start, end, "content control content")?,
         b"sdtContent",
     )
     .map(|owner| owner.text)
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: paragraph.get(),
         reason,
     })
@@ -9363,7 +9310,7 @@ fn selected_nested_inline_control_hyperlink_text(
     paragraph: Position,
     controls: &[Position],
     hyperlink: Position,
-) -> TransactionResult<String> {
+) -> Result<String> {
     let owner = select_nested_inline_control_content(snapshot, paragraph, controls)?;
     selected_composite_hyperlink_text(snapshot, owner, b"sdtContent", hyperlink, paragraph.get())
 }
@@ -9371,18 +9318,17 @@ fn selected_nested_inline_control_hyperlink_text(
 fn select_block_control_content(
     snapshot: &Snapshot,
     controls: &[Position],
-) -> TransactionResult<(usize, usize)> {
+) -> Result<(usize, usize)> {
     validate_path_length(controls.len(), "block content control path")?;
     let first = controls[0];
-    let range =
-        snapshot
-            .block_controls
-            .get(first.get())
-            .copied()
-            .ok_or(TransactionError::Refused {
-                position: first.get(),
-                reason: Refusal::ContentControlNotFound,
-            })?;
+    let range = snapshot
+        .block_controls
+        .get(first.get())
+        .copied()
+        .ok_or(Error::Refused {
+            position: first.get(),
+            reason: Refusal::ContentControlNotFound,
+        })?;
     let mut start = checked_start(range, "block content control")?;
     let mut end = checked_end(range, "block content control")?;
     (start, end) = select_single_control_content(snapshot, start, end, first.get())?;
@@ -9403,7 +9349,7 @@ fn select_block_control_paragraph(
     snapshot: &Snapshot,
     controls: &[Position],
     paragraph: Position,
-) -> TransactionResult<(usize, usize)> {
+) -> Result<(usize, usize)> {
     let (content_start, content_end) = select_block_control_content(snapshot, controls)?;
     let content_xml = checked_slice(
         snapshot.xml_bytes(),
@@ -9418,7 +9364,7 @@ fn select_block_control_paragraph(
         paragraph,
         Refusal::ContentControlNotFound,
     )
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: controls.first().map_or(0, |position| position.get()),
         reason,
     })?;
@@ -9432,14 +9378,14 @@ fn selected_block_control_paragraph_text(
     snapshot: &Snapshot,
     controls: &[Position],
     paragraph: Position,
-) -> TransactionResult<String> {
+) -> Result<String> {
     let (start, end) = select_block_control_paragraph(snapshot, controls, paragraph)?;
     scan_text_owner(
         checked_slice(snapshot.xml_bytes(), start, end, "block control paragraph")?,
         b"p",
     )
     .map(|owner| owner.text)
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: controls.first().map_or(0, |position| position.get()),
         reason,
     })
@@ -9450,7 +9396,7 @@ fn selected_block_control_paragraph_hyperlink_text(
     controls: &[Position],
     paragraph: Position,
     hyperlink: Position,
-) -> TransactionResult<String> {
+) -> Result<String> {
     let owner = select_block_control_paragraph(snapshot, controls, paragraph)?;
     selected_composite_hyperlink_text(
         snapshot,
@@ -9464,18 +9410,17 @@ fn selected_block_control_paragraph_hyperlink_text(
 fn select_nested_cell<'a>(
     snapshot: &'a Snapshot,
     path: &[TableCellAddress],
-) -> TransactionResult<CellSelection<'a>> {
+) -> Result<CellSelection<'a>> {
     validate_path_length(path.len(), "nested table path")?;
     let first = path[0];
-    let table_range =
-        snapshot
-            .tables
-            .get(first.table.get())
-            .copied()
-            .ok_or(TransactionError::Refused {
-                position: first.table.get(),
-                reason: Refusal::CellNotFound,
-            })?;
+    let table_range = snapshot
+        .tables
+        .get(first.table.get())
+        .copied()
+        .ok_or(Error::Refused {
+            position: first.table.get(),
+            reason: Refusal::CellNotFound,
+        })?;
     let mut table_start = checked_start(table_range, "table")?;
     let table_end = checked_end(table_range, "table")?;
     let mut table_xml = checked_slice(snapshot.xml_bytes(), table_start, table_end, "table")?;
@@ -9495,7 +9440,7 @@ fn select_nested_cell<'a>(
             address.table,
             Refusal::CellNotFound,
         )
-        .map_err(|reason| TransactionError::Refused {
+        .map_err(|reason| Error::Refused {
             position: first.table.get(),
             reason,
         })?;
@@ -9523,11 +9468,11 @@ fn select_nested_cell_paragraph(
     snapshot: &Snapshot,
     path: &[TableCellAddress],
     paragraph: Position,
-) -> TransactionResult<(usize, usize)> {
+) -> Result<(usize, usize)> {
     let selection = select_nested_cell(snapshot, path)?;
     let paragraph_range =
         select_direct_child(selection.xml, b"tc", b"p", paragraph, Refusal::CellNotFound).map_err(
-            |reason| TransactionError::Refused {
+            |reason| Error::Refused {
                 position: path.first().map_or(0, |address| address.table.get()),
                 reason,
             },
@@ -9542,14 +9487,14 @@ fn selected_nested_cell_paragraph_text(
     snapshot: &Snapshot,
     path: &[TableCellAddress],
     paragraph: Position,
-) -> TransactionResult<String> {
+) -> Result<String> {
     let (start, end) = select_nested_cell_paragraph(snapshot, path, paragraph)?;
     scan_text_owner(
         checked_slice(snapshot.xml_bytes(), start, end, "nested table paragraph")?,
         b"p",
     )
     .map(|owner| owner.text)
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: path.first().map_or(0, |address| address.table.get()),
         reason,
     })
@@ -9560,7 +9505,7 @@ fn selected_nested_cell_paragraph_hyperlink_text(
     path: &[TableCellAddress],
     paragraph: Position,
     hyperlink: Position,
-) -> TransactionResult<String> {
+) -> Result<String> {
     let owner = select_nested_cell_paragraph(snapshot, path, paragraph)?;
     selected_composite_hyperlink_text(
         snapshot,
@@ -9575,13 +9520,13 @@ fn selected_hyperlink_text(
     snapshot: &Snapshot,
     paragraph: Position,
     hyperlink: Position,
-) -> TransactionResult<String> {
+) -> Result<String> {
     let paragraph_range =
         snapshot
             .paragraphs
             .get(paragraph.get())
             .copied()
-            .ok_or(TransactionError::OutOfBounds {
+            .ok_or(Error::OutOfBounds {
                 position: paragraph.get(),
                 len: snapshot.paragraph_count(),
             })?;
@@ -9595,7 +9540,7 @@ fn selected_hyperlink_text(
         hyperlink,
         Refusal::HyperlinkNotFound,
     )
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: paragraph.get(),
         reason,
     })?;
@@ -9606,7 +9551,7 @@ fn selected_hyperlink_text(
         b"hyperlink",
     )
     .map(|scanned| scanned.text)
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: paragraph.get(),
         reason,
     })
@@ -9618,13 +9563,13 @@ fn selected_direct_paragraph_owner_text(
     owner: Position,
     child_name: &[u8],
     missing: Refusal,
-) -> TransactionResult<String> {
+) -> Result<String> {
     let paragraph_range =
         snapshot
             .paragraphs
             .get(paragraph.get())
             .copied()
-            .ok_or(TransactionError::OutOfBounds {
+            .ok_or(Error::OutOfBounds {
                 position: paragraph.get(),
                 len: snapshot.paragraph_count(),
             })?;
@@ -9637,7 +9582,7 @@ fn selected_direct_paragraph_owner_text(
         "paragraph",
     )?;
     let owner_range = select_direct_child(paragraph_xml, b"p", child_name, owner, missing)
-        .map_err(|reason| TransactionError::Refused {
+        .map_err(|reason| Error::Refused {
             position: paragraph.get(),
             reason,
         })?;
@@ -9648,7 +9593,7 @@ fn selected_direct_paragraph_owner_text(
         child_name,
     )
     .map(|scanned| scanned.text)
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: paragraph.get(),
         reason,
     })
@@ -9658,13 +9603,13 @@ fn selected_complex_field_result_text(
     snapshot: &Snapshot,
     paragraph: Position,
     field: Position,
-) -> TransactionResult<String> {
+) -> Result<String> {
     let paragraph_range =
         snapshot
             .paragraphs
             .get(paragraph.get())
             .copied()
-            .ok_or(TransactionError::OutOfBounds {
+            .ok_or(Error::OutOfBounds {
                 position: paragraph.get(),
                 len: snapshot.paragraph_count(),
             })?;
@@ -9676,12 +9621,11 @@ fn selected_complex_field_result_text(
         paragraph_end,
         "paragraph",
     )?;
-    let result_range = select_complex_field_result(paragraph_xml, field).map_err(|reason| {
-        TransactionError::Refused {
+    let result_range =
+        select_complex_field_result(paragraph_xml, field).map_err(|reason| Error::Refused {
             position: paragraph.get(),
             reason,
-        }
-    })?;
+        })?;
     let start = checked_relative_start(paragraph_start, result_range)?;
     let end = checked_relative_end(paragraph_start, result_range)?;
     scan_run_region(checked_slice(
@@ -9691,7 +9635,7 @@ fn selected_complex_field_result_text(
         "complex field result",
     )?)
     .map(|(_wrapper, _prefix_length, _suffix_length, owner)| owner.text)
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: paragraph.get(),
         reason,
     })
@@ -9701,13 +9645,13 @@ fn select_content_control_content(
     snapshot: &Snapshot,
     paragraph: Position,
     control: Position,
-) -> TransactionResult<(usize, usize)> {
+) -> Result<(usize, usize)> {
     let paragraph_range =
         snapshot
             .paragraphs
             .get(paragraph.get())
             .copied()
-            .ok_or(TransactionError::OutOfBounds {
+            .ok_or(Error::OutOfBounds {
                 position: paragraph.get(),
                 len: snapshot.paragraph_count(),
             })?;
@@ -9726,7 +9670,7 @@ fn select_content_control_content(
         control,
         Refusal::ContentControlNotFound,
     )
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: paragraph.get(),
         reason,
     })?;
@@ -9745,7 +9689,7 @@ fn select_content_control_content(
         Position::new(0),
         Refusal::ComplexContent,
     )
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: paragraph.get(),
         reason,
     })?;
@@ -9758,7 +9702,7 @@ fn select_content_control_content(
     )
     .is_ok()
     {
-        return Err(TransactionError::Refused {
+        return Err(Error::Refused {
             position: paragraph.get(),
             reason: Refusal::ComplexContent,
         });
@@ -9773,14 +9717,14 @@ fn selected_content_control_text(
     snapshot: &Snapshot,
     paragraph: Position,
     control: Position,
-) -> TransactionResult<String> {
+) -> Result<String> {
     let (start, end) = select_content_control_content(snapshot, paragraph, control)?;
     scan_text_owner(
         checked_slice(snapshot.xml_bytes(), start, end, "content control content")?,
         b"sdtContent",
     )
     .map(|owner| owner.text)
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: paragraph.get(),
         reason,
     })
@@ -9791,7 +9735,7 @@ fn selected_cell_text(
     table: Position,
     row: Position,
     cell: Position,
-) -> TransactionResult<String> {
+) -> Result<String> {
     let selection = select_cell(snapshot, table, row, cell)?;
     let paragraph = single_cell_paragraph(selection.xml)?;
     let start = checked_relative_start(selection.start, paragraph)?;
@@ -9801,7 +9745,7 @@ fn selected_cell_text(
         b"p",
     )
     .map(|owner| owner.text)
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: table.get(),
         reason,
     })
@@ -9813,11 +9757,11 @@ fn selected_cell_paragraph_text(
     row: Position,
     cell: Position,
     paragraph: Position,
-) -> TransactionResult<String> {
+) -> Result<String> {
     let selection = select_cell(snapshot, table, row, cell)?;
     let paragraph_range =
         select_direct_child(selection.xml, b"tc", b"p", paragraph, Refusal::CellNotFound).map_err(
-            |reason| TransactionError::Refused {
+            |reason| Error::Refused {
                 position: table.get(),
                 reason,
             },
@@ -9829,19 +9773,19 @@ fn selected_cell_paragraph_text(
         b"p",
     )
     .map(|owner| owner.text)
-    .map_err(|reason| TransactionError::Refused {
+    .map_err(|reason| Error::Refused {
         position: table.get(),
         reason,
     })
 }
 
-fn checked_start(range: Range, resource: &'static str) -> TransactionResult<usize> {
+fn checked_start(range: Range, resource: &'static str) -> Result<usize> {
     usize::try_from(range.start).map_err(|_error| {
         crate::Error::InvalidFormat(format!("{resource} offset does not fit usize")).into()
     })
 }
 
-fn checked_end(range: Range, resource: &'static str) -> TransactionResult<usize> {
+fn checked_end(range: Range, resource: &'static str) -> Result<usize> {
     checked_start(range, resource)?
         .checked_add(usize::try_from(range.length).map_err(|_error| {
             crate::Error::InvalidFormat(format!("{resource} length does not fit usize"))
@@ -9851,14 +9795,14 @@ fn checked_end(range: Range, resource: &'static str) -> TransactionResult<usize>
         })
 }
 
-fn checked_relative_start(base: usize, range: Range) -> TransactionResult<usize> {
+fn checked_relative_start(base: usize, range: Range) -> Result<usize> {
     base.checked_add(usize::try_from(range.start).map_err(|_error| {
         crate::Error::InvalidFormat("relative XML offset does not fit usize".into())
     })?)
     .ok_or_else(|| crate::Error::InvalidFormat("relative XML offset overflows".into()).into())
 }
 
-fn checked_relative_end(base: usize, range: Range) -> TransactionResult<usize> {
+fn checked_relative_end(base: usize, range: Range) -> Result<usize> {
     checked_relative_start(base, range)?
         .checked_add(usize::try_from(range.length).map_err(|_error| {
             crate::Error::InvalidFormat("relative XML length does not fit usize".into())
@@ -9871,16 +9815,13 @@ fn checked_slice<'a>(
     start: usize,
     end: usize,
     resource: &'static str,
-) -> TransactionResult<&'a [u8]> {
+) -> Result<&'a [u8]> {
     source.get(start..end).ok_or_else(|| {
         crate::Error::InvalidFormat(format!("{resource} range is outside document XML")).into()
     })
 }
 
-fn replace_ranges(
-    source: &[u8],
-    replacements: &[(usize, usize, Vec<u8>)],
-) -> TransactionResult<Vec<u8>> {
+fn replace_ranges(source: &[u8], replacements: &[(usize, usize, Vec<u8>)]) -> Result<Vec<u8>> {
     let mut capacity = source.len();
     let mut previous_end = 0usize;
     for (start, end, replacement) in replacements {
@@ -9893,7 +9834,7 @@ fn replace_ranges(
         capacity = capacity
             .checked_sub(end - start)
             .and_then(|size| size.checked_add(replacement.len()))
-            .ok_or(TransactionError::Limit {
+            .ok_or(Error::Limit {
                 resource: "projected XML bytes",
                 max: MAX_DOCUMENT_XML_BYTES,
                 actual: usize::MAX,
@@ -9901,7 +9842,7 @@ fn replace_ranges(
         previous_end = *end;
     }
     if capacity > MAX_DOCUMENT_XML_BYTES {
-        return Err(TransactionError::Limit {
+        return Err(Error::Limit {
             resource: "projected XML bytes",
             max: MAX_DOCUMENT_XML_BYTES,
             actual: capacity,
@@ -9924,7 +9865,7 @@ fn replace_ranges(
     Ok(output)
 }
 
-fn validate_authored_text(text: &str) -> Result<(), Refusal> {
+fn validate_authored_text(text: &str) -> std::result::Result<(), Refusal> {
     if text.contains(['\t', '\n', '\r'])
         || text.chars().any(|character| {
             !matches!(character, '\u{20}'..='\u{D7FF}' | '\u{E000}'..='\u{FFFD}' | '\u{10000}'..='\u{10FFFF}')
@@ -9935,7 +9876,7 @@ fn validate_authored_text(text: &str) -> Result<(), Refusal> {
     Ok(())
 }
 
-fn validate_authored_run_content(text: &str) -> Result<(), Refusal> {
+fn validate_authored_run_content(text: &str) -> std::result::Result<(), Refusal> {
     if text.chars().any(|character| {
         !matches!(character, '\u{9}' | '\u{A}' | '\u{D}' | '\u{20}'..='\u{D7FF}' | '\u{E000}'..='\u{FFFD}' | '\u{10000}'..='\u{10FFFF}')
     }) {
@@ -9948,7 +9889,7 @@ fn run_content_fragment_len(
     prefix: &[u8],
     original_local_name: &[u8],
     text: &str,
-) -> TransactionResult<usize> {
+) -> Result<usize> {
     let text_local_name = if original_local_name == b"delText" {
         b"delText".as_slice()
     } else {
@@ -9978,14 +9919,13 @@ fn run_content_fragment_len(
             }
             let name_len = qualified_name_len(prefix, local_name)?;
             output_len = replacement_len_add(output_len, replacement_len_add(3, name_len)?)?;
-            plain_start =
-                index
-                    .checked_add(character.len_utf8())
-                    .ok_or(TransactionError::Limit {
-                        resource: "replacement text bytes",
-                        max: MAX_REPLACEMENT_TEXT_BYTES,
-                        actual: usize::MAX,
-                    })?;
+            plain_start = index
+                .checked_add(character.len_utf8())
+                .ok_or(Error::Limit {
+                    resource: "replacement text bytes",
+                    max: MAX_REPLACEMENT_TEXT_BYTES,
+                    actual: usize::MAX,
+                })?;
         }
     }
     let plain = &text[plain_start..];
@@ -10002,7 +9942,7 @@ fn try_run_content_fragment(
     prefix: &[u8],
     original_local_name: &[u8],
     text: &str,
-) -> TransactionResult<Vec<u8>> {
+) -> Result<Vec<u8>> {
     let capacity = run_content_fragment_len(prefix, original_local_name, text)?;
     let text_local_name = if original_local_name == b"delText" {
         b"delText".as_slice()
@@ -10011,7 +9951,7 @@ fn try_run_content_fragment(
     };
     let mut output = Vec::new();
     output.try_reserve_exact(capacity).map_err(|source| {
-        TransactionError::Document(crate::Error::Allocation {
+        Error::Document(crate::Error::Allocation {
             resource: "paragraph replacement XML",
             source,
         })
@@ -10038,14 +9978,13 @@ fn try_run_content_fragment(
             output.push(b'<');
             append_qualified_name(&mut output, prefix, local_name);
             output.extend_from_slice(b"/>");
-            plain_start =
-                index
-                    .checked_add(character.len_utf8())
-                    .ok_or(TransactionError::Limit {
-                        resource: "replacement text bytes",
-                        max: MAX_REPLACEMENT_TEXT_BYTES,
-                        actual: usize::MAX,
-                    })?;
+            plain_start = index
+                .checked_add(character.len_utf8())
+                .ok_or(Error::Limit {
+                    resource: "replacement text bytes",
+                    max: MAX_REPLACEMENT_TEXT_BYTES,
+                    actual: usize::MAX,
+                })?;
         }
     }
     let plain = &text[plain_start..];
@@ -10056,26 +9995,22 @@ fn try_run_content_fragment(
     Ok(output)
 }
 
-fn replacement_len_add(left: usize, right: usize) -> TransactionResult<usize> {
-    left.checked_add(right).ok_or(TransactionError::Limit {
+fn replacement_len_add(left: usize, right: usize) -> Result<usize> {
+    left.checked_add(right).ok_or(Error::Limit {
         resource: "replacement XML bytes",
         max: MAX_DOCUMENT_XML_BYTES,
         actual: usize::MAX,
     })
 }
 
-fn qualified_name_len(prefix: &[u8], local_name: &[u8]) -> TransactionResult<usize> {
+fn qualified_name_len(prefix: &[u8], local_name: &[u8]) -> Result<usize> {
     replacement_len_add(
         replacement_len_add(prefix.len(), if prefix.is_empty() { 0 } else { 1 })?,
         local_name.len(),
     )
 }
 
-fn text_element_named_len(
-    prefix: &[u8],
-    local_name: &[u8],
-    text: &str,
-) -> TransactionResult<usize> {
+fn text_element_named_len(prefix: &[u8], local_name: &[u8], text: &str) -> Result<usize> {
     let name_len = qualified_name_len(prefix, local_name)?;
     if text.is_empty() {
         return replacement_len_add(3, name_len);
@@ -10093,7 +10028,7 @@ fn text_element_named_len(
     replacement_len_add(length, escaped_xml_len(text)?)
 }
 
-fn escaped_xml_len(text: &str) -> TransactionResult<usize> {
+fn escaped_xml_len(text: &str) -> Result<usize> {
     let mut length = 0usize;
     for byte in text.bytes() {
         let encoded_len = match byte {
@@ -10154,7 +10089,7 @@ fn append_escaped_xml(output: &mut Vec<u8>, text: &str) {
     output.extend_from_slice(&text.as_bytes()[cursor..]);
 }
 
-fn try_plain_paragraph(conformance: Conformance, text: &str) -> TransactionResult<Vec<u8>> {
+fn try_plain_paragraph(conformance: Conformance, text: &str) -> Result<Vec<u8>> {
     let namespace = conformance.namespace().as_bytes();
     let prefix = b"<w:p xmlns:w=\"";
     if text.is_empty() {
@@ -10163,7 +10098,7 @@ fn try_plain_paragraph(conformance: Conformance, text: &str) -> TransactionResul
             b"\"/>".len(),
         )?;
         if capacity > MAX_DOCUMENT_XML_BYTES {
-            return Err(TransactionError::Limit {
+            return Err(Error::Limit {
                 resource: "XML bytes",
                 max: MAX_DOCUMENT_XML_BYTES,
                 actual: capacity,
@@ -10171,7 +10106,7 @@ fn try_plain_paragraph(conformance: Conformance, text: &str) -> TransactionResul
         }
         let mut paragraph = Vec::new();
         paragraph.try_reserve_exact(capacity).map_err(|source| {
-            TransactionError::Document(crate::Error::Allocation {
+            Error::Document(crate::Error::Allocation {
                 resource: "plain paragraph XML",
                 source,
             })
@@ -10190,7 +10125,7 @@ fn try_plain_paragraph(conformance: Conformance, text: &str) -> TransactionResul
         replacement_len_add(text_len, b"</w:r></w:p>".len())?,
     )?;
     if capacity > MAX_DOCUMENT_XML_BYTES {
-        return Err(TransactionError::Limit {
+        return Err(Error::Limit {
             resource: "XML bytes",
             max: MAX_DOCUMENT_XML_BYTES,
             actual: capacity,
@@ -10198,7 +10133,7 @@ fn try_plain_paragraph(conformance: Conformance, text: &str) -> TransactionResul
     }
     let mut paragraph = Vec::new();
     paragraph.try_reserve_exact(capacity).map_err(|source| {
-        TransactionError::Document(crate::Error::Allocation {
+        Error::Document(crate::Error::Allocation {
             resource: "plain paragraph XML",
             source,
         })
@@ -10212,12 +10147,7 @@ fn try_plain_paragraph(conformance: Conformance, text: &str) -> TransactionResul
     Ok(paragraph)
 }
 
-fn replace_range(
-    source: &[u8],
-    start: usize,
-    end: usize,
-    replacement: &[u8],
-) -> TransactionResult<Vec<u8>> {
+fn replace_range(source: &[u8], start: usize, end: usize, replacement: &[u8]) -> Result<Vec<u8>> {
     if start > end || end > source.len() {
         return Err(crate::Error::InvalidFormat("invalid document rewrite range".into()).into());
     }
@@ -10225,13 +10155,13 @@ fn replace_range(
         .len()
         .checked_sub(end - start)
         .and_then(|size| size.checked_add(replacement.len()))
-        .ok_or(TransactionError::Limit {
+        .ok_or(Error::Limit {
             resource: "projected XML bytes",
             max: MAX_DOCUMENT_XML_BYTES,
             actual: usize::MAX,
         })?;
     if capacity > MAX_DOCUMENT_XML_BYTES {
-        return Err(TransactionError::Limit {
+        return Err(Error::Limit {
             resource: "projected XML bytes",
             max: MAX_DOCUMENT_XML_BYTES,
             actual: capacity,
@@ -11164,21 +11094,21 @@ mod tests {
         let mut refused = source.edit();
         assert!(matches!(
             refused.replace_body_paragraph_texts(&duplicate),
-            Err(TransactionError::Refused {
+            Err(Error::Refused {
                 reason: Refusal::AmbiguousCompositeSelector,
                 ..
             })
         ));
         assert!(matches!(
             refused.replace_body_paragraph_texts(&[]),
-            Err(TransactionError::Refused {
+            Err(Error::Refused {
                 reason: Refusal::AmbiguousCompositeSelector,
                 ..
             })
         ));
         assert!(matches!(
             refused.replace_body_paragraph_texts(&out_of_order),
-            Err(TransactionError::Refused {
+            Err(Error::Refused {
                 reason: Refusal::AmbiguousCompositeSelector,
                 ..
             })
@@ -11224,7 +11154,7 @@ mod tests {
         let mut refused = source.edit();
         assert!(matches!(
             refused.replace_paragraph_text(Position::new(0), "no"),
-            Err(TransactionError::Refused {
+            Err(Error::Refused {
                 reason: Refusal::ComplexContent,
                 ..
             })
@@ -11237,7 +11167,7 @@ mod tests {
         let stale = Snapshot::from_xml(document("<w:p><w:r><w:t>other</w:t></w:r></w:p>")).unwrap();
         assert!(matches!(
             commit.patch().apply(&stale),
-            Err(TransactionError::StaleSource)
+            Err(Error::StaleSource)
         ));
     }
 
@@ -11407,7 +11337,7 @@ mod tests {
         let mut refused = unsupported.edit();
         assert!(matches!(
             refused.accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(0),),
-            Err(TransactionError::Refused {
+            Err(Error::Refused {
                 reason: Refusal::RevisionDependency,
                 ..
             })
@@ -11426,7 +11356,7 @@ mod tests {
                 RevisionKind::Insertion,
                 Position::new(0),
             ),
-            Err(TransactionError::Refused {
+            Err(Error::Refused {
                 reason: Refusal::RevisionDependency,
                 ..
             })
@@ -11448,7 +11378,7 @@ mod tests {
                 RevisionKind::Insertion,
                 Position::new(0),
             ),
-            Err(TransactionError::Refused {
+            Err(Error::Refused {
                 reason: Refusal::RevisionDependency,
                 ..
             })
@@ -11461,7 +11391,7 @@ mod tests {
         let mut noop = empty.edit();
         assert!(matches!(
             noop.accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(1),),
-            Err(TransactionError::Refused {
+            Err(Error::Refused {
                 reason: Refusal::RevisionNotFound,
                 ..
             })
@@ -11473,7 +11403,7 @@ mod tests {
             Snapshot::from_xml(document("<w:p><w:r><w:t>different</w:t></w:r></w:p>")).unwrap();
         assert!(matches!(
             noop.commit().unwrap().patch().apply(&stale),
-            Err(TransactionError::StaleSource)
+            Err(Error::StaleSource)
         ));
     }
 
@@ -11505,7 +11435,7 @@ mod tests {
         let mut replay = source.edit();
         assert!(matches!(
             replay.apply_operation(&tampered),
-            Err(TransactionError::SemanticPrecondition)
+            Err(Error::SemanticPrecondition)
         ));
         assert_eq!(replay.projected().xml_bytes(), source.xml_bytes());
         assert!(replay.operations.is_empty());
@@ -11556,14 +11486,14 @@ mod tests {
             ExecutionContext::new(budget.clone(), cancellation, limits),
         )
         .unwrap();
-        let mut managed = package.edit_document().unwrap();
+        let mut managed = package.edit().unwrap();
         assert!(managed.projected.is_managed());
         let projected = managed.projected().xml_bytes().to_vec();
         let reserved = budget.used(Resource::Memory);
 
         assert!(matches!(
             managed.apply_operation(&recorded),
-            Err(TransactionError::Document(crate::Error::UnsafeEdit {
+            Err(Error::Document(crate::Error::UnsafeEdit {
                 format: "DOCX",
                 operation: "apply_revision",
                 ..
@@ -11588,7 +11518,7 @@ mod tests {
                 RevisionKind::Insertion,
                 Position::new(0),
             ),
-            Err(TransactionError::Refused {
+            Err(Error::Refused {
                 reason: Refusal::RevisionDependency,
                 ..
             })
@@ -11709,7 +11639,7 @@ mod tests {
                 .unwrap();
             assert!(matches!(
                 edit.commit(),
-                Err(TransactionError::Document(crate::Error::InvalidFormat(_)))
+                Err(Error::Document(crate::Error::InvalidFormat(_)))
             ));
         }
     }
@@ -11794,7 +11724,7 @@ mod tests {
         let mut replay = source.edit();
         assert!(matches!(
             replay.apply_operation(&malformed),
-            Err(TransactionError::SemanticPrecondition)
+            Err(Error::SemanticPrecondition)
         ));
         assert_eq!(replay.projected().xml_bytes(), source.xml_bytes());
         assert!(replay.operations.is_empty());
@@ -11983,7 +11913,7 @@ mod tests {
         let stale = Snapshot::from_xml(document("<w:p><w:r><w:t>other</w:t></w:r></w:p>")).unwrap();
         assert!(matches!(
             stale.apply_durable(&decoded),
-            Err(TransactionError::StaleSource)
+            Err(Error::StaleSource)
         ));
     }
 
@@ -12550,14 +12480,14 @@ mod tests {
         let mut refused = source.edit();
         assert!(matches!(
             refused.replace_body_hyperlink_texts(&[]),
-            Err(TransactionError::Refused {
+            Err(Error::Refused {
                 reason: Refusal::AmbiguousCompositeSelector,
                 ..
             })
         ));
         assert!(matches!(
             refused.replace_body_hyperlink_texts(&duplicate),
-            Err(TransactionError::Refused {
+            Err(Error::Refused {
                 reason: Refusal::AmbiguousCompositeSelector,
                 ..
             })
@@ -12576,7 +12506,7 @@ mod tests {
         ];
         assert!(matches!(
             refused.replace_body_hyperlink_texts(&late_failure),
-            Err(TransactionError::Refused {
+            Err(Error::Refused {
                 reason: Refusal::HyperlinkNotFound,
                 ..
             })

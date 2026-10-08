@@ -8,6 +8,59 @@
       "features": [],
       "banned_names": [],
       "families": []
+    },
+    {
+      "id": "docx-minimal",
+      "package": "litchi-docx",
+      "default_features": false,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "edit_document",
+          "scope": "litchi_docx",
+          "replacement": "use Package::edit()"
+        },
+        {
+          "name": "TransactionError",
+          "scope": "litchi_docx::document",
+          "replacement": "use document::Error"
+        },
+        {
+          "name": "TransactionResult",
+          "scope": "litchi_docx::document",
+          "replacement": "use document::Result"
+        }
+      ],
+      "families": []
+    },
+    {
+      "id": "docx-full",
+      "package": "litchi-docx",
+      "default_features": false,
+      "features": [
+        "automatic-fonts",
+        "encryption",
+        "sign",
+        "vba-inspection"
+      ],
+      "banned_names": [
+        {
+          "name": "edit_document",
+          "scope": "litchi_docx",
+          "replacement": "use Package::edit()"
+        },
+        {
+          "name": "TransactionError",
+          "scope": "litchi_docx::document",
+          "replacement": "use document::Error"
+        },
+        {
+          "name": "TransactionResult",
+          "scope": "litchi_docx::document",
+          "replacement": "use document::Result"
+        }
+      ],
+      "families": []
     }
   ]
 }

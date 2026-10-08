@@ -16,7 +16,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits,
     OwnedSource, Position, ReadAt, Resource, SourceVersion,
 };
-use litchi_docx::document::{ParagraphTextReplacement, Refusal, TransactionError};
+use litchi_docx::document::{Error as TransactionError, ParagraphTextReplacement, Refusal};
 use litchi_docx::{Error, ReadLimits, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcError, OpcPackage, PackURI};

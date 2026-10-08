@@ -218,7 +218,7 @@ fn a_fully_marked_document_reads_and_saves_like_the_unmarked_document() {
 #[test]
 fn a_semantic_edit_of_a_marked_main_part_matches_the_unmarked_edit() {
     let (kept, _) = differential(&generated_document(), is_xml_member, |package| {
-        let mut edit = package.edit_document().unwrap();
+        let mut edit = package.edit().unwrap();
         edit.replace_paragraph_text(Position::new(1), "edited & <after>")
             .unwrap();
         edit.replace_paragraph_text(Position::new(4), "").unwrap();
@@ -258,7 +258,7 @@ fn the_marked_alt_chunk_fixture_reads_and_edits_like_its_unmarked_twin() {
         |package| {
             let before = observe(package);
             let semantic = package
-                .edit_document()
+                .edit()
                 .map(|_| ())
                 .map_err(|error| error.to_string());
             let mutable = package

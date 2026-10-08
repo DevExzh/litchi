@@ -220,7 +220,7 @@ fn exact_noop_and_changed_document_overlay_preserve_raw_unselected_members() {
     let (path, source_bytes) = write_fixture(&directory, "before");
 
     let package = source_backed::Package::from_path(&path).unwrap();
-    let noop = package.edit_document().unwrap().commit().unwrap();
+    let noop = package.edit().unwrap().commit().unwrap();
     let mut output = Vec::new();
     package
         .publish_document_commit_to_stream(&mut output, &noop)
@@ -228,7 +228,7 @@ fn exact_noop_and_changed_document_overlay_preserve_raw_unselected_members() {
     assert_eq!(output, source_bytes);
 
     let package = source_backed::Package::from_path(&path).unwrap();
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(litchi_core::Position::new(0), "after")
         .unwrap();
     let commit = edit.commit().unwrap();

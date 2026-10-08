@@ -17,7 +17,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, Position,
     Resource,
 };
-use litchi_docx::document::{Edit, Snapshot, TransactionError};
+use litchi_docx::document::{Edit, Error as TransactionError, Snapshot};
 use litchi_docx::{Error, Package, ReadLimits, source_backed};
 use litchi_ooxml_common::mce::admission::{Admission, admit};
 use litchi_ooxml_common::mce::{self, Capabilities};
@@ -218,7 +218,7 @@ fn source_backed_edits_publish_what_the_eager_owner_publishes() {
 
         let package = source(&original);
         let mut edit = package
-            .edit_document()
+            .edit()
             .unwrap_or_else(|error| panic!("{name}: {error}"));
         first_edit(&mut edit);
         let commit = edit.commit().unwrap();
@@ -227,7 +227,7 @@ fn source_backed_edits_publish_what_the_eager_owner_publishes() {
 
         let mut owner = eager(&original);
         let mut edit = owner
-            .edit_document()
+            .edit()
             .unwrap_or_else(|error| panic!("{name}: {error}"));
         first_edit(&mut edit);
         let commit = edit.commit().unwrap();
@@ -290,7 +290,7 @@ fn exact_no_ops_republish_every_fixture_byte_for_byte() {
     for name in all_fixtures() {
         let original = fixture(name);
         let package = source(&original);
-        let commit = package.edit_document().unwrap().commit().unwrap();
+        let commit = package.edit().unwrap().commit().unwrap();
         assert!(!commit.patch().changed());
         let mut published = Vec::new();
         package
@@ -300,7 +300,7 @@ fn exact_no_ops_republish_every_fixture_byte_for_byte() {
 
         let mut owner = eager(&original);
         let before = owner.document_snapshot().unwrap();
-        let commit = owner.edit_document().unwrap().commit().unwrap();
+        let commit = owner.edit().unwrap().commit().unwrap();
         let after = owner.publish_document_commit(commit).unwrap();
         assert_eq!(
             after.patch().source().xml_bytes(),
@@ -563,9 +563,9 @@ fn witness_matrix_on_both_owners_and_the_managed_route() {
     for (label, xml, expect) in witnesses {
         let bytes = package(&xml, None);
         let source_owner = source(&bytes);
-        let source_edit = source_owner.edit_document();
+        let source_edit = source_owner.edit();
         let mut owner = eager(&bytes);
-        let eager_edit = owner.edit_document();
+        let eager_edit = owner.edit();
         match expect {
             Expect::Admitted | Expect::AdmittedExceptManagedCapture | Expect::UnmanagedOnly => {
                 let mut source_edit =
@@ -607,7 +607,7 @@ fn witness_matrix_on_both_owners_and_the_managed_route() {
                     matches!(
                         source_edit,
                         Err(TransactionError::Document(Error::UnsafeEdit {
-                            operation: "edit_document",
+                            operation: "edit",
                             reason: "source-backed document transactions do not support markup-compatibility branch selection",
                             ..
                         }))

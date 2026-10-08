@@ -70,7 +70,7 @@ fn open_path(path: &std::path::Path, options: &OpenOptions) -> Docx {
 /// The main-document edit an unsigned handle's editor builder returns.
 #[track_caller]
 fn retained_edit(docx: &Docx) -> litchi_docx::document::Edit {
-    match docx.edit_document() {
+    match docx.edit() {
         Ok(DocxEditor::Edit(edit)) => *edit,
         other => panic!("expected a main-document edit, got {other:?}"),
     }
@@ -351,14 +351,14 @@ fn every_source_read_reports_a_changed_file() {
         docx.metadata().unwrap_err(),
         docx.tolerance_report().unwrap_err(),
         docx.section_inventory().unwrap_err(),
-        docx.edit_document().unwrap_err(),
+        docx.edit().unwrap_err(),
         docx.owner().check_source().unwrap_err(),
     ];
     for error in errors {
         assert_eq!(error.code(), Code::IoError, "{error:?}");
         let changed = match error.leaf() {
             Source::Docx(litchi_docx::Error::Opc(error)) | Source::Opc(error) => error,
-            Source::DocxTransaction(litchi_docx::document::TransactionError::Document(
+            Source::DocxTransaction(litchi_docx::document::Error::Document(
                 litchi_docx::Error::Opc(error),
             )) => error,
             other => panic!("expected a typed OPC source change, got {other:?}"),
@@ -422,7 +422,7 @@ fn editor_admits_word_markup_compatibility_on_both_owners() {
         let eager = open_eager(bytes.clone(), &OpenOptions::new()).unwrap();
         let source = open_bytes(bytes, &OpenOptions::new()).unwrap();
         let eager_edit = retained_edit(&eager);
-        let source_edit = match source.edit_document() {
+        let source_edit = match source.edit() {
             Ok(DocxEditor::Edit(edit)) => *edit,
             other => panic!("{name}: {other:?}"),
         };
@@ -453,13 +453,13 @@ fn editor_refuses_alternate_content_on_both_owners() {
     assert_eq!(source.text().unwrap(), eager.text().unwrap());
     assert!(!source.text().unwrap().contains("FALLBACK"));
     for docx in [&source, &eager] {
-        let error = docx.edit_document().unwrap_err();
+        let error = docx.edit().unwrap_err();
         assert_eq!(error.code(), Code::UnsupportedCapability, "{error:?}");
         assert_eq!(error.format(), Some(FileFormat::Docx));
         assert!(
             matches!(
                 error.leaf(),
-                Source::DocxTransaction(litchi_docx::document::TransactionError::Document(
+                Source::DocxTransaction(litchi_docx::document::Error::Document(
                     litchi_docx::Error::UnsafeEdit { .. }
                 ))
             ),
@@ -476,7 +476,7 @@ fn editor_refuses_when_the_source_is_not_retained() {
         open_bytes(bytes.clone(), &options).unwrap(),
         open_eager(bytes.clone(), &options).unwrap(),
     ] {
-        let error = docx.edit_document().unwrap_err();
+        let error = docx.edit().unwrap_err();
         assert_eq!(error.code(), Code::UnsupportedCapability);
         assert_eq!(error.format(), Some(FileFormat::Docx));
         assert!(error.suggestion().is_some());
@@ -487,7 +487,7 @@ fn editor_refuses_when_the_source_is_not_retained() {
 
 #[test]
 fn transaction_errors_are_classified_and_typed() {
-    use litchi_docx::document::TransactionError;
+    use litchi_docx::document::Error as TransactionError;
 
     let cases = [
         (

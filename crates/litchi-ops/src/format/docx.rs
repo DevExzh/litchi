@@ -95,7 +95,7 @@ pub(crate) enum DocxEditor {
     /// After [`Signed::unsign`](crate::Signed::unsign): an owning copy of the
     /// document whose signature the leaf removed explicitly
     /// ([`litchi_docx::Package::unsign`]). Edits start from it
-    /// (`edit_document`) and publish into it, so the output carries no
+    /// (`edit`) and publish into it, so the output carries no
     /// signature part.
     Unsigned(Box<litchi_docx::Package>),
 }
@@ -417,7 +417,7 @@ impl Docx {
     /// Build what a write starts from.
     ///
     /// On an unsigned document, both owner states reach the leaf's
-    /// `edit_document` directly, so no container is indexed again. After
+    /// `edit` directly, so no container is indexed again. After
     /// [`Signed::unsign`](crate::Signed::unsign) the editor is an owning copy
     /// whose signature the leaf removed explicitly (record 0013): it is opened
     /// over the exact input bytes, or cloned from the eager owner's package,
@@ -432,7 +432,7 @@ impl Docx {
     /// lose its encryption profile in the unsigned copy; [`Code::IoError`]
     /// when the source changed; and the leaf's typed failures otherwise.
     #[cfg_attr(not(test), expect(dead_code, reason = "write verbs arrive in M2"))]
-    pub(crate) fn edit_document(&self) -> Result<DocxEditor> {
+    pub(crate) fn edit(&self) -> Result<DocxEditor> {
         if self.0.signature() == Signature::Signed {
             return Err(signature::refusal(FileFormat::Docx));
         }
@@ -450,9 +450,9 @@ impl Docx {
                 .map(|package| DocxEditor::Unsigned(Box::new(package)));
         }
         match &self.0.owner {
-            DocxOwner::Eager(package) => Ok(DocxEditor::Edit(Box::new(package.edit_document()?))),
+            DocxOwner::Eager(package) => Ok(DocxEditor::Edit(Box::new(package.edit()?))),
             DocxOwner::Source(package) => {
-                let result = package.edit_document().map_err(Error::from);
+                let result = package.edit().map_err(Error::from);
                 self.0
                     .owner
                     .finish(result)

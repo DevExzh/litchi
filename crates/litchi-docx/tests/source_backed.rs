@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 use litchi_core::{Position, ReadAt, SourceVersion};
 use litchi_docx::alt::{Data, MAX_DATA_BYTES};
-use litchi_docx::document::{Snapshot, TransactionError};
+use litchi_docx::document::{Error as TransactionError, Snapshot};
 use litchi_docx::{Error, Package, ReadLimits, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::rel::TargetMode;
@@ -391,7 +391,7 @@ fn document_commit_edits_only_the_main_part_and_reopens() {
     ));
     let read_at: Arc<dyn ReadAt> = source.clone();
     let package = source_backed::Package::from_read_at(read_at).unwrap();
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(1), "edited")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -441,7 +441,7 @@ fn exact_noop_reproduces_every_source_byte() {
     let source = Arc::new(ObservedSource::new(source_bytes.clone(), main, unused));
     let read_at: Arc<dyn ReadAt> = source;
     let package = source_backed::Package::from_read_at(read_at).unwrap();
-    let commit = package.edit_document().unwrap().commit().unwrap();
+    let commit = package.edit().unwrap().commit().unwrap();
     let mut output = Vec::new();
 
     package
@@ -460,7 +460,7 @@ fn rolled_back_document_operations_use_the_exact_signed_source_path() {
     let source = Arc::new(ObservedSource::new(source_bytes.clone(), main, unused));
     let read_at: Arc<dyn ReadAt> = source;
     let package = source_backed::Package::from_read_at(read_at).unwrap();
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "temporary")
         .unwrap();
     edit.replace_paragraph_text(Position::new(0), "alpha")
@@ -482,7 +482,7 @@ fn stale_commit_and_changed_source_fail_before_output() {
     let source = Arc::new(ObservedSource::new(source_bytes, main, unused));
     let read_at: Arc<dyn ReadAt> = source.clone();
     let package = source_backed::Package::from_read_at(read_at).unwrap();
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(1), "edited")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -550,7 +550,7 @@ fn signed_changes_are_refused_but_signed_noops_are_exact() {
     ));
     let read_at: Arc<dyn ReadAt> = source;
     let package = source_backed::Package::from_read_at(read_at).unwrap();
-    let noop = package.edit_document().unwrap().commit().unwrap();
+    let noop = package.edit().unwrap().commit().unwrap();
     let mut output = Vec::new();
     package
         .publish_document_commit_to_stream(&mut output, &noop)
@@ -560,7 +560,7 @@ fn signed_changes_are_refused_but_signed_noops_are_exact() {
     let source = Arc::new(ObservedSource::new(signed_bytes, main, unused));
     let read_at: Arc<dyn ReadAt> = source;
     let package = source_backed::Package::from_read_at(read_at).unwrap();
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -580,7 +580,7 @@ fn sequential_sink_failure_is_typed_as_incomplete_output() {
     let source = Arc::new(ObservedSource::new(bytes, main, unused));
     let read_at: Arc<dyn ReadAt> = source;
     let package = source_backed::Package::from_read_at(read_at).unwrap();
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(1), "edited")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -609,7 +609,7 @@ fn strict_main_document_relationship_uses_the_same_overlay_contract() {
     let source = Arc::new(ObservedSource::new(bytes, main, unused));
     let read_at: Arc<dyn ReadAt> = source;
     let package = source_backed::Package::from_read_at(read_at).unwrap();
-    let mut edit = package.edit_document().unwrap();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "strict edited")
         .unwrap();
     let commit = edit.commit().unwrap();

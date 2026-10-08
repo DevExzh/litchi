@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0018 | DOCX primary edit entry and focused error/result names; minimal/full glossary bans | names migrated; package-owned commit/projection W2 work pending |
 | 0017 | W0 rustdoc API glossary gate, scoped rules, six-type family checks and CI | complete; profiles for leaf migration waves pending |
 | 0016 | Rebase onto current base; adopt API glossary as ADR 0034; preserve shared fingerprint memo | kickoff; W0 checker and leaf migrations pending |
 | 0001 | Owner override: read + write for every claimed format; tiers OOXML → OLE → (RTF, ODF, iWork) | recorded in the goal (2026-10-04) |
@@ -172,3 +173,13 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
   limitations are recorded in 0017; unresolved external globs fail closed.
 - Next: DOCX W2 migration with consumer updates and behavior gates. W1 iWork
   ownership and the original all-format CRUD goal remain unchanged.
+
+## 0018 — DOCX canonical entry/error names
+
+- Eager/source `Package::edit()` replaces `edit_document`; main-document
+  errors/results now live at `document::{Error, Result}`. Existing edit,
+  commit, patch and publication semantics are retained for the ownership step.
+- Active consumers, examples, tests and current leaf docs migrated together;
+  historical benchmark records keep their original source/API names.
+- Minimal/full DOCX glossary profiles enforce removal without public aliases.
+- Verification and outstanding W2 ownership work are recorded in 0018.

@@ -18,7 +18,7 @@ fn repeated_attributes() -> String {
     attributes
 }
 
-fn marker(attributes: &str) -> Result<Option<ComplexFieldMarker>, Refusal> {
+fn marker(attributes: &str) -> std::result::Result<Option<ComplexFieldMarker>, Refusal> {
     let run = format!(r#"<w:r xmlns:w="{WORD}"><w:fldChar{attributes}/></w:r>"#);
     complex_field_marker(run.as_bytes())
 }

@@ -538,9 +538,9 @@ fn source_queries_read_only_selected_payloads_and_preserve_stale_precedence() {
     during_snapshot_source.arm_main_change();
     assert!(matches!(
         during_snapshot_package.document_snapshot(),
-        Err(litchi_docx::document::TransactionError::Document(
-            Error::Opc(OpcError::SourceChanged { .. })
-        ))
+        Err(litchi_docx::document::Error::Document(Error::Opc(
+            OpcError::SourceChanged { .. }
+        )))
     ));
 }
 

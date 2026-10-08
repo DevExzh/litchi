@@ -34,7 +34,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, FileSource, Limits, OwnedSource,
     Position, ReadAt, Resource, SourceVersion,
 };
-use litchi_docx::{document::TransactionError, source_backed};
+use litchi_docx::{document::Error as TransactionError, source_backed};
 use litchi_opc::{ReadLimits, SourceCacheLimits};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -1258,7 +1258,7 @@ fn execute_api(
     let open_ns = phase_elapsed(open_started)?;
 
     let edit_staging_started = phase_start(config.phase_diagnostics);
-    let mut edit = package.edit_document()?;
+    let mut edit = package.edit()?;
     edit.replace_paragraph_text(
         Position::new(prepared.target_position),
         &prepared.replacement_text,

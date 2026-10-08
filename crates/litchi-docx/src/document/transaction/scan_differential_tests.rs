@@ -16,7 +16,7 @@ const WORD: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main
 const WORD_STRICT: &str = "http://purl.oclc.org/ooxml/wordprocessingml/main";
 
 /// One scan's complete observable outcome.
-fn outcome(result: TransactionResult<Layout>) -> String {
+fn outcome(result: Result<Layout>) -> String {
     match result {
         Ok(layout) => format!(
             "ok paragraphs={:?} tables={:?} controls={:?} end={} conformance={}",
