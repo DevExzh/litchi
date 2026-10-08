@@ -1,0 +1,184 @@
+{
+  "schema": "litchi.performance.0968.cfb_commit_census.provenance.v3",
+  "state": "diagnostic_source_harness_sealed_pending_oracle_review_and_formal_go",
+  "current_head": "6493e26155ee05e554f1371dd2fad707cd4bca0e",
+  "source_baseline_archive_sha256": "afa888cbe5f38d69d29cd96fb41d08b43ac95c76b7bdea1dd3127d1a5b5be749",
+  "source_baseline_path": "/home/zhuhe/litchi-performance-0968/source-baseline",
+  "source_diagnostic_path": "/home/zhuhe/litchi-performance-0968/source-diagnostic",
+  "code_patch": {
+    "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic-v2-code.patch",
+    "bytes": 117123,
+    "sha256": "039a76ea250adcdf5eaa11d5d7a2bef2a7f4b4c041e22450e9a83c4cf7f5cf68"
+  },
+  "plan_v2": {
+    "path": "/home/zhuhe/litchi-performance-0968/census-plan-v2.md",
+    "bytes": 5344,
+    "sha256": "4abfb7a7aa32f9243bf818b8a0a28ceb86ddf5fb280a2ad36d32f8f1facd8881"
+  },
+  "diagnostic_files": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/crates/litchi-ole-common/src/lib.rs",
+      "bytes": 668,
+      "sha256": "b05d0fe654dfeb4191b6c7779570f9e82bbb300e867c27e8dd7b074c9eb2036f"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/crates/litchi-ole-common/src/object/mod.rs",
+      "bytes": 1260,
+      "sha256": "447fde49aab4c3432084b0dc4c2f91ca184e8e376ed52228c05b49982d78b346"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/crates/litchi-ole-common/src/object/census.rs",
+      "bytes": 12773,
+      "sha256": "2a807a0e46e23776ca909700df25f963390fcd944fc3ab5aa16c109d83af8220"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/crates/litchi-ole-common/src/object/editor.rs",
+      "bytes": 40250,
+      "sha256": "376978fde487e514c88ba0ef1affee45384dbc6f4fdfe51f1bb5a65379917dc4"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/crates/litchi-ole-common/src/object/codec.rs",
+      "bytes": 53866,
+      "sha256": "7374b31167f23763163bd77b2fae2ea8b68b6b330b3b6d1fcda37e29590be12e"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/Cargo.toml",
+      "bytes": 597,
+      "sha256": "e3e8f57cd892ae304e5072efe65cd91a0cb36df80e485a076c9e3548645635c1"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/Cargo.lock",
+      "bytes": 33123,
+      "sha256": "907d443b2f0008756e40d90e0186312d837a909fb21d973d54eab9b0ede507f2"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/src/main.rs",
+      "bytes": 104,
+      "sha256": "c39d3a4ac91b383d4fe7a6655697c85862b39dcb95c6203828b00397454e7eb4"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/src/lib.rs",
+      "bytes": 34964,
+      "sha256": "53b039fdab3a64a87d2910c92fbf80e6402810a31a1a843e94ab32e9f201f10b"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/src/oracle_0730.rs",
+      "bytes": 58805,
+      "sha256": "2b7a4d8e41c53690c8abf8d656e4b90942a7b7a0d84f205f93a1ac811f5f61e6"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/Cargo.toml",
+      "bytes": 10257,
+      "sha256": "94a832011482c7e0dd2a706847ff66ab140315e8b78541d31746ec43fff460e7"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/Cargo.lock",
+      "bytes": 138201,
+      "sha256": "e0894cf3b1844d618028e39ce8c899e2ed0cccc145c4a72e32b1f33d76865948"
+    }
+  ],
+  "binary": {
+    "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/target/release/doc_cfb_commit_census_0968",
+    "bytes": 55125224,
+    "sha256": "50693dd8d2e7562f69c86d08872246f1a5d040be9f4f42fc850ed9c0a309dac9"
+  },
+  "fixtures": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/test-data/ole/doc/NoHeadFoot.doc",
+      "bytes": 26112,
+      "sha256": "45e5df073f34314da6f39d2dad119fb2ef23470878fd2df67f632864cd92ea48"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/test-data/ole/doc/FloatingPictures.doc",
+      "bytes": 335360,
+      "sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d"
+    }
+  ],
+  "smoke_packets": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/smoke-docnohf-e1-zero-v4.json",
+      "bytes": 15803,
+      "sha256": "34af4f4d1484a5d4c4bf6e787faecfdf33d8db32c145c976e208cf8299486cf9"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/smoke-docfloat-e1-zero-v4.json",
+      "bytes": 15827,
+      "sha256": "7075ac6fc9240ba28050a09533c0e5dc22691e82d1e0ec9f8d3466bea210f152"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/smoke-docnohf-e1-zero-v4-repeat.json",
+      "bytes": 15803,
+      "sha256": "34af4f4d1484a5d4c4bf6e787faecfdf33d8db32c145c976e208cf8299486cf9"
+    }
+  ],
+  "build": {
+    "command": "cargo build --release --manifest-path tools/perf-cfb-census-0968/Cargo.toml",
+    "stdout": "/home/zhuhe/litchi-performance-0968/build-census-v4.stdout.log",
+    "stderr": "/home/zhuhe/litchi-performance-0968/build-census-v4.stderr.log",
+    "exit_code": 0,
+    "features": [
+      "litchi-doc/performance-diagnostics",
+      "litchi-ole-common/performance-diagnostics"
+    ],
+    "timing_claim": false,
+    "allocator_instrumentation": false
+  },
+  "checks": [
+    {
+      "command": "cargo check -p litchi-ole-common --features performance-diagnostics",
+      "result": "pass"
+    },
+    {
+      "command": "cargo check -p litchi-ole-common",
+      "result": "pass"
+    },
+    {
+      "command": "cargo check --manifest-path tools/perf-cfb-census-0968/Cargo.toml",
+      "result": "pass"
+    },
+    {
+      "command": "cargo test -p litchi-ole-common --features performance-diagnostics",
+      "result": "200 unit/integration passed, 1 doctest ignored"
+    },
+    {
+      "command": "cargo test -p litchi-doc --features performance-diagnostics",
+      "result": "1130 passed, 2 ignored; integration/doc tests passed"
+    },
+    {
+      "command": "cargo test -p litchi-ole-common --features performance-diagnostics object::census::tests",
+      "result": "3 controls passed"
+    },
+    {
+      "command": "cargo test -p litchi-ole-common --features performance-diagnostics",
+      "result": "final receipt: 200 unit/integration passed, 1 doctest ignored",
+      "log": "/home/zhuhe/litchi-performance-0968/test-ole-common-final.log",
+      "log_sha256": "ae4b96a768a2e47e636bdb9790c505f3ca7b6784b75e5ddc9d51d633093770c0"
+    }
+  ],
+  "ordinary_0967_oracle": {
+    "binary": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+    "binary_sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb",
+    "binary_bytes": 47909224,
+    "runtime_key_files_equal_to_0968_baseline": true,
+    "harness_byte_identity": false,
+    "dependency_lock_byte_identity": false,
+    "reuse_decision": "retained output-oracle candidate only; not used for diagnostic counters; cpu_review must independently qualify cross-harness output identity"
+  },
+  "formal_capture": {
+    "authorized": false,
+    "children": 48,
+    "variants": 1,
+    "warmups": 0,
+    "samples_per_child": 1
+  },
+  "schema_v2": {
+    "path": "/home/zhuhe/litchi-performance-0968/census-schema-v2.json",
+    "bytes": 1407,
+    "sha256": "bb0004a8cdf200d27099c4624a5226366de5024b279ed74f1f2f210de29dd963"
+  },
+  "build_config": {
+    "path": "/home/zhuhe/litchi-performance-0968/build-config-v3.json",
+    "bytes": 3339,
+    "sha256": "9796161240ae976e43f0b2c5a96749398f2f52097d6c022e99f27c58737bbc58"
+  }
+}

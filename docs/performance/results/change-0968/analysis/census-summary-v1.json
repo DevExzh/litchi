@@ -1,0 +1,1415 @@
+{
+  "aggregate": {
+    "capture_attempted": 516,
+    "capture_error": 0,
+    "capture_payload_bytes": 130646838,
+    "capture_streams": 4902,
+    "capture_success": 516,
+    "commit_attempts": 516,
+    "commit_errors": 0,
+    "commit_successes": 516,
+    "layout_attempted": 516,
+    "layout_error": 0,
+    "layout_non_reuse": 0,
+    "layout_reuse_success": 516,
+    "overlay_attempted": 516,
+    "overlay_declined": 516,
+    "overlay_error": 0,
+    "overlay_not_attempted": 0,
+    "overlay_outcomes": {
+      "declined": 516,
+      "error": 0,
+      "not_attempted": 0,
+      "success": 0
+    },
+    "overlay_success": 0
+  },
+  "allocator_total_claim": false,
+  "binary": {
+    "bytes": 55125224,
+    "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/target/release/doc_cfb_commit_census_0968",
+    "sha256": "50693dd8d2e7562f69c86d08872246f1a5d040be9f4f42fc850ed9c0a309dac9"
+  },
+  "capture_manifest": {
+    "bytes": 94568,
+    "path": "/home/zhuhe/litchi-performance-0968/capture/census-v6/capture-manifest-v3.json",
+    "sha256": "7f36d3ed05d89ab1ede777703c27536518116c47e8bef91955396c573ed715d9"
+  },
+  "cell_count": 24,
+  "cells": {
+    "docfloat/e1/default": {
+      "correctness": {
+        "all_stages_change_text": true,
+        "allocator_retained_matches_output_capacity": true,
+        "directory_metadata_preserved": true,
+        "exact_cross_route_outputs": true,
+        "exact_noop_source": true,
+        "final_paragraph_semantic_readback": true,
+        "final_public_reader_reopen": true,
+        "foreign_patch_refused": true,
+        "forward_patch_exact_output": true,
+        "inverse_patch_exact_source": true,
+        "noop_shares_source_allocation": true,
+        "operation_limit_refusal_atomic": true,
+        "release_route_clears_every_stage": true,
+        "retained_capacities_within_ceiling": true,
+        "same_value_preserves_retention": true,
+        "semantic_change_count_matches_edit_count": true,
+        "semantic_oracles_passed": true,
+        "stale_patch_refused": true,
+        "untouched_streams_preserved": true,
+        "zero_route_clears_retention": true
+      },
+      "output": {
+        "bytes": 342528,
+        "sha256": "6ba1bc972d66715e76d882f47c587b22000100f47abaa88428990619fc59fa20"
+      },
+      "repeat_equal": true,
+      "repetitions": [
+        "cfb-r01-docfloat-e01-default",
+        "cfb-r02-docfloat-e01-default"
+      ],
+      "route_census": {
+        "capture_attempted": 1,
+        "capture_error": 0,
+        "capture_payload_bytes": 334948,
+        "capture_streams": 13,
+        "capture_success": 1,
+        "commit_attempts": 1,
+        "commit_errors": 0,
+        "commit_successes": 1,
+        "layout_attempted": 1,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 1,
+        "overlay_attempted": 1,
+        "overlay_declined": 1,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0,
+        "saturated": false
+      }
+    },
+    "docfloat/e1/release": {
+      "correctness": {
+        "all_stages_change_text": true,
+        "allocator_retained_matches_output_capacity": true,
+        "directory_metadata_preserved": true,
+        "exact_cross_route_outputs": true,
+        "exact_noop_source": true,
+        "final_paragraph_semantic_readback": true,
+        "final_public_reader_reopen": true,
+        "foreign_patch_refused": true,
+        "forward_patch_exact_output": true,
+        "inverse_patch_exact_source": true,
+        "noop_shares_source_allocation": true,
+        "operation_limit_refusal_atomic": true,
+        "release_route_clears_every_stage": true,
+        "retained_capacities_within_ceiling": true,
+        "same_value_preserves_retention": true,
+        "semantic_change_count_matches_edit_count": true,
+        "semantic_oracles_passed": true,
+        "stale_patch_refused": true,
+        "untouched_streams_preserved": true,
+        "zero_route_clears_retention": true
+      },
+      "output": {
+        "bytes": 342528,
+        "sha256": "6ba1bc972d66715e76d882f47c587b22000100f47abaa88428990619fc59fa20"
+      },
+      "repeat_equal": true,
+      "repetitions": [
+        "cfb-r01-docfloat-e01-release",
+        "cfb-r02-docfloat-e01-release"
+      ],
+      "route_census": {
+        "capture_attempted": 1,
+        "capture_error": 0,
+        "capture_payload_bytes": 334948,
+        "capture_streams": 13,
+        "capture_success": 1,
+        "commit_attempts": 1,
+        "commit_errors": 0,
+        "commit_successes": 1,
+        "layout_attempted": 1,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 1,
+        "overlay_attempted": 1,
+        "overlay_declined": 1,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0,
+        "saturated": false
+      }
+    },
+    "docfloat/e1/zero": {
+      "correctness": {
+        "all_stages_change_text": true,
+        "allocator_retained_matches_output_capacity": true,
+        "directory_metadata_preserved": true,
+        "exact_cross_route_outputs": true,
+        "exact_noop_source": true,
+        "final_paragraph_semantic_readback": true,
+        "final_public_reader_reopen": true,
+        "foreign_patch_refused": true,
+        "forward_patch_exact_output": true,
+        "inverse_patch_exact_source": true,
+        "noop_shares_source_allocation": true,
+        "operation_limit_refusal_atomic": true,
+        "release_route_clears_every_stage": true,
+        "retained_capacities_within_ceiling": true,
+        "same_value_preserves_retention": true,
+        "semantic_change_count_matches_edit_count": true,
+        "semantic_oracles_passed": true,
+        "stale_patch_refused": true,
+        "untouched_streams_preserved": true,
+        "zero_route_clears_retention": true
+      },
+      "output": {
+        "bytes": 342528,
+        "sha256": "6ba1bc972d66715e76d882f47c587b22000100f47abaa88428990619fc59fa20"
+      },
+      "repeat_equal": true,
+      "repetitions": [
+        "cfb-r01-docfloat-e01-zero",
+        "cfb-r02-docfloat-e01-zero"
+      ],
+      "route_census": {
+        "capture_attempted": 1,
+        "capture_error": 0,
+        "capture_payload_bytes": 334948,
+        "capture_streams": 13,
+        "capture_success": 1,
+        "commit_attempts": 1,
+        "commit_errors": 0,
+        "commit_successes": 1,
+        "layout_attempted": 1,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 1,
+        "overlay_attempted": 1,
+        "overlay_declined": 1,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0,
+        "saturated": false
+      }
+    },
+    "docfloat/e2/default": {
+      "correctness": {
+        "all_stages_change_text": true,
+        "allocator_retained_matches_output_capacity": true,
+        "directory_metadata_preserved": true,
+        "exact_cross_route_outputs": true,
+        "exact_noop_source": true,
+        "final_paragraph_semantic_readback": true,
+        "final_public_reader_reopen": true,
+        "foreign_patch_refused": true,
+        "forward_patch_exact_output": true,
+        "inverse_patch_exact_source": true,
+        "noop_shares_source_allocation": true,
+        "operation_limit_refusal_atomic": true,
+        "release_route_clears_every_stage": true,
+        "retained_capacities_within_ceiling": true,
+        "same_value_preserves_retention": true,
+        "semantic_change_count_matches_edit_count": true,
+        "semantic_oracles_passed": true,
+        "stale_patch_refused": true,
+        "untouched_streams_preserved": true,
+        "zero_route_clears_retention": true
+      },
+      "output": {
+        "bytes": 353280,
+        "sha256": "a298ac14820cfa74f952367a2c9212f13654ac5aca306f46756745b7bfbe7e39"
+      },
+      "repeat_equal": true,
+      "repetitions": [
+        "cfb-r01-docfloat-e02-default",
+        "cfb-r02-docfloat-e02-default"
+      ],
+      "route_census": {
+        "capture_attempted": 2,
+        "capture_error": 0,
+        "capture_payload_bytes": 680679,
+        "capture_streams": 26,
+        "capture_success": 2,
+        "commit_attempts": 2,
+        "commit_errors": 0,
+        "commit_successes": 2,
+        "layout_attempted": 2,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 2,
+        "overlay_attempted": 2,
+        "overlay_declined": 2,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0,
+        "saturated": false
+      }
+    },
+    "docfloat/e2/release": {
+      "correctness": {
+        "all_stages_change_text": true,
+        "allocator_retained_matches_output_capacity": true,
+        "directory_metadata_preserved": true,
+        "exact_cross_route_outputs": true,
+        "exact_noop_source": true,
+        "final_paragraph_semantic_readback": true,
+        "final_public_reader_reopen": true,
+        "foreign_patch_refused": true,
+        "forward_patch_exact_output": true,
+        "inverse_patch_exact_source": true,
+        "noop_shares_source_allocation": true,
+        "operation_limit_refusal_atomic": true,
+        "release_route_clears_every_stage": true,
+        "retained_capacities_within_ceiling": true,
+        "same_value_preserves_retention": true,
+        "semantic_change_count_matches_edit_count": true,
+        "semantic_oracles_passed": true,
+        "stale_patch_refused": true,
+        "untouched_streams_preserved": true,
+        "zero_route_clears_retention": true
+      },
+      "output": {
+        "bytes": 353280,
+        "sha256": "a298ac14820cfa74f952367a2c9212f13654ac5aca306f46756745b7bfbe7e39"
+      },
+      "repeat_equal": true,
+      "repetitions": [
+        "cfb-r01-docfloat-e02-release",
+        "cfb-r02-docfloat-e02-release"
+      ],
+      "route_census": {
+        "capture_attempted": 2,
+        "capture_error": 0,
+        "capture_payload_bytes": 680679,
+        "capture_streams": 26,
+        "capture_success": 2,
+        "commit_attempts": 2,
+        "commit_errors": 0,
+        "commit_successes": 2,
+        "layout_attempted": 2,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 2,
+        "overlay_attempted": 2,
+        "overlay_declined": 2,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0,
+        "saturated": false
+      }
+    },
+    "docfloat/e2/zero": {
+      "correctness": {
+        "all_stages_change_text": true,
+        "allocator_retained_matches_output_capacity": true,
+        "directory_metadata_preserved": true,
+        "exact_cross_route_outputs": true,
+        "exact_noop_source": true,
+        "final_paragraph_semantic_readback": true,
+        "final_public_reader_reopen": true,
+        "foreign_patch_refused": true,
+        "forward_patch_exact_output": true,
+        "inverse_patch_exact_source": true,
+        "noop_shares_source_allocation": true,
+        "operation_limit_refusal_atomic": true,
+        "release_route_clears_every_stage": true,
+        "retained_capacities_within_ceiling": true,
+        "same_value_preserves_retention": true,
+        "semantic_change_count_matches_edit_count": true,
+        "semantic_oracles_passed": true,
+        "stale_patch_refused": true,
+        "untouched_streams_preserved": true,
+        "zero_route_clears_retention": true
+      },
+      "output": {
+        "bytes": 353280,
+        "sha256": "a298ac14820cfa74f952367a2c9212f13654ac5aca306f46756745b7bfbe7e39"
+      },
+      "repeat_equal": true,
+      "repetitions": [
+        "cfb-r01-docfloat-e02-zero",
+        "cfb-r02-docfloat-e02-zero"
+      ],
+      "route_census": {
+        "capture_attempted": 2,
+        "capture_error": 0,
+        "capture_payload_bytes": 680679,
+        "capture_streams": 26,
+        "capture_success": 2,
+        "commit_attempts": 2,
+        "commit_errors": 0,
+        "commit_successes": 2,
+        "layout_attempted": 2,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 2,
+        "overlay_attempted": 2,
+        "overlay_declined": 2,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0,
+        "saturated": false
+      }
+    },
+    "docfloat/e32/default": {
+      "correctness": {
+        "all_stages_change_text": true,
+        "allocator_retained_matches_output_capacity": true,
+        "directory_metadata_preserved": true,
+        "exact_cross_route_outputs": true,
+        "exact_noop_source": true,
+        "final_paragraph_semantic_readback": true,
+        "final_public_reader_reopen": true,
+        "foreign_patch_refused": true,
+        "forward_patch_exact_output": true,
+        "inverse_patch_exact_source": true,
+        "noop_shares_source_allocation": true,
+        "operation_limit_refusal_atomic": true,
+        "release_route_clears_every_stage": true,
+        "retained_capacities_within_ceiling": true,
+        "same_value_preserves_retention": true,
+        "semantic_change_count_matches_edit_count": true,
+        "semantic_oracles_passed": true,
+        "stale_patch_refused": true,
+        "untouched_streams_preserved": true,
+        "zero_route_clears_retention": true
+      },
+      "output": {
+        "bytes": 686592,
+        "sha256": "642063d159bdbcc65148087a1a491d7ff9a36814fcf4ee7a8a48c7c281021ad8"
+      },
+      "repeat_equal": true,
+      "repetitions": [
+        "cfb-r01-docfloat-e32-default",
+        "cfb-r02-docfloat-e32-default"
+      ],
+      "route_census": {
+        "capture_attempted": 32,
+        "capture_error": 0,
+        "capture_payload_bytes": 16121304,
+        "capture_streams": 416,
+        "capture_success": 32,
+        "commit_attempts": 32,
+        "commit_errors": 0,
+        "commit_successes": 32,
+        "layout_attempted": 32,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 32,
+        "overlay_attempted": 32,
+        "overlay_declined": 32,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0,
+        "saturated": false
+      }
+    },
+    "docfloat/e32/release": {
+      "correctness": {
+        "all_stages_change_text": true,
+        "allocator_retained_matches_output_capacity": true,
+        "directory_metadata_preserved": true,
+        "exact_cross_route_outputs": true,
+        "exact_noop_source": true,
+        "final_paragraph_semantic_readback": true,
+        "final_public_reader_reopen": true,
+        "foreign_patch_refused": true,
+        "forward_patch_exact_output": true,
+        "inverse_patch_exact_source": true,
+        "noop_shares_source_allocation": true,
+        "operation_limit_refusal_atomic": true,
+        "release_route_clears_every_stage": true,
+        "retained_capacities_within_ceiling": true,
+        "same_value_preserves_retention": true,
+        "semantic_change_count_matches_edit_count": true,
+        "semantic_oracles_passed": true,
+        "stale_patch_refused": true,
+        "untouched_streams_preserved": true,
+        "zero_route_clears_retention": true
+      },
+      "output": {
+        "bytes": 686592,
+        "sha256": "642063d159bdbcc65148087a1a491d7ff9a36814fcf4ee7a8a48c7c281021ad8"
+      },
+      "repeat_equal": true,
+      "repetitions": [
+        "cfb-r01-docfloat-e32-release",
+        "cfb-r02-docfloat-e32-release"
+      ],
+      "route_census": {
+        "capture_attempted": 32,
+        "capture_error": 0,
+        "capture_payload_bytes": 16121304,
+        "capture_streams": 416,
+        "capture_success": 32,
+        "commit_attempts": 32,
+        "commit_errors": 0,
+        "commit_successes": 32,
+        "layout_attempted": 32,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 32,
+        "overlay_attempted": 32,
+        "overlay_declined": 32,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0,
+        "saturated": false
+      }
+    },
+    "docfloat/e32/zero": {
+      "correctness": {
+        "all_stages_change_text": true,
+        "allocator_retained_matches_output_capacity": true,
+        "directory_metadata_preserved": true,
+        "exact_cross_route_outputs": true,
+        "exact_noop_source": true,
+        "final_paragraph_semantic_readback": true,
+        "final_public_reader_reopen": true,
+        "foreign_patch_refused": true,
+        "forward_patch_exact_output": true,
+        "inverse_patch_exact_source": true,
+        "noop_shares_source_allocation": true,
+        "operation_limit_refusal_atomic": true,
+        "release_route_clears_every_stage": true,
+        "retained_capacities_within_ceiling": true,
+        "same_value_preserves_retention": true,
+        "semantic_change_count_matches_edit_count": true,
+        "semantic_oracles_passed": true,
+        "stale_patch_refused": true,
+        "untouched_streams_preserved": true,
+        "zero_route_clears_retention": true
+      },
+      "output": {
+        "bytes": 686592,
+        "sha256": "642063d159bdbcc65148087a1a491d7ff9a36814fcf4ee7a8a48c7c281021ad8"
+      },
+      "repeat_equal": true,
+      "repetitions": [
+        "cfb-r01-docfloat-e32-zero",
+        "cfb-r02-docfloat-e32-zero"
+      ],
+      "route_census": {
+        "capture_attempted": 32,
+        "capture_error": 0,
+        "capture_payload_bytes": 16121304,
+        "capture_streams": 416,
+        "capture_success": 32,
+        "commit_attempts": 32,
+        "commit_errors": 0,
+        "commit_successes": 32,
+        "layout_attempted": 32,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 32,
+        "overlay_attempted": 32,
+        "overlay_declined": 32,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0,
+        "saturated": false
+      }
+    },
+    "docfloat/e8/default": {
+      "correctness": {
+        "all_stages_change_text": true,
+        "allocator_retained_matches_output_capacity": true,
+        "directory_metadata_preserved": true,
+        "exact_cross_route_outputs": true,
+        "exact_noop_source": true,
+        "final_paragraph_semantic_readback": true,
+        "final_public_reader_reopen": true,
+        "foreign_patch_refused": true,
+        "forward_patch_exact_output": true,
+        "inverse_patch_exact_source": true,
+        "noop_shares_source_allocation": true,
+        "operation_limit_refusal_atomic": true,
+        "release_route_clears_every_stage": true,
+        "retained_capacities_within_ceiling": true,
+        "same_value_preserves_retention": true,
+        "semantic_change_count_matches_edit_count": true,
+        "semantic_oracles_passed": true,
+        "stale_patch_refused": true,
+        "untouched_streams_preserved": true,
+        "zero_route_clears_retention": true
+      },
+      "output": {
+        "bytes": 418304,
+        "sha256": "59f03ff2e64e77b93ab35ca28f10f5ce6b09361b06c045b03322a4e6b05241f5"
+      },
+      "repeat_equal": true,
+      "repetitions": [
+        "cfb-r01-docfloat-e08-default",
+        "cfb-r02-docfloat-e08-default"
+      ],
+      "route_census": {
+        "capture_attempted": 8,
+        "capture_error": 0,
+        "capture_payload_bytes": 2981508,
+        "capture_streams": 104,
+        "capture_success": 8,
+        "commit_attempts": 8,
+        "commit_errors": 0,
+        "commit_successes": 8,
+        "layout_attempted": 8,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 8,
+        "overlay_attempted": 8,
+        "overlay_declined": 8,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0,
+        "saturated": false
+      }
+    },
+    "docfloat/e8/release": {
+      "correctness": {
+        "all_stages_change_text": true,
+        "allocator_retained_matches_output_capacity": true,
+        "directory_metadata_preserved": true,
+        "exact_cross_route_outputs": true,
+        "exact_noop_source": true,
+        "final_paragraph_semantic_readback": true,
+        "final_public_reader_reopen": true,
+        "foreign_patch_refused": true,
+        "forward_patch_exact_output": true,
+        "inverse_patch_exact_source": true,
+        "noop_shares_source_allocation": true,
+        "operation_limit_refusal_atomic": true,
+        "release_route_clears_every_stage": true,
+        "retained_capacities_within_ceiling": true,
+        "same_value_preserves_retention": true,
+        "semantic_change_count_matches_edit_count": true,
+        "semantic_oracles_passed": true,
+        "stale_patch_refused": true,
+        "untouched_streams_preserved": true,
+        "zero_route_clears_retention": true
+      },
+      "output": {
+        "bytes": 418304,
+        "sha256": "59f03ff2e64e77b93ab35ca28f10f5ce6b09361b06c045b03322a4e6b05241f5"
+      },
+      "repeat_equal": true,
+      "repetitions": [
+        "cfb-r01-docfloat-e08-release",
+        "cfb-r02-docfloat-e08-release"
+      ],
+      "route_census": {
+        "capture_attempted": 8,
+        "capture_error": 0,
+        "capture_payload_bytes": 2981508,
+        "capture_streams": 104,
+        "capture_success": 8,
+        "commit_attempts": 8,
+        "commit_errors": 0,
+        "commit_successes": 8,
+        "layout_attempted": 8,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 8,
+        "overlay_attempted": 8,
+        "overlay_declined": 8,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0,
+        "saturated": false
+      }
+    },
+    "docfloat/e8/zero": {
+      "correctness": {
+        "all_stages_change_text": true,
+        "allocator_retained_matches_output_capacity": true,
+        "directory_metadata_preserved": true,
+        "exact_cross_route_outputs": true,
+        "exact_noop_source": true,
+        "final_paragraph_semantic_readback": true,
+        "final_public_reader_reopen": true,
+        "foreign_patch_refused": true,
+        "forward_patch_exact_output": true,
+        "inverse_patch_exact_source": true,
+        "noop_shares_source_allocation": true,
+        "operation_limit_refusal_atomic": true,
+        "release_route_clears_every_stage": true,
+        "retained_capacities_within_ceiling": true,
+        "same_value_preserves_retention": true,
+        "semantic_change_count_matches_edit_count": true,
+        "semantic_oracles_passed": true,
+        "stale_patch_refused": true,
+        "untouched_streams_preserved": true,
+        "zero_route_clears_retention": true
+      },
+      "output": {
+        "bytes": 418304,
+        "sha256": "59f03ff2e64e77b93ab35ca28f10f5ce6b09361b06c045b03322a4e6b05241f5"
+      },
+      "repeat_equal": true,
+      "repetitions": [
+        "cfb-r01-docfloat-e08-zero",
+        "cfb-r02-docfloat-e08-zero"
+      ],
+      "route_census": {
+        "capture_attempted": 8,
+        "capture_error": 0,
+        "capture_payload_bytes": 2981508,
+        "capture_streams": 104,
+        "capture_success": 8,
+        "commit_attempts": 8,
+        "commit_errors": 0,
+        "commit_successes": 8,
+        "layout_attempted": 8,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 8,
+        "overlay_attempted": 8,
+        "overlay_declined": 8,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0,
+        "saturated": false
+      }
+    },
+    "docnohf/e1/default": {
+      "correctness": {
+        "all_stages_change_text": true,
+        "allocator_retained_matches_output_capacity": true,
+        "directory_metadata_preserved": true,
+        "exact_cross_route_outputs": true,
+        "exact_noop_source": true,
+        "final_paragraph_semantic_readback": true,
+        "final_public_reader_reopen": true,
+        "foreign_patch_refused": true,
+        "forward_patch_exact_output": true,
+        "inverse_patch_exact_source": true,
+        "noop_shares_source_allocation": true,
+        "operation_limit_refusal_atomic": true,
+        "release_route_clears_every_stage": true,
+        "retained_capacities_within_ceiling": true,
+        "same_value_preserves_retention": true,
+        "semantic_change_count_matches_edit_count": true,
+        "semantic_oracles_passed": true,
+        "stale_patch_refused": true,
+        "untouched_streams_preserved": true,
+        "zero_route_clears_retention": true
+      },
+      "output": {
+        "bytes": 27648,
+        "sha256": "5d79970a33fc60ca8447d8592d37706a76d3f8599d7892faa24f303bde5c2d91"
+      },
+      "repeat_equal": true,
+      "repetitions": [
+        "cfb-r01-docnohf-e01-default",
+        "cfb-r02-docnohf-e01-default"
+      ],
+      "route_census": {
+        "capture_attempted": 1,
+        "capture_error": 0,
+        "capture_payload_bytes": 24313,
+        "capture_streams": 6,
+        "capture_success": 1,
+        "commit_attempts": 1,
+        "commit_errors": 0,
+        "commit_successes": 1,
+        "layout_attempted": 1,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 1,
+        "overlay_attempted": 1,
+        "overlay_declined": 1,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0,
+        "saturated": false
+      }
+    },
+    "docnohf/e1/release": {
+      "correctness": {
+        "all_stages_change_text": true,
+        "allocator_retained_matches_output_capacity": true,
+        "directory_metadata_preserved": true,
+        "exact_cross_route_outputs": true,
+        "exact_noop_source": true,
+        "final_paragraph_semantic_readback": true,
+        "final_public_reader_reopen": true,
+        "foreign_patch_refused": true,
+        "forward_patch_exact_output": true,
+        "inverse_patch_exact_source": true,
+        "noop_shares_source_allocation": true,
+        "operation_limit_refusal_atomic": true,
+        "release_route_clears_every_stage": true,
+        "retained_capacities_within_ceiling": true,
+        "same_value_preserves_retention": true,
+        "semantic_change_count_matches_edit_count": true,
+        "semantic_oracles_passed": true,
+        "stale_patch_refused": true,
+        "untouched_streams_preserved": true,
+        "zero_route_clears_retention": true
+      },
+      "output": {
+        "bytes": 27648,
+        "sha256": "5d79970a33fc60ca8447d8592d37706a76d3f8599d7892faa24f303bde5c2d91"
+      },
+      "repeat_equal": true,
+      "repetitions": [
+        "cfb-r01-docnohf-e01-release",
+        "cfb-r02-docnohf-e01-release"
+      ],
+      "route_census": {
+        "capture_attempted": 1,
+        "capture_error": 0,
+        "capture_payload_bytes": 24313,
+        "capture_streams": 6,
+        "capture_success": 1,
+        "commit_attempts": 1,
+        "commit_errors": 0,
+        "commit_successes": 1,
+        "layout_attempted": 1,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 1,
+        "overlay_attempted": 1,
+        "overlay_declined": 1,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0,
+        "saturated": false
+      }
+    },
+    "docnohf/e1/zero": {
+      "correctness": {
+        "all_stages_change_text": true,
+        "allocator_retained_matches_output_capacity": true,
+        "directory_metadata_preserved": true,
+        "exact_cross_route_outputs": true,
+        "exact_noop_source": true,
+        "final_paragraph_semantic_readback": true,
+        "final_public_reader_reopen": true,
+        "foreign_patch_refused": true,
+        "forward_patch_exact_output": true,
+        "inverse_patch_exact_source": true,
+        "noop_shares_source_allocation": true,
+        "operation_limit_refusal_atomic": true,
+        "release_route_clears_every_stage": true,
+        "retained_capacities_within_ceiling": true,
+        "same_value_preserves_retention": true,
+        "semantic_change_count_matches_edit_count": true,
+        "semantic_oracles_passed": true,
+        "stale_patch_refused": true,
+        "untouched_streams_preserved": true,
+        "zero_route_clears_retention": true
+      },
+      "output": {
+        "bytes": 27648,
+        "sha256": "5d79970a33fc60ca8447d8592d37706a76d3f8599d7892faa24f303bde5c2d91"
+      },
+      "repeat_equal": true,
+      "repetitions": [
+        "cfb-r01-docnohf-e01-zero",
+        "cfb-r02-docnohf-e01-zero"
+      ],
+      "route_census": {
+        "capture_attempted": 1,
+        "capture_error": 0,
+        "capture_payload_bytes": 24313,
+        "capture_streams": 6,
+        "capture_success": 1,
+        "commit_attempts": 1,
+        "commit_errors": 0,
+        "commit_successes": 1,
+        "layout_attempted": 1,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 1,
+        "overlay_attempted": 1,
+        "overlay_declined": 1,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0,
+        "saturated": false
+      }
+    },
+    "docnohf/e2/default": {
+      "correctness": {
+        "all_stages_change_text": true,
+        "allocator_retained_matches_output_capacity": true,
+        "directory_metadata_preserved": true,
+        "exact_cross_route_outputs": true,
+        "exact_noop_source": true,
+        "final_paragraph_semantic_readback": true,
+        "final_public_reader_reopen": true,
+        "foreign_patch_refused": true,
+        "forward_patch_exact_output": true,
+        "inverse_patch_exact_source": true,
+        "noop_shares_source_allocation": true,
+        "operation_limit_refusal_atomic": true,
+        "release_route_clears_every_stage": true,
+        "retained_capacities_within_ceiling": true,
+        "same_value_preserves_retention": true,
+        "semantic_change_count_matches_edit_count": true,
+        "semantic_oracles_passed": true,
+        "stale_patch_refused": true,
+        "untouched_streams_preserved": true,
+        "zero_route_clears_retention": true
+      },
+      "output": {
+        "bytes": 28672,
+        "sha256": "35443830a8bd58f75a41081b4800c23e6bf54ed96b05e48eeaa83c19a168f0e2"
+      },
+      "repeat_equal": true,
+      "repetitions": [
+        "cfb-r01-docnohf-e02-default",
+        "cfb-r02-docnohf-e02-default"
+      ],
+      "route_census": {
+        "capture_attempted": 2,
+        "capture_error": 0,
+        "capture_payload_bytes": 49789,
+        "capture_streams": 12,
+        "capture_success": 2,
+        "commit_attempts": 2,
+        "commit_errors": 0,
+        "commit_successes": 2,
+        "layout_attempted": 2,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 2,
+        "overlay_attempted": 2,
+        "overlay_declined": 2,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0,
+        "saturated": false
+      }
+    },
+    "docnohf/e2/release": {
+      "correctness": {
+        "all_stages_change_text": true,
+        "allocator_retained_matches_output_capacity": true,
+        "directory_metadata_preserved": true,
+        "exact_cross_route_outputs": true,
+        "exact_noop_source": true,
+        "final_paragraph_semantic_readback": true,
+        "final_public_reader_reopen": true,
+        "foreign_patch_refused": true,
+        "forward_patch_exact_output": true,
+        "inverse_patch_exact_source": true,
+        "noop_shares_source_allocation": true,
+        "operation_limit_refusal_atomic": true,
+        "release_route_clears_every_stage": true,
+        "retained_capacities_within_ceiling": true,
+        "same_value_preserves_retention": true,
+        "semantic_change_count_matches_edit_count": true,
+        "semantic_oracles_passed": true,
+        "stale_patch_refused": true,
+        "untouched_streams_preserved": true,
+        "zero_route_clears_retention": true
+      },
+      "output": {
+        "bytes": 28672,
+        "sha256": "35443830a8bd58f75a41081b4800c23e6bf54ed96b05e48eeaa83c19a168f0e2"
+      },
+      "repeat_equal": true,
+      "repetitions": [
+        "cfb-r01-docnohf-e02-release",
+        "cfb-r02-docnohf-e02-release"
+      ],
+      "route_census": {
+        "capture_attempted": 2,
+        "capture_error": 0,
+        "capture_payload_bytes": 49789,
+        "capture_streams": 12,
+        "capture_success": 2,
+        "commit_attempts": 2,
+        "commit_errors": 0,
+        "commit_successes": 2,
+        "layout_attempted": 2,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 2,
+        "overlay_attempted": 2,
+        "overlay_declined": 2,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0,
+        "saturated": false
+      }
+    },
+    "docnohf/e2/zero": {
+      "correctness": {
+        "all_stages_change_text": true,
+        "allocator_retained_matches_output_capacity": true,
+        "directory_metadata_preserved": true,
+        "exact_cross_route_outputs": true,
+        "exact_noop_source": true,
+        "final_paragraph_semantic_readback": true,
+        "final_public_reader_reopen": true,
+        "foreign_patch_refused": true,
+        "forward_patch_exact_output": true,
+        "inverse_patch_exact_source": true,
+        "noop_shares_source_allocation": true,
+        "operation_limit_refusal_atomic": true,
+        "release_route_clears_every_stage": true,
+        "retained_capacities_within_ceiling": true,
+        "same_value_preserves_retention": true,
+        "semantic_change_count_matches_edit_count": true,
+        "semantic_oracles_passed": true,
+        "stale_patch_refused": true,
+        "untouched_streams_preserved": true,
+        "zero_route_clears_retention": true
+      },
+      "output": {
+        "bytes": 28672,
+        "sha256": "35443830a8bd58f75a41081b4800c23e6bf54ed96b05e48eeaa83c19a168f0e2"
+      },
+      "repeat_equal": true,
+      "repetitions": [
+        "cfb-r01-docnohf-e02-zero",
+        "cfb-r02-docnohf-e02-zero"
+      ],
+      "route_census": {
+        "capture_attempted": 2,
+        "capture_error": 0,
+        "capture_payload_bytes": 49789,
+        "capture_streams": 12,
+        "capture_success": 2,
+        "commit_attempts": 2,
+        "commit_errors": 0,
+        "commit_successes": 2,
+        "layout_attempted": 2,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 2,
+        "overlay_attempted": 2,
+        "overlay_declined": 2,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0,
+        "saturated": false
+      }
+    },
+    "docnohf/e32/default": {
+      "correctness": {
+        "all_stages_change_text": true,
+        "allocator_retained_matches_output_capacity": true,
+        "directory_metadata_preserved": true,
+        "exact_cross_route_outputs": true,
+        "exact_noop_source": true,
+        "final_paragraph_semantic_readback": true,
+        "final_public_reader_reopen": true,
+        "foreign_patch_refused": true,
+        "forward_patch_exact_output": true,
+        "inverse_patch_exact_source": true,
+        "noop_shares_source_allocation": true,
+        "operation_limit_refusal_atomic": true,
+        "release_route_clears_every_stage": true,
+        "retained_capacities_within_ceiling": true,
+        "same_value_preserves_retention": true,
+        "semantic_change_count_matches_edit_count": true,
+        "semantic_oracles_passed": true,
+        "stale_patch_refused": true,
+        "untouched_streams_preserved": true,
+        "zero_route_clears_retention": true
+      },
+      "output": {
+        "bytes": 63488,
+        "sha256": "0c91fc9286b8592e25f2f2cb0de23f5ae32244c43fec8ee7883cf437c710347f"
+      },
+      "repeat_equal": true,
+      "repetitions": [
+        "cfb-r01-docnohf-e32-default",
+        "cfb-r02-docnohf-e32-default"
+      ],
+      "route_census": {
+        "capture_attempted": 32,
+        "capture_error": 0,
+        "capture_payload_bytes": 1354864,
+        "capture_streams": 192,
+        "capture_success": 32,
+        "commit_attempts": 32,
+        "commit_errors": 0,
+        "commit_successes": 32,
+        "layout_attempted": 32,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 32,
+        "overlay_attempted": 32,
+        "overlay_declined": 32,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0,
+        "saturated": false
+      }
+    },
+    "docnohf/e32/release": {
+      "correctness": {
+        "all_stages_change_text": true,
+        "allocator_retained_matches_output_capacity": true,
+        "directory_metadata_preserved": true,
+        "exact_cross_route_outputs": true,
+        "exact_noop_source": true,
+        "final_paragraph_semantic_readback": true,
+        "final_public_reader_reopen": true,
+        "foreign_patch_refused": true,
+        "forward_patch_exact_output": true,
+        "inverse_patch_exact_source": true,
+        "noop_shares_source_allocation": true,
+        "operation_limit_refusal_atomic": true,
+        "release_route_clears_every_stage": true,
+        "retained_capacities_within_ceiling": true,
+        "same_value_preserves_retention": true,
+        "semantic_change_count_matches_edit_count": true,
+        "semantic_oracles_passed": true,
+        "stale_patch_refused": true,
+        "untouched_streams_preserved": true,
+        "zero_route_clears_retention": true
+      },
+      "output": {
+        "bytes": 63488,
+        "sha256": "0c91fc9286b8592e25f2f2cb0de23f5ae32244c43fec8ee7883cf437c710347f"
+      },
+      "repeat_equal": true,
+      "repetitions": [
+        "cfb-r01-docnohf-e32-release",
+        "cfb-r02-docnohf-e32-release"
+      ],
+      "route_census": {
+        "capture_attempted": 32,
+        "capture_error": 0,
+        "capture_payload_bytes": 1354864,
+        "capture_streams": 192,
+        "capture_success": 32,
+        "commit_attempts": 32,
+        "commit_errors": 0,
+        "commit_successes": 32,
+        "layout_attempted": 32,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 32,
+        "overlay_attempted": 32,
+        "overlay_declined": 32,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0,
+        "saturated": false
+      }
+    },
+    "docnohf/e32/zero": {
+      "correctness": {
+        "all_stages_change_text": true,
+        "allocator_retained_matches_output_capacity": true,
+        "directory_metadata_preserved": true,
+        "exact_cross_route_outputs": true,
+        "exact_noop_source": true,
+        "final_paragraph_semantic_readback": true,
+        "final_public_reader_reopen": true,
+        "foreign_patch_refused": true,
+        "forward_patch_exact_output": true,
+        "inverse_patch_exact_source": true,
+        "noop_shares_source_allocation": true,
+        "operation_limit_refusal_atomic": true,
+        "release_route_clears_every_stage": true,
+        "retained_capacities_within_ceiling": true,
+        "same_value_preserves_retention": true,
+        "semantic_change_count_matches_edit_count": true,
+        "semantic_oracles_passed": true,
+        "stale_patch_refused": true,
+        "untouched_streams_preserved": true,
+        "zero_route_clears_retention": true
+      },
+      "output": {
+        "bytes": 63488,
+        "sha256": "0c91fc9286b8592e25f2f2cb0de23f5ae32244c43fec8ee7883cf437c710347f"
+      },
+      "repeat_equal": true,
+      "repetitions": [
+        "cfb-r01-docnohf-e32-zero",
+        "cfb-r02-docnohf-e32-zero"
+      ],
+      "route_census": {
+        "capture_attempted": 32,
+        "capture_error": 0,
+        "capture_payload_bytes": 1354864,
+        "capture_streams": 192,
+        "capture_success": 32,
+        "commit_attempts": 32,
+        "commit_errors": 0,
+        "commit_successes": 32,
+        "layout_attempted": 32,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 32,
+        "overlay_attempted": 32,
+        "overlay_declined": 32,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0,
+        "saturated": false
+      }
+    },
+    "docnohf/e8/default": {
+      "correctness": {
+        "all_stages_change_text": true,
+        "allocator_retained_matches_output_capacity": true,
+        "directory_metadata_preserved": true,
+        "exact_cross_route_outputs": true,
+        "exact_noop_source": true,
+        "final_paragraph_semantic_readback": true,
+        "final_public_reader_reopen": true,
+        "foreign_patch_refused": true,
+        "forward_patch_exact_output": true,
+        "inverse_patch_exact_source": true,
+        "noop_shares_source_allocation": true,
+        "operation_limit_refusal_atomic": true,
+        "release_route_clears_every_stage": true,
+        "retained_capacities_within_ceiling": true,
+        "same_value_preserves_retention": true,
+        "semantic_change_count_matches_edit_count": true,
+        "semantic_oracles_passed": true,
+        "stale_patch_refused": true,
+        "untouched_streams_preserved": true,
+        "zero_route_clears_retention": true
+      },
+      "output": {
+        "bytes": 35840,
+        "sha256": "843d927e1f802738a4dcb9e7f99e52f0cf2b18c1e3f9001a1197eafcdcdf563c"
+      },
+      "repeat_equal": true,
+      "repetitions": [
+        "cfb-r01-docnohf-e08-default",
+        "cfb-r02-docnohf-e08-default"
+      ],
+      "route_census": {
+        "capture_attempted": 8,
+        "capture_error": 0,
+        "capture_payload_bytes": 227068,
+        "capture_streams": 48,
+        "capture_success": 8,
+        "commit_attempts": 8,
+        "commit_errors": 0,
+        "commit_successes": 8,
+        "layout_attempted": 8,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 8,
+        "overlay_attempted": 8,
+        "overlay_declined": 8,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0,
+        "saturated": false
+      }
+    },
+    "docnohf/e8/release": {
+      "correctness": {
+        "all_stages_change_text": true,
+        "allocator_retained_matches_output_capacity": true,
+        "directory_metadata_preserved": true,
+        "exact_cross_route_outputs": true,
+        "exact_noop_source": true,
+        "final_paragraph_semantic_readback": true,
+        "final_public_reader_reopen": true,
+        "foreign_patch_refused": true,
+        "forward_patch_exact_output": true,
+        "inverse_patch_exact_source": true,
+        "noop_shares_source_allocation": true,
+        "operation_limit_refusal_atomic": true,
+        "release_route_clears_every_stage": true,
+        "retained_capacities_within_ceiling": true,
+        "same_value_preserves_retention": true,
+        "semantic_change_count_matches_edit_count": true,
+        "semantic_oracles_passed": true,
+        "stale_patch_refused": true,
+        "untouched_streams_preserved": true,
+        "zero_route_clears_retention": true
+      },
+      "output": {
+        "bytes": 35840,
+        "sha256": "843d927e1f802738a4dcb9e7f99e52f0cf2b18c1e3f9001a1197eafcdcdf563c"
+      },
+      "repeat_equal": true,
+      "repetitions": [
+        "cfb-r01-docnohf-e08-release",
+        "cfb-r02-docnohf-e08-release"
+      ],
+      "route_census": {
+        "capture_attempted": 8,
+        "capture_error": 0,
+        "capture_payload_bytes": 227068,
+        "capture_streams": 48,
+        "capture_success": 8,
+        "commit_attempts": 8,
+        "commit_errors": 0,
+        "commit_successes": 8,
+        "layout_attempted": 8,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 8,
+        "overlay_attempted": 8,
+        "overlay_declined": 8,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0,
+        "saturated": false
+      }
+    },
+    "docnohf/e8/zero": {
+      "correctness": {
+        "all_stages_change_text": true,
+        "allocator_retained_matches_output_capacity": true,
+        "directory_metadata_preserved": true,
+        "exact_cross_route_outputs": true,
+        "exact_noop_source": true,
+        "final_paragraph_semantic_readback": true,
+        "final_public_reader_reopen": true,
+        "foreign_patch_refused": true,
+        "forward_patch_exact_output": true,
+        "inverse_patch_exact_source": true,
+        "noop_shares_source_allocation": true,
+        "operation_limit_refusal_atomic": true,
+        "release_route_clears_every_stage": true,
+        "retained_capacities_within_ceiling": true,
+        "same_value_preserves_retention": true,
+        "semantic_change_count_matches_edit_count": true,
+        "semantic_oracles_passed": true,
+        "stale_patch_refused": true,
+        "untouched_streams_preserved": true,
+        "zero_route_clears_retention": true
+      },
+      "output": {
+        "bytes": 35840,
+        "sha256": "843d927e1f802738a4dcb9e7f99e52f0cf2b18c1e3f9001a1197eafcdcdf563c"
+      },
+      "repeat_equal": true,
+      "repetitions": [
+        "cfb-r01-docnohf-e08-zero",
+        "cfb-r02-docnohf-e08-zero"
+      ],
+      "route_census": {
+        "capture_attempted": 8,
+        "capture_error": 0,
+        "capture_payload_bytes": 227068,
+        "capture_streams": 48,
+        "capture_success": 8,
+        "commit_attempts": 8,
+        "commit_errors": 0,
+        "commit_successes": 8,
+        "layout_attempted": 8,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 8,
+        "overlay_attempted": 8,
+        "overlay_declined": 8,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0,
+        "saturated": false
+      }
+    }
+  },
+  "created_utc": "2026-10-08T00:52:47.553701Z",
+  "decision": "diagnostic_only_no_adoption",
+  "errors": [],
+  "packet_count": 48,
+  "plan": {
+    "bytes": 32587,
+    "path": "/home/zhuhe/litchi-performance-0968/plans/plan-0968-prospective-v6.json",
+    "sha256": "3ffcc37e7078f716082844ed0689bdfaf500e820ec5d2ca11a1c61bd47638797"
+  },
+  "repeat_count_per_cell": 2,
+  "schema": "litchi.performance.0968.cfb_commit_census_reduction.v3",
+  "source": {
+    "baseline_archive_sha256": "afa888cbe5f38d69d29cd96fb41d08b43ac95c76b7bdea1dd3127d1a5b5be749",
+    "diagnostic_boundary": {
+      "capture_scope": "post_render_package_capture_stream_reads_only",
+      "commit_success_after": "object_discovery_returns_successfully"
+    },
+    "file_count": 12,
+    "root": "/home/zhuhe/litchi-performance-0968/source-diagnostic",
+    "scope_files": [
+      {
+        "bytes": 138201,
+        "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/Cargo.lock",
+        "relative": "Cargo.lock",
+        "sha256": "e0894cf3b1844d618028e39ce8c899e2ed0cccc145c4a72e32b1f33d76865948"
+      },
+      {
+        "bytes": 10257,
+        "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/Cargo.toml",
+        "relative": "Cargo.toml",
+        "sha256": "94a832011482c7e0dd2a706847ff66ab140315e8b78541d31746ec43fff460e7"
+      },
+      {
+        "bytes": 668,
+        "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/crates/litchi-ole-common/src/lib.rs",
+        "relative": "crates/litchi-ole-common/src/lib.rs",
+        "sha256": "b05d0fe654dfeb4191b6c7779570f9e82bbb300e867c27e8dd7b074c9eb2036f"
+      },
+      {
+        "bytes": 12773,
+        "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/crates/litchi-ole-common/src/object/census.rs",
+        "relative": "crates/litchi-ole-common/src/object/census.rs",
+        "sha256": "2a807a0e46e23776ca909700df25f963390fcd944fc3ab5aa16c109d83af8220"
+      },
+      {
+        "bytes": 53866,
+        "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/crates/litchi-ole-common/src/object/codec.rs",
+        "relative": "crates/litchi-ole-common/src/object/codec.rs",
+        "sha256": "7374b31167f23763163bd77b2fae2ea8b68b6b330b3b6d1fcda37e29590be12e"
+      },
+      {
+        "bytes": 40250,
+        "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/crates/litchi-ole-common/src/object/editor.rs",
+        "relative": "crates/litchi-ole-common/src/object/editor.rs",
+        "sha256": "376978fde487e514c88ba0ef1affee45384dbc6f4fdfe51f1bb5a65379917dc4"
+      },
+      {
+        "bytes": 1260,
+        "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/crates/litchi-ole-common/src/object/mod.rs",
+        "relative": "crates/litchi-ole-common/src/object/mod.rs",
+        "sha256": "447fde49aab4c3432084b0dc4c2f91ca184e8e376ed52228c05b49982d78b346"
+      },
+      {
+        "bytes": 33123,
+        "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/Cargo.lock",
+        "relative": "tools/perf-cfb-census-0968/Cargo.lock",
+        "sha256": "907d443b2f0008756e40d90e0186312d837a909fb21d973d54eab9b0ede507f2"
+      },
+      {
+        "bytes": 597,
+        "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/Cargo.toml",
+        "relative": "tools/perf-cfb-census-0968/Cargo.toml",
+        "sha256": "e3e8f57cd892ae304e5072efe65cd91a0cb36df80e485a076c9e3548645635c1"
+      },
+      {
+        "bytes": 34964,
+        "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/src/lib.rs",
+        "relative": "tools/perf-cfb-census-0968/src/lib.rs",
+        "sha256": "53b039fdab3a64a87d2910c92fbf80e6402810a31a1a843e94ab32e9f201f10b"
+      },
+      {
+        "bytes": 104,
+        "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/src/main.rs",
+        "relative": "tools/perf-cfb-census-0968/src/main.rs",
+        "sha256": "c39d3a4ac91b383d4fe7a6655697c85862b39dcb95c6203828b00397454e7eb4"
+      },
+      {
+        "bytes": 58805,
+        "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/src/oracle_0730.rs",
+        "relative": "tools/perf-cfb-census-0968/src/oracle_0730.rs",
+        "sha256": "2b7a4d8e41c53690c8abf8d656e4b90942a7b7a0d84f205f93a1ac811f5f61e6"
+      }
+    ],
+    "scope_sha256": "f8349e87968c174141d9f10a68f34cc5ac81b45bafa0e5d8d639b7b2c57f5a6f"
+  },
+  "source_harness": {
+    "bytes": 2883,
+    "path": "/home/zhuhe/litchi-performance-0968/seal-v4.json",
+    "sha256": "a80424d394e36849a3abbb6d0c415dbd513e150fb9494f061e124137215e3245"
+  },
+  "status": "pass",
+  "timing_claim": false
+}

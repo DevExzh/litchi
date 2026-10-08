@@ -1,0 +1,182 @@
+{
+  "build_receipt": {
+    "bytes": 15975,
+    "mode": "0o664",
+    "path": "/home/zhuhe/litchi-performance-0967/receipts/build-0967-cfb-v1.json",
+    "sha256": "d1de24c3a310d7f9d6e4c0819a7aac9287138715d835b73d1f062739d37dd5d6"
+  },
+  "cells": {
+    "docfloat/e1/default": {
+      "bytes": 342528,
+      "sha256": "6ba1bc972d66715e76d882f47c587b22000100f47abaa88428990619fc59fa20"
+    },
+    "docfloat/e1/release": {
+      "bytes": 342528,
+      "sha256": "6ba1bc972d66715e76d882f47c587b22000100f47abaa88428990619fc59fa20"
+    },
+    "docfloat/e1/zero": {
+      "bytes": 342528,
+      "sha256": "6ba1bc972d66715e76d882f47c587b22000100f47abaa88428990619fc59fa20"
+    },
+    "docfloat/e2/default": {
+      "bytes": 353280,
+      "sha256": "a298ac14820cfa74f952367a2c9212f13654ac5aca306f46756745b7bfbe7e39"
+    },
+    "docfloat/e2/release": {
+      "bytes": 353280,
+      "sha256": "a298ac14820cfa74f952367a2c9212f13654ac5aca306f46756745b7bfbe7e39"
+    },
+    "docfloat/e2/zero": {
+      "bytes": 353280,
+      "sha256": "a298ac14820cfa74f952367a2c9212f13654ac5aca306f46756745b7bfbe7e39"
+    },
+    "docfloat/e32/default": {
+      "bytes": 686592,
+      "sha256": "642063d159bdbcc65148087a1a491d7ff9a36814fcf4ee7a8a48c7c281021ad8"
+    },
+    "docfloat/e32/release": {
+      "bytes": 686592,
+      "sha256": "642063d159bdbcc65148087a1a491d7ff9a36814fcf4ee7a8a48c7c281021ad8"
+    },
+    "docfloat/e32/zero": {
+      "bytes": 686592,
+      "sha256": "642063d159bdbcc65148087a1a491d7ff9a36814fcf4ee7a8a48c7c281021ad8"
+    },
+    "docfloat/e8/default": {
+      "bytes": 418304,
+      "sha256": "59f03ff2e64e77b93ab35ca28f10f5ce6b09361b06c045b03322a4e6b05241f5"
+    },
+    "docfloat/e8/release": {
+      "bytes": 418304,
+      "sha256": "59f03ff2e64e77b93ab35ca28f10f5ce6b09361b06c045b03322a4e6b05241f5"
+    },
+    "docfloat/e8/zero": {
+      "bytes": 418304,
+      "sha256": "59f03ff2e64e77b93ab35ca28f10f5ce6b09361b06c045b03322a4e6b05241f5"
+    },
+    "docnohf/e1/default": {
+      "bytes": 27648,
+      "sha256": "5d79970a33fc60ca8447d8592d37706a76d3f8599d7892faa24f303bde5c2d91"
+    },
+    "docnohf/e1/release": {
+      "bytes": 27648,
+      "sha256": "5d79970a33fc60ca8447d8592d37706a76d3f8599d7892faa24f303bde5c2d91"
+    },
+    "docnohf/e1/zero": {
+      "bytes": 27648,
+      "sha256": "5d79970a33fc60ca8447d8592d37706a76d3f8599d7892faa24f303bde5c2d91"
+    },
+    "docnohf/e2/default": {
+      "bytes": 28672,
+      "sha256": "35443830a8bd58f75a41081b4800c23e6bf54ed96b05e48eeaa83c19a168f0e2"
+    },
+    "docnohf/e2/release": {
+      "bytes": 28672,
+      "sha256": "35443830a8bd58f75a41081b4800c23e6bf54ed96b05e48eeaa83c19a168f0e2"
+    },
+    "docnohf/e2/zero": {
+      "bytes": 28672,
+      "sha256": "35443830a8bd58f75a41081b4800c23e6bf54ed96b05e48eeaa83c19a168f0e2"
+    },
+    "docnohf/e32/default": {
+      "bytes": 63488,
+      "sha256": "0c91fc9286b8592e25f2f2cb0de23f5ae32244c43fec8ee7883cf437c710347f"
+    },
+    "docnohf/e32/release": {
+      "bytes": 63488,
+      "sha256": "0c91fc9286b8592e25f2f2cb0de23f5ae32244c43fec8ee7883cf437c710347f"
+    },
+    "docnohf/e32/zero": {
+      "bytes": 63488,
+      "sha256": "0c91fc9286b8592e25f2f2cb0de23f5ae32244c43fec8ee7883cf437c710347f"
+    },
+    "docnohf/e8/default": {
+      "bytes": 35840,
+      "sha256": "843d927e1f802738a4dcb9e7f99e52f0cf2b18c1e3f9001a1197eafcdcdf563c"
+    },
+    "docnohf/e8/release": {
+      "bytes": 35840,
+      "sha256": "843d927e1f802738a4dcb9e7f99e52f0cf2b18c1e3f9001a1197eafcdcdf563c"
+    },
+    "docnohf/e8/zero": {
+      "bytes": 35840,
+      "sha256": "843d927e1f802738a4dcb9e7f99e52f0cf2b18c1e3f9001a1197eafcdcdf563c"
+    }
+  },
+  "evidence": {
+    "all_packets_terminal_and_correct": true,
+    "capture_root": "/home/zhuhe/litchi-performance-0967/capture/native",
+    "output_consensus_failures": 0,
+    "packet_manifest": {
+      "bytes": 174344108,
+      "file_count": 288,
+      "file_pattern": "native-*-baseline.json",
+      "manifest_algorithm": "sorted relative filename + NUL + 8-byte big-endian size + lowercase SHA-256 + LF",
+      "manifest_sha256": "d09e936eaa00fa08975a9154d2f25e22d54395b0c2b6b3218602f92fc5a73e91",
+      "root": "/home/zhuhe/litchi-performance-0967/capture/native"
+    },
+    "timing_fields_ignored": true
+  },
+  "fixtures": {
+    "docfloat": {
+      "bytes": 335360,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0968/source-baseline/test-data/ole/doc/FloatingPictures.doc",
+      "sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d"
+    },
+    "docnohf": {
+      "bytes": 26112,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0968/source-baseline/test-data/ole/doc/NoHeadFoot.doc",
+      "sha256": "45e5df073f34314da6f39d2dad119fb2ef23470878fd2df67f632864cd92ea48"
+    }
+  },
+  "matrix": {
+    "cases": [
+      "docnohf",
+      "docfloat"
+    ],
+    "cells": 24,
+    "edits": [
+      1,
+      2,
+      8,
+      32
+    ],
+    "packets_per_cell": 12,
+    "retained_baseline_packets": 288,
+    "retentions": [
+      "zero",
+      "default",
+      "release"
+    ]
+  },
+  "runtime_binary": {
+    "bytes": 47909224,
+    "elf": {
+      "build_id_sha1": "e5c457384eeebd057932c444efda77618f137399",
+      "class": "ELF64",
+      "debug_info": true,
+      "machine": "x86-64",
+      "stripped": false,
+      "type": "DYN (PIE)"
+    },
+    "executable": true,
+    "mode": "0o775",
+    "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+    "role": "ordinary_uninstrumented",
+    "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+  },
+  "runtime_source_revision": "893072657ad8b1d726bfce351b5ec2e98f084e94",
+  "schema": "litchi.performance.0968.cfb_commit_ordinary_oracle.v1",
+  "source_revision": "6493e26155ee05e554f1371dd2fad707cd4bca0e",
+  "source_scope": {
+    "focused_scope_bytes": 155547493,
+    "focused_scope_file_count": 9267,
+    "focused_scope_tree_sha256": "8ef3c1a5ab9769518dd6c5c1b739fa4ae45fd1559bdfcf46a904ccae05d10498",
+    "historical_runtime_source_root": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline",
+    "scope_identical_old_to_target": true,
+    "target_source_root": "/home/zhuhe/litchi-performance-0968/source-baseline"
+  },
+  "status": "byte_equivalent"
+}

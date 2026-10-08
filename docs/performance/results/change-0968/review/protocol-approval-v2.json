@@ -1,0 +1,251 @@
+{
+  "capture_state": {
+    "corrected_capture_root_absent_or_unlaunched": true,
+    "formal_capture_run_for_corrected_v3": false,
+    "new_root_go_required": true,
+    "retained_v5_is_invalid_old_epoch_only": true,
+    "root_go_required": true
+  },
+  "claim_limits": {
+    "adoption_claim": false,
+    "allocator_field": "forbidden",
+    "allocator_total_claim": false,
+    "diagnostic_only": true,
+    "elapsed_time_field": "forbidden",
+    "metadata_projection": false,
+    "optimization_candidate": false,
+    "payload_bytes": "capture stream-read sum only; no allocator, live-peak, timing, or savings interpretation",
+    "timing_claim": false
+  },
+  "corrected_contract": {
+    "capture_attempted": "row.edits",
+    "capture_streams_positive_for_successful_packets": true,
+    "capture_success": "row.edits",
+    "commit_and_capture_errors": 0,
+    "commit_attempts": "row.edits",
+    "commit_successes": "row.edits",
+    "counter_conservation_checked": [
+      "commit_attempts = commit_successes + commit_errors",
+      "overlay_attempted + overlay_not_attempted = commit_attempts",
+      "overlay_attempted = overlay_success + overlay_declined + overlay_error",
+      "layout_attempted = layout_reuse_success + layout_non_reuse + layout_error",
+      "capture_attempted = capture_success + capture_error"
+    ],
+    "stream_or_payload_formula_asserted": false
+  },
+  "custody": {
+    "diagnostic_binary": {
+      "bytes": 55125224,
+      "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/target/release/doc_cfb_commit_census_0968",
+      "sha256": "50693dd8d2e7562f69c86d08872246f1a5d040be9f4f42fc850ed9c0a309dac9"
+    },
+    "incident": {
+      "bytes": 13939,
+      "path": "/home/zhuhe/litchi-performance-0968/review/census-v2-incident-v1.json",
+      "sha256": "6a2e274d2b6bc34ad4d3c5aefba2966d18c945d711cc88f86e33955f3ce4e48d"
+    },
+    "ordinary_oracle_equivalence": {
+      "allocator_equivalence_claim": false,
+      "bytes": 28337,
+      "oracle_path_and_hash_match": true,
+      "ordinary_binary_diagnostic_reuse": false,
+      "path": "/home/zhuhe/litchi-performance-0968/review/ordinary-oracle-equivalence-v1.json",
+      "sha256": "b01f9a3d76ad5a4a11537c21c3d84a78421cc449018f0acc084a173976020a75",
+      "timing_equivalence_claim": false
+    },
+    "ordinary_output_oracle": {
+      "bytes": 6281,
+      "path": "/home/zhuhe/litchi-performance-0968/review/ordinary-output-oracle-v1.json",
+      "sha256": "2bfe13300e26560b191c9d624e5dc8e7e1c9aa2f07f0fb7fe130729b25d79d20"
+    },
+    "source_and_binary_unchanged": true,
+    "source_approval": {
+      "bytes": 3979,
+      "embedded_seal_hash_matches": true,
+      "path": "/home/zhuhe/litchi-performance-0968/review/diagnostic-source-approval-v2.json",
+      "sha256": "fbde1c957dbe48ae6485c131a81cd5a59a950465243eeb3594b7e58eba1e0c6c"
+    },
+    "source_harness": {
+      "bytes": 2883,
+      "path": "/home/zhuhe/litchi-performance-0968/seal-v4.json",
+      "sha256": "a80424d394e36849a3abbb6d0c415dbd513e150fb9494f061e124137215e3245"
+    }
+  },
+  "decision": "Protocol approval PASS. The corrected per-edit cardinality and full 48-row schedule are independently bound and audited; no unresolved blocker remains. Launch remains conditional on a new explicit root GO using the sealed no-retry v3 protocol.",
+  "helpers": {
+    "prepare": {
+      "bytes": 10747,
+      "path": "/home/zhuhe/litchi-performance-0968/tools/prepare_cfb_commit_census_0968_v3.py",
+      "sha256": "7b2578f23773f57445fc39e791f444e11e2ca46957a6157af9d34bffdc964040"
+    },
+    "reducer": {
+      "bytes": 13852,
+      "path": "/home/zhuhe/litchi-performance-0968/tools/reduce_cfb_commit_census_0968_v3.py",
+      "sha256": "934d4aed6b29ecb9c942102a7b3620d36e9b82a530618f56b9c68ac0ecacdf78"
+    },
+    "runner": {
+      "bytes": 16072,
+      "path": "/home/zhuhe/litchi-performance-0968/tools/run_cfb_commit_census_0968_v3.py",
+      "sha256": "4da008925026dd95769ee9758017fe02b6c1d9795ee1393e80364322d0791567"
+    },
+    "schema": {
+      "bytes": 37259,
+      "path": "/home/zhuhe/litchi-performance-0968/tools/cfb_census_schema_0968_v3.py",
+      "sha256": "e0a9c9e7a853acda3fe81a5a80e6ba480d30b15b0e27a3005b596d27e1a801ab"
+    },
+    "tests": {
+      "bytes": 5663,
+      "path": "/home/zhuhe/litchi-performance-0968/tools/test_cfb_commit_census_0968_v3.py",
+      "sha256": "1e039f7a400a5be791c3262e9522c943c5d2ac66a121b05132a2eee532f9c1b7"
+    }
+  },
+  "independent_validation": {
+    "incident_binding": {
+      "new_epoch_capture_performed": false,
+      "old_epoch_preserved_without_selective_retry": true,
+      "path": "/home/zhuhe/litchi-performance-0968/review/census-v2-incident-v1.json",
+      "sha256": "6a2e274d2b6bc34ad4d3c5aefba2966d18c945d711cc88f86e33955f3ce4e48d",
+      "source_or_binary_changed": false,
+      "status": "protocol_bug_confirmed_pending_v3_review_and_go",
+      "workload_retry_performed": false
+    },
+    "raw_stdout_report_audit": {
+      "all_20_correctness_gates_true": true,
+      "allocator_total_field_absent": true,
+      "capture_attempts_per_edit_count": {
+        "1": 12,
+        "2": 12,
+        "32": 12,
+        "8": 12
+      },
+      "cells": 24,
+      "children_per_edit_count": {
+        "1": 12,
+        "2": 12,
+        "32": 12,
+        "8": 12
+      },
+      "commit_attempts_per_edit_count": {
+        "1": 12,
+        "2": 12,
+        "32": 12,
+        "8": 12
+      },
+      "elapsed_field_absent": true,
+      "exact_report_fields_and_v2_schema": true,
+      "exact_three_route_outputs_zero_default_8mib_release_8mib": true,
+      "repeated_cells_normalized_equal": 24,
+      "reports_checked": 48,
+      "reports_passed_corrected_v3_schema_and_oracle": 48,
+      "selected_and_route_outputs_match_ordinary_oracle": true,
+      "semantic_change_count_matches_row_edits": true,
+      "timing_claim_false": true
+    },
+    "retained_raw_manifest": {
+      "bytes": 99462,
+      "old_v2_checker_failures": 36,
+      "path": "/home/zhuhe/litchi-performance-0968/capture/census-v5/capture-manifest-v2.json",
+      "processes_returncode_0": 48,
+      "retry_count": 0,
+      "schema": "litchi.performance.0968.cfb_commit_census_capture.v2",
+      "sha256": "0a5e41cf25d56d4c5dd805bfef3744c4e04e739c8dc0c10d8fd54a2d592c98e5",
+      "status": "complete_with_failures"
+    },
+    "runner_check_plan": "pass",
+    "strict_duplicate_key_current_protocol_inputs": "pass; superseded historical seal-v2 and seal-v3 duplicate schema artifacts excluded from current binding",
+    "v3_unit_tests": {
+      "count": 11,
+      "status": "pass"
+    }
+  },
+  "matrix_and_argv": {
+    "actual_argv_template": [
+      "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/target/release/doc_cfb_commit_census_0968",
+      "--input",
+      "{fixture}",
+      "--case",
+      "{case}",
+      "--edits",
+      "{edits}",
+      "--retention",
+      "{retention_arg}",
+      "--warmup",
+      "0",
+      "--samples",
+      "1"
+    ],
+    "all_48_rows_bound_to_v6_schedule": true,
+    "cases": [
+      "docnohf",
+      "docfloat"
+    ],
+    "cells": 24,
+    "edits": [
+      1,
+      2,
+      8,
+      32
+    ],
+    "fresh_serial_child": true,
+    "raw_stdout_stderr_retained": true,
+    "repetitions_per_cell": 2,
+    "retentions": [
+      "zero",
+      "default",
+      "release"
+    ],
+    "retry": false,
+    "rows": 48,
+    "samples_per_child": 1,
+    "serial": true,
+    "terminal_before_parse": true,
+    "unique_child_ids": 48,
+    "warmups": 0
+  },
+  "plan": {
+    "bytes": 32587,
+    "capture_root": "/home/zhuhe/litchi-performance-0968/capture/census-v6",
+    "path": "/home/zhuhe/litchi-performance-0968/plans/plan-0968-prospective-v6.json",
+    "schema": "litchi.performance.0968.cfb_commit_census_plan.v3",
+    "schema_version": 3,
+    "sha256": "3ffcc37e7078f716082844ed0689bdfaf500e820ec5d2ca11a1c61bd47638797",
+    "source_revision": "6493e26155ee05e554f1371dd2fad707cd4bca0e",
+    "status": "prospective_only_no_build_no_capture"
+  },
+  "reviewed_at": "2026-10-08",
+  "reviewer": "doc_census_review",
+  "schema": "litchi.performance.0968.review.protocol_approval.v2",
+  "scope": "corrected sealed 0968 protocol plan/checker/runner/reducer; independent raw audit only; no formal capture, build, workload, or production edit",
+  "seal": {
+    "bytes": 4689,
+    "correction": {
+      "capture_attempted": "row.edits",
+      "capture_success": "row.edits",
+      "commit_attempts": "row.edits",
+      "commit_successes": "row.edits",
+      "fixed_stream_or_payload_formula": false,
+      "full_matrix": "2 cases x 4 edit counts x 3 retentions x 2 repeats = 48 serial children",
+      "report_schema_remains": "litchi.performance.0968.cfb_commit_census.v2"
+    },
+    "path": "/home/zhuhe/litchi-performance-0968/receipts/protocol-seal-0968-v3.json",
+    "schema": "litchi.performance.0968.cfb_commit_census_protocol_seal.v3",
+    "scope": {
+      "allocator_total_claim": false,
+      "diagnostic_only": true,
+      "formal_go": false,
+      "metadata_projection": false,
+      "new_build": false,
+      "new_capture": false,
+      "new_workload": false,
+      "retry": false,
+      "timing_claim": false
+    },
+    "sha256": "bc970a5f03fb45ec8c6257d1ea452b71db2d4e1babfa3a79dcd3135449a81a42",
+    "status": "SEALED_CORRECTED_PER_EDIT_CARDINALITY_PENDING_REVIEW_AND_GO"
+  },
+  "status": "PASS",
+  "supersedes": {
+    "path": "/home/zhuhe/litchi-performance-0968/review/protocol-approval-v1.json",
+    "reason": "v1 bound the superseded v2 checker contract commit_attempts == 1 and capture_attempted == 1; the sealed v3 contract binds both to row.edits."
+  }
+}

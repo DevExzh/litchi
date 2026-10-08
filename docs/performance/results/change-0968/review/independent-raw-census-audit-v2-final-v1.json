@@ -1,0 +1,947 @@
+{
+  "checks": {
+    "all_20_correctness_gates_true": true,
+    "all_24_repeats_equal": true,
+    "all_child_packets_custodied": true,
+    "all_reports_and_routes_schema_valid": true,
+    "fixed_schedule": true,
+    "no_timer_or_allocator_measurement_fields": true,
+    "ordinary_output_sha_length_match": true,
+    "per_packet_stage_conservation": true,
+    "source_executable_plan_go_manifest_terminal_bound": true
+  },
+  "created_utc": "2026-10-08T00:53:47.537962Z",
+  "custody": {
+    "binary": {
+      "bytes": 55125224,
+      "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/target/release/doc_cfb_commit_census_0968",
+      "sha256": "50693dd8d2e7562f69c86d08872246f1a5d040be9f4f42fc850ed9c0a309dac9"
+    },
+    "cells": 24,
+    "children": 48,
+    "ordinary_oracle_cells": 24,
+    "retries": 0,
+    "source_revision": "6493e26155ee05e554f1371dd2fad707cd4bca0e",
+    "source_root": "/home/zhuhe/litchi-performance-0968/source-diagnostic",
+    "source_scope_files": 12,
+    "source_scope_sha256": "f8349e87968c174141d9f10a68f34cc5ac81b45bafa0e5d8d639b7b2c57f5a6f",
+    "terminal_before_parse": true
+  },
+  "decision": "diagnostic_only_no_adoption",
+  "findings": [],
+  "inputs": {
+    "capture_manifest": {
+      "bytes": 94568,
+      "path": "/home/zhuhe/litchi-performance-0968/capture/census-v6/capture-manifest-v3.json",
+      "sha256": "7f36d3ed05d89ab1ede777703c27536518116c47e8bef91955396c573ed715d9"
+    },
+    "go": {
+      "bytes": 958,
+      "path": "/home/zhuhe/litchi-performance-0968/receipts/root-go-v2.json",
+      "sha256": "3ec3b54400bea1bef26522a974fb7494d66d58f2193a71913aff02e2371c5ab3"
+    },
+    "plan": {
+      "bytes": 32587,
+      "path": "/home/zhuhe/litchi-performance-0968/plans/plan-0968-prospective-v6.json",
+      "sha256": "3ffcc37e7078f716082844ed0689bdfaf500e820ec5d2ca11a1c61bd47638797"
+    }
+  },
+  "repeat_results": {
+    "docfloat/e1/default": {
+      "children": [
+        "cfb-r01-docfloat-e01-default",
+        "cfb-r02-docfloat-e01-default"
+      ],
+      "equal": true,
+      "output": {
+        "bytes": 342528,
+        "sha256": "6ba1bc972d66715e76d882f47c587b22000100f47abaa88428990619fc59fa20"
+      }
+    },
+    "docfloat/e1/release": {
+      "children": [
+        "cfb-r01-docfloat-e01-release",
+        "cfb-r02-docfloat-e01-release"
+      ],
+      "equal": true,
+      "output": {
+        "bytes": 342528,
+        "sha256": "6ba1bc972d66715e76d882f47c587b22000100f47abaa88428990619fc59fa20"
+      }
+    },
+    "docfloat/e1/zero": {
+      "children": [
+        "cfb-r01-docfloat-e01-zero",
+        "cfb-r02-docfloat-e01-zero"
+      ],
+      "equal": true,
+      "output": {
+        "bytes": 342528,
+        "sha256": "6ba1bc972d66715e76d882f47c587b22000100f47abaa88428990619fc59fa20"
+      }
+    },
+    "docfloat/e2/default": {
+      "children": [
+        "cfb-r01-docfloat-e02-default",
+        "cfb-r02-docfloat-e02-default"
+      ],
+      "equal": true,
+      "output": {
+        "bytes": 353280,
+        "sha256": "a298ac14820cfa74f952367a2c9212f13654ac5aca306f46756745b7bfbe7e39"
+      }
+    },
+    "docfloat/e2/release": {
+      "children": [
+        "cfb-r01-docfloat-e02-release",
+        "cfb-r02-docfloat-e02-release"
+      ],
+      "equal": true,
+      "output": {
+        "bytes": 353280,
+        "sha256": "a298ac14820cfa74f952367a2c9212f13654ac5aca306f46756745b7bfbe7e39"
+      }
+    },
+    "docfloat/e2/zero": {
+      "children": [
+        "cfb-r01-docfloat-e02-zero",
+        "cfb-r02-docfloat-e02-zero"
+      ],
+      "equal": true,
+      "output": {
+        "bytes": 353280,
+        "sha256": "a298ac14820cfa74f952367a2c9212f13654ac5aca306f46756745b7bfbe7e39"
+      }
+    },
+    "docfloat/e32/default": {
+      "children": [
+        "cfb-r01-docfloat-e32-default",
+        "cfb-r02-docfloat-e32-default"
+      ],
+      "equal": true,
+      "output": {
+        "bytes": 686592,
+        "sha256": "642063d159bdbcc65148087a1a491d7ff9a36814fcf4ee7a8a48c7c281021ad8"
+      }
+    },
+    "docfloat/e32/release": {
+      "children": [
+        "cfb-r01-docfloat-e32-release",
+        "cfb-r02-docfloat-e32-release"
+      ],
+      "equal": true,
+      "output": {
+        "bytes": 686592,
+        "sha256": "642063d159bdbcc65148087a1a491d7ff9a36814fcf4ee7a8a48c7c281021ad8"
+      }
+    },
+    "docfloat/e32/zero": {
+      "children": [
+        "cfb-r01-docfloat-e32-zero",
+        "cfb-r02-docfloat-e32-zero"
+      ],
+      "equal": true,
+      "output": {
+        "bytes": 686592,
+        "sha256": "642063d159bdbcc65148087a1a491d7ff9a36814fcf4ee7a8a48c7c281021ad8"
+      }
+    },
+    "docfloat/e8/default": {
+      "children": [
+        "cfb-r01-docfloat-e08-default",
+        "cfb-r02-docfloat-e08-default"
+      ],
+      "equal": true,
+      "output": {
+        "bytes": 418304,
+        "sha256": "59f03ff2e64e77b93ab35ca28f10f5ce6b09361b06c045b03322a4e6b05241f5"
+      }
+    },
+    "docfloat/e8/release": {
+      "children": [
+        "cfb-r01-docfloat-e08-release",
+        "cfb-r02-docfloat-e08-release"
+      ],
+      "equal": true,
+      "output": {
+        "bytes": 418304,
+        "sha256": "59f03ff2e64e77b93ab35ca28f10f5ce6b09361b06c045b03322a4e6b05241f5"
+      }
+    },
+    "docfloat/e8/zero": {
+      "children": [
+        "cfb-r01-docfloat-e08-zero",
+        "cfb-r02-docfloat-e08-zero"
+      ],
+      "equal": true,
+      "output": {
+        "bytes": 418304,
+        "sha256": "59f03ff2e64e77b93ab35ca28f10f5ce6b09361b06c045b03322a4e6b05241f5"
+      }
+    },
+    "docnohf/e1/default": {
+      "children": [
+        "cfb-r01-docnohf-e01-default",
+        "cfb-r02-docnohf-e01-default"
+      ],
+      "equal": true,
+      "output": {
+        "bytes": 27648,
+        "sha256": "5d79970a33fc60ca8447d8592d37706a76d3f8599d7892faa24f303bde5c2d91"
+      }
+    },
+    "docnohf/e1/release": {
+      "children": [
+        "cfb-r01-docnohf-e01-release",
+        "cfb-r02-docnohf-e01-release"
+      ],
+      "equal": true,
+      "output": {
+        "bytes": 27648,
+        "sha256": "5d79970a33fc60ca8447d8592d37706a76d3f8599d7892faa24f303bde5c2d91"
+      }
+    },
+    "docnohf/e1/zero": {
+      "children": [
+        "cfb-r01-docnohf-e01-zero",
+        "cfb-r02-docnohf-e01-zero"
+      ],
+      "equal": true,
+      "output": {
+        "bytes": 27648,
+        "sha256": "5d79970a33fc60ca8447d8592d37706a76d3f8599d7892faa24f303bde5c2d91"
+      }
+    },
+    "docnohf/e2/default": {
+      "children": [
+        "cfb-r01-docnohf-e02-default",
+        "cfb-r02-docnohf-e02-default"
+      ],
+      "equal": true,
+      "output": {
+        "bytes": 28672,
+        "sha256": "35443830a8bd58f75a41081b4800c23e6bf54ed96b05e48eeaa83c19a168f0e2"
+      }
+    },
+    "docnohf/e2/release": {
+      "children": [
+        "cfb-r01-docnohf-e02-release",
+        "cfb-r02-docnohf-e02-release"
+      ],
+      "equal": true,
+      "output": {
+        "bytes": 28672,
+        "sha256": "35443830a8bd58f75a41081b4800c23e6bf54ed96b05e48eeaa83c19a168f0e2"
+      }
+    },
+    "docnohf/e2/zero": {
+      "children": [
+        "cfb-r01-docnohf-e02-zero",
+        "cfb-r02-docnohf-e02-zero"
+      ],
+      "equal": true,
+      "output": {
+        "bytes": 28672,
+        "sha256": "35443830a8bd58f75a41081b4800c23e6bf54ed96b05e48eeaa83c19a168f0e2"
+      }
+    },
+    "docnohf/e32/default": {
+      "children": [
+        "cfb-r01-docnohf-e32-default",
+        "cfb-r02-docnohf-e32-default"
+      ],
+      "equal": true,
+      "output": {
+        "bytes": 63488,
+        "sha256": "0c91fc9286b8592e25f2f2cb0de23f5ae32244c43fec8ee7883cf437c710347f"
+      }
+    },
+    "docnohf/e32/release": {
+      "children": [
+        "cfb-r01-docnohf-e32-release",
+        "cfb-r02-docnohf-e32-release"
+      ],
+      "equal": true,
+      "output": {
+        "bytes": 63488,
+        "sha256": "0c91fc9286b8592e25f2f2cb0de23f5ae32244c43fec8ee7883cf437c710347f"
+      }
+    },
+    "docnohf/e32/zero": {
+      "children": [
+        "cfb-r01-docnohf-e32-zero",
+        "cfb-r02-docnohf-e32-zero"
+      ],
+      "equal": true,
+      "output": {
+        "bytes": 63488,
+        "sha256": "0c91fc9286b8592e25f2f2cb0de23f5ae32244c43fec8ee7883cf437c710347f"
+      }
+    },
+    "docnohf/e8/default": {
+      "children": [
+        "cfb-r01-docnohf-e08-default",
+        "cfb-r02-docnohf-e08-default"
+      ],
+      "equal": true,
+      "output": {
+        "bytes": 35840,
+        "sha256": "843d927e1f802738a4dcb9e7f99e52f0cf2b18c1e3f9001a1197eafcdcdf563c"
+      }
+    },
+    "docnohf/e8/release": {
+      "children": [
+        "cfb-r01-docnohf-e08-release",
+        "cfb-r02-docnohf-e08-release"
+      ],
+      "equal": true,
+      "output": {
+        "bytes": 35840,
+        "sha256": "843d927e1f802738a4dcb9e7f99e52f0cf2b18c1e3f9001a1197eafcdcdf563c"
+      }
+    },
+    "docnohf/e8/zero": {
+      "children": [
+        "cfb-r01-docnohf-e08-zero",
+        "cfb-r02-docnohf-e08-zero"
+      ],
+      "equal": true,
+      "output": {
+        "bytes": 35840,
+        "sha256": "843d927e1f802738a4dcb9e7f99e52f0cf2b18c1e3f9001a1197eafcdcdf563c"
+      }
+    }
+  },
+  "route_payload_summary": {
+    "by_case": {
+      "docfloat": {
+        "capture_attempted": 258,
+        "capture_error": 0,
+        "capture_payload_bytes": 120710634,
+        "capture_streams": 3354,
+        "capture_success": 258,
+        "commit_attempts": 258,
+        "commit_errors": 0,
+        "commit_successes": 258,
+        "layout_attempted": 258,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 258,
+        "overlay_attempted": 258,
+        "overlay_declined": 258,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0
+      },
+      "docnohf": {
+        "capture_attempted": 258,
+        "capture_error": 0,
+        "capture_payload_bytes": 9936204,
+        "capture_streams": 1548,
+        "capture_success": 258,
+        "commit_attempts": 258,
+        "commit_errors": 0,
+        "commit_successes": 258,
+        "layout_attempted": 258,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 258,
+        "overlay_attempted": 258,
+        "overlay_declined": 258,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0
+      }
+    },
+    "by_cell": {
+      "docfloat/e1/default": {
+        "capture_attempted": 2,
+        "capture_error": 0,
+        "capture_payload_bytes": 669896,
+        "capture_streams": 26,
+        "capture_success": 2,
+        "commit_attempts": 2,
+        "commit_errors": 0,
+        "commit_successes": 2,
+        "layout_attempted": 2,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 2,
+        "overlay_attempted": 2,
+        "overlay_declined": 2,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0
+      },
+      "docfloat/e1/release": {
+        "capture_attempted": 2,
+        "capture_error": 0,
+        "capture_payload_bytes": 669896,
+        "capture_streams": 26,
+        "capture_success": 2,
+        "commit_attempts": 2,
+        "commit_errors": 0,
+        "commit_successes": 2,
+        "layout_attempted": 2,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 2,
+        "overlay_attempted": 2,
+        "overlay_declined": 2,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0
+      },
+      "docfloat/e1/zero": {
+        "capture_attempted": 2,
+        "capture_error": 0,
+        "capture_payload_bytes": 669896,
+        "capture_streams": 26,
+        "capture_success": 2,
+        "commit_attempts": 2,
+        "commit_errors": 0,
+        "commit_successes": 2,
+        "layout_attempted": 2,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 2,
+        "overlay_attempted": 2,
+        "overlay_declined": 2,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0
+      },
+      "docfloat/e2/default": {
+        "capture_attempted": 4,
+        "capture_error": 0,
+        "capture_payload_bytes": 1361358,
+        "capture_streams": 52,
+        "capture_success": 4,
+        "commit_attempts": 4,
+        "commit_errors": 0,
+        "commit_successes": 4,
+        "layout_attempted": 4,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 4,
+        "overlay_attempted": 4,
+        "overlay_declined": 4,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0
+      },
+      "docfloat/e2/release": {
+        "capture_attempted": 4,
+        "capture_error": 0,
+        "capture_payload_bytes": 1361358,
+        "capture_streams": 52,
+        "capture_success": 4,
+        "commit_attempts": 4,
+        "commit_errors": 0,
+        "commit_successes": 4,
+        "layout_attempted": 4,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 4,
+        "overlay_attempted": 4,
+        "overlay_declined": 4,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0
+      },
+      "docfloat/e2/zero": {
+        "capture_attempted": 4,
+        "capture_error": 0,
+        "capture_payload_bytes": 1361358,
+        "capture_streams": 52,
+        "capture_success": 4,
+        "commit_attempts": 4,
+        "commit_errors": 0,
+        "commit_successes": 4,
+        "layout_attempted": 4,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 4,
+        "overlay_attempted": 4,
+        "overlay_declined": 4,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0
+      },
+      "docfloat/e32/default": {
+        "capture_attempted": 64,
+        "capture_error": 0,
+        "capture_payload_bytes": 32242608,
+        "capture_streams": 832,
+        "capture_success": 64,
+        "commit_attempts": 64,
+        "commit_errors": 0,
+        "commit_successes": 64,
+        "layout_attempted": 64,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 64,
+        "overlay_attempted": 64,
+        "overlay_declined": 64,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0
+      },
+      "docfloat/e32/release": {
+        "capture_attempted": 64,
+        "capture_error": 0,
+        "capture_payload_bytes": 32242608,
+        "capture_streams": 832,
+        "capture_success": 64,
+        "commit_attempts": 64,
+        "commit_errors": 0,
+        "commit_successes": 64,
+        "layout_attempted": 64,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 64,
+        "overlay_attempted": 64,
+        "overlay_declined": 64,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0
+      },
+      "docfloat/e32/zero": {
+        "capture_attempted": 64,
+        "capture_error": 0,
+        "capture_payload_bytes": 32242608,
+        "capture_streams": 832,
+        "capture_success": 64,
+        "commit_attempts": 64,
+        "commit_errors": 0,
+        "commit_successes": 64,
+        "layout_attempted": 64,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 64,
+        "overlay_attempted": 64,
+        "overlay_declined": 64,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0
+      },
+      "docfloat/e8/default": {
+        "capture_attempted": 16,
+        "capture_error": 0,
+        "capture_payload_bytes": 5963016,
+        "capture_streams": 208,
+        "capture_success": 16,
+        "commit_attempts": 16,
+        "commit_errors": 0,
+        "commit_successes": 16,
+        "layout_attempted": 16,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 16,
+        "overlay_attempted": 16,
+        "overlay_declined": 16,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0
+      },
+      "docfloat/e8/release": {
+        "capture_attempted": 16,
+        "capture_error": 0,
+        "capture_payload_bytes": 5963016,
+        "capture_streams": 208,
+        "capture_success": 16,
+        "commit_attempts": 16,
+        "commit_errors": 0,
+        "commit_successes": 16,
+        "layout_attempted": 16,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 16,
+        "overlay_attempted": 16,
+        "overlay_declined": 16,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0
+      },
+      "docfloat/e8/zero": {
+        "capture_attempted": 16,
+        "capture_error": 0,
+        "capture_payload_bytes": 5963016,
+        "capture_streams": 208,
+        "capture_success": 16,
+        "commit_attempts": 16,
+        "commit_errors": 0,
+        "commit_successes": 16,
+        "layout_attempted": 16,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 16,
+        "overlay_attempted": 16,
+        "overlay_declined": 16,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0
+      },
+      "docnohf/e1/default": {
+        "capture_attempted": 2,
+        "capture_error": 0,
+        "capture_payload_bytes": 48626,
+        "capture_streams": 12,
+        "capture_success": 2,
+        "commit_attempts": 2,
+        "commit_errors": 0,
+        "commit_successes": 2,
+        "layout_attempted": 2,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 2,
+        "overlay_attempted": 2,
+        "overlay_declined": 2,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0
+      },
+      "docnohf/e1/release": {
+        "capture_attempted": 2,
+        "capture_error": 0,
+        "capture_payload_bytes": 48626,
+        "capture_streams": 12,
+        "capture_success": 2,
+        "commit_attempts": 2,
+        "commit_errors": 0,
+        "commit_successes": 2,
+        "layout_attempted": 2,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 2,
+        "overlay_attempted": 2,
+        "overlay_declined": 2,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0
+      },
+      "docnohf/e1/zero": {
+        "capture_attempted": 2,
+        "capture_error": 0,
+        "capture_payload_bytes": 48626,
+        "capture_streams": 12,
+        "capture_success": 2,
+        "commit_attempts": 2,
+        "commit_errors": 0,
+        "commit_successes": 2,
+        "layout_attempted": 2,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 2,
+        "overlay_attempted": 2,
+        "overlay_declined": 2,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0
+      },
+      "docnohf/e2/default": {
+        "capture_attempted": 4,
+        "capture_error": 0,
+        "capture_payload_bytes": 99578,
+        "capture_streams": 24,
+        "capture_success": 4,
+        "commit_attempts": 4,
+        "commit_errors": 0,
+        "commit_successes": 4,
+        "layout_attempted": 4,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 4,
+        "overlay_attempted": 4,
+        "overlay_declined": 4,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0
+      },
+      "docnohf/e2/release": {
+        "capture_attempted": 4,
+        "capture_error": 0,
+        "capture_payload_bytes": 99578,
+        "capture_streams": 24,
+        "capture_success": 4,
+        "commit_attempts": 4,
+        "commit_errors": 0,
+        "commit_successes": 4,
+        "layout_attempted": 4,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 4,
+        "overlay_attempted": 4,
+        "overlay_declined": 4,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0
+      },
+      "docnohf/e2/zero": {
+        "capture_attempted": 4,
+        "capture_error": 0,
+        "capture_payload_bytes": 99578,
+        "capture_streams": 24,
+        "capture_success": 4,
+        "commit_attempts": 4,
+        "commit_errors": 0,
+        "commit_successes": 4,
+        "layout_attempted": 4,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 4,
+        "overlay_attempted": 4,
+        "overlay_declined": 4,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0
+      },
+      "docnohf/e32/default": {
+        "capture_attempted": 64,
+        "capture_error": 0,
+        "capture_payload_bytes": 2709728,
+        "capture_streams": 384,
+        "capture_success": 64,
+        "commit_attempts": 64,
+        "commit_errors": 0,
+        "commit_successes": 64,
+        "layout_attempted": 64,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 64,
+        "overlay_attempted": 64,
+        "overlay_declined": 64,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0
+      },
+      "docnohf/e32/release": {
+        "capture_attempted": 64,
+        "capture_error": 0,
+        "capture_payload_bytes": 2709728,
+        "capture_streams": 384,
+        "capture_success": 64,
+        "commit_attempts": 64,
+        "commit_errors": 0,
+        "commit_successes": 64,
+        "layout_attempted": 64,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 64,
+        "overlay_attempted": 64,
+        "overlay_declined": 64,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0
+      },
+      "docnohf/e32/zero": {
+        "capture_attempted": 64,
+        "capture_error": 0,
+        "capture_payload_bytes": 2709728,
+        "capture_streams": 384,
+        "capture_success": 64,
+        "commit_attempts": 64,
+        "commit_errors": 0,
+        "commit_successes": 64,
+        "layout_attempted": 64,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 64,
+        "overlay_attempted": 64,
+        "overlay_declined": 64,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0
+      },
+      "docnohf/e8/default": {
+        "capture_attempted": 16,
+        "capture_error": 0,
+        "capture_payload_bytes": 454136,
+        "capture_streams": 96,
+        "capture_success": 16,
+        "commit_attempts": 16,
+        "commit_errors": 0,
+        "commit_successes": 16,
+        "layout_attempted": 16,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 16,
+        "overlay_attempted": 16,
+        "overlay_declined": 16,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0
+      },
+      "docnohf/e8/release": {
+        "capture_attempted": 16,
+        "capture_error": 0,
+        "capture_payload_bytes": 454136,
+        "capture_streams": 96,
+        "capture_success": 16,
+        "commit_attempts": 16,
+        "commit_errors": 0,
+        "commit_successes": 16,
+        "layout_attempted": 16,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 16,
+        "overlay_attempted": 16,
+        "overlay_declined": 16,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0
+      },
+      "docnohf/e8/zero": {
+        "capture_attempted": 16,
+        "capture_error": 0,
+        "capture_payload_bytes": 454136,
+        "capture_streams": 96,
+        "capture_success": 16,
+        "commit_attempts": 16,
+        "commit_errors": 0,
+        "commit_successes": 16,
+        "layout_attempted": 16,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 16,
+        "overlay_attempted": 16,
+        "overlay_declined": 16,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0
+      }
+    },
+    "by_retention": {
+      "default_8mib": {
+        "capture_attempted": 172,
+        "capture_error": 0,
+        "capture_payload_bytes": 43548946,
+        "capture_streams": 1634,
+        "capture_success": 172,
+        "commit_attempts": 172,
+        "commit_errors": 0,
+        "commit_successes": 172,
+        "layout_attempted": 172,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 172,
+        "overlay_attempted": 172,
+        "overlay_declined": 172,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0
+      },
+      "release_8mib": {
+        "capture_attempted": 172,
+        "capture_error": 0,
+        "capture_payload_bytes": 43548946,
+        "capture_streams": 1634,
+        "capture_success": 172,
+        "commit_attempts": 172,
+        "commit_errors": 0,
+        "commit_successes": 172,
+        "layout_attempted": 172,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 172,
+        "overlay_attempted": 172,
+        "overlay_declined": 172,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0
+      },
+      "zero": {
+        "capture_attempted": 172,
+        "capture_error": 0,
+        "capture_payload_bytes": 43548946,
+        "capture_streams": 1634,
+        "capture_success": 172,
+        "commit_attempts": 172,
+        "commit_errors": 0,
+        "commit_successes": 172,
+        "layout_attempted": 172,
+        "layout_error": 0,
+        "layout_non_reuse": 0,
+        "layout_reuse_success": 172,
+        "overlay_attempted": 172,
+        "overlay_declined": 172,
+        "overlay_error": 0,
+        "overlay_not_attempted": 0,
+        "overlay_success": 0
+      }
+    },
+    "counts": {
+      "by_case": {
+        "docfloat": 24,
+        "docnohf": 24
+      },
+      "by_cell": {
+        "docfloat/e1/default": 2,
+        "docfloat/e1/release": 2,
+        "docfloat/e1/zero": 2,
+        "docfloat/e2/default": 2,
+        "docfloat/e2/release": 2,
+        "docfloat/e2/zero": 2,
+        "docfloat/e32/default": 2,
+        "docfloat/e32/release": 2,
+        "docfloat/e32/zero": 2,
+        "docfloat/e8/default": 2,
+        "docfloat/e8/release": 2,
+        "docfloat/e8/zero": 2,
+        "docnohf/e1/default": 2,
+        "docnohf/e1/release": 2,
+        "docnohf/e1/zero": 2,
+        "docnohf/e2/default": 2,
+        "docnohf/e2/release": 2,
+        "docnohf/e2/zero": 2,
+        "docnohf/e32/default": 2,
+        "docnohf/e32/release": 2,
+        "docnohf/e32/zero": 2,
+        "docnohf/e8/default": 2,
+        "docnohf/e8/release": 2,
+        "docnohf/e8/zero": 2
+      },
+      "by_retention": {
+        "default_8mib": 16,
+        "release_8mib": 16,
+        "zero": 16
+      },
+      "overall": 48
+    },
+    "overall": {
+      "capture_attempted": 516,
+      "capture_error": 0,
+      "capture_payload_bytes": 130646838,
+      "capture_streams": 4902,
+      "capture_success": 516,
+      "commit_attempts": 516,
+      "commit_errors": 0,
+      "commit_successes": 516,
+      "layout_attempted": 516,
+      "layout_error": 0,
+      "layout_non_reuse": 0,
+      "layout_reuse_success": 516,
+      "overlay_attempted": 516,
+      "overlay_declined": 516,
+      "overlay_error": 0,
+      "overlay_not_attempted": 0,
+      "overlay_success": 0
+    }
+  },
+  "schema": "litchi.performance.0968.independent_raw_census_audit.v2",
+  "scope": {
+    "adoption_claim": false,
+    "allocator_total_claim": false,
+    "new_build": false,
+    "new_capture": false,
+    "read_only": true,
+    "speedup_claim": false,
+    "timing_claim": false
+  },
+  "status": "pass",
+  "tool": {
+    "bytes": 53670,
+    "path": "/home/zhuhe/litchi-performance-0968/review/independent_raw_census_audit_0968_v2.py",
+    "sha256": "5d26d4dbdee0a4b9edda5a91a4d25a15c09aa8cdab83320e0e31f3303946b5c0"
+  }
+}

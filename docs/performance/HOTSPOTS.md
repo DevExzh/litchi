@@ -1,5 +1,33 @@
 # Performance hotspot inventory
 
+## 0968 — CFB recapture route census completes diagnostic evidence
+
+[0968](0968-cfb-commit-census.md) ranks the current CFB commit path for a
+bounded writer-proof handoff. In the retained 0942
+`FloatingPictures/e32` commit focus, `Package::capture` has 25.054588%
+inclusive sampled ancestry, nested `OleFile::open_stream` has 13.878805%, and
+`OleWriter::write_to` has 37.789601%. These inclusive CPU observations overlap
+and do not establish removable work, native speedup, or allocator traffic.
+
+The corrected v6 census passes 48/48 children and all 20 correctness gates.
+Across both repeats it records 516 successful commits, 516 overlay declines,
+516 layout-reuse successes, 4,902 captured streams, and 130,646,838 captured
+payload bytes. At 32 edits, one representative child reads 1,354,864 bytes
+over 192 streams for `NoHeadFoot` and 16,121,304 bytes over 416 streams for
+`FloatingPictures`; retention routes repeat exactly. This is route evidence,
+not timing, allocator traffic, or a speedup bound.
+
+The source-bound 0921 recapture candidate remains rejected and separate. Any
+new handoff must bind a successful `ReusePlan` to the exact model and emitted
+vector, project final CFB metadata, and retain final physical reopen and
+discovery. Independent audit and protocol custody pass, with the approval
+overwrite recovered byte-exactly; production remains unchanged. [Packet
+cleanup](results/change-0968/receipts/build-cache-cleanup-v1.json) is recorded
+in the receipt (8,359 bytes, SHA-256
+`0c45dde744f4f0488c0e737a6bdd46e1321db8f800b8d506ce63a0b956b8d5ee`) and
+freed 8,896,917,504 allocated bytes while preserving the exact executable,
+source, and raw evidence. No runtime candidate is adopted.
+
 ## 0967 — vector-free strict SPRM reject fails latency and RSS guards
 
 [0967](0967-doc-sprm-vector-reject.md) tests a private borrowed SPRM walk that

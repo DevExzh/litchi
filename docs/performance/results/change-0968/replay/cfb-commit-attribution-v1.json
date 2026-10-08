@@ -1,0 +1,2955 @@
+{
+  "all_formal": {
+    "denominator": {
+      "period": 10037338577,
+      "samples": 2352
+    },
+    "derived_inclusive": {
+      "all_exact_target_union": {
+        "period": 7783023995,
+        "period_share_percent": 77.540714,
+        "samples": 1823
+      },
+      "any_physical_litchi_cfb_frame": {
+        "period": 7816010245,
+        "period_share_percent": 77.869349,
+        "samples": 1831
+      },
+      "capture_family_package_capture_container_open_stream": {
+        "period": 2219116066,
+        "period_share_percent": 22.10861,
+        "samples": 520
+      },
+      "package_capture_and_open_stream_overlap": {
+        "period": 1190690639,
+        "period_share_percent": 11.862613,
+        "samples": 279
+      },
+      "validation_open_family_ole_open_or_codec_open": {
+        "period": 1690748188,
+        "period_share_percent": 16.844587,
+        "samples": 395
+      }
+    },
+    "exclusive_nearest_frame": {
+      "buckets": {
+        "cfb_ole_open": {
+          "period": 1690748188,
+          "period_share_percent": 16.844587,
+          "samples": 395
+        },
+        "cfb_open_stream": {
+          "period": 1190690639,
+          "period_share_percent": 11.862613,
+          "samples": 279
+        },
+        "cfb_writer_write_to": {
+          "period": 3873159741,
+          "period_share_percent": 38.587517,
+          "samples": 908
+        },
+        "no_target_cfb_frame": {
+          "period": 1475035154,
+          "period_share_percent": 14.695481,
+          "samples": 346
+        },
+        "other_physical_cfb": {
+          "period": 779279428,
+          "period_share_percent": 7.763805,
+          "samples": 183
+        },
+        "package_capture": {
+          "period": 1028425427,
+          "period_share_percent": 10.245997,
+          "samples": 241
+        }
+      },
+      "conserves_denominator": true,
+      "rule": "nearest physical target frame from leaf toward commit root; then other physical CFB; then no target CFB frame",
+      "sum_period": 10037338577,
+      "sum_samples": 2352
+    },
+    "inclusive_overlap": {
+      "exact_target_union_period": 7783023995,
+      "overlap_excess_period": 1190690639,
+      "sum_of_tag_periods": 8973714634,
+      "warning": "inclusive tag periods overlap and must not be added"
+    },
+    "inclusive_tags": {
+      "cfb_ole_open": {
+        "period": 1690748188,
+        "period_share_percent": 16.844587,
+        "samples": 395
+      },
+      "cfb_open_stream": {
+        "period": 1190690639,
+        "period_share_percent": 11.862613,
+        "samples": 279
+      },
+      "cfb_writer_write_to": {
+        "period": 3873159741,
+        "period_share_percent": 38.587517,
+        "samples": 908
+      },
+      "package_capture": {
+        "period": 2219116066,
+        "period_share_percent": 22.10861,
+        "samples": 520
+      }
+    },
+    "target_combinations": [
+      {
+        "labels": [
+          "cfb_writer_write_to"
+        ],
+        "period": 3873159741,
+        "period_share_percent": 38.587517,
+        "samples": 908
+      },
+      {
+        "labels": [],
+        "period": 2254314582,
+        "period_share_percent": 22.459286,
+        "samples": 529
+      },
+      {
+        "labels": [
+          "cfb_ole_open"
+        ],
+        "period": 1690748188,
+        "period_share_percent": 16.844587,
+        "samples": 395
+      },
+      {
+        "labels": [
+          "cfb_open_stream",
+          "package_capture"
+        ],
+        "period": 1190690639,
+        "period_share_percent": 11.862613,
+        "samples": 279
+      },
+      {
+        "labels": [
+          "package_capture"
+        ],
+        "period": 1028425427,
+        "period_share_percent": 10.245997,
+        "samples": 241
+      }
+    ]
+  },
+  "binding": {
+    "binary": {
+      "bytes": 126326672,
+      "path": "/home/zhuhe/litchi-performance-0942/target-profile-v2/release/doc_retention_probe_0942_cfb_profile",
+      "sha256": "92f85ce6019405fa1b0d97ec796947cd7ec240d2b8143f9cf06356d97409e70e"
+    },
+    "event_counts": {
+      "cycles:u": 18209
+    },
+    "formal_reduction": {
+      "bytes": 260569,
+      "path": "/home/zhuhe/litchi-performance-0942/reports/formal-reduction-v5.json",
+      "sha256": "5619db9dd6b81b0cc6c71d4d5143f97a69aa628a5678e673bf268483c5e9a366"
+    },
+    "lost_records": 0,
+    "manifest": {
+      "bytes": 17088,
+      "path": "/home/zhuhe/litchi-performance-0942/manifests/cfb-profile-manifest-v5.json",
+      "sha256": "27f7a1e4c21f6b77ba26e6180894a016299396131a96028d92d5c34f694cea27"
+    },
+    "parse_stats": {
+      "profile-r01-docfloat-e01": {
+        "lost_records": 0,
+        "period": 6041860449,
+        "records": 1399
+      },
+      "profile-r01-docfloat-e02": {
+        "lost_records": 0,
+        "period": 6459882316,
+        "records": 1565
+      },
+      "profile-r01-docfloat-e08": {
+        "lost_records": 0,
+        "period": 7847134550,
+        "records": 1926
+      },
+      "profile-r01-docfloat-e32": {
+        "lost_records": 0,
+        "period": 13521913169,
+        "records": 3270
+      },
+      "profile-r01-docnohf-e01": {
+        "lost_records": 0,
+        "period": 668676298,
+        "records": 167
+      },
+      "profile-r01-docnohf-e02": {
+        "lost_records": 0,
+        "period": 706569454,
+        "records": 175
+      },
+      "profile-r01-docnohf-e08": {
+        "lost_records": 0,
+        "period": 879551486,
+        "records": 216
+      },
+      "profile-r01-docnohf-e32": {
+        "lost_records": 0,
+        "period": 1659915769,
+        "records": 394
+      },
+      "profile-r02-docfloat-e01": {
+        "lost_records": 0,
+        "period": 6235938845,
+        "records": 1527
+      },
+      "profile-r02-docfloat-e02": {
+        "lost_records": 0,
+        "period": 6373660140,
+        "records": 1509
+      },
+      "profile-r02-docfloat-e08": {
+        "lost_records": 0,
+        "period": 7827294714,
+        "records": 1910
+      },
+      "profile-r02-docfloat-e32": {
+        "lost_records": 0,
+        "period": 13394725465,
+        "records": 3201
+      },
+      "profile-r02-docnohf-e01": {
+        "lost_records": 0,
+        "period": 671858718,
+        "records": 167
+      },
+      "profile-r02-docnohf-e02": {
+        "lost_records": 0,
+        "period": 701581320,
+        "records": 173
+      },
+      "profile-r02-docnohf-e08": {
+        "lost_records": 0,
+        "period": 883157161,
+        "records": 217
+      },
+      "profile-r02-docnohf-e32": {
+        "lost_records": 0,
+        "period": 1656834300,
+        "records": 393
+      }
+    },
+    "raw_script_count": 16,
+    "raw_scripts": [
+      {
+        "bytes": 3174299,
+        "path": "capture/formal-v5/children/profile-r01-docfloat-e01/perf-script.txt",
+        "sha256": "84ef0e33464cc52ddfafd8c4d51d0cf7b2fdf1ebe4955179a8425addc523d13a"
+      },
+      {
+        "bytes": 3589969,
+        "path": "capture/formal-v5/children/profile-r01-docfloat-e02/perf-script.txt",
+        "sha256": "395a4c069163ac98dc5da469828a5b801a2f0e21d6dea49610af8f0dd6ae034d"
+      },
+      {
+        "bytes": 4586437,
+        "path": "capture/formal-v5/children/profile-r01-docfloat-e08/perf-script.txt",
+        "sha256": "a827d811980bc76fc5c2b78a09c123771171ab182d47f3ceef168fec751000ca"
+      },
+      {
+        "bytes": 8290027,
+        "path": "capture/formal-v5/children/profile-r01-docfloat-e32/perf-script.txt",
+        "sha256": "fd9677463beb7e2822f172ee16c7e3de21d7ce4537e8bc8a07adc241214d96dd"
+      },
+      {
+        "bytes": 393579,
+        "path": "capture/formal-v5/children/profile-r01-docnohf-e01/perf-script.txt",
+        "sha256": "6ebddccb2fdf17ceda5b332ceddb52ac7553c181bf3d97cb024624ee0e097096"
+      },
+      {
+        "bytes": 427060,
+        "path": "capture/formal-v5/children/profile-r01-docnohf-e02/perf-script.txt",
+        "sha256": "7b66e7a92cd5fc90bf963e7e7da69335111ac6cd45d1a9c046eb57e113333aea"
+      },
+      {
+        "bytes": 544023,
+        "path": "capture/formal-v5/children/profile-r01-docnohf-e08/perf-script.txt",
+        "sha256": "8b0a117581b36eb8d8fc970cf4b3e355a045b6b024645bdb503f5a780ff323a1"
+      },
+      {
+        "bytes": 1069269,
+        "path": "capture/formal-v5/children/profile-r01-docnohf-e32/perf-script.txt",
+        "sha256": "5b2fe63da13e0d916ac7c4dc3ef5f186eeed41ed859c4bcd0c6f9680971d2f49"
+      },
+      {
+        "bytes": 3451865,
+        "path": "capture/formal-v5/children/profile-r02-docfloat-e01/perf-script.txt",
+        "sha256": "b7c4775acdc89cff22337ff0abb179f3c5f28b7d63b9bf649632d77381d06d9c"
+      },
+      {
+        "bytes": 3468473,
+        "path": "capture/formal-v5/children/profile-r02-docfloat-e02/perf-script.txt",
+        "sha256": "8122b3d429c6585f6db4a32c799aa1ebf7f0bba96a91abf7db588c09f7e6fe59"
+      },
+      {
+        "bytes": 4544531,
+        "path": "capture/formal-v5/children/profile-r02-docfloat-e08/perf-script.txt",
+        "sha256": "21e5a4301ee87c623e283d064d93d69ac32c402bc3de8dc11c32536b98bf89e8"
+      },
+      {
+        "bytes": 8110060,
+        "path": "capture/formal-v5/children/profile-r02-docfloat-e32/perf-script.txt",
+        "sha256": "415e853638bcfff9827a569143f1298595ba28357cf1f4050d75c229ad9b209b"
+      },
+      {
+        "bytes": 374603,
+        "path": "capture/formal-v5/children/profile-r02-docnohf-e01/perf-script.txt",
+        "sha256": "996f092699c1a0d0c58bdd8bf764cd039ffb2144e5a218cedaaa1b31203d0a79"
+      },
+      {
+        "bytes": 410615,
+        "path": "capture/formal-v5/children/profile-r02-docnohf-e02/perf-script.txt",
+        "sha256": "3385569925396119db3b623de7077f13014602d9b6a3bc1dfa6f855942d4c915"
+      },
+      {
+        "bytes": 545619,
+        "path": "capture/formal-v5/children/profile-r02-docnohf-e08/perf-script.txt",
+        "sha256": "18f1183a5ccb82f87dbf116cead38a8ab4933a16969ee0a3523c861ddfed47c8"
+      },
+      {
+        "bytes": 1062059,
+        "path": "capture/formal-v5/children/profile-r02-docnohf-e32/perf-script.txt",
+        "sha256": "3bd9accd18709dd52f0c202740a7447fd45709f1baf63ab811db4b465b5147e9"
+      }
+    ]
+  },
+  "created_utc": "2026-10-08T00:24:18.011622+00:00",
+  "focus_floatpictures_e32": {
+    "denominator": {
+      "period": 6302069415,
+      "samples": 1477
+    },
+    "derived_inclusive": {
+      "all_exact_target_union": {
+        "period": 4856943739,
+        "period_share_percent": 77.06903,
+        "samples": 1138
+      },
+      "any_physical_litchi_cfb_frame": {
+        "period": 4796517962,
+        "period_share_percent": 76.110205,
+        "samples": 1124
+      },
+      "capture_family_package_capture_container_open_stream": {
+        "period": 1578957556,
+        "period_share_percent": 25.054588,
+        "samples": 370
+      },
+      "package_capture_and_open_stream_overlap": {
+        "period": 874651929,
+        "period_share_percent": 13.878805,
+        "samples": 205
+      },
+      "validation_open_family_ole_open_or_codec_open": {
+        "period": 896459269,
+        "period_share_percent": 14.22484,
+        "samples": 210
+      }
+    },
+    "exclusive_nearest_frame": {
+      "buckets": {
+        "cfb_ole_open": {
+          "period": 896459269,
+          "period_share_percent": 14.22484,
+          "samples": 210
+        },
+        "cfb_open_stream": {
+          "period": 874651929,
+          "period_share_percent": 13.878805,
+          "samples": 205
+        },
+        "cfb_writer_write_to": {
+          "period": 2381526914,
+          "period_share_percent": 37.789601,
+          "samples": 558
+        },
+        "no_target_cfb_frame": {
+          "period": 959277018,
+          "period_share_percent": 15.221619,
+          "samples": 225
+        },
+        "other_physical_cfb": {
+          "period": 485848658,
+          "period_share_percent": 7.709351,
+          "samples": 114
+        },
+        "package_capture": {
+          "period": 704305627,
+          "period_share_percent": 11.175783,
+          "samples": 165
+        }
+      },
+      "conserves_denominator": true,
+      "rule": "nearest physical target frame from leaf toward commit root; then other physical CFB; then no target CFB frame",
+      "sum_period": 6302069415,
+      "sum_samples": 1477
+    },
+    "inclusive_overlap": {
+      "exact_target_union_period": 4856943739,
+      "overlap_excess_period": 874651929,
+      "sum_of_tag_periods": 5731595668,
+      "warning": "inclusive tag periods overlap and must not be added"
+    },
+    "inclusive_tags": {
+      "cfb_ole_open": {
+        "period": 896459269,
+        "period_share_percent": 14.22484,
+        "samples": 210
+      },
+      "cfb_open_stream": {
+        "period": 874651929,
+        "period_share_percent": 13.878805,
+        "samples": 205
+      },
+      "cfb_writer_write_to": {
+        "period": 2381526914,
+        "period_share_percent": 37.789601,
+        "samples": 558
+      },
+      "package_capture": {
+        "period": 1578957556,
+        "period_share_percent": 25.054588,
+        "samples": 370
+      }
+    },
+    "target_combinations": [
+      {
+        "labels": [
+          "cfb_writer_write_to"
+        ],
+        "period": 2381526914,
+        "period_share_percent": 37.789601,
+        "samples": 558
+      },
+      {
+        "labels": [],
+        "period": 1445125676,
+        "period_share_percent": 22.93097,
+        "samples": 339
+      },
+      {
+        "labels": [
+          "cfb_ole_open"
+        ],
+        "period": 896459269,
+        "period_share_percent": 14.22484,
+        "samples": 210
+      },
+      {
+        "labels": [
+          "cfb_open_stream",
+          "package_capture"
+        ],
+        "period": 874651929,
+        "period_share_percent": 13.878805,
+        "samples": 205
+      },
+      {
+        "labels": [
+          "package_capture"
+        ],
+        "period": 704305627,
+        "period_share_percent": 11.175783,
+        "samples": 165
+      }
+    ]
+  },
+  "interpretation": {
+    "candidate_scope": "Package::capture/capture_container/open_stream is a measured handoff target; codec::open and discovery::from_package require source review and fresh evidence rather than zero-cost inference",
+    "capture_container": "source-confirmed helper but no physical named frame observed in retained no-inline commit subset",
+    "exclusive": "nearest observed exact target from leaf toward commit root, then other physical CFB, then no target CFB frame",
+    "inclusive": "ancestry membership within the commit root; rows overlap",
+    "missing_named_frame": "does not establish zero CPU; helper may be inlined, short, or unsampled"
+  },
+  "parser_contract": {
+    "commit_root_frame": "litchi_ole_common::object::editor::Editor::commit_candidate_with_rendered",
+    "frame_order": "perf script leaf first",
+    "marker_frame": "doc_retention_probe_0942_cfb_profile::profiled_measured_case",
+    "period_units": "perf sample period from cycles:u header",
+    "physical_dso": [
+      "/home/zhuhe/litchi-performance-0942/target-profile-v2/release/doc_retention_probe_0942_cfb_profile",
+      "doc_retention_probe_0942_cfb_profile"
+    ],
+    "qualified_rule": "exactly one physical marker and one physical commit root, with commit index below marker index",
+    "target_match": "exact demangled symbol plus physical binary DSO, bounded to frames through commit root"
+  },
+  "per_child": {
+    "profile-r01-docfloat-e01": {
+      "denominator": {
+        "period": 109178057,
+        "samples": 25
+      },
+      "derived_inclusive": {
+        "all_exact_target_union": {
+          "period": 87342651,
+          "period_share_percent": 80.000188,
+          "samples": 20
+        },
+        "any_physical_litchi_cfb_frame": {
+          "period": 87337850,
+          "period_share_percent": 79.995791,
+          "samples": 20
+        },
+        "capture_family_package_capture_container_open_stream": {
+          "period": 26228327,
+          "period_share_percent": 24.023442,
+          "samples": 6
+        },
+        "package_capture_and_open_stream_overlap": {
+          "period": 8746643,
+          "period_share_percent": 8.011356,
+          "samples": 2
+        },
+        "validation_open_family_ole_open_or_codec_open": {
+          "period": 34927132,
+          "period_share_percent": 31.990981,
+          "samples": 8
+        }
+      },
+      "exclusive_nearest_frame": {
+        "buckets": {
+          "cfb_ole_open": {
+            "period": 34927132,
+            "period_share_percent": 31.990981,
+            "samples": 8
+          },
+          "cfb_open_stream": {
+            "period": 8746643,
+            "period_share_percent": 8.011356,
+            "samples": 2
+          },
+          "cfb_writer_write_to": {
+            "period": 26187192,
+            "period_share_percent": 23.985765,
+            "samples": 6
+          },
+          "no_target_cfb_frame": {
+            "period": 13099577,
+            "period_share_percent": 11.998361,
+            "samples": 3
+          },
+          "other_physical_cfb": {
+            "period": 8735829,
+            "period_share_percent": 8.001451,
+            "samples": 2
+          },
+          "package_capture": {
+            "period": 17481684,
+            "period_share_percent": 16.012086,
+            "samples": 4
+          }
+        },
+        "conserves_denominator": true,
+        "rule": "nearest physical target frame from leaf toward commit root; then other physical CFB; then no target CFB frame",
+        "sum_period": 109178057,
+        "sum_samples": 25
+      },
+      "inclusive_overlap": {
+        "exact_target_union_period": 87342651,
+        "overlap_excess_period": 8746643,
+        "sum_of_tag_periods": 96089294,
+        "warning": "inclusive tag periods overlap and must not be added"
+      },
+      "inclusive_tags": {
+        "cfb_ole_open": {
+          "period": 34927132,
+          "period_share_percent": 31.990981,
+          "samples": 8
+        },
+        "cfb_open_stream": {
+          "period": 8746643,
+          "period_share_percent": 8.011356,
+          "samples": 2
+        },
+        "cfb_writer_write_to": {
+          "period": 26187192,
+          "period_share_percent": 23.985765,
+          "samples": 6
+        },
+        "package_capture": {
+          "period": 26228327,
+          "period_share_percent": 24.023442,
+          "samples": 6
+        }
+      },
+      "target_combinations": [
+        {
+          "labels": [
+            "cfb_ole_open"
+          ],
+          "period": 34927132,
+          "period_share_percent": 31.990981,
+          "samples": 8
+        },
+        {
+          "labels": [
+            "cfb_writer_write_to"
+          ],
+          "period": 26187192,
+          "period_share_percent": 23.985765,
+          "samples": 6
+        },
+        {
+          "labels": [],
+          "period": 21835406,
+          "period_share_percent": 19.999812,
+          "samples": 5
+        },
+        {
+          "labels": [
+            "package_capture"
+          ],
+          "period": 17481684,
+          "period_share_percent": 16.012086,
+          "samples": 4
+        },
+        {
+          "labels": [
+            "cfb_open_stream",
+            "package_capture"
+          ],
+          "period": 8746643,
+          "period_share_percent": 8.011356,
+          "samples": 2
+        }
+      ]
+    },
+    "profile-r01-docfloat-e02": {
+      "denominator": {
+        "period": 215532040,
+        "samples": 51
+      },
+      "derived_inclusive": {
+        "all_exact_target_union": {
+          "period": 156426412,
+          "period_share_percent": 72.576872,
+          "samples": 37
+        },
+        "any_physical_litchi_cfb_frame": {
+          "period": 152145479,
+          "period_share_percent": 70.590655,
+          "samples": 36
+        },
+        "capture_family_package_capture_container_open_stream": {
+          "period": 38112041,
+          "period_share_percent": 17.682773,
+          "samples": 9
+        },
+        "package_capture_and_open_stream_overlap": {
+          "period": 8500905,
+          "period_share_percent": 3.944149,
+          "samples": 2
+        },
+        "validation_open_family_ole_open_or_codec_open": {
+          "period": 21123979,
+          "period_share_percent": 9.800853,
+          "samples": 5
+        }
+      },
+      "exclusive_nearest_frame": {
+        "buckets": {
+          "cfb_ole_open": {
+            "period": 21123979,
+            "period_share_percent": 9.800853,
+            "samples": 5
+          },
+          "cfb_open_stream": {
+            "period": 8500905,
+            "period_share_percent": 3.944149,
+            "samples": 2
+          },
+          "cfb_writer_write_to": {
+            "period": 97190392,
+            "period_share_percent": 45.093246,
+            "samples": 23
+          },
+          "no_target_cfb_frame": {
+            "period": 38006664,
+            "period_share_percent": 17.633881,
+            "samples": 9
+          },
+          "other_physical_cfb": {
+            "period": 21098964,
+            "period_share_percent": 9.789247,
+            "samples": 5
+          },
+          "package_capture": {
+            "period": 29611136,
+            "period_share_percent": 13.738624,
+            "samples": 7
+          }
+        },
+        "conserves_denominator": true,
+        "rule": "nearest physical target frame from leaf toward commit root; then other physical CFB; then no target CFB frame",
+        "sum_period": 215532040,
+        "sum_samples": 51
+      },
+      "inclusive_overlap": {
+        "exact_target_union_period": 156426412,
+        "overlap_excess_period": 8500905,
+        "sum_of_tag_periods": 164927317,
+        "warning": "inclusive tag periods overlap and must not be added"
+      },
+      "inclusive_tags": {
+        "cfb_ole_open": {
+          "period": 21123979,
+          "period_share_percent": 9.800853,
+          "samples": 5
+        },
+        "cfb_open_stream": {
+          "period": 8500905,
+          "period_share_percent": 3.944149,
+          "samples": 2
+        },
+        "cfb_writer_write_to": {
+          "period": 97190392,
+          "period_share_percent": 45.093246,
+          "samples": 23
+        },
+        "package_capture": {
+          "period": 38112041,
+          "period_share_percent": 17.682773,
+          "samples": 9
+        }
+      },
+      "target_combinations": [
+        {
+          "labels": [
+            "cfb_writer_write_to"
+          ],
+          "period": 97190392,
+          "period_share_percent": 45.093246,
+          "samples": 23
+        },
+        {
+          "labels": [],
+          "period": 59105628,
+          "period_share_percent": 27.423128,
+          "samples": 14
+        },
+        {
+          "labels": [
+            "package_capture"
+          ],
+          "period": 29611136,
+          "period_share_percent": 13.738624,
+          "samples": 7
+        },
+        {
+          "labels": [
+            "cfb_ole_open"
+          ],
+          "period": 21123979,
+          "period_share_percent": 9.800853,
+          "samples": 5
+        },
+        {
+          "labels": [
+            "cfb_open_stream",
+            "package_capture"
+          ],
+          "period": 8500905,
+          "period_share_percent": 3.944149,
+          "samples": 2
+        }
+      ]
+    },
+    "profile-r01-docfloat-e08": {
+      "denominator": {
+        "period": 807623755,
+        "samples": 192
+      },
+      "derived_inclusive": {
+        "all_exact_target_union": {
+          "period": 613815456,
+          "period_share_percent": 76.00265,
+          "samples": 146
+        },
+        "any_physical_litchi_cfb_frame": {
+          "period": 601302073,
+          "period_share_percent": 74.453243,
+          "samples": 143
+        },
+        "capture_family_package_capture_container_open_stream": {
+          "period": 176905493,
+          "period_share_percent": 21.904444,
+          "samples": 42
+        },
+        "package_capture_and_open_stream_overlap": {
+          "period": 80083987,
+          "period_share_percent": 9.916002,
+          "samples": 19
+        },
+        "validation_open_family_ole_open_or_codec_open": {
+          "period": 121959615,
+          "period_share_percent": 15.101044,
+          "samples": 29
+        }
+      },
+      "exclusive_nearest_frame": {
+        "buckets": {
+          "cfb_ole_open": {
+            "period": 121959615,
+            "period_share_percent": 15.101044,
+            "samples": 29
+          },
+          "cfb_open_stream": {
+            "period": 80083987,
+            "period_share_percent": 9.916002,
+            "samples": 19
+          },
+          "cfb_writer_write_to": {
+            "period": 314950348,
+            "period_share_percent": 38.997162,
+            "samples": 75
+          },
+          "no_target_cfb_frame": {
+            "period": 122235547,
+            "period_share_percent": 15.135209,
+            "samples": 29
+          },
+          "other_physical_cfb": {
+            "period": 71572752,
+            "period_share_percent": 8.862141,
+            "samples": 17
+          },
+          "package_capture": {
+            "period": 96821506,
+            "period_share_percent": 11.988442,
+            "samples": 23
+          }
+        },
+        "conserves_denominator": true,
+        "rule": "nearest physical target frame from leaf toward commit root; then other physical CFB; then no target CFB frame",
+        "sum_period": 807623755,
+        "sum_samples": 192
+      },
+      "inclusive_overlap": {
+        "exact_target_union_period": 613815456,
+        "overlap_excess_period": 80083987,
+        "sum_of_tag_periods": 693899443,
+        "warning": "inclusive tag periods overlap and must not be added"
+      },
+      "inclusive_tags": {
+        "cfb_ole_open": {
+          "period": 121959615,
+          "period_share_percent": 15.101044,
+          "samples": 29
+        },
+        "cfb_open_stream": {
+          "period": 80083987,
+          "period_share_percent": 9.916002,
+          "samples": 19
+        },
+        "cfb_writer_write_to": {
+          "period": 314950348,
+          "period_share_percent": 38.997162,
+          "samples": 75
+        },
+        "package_capture": {
+          "period": 176905493,
+          "period_share_percent": 21.904444,
+          "samples": 42
+        }
+      },
+      "target_combinations": [
+        {
+          "labels": [
+            "cfb_writer_write_to"
+          ],
+          "period": 314950348,
+          "period_share_percent": 38.997162,
+          "samples": 75
+        },
+        {
+          "labels": [],
+          "period": 193808299,
+          "period_share_percent": 23.99735,
+          "samples": 46
+        },
+        {
+          "labels": [
+            "cfb_ole_open"
+          ],
+          "period": 121959615,
+          "period_share_percent": 15.101044,
+          "samples": 29
+        },
+        {
+          "labels": [
+            "package_capture"
+          ],
+          "period": 96821506,
+          "period_share_percent": 11.988442,
+          "samples": 23
+        },
+        {
+          "labels": [
+            "cfb_open_stream",
+            "package_capture"
+          ],
+          "period": 80083987,
+          "period_share_percent": 9.916002,
+          "samples": 19
+        }
+      ]
+    },
+    "profile-r01-docfloat-e32": {
+      "denominator": {
+        "period": 3112476761,
+        "samples": 731
+      },
+      "derived_inclusive": {
+        "all_exact_target_union": {
+          "period": 2411228994,
+          "period_share_percent": 77.469783,
+          "samples": 566
+        },
+        "any_physical_litchi_cfb_frame": {
+          "period": 2329398222,
+          "period_share_percent": 74.840662,
+          "samples": 547
+        },
+        "capture_family_package_capture_container_open_stream": {
+          "period": 818166901,
+          "period_share_percent": 26.286683,
+          "samples": 192
+        },
+        "package_capture_and_open_stream_overlap": {
+          "period": 430206204,
+          "period_share_percent": 13.821989,
+          "samples": 101
+        },
+        "validation_open_family_ole_open_or_codec_open": {
+          "period": 396503237,
+          "period_share_percent": 12.739155,
+          "samples": 93
+        }
+      },
+      "exclusive_nearest_frame": {
+        "buckets": {
+          "cfb_ole_open": {
+            "period": 396503237,
+            "period_share_percent": 12.739155,
+            "samples": 93
+          },
+          "cfb_open_stream": {
+            "period": 430206204,
+            "period_share_percent": 13.821989,
+            "samples": 101
+          },
+          "cfb_writer_write_to": {
+            "period": 1196558856,
+            "period_share_percent": 38.443945,
+            "samples": 281
+          },
+          "no_target_cfb_frame": {
+            "period": 450435711,
+            "period_share_percent": 14.471938,
+            "samples": 106
+          },
+          "other_physical_cfb": {
+            "period": 250812056,
+            "period_share_percent": 8.058279,
+            "samples": 59
+          },
+          "package_capture": {
+            "period": 387960697,
+            "period_share_percent": 12.464694,
+            "samples": 91
+          }
+        },
+        "conserves_denominator": true,
+        "rule": "nearest physical target frame from leaf toward commit root; then other physical CFB; then no target CFB frame",
+        "sum_period": 3112476761,
+        "sum_samples": 731
+      },
+      "inclusive_overlap": {
+        "exact_target_union_period": 2411228994,
+        "overlap_excess_period": 430206204,
+        "sum_of_tag_periods": 2841435198,
+        "warning": "inclusive tag periods overlap and must not be added"
+      },
+      "inclusive_tags": {
+        "cfb_ole_open": {
+          "period": 396503237,
+          "period_share_percent": 12.739155,
+          "samples": 93
+        },
+        "cfb_open_stream": {
+          "period": 430206204,
+          "period_share_percent": 13.821989,
+          "samples": 101
+        },
+        "cfb_writer_write_to": {
+          "period": 1196558856,
+          "period_share_percent": 38.443945,
+          "samples": 281
+        },
+        "package_capture": {
+          "period": 818166901,
+          "period_share_percent": 26.286683,
+          "samples": 192
+        }
+      },
+      "target_combinations": [
+        {
+          "labels": [
+            "cfb_writer_write_to"
+          ],
+          "period": 1196558856,
+          "period_share_percent": 38.443945,
+          "samples": 281
+        },
+        {
+          "labels": [],
+          "period": 701247767,
+          "period_share_percent": 22.530217,
+          "samples": 165
+        },
+        {
+          "labels": [
+            "cfb_open_stream",
+            "package_capture"
+          ],
+          "period": 430206204,
+          "period_share_percent": 13.821989,
+          "samples": 101
+        },
+        {
+          "labels": [
+            "cfb_ole_open"
+          ],
+          "period": 396503237,
+          "period_share_percent": 12.739155,
+          "samples": 93
+        },
+        {
+          "labels": [
+            "package_capture"
+          ],
+          "period": 387960697,
+          "period_share_percent": 12.464694,
+          "samples": 91
+        }
+      ]
+    },
+    "profile-r01-docnohf-e01": {
+      "denominator": {
+        "period": 3846528,
+        "samples": 1
+      },
+      "derived_inclusive": {
+        "all_exact_target_union": {
+          "period": 3846528,
+          "period_share_percent": 100.0,
+          "samples": 1
+        },
+        "any_physical_litchi_cfb_frame": {
+          "period": 3846528,
+          "period_share_percent": 100.0,
+          "samples": 1
+        },
+        "capture_family_package_capture_container_open_stream": {
+          "period": 0,
+          "period_share_percent": 0.0,
+          "samples": 0
+        },
+        "package_capture_and_open_stream_overlap": {
+          "period": 0,
+          "period_share_percent": 0.0,
+          "samples": 0
+        },
+        "validation_open_family_ole_open_or_codec_open": {
+          "period": 3846528,
+          "period_share_percent": 100.0,
+          "samples": 1
+        }
+      },
+      "exclusive_nearest_frame": {
+        "buckets": {
+          "cfb_ole_open": {
+            "period": 3846528,
+            "period_share_percent": 100.0,
+            "samples": 1
+          }
+        },
+        "conserves_denominator": true,
+        "rule": "nearest physical target frame from leaf toward commit root; then other physical CFB; then no target CFB frame",
+        "sum_period": 3846528,
+        "sum_samples": 1
+      },
+      "inclusive_overlap": {
+        "exact_target_union_period": 3846528,
+        "overlap_excess_period": 0,
+        "sum_of_tag_periods": 3846528,
+        "warning": "inclusive tag periods overlap and must not be added"
+      },
+      "inclusive_tags": {
+        "cfb_ole_open": {
+          "period": 3846528,
+          "period_share_percent": 100.0,
+          "samples": 1
+        }
+      },
+      "target_combinations": [
+        {
+          "labels": [
+            "cfb_ole_open"
+          ],
+          "period": 3846528,
+          "period_share_percent": 100.0,
+          "samples": 1
+        }
+      ]
+    },
+    "profile-r01-docnohf-e02": {
+      "denominator": {
+        "period": 38933546,
+        "samples": 9
+      },
+      "derived_inclusive": {
+        "all_exact_target_union": {
+          "period": 34605741,
+          "period_share_percent": 88.884123,
+          "samples": 8
+        },
+        "any_physical_litchi_cfb_frame": {
+          "period": 38933546,
+          "period_share_percent": 100.0,
+          "samples": 9
+        },
+        "capture_family_package_capture_container_open_stream": {
+          "period": 4321568,
+          "period_share_percent": 11.099857,
+          "samples": 1
+        },
+        "package_capture_and_open_stream_overlap": {
+          "period": 4321568,
+          "period_share_percent": 11.099857,
+          "samples": 1
+        },
+        "validation_open_family_ole_open_or_codec_open": {
+          "period": 8625898,
+          "period_share_percent": 22.155439,
+          "samples": 2
+        }
+      },
+      "exclusive_nearest_frame": {
+        "buckets": {
+          "cfb_ole_open": {
+            "period": 8625898,
+            "period_share_percent": 22.155439,
+            "samples": 2
+          },
+          "cfb_open_stream": {
+            "period": 4321568,
+            "period_share_percent": 11.099857,
+            "samples": 1
+          },
+          "cfb_writer_write_to": {
+            "period": 21658275,
+            "period_share_percent": 55.628827,
+            "samples": 5
+          },
+          "other_physical_cfb": {
+            "period": 4327805,
+            "period_share_percent": 11.115877,
+            "samples": 1
+          }
+        },
+        "conserves_denominator": true,
+        "rule": "nearest physical target frame from leaf toward commit root; then other physical CFB; then no target CFB frame",
+        "sum_period": 38933546,
+        "sum_samples": 9
+      },
+      "inclusive_overlap": {
+        "exact_target_union_period": 34605741,
+        "overlap_excess_period": 4321568,
+        "sum_of_tag_periods": 38927309,
+        "warning": "inclusive tag periods overlap and must not be added"
+      },
+      "inclusive_tags": {
+        "cfb_ole_open": {
+          "period": 8625898,
+          "period_share_percent": 22.155439,
+          "samples": 2
+        },
+        "cfb_open_stream": {
+          "period": 4321568,
+          "period_share_percent": 11.099857,
+          "samples": 1
+        },
+        "cfb_writer_write_to": {
+          "period": 21658275,
+          "period_share_percent": 55.628827,
+          "samples": 5
+        },
+        "package_capture": {
+          "period": 4321568,
+          "period_share_percent": 11.099857,
+          "samples": 1
+        }
+      },
+      "target_combinations": [
+        {
+          "labels": [
+            "cfb_writer_write_to"
+          ],
+          "period": 21658275,
+          "period_share_percent": 55.628827,
+          "samples": 5
+        },
+        {
+          "labels": [
+            "cfb_ole_open"
+          ],
+          "period": 8625898,
+          "period_share_percent": 22.155439,
+          "samples": 2
+        },
+        {
+          "labels": [],
+          "period": 4327805,
+          "period_share_percent": 11.115877,
+          "samples": 1
+        },
+        {
+          "labels": [
+            "cfb_open_stream",
+            "package_capture"
+          ],
+          "period": 4321568,
+          "period_share_percent": 11.099857,
+          "samples": 1
+        }
+      ]
+    },
+    "profile-r01-docnohf-e08": {
+      "denominator": {
+        "period": 159450464,
+        "samples": 37
+      },
+      "derived_inclusive": {
+        "all_exact_target_union": {
+          "period": 125446216,
+          "period_share_percent": 78.674099,
+          "samples": 29
+        },
+        "any_physical_litchi_cfb_frame": {
+          "period": 129154229,
+          "period_share_percent": 80.999594,
+          "samples": 30
+        },
+        "capture_family_package_capture_container_open_stream": {
+          "period": 21632854,
+          "period_share_percent": 13.567131,
+          "samples": 5
+        },
+        "package_capture_and_open_stream_overlap": {
+          "period": 12971498,
+          "period_share_percent": 8.135127,
+          "samples": 3
+        },
+        "validation_open_family_ole_open_or_codec_open": {
+          "period": 47573559,
+          "period_share_percent": 29.835949,
+          "samples": 11
+        }
+      },
+      "exclusive_nearest_frame": {
+        "buckets": {
+          "cfb_ole_open": {
+            "period": 47573559,
+            "period_share_percent": 29.835949,
+            "samples": 11
+          },
+          "cfb_open_stream": {
+            "period": 12971498,
+            "period_share_percent": 8.135127,
+            "samples": 3
+          },
+          "cfb_writer_write_to": {
+            "period": 56239803,
+            "period_share_percent": 35.271019,
+            "samples": 13
+          },
+          "no_target_cfb_frame": {
+            "period": 25965600,
+            "period_share_percent": 16.284431,
+            "samples": 6
+          },
+          "other_physical_cfb": {
+            "period": 8038648,
+            "period_share_percent": 5.04147,
+            "samples": 2
+          },
+          "package_capture": {
+            "period": 8661356,
+            "period_share_percent": 5.432004,
+            "samples": 2
+          }
+        },
+        "conserves_denominator": true,
+        "rule": "nearest physical target frame from leaf toward commit root; then other physical CFB; then no target CFB frame",
+        "sum_period": 159450464,
+        "sum_samples": 37
+      },
+      "inclusive_overlap": {
+        "exact_target_union_period": 125446216,
+        "overlap_excess_period": 12971498,
+        "sum_of_tag_periods": 138417714,
+        "warning": "inclusive tag periods overlap and must not be added"
+      },
+      "inclusive_tags": {
+        "cfb_ole_open": {
+          "period": 47573559,
+          "period_share_percent": 29.835949,
+          "samples": 11
+        },
+        "cfb_open_stream": {
+          "period": 12971498,
+          "period_share_percent": 8.135127,
+          "samples": 3
+        },
+        "cfb_writer_write_to": {
+          "period": 56239803,
+          "period_share_percent": 35.271019,
+          "samples": 13
+        },
+        "package_capture": {
+          "period": 21632854,
+          "period_share_percent": 13.567131,
+          "samples": 5
+        }
+      },
+      "target_combinations": [
+        {
+          "labels": [
+            "cfb_writer_write_to"
+          ],
+          "period": 56239803,
+          "period_share_percent": 35.271019,
+          "samples": 13
+        },
+        {
+          "labels": [
+            "cfb_ole_open"
+          ],
+          "period": 47573559,
+          "period_share_percent": 29.835949,
+          "samples": 11
+        },
+        {
+          "labels": [],
+          "period": 34004248,
+          "period_share_percent": 21.325901,
+          "samples": 8
+        },
+        {
+          "labels": [
+            "cfb_open_stream",
+            "package_capture"
+          ],
+          "period": 12971498,
+          "period_share_percent": 8.135127,
+          "samples": 3
+        },
+        {
+          "labels": [
+            "package_capture"
+          ],
+          "period": 8661356,
+          "period_share_percent": 5.432004,
+          "samples": 2
+        }
+      ]
+    },
+    "profile-r01-docnohf-e32": {
+      "denominator": {
+        "period": 577477306,
+        "samples": 133
+      },
+      "derived_inclusive": {
+        "all_exact_target_union": {
+          "period": 451789244,
+          "period_share_percent": 78.234978,
+          "samples": 104
+        },
+        "any_physical_litchi_cfb_frame": {
+          "period": 494924678,
+          "period_share_percent": 85.704611,
+          "samples": 114
+        },
+        "capture_family_package_capture_container_open_stream": {
+          "period": 78273015,
+          "period_share_percent": 13.554301,
+          "samples": 18
+        },
+        "package_capture_and_open_stream_overlap": {
+          "period": 39133432,
+          "period_share_percent": 6.776618,
+          "samples": 9
+        },
+        "validation_open_family_ole_open_or_codec_open": {
+          "period": 160762058,
+          "period_share_percent": 27.83868,
+          "samples": 37
+        }
+      },
+      "exclusive_nearest_frame": {
+        "buckets": {
+          "cfb_ole_open": {
+            "period": 160762058,
+            "period_share_percent": 27.83868,
+            "samples": 37
+          },
+          "cfb_open_stream": {
+            "period": 39133432,
+            "period_share_percent": 6.776618,
+            "samples": 9
+          },
+          "cfb_writer_write_to": {
+            "period": 212754171,
+            "period_share_percent": 36.841997,
+            "samples": 49
+          },
+          "no_target_cfb_frame": {
+            "period": 65162304,
+            "period_share_percent": 11.283959,
+            "samples": 15
+          },
+          "other_physical_cfb": {
+            "period": 60525758,
+            "period_share_percent": 10.481063,
+            "samples": 14
+          },
+          "package_capture": {
+            "period": 39139583,
+            "period_share_percent": 6.777683,
+            "samples": 9
+          }
+        },
+        "conserves_denominator": true,
+        "rule": "nearest physical target frame from leaf toward commit root; then other physical CFB; then no target CFB frame",
+        "sum_period": 577477306,
+        "sum_samples": 133
+      },
+      "inclusive_overlap": {
+        "exact_target_union_period": 451789244,
+        "overlap_excess_period": 39133432,
+        "sum_of_tag_periods": 490922676,
+        "warning": "inclusive tag periods overlap and must not be added"
+      },
+      "inclusive_tags": {
+        "cfb_ole_open": {
+          "period": 160762058,
+          "period_share_percent": 27.83868,
+          "samples": 37
+        },
+        "cfb_open_stream": {
+          "period": 39133432,
+          "period_share_percent": 6.776618,
+          "samples": 9
+        },
+        "cfb_writer_write_to": {
+          "period": 212754171,
+          "period_share_percent": 36.841997,
+          "samples": 49
+        },
+        "package_capture": {
+          "period": 78273015,
+          "period_share_percent": 13.554301,
+          "samples": 18
+        }
+      },
+      "target_combinations": [
+        {
+          "labels": [
+            "cfb_writer_write_to"
+          ],
+          "period": 212754171,
+          "period_share_percent": 36.841997,
+          "samples": 49
+        },
+        {
+          "labels": [
+            "cfb_ole_open"
+          ],
+          "period": 160762058,
+          "period_share_percent": 27.83868,
+          "samples": 37
+        },
+        {
+          "labels": [],
+          "period": 125688062,
+          "period_share_percent": 21.765022,
+          "samples": 29
+        },
+        {
+          "labels": [
+            "package_capture"
+          ],
+          "period": 39139583,
+          "period_share_percent": 6.777683,
+          "samples": 9
+        },
+        {
+          "labels": [
+            "cfb_open_stream",
+            "package_capture"
+          ],
+          "period": 39133432,
+          "period_share_percent": 6.776618,
+          "samples": 9
+        }
+      ]
+    },
+    "profile-r02-docfloat-e01": {
+      "denominator": {
+        "period": 134717180,
+        "samples": 32
+      },
+      "derived_inclusive": {
+        "all_exact_target_union": {
+          "period": 101240122,
+          "period_share_percent": 75.15012,
+          "samples": 24
+        },
+        "any_physical_litchi_cfb_frame": {
+          "period": 105249291,
+          "period_share_percent": 78.126109,
+          "samples": 25
+        },
+        "capture_family_package_capture_container_open_stream": {
+          "period": 16888629,
+          "period_share_percent": 12.536359,
+          "samples": 4
+        },
+        "package_capture_and_open_stream_overlap": {
+          "period": 8373799,
+          "period_share_percent": 6.215836,
+          "samples": 2
+        },
+        "validation_open_family_ole_open_or_codec_open": {
+          "period": 33836180,
+          "period_share_percent": 25.116455,
+          "samples": 8
+        }
+      },
+      "exclusive_nearest_frame": {
+        "buckets": {
+          "cfb_ole_open": {
+            "period": 33836180,
+            "period_share_percent": 25.116455,
+            "samples": 8
+          },
+          "cfb_open_stream": {
+            "period": 8373799,
+            "period_share_percent": 6.215836,
+            "samples": 2
+          },
+          "cfb_writer_write_to": {
+            "period": 50515313,
+            "period_share_percent": 37.497306,
+            "samples": 12
+          },
+          "no_target_cfb_frame": {
+            "period": 25166793,
+            "period_share_percent": 18.681205,
+            "samples": 6
+          },
+          "other_physical_cfb": {
+            "period": 8310265,
+            "period_share_percent": 6.168675,
+            "samples": 2
+          },
+          "package_capture": {
+            "period": 8514830,
+            "period_share_percent": 6.320523,
+            "samples": 2
+          }
+        },
+        "conserves_denominator": true,
+        "rule": "nearest physical target frame from leaf toward commit root; then other physical CFB; then no target CFB frame",
+        "sum_period": 134717180,
+        "sum_samples": 32
+      },
+      "inclusive_overlap": {
+        "exact_target_union_period": 101240122,
+        "overlap_excess_period": 8373799,
+        "sum_of_tag_periods": 109613921,
+        "warning": "inclusive tag periods overlap and must not be added"
+      },
+      "inclusive_tags": {
+        "cfb_ole_open": {
+          "period": 33836180,
+          "period_share_percent": 25.116455,
+          "samples": 8
+        },
+        "cfb_open_stream": {
+          "period": 8373799,
+          "period_share_percent": 6.215836,
+          "samples": 2
+        },
+        "cfb_writer_write_to": {
+          "period": 50515313,
+          "period_share_percent": 37.497306,
+          "samples": 12
+        },
+        "package_capture": {
+          "period": 16888629,
+          "period_share_percent": 12.536359,
+          "samples": 4
+        }
+      },
+      "target_combinations": [
+        {
+          "labels": [
+            "cfb_writer_write_to"
+          ],
+          "period": 50515313,
+          "period_share_percent": 37.497306,
+          "samples": 12
+        },
+        {
+          "labels": [],
+          "period": 33477058,
+          "period_share_percent": 24.84988,
+          "samples": 8
+        },
+        {
+          "labels": [
+            "cfb_ole_open"
+          ],
+          "period": 33836180,
+          "period_share_percent": 25.116455,
+          "samples": 8
+        },
+        {
+          "labels": [
+            "package_capture"
+          ],
+          "period": 8514830,
+          "period_share_percent": 6.320523,
+          "samples": 2
+        },
+        {
+          "labels": [
+            "cfb_open_stream",
+            "package_capture"
+          ],
+          "period": 8373799,
+          "period_share_percent": 6.215836,
+          "samples": 2
+        }
+      ]
+    },
+    "profile-r02-docfloat-e02": {
+      "denominator": {
+        "period": 171891402,
+        "samples": 40
+      },
+      "derived_inclusive": {
+        "all_exact_target_union": {
+          "period": 141814088,
+          "period_share_percent": 82.502142,
+          "samples": 33
+        },
+        "any_physical_litchi_cfb_frame": {
+          "period": 141769852,
+          "period_share_percent": 82.476407,
+          "samples": 33
+        },
+        "capture_family_package_capture_container_open_stream": {
+          "period": 30145838,
+          "period_share_percent": 17.537723,
+          "samples": 7
+        },
+        "package_capture_and_open_stream_overlap": {
+          "period": 12903029,
+          "period_share_percent": 7.506501,
+          "samples": 3
+        },
+        "validation_open_family_ole_open_or_codec_open": {
+          "period": 25708335,
+          "period_share_percent": 14.956149,
+          "samples": 6
+        }
+      },
+      "exclusive_nearest_frame": {
+        "buckets": {
+          "cfb_ole_open": {
+            "period": 25708335,
+            "period_share_percent": 14.956149,
+            "samples": 6
+          },
+          "cfb_open_stream": {
+            "period": 12903029,
+            "period_share_percent": 7.506501,
+            "samples": 3
+          },
+          "cfb_writer_write_to": {
+            "period": 85959915,
+            "period_share_percent": 50.008269,
+            "samples": 20
+          },
+          "no_target_cfb_frame": {
+            "period": 21516156,
+            "period_share_percent": 12.517296,
+            "samples": 5
+          },
+          "other_physical_cfb": {
+            "period": 8561158,
+            "period_share_percent": 4.980562,
+            "samples": 2
+          },
+          "package_capture": {
+            "period": 17242809,
+            "period_share_percent": 10.031223,
+            "samples": 4
+          }
+        },
+        "conserves_denominator": true,
+        "rule": "nearest physical target frame from leaf toward commit root; then other physical CFB; then no target CFB frame",
+        "sum_period": 171891402,
+        "sum_samples": 40
+      },
+      "inclusive_overlap": {
+        "exact_target_union_period": 141814088,
+        "overlap_excess_period": 12903029,
+        "sum_of_tag_periods": 154717117,
+        "warning": "inclusive tag periods overlap and must not be added"
+      },
+      "inclusive_tags": {
+        "cfb_ole_open": {
+          "period": 25708335,
+          "period_share_percent": 14.956149,
+          "samples": 6
+        },
+        "cfb_open_stream": {
+          "period": 12903029,
+          "period_share_percent": 7.506501,
+          "samples": 3
+        },
+        "cfb_writer_write_to": {
+          "period": 85959915,
+          "period_share_percent": 50.008269,
+          "samples": 20
+        },
+        "package_capture": {
+          "period": 30145838,
+          "period_share_percent": 17.537723,
+          "samples": 7
+        }
+      },
+      "target_combinations": [
+        {
+          "labels": [
+            "cfb_writer_write_to"
+          ],
+          "period": 85959915,
+          "period_share_percent": 50.008269,
+          "samples": 20
+        },
+        {
+          "labels": [],
+          "period": 30077314,
+          "period_share_percent": 17.497858,
+          "samples": 7
+        },
+        {
+          "labels": [
+            "cfb_ole_open"
+          ],
+          "period": 25708335,
+          "period_share_percent": 14.956149,
+          "samples": 6
+        },
+        {
+          "labels": [
+            "package_capture"
+          ],
+          "period": 17242809,
+          "period_share_percent": 10.031223,
+          "samples": 4
+        },
+        {
+          "labels": [
+            "cfb_open_stream",
+            "package_capture"
+          ],
+          "period": 12903029,
+          "period_share_percent": 7.506501,
+          "samples": 3
+        }
+      ]
+    },
+    "profile-r02-docfloat-e08": {
+      "denominator": {
+        "period": 772032701,
+        "samples": 183
+      },
+      "derived_inclusive": {
+        "all_exact_target_union": {
+          "period": 590735808,
+          "period_share_percent": 76.516941,
+          "samples": 140
+        },
+        "any_physical_litchi_cfb_frame": {
+          "period": 624537013,
+          "period_share_percent": 80.89515,
+          "samples": 148
+        },
+        "capture_family_package_capture_container_open_stream": {
+          "period": 134884331,
+          "period_share_percent": 17.471324,
+          "samples": 32
+        },
+        "package_capture_and_open_stream_overlap": {
+          "period": 75932057,
+          "period_share_percent": 9.835342,
+          "samples": 18
+        },
+        "validation_open_family_ole_open_or_codec_open": {
+          "period": 105439251,
+          "period_share_percent": 13.657356,
+          "samples": 25
+        }
+      },
+      "exclusive_nearest_frame": {
+        "buckets": {
+          "cfb_ole_open": {
+            "period": 105439251,
+            "period_share_percent": 13.657356,
+            "samples": 25
+          },
+          "cfb_open_stream": {
+            "period": 75932057,
+            "period_share_percent": 9.835342,
+            "samples": 18
+          },
+          "cfb_writer_write_to": {
+            "period": 350412226,
+            "period_share_percent": 45.388262,
+            "samples": 83
+          },
+          "no_target_cfb_frame": {
+            "period": 126379934,
+            "period_share_percent": 16.369764,
+            "samples": 30
+          },
+          "other_physical_cfb": {
+            "period": 54916959,
+            "period_share_percent": 7.113294,
+            "samples": 13
+          },
+          "package_capture": {
+            "period": 58952274,
+            "period_share_percent": 7.635981,
+            "samples": 14
+          }
+        },
+        "conserves_denominator": true,
+        "rule": "nearest physical target frame from leaf toward commit root; then other physical CFB; then no target CFB frame",
+        "sum_period": 772032701,
+        "sum_samples": 183
+      },
+      "inclusive_overlap": {
+        "exact_target_union_period": 590735808,
+        "overlap_excess_period": 75932057,
+        "sum_of_tag_periods": 666667865,
+        "warning": "inclusive tag periods overlap and must not be added"
+      },
+      "inclusive_tags": {
+        "cfb_ole_open": {
+          "period": 105439251,
+          "period_share_percent": 13.657356,
+          "samples": 25
+        },
+        "cfb_open_stream": {
+          "period": 75932057,
+          "period_share_percent": 9.835342,
+          "samples": 18
+        },
+        "cfb_writer_write_to": {
+          "period": 350412226,
+          "period_share_percent": 45.388262,
+          "samples": 83
+        },
+        "package_capture": {
+          "period": 134884331,
+          "period_share_percent": 17.471324,
+          "samples": 32
+        }
+      },
+      "target_combinations": [
+        {
+          "labels": [
+            "cfb_writer_write_to"
+          ],
+          "period": 350412226,
+          "period_share_percent": 45.388262,
+          "samples": 83
+        },
+        {
+          "labels": [],
+          "period": 181296893,
+          "period_share_percent": 23.483059,
+          "samples": 43
+        },
+        {
+          "labels": [
+            "cfb_ole_open"
+          ],
+          "period": 105439251,
+          "period_share_percent": 13.657356,
+          "samples": 25
+        },
+        {
+          "labels": [
+            "cfb_open_stream",
+            "package_capture"
+          ],
+          "period": 75932057,
+          "period_share_percent": 9.835342,
+          "samples": 18
+        },
+        {
+          "labels": [
+            "package_capture"
+          ],
+          "period": 58952274,
+          "period_share_percent": 7.635981,
+          "samples": 14
+        }
+      ]
+    },
+    "profile-r02-docfloat-e32": {
+      "denominator": {
+        "period": 3189592654,
+        "samples": 746
+      },
+      "derived_inclusive": {
+        "all_exact_target_union": {
+          "period": 2445714745,
+          "period_share_percent": 76.677965,
+          "samples": 572
+        },
+        "any_physical_litchi_cfb_frame": {
+          "period": 2467119740,
+          "period_share_percent": 77.349054,
+          "samples": 577
+        },
+        "capture_family_package_capture_container_open_stream": {
+          "period": 760790655,
+          "period_share_percent": 23.852283,
+          "samples": 178
+        },
+        "package_capture_and_open_stream_overlap": {
+          "period": 444445725,
+          "period_share_percent": 13.934247,
+          "samples": 104
+        },
+        "validation_open_family_ole_open_or_codec_open": {
+          "period": 499956032,
+          "period_share_percent": 15.674604,
+          "samples": 117
+        }
+      },
+      "exclusive_nearest_frame": {
+        "buckets": {
+          "cfb_ole_open": {
+            "period": 499956032,
+            "period_share_percent": 15.674604,
+            "samples": 117
+          },
+          "cfb_open_stream": {
+            "period": 444445725,
+            "period_share_percent": 13.934247,
+            "samples": 104
+          },
+          "cfb_writer_write_to": {
+            "period": 1184968058,
+            "period_share_percent": 37.151078,
+            "samples": 277
+          },
+          "no_target_cfb_frame": {
+            "period": 508841307,
+            "period_share_percent": 15.953175,
+            "samples": 119
+          },
+          "other_physical_cfb": {
+            "period": 235036602,
+            "period_share_percent": 7.36886,
+            "samples": 55
+          },
+          "package_capture": {
+            "period": 316344930,
+            "period_share_percent": 9.918035,
+            "samples": 74
+          }
+        },
+        "conserves_denominator": true,
+        "rule": "nearest physical target frame from leaf toward commit root; then other physical CFB; then no target CFB frame",
+        "sum_period": 3189592654,
+        "sum_samples": 746
+      },
+      "inclusive_overlap": {
+        "exact_target_union_period": 2445714745,
+        "overlap_excess_period": 444445725,
+        "sum_of_tag_periods": 2890160470,
+        "warning": "inclusive tag periods overlap and must not be added"
+      },
+      "inclusive_tags": {
+        "cfb_ole_open": {
+          "period": 499956032,
+          "period_share_percent": 15.674604,
+          "samples": 117
+        },
+        "cfb_open_stream": {
+          "period": 444445725,
+          "period_share_percent": 13.934247,
+          "samples": 104
+        },
+        "cfb_writer_write_to": {
+          "period": 1184968058,
+          "period_share_percent": 37.151078,
+          "samples": 277
+        },
+        "package_capture": {
+          "period": 760790655,
+          "period_share_percent": 23.852283,
+          "samples": 178
+        }
+      },
+      "target_combinations": [
+        {
+          "labels": [
+            "cfb_writer_write_to"
+          ],
+          "period": 1184968058,
+          "period_share_percent": 37.151078,
+          "samples": 277
+        },
+        {
+          "labels": [],
+          "period": 743877909,
+          "period_share_percent": 23.322035,
+          "samples": 174
+        },
+        {
+          "labels": [
+            "cfb_ole_open"
+          ],
+          "period": 499956032,
+          "period_share_percent": 15.674604,
+          "samples": 117
+        },
+        {
+          "labels": [
+            "cfb_open_stream",
+            "package_capture"
+          ],
+          "period": 444445725,
+          "period_share_percent": 13.934247,
+          "samples": 104
+        },
+        {
+          "labels": [
+            "package_capture"
+          ],
+          "period": 316344930,
+          "period_share_percent": 9.918035,
+          "samples": 74
+        }
+      ]
+    },
+    "profile-r02-docnohf-e01": {
+      "denominator": {
+        "period": 30161485,
+        "samples": 7
+      },
+      "derived_inclusive": {
+        "all_exact_target_union": {
+          "period": 21488325,
+          "period_share_percent": 71.244254,
+          "samples": 5
+        },
+        "any_physical_litchi_cfb_frame": {
+          "period": 30161485,
+          "period_share_percent": 100.0,
+          "samples": 7
+        },
+        "capture_family_package_capture_container_open_stream": {
+          "period": 4202972,
+          "period_share_percent": 13.934897,
+          "samples": 1
+        },
+        "package_capture_and_open_stream_overlap": {
+          "period": 4202972,
+          "period_share_percent": 13.934897,
+          "samples": 1
+        },
+        "validation_open_family_ole_open_or_codec_open": {
+          "period": 8634448,
+          "period_share_percent": 28.627397,
+          "samples": 2
+        }
+      },
+      "exclusive_nearest_frame": {
+        "buckets": {
+          "cfb_ole_open": {
+            "period": 8634448,
+            "period_share_percent": 28.627397,
+            "samples": 2
+          },
+          "cfb_open_stream": {
+            "period": 4202972,
+            "period_share_percent": 13.934897,
+            "samples": 1
+          },
+          "cfb_writer_write_to": {
+            "period": 8650905,
+            "period_share_percent": 28.68196,
+            "samples": 2
+          },
+          "other_physical_cfb": {
+            "period": 8673160,
+            "period_share_percent": 28.755746,
+            "samples": 2
+          }
+        },
+        "conserves_denominator": true,
+        "rule": "nearest physical target frame from leaf toward commit root; then other physical CFB; then no target CFB frame",
+        "sum_period": 30161485,
+        "sum_samples": 7
+      },
+      "inclusive_overlap": {
+        "exact_target_union_period": 21488325,
+        "overlap_excess_period": 4202972,
+        "sum_of_tag_periods": 25691297,
+        "warning": "inclusive tag periods overlap and must not be added"
+      },
+      "inclusive_tags": {
+        "cfb_ole_open": {
+          "period": 8634448,
+          "period_share_percent": 28.627397,
+          "samples": 2
+        },
+        "cfb_open_stream": {
+          "period": 4202972,
+          "period_share_percent": 13.934897,
+          "samples": 1
+        },
+        "cfb_writer_write_to": {
+          "period": 8650905,
+          "period_share_percent": 28.68196,
+          "samples": 2
+        },
+        "package_capture": {
+          "period": 4202972,
+          "period_share_percent": 13.934897,
+          "samples": 1
+        }
+      },
+      "target_combinations": [
+        {
+          "labels": [
+            "cfb_ole_open"
+          ],
+          "period": 8634448,
+          "period_share_percent": 28.627397,
+          "samples": 2
+        },
+        {
+          "labels": [
+            "cfb_writer_write_to"
+          ],
+          "period": 8650905,
+          "period_share_percent": 28.68196,
+          "samples": 2
+        },
+        {
+          "labels": [],
+          "period": 8673160,
+          "period_share_percent": 28.755746,
+          "samples": 2
+        },
+        {
+          "labels": [
+            "cfb_open_stream",
+            "package_capture"
+          ],
+          "period": 4202972,
+          "period_share_percent": 13.934897,
+          "samples": 1
+        }
+      ]
+    },
+    "profile-r02-docnohf-e02": {
+      "denominator": {
+        "period": 21293114,
+        "samples": 5
+      },
+      "derived_inclusive": {
+        "all_exact_target_union": {
+          "period": 13008194,
+          "period_share_percent": 61.091083,
+          "samples": 3
+        },
+        "any_physical_litchi_cfb_frame": {
+          "period": 16952062,
+          "period_share_percent": 79.612883,
+          "samples": 4
+        },
+        "capture_family_package_capture_container_open_stream": {
+          "period": 0,
+          "period_share_percent": 0.0,
+          "samples": 0
+        },
+        "package_capture_and_open_stream_overlap": {
+          "period": 0,
+          "period_share_percent": 0.0,
+          "samples": 0
+        },
+        "validation_open_family_ole_open_or_codec_open": {
+          "period": 4325502,
+          "period_share_percent": 20.314088,
+          "samples": 1
+        }
+      },
+      "exclusive_nearest_frame": {
+        "buckets": {
+          "cfb_ole_open": {
+            "period": 4325502,
+            "period_share_percent": 20.314088,
+            "samples": 1
+          },
+          "cfb_writer_write_to": {
+            "period": 8682692,
+            "period_share_percent": 40.776995,
+            "samples": 2
+          },
+          "no_target_cfb_frame": {
+            "period": 4341052,
+            "period_share_percent": 20.387117,
+            "samples": 1
+          },
+          "other_physical_cfb": {
+            "period": 3943868,
+            "period_share_percent": 18.5218,
+            "samples": 1
+          }
+        },
+        "conserves_denominator": true,
+        "rule": "nearest physical target frame from leaf toward commit root; then other physical CFB; then no target CFB frame",
+        "sum_period": 21293114,
+        "sum_samples": 5
+      },
+      "inclusive_overlap": {
+        "exact_target_union_period": 13008194,
+        "overlap_excess_period": 0,
+        "sum_of_tag_periods": 13008194,
+        "warning": "inclusive tag periods overlap and must not be added"
+      },
+      "inclusive_tags": {
+        "cfb_ole_open": {
+          "period": 4325502,
+          "period_share_percent": 20.314088,
+          "samples": 1
+        },
+        "cfb_writer_write_to": {
+          "period": 8682692,
+          "period_share_percent": 40.776995,
+          "samples": 2
+        }
+      },
+      "target_combinations": [
+        {
+          "labels": [],
+          "period": 8284920,
+          "period_share_percent": 38.908917,
+          "samples": 2
+        },
+        {
+          "labels": [
+            "cfb_writer_write_to"
+          ],
+          "period": 8682692,
+          "period_share_percent": 40.776995,
+          "samples": 2
+        },
+        {
+          "labels": [
+            "cfb_ole_open"
+          ],
+          "period": 4325502,
+          "period_share_percent": 20.314088,
+          "samples": 1
+        }
+      ]
+    },
+    "profile-r02-docnohf-e08": {
+      "denominator": {
+        "period": 141289715,
+        "samples": 33
+      },
+      "derived_inclusive": {
+        "all_exact_target_union": {
+          "period": 111013129,
+          "period_share_percent": 78.571274,
+          "samples": 26
+        },
+        "any_physical_litchi_cfb_frame": {
+          "period": 119668026,
+          "period_share_percent": 84.696912,
+          "samples": 28
+        },
+        "capture_family_package_capture_container_open_stream": {
+          "period": 17293424,
+          "period_share_percent": 12.239691,
+          "samples": 4
+        },
+        "package_capture_and_open_stream_overlap": {
+          "period": 8648021,
+          "period_share_percent": 6.120772,
+          "samples": 2
+        },
+        "validation_open_family_ole_open_or_codec_open": {
+          "period": 21622971,
+          "period_share_percent": 15.303995,
+          "samples": 5
+        }
+      },
+      "exclusive_nearest_frame": {
+        "buckets": {
+          "cfb_ole_open": {
+            "period": 21622971,
+            "period_share_percent": 15.303995,
+            "samples": 5
+          },
+          "cfb_open_stream": {
+            "period": 8648021,
+            "period_share_percent": 6.120772,
+            "samples": 2
+          },
+          "cfb_writer_write_to": {
+            "period": 72096734,
+            "period_share_percent": 51.027588,
+            "samples": 17
+          },
+          "no_target_cfb_frame": {
+            "period": 17299953,
+            "period_share_percent": 12.244312,
+            "samples": 4
+          },
+          "other_physical_cfb": {
+            "period": 12976633,
+            "period_share_percent": 9.184414,
+            "samples": 3
+          },
+          "package_capture": {
+            "period": 8645403,
+            "period_share_percent": 6.118919,
+            "samples": 2
+          }
+        },
+        "conserves_denominator": true,
+        "rule": "nearest physical target frame from leaf toward commit root; then other physical CFB; then no target CFB frame",
+        "sum_period": 141289715,
+        "sum_samples": 33
+      },
+      "inclusive_overlap": {
+        "exact_target_union_period": 111013129,
+        "overlap_excess_period": 8648021,
+        "sum_of_tag_periods": 119661150,
+        "warning": "inclusive tag periods overlap and must not be added"
+      },
+      "inclusive_tags": {
+        "cfb_ole_open": {
+          "period": 21622971,
+          "period_share_percent": 15.303995,
+          "samples": 5
+        },
+        "cfb_open_stream": {
+          "period": 8648021,
+          "period_share_percent": 6.120772,
+          "samples": 2
+        },
+        "cfb_writer_write_to": {
+          "period": 72096734,
+          "period_share_percent": 51.027588,
+          "samples": 17
+        },
+        "package_capture": {
+          "period": 17293424,
+          "period_share_percent": 12.239691,
+          "samples": 4
+        }
+      },
+      "target_combinations": [
+        {
+          "labels": [
+            "cfb_writer_write_to"
+          ],
+          "period": 72096734,
+          "period_share_percent": 51.027588,
+          "samples": 17
+        },
+        {
+          "labels": [],
+          "period": 30276586,
+          "period_share_percent": 21.428726,
+          "samples": 7
+        },
+        {
+          "labels": [
+            "cfb_ole_open"
+          ],
+          "period": 21622971,
+          "period_share_percent": 15.303995,
+          "samples": 5
+        },
+        {
+          "labels": [
+            "package_capture"
+          ],
+          "period": 8645403,
+          "period_share_percent": 6.118919,
+          "samples": 2
+        },
+        {
+          "labels": [
+            "cfb_open_stream",
+            "package_capture"
+          ],
+          "period": 8648021,
+          "period_share_percent": 6.120772,
+          "samples": 2
+        }
+      ]
+    },
+    "profile-r02-docnohf-e32": {
+      "denominator": {
+        "period": 551841869,
+        "samples": 127
+      },
+      "derived_inclusive": {
+        "all_exact_target_union": {
+          "period": 473508342,
+          "period_share_percent": 85.805077,
+          "samples": 109
+        },
+        "any_physical_litchi_cfb_frame": {
+          "period": 473510171,
+          "period_share_percent": 85.805409,
+          "samples": 109
+        },
+        "capture_family_package_capture_container_open_stream": {
+          "period": 91270018,
+          "period_share_percent": 16.539162,
+          "samples": 21
+        },
+        "package_capture_and_open_stream_overlap": {
+          "period": 52220799,
+          "period_share_percent": 9.463001,
+          "samples": 12
+        },
+        "validation_open_family_ole_open_or_codec_open": {
+          "period": 195903463,
+          "period_share_percent": 35.499927,
+          "samples": 45
+        }
+      },
+      "exclusive_nearest_frame": {
+        "buckets": {
+          "cfb_ole_open": {
+            "period": 195903463,
+            "period_share_percent": 35.499927,
+            "samples": 45
+          },
+          "cfb_open_stream": {
+            "period": 52220799,
+            "period_share_percent": 9.463001,
+            "samples": 12
+          },
+          "cfb_writer_write_to": {
+            "period": 186334861,
+            "period_share_percent": 33.765988,
+            "samples": 43
+          },
+          "no_target_cfb_frame": {
+            "period": 56584556,
+            "period_share_percent": 10.253763,
+            "samples": 13
+          },
+          "other_physical_cfb": {
+            "period": 21748971,
+            "period_share_percent": 3.94116,
+            "samples": 5
+          },
+          "package_capture": {
+            "period": 39049219,
+            "period_share_percent": 7.076161,
+            "samples": 9
+          }
+        },
+        "conserves_denominator": true,
+        "rule": "nearest physical target frame from leaf toward commit root; then other physical CFB; then no target CFB frame",
+        "sum_period": 551841869,
+        "sum_samples": 127
+      },
+      "inclusive_overlap": {
+        "exact_target_union_period": 473508342,
+        "overlap_excess_period": 52220799,
+        "sum_of_tag_periods": 525729141,
+        "warning": "inclusive tag periods overlap and must not be added"
+      },
+      "inclusive_tags": {
+        "cfb_ole_open": {
+          "period": 195903463,
+          "period_share_percent": 35.499927,
+          "samples": 45
+        },
+        "cfb_open_stream": {
+          "period": 52220799,
+          "period_share_percent": 9.463001,
+          "samples": 12
+        },
+        "cfb_writer_write_to": {
+          "period": 186334861,
+          "period_share_percent": 33.765988,
+          "samples": 43
+        },
+        "package_capture": {
+          "period": 91270018,
+          "period_share_percent": 16.539162,
+          "samples": 21
+        }
+      },
+      "target_combinations": [
+        {
+          "labels": [
+            "cfb_ole_open"
+          ],
+          "period": 195903463,
+          "period_share_percent": 35.499927,
+          "samples": 45
+        },
+        {
+          "labels": [
+            "cfb_writer_write_to"
+          ],
+          "period": 186334861,
+          "period_share_percent": 33.765988,
+          "samples": 43
+        },
+        {
+          "labels": [],
+          "period": 78333527,
+          "period_share_percent": 14.194923,
+          "samples": 18
+        },
+        {
+          "labels": [
+            "cfb_open_stream",
+            "package_capture"
+          ],
+          "period": 52220799,
+          "period_share_percent": 9.463001,
+          "samples": 12
+        },
+        {
+          "labels": [
+            "package_capture"
+          ],
+          "period": 39049219,
+          "period_share_percent": 7.076161,
+          "samples": 9
+        }
+      ]
+    }
+  },
+  "raw_totals": {
+    "all_records": {
+      "period": 75530554154,
+      "samples": 18209
+    },
+    "commit_qualified": {
+      "period": 10037338577,
+      "samples": 2352,
+      "truncated_period": 0,
+      "truncated_samples": 0
+    },
+    "commit_within_marker": {
+      "meaning": "qualified commit root subset divided by marker-qualified denominator",
+      "period_share_percent": 40.173404,
+      "samples_share_percent": 40.095465
+    },
+    "crosscheck_expected_formal_raw": {
+      "all_records": {
+        "period": 75530554154,
+        "samples": 18209
+      },
+      "all_records_match": true,
+      "marker_match": true,
+      "marker_qualified": {
+        "period": 24985033857,
+        "samples": 5866
+      }
+    },
+    "marker_qualified": {
+      "period": 24985033857,
+      "samples": 5866
+    }
+  },
+  "reduction_crosscheck": {
+    "all_match": true,
+    "children": [
+      {
+        "child": "profile-r01-docnohf-e01",
+        "match": true,
+        "observed_marker": {
+          "period": 68731710,
+          "samples": 16
+        },
+        "retained_reduction_marker": {
+          "period": 68731710,
+          "samples": 16
+        }
+      },
+      {
+        "child": "profile-r01-docnohf-e02",
+        "match": true,
+        "observed_marker": {
+          "period": 142632422,
+          "samples": 33
+        },
+        "retained_reduction_marker": {
+          "period": 142632422,
+          "samples": 33
+        }
+      },
+      {
+        "child": "profile-r01-docnohf-e08",
+        "match": true,
+        "observed_marker": {
+          "period": 313965397,
+          "samples": 73
+        },
+        "retained_reduction_marker": {
+          "period": 313965397,
+          "samples": 73
+        }
+      },
+      {
+        "child": "profile-r01-docnohf-e32",
+        "match": true,
+        "observed_marker": {
+          "period": 901402946,
+          "samples": 208
+        },
+        "retained_reduction_marker": {
+          "period": 901402946,
+          "samples": 208
+        }
+      },
+      {
+        "child": "profile-r01-docfloat-e01",
+        "match": true,
+        "observed_marker": {
+          "period": 863745461,
+          "samples": 198
+        },
+        "retained_reduction_marker": {
+          "period": 863745461,
+          "samples": 198
+        }
+      },
+      {
+        "child": "profile-r01-docfloat-e02",
+        "match": true,
+        "observed_marker": {
+          "period": 1072177355,
+          "samples": 254
+        },
+        "retained_reduction_marker": {
+          "period": 1072177355,
+          "samples": 254
+        }
+      },
+      {
+        "child": "profile-r01-docfloat-e08",
+        "match": true,
+        "observed_marker": {
+          "period": 2208030685,
+          "samples": 526
+        },
+        "retained_reduction_marker": {
+          "period": 2208030685,
+          "samples": 526
+        }
+      },
+      {
+        "child": "profile-r01-docfloat-e32",
+        "match": true,
+        "observed_marker": {
+          "period": 6900502499,
+          "samples": 1623
+        },
+        "retained_reduction_marker": {
+          "period": 6900502499,
+          "samples": 1623
+        }
+      },
+      {
+        "child": "profile-r02-docfloat-e32",
+        "match": true,
+        "observed_marker": {
+          "period": 6800382222,
+          "samples": 1592
+        },
+        "retained_reduction_marker": {
+          "period": 6800382222,
+          "samples": 1592
+        }
+      },
+      {
+        "child": "profile-r02-docfloat-e08",
+        "match": true,
+        "observed_marker": {
+          "period": 2205999781,
+          "samples": 524
+        },
+        "retained_reduction_marker": {
+          "period": 2205999781,
+          "samples": 524
+        }
+      },
+      {
+        "child": "profile-r02-docfloat-e02",
+        "match": true,
+        "observed_marker": {
+          "period": 1104301543,
+          "samples": 257
+        },
+        "retained_reduction_marker": {
+          "period": 1104301543,
+          "samples": 257
+        }
+      },
+      {
+        "child": "profile-r02-docfloat-e01",
+        "match": true,
+        "observed_marker": {
+          "period": 953041791,
+          "samples": 227
+        },
+        "retained_reduction_marker": {
+          "period": 953041791,
+          "samples": 227
+        }
+      },
+      {
+        "child": "profile-r02-docnohf-e32",
+        "match": true,
+        "observed_marker": {
+          "period": 902914682,
+          "samples": 208
+        },
+        "retained_reduction_marker": {
+          "period": 902914682,
+          "samples": 208
+        }
+      },
+      {
+        "child": "profile-r02-docnohf-e08",
+        "match": true,
+        "observed_marker": {
+          "period": 292724416,
+          "samples": 68
+        },
+        "retained_reduction_marker": {
+          "period": 292724416,
+          "samples": 68
+        }
+      },
+      {
+        "child": "profile-r02-docnohf-e02",
+        "match": true,
+        "observed_marker": {
+          "period": 129544424,
+          "samples": 30
+        },
+        "retained_reduction_marker": {
+          "period": 129544424,
+          "samples": 30
+        }
+      },
+      {
+        "child": "profile-r02-docnohf-e01",
+        "match": true,
+        "observed_marker": {
+          "period": 124936523,
+          "samples": 29
+        },
+        "retained_reduction_marker": {
+          "period": 124936523,
+          "samples": 29
+        }
+      }
+    ]
+  },
+  "schema": "litchi.performance.0968.cfb-commit-attribution.v1",
+  "scope": {
+    "claim": "diagnostic sampled CPU attribution; no performance or adoption claim",
+    "main_checkout_writes": false,
+    "new_build": false,
+    "new_capture": false,
+    "offline_only": true
+  },
+  "source_equivalence": {
+    "all_files_same_bytes": true,
+    "current_head": "6493e26155ee05e554f1371dd2fad707cd4bca0e",
+    "files": [
+      {
+        "current": {
+          "bytes": 39109,
+          "path": "crates/litchi-ole-common/src/object/editor.rs",
+          "sha256": "ee6079567bf85a0ff68a335fb43999d780fab335a09a9cec8b845c16b7b5b319"
+        },
+        "file": "crates/litchi-ole-common/src/object/editor.rs",
+        "retained": {
+          "bytes": 39109,
+          "path": "crates/litchi-ole-common/src/object/editor.rs",
+          "sha256": "ee6079567bf85a0ff68a335fb43999d780fab335a09a9cec8b845c16b7b5b319"
+        },
+        "role": "commit_candidate_with_rendered; render, reopen, capture, rediscover",
+        "same_bytes": true
+      },
+      {
+        "current": {
+          "bytes": 52977,
+          "path": "crates/litchi-ole-common/src/object/codec.rs",
+          "sha256": "99dc73a358cbe5a76c6fc242e42af6524ba6d0954c2ae508cf55f84cb6a5cafd"
+        },
+        "file": "crates/litchi-ole-common/src/object/codec.rs",
+        "retained": {
+          "bytes": 52977,
+          "path": "crates/litchi-ole-common/src/object/codec.rs",
+          "sha256": "99dc73a358cbe5a76c6fc242e42af6524ba6d0954c2ae508cf55f84cb6a5cafd"
+        },
+        "role": "Package::capture, capture_with_budget, capture_container, codec::open",
+        "same_bytes": true
+      },
+      {
+        "current": {
+          "bytes": 2375,
+          "path": "crates/litchi-ole-common/src/object/discovery.rs",
+          "sha256": "830fa39ca65ef5073d14dabcc60513bca6a1f221eaaa1e28e62e9644bbeffdea"
+        },
+        "file": "crates/litchi-ole-common/src/object/discovery.rs",
+        "retained": {
+          "bytes": 2375,
+          "path": "crates/litchi-ole-common/src/object/discovery.rs",
+          "sha256": "830fa39ca65ef5073d14dabcc60513bca6a1f221eaaa1e28e62e9644bbeffdea"
+        },
+        "role": "from_package discovery traversal",
+        "same_bytes": true
+      },
+      {
+        "current": {
+          "bytes": 275459,
+          "path": "crates/litchi-cfb/src/file.rs",
+          "sha256": "0cc789bfd893a0cd9a10e9d7488c4a8409a54021995dc44c20c29c8baaede5bd"
+        },
+        "file": "crates/litchi-cfb/src/file.rs",
+        "retained": {
+          "bytes": 275459,
+          "path": "crates/litchi-cfb/src/file.rs",
+          "sha256": "0cc789bfd893a0cd9a10e9d7488c4a8409a54021995dc44c20c29c8baaede5bd"
+        },
+        "role": "OleFile::open and OleFile::open_stream",
+        "same_bytes": true
+      },
+      {
+        "current": {
+          "bytes": 120349,
+          "path": "crates/litchi-cfb/src/writer/core.rs",
+          "sha256": "a5ead3dded13baa8bdaa350742bfe79185e39cc2f16f86e433701e939fb2b19c"
+        },
+        "file": "crates/litchi-cfb/src/writer/core.rs",
+        "retained": {
+          "bytes": 120349,
+          "path": "crates/litchi-cfb/src/writer/core.rs",
+          "sha256": "a5ead3dded13baa8bdaa350742bfe79185e39cc2f16f86e433701e939fb2b19c"
+        },
+        "role": "OleWriter::write_to",
+        "same_bytes": true
+      },
+      {
+        "current": {
+          "bytes": 96613,
+          "path": "crates/litchi-cfb/src/writer/layout.rs",
+          "sha256": "480b30fb1c6c018c3182fc5e0ab1f53bb55f61169396e2f2d8bce257c7d1460c"
+        },
+        "file": "crates/litchi-cfb/src/writer/layout.rs",
+        "retained": {
+          "bytes": 96613,
+          "path": "crates/litchi-cfb/src/writer/layout.rs",
+          "sha256": "480b30fb1c6c018c3182fc5e0ab1f53bb55f61169396e2f2d8bce257c7d1460c"
+        },
+        "role": "layout validation and stream comparison context",
+        "same_bytes": true
+      }
+    ],
+    "retained_manifest_source_revision": "73559c87c37898b675100b02985181a7764c66d2",
+    "revision_used_as_equivalence_proof": false
+  },
+  "source_evidence": [
+    {
+      "file": "crates/litchi-ole-common/src/object/editor.rs",
+      "lines": "977-1000",
+      "text": "commit_candidate_with_rendered renders, OleFile::open, codec::open, Package::capture, and discovery::from_package"
+    },
+    {
+      "file": "crates/litchi-ole-common/src/object/codec.rs",
+      "lines": "28-80,1157-1215,1326-1328",
+      "text": "Package::capture delegates through capture_with_budget to capture_container, whose stream branch calls OleFile::open_stream; codec::open is a protected-container check"
+    },
+    {
+      "file": "crates/litchi-ole-common/src/object/discovery.rs",
+      "lines": "46-68",
+      "text": "from_package validates limits and materializes selected objects from the captured package"
+    },
+    {
+      "file": "crates/litchi-cfb/src/file.rs",
+      "lines": "938-962,3382-3535",
+      "text": "physical OleFile open/open_stream implementations"
+    },
+    {
+      "file": "crates/litchi-cfb/src/writer/core.rs",
+      "lines": "1631-1659",
+      "text": "OleWriter::write_to emission path"
+    }
+  ],
+  "status": "passed",
+  "tool": {
+    "bytes": 32759,
+    "path": "/home/zhuhe/litchi-performance-0968/analyze_cfb_commit_v1.py",
+    "sha256": "a7c720784f8dc82f68e02ad3dff576ce60ed9593d5dc99ad2fd0996771510fc0"
+  }
+}

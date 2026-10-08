@@ -1,0 +1,64 @@
+{
+  "schema": "litchi.performance.0968.cfb_commit_census.build_config.v3",
+  "command": "cargo build --release --manifest-path tools/perf-cfb-census-0968/Cargo.toml",
+  "cwd": "/home/zhuhe/litchi-performance-0968/source-diagnostic",
+  "manifest": "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/Cargo.toml",
+  "source_root": "/home/zhuhe/litchi-performance-0968/source-diagnostic",
+  "source_head": "6493e26155ee05e554f1371dd2fad707cd4bca0e",
+  "compiler": {
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\nrelease: 1.95.0\ncommit-hash: f2d3ce0bd7f24a49f8f72d9000448f8838c4e850\ncommit-date: 2026-03-21\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.2 (sys:0.20.4 vendored)\nlibcurl: 8.15.0-DEV (sys:0.4.83+curl-8.15.0 vendored ssl:OpenSSL/3.5.4)\nssl: OpenSSL 3.5.4 30 Sep 2025\nos: Ubuntu 26.4.0 (resolute) [64-bit]",
+    "active_toolchain": "1.95.0-x86_64-unknown-linux-gnu (overridden by '/home/zhuhe/code/litchi/rust-toolchain.toml')"
+  },
+  "host": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2",
+  "profile": {
+    "name": "release",
+    "debug": 1,
+    "opt_level": "cargo profile release default",
+    "lto": "cargo profile release default",
+    "codegen_units": "cargo profile release default"
+  },
+  "feature_flags": {
+    "litchi-doc": "performance-diagnostics",
+    "litchi-ole-common": "performance-diagnostics",
+    "allocator_instrumentation": false,
+    "timers": false
+  },
+  "lockfiles": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/Cargo.lock",
+      "bytes": 138201,
+      "sha256": "e0894cf3b1844d618028e39ce8c899e2ed0cccc145c4a72e32b1f33d76865948"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/Cargo.lock",
+      "bytes": 33123,
+      "sha256": "907d443b2f0008756e40d90e0186312d837a909fb21d973d54eab9b0ede507f2"
+    }
+  ],
+  "environment": {},
+  "binary": {
+    "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/target/release/doc_cfb_commit_census_0968",
+    "bytes": 55125224,
+    "sha256": "50693dd8d2e7562f69c86d08872246f1a5d040be9f4f42fc850ed9c0a309dac9"
+  },
+  "build_logs": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/build-census-v4.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/build-census-v4.stderr.log",
+      "bytes": 540,
+      "sha256": "536b3365cfebcc3f0573fc661174cc9e3a66c439162e3c99215f1e923be209f6"
+    }
+  ],
+  "ordinary_0967_oracle_candidate": {
+    "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+    "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb",
+    "bytes": 47909224,
+    "role": "retained output-oracle candidate only; not used for diagnostic counters"
+  },
+  "formal_capture_started": false
+}

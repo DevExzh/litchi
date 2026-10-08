@@ -49,6 +49,9 @@ on:
       - 'tools/test_perf_abba_package.py'
       - 'tools/perf_abba_summary.py'
       - 'tools/test_perf_abba_summary.py'
+      - 'tools/perf_decision.py'
+      - 'tools/test_perf_decision.py'
+      - 'tools/perf_decision.md'
       - 'tools/perf_resource_profile.py'
       - 'tools/validate_perf_corpus_binding.py'
       - 'tools/test_perf_corpus_binding.py'
@@ -129,6 +132,9 @@ on:
       - 'tools/test_perf_abba_package.py'
       - 'tools/perf_abba_summary.py'
       - 'tools/test_perf_abba_summary.py'
+      - 'tools/perf_decision.py'
+      - 'tools/test_perf_decision.py'
+      - 'tools/perf_decision.md'
       - 'tools/perf_resource_profile.py'
       - 'tools/validate_perf_corpus_binding.py'
       - 'tools/test_perf_corpus_binding.py'
@@ -383,6 +389,7 @@ jobs:
             tools.test_perf_smoke_baseline \
             tools.test_perf_abba_summary \
             tools.test_perf_abba_package \
+            tools.test_perf_decision \
             tools.test_perf_resource_profile \
             tools.test_perf_corpus_binding \
             tools.test_validate_opc_serial_eager_allocator_abba \

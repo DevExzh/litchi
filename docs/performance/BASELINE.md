@@ -1,5 +1,35 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0968 — staged CFB commit census completes diagnostic route evidence
+
+[0968](0968-cfb-commit-census.md) records a diagnostic-only census for a
+possible operation-local writer `ReusePlan` proof. Retained 0942 attribution
+for `FloatingPictures/e32` assigns `Package::capture` 25.054588% inclusive,
+nested `OleFile::open_stream` 13.878805%, and `OleWriter::write_to` 37.789601%
+of the commit-root samples. Inclusive rows overlap and these are sampled CPU
+shares, not removable work or a speedup bound. The source-bound 0921 recapture
+path remains distinct; a prospective handoff would require final directory
+metadata projection and the ordinary final physical reopen and discovery.
+
+The corrected v6 reduction passes 48/48 children, 24/24 cells, zero errors,
+all 20 correctness gates, and exact repetition identity. Across both repeats
+and all edit counts it records 516 successful commits, 516 overlay declines,
+516 layout-reuse successes, 516 captures, 4,902 captured streams, and
+130,646,838 captured payload bytes. At 32 edits, one representative child
+records `NoHeadFoot` 192 streams / 1,354,864 bytes and `FloatingPictures` 416
+streams / 16,121,304 bytes; all retention routes repeat exactly. These are
+route and payload counters, with no timing or allocator claim.
+
+The independent audit passes all packet, schedule, custody, repetition, and
+correctness checks and records `diagnostic_only_no_adoption`; production remains
+unchanged. The protocol-approval overwrite was recovered byte-exactly and is
+documented in the coordinating record; no raw capture or source artifact
+changed. [Packet cleanup](results/change-0968/receipts/build-cache-cleanup-v1.json)
+is recorded in the receipt (8,359 bytes, SHA-256
+`0c45dde744f4f0488c0e737a6bdd46e1321db8f800b8d506ce63a0b956b8d5ee`) and
+freed 8,896,917,504 allocated bytes while preserving the exact executable,
+source, and raw evidence. No runtime handoff or speedup follows.
+
 ## 0967 — DOC vector-free SPRM candidate rejected
 
 [0967](0967-doc-sprm-vector-reject.md) records the bounded borrowed-SPRM

@@ -1,0 +1,419 @@
+{
+  "auditor_history": {
+    "v1": {
+      "disposition": "historical; do not use for a multi-edit capture",
+      "path": "/home/zhuhe/litchi-performance-0968/review/independent_raw_census_audit_0968_v1.py",
+      "sha256": "61c6b3f1baeffbc3af2102447a0ab235a14bd0a62bf026dc116cabc4c0bac489",
+      "wrong_assumptions": [
+        {
+          "condition": "commit_attempts == 1 and commit_successes == 1 and commit_errors == 0",
+          "line": 451
+        },
+        {
+          "condition": "capture_attempted == 1 and capture_success == 1 and capture_error == 0",
+          "line": 459
+        }
+      ]
+    },
+    "v2": {
+      "bytes": 53670,
+      "correction": "requires commit and capture attempt/success counts equal row.edits, preserves per-stage conservation, and imposes no fixed stream or payload formula",
+      "envelope_schemas": {
+        "capture": "litchi.performance.0968.cfb_commit_census_capture.v3",
+        "child_parse": "litchi.performance.0968.cfb_child_parse.v3",
+        "child_start": "litchi.performance.0968.cfb_child_start.v3",
+        "child_terminal": "litchi.performance.0968.cfb_child_terminal.v3",
+        "go": "litchi.performance.0968.cfb_commit_census_go.v3",
+        "plan": "litchi.performance.0968.cfb_commit_census_plan.v3",
+        "report": "litchi.performance.0968.cfb_commit_census.v2",
+        "run_start": "litchi.performance.0968.cfb_census_run_start.v3",
+        "run_terminal": "litchi.performance.0968.cfb_census_run_terminal.v3"
+      },
+      "full_capture_audit_run": false,
+      "path": "/home/zhuhe/litchi-performance-0968/review/independent_raw_census_audit_0968_v2.py",
+      "sha256": "5d26d4dbdee0a4b9edda5a91a4d25a15c09aa8cdab83320e0e31f3303946b5c0",
+      "static_raw_census_check": "pass",
+      "static_raw_census_rows_checked": 48,
+      "v6_plan_dry_binding": "pass"
+    }
+  },
+  "created_utc": "2026-10-08T00:50:54.313563Z",
+  "custody": {
+    "binary_descriptor": {
+      "bytes": 55125224,
+      "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/target/release/doc_cfb_commit_census_0968",
+      "sha256": "50693dd8d2e7562f69c86d08872246f1a5d040be9f4f42fc850ed9c0a309dac9"
+    },
+    "go_descriptor": {
+      "bytes": 911,
+      "path": "/home/zhuhe/litchi-performance-0968/receipts/root-go-v1.json",
+      "sha256": "7f3587baa3782dc2e384c9eb663c85aec7a8dcd93f51e8e5b86c19e6acc2e860"
+    },
+    "manifest_descriptor": {
+      "bytes": 99462,
+      "path": "/home/zhuhe/litchi-performance-0968/capture/census-v5/capture-manifest-v2.json",
+      "sha256": "0a5e41cf25d56d4c5dd805bfef3744c4e04e739c8dc0c10d8fd54a2d592c98e5"
+    },
+    "plan_descriptor": {
+      "bytes": 32380,
+      "path": "/home/zhuhe/litchi-performance-0968/plans/plan-0968-prospective-v5.json",
+      "sha256": "d78f51678ec7fe26ec2caa118154391fd59d1ef69df299c208ac284da73b1dbb"
+    },
+    "plan_go_source_harness_binary_files_match_manifest": true,
+    "source_harness_descriptor": {
+      "bytes": 2883,
+      "path": "/home/zhuhe/litchi-performance-0968/seal-v4.json",
+      "sha256": "a80424d394e36849a3abbb6d0c415dbd513e150fb9494f061e124137215e3245"
+    },
+    "source_scope_files_match_manifest": true
+  },
+  "failures_by_text": {
+    "report parse/identity failure: report.samples[0].census: expected one commit attempt": 36
+  },
+  "findings": [
+    "v5 is an invalid formal capture only because its capture-time validator rejected otherwise zero-exit multi-edit reports under the one-attempt assumption; no performance or adoption conclusion is drawn.",
+    "v1 review note is retained; v2 auditor development adds final v3 envelope bindings and exact ordinary-oracle version handling before the fresh capture."
+  ],
+  "incident": {
+    "all_terminal_returncodes_zero": true,
+    "capture_root": "/home/zhuhe/litchi-performance-0968/capture/census-v5",
+    "cause": "The capture-time packet validator required one commit attempt per child, while the instrumented loop emits one successful commit-stage record per requested edit.",
+    "failure_packets": 36,
+    "manifest": {
+      "bytes": 99462,
+      "path": "/home/zhuhe/litchi-performance-0968/capture/census-v5/capture-manifest-v2.json",
+      "sha256": "0a5e41cf25d56d4c5dd805bfef3744c4e04e739c8dc0c10d8fd54a2d592c98e5"
+    },
+    "manifest_status": "complete_with_failures",
+    "recorded_failure_text": "report parse/identity failure: report.samples[0].census: expected one commit attempt",
+    "report_packets": 12,
+    "required_disposition": "Exclude v5 from formal evidence; retain raw packets and failure receipts; require a separately sealed corrected helper and fresh full capture.",
+    "retries": 0
+  },
+  "observed_count_interpretation": {
+    "capture_payload_formula_claim": false,
+    "capture_streams_formula_claim": false,
+    "fields_equal_to_row_edits": [
+      "commit_attempts",
+      "commit_successes",
+      "overlay_attempted",
+      "layout_attempted",
+      "capture_attempted",
+      "capture_success"
+    ],
+    "fields_zero_for_all_rows": [
+      "commit_errors",
+      "overlay_success",
+      "overlay_error",
+      "overlay_not_attempted",
+      "layout_non_reuse",
+      "layout_error",
+      "capture_error"
+    ],
+    "note": "capture_streams and capture_payload_bytes are retained as observed bounded integers; this receipt asserts no linear scaling formula.",
+    "overlay_declined_equals_row_edits": true
+  },
+  "observed_per_edit_counts": {
+    "1": {
+      "capture_payload_bytes_by_case": {
+        "docfloat": [
+          334948
+        ],
+        "docnohf": [
+          24313
+        ]
+      },
+      "capture_streams_by_case": {
+        "docfloat": [
+          13
+        ],
+        "docnohf": [
+          6
+        ]
+      },
+      "children": 12,
+      "counter_vectors": {
+        "capture_attempted": [
+          1
+        ],
+        "capture_error": [
+          0
+        ],
+        "capture_success": [
+          1
+        ],
+        "commit_attempts": [
+          1
+        ],
+        "commit_errors": [
+          0
+        ],
+        "commit_successes": [
+          1
+        ],
+        "layout_attempted": [
+          1
+        ],
+        "layout_error": [
+          0
+        ],
+        "layout_non_reuse": [
+          0
+        ],
+        "layout_reuse_success": [
+          1
+        ],
+        "overlay_attempted": [
+          1
+        ],
+        "overlay_declined": [
+          1
+        ],
+        "overlay_error": [
+          0
+        ],
+        "overlay_not_attempted": [
+          0
+        ],
+        "overlay_success": [
+          0
+        ]
+      },
+      "failure_packets": 0,
+      "reports": 12,
+      "terminal_returncodes": [
+        0
+      ]
+    },
+    "2": {
+      "capture_payload_bytes_by_case": {
+        "docfloat": [
+          680679
+        ],
+        "docnohf": [
+          49789
+        ]
+      },
+      "capture_streams_by_case": {
+        "docfloat": [
+          26
+        ],
+        "docnohf": [
+          12
+        ]
+      },
+      "children": 12,
+      "counter_vectors": {
+        "capture_attempted": [
+          2
+        ],
+        "capture_error": [
+          0
+        ],
+        "capture_success": [
+          2
+        ],
+        "commit_attempts": [
+          2
+        ],
+        "commit_errors": [
+          0
+        ],
+        "commit_successes": [
+          2
+        ],
+        "layout_attempted": [
+          2
+        ],
+        "layout_error": [
+          0
+        ],
+        "layout_non_reuse": [
+          0
+        ],
+        "layout_reuse_success": [
+          2
+        ],
+        "overlay_attempted": [
+          2
+        ],
+        "overlay_declined": [
+          2
+        ],
+        "overlay_error": [
+          0
+        ],
+        "overlay_not_attempted": [
+          0
+        ],
+        "overlay_success": [
+          0
+        ]
+      },
+      "failure_packets": 12,
+      "reports": 0,
+      "terminal_returncodes": [
+        0
+      ]
+    },
+    "32": {
+      "capture_payload_bytes_by_case": {
+        "docfloat": [
+          16121304
+        ],
+        "docnohf": [
+          1354864
+        ]
+      },
+      "capture_streams_by_case": {
+        "docfloat": [
+          416
+        ],
+        "docnohf": [
+          192
+        ]
+      },
+      "children": 12,
+      "counter_vectors": {
+        "capture_attempted": [
+          32
+        ],
+        "capture_error": [
+          0
+        ],
+        "capture_success": [
+          32
+        ],
+        "commit_attempts": [
+          32
+        ],
+        "commit_errors": [
+          0
+        ],
+        "commit_successes": [
+          32
+        ],
+        "layout_attempted": [
+          32
+        ],
+        "layout_error": [
+          0
+        ],
+        "layout_non_reuse": [
+          0
+        ],
+        "layout_reuse_success": [
+          32
+        ],
+        "overlay_attempted": [
+          32
+        ],
+        "overlay_declined": [
+          32
+        ],
+        "overlay_error": [
+          0
+        ],
+        "overlay_not_attempted": [
+          0
+        ],
+        "overlay_success": [
+          0
+        ]
+      },
+      "failure_packets": 12,
+      "reports": 0,
+      "terminal_returncodes": [
+        0
+      ]
+    },
+    "8": {
+      "capture_payload_bytes_by_case": {
+        "docfloat": [
+          2981508
+        ],
+        "docnohf": [
+          227068
+        ]
+      },
+      "capture_streams_by_case": {
+        "docfloat": [
+          104
+        ],
+        "docnohf": [
+          48
+        ]
+      },
+      "children": 12,
+      "counter_vectors": {
+        "capture_attempted": [
+          8
+        ],
+        "capture_error": [
+          0
+        ],
+        "capture_success": [
+          8
+        ],
+        "commit_attempts": [
+          8
+        ],
+        "commit_errors": [
+          0
+        ],
+        "commit_successes": [
+          8
+        ],
+        "layout_attempted": [
+          8
+        ],
+        "layout_error": [
+          0
+        ],
+        "layout_non_reuse": [
+          0
+        ],
+        "layout_reuse_success": [
+          8
+        ],
+        "overlay_attempted": [
+          8
+        ],
+        "overlay_declined": [
+          8
+        ],
+        "overlay_error": [
+          0
+        ],
+        "overlay_not_attempted": [
+          0
+        ],
+        "overlay_success": [
+          0
+        ]
+      },
+      "failure_packets": 12,
+      "reports": 0,
+      "terminal_returncodes": [
+        0
+      ]
+    }
+  },
+  "schema": "litchi.performance.0968.cfb_commit_census_independent_incident_review.v2",
+  "scope": {
+    "adoption_decision": false,
+    "formal_audit_of_v5": false,
+    "new_build": false,
+    "new_workload": false,
+    "performance_claim": false,
+    "raw_capture_preserved": true,
+    "read_only": true
+  },
+  "source_revision_and_binary_are_not_reinterpreted": true,
+  "status": "preserved_invalid_capture",
+  "supersedes": {
+    "bytes": 9954,
+    "path": "/home/zhuhe/litchi-performance-0968/review/incident-census-v5-per-edit-count-v1.json",
+    "sha256": "fffd510b447b0340f86441a9b5edad89fb554c24443b239aaec2b2872f1304d8"
+  }
+}

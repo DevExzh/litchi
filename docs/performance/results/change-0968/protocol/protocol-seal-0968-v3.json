@@ -1,0 +1,121 @@
+{
+  "authorization": {
+    "capture_before_go": false,
+    "independent_protocol_review_required": true,
+    "new_root_go_required": true
+  },
+  "binary": {
+    "bytes": 55125224,
+    "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/target/release/doc_cfb_commit_census_0968",
+    "sha256": "50693dd8d2e7562f69c86d08872246f1a5d040be9f4f42fc850ed9c0a309dac9"
+  },
+  "change": "0968",
+  "correction": {
+    "capture_attempted": "row.edits",
+    "capture_success": "row.edits",
+    "commit_attempts": "row.edits",
+    "commit_successes": "row.edits",
+    "fixed_stream_or_payload_formula": false,
+    "full_matrix": "2 cases x 4 edit counts x 3 retentions x 2 repeats = 48 serial children",
+    "report_schema_remains": "litchi.performance.0968.cfb_commit_census.v2"
+  },
+  "helpers": {
+    "prepare": {
+      "bytes": 10747,
+      "path": "/home/zhuhe/litchi-performance-0968/tools/prepare_cfb_commit_census_0968_v3.py",
+      "sha256": "7b2578f23773f57445fc39e791f444e11e2ca46957a6157af9d34bffdc964040"
+    },
+    "reducer": {
+      "bytes": 13852,
+      "path": "/home/zhuhe/litchi-performance-0968/tools/reduce_cfb_commit_census_0968_v3.py",
+      "sha256": "934d4aed6b29ecb9c942102a7b3620d36e9b82a530618f56b9c68ac0ecacdf78"
+    },
+    "runner": {
+      "bytes": 16072,
+      "path": "/home/zhuhe/litchi-performance-0968/tools/run_cfb_commit_census_0968_v3.py",
+      "sha256": "4da008925026dd95769ee9758017fe02b6c1d9795ee1393e80364322d0791567"
+    },
+    "schema": {
+      "bytes": 37259,
+      "path": "/home/zhuhe/litchi-performance-0968/tools/cfb_census_schema_0968_v3.py",
+      "sha256": "e0a9c9e7a853acda3fe81a5a80e6ba480d30b15b0e27a3005b596d27e1a801ab"
+    },
+    "tests": {
+      "bytes": 5663,
+      "path": "/home/zhuhe/litchi-performance-0968/tools/test_cfb_commit_census_0968_v3.py",
+      "sha256": "1e039f7a400a5be791c3262e9522c943c5d2ac66a121b05132a2eee532f9c1b7"
+    }
+  },
+  "incident": {
+    "bytes": 13939,
+    "path": "/home/zhuhe/litchi-performance-0968/review/census-v2-incident-v1.json",
+    "sha256": "6a2e274d2b6bc34ad4d3c5aefba2966d18c945d711cc88f86e33955f3ce4e48d"
+  },
+  "ordinary_oracle_equivalence": {
+    "bytes": 28337,
+    "path": "/home/zhuhe/litchi-performance-0968/review/ordinary-oracle-equivalence-v1.json",
+    "sha256": "b01f9a3d76ad5a4a11537c21c3d84a78421cc449018f0acc084a173976020a75"
+  },
+  "ordinary_output_oracle": {
+    "bytes": 6281,
+    "path": "/home/zhuhe/litchi-performance-0968/review/ordinary-output-oracle-v1.json",
+    "sha256": "2bfe13300e26560b191c9d624e5dc8e7e1c9aa2f07f0fb7fe130729b25d79d20"
+  },
+  "plan": {
+    "bytes": 32587,
+    "path": "/home/zhuhe/litchi-performance-0968/plans/plan-0968-prospective-v6.json",
+    "sha256": "3ffcc37e7078f716082844ed0689bdfaf500e820ec5d2ca11a1c61bd47638797"
+  },
+  "retained_invalid_epoch": {
+    "manifest": {
+      "bytes": 99462,
+      "path": "/home/zhuhe/litchi-performance-0968/capture/census-v5/capture-manifest-v2.json",
+      "sha256": "0a5e41cf25d56d4c5dd805bfef3744c4e04e739c8dc0c10d8fd54a2d592c98e5"
+    },
+    "plan": {
+      "bytes": 32380,
+      "path": "/home/zhuhe/litchi-performance-0968/plans/plan-0968-prospective-v5.json",
+      "sha256": "d78f51678ec7fe26ec2caa118154391fd59d1ef69df299c208ac284da73b1dbb"
+    },
+    "run_terminal": {
+      "bytes": 1450,
+      "path": "/home/zhuhe/litchi-performance-0968/capture/census-v5/run-terminal.json",
+      "sha256": "60484570aff121d6130b3b94d71d530c01161cf3c3b2c574b26397ee9d088e00"
+    }
+  },
+  "schema": "litchi.performance.0968.cfb_commit_census_protocol_seal.v3",
+  "scope": {
+    "allocator_total_claim": false,
+    "diagnostic_only": true,
+    "formal_go": false,
+    "metadata_projection": false,
+    "new_build": false,
+    "new_capture": false,
+    "new_workload": false,
+    "retry": false,
+    "timing_claim": false
+  },
+  "sealed_at_utc": "2026-10-08T00:49:55.852837Z",
+  "source_approval": {
+    "bytes": 3979,
+    "path": "/home/zhuhe/litchi-performance-0968/review/diagnostic-source-approval-v2.json",
+    "sha256": "fbde1c957dbe48ae6485c131a81cd5a59a950465243eeb3594b7e58eba1e0c6c"
+  },
+  "source_harness": {
+    "bytes": 2883,
+    "path": "/home/zhuhe/litchi-performance-0968/seal-v4.json",
+    "sha256": "a80424d394e36849a3abbb6d0c415dbd513e150fb9494f061e124137215e3245"
+  },
+  "status": "SEALED_CORRECTED_PER_EDIT_CARDINALITY_PENDING_REVIEW_AND_GO",
+  "validation": {
+    "py_compile": "pass",
+    "reducer_check_plan": "pass",
+    "retained_v5_exit_codes": "48/48 rc0",
+    "retained_v5_offline_reports": "48/48 pass under corrected per-edit checker",
+    "runner_check_plan": "pass",
+    "v3_unit_tests": {
+      "count": 11,
+      "status": "pass"
+    }
+  }
+}

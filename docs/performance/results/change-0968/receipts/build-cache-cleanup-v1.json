@@ -1,0 +1,181 @@
+{
+  "schema": "litchi.performance.0968.build-cache-cleanup.v1",
+  "status": "completed",
+  "recorded_utc": "2026-10-08T00:56:19Z",
+  "authorization": {
+    "root_go_received": true,
+    "cleanup_plan": "/home/zhuhe/litchi-performance-0968/receipts/cleanup-plan-v1.json",
+    "cleanup_plan_sha256": "53a0f919ed99a49751a0ab3ba6f0e51df836a23a3a0abb5306505ccad88dfef7",
+    "independent_raw_audit": "/home/zhuhe/litchi-performance-0968/review/independent-raw-census-audit-v2-final-v1.json",
+    "independent_raw_audit_sha256": "1fb1c5b5aaad32d8b55770d3e06917927b7cc6e4f7b7100ae02b2d58f6bb0333",
+    "no_tracked_main_checkout_mutation": true
+  },
+  "scope": {
+    "deleted_whole_cache_roots": [
+      "/home/zhuhe/litchi-performance-0968/source-diagnostic/target"
+    ],
+    "pruned_cache_roots": [
+      "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/target"
+    ],
+    "retained_exact_path_in_pruned_root": "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/target/release/doc_cfb_commit_census_0968",
+    "removed_generated_pycache": [
+      "/home/zhuhe/litchi-performance-0968/__pycache__",
+      "/home/zhuhe/litchi-performance-0968/tools/__pycache__",
+      "/home/zhuhe/litchi-performance-0968/review/__pycache__",
+      "/home/zhuhe/code/litchi/tools/__pycache__"
+    ],
+    "preserved_source_and_evidence": [
+      "/home/zhuhe/litchi-performance-0968/source-baseline",
+      "/home/zhuhe/litchi-performance-0968/source-diagnostic source, test-data, helper source, docs, logs, and evidence outside the two exact target cache scopes",
+      "/home/zhuhe/litchi-performance-0968/capture",
+      "/home/zhuhe/litchi-performance-0968/review (including the final raw audit receipt)",
+      "/home/zhuhe/litchi-performance-0968/repro",
+      "/home/zhuhe/litchi-performance-0968/receipts",
+      "/home/zhuhe/litchi-performance-0968/raw capture children and all helper/source files"
+    ],
+    "preserved_source_export_pycache": [
+      "/home/zhuhe/litchi-performance-0968/source-baseline/**/__pycache__",
+      "/home/zhuhe/litchi-performance-0968/source-diagnostic/**/__pycache__"
+    ],
+    "old_0967_touched": false
+  },
+  "preflight": {
+    "process_check": {
+      "command": "ps -eo pid=,ppid=,stat=,comm=,args=; exact comm names cargo, rustc, perf, heaptrack, and doc_cfb_commit_census_0968",
+      "matches_before": 0,
+      "matches_after": 0
+    },
+    "open_file_check": {
+      "command_before": "lsof -nP +D on both target roots, the bound binary, and all four generated pycache candidates",
+      "records_before": 0,
+      "timeouts_before": 0,
+      "command_after": "lsof -nP +D on retained harness target and lsof -nP on retained binary",
+      "records_after": 0,
+      "timeouts_after": 0,
+      "environment_warning": "lsof reported container overlay/nsfs stat warnings; no named open-file records were returned"
+    },
+    "source_binding": {
+      "source_revision": "6493e26155ee05e554f1371dd2fad707cd4bca0e",
+      "source_key_files_checked_before": 10,
+      "source_key_files_checked_after": 10,
+      "source_hash_mismatches": 0,
+      "source_unchanged": true,
+      "provenance_v3_sha256": "64d7018c047b42389ba9e5b01d07d3ade1634ef55ca6bb2a8797d94d14de30e2",
+      "runtime_fixture_hashes_checked_after": 2,
+      "runtime_fixture_hash_mismatches": 0,
+      "final_raw_audit_children": 48,
+      "final_raw_audit_findings": 0
+    }
+  },
+  "bytes_freed": {
+    "cache_disk_bytes": 8888532992,
+    "cache_apparent_bytes": 8865212649,
+    "helper_pycache_disk_bytes": 8384512,
+    "helper_pycache_apparent_bytes": 8278452,
+    "total_disk_bytes": 8896917504,
+    "total_apparent_bytes": 8873491101
+  },
+  "cache_bytes": {
+    "/home/zhuhe/litchi-performance-0968/source-diagnostic/target": {
+      "disk_bytes_before": 7748198400,
+      "apparent_bytes_before": 7733173214,
+      "disk_bytes_after": 0,
+      "apparent_bytes_after": 0,
+      "disk_bytes_freed": 7748198400,
+      "apparent_bytes_freed": 7733173214,
+      "files_before": 9117,
+      "directories_before": 498
+    },
+    "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/target": {
+      "disk_bytes_before": 1195470848,
+      "apparent_bytes_before": 1187164659,
+      "disk_bytes_after": 55136256,
+      "apparent_bytes_after": 55125224,
+      "disk_bytes_freed": 1140334592,
+      "apparent_bytes_freed": 1132039435,
+      "files_before": 2096,
+      "directories_before": 467,
+      "files_after": 1,
+      "directories_after": 1
+    }
+  },
+  "helper_pycache": {
+    "removed": [
+      "/home/zhuhe/litchi-performance-0968/__pycache__",
+      "/home/zhuhe/litchi-performance-0968/tools/__pycache__",
+      "/home/zhuhe/litchi-performance-0968/review/__pycache__",
+      "/home/zhuhe/code/litchi/tools/__pycache__"
+    ],
+    "source_export_pycache_removed": false,
+    "disk_bytes_before": {
+      "/home/zhuhe/litchi-performance-0968/__pycache__": 49152,
+      "/home/zhuhe/litchi-performance-0968/tools/__pycache__": 409600,
+      "/home/zhuhe/litchi-performance-0968/review/__pycache__": 94208,
+      "/home/zhuhe/code/litchi/tools/__pycache__": 7831552
+    },
+    "apparent_bytes_before": {
+      "/home/zhuhe/litchi-performance-0968/__pycache__": 42917,
+      "/home/zhuhe/litchi-performance-0968/tools/__pycache__": 367099,
+      "/home/zhuhe/litchi-performance-0968/review/__pycache__": 87526,
+      "/home/zhuhe/code/litchi/tools/__pycache__": 7780910
+    }
+  },
+  "retained_executable_proof": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/target/release/doc_cfb_commit_census_0968",
+      "expected_sha256": "50693dd8d2e7562f69c86d08872246f1a5d040be9f4f42fc850ed9c0a309dac9",
+      "bytes_before": 55125224,
+      "bytes_after": 55125224,
+      "sha256_before": "50693dd8d2e7562f69c86d08872246f1a5d040be9f4f42fc850ed9c0a309dac9",
+      "sha256_after": "50693dd8d2e7562f69c86d08872246f1a5d040be9f4f42fc850ed9c0a309dac9",
+      "inode_before": 15125082,
+      "inode_after": 15125082,
+      "hard_links_before": 2,
+      "hard_links_after": 1,
+      "deps_hardlink_removed": "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/target/release/deps/doc_cfb_commit_census_0968-1085adcfe16c495f",
+      "path_hash_size_inode_preserved": true
+    }
+  ],
+  "retained_controls_and_commands": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/review/independent-raw-census-audit-v2-final-v1.json",
+      "bytes": 27912,
+      "sha256": "1fb1c5b5aaad32d8b55770d3e06917927b7cc6e4f7b7100ae02b2d58f6bb0333"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/capture/census-v6/capture-manifest-v3.json",
+      "bytes": 94568,
+      "sha256": "7f36d3ed05d89ab1ede777703c27536518116c47e8bef91955396c573ed715d9"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/receipts/root-go-v2.json",
+      "bytes": 958,
+      "sha256": "3ec3b54400bea1bef26522a974fb7494d66d58f2193a71913aff02e2371c5ab3"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/plans/plan-0968-prospective-v6.json",
+      "bytes": 32587,
+      "sha256": "3ffcc37e7078f716082844ed0689bdfaf500e820ec5d2ca11a1c61bd47638797"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/provenance-diagnostic-v3.json",
+      "bytes": 7748,
+      "sha256": "64d7018c047b42389ba9e5b01d07d3ade1634ef55ca6bb2a8797d94d14de30e2"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/build-config-v3.json",
+      "bytes": 3339,
+      "sha256": "9796161240ae976e43f0b2c5a96749398f2f52097d6c022e99f27c58737bbc58"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/census-plan-v2.md",
+      "bytes": 5344,
+      "sha256": "4abfb7a7aa32f9243bf818b8a0a28ceb86ddf5fb280a2ad36d32f8f1facd8881"
+    }
+  ],
+  "cleanup_commands": [
+    "Python 3: verify root GO, exact process/open-file state, source and fixture hashes, and sealed executable identity before mutation.",
+    "Python 3: remove only source-diagnostic/target; prune only generated contents of the census target while retaining the exact release executable; remove only the four approved generated pycache directories.",
+    "Python 3: verify retained target shape, executable path/inode/hash/size, audit and source bindings, process/open-file state, and allocated/apparent bytes before and after."
+  ]
+}

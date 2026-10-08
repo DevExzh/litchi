@@ -1,0 +1,153 @@
+{
+  "schema": "litchi.performance.0968.retained-cpu-binding.v1",
+  "status": "canonical_cpu_record_only",
+  "source_revision": "6493e26155ee05e554f1371dd2fad707cd4bca0e",
+  "canonical_artifacts": {
+    "json": {
+      "external_path": "/home/zhuhe/litchi-performance-0968/v2/cfb-commit-attribution-v1.json",
+      "packet_path": "analysis/v2/cfb-commit-attribution-v1.json",
+      "bytes": 85297,
+      "sha256": "e6f937fee96738866b0a19e8d0356bbe97397b346f21ecd02f5a397491863d49"
+    },
+    "markdown": {
+      "external_path": "/home/zhuhe/litchi-performance-0968/v2/cfb-commit-attribution-v1.md",
+      "packet_path": "analysis/v2/cfb-commit-attribution-v1.md",
+      "bytes": 3837,
+      "sha256": "1e612750df98818e2a94e7bd4a5e9b7294a06d11ed519add06f3ba60bb1f3c7e"
+    }
+  },
+  "analyzer": {
+    "external_path": "/home/zhuhe/litchi-performance-0968/analyze_cfb_commit_v1.py",
+    "packet_path": "tools/analyze_cfb_commit_v1.py",
+    "bytes": 32759,
+    "sha256": "a7c720784f8dc82f68e02ad3dff576ce60ed9593d5dc99ad2fd0996771510fc0"
+  },
+  "retained_input_binding": {
+    "capture_root": "/home/zhuhe/litchi-performance-0942/capture/formal-v5/children",
+    "raw_script_count": 16,
+    "raw_script_total_bytes": 44042488,
+    "raw_script_max_bytes": 8290027,
+    "raw_scripts_external_only": true,
+    "formal_reduction": {
+      "bytes": 260569,
+      "path": "/home/zhuhe/litchi-performance-0942/reports/formal-reduction-v5.json",
+      "sha256": "5619db9dd6b81b0cc6c71d4d5143f97a69aa628a5678e673bf268483c5e9a366"
+    },
+    "manifest": {
+      "bytes": 17088,
+      "path": "/home/zhuhe/litchi-performance-0942/manifests/cfb-profile-manifest-v5.json",
+      "sha256": "27f7a1e4c21f6b77ba26e6180894a016299396131a96028d92d5c34f694cea27"
+    },
+    "binary": {
+      "bytes": 126326672,
+      "path": "/home/zhuhe/litchi-performance-0942/target-profile-v2/release/doc_retention_probe_0942_cfb_profile",
+      "sha256": "92f85ce6019405fa1b0d97ec796947cd7ec240d2b8143f9cf06356d97409e70e"
+    },
+    "lost_records": 0
+  },
+  "claim_boundary": {
+    "claim": "diagnostic sampled CPU attribution; no performance or adoption claim",
+    "main_checkout_writes": false,
+    "new_build": false,
+    "new_capture": false,
+    "offline_only": true
+  },
+  "source_equivalence": {
+    "all_files_same_bytes": true,
+    "current_head": "6493e26155ee05e554f1371dd2fad707cd4bca0e",
+    "files": [
+      {
+        "current": {
+          "bytes": 39109,
+          "path": "crates/litchi-ole-common/src/object/editor.rs",
+          "sha256": "ee6079567bf85a0ff68a335fb43999d780fab335a09a9cec8b845c16b7b5b319"
+        },
+        "file": "crates/litchi-ole-common/src/object/editor.rs",
+        "retained": {
+          "bytes": 39109,
+          "path": "crates/litchi-ole-common/src/object/editor.rs",
+          "sha256": "ee6079567bf85a0ff68a335fb43999d780fab335a09a9cec8b845c16b7b5b319"
+        },
+        "role": "commit_candidate_with_rendered; render, reopen, capture, rediscover",
+        "same_bytes": true
+      },
+      {
+        "current": {
+          "bytes": 52977,
+          "path": "crates/litchi-ole-common/src/object/codec.rs",
+          "sha256": "99dc73a358cbe5a76c6fc242e42af6524ba6d0954c2ae508cf55f84cb6a5cafd"
+        },
+        "file": "crates/litchi-ole-common/src/object/codec.rs",
+        "retained": {
+          "bytes": 52977,
+          "path": "crates/litchi-ole-common/src/object/codec.rs",
+          "sha256": "99dc73a358cbe5a76c6fc242e42af6524ba6d0954c2ae508cf55f84cb6a5cafd"
+        },
+        "role": "Package::capture, capture_with_budget, capture_container, codec::open",
+        "same_bytes": true
+      },
+      {
+        "current": {
+          "bytes": 2375,
+          "path": "crates/litchi-ole-common/src/object/discovery.rs",
+          "sha256": "830fa39ca65ef5073d14dabcc60513bca6a1f221eaaa1e28e62e9644bbeffdea"
+        },
+        "file": "crates/litchi-ole-common/src/object/discovery.rs",
+        "retained": {
+          "bytes": 2375,
+          "path": "crates/litchi-ole-common/src/object/discovery.rs",
+          "sha256": "830fa39ca65ef5073d14dabcc60513bca6a1f221eaaa1e28e62e9644bbeffdea"
+        },
+        "role": "from_package discovery traversal",
+        "same_bytes": true
+      },
+      {
+        "current": {
+          "bytes": 275459,
+          "path": "crates/litchi-cfb/src/file.rs",
+          "sha256": "0cc789bfd893a0cd9a10e9d7488c4a8409a54021995dc44c20c29c8baaede5bd"
+        },
+        "file": "crates/litchi-cfb/src/file.rs",
+        "retained": {
+          "bytes": 275459,
+          "path": "crates/litchi-cfb/src/file.rs",
+          "sha256": "0cc789bfd893a0cd9a10e9d7488c4a8409a54021995dc44c20c29c8baaede5bd"
+        },
+        "role": "OleFile::open and OleFile::open_stream",
+        "same_bytes": true
+      },
+      {
+        "current": {
+          "bytes": 120349,
+          "path": "crates/litchi-cfb/src/writer/core.rs",
+          "sha256": "a5ead3dded13baa8bdaa350742bfe79185e39cc2f16f86e433701e939fb2b19c"
+        },
+        "file": "crates/litchi-cfb/src/writer/core.rs",
+        "retained": {
+          "bytes": 120349,
+          "path": "crates/litchi-cfb/src/writer/core.rs",
+          "sha256": "a5ead3dded13baa8bdaa350742bfe79185e39cc2f16f86e433701e939fb2b19c"
+        },
+        "role": "OleWriter::write_to",
+        "same_bytes": true
+      },
+      {
+        "current": {
+          "bytes": 96613,
+          "path": "crates/litchi-cfb/src/writer/layout.rs",
+          "sha256": "480b30fb1c6c018c3182fc5e0ab1f53bb55f61169396e2f2d8bce257c7d1460c"
+        },
+        "file": "crates/litchi-cfb/src/writer/layout.rs",
+        "retained": {
+          "bytes": 96613,
+          "path": "crates/litchi-cfb/src/writer/layout.rs",
+          "sha256": "480b30fb1c6c018c3182fc5e0ab1f53bb55f61169396e2f2d8bce257c7d1460c"
+        },
+        "role": "layout validation and stream comparison context",
+        "same_bytes": true
+      }
+    ],
+    "retained_manifest_source_revision": "73559c87c37898b675100b02985181a7764c66d2",
+    "revision_used_as_equivalence_proof": false
+  }
+}

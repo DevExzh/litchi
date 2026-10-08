@@ -1,0 +1,17 @@
+{
+  "correct_descriptor": {
+    "bytes": 2875,
+    "path": "/home/zhuhe/litchi-performance-0968/seal-v3.json",
+    "sha256": "d70f3ec086e8c590dd2af18177321da37f11ce5e848c14bfbe462065a487b72d"
+  },
+  "corrects": {
+    "bytes": 900,
+    "path": "/home/zhuhe/litchi-performance-0968/review/seal-v4-validation-v1.json",
+    "sha256": "fd5bad4dec9ef59a7294ea455a29f9ed80d5d655a2fe981b8b8f76bf1d21432c"
+  },
+  "created_utc": "2026-10-08T00:58:20.857877+00:00",
+  "field": "v3_preservation.sha256",
+  "recorded_typo": "d70f3ec086e8c590dd2af18177321da37f11ce5e848c14bfbe462065a487b72",
+  "schema": "litchi.performance.0968.seal_v4_validation_correction.v1",
+  "scope": "Corrects a truncated SHA-256 for the superseded duplicate-key seal-v3 only. Current seal-v4 and all final source, executable, plan, authorization, raw capture and audit bindings are unchanged. Original validation receipt is preserved."
+}

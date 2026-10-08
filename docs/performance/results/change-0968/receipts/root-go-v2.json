@@ -1,0 +1,17 @@
+{
+  "authorized_by": "root",
+  "binary_sha256": "50693dd8d2e7562f69c86d08872246f1a5d040be9f4f42fc850ed9c0a309dac9",
+  "created_utc": "2026-10-08T00:52:35.786148+00:00",
+  "plan_sha256": "3ffcc37e7078f716082844ed0689bdfaf500e820ec5d2ca11a1c61bd47638797",
+  "protocol_review": {
+    "bytes": 9628,
+    "path": "/home/zhuhe/litchi-performance-0968/review/protocol-approval-v2.json",
+    "sha256": "2d8468789f99de61042d74183ce8e680e1326d4d213e43f13995ae7d54150225"
+  },
+  "retry": false,
+  "schema": "litchi.performance.0968.cfb_commit_census_go.v3",
+  "scope": "Fresh full 48-child diagnostic epoch after correction of per-edit commit count validator; old epoch preserved and excluded; no selective retry, timing, allocation or adoption claim.",
+  "source_harness_sha256": "a80424d394e36849a3abbb6d0c415dbd513e150fb9494f061e124137215e3245",
+  "source_scope_sha256": "f8349e87968c174141d9f10a68f34cc5ac81b45bafa0e5d8d639b7b2c57f5a6f",
+  "status": "authorized"
+}

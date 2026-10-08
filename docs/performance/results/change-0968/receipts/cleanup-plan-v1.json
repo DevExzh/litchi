@@ -1,0 +1,188 @@
+{
+  "schema": "litchi.performance.0968.cleanup-plan.v1",
+  "plan_id": "0968-scoped-cache-cleanup-v1",
+  "recorded_utc": "2026-10-08T00:41:28Z",
+  "status": "plan_only_no_deletions",
+  "scope_root": "/home/zhuhe/litchi-performance-0968",
+  "root_go_required": true,
+  "cleanup_gate": {
+    "eligible_only_after": [
+      "formal_48_complete",
+      "audit_complete",
+      "explicit_root_go",
+      "fresh_no_build_or_capture_process_check",
+      "fresh_open_file_check_for_target_roots_and_bound_executable"
+    ],
+    "current_provenance_state": "diagnostic_source_harness_sealed_pending_oracle_review_and_formal_go",
+    "current_action": "do_not_delete"
+  },
+  "scope": {
+    "target_cache_roots": [
+      "/home/zhuhe/litchi-performance-0968/source-diagnostic/target",
+      "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/target"
+    ],
+    "generated_pycache_candidates": [
+      "/home/zhuhe/litchi-performance-0968/__pycache__",
+      "/home/zhuhe/litchi-performance-0968/tools/__pycache__"
+    ],
+    "no_other_paths_are_in_scope": true,
+    "old_0967_untouched": true,
+    "old_0967_root": "/home/zhuhe/litchi-performance-0967"
+  },
+  "sealed_executable_protection": {
+    "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/target/release/doc_cfb_commit_census_0968",
+    "expected_sha256": "50693dd8d2e7562f69c86d08872246f1a5d040be9f4f42fc850ed9c0a309dac9",
+    "actual_sha256": "50693dd8d2e7562f69c86d08872246f1a5d040be9f4f42fc850ed9c0a309dac9",
+    "expected_bytes": 55125224,
+    "actual_bytes": 55125224,
+    "inode": 15125082,
+    "hard_links_before_cleanup": 2,
+    "mode": "775",
+    "verified": true,
+    "same_inode_alias_to_remove_only_after_go": "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/target/release/deps/doc_cfb_commit_census_0968-1085adcfe16c495f",
+    "alias_sha256": "50693dd8d2e7562f69c86d08872246f1a5d040be9f4f42fc850ed9c0a309dac9",
+    "alias_inode": 15125082,
+    "alias_removal_rule": "The release path and its bytes/hash must survive; the deps hard-link may be removed only after root GO and a post-cleanup hash check.",
+    "post_cleanup_requirement": "release path must still exist with the expected size and SHA-256"
+  },
+  "runtime_fixture_and_provenance_binding": {
+    "source_revision": "6493e26155ee05e554f1371dd2fad707cd4bca0e",
+    "source_baseline_archive_sha256": "afa888cbe5f38d69d29cd96fb41d08b43ac95c76b7bdea1dd3127d1a5b5be749",
+    "provenance_v3": {
+      "path": "/home/zhuhe/litchi-performance-0968/provenance-diagnostic-v3.json",
+      "bytes": 7748,
+      "sha256": "64d7018c047b42389ba9e5b01d07d3ade1634ef55ca6bb2a8797d94d14de30e2",
+      "seal_expected_sha256": "64d7018c047b42389ba9e5b01d07d3ade1634ef55ca6bb2a8797d94d14de30e2",
+      "verified": true
+    },
+    "build_config": {
+      "path": "/home/zhuhe/litchi-performance-0968/build-config-v3.json",
+      "bytes": 3339,
+      "sha256": "9796161240ae976e43f0b2c5a96749398f2f52097d6c022e99f27c58737bbc58",
+      "verified": true
+    },
+    "census_plan": {
+      "path": "/home/zhuhe/litchi-performance-0968/census-plan-v2.md",
+      "bytes": 5344,
+      "sha256": "4abfb7a7aa32f9243bf818b8a0a28ceb86ddf5fb280a2ad36d32f8f1facd8881",
+      "verified": true
+    },
+    "fixtures": [
+      {
+        "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/test-data/ole/doc/NoHeadFoot.doc",
+        "bytes": 26112,
+        "sha256": "45e5df073f34314da6f39d2dad119fb2ef23470878fd2df67f632864cd92ea48",
+        "verified": true
+      },
+      {
+        "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/test-data/ole/doc/FloatingPictures.doc",
+        "bytes": 335360,
+        "sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d",
+        "verified": true
+      }
+    ],
+    "runtime_key_files_equal_to_0968_baseline": true,
+    "provenance_v3_descriptors_checked": 22,
+    "provenance_v3_descriptor_mismatches": 0,
+    "selected_source_provenance_hashes_checked": 10,
+    "selected_source_provenance_hash_mismatches": 0
+  },
+  "cache_inventory": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/target",
+      "kind": "cargo_target_build_cache",
+      "apparent_bytes_du_sb": 7733173214,
+      "allocated_bytes_du_B1": 7748198400,
+      "directory_count": 498,
+      "regular_file_count": 9117,
+      "symlink_count": 0,
+      "bound_path_inside": false,
+      "planned_action_after_gate": "remove_this_exact_target_tree_recursively",
+      "preserve_during_action": "all_paths outside this exact target root"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/target",
+      "kind": "cargo_target_build_cache_with_sealed_release_binary",
+      "apparent_bytes_du_sb": 1187164659,
+      "allocated_bytes_du_B1": 1195470848,
+      "directory_count": 467,
+      "regular_file_count": 2096,
+      "symlink_count": 0,
+      "bound_path_inside": true,
+      "planned_action_after_gate": "remove_generated_target_contents_except_the_exact_sealed_release_path",
+      "preserve_exactly": [
+        "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/target/release/doc_cfb_commit_census_0968"
+      ],
+      "bound_file_apparent_bytes": 55125224,
+      "bound_file_allocated_bytes_du_B1": 55128064,
+      "same_inode_hardlink_alias_is_disposable_after_go": true
+    }
+  ],
+  "pycache_inventory": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/__pycache__",
+      "kind": "generated_python_bytecode",
+      "apparent_bytes_du_sb": 42917,
+      "allocated_bytes_du_B1": 49152,
+      "regular_file_count": 1,
+      "planned_action_after_gate": "remove_exact_directory_recursively"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0968/tools/__pycache__",
+      "kind": "generated_python_bytecode",
+      "apparent_bytes_du_sb": 219795,
+      "allocated_bytes_du_B1": 253952,
+      "regular_file_count": 10,
+      "planned_action_after_gate": "remove_exact_directory_recursively"
+    }
+  ],
+  "preserve_unconditionally": [
+    "/home/zhuhe/litchi-performance-0968/source-baseline",
+    "/home/zhuhe/litchi-performance-0968/source-diagnostic source, test-data, tools source, and documentation outside the two exact target cache roots",
+    "/home/zhuhe/litchi-performance-0968/replay-independent-v1",
+    "/home/zhuhe/litchi-performance-0968/review",
+    "/home/zhuhe/litchi-performance-0968/v2",
+    "/home/zhuhe/litchi-performance-0968/raw and evidence paths",
+    "/home/zhuhe/litchi-performance-0968/receipts and control/provenance files",
+    "/home/zhuhe/code/litchi"
+  ],
+  "explicitly_excluded_from_cleanup": [
+    "/home/zhuhe/litchi-performance-0967",
+    "/home/zhuhe/litchi-performance-0968/source-baseline/**/__pycache__",
+    "/home/zhuhe/litchi-performance-0968/source-diagnostic/**/__pycache__",
+    "/home/zhuhe/litchi-performance-0968/source-diagnostic/docs/performance/results/**",
+    "/home/zhuhe/litchi-performance-0968/source-diagnostic/docs/report/**",
+    "/home/zhuhe/litchi-performance-0968/source-diagnostic/crates/**/src/build"
+  ],
+  "process_preflight": {
+    "observed_utc": "2026-10-08T00:41:28Z",
+    "command": "ps -eo comm= | awk '$1 ~ /^(cargo|rustc|perf|heaptrack|doc_cfb_commit_census_0968)$/ {n++} END {print n+0}'",
+    "matching_build_capture_processes": 0,
+    "open_file_check": "not run for this plan; must be fresh immediately before any root-authorized deletion"
+  },
+  "future_cleanup_and_receipt_requirements": {
+    "before_mutation": [
+      "obtain explicit root GO after formal 48 and audit",
+      "repeat the process check",
+      "run lsof/fuser checks against both exact target roots and the sealed release path",
+      "rehash the sealed release path and record inode, link count, size, and SHA-256",
+      "rehash both runtime fixtures and provenance-v3 binding files"
+    ],
+    "mutation_scope": [
+      "remove only /home/zhuhe/litchi-performance-0968/source-diagnostic/target",
+      "remove only generated contents of /home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/target while retaining the exact sealed release path",
+      "remove only the two listed top-level generated __pycache__ directories"
+    ],
+    "after_mutation": [
+      "verify the sealed release path still exists with 55125224 bytes and the expected SHA-256",
+      "verify both runtime fixture hashes and the provenance-v3 hash binding",
+      "record exact allocated and apparent bytes before/after and bytes freed",
+      "record deletion paths and any retained hard-link state in the cleanup receipt"
+    ]
+  },
+  "deletions_performed": [],
+  "plan_write_only_mutation": [
+    "/home/zhuhe/litchi-performance-0968/receipts/ (created if absent)",
+    "/home/zhuhe/litchi-performance-0968/receipts/cleanup-plan-v1.json"
+  ]
+}

@@ -1,0 +1,193 @@
+{
+  "audit": {
+    "artifact": {
+      "bytes": 27912,
+      "external_path": "/home/zhuhe/litchi-performance-0968/review/independent-raw-census-audit-v2-final-v1.json",
+      "packet_path": "review/independent-raw-census-audit-v2-final-v1.json",
+      "sha256": "1fb1c5b5aaad32d8b55770d3e06917927b7cc6e4f7b7100ae02b2d58f6bb0333"
+    },
+    "auditor": {
+      "bytes": 53670,
+      "external_path": "/home/zhuhe/litchi-performance-0968/review/independent_raw_census_audit_0968_v2.py",
+      "packet_path": "tools/independent_raw_census_audit_0968_v2.py",
+      "sha256": "5d26d4dbdee0a4b9edda5a91a4d25a15c09aa8cdab83320e0e31f3303946b5c0"
+    },
+    "checks": {
+      "all_20_correctness_gates_true": true,
+      "all_24_repeats_equal": true,
+      "all_child_packets_custodied": true,
+      "all_reports_and_routes_schema_valid": true,
+      "fixed_schedule": true,
+      "no_timer_or_allocator_measurement_fields": true,
+      "ordinary_output_sha_length_match": true,
+      "per_packet_stage_conservation": true,
+      "source_executable_plan_go_manifest_terminal_bound": true
+    },
+    "custody": {
+      "binary": {
+        "bytes": 55125224,
+        "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/target/release/doc_cfb_commit_census_0968",
+        "sha256": "50693dd8d2e7562f69c86d08872246f1a5d040be9f4f42fc850ed9c0a309dac9"
+      },
+      "cells": 24,
+      "children": 48,
+      "ordinary_oracle_cells": 24,
+      "retries": 0,
+      "source_revision": "6493e26155ee05e554f1371dd2fad707cd4bca0e",
+      "source_root": "/home/zhuhe/litchi-performance-0968/source-diagnostic",
+      "source_scope_files": 12,
+      "source_scope_sha256": "f8349e87968c174141d9f10a68f34cc5ac81b45bafa0e5d8d639b7b2c57f5a6f",
+      "terminal_before_parse": true
+    },
+    "decision": "diagnostic_only_no_adoption",
+    "status": "pass"
+  },
+  "capture": {
+    "cells": 24,
+    "epoch": "census-v6",
+    "errors": [],
+    "manifest": {
+      "bytes": 94568,
+      "path": "/home/zhuhe/litchi-performance-0968/capture/census-v6/capture-manifest-v3.json",
+      "sha256": "7f36d3ed05d89ab1ede777703c27536518116c47e8bef91955396c573ed715d9"
+    },
+    "packets": 48,
+    "raw_capture_copied": false,
+    "raw_children_external_only": true,
+    "repeats_per_cell": 2,
+    "retry_count": 0,
+    "root": "/home/zhuhe/litchi-performance-0968/capture/census-v6"
+  },
+  "claims": {
+    "adoption": false,
+    "allocation": false,
+    "causality": false,
+    "performance": false,
+    "timing": false
+  },
+  "cleanup": {
+    "bytes": 8359,
+    "external_path": "/home/zhuhe/litchi-performance-0968/receipts/build-cache-cleanup-v1.json",
+    "packet_path": "receipts/build-cache-cleanup-v1.json",
+    "retained_executable_sha256": "50693dd8d2e7562f69c86d08872246f1a5d040be9f4f42fc850ed9c0a309dac9",
+    "sha256": "0c45dde744f4f0488c0e737a6bdd46e1321db8f800b8d506ce63a0b956b8d5ee",
+    "status": "completed",
+    "total_apparent_bytes_freed": 8873491101,
+    "total_disk_bytes_freed": 8896917504
+  },
+  "decision": "diagnostic_only_no_adoption",
+  "historical_invalid_v5": {
+    "formal_status": "excluded_from_formal_evidence",
+    "incident": {
+      "bytes": 13939,
+      "external_path": "/home/zhuhe/litchi-performance-0968/review/census-v2-incident-v1.json",
+      "packet_path": "review/census-v2-incident-v1.json",
+      "sha256": "6a2e274d2b6bc34ad4d3c5aefba2966d18c945d711cc88f86e33955f3ce4e48d"
+    },
+    "independent_review": {
+      "bytes": 11066,
+      "external_path": "/home/zhuhe/litchi-performance-0968/review/incident-census-v5-per-edit-count-v2.json",
+      "packet_path": "review/incident-census-v5-per-edit-count-v2.json",
+      "sha256": "fe4656845ff26a4a3e1fc188c7739136b7dcd9fa8027da2fdcec157b88cbd6f4"
+    },
+    "reason": "The v5 checker assumed one commit/capture attempt per child; multi-edit rows correctly emit one successful stage record per requested edit. The v5 raw evidence remains external and is not used as formal evidence."
+  },
+  "protocol": {
+    "approval_binding_note": "Root GO v2 binds the restored original approval-v2 bytes; amended v3 is supplemental history and is not substituted for that binding.",
+    "approval_custody_incident": {
+      "bytes": 2965,
+      "external_path": "/home/zhuhe/litchi-performance-0968/review/protocol-approval-custody-incident-v1.json",
+      "packet_path": "review/protocol-approval-custody-incident-v1.json",
+      "sha256": "ed51390508d8795432637c954d2eeb58a9d9536dc8ebd865be646725056cd949"
+    },
+    "approval_v2": {
+      "bytes": 9628,
+      "external_path": "/home/zhuhe/litchi-performance-0968/review/protocol-approval-v2.json",
+      "packet_path": "review/protocol-approval-v2.json",
+      "sha256": "2d8468789f99de61042d74183ce8e680e1326d4d213e43f13995ae7d54150225"
+    },
+    "approval_v3_amended": {
+      "bytes": 10086,
+      "external_path": "/home/zhuhe/litchi-performance-0968/review/protocol-approval-v3-amended-retained-v1.json",
+      "packet_path": "review/protocol-approval-v3-amended-retained-v1.json",
+      "sha256": "dbd51169792a19350b2c308b6eb0d21746a72be08645bfab3ac9161a618bc70c"
+    },
+    "plan": {
+      "bytes": 32587,
+      "external_path": "/home/zhuhe/litchi-performance-0968/plans/plan-0968-prospective-v6.json",
+      "packet_path": "protocol/plan-0968-prospective-v6.json",
+      "sha256": "3ffcc37e7078f716082844ed0689bdfaf500e820ec5d2ca11a1c61bd47638797"
+    },
+    "root_go": {
+      "bytes": 958,
+      "external_path": "/home/zhuhe/litchi-performance-0968/receipts/root-go-v2.json",
+      "packet_path": "receipts/root-go-v2.json",
+      "sha256": "3ec3b54400bea1bef26522a974fb7494d66d58f2193a71913aff02e2371c5ab3"
+    },
+    "seal": {
+      "bytes": 4689,
+      "external_path": "/home/zhuhe/litchi-performance-0968/receipts/protocol-seal-0968-v3.json",
+      "packet_path": "protocol/protocol-seal-0968-v3.json",
+      "sha256": "bc970a5f03fb45ec8c6257d1ea452b71db2d4e1babfa3a79dcd3135449a81a42"
+    }
+  },
+  "read_only": true,
+  "reduction": {
+    "aggregate": {
+      "capture_attempted": 516,
+      "capture_error": 0,
+      "capture_payload_bytes": 130646838,
+      "capture_streams": 4902,
+      "capture_success": 516,
+      "commit_attempts": 516,
+      "commit_errors": 0,
+      "commit_successes": 516,
+      "layout_attempted": 516,
+      "layout_error": 0,
+      "layout_non_reuse": 0,
+      "layout_reuse_success": 516,
+      "overlay_attempted": 516,
+      "overlay_declined": 516,
+      "overlay_error": 0,
+      "overlay_not_attempted": 0,
+      "overlay_outcomes": {
+        "declined": 516,
+        "error": 0,
+        "not_attempted": 0,
+        "success": 0
+      },
+      "overlay_success": 0
+    },
+    "allocator_total_claim": false,
+    "summary": {
+      "bytes": 50259,
+      "external_path": "/home/zhuhe/litchi-performance-0968/analysis/census-summary-v1.json",
+      "packet_path": "analysis/census-summary-v1.json",
+      "sha256": "48fc947ac31ce136ea45f3c2b55143e00543e65ad6accd02f054424ab4304035"
+    },
+    "timing_claim": false
+  },
+  "reproduction": {
+    "audit": "PYTHONDONTWRITEBYTECODE=1 python3 tools/independent_raw_census_audit_0968_v2.py --help; require an explicit --output path outside the canonical audit file.",
+    "capture": "Reproduction requires the external source-diagnostic tree, binary, fixtures, and raw census-v6 capture root; no capture or workload is rerun for this repository packet.",
+    "reduction": "PYTHONDONTWRITEBYTECODE=1 python3 tools/reduce_cfb_commit_census_0968_v3.py --help; replay against the external census-v6 capture root with a fresh non-existing output path per the v6 plan.",
+    "tests": "PYTHONDONTWRITEBYTECODE=1 python3 tools/test_cfb_commit_census_0968_v3.py"
+  },
+  "schema": "litchi.performance.0968.cfb_commit_census_binding.v1",
+  "source": {
+    "binary": {
+      "bytes": 55125224,
+      "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/target/release/doc_cfb_commit_census_0968",
+      "sha256": "50693dd8d2e7562f69c86d08872246f1a5d040be9f4f42fc850ed9c0a309dac9"
+    },
+    "revision": "6493e26155ee05e554f1371dd2fad707cd4bca0e",
+    "scope_sha256": "f8349e87968c174141d9f10a68f34cc5ac81b45bafa0e5d8d639b7b2c57f5a6f",
+    "source_harness": {
+      "bytes": 2883,
+      "path": "/home/zhuhe/litchi-performance-0968/seal-v4.json",
+      "sha256": "a80424d394e36849a3abbb6d0c415dbd513e150fb9494f061e124137215e3245"
+    },
+    "source_root": "/home/zhuhe/litchi-performance-0968/source-diagnostic"
+  },
+  "status": "v6_capture_and_independent_audit_and_cleanup_complete"
+}

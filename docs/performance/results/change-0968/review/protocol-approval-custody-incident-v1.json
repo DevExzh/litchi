@@ -1,0 +1,55 @@
+{
+  "decision": "Custody incident resolved. Root GO v2 can continue to bind protocol-approval-v2.json at the restored original SHA; the amended bytes remain available under the supplemental v3 path.",
+  "recorded_utc": "2026-10-08T00:53:25.873557Z",
+  "reviewer": "doc_census_review",
+  "root_go_binding": {
+    "binding_is_valid_again": true,
+    "bound_path": "/home/zhuhe/litchi-performance-0968/review/protocol-approval-v2.json",
+    "hash_matches_required": true,
+    "required_sha256": "2d8468789f99de61042d74183ce8e680e1326d4d213e43f13995ae7d54150225",
+    "restored_file": {
+      "bytes": 9628,
+      "path": "/home/zhuhe/litchi-performance-0968/review/protocol-approval-v2.json",
+      "sha256": "2d8468789f99de61042d74183ce8e680e1326d4d213e43f13995ae7d54150225"
+    }
+  },
+  "schema": "litchi.performance.0968.review.protocol_approval_custody_incident.v1",
+  "scope": "receipt custody only; no source, binary, plan, helper, raw capture, build, workload, or production artifact changes",
+  "status": "RESOLVED_ORIGINAL_V2_BINDING_RESTORED",
+  "supplemental_preservation": {
+    "bytes_preserved_exactly": true,
+    "expected_sha256": "dbd51169792a19350b2c308b6eb0d21746a72be08645bfab3ac9161a618bc70c",
+    "file": {
+      "bytes": 10086,
+      "path": "/home/zhuhe/litchi-performance-0968/review/protocol-approval-v3.json",
+      "sha256": "dbd51169792a19350b2c308b6eb0d21746a72be08645bfab3ac9161a618bc70c"
+    },
+    "path": "/home/zhuhe/litchi-performance-0968/review/protocol-approval-v3.json",
+    "role": "preserved amended receipt bytes; supplemental evidence only and not the root GO binding"
+  },
+  "timeline": {
+    "amended_same_path_bytes": 10086,
+    "amended_same_path_sha256": "dbd51169792a19350b2c308b6eb0d21746a72be08645bfab3ac9161a618bc70c",
+    "amendment_observed_before_recovery_utc": "2026-10-08T00:52Z filesystem mtime window",
+    "initial_approval_v2_bytes": 9628,
+    "initial_approval_v2_sha256": "2d8468789f99de61042d74183ce8e680e1326d4d213e43f13995ae7d54150225",
+    "recovery_recorded_utc": "2026-10-08T00:53:25.873557Z",
+    "supplemental_preserved_before_restore": true
+  },
+  "unchanged_artifacts": {
+    "helpers": "unchanged",
+    "new_capture_or_workload": "none",
+    "plan_v6": "3ffcc37e7078f716082844ed0689bdfaf500e820ec5d2ca11a1c61bd47638797",
+    "protocol_seal_v3": "bc970a5f03fb45ec8c6257d1ea452b71db2d4e1babfa3a79dcd3135449a81a42",
+    "raw_capture_epoch": "unchanged",
+    "source_and_binary": "unchanged"
+  },
+  "what_changed": {
+    "amended_field_added": "independent_validation.raw_stdout_report_audit.child_descriptor_custody",
+    "amended_field_purpose": "recorded the separately completed 48-child terminal/start/stdout/stderr descriptor audit",
+    "amended_field_removed_from_bound_v2": true,
+    "amended_path": "/home/zhuhe/litchi-performance-0968/review/protocol-approval-v2.json",
+    "original_bytes_reconstructed_from_known_one_field_delta": true,
+    "reconstruction_hash_verified": true
+  }
+}

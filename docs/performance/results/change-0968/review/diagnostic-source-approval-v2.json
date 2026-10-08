@@ -1,0 +1,79 @@
+{
+  "schema": "litchi.performance.0968.review.diagnostic_source_approval.v2",
+  "status": "PASS",
+  "reviewer": "doc_census_review",
+  "reviewed_at": "2026-10-08",
+  "supersedes": {
+    "path": "/home/zhuhe/litchi-performance-0968/review/diagnostic-source-approval-v1.json",
+    "reason": "v1 was bound to seal-v3, whose duplicate top-level schema key makes strict JSON loading reject it"
+  },
+  "seal_v4": {
+    "path": "/home/zhuhe/litchi-performance-0968/seal-v4.json",
+    "sha256": "a80424d394e36849a3abbb6d0c415dbd513e150fb9494f061e124137215e3245",
+    "top_level_schema": "litchi.performance.0968.cfb_commit_census.seal.v4",
+    "schema_receipt_key": "schema_receipt",
+    "duplicate_key_rejecting_parse": "pass"
+  },
+  "duplicate_key_audit": {
+    "parser": "json.loads with object_pairs_hook rejecting repeated object keys",
+    "sealed_inputs_unique": true,
+    "checked_inputs": [
+      "/home/zhuhe/litchi-performance-0968/seal-v4.json",
+      "/home/zhuhe/litchi-performance-0968/census-schema-v2.json",
+      "/home/zhuhe/litchi-performance-0968/provenance-diagnostic-v3.json",
+      "/home/zhuhe/litchi-performance-0968/build-config-v3.json",
+      "/home/zhuhe/litchi-performance-0968/smoke-docnohf-e1-zero-v4.json",
+      "/home/zhuhe/litchi-performance-0968/smoke-docnohf-e1-zero-v4-repeat.json",
+      "/home/zhuhe/litchi-performance-0968/smoke-docfloat-e1-zero-v4.json",
+      "/home/zhuhe/litchi-performance-0968/review/diagnostic-source-approval-v1.json",
+      "/home/zhuhe/litchi-performance-0968/review/seal-v4-validation-v1.json",
+      "/home/zhuhe/litchi-performance-0968/review/diagnostic-source-approval-v2-addendum-request.json"
+    ],
+    "historical_rejections": [
+      {
+        "path": "/home/zhuhe/litchi-performance-0968/seal-v2.json",
+        "duplicate_key": "schema",
+        "role": "superseded historical artifact"
+      },
+      {
+        "path": "/home/zhuhe/litchi-performance-0968/seal-v3.json",
+        "duplicate_key": "schema",
+        "role": "superseded historical artifact"
+      }
+    ]
+  },
+  "hash_binding": {
+    "code_patch_sha256": "039a76ea250adcdf5eaa11d5d7a2bef2a7f4b4c041e22450e9a83c4cf7f5cf68",
+    "plan_sha256": "4abfb7a7aa32f9243bf818b8a0a28ceb86ddf5fb280a2ad36d32f8f1facd8881",
+    "schema_sha256": "bb0004a8cdf200d27099c4624a5226366de5024b279ed74f1f2f210de29dd963",
+    "provenance_sha256": "64d7018c047b42389ba9e5b01d07d3ade1634ef55ca6bb2a8797d94d14de30e2",
+    "build_config_sha256": "9796161240ae976e43f0b2c5a96749398f2f52097d6c022e99f27c58737bbc58",
+    "diagnostic_binary_sha256": "50693dd8d2e7562f69c86d08872246f1a5d040be9f4f42fc850ed9c0a309dac9",
+    "declared_bindings_verified": 19,
+    "source_and_binary_unchanged_from_v1": true
+  },
+  "source_review": {
+    "carried_forward": true,
+    "phase_gate": "RenderScope only covers main candidate render; layout requires render phase",
+    "success_boundary": "commit success follows reopen, capture, reuse, and discovery",
+    "capture_gate": "stream/payload counters require active Package::capture and close on success/error",
+    "route_classification": "last_sector_layout reports reused/non_reused; missing report is error",
+    "overflow": "checked scalar additions saturate and set saturated; schema rejects saturated reports",
+    "feature_off": "diagnostic module and calls are feature gated",
+    "retention": "no payload/path/event/clock/timing/allocator instrumentation"
+  },
+  "read_only_validation": {
+    "schema_tests": "7 passed",
+    "formal_capture": false,
+    "build_by_reviewer": false,
+    "production_source_edits": false
+  },
+  "scope_limits": {
+    "timing_claim": false,
+    "allocator_instrumentation": false,
+    "metadata_projection": false,
+    "ordinary_0967_oracle": "separate qualification gate; not asserted by this receipt",
+    "protocol_go": "separate staging_protocol and root gate"
+  },
+  "decision": "No source or seal-v4 binding blocker. v1 is superseded for binding; v2 is the current independent approval."
+}

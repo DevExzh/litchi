@@ -1,0 +1,244 @@
+{
+  "checks": {
+    "claims_review": {
+      "focus_denominator_explicit": true,
+      "fresh_build_and_matched_profile_required_for_candidate": true,
+      "inclusive_vs_exclusive_explained": true,
+      "missing_named_frames_are_not_zero_cpu_claim": true,
+      "no_native_performance_speedup_or_adoption_inference": true,
+      "report_scope_is_diagnostic_only": true
+    },
+    "focus_floatpictures_e32": {
+      "denominator": {
+        "period": 6302069415,
+        "samples": 1477
+      },
+      "exclusive_buckets": {
+        "cfb_ole_open": {
+          "period": 896459269,
+          "samples": 210
+        },
+        "cfb_open_stream": {
+          "period": 874651929,
+          "samples": 205
+        },
+        "cfb_writer_write_to": {
+          "period": 2381526914,
+          "samples": 558
+        },
+        "no_target_cfb_frame": {
+          "period": 959277018,
+          "samples": 225
+        },
+        "other_physical_cfb": {
+          "period": 485848658,
+          "samples": 114
+        },
+        "package_capture": {
+          "period": 704305627,
+          "samples": 165
+        }
+      },
+      "exclusive_conservation": {
+        "matches_denominator": true,
+        "period": 6302069415,
+        "samples": 1477
+      },
+      "inclusive": {
+        "cfb_ole_open": {
+          "period": 896459269,
+          "period_share_percent": 14.22484,
+          "samples": 210
+        },
+        "cfb_open_stream": {
+          "period": 874651929,
+          "period_share_percent": 13.878805,
+          "samples": 205
+        },
+        "cfb_writer_write_to": {
+          "period": 2381526914,
+          "period_share_percent": 37.789601,
+          "samples": 558
+        },
+        "package_capture": {
+          "period": 1578957556,
+          "period_share_percent": 25.054588,
+          "samples": 370
+        }
+      },
+      "overlap": {
+        "inclusive_rows_must_not_be_summed": true,
+        "package_capture_and_open_stream": {
+          "period": 874651929,
+          "samples": 205
+        }
+      },
+      "unions": {
+        "any_physical_litchi_cfb": {
+          "period": 4796517962,
+          "samples": 1124
+        },
+        "exact_targets": {
+          "period": 4856943739,
+          "samples": 1138
+        }
+      }
+    },
+    "formal_reduction_crosscheck": {
+      "all_marker_sample_period_pairs_match": true,
+      "children": 16
+    },
+    "independent_raw_parse": {
+      "events": {
+        "cycles:u": 18209
+      },
+      "exact_frame_unambiguous": {
+        "all_physical": true,
+        "commit_exactly_one_all": true,
+        "marker_exactly_one_all": true,
+        "qualified_records": 2352
+      },
+      "lost_records": 0,
+      "parse_errors": 0,
+      "physical_marker": {
+        "period": 24985033857,
+        "samples": 5866
+      },
+      "qualified_commit": {
+        "commit_below_marker": true,
+        "period": 10037338577,
+        "samples": 2352
+      },
+      "records": 18209,
+      "scripts": 16,
+      "total_period": 75530554154,
+      "truncated_records": 0
+    },
+    "input_custody": {
+      "binary_regular_file": "pass",
+      "descriptor_count_verified": 19,
+      "descriptor_size_hash_matches": "pass",
+      "formal_reduction_regular_file": "pass",
+      "manifest_regular_file": "pass",
+      "raw_scripts_count": 16
+    },
+    "replicates": {
+      "profile-r01-docfloat-e32": {
+        "open_stream": {
+          "period": 430206204,
+          "samples": 101
+        },
+        "package_capture": {
+          "period": 818166901,
+          "samples": 192
+        },
+        "period": 3112476761,
+        "samples": 731,
+        "writer": {
+          "period": 1196558856,
+          "samples": 281
+        }
+      },
+      "profile-r02-docfloat-e32": {
+        "open_stream": {
+          "period": 444445725,
+          "samples": 104
+        },
+        "package_capture": {
+          "period": 760790655,
+          "samples": 178
+        },
+        "period": 3189592654,
+        "samples": 746,
+        "writer": {
+          "period": 1184968058,
+          "samples": 277
+        }
+      },
+      "sum_matches_focus": true
+    },
+    "source_equivalence": {
+      "all_selected_byte_equal": true,
+      "all_selected_equal_head": true,
+      "current_head": "6493e26155ee05e554f1371dd2fad707cd4bca0e",
+      "files": [
+        {
+          "bytes": 39109,
+          "file": "crates/litchi-ole-common/src/object/editor.rs",
+          "sha256": "ee6079567bf85a0ff68a335fb43999d780fab335a09a9cec8b845c16b7b5b319"
+        },
+        {
+          "bytes": 52977,
+          "file": "crates/litchi-ole-common/src/object/codec.rs",
+          "sha256": "99dc73a358cbe5a76c6fc2424e42af6524ba6d0954c2ae508cf55f84cb6a5cafd"
+        },
+        {
+          "bytes": 2375,
+          "file": "crates/litchi-ole-common/src/object/discovery.rs",
+          "sha256": "830fa39ca65ef5073d14dabcc60513bca6a1f221eaaa1e28e62e9644bbeffdea"
+        },
+        {
+          "bytes": 275459,
+          "file": "crates/litchi-cfb/src/file.rs",
+          "sha256": "0cc789bfd893a0cd9a10e9d7488c4a8409a54021995dc44c20c29c8baaede5bd"
+        },
+        {
+          "bytes": 120349,
+          "file": "crates/litchi-cfb/src/writer/core.rs",
+          "sha256": "a5ead3dded13baa8bdaa350742bfe79185e39cc2f16f86e433701e939fb2b19c"
+        },
+        {
+          "bytes": 96613,
+          "file": "crates/litchi-cfb/src/writer/layout.rs",
+          "sha256": "480b30fb1c6c018c3182fc5e0ab1f53bb55f61169396e2f2d8bce257c7d1460c"
+        }
+      ],
+      "retained_root": "/home/zhuhe/litchi-performance-0942/source-v2",
+      "scope_note": "This is an exact six-runtime-file equivalence proof, not an assertion that every checkout file equals retained source; the report states this scope.",
+      "selected_files_count": 6
+    },
+    "syntax_and_cli": {
+      "ast_parse": "pass",
+      "fixed_output_overwrite_guard": "present",
+      "help_side_effect_free": "pass"
+    }
+  },
+  "created_utc": "2026-10-08T00:25:57.611882+00:00",
+  "decision": "pass_for_retained_cpu_record_only",
+  "findings": [],
+  "replay": {
+    "comparison": "JSON equal to sealed v2 after removing created_utc; Markdown byte-identical",
+    "exit_code": 0,
+    "json_sha256": "ace7d5a9656613bfbe8c31149a8c8263710c5393516023908063f02e9e34ed01",
+    "markdown_sha256": "1e612750df98818e2a94e7bd4a5e9b7294a06d11ed519add06f3ba60bb1f3c7e",
+    "output_dir": "/home/zhuhe/litchi-performance-0968/replay-independent-v1",
+    "side_effects": "fresh external output only; analyzer source path performs retained-file reads and git rev-parse, no perf/build/workload"
+  },
+  "schema": "litchi.performance.0968.independent-review.v1",
+  "scope": {
+    "claim_boundary": "diagnostic sampled CPU callchain attribution only; no latency, allocation, performance, speedup, or adoption claim",
+    "native_workload_executed": false,
+    "new_build": false,
+    "new_capture": false,
+    "performance_speedup_adoption_inference": false,
+    "review": "independent read-only review of retained 0942 CFB commit attribution"
+  },
+  "sealed_artifacts": {
+    "analyzer": {
+      "bytes": 32759,
+      "path": "/home/zhuhe/litchi-performance-0968/analyze_cfb_commit_v1.py",
+      "sha256": "a7c720784f8dc82f68e02ad3dff576ce60ed9593d5dc99ad2fd0996771510fc0"
+    },
+    "json": {
+      "bytes": 85297,
+      "path": "/home/zhuhe/litchi-performance-0968/v2/cfb-commit-attribution-v1.json",
+      "sha256": "e6f937fee96738866b0a19e8d0356bbe97397b346f21ecd02f5a397491863d49"
+    },
+    "markdown": {
+      "bytes": 3837,
+      "path": "/home/zhuhe/litchi-performance-0968/v2/cfb-commit-attribution-v1.md",
+      "sha256": "1e612750df98818e2a94e7bd4a5e9b7294a06d11ed519add06f3ba60bb1f3c7e"
+    }
+  },
+  "status": "pass"
+}

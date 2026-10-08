@@ -1,0 +1,469 @@
+{
+  "change": "0968",
+  "disposition": "Preserve v2 helpers, v5 plan, and v5 raw capture permanently; prepare a fresh v3 48-child plan/capture root and require independent review plus a new GO before rerun.",
+  "finding": {
+    "correct_contract": [
+      "commit_attempts == row.edits",
+      "commit_successes == row.edits",
+      "capture_attempted == row.edits",
+      "capture_success == row.edits"
+    ],
+    "incorrect_v2_requirements": [
+      "commit_attempts == 1",
+      "capture_attempted == 1"
+    ],
+    "source_or_binary_changed": false,
+    "summary": "The v2 checker required one commit and one capture per child, but the sealed diagnostic harness executes one commit/capture per requested edit within each child.",
+    "workload_retry_performed": false
+  },
+  "offline_audit": {
+    "checker": "tools/cfb_census_schema_0968_v3.py",
+    "matrix_edits": [
+      1,
+      2,
+      8,
+      32
+    ],
+    "repetitions": 2,
+    "result": "all_48_retained_stdout_packets_pass_per_edit_cardinality_and_existing_correctness_oracles",
+    "retentions": [
+      "zero",
+      "default",
+      "release"
+    ]
+  },
+  "recorded_utc": "2026-10-08T00:48:12.674671Z",
+  "retained_v2": {
+    "binary": {
+      "bytes": 55125224,
+      "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/target/release/doc_cfb_commit_census_0968",
+      "sha256": "50693dd8d2e7562f69c86d08872246f1a5d040be9f4f42fc850ed9c0a309dac9"
+    },
+    "capture_manifest": {
+      "bytes": 99462,
+      "path": "/home/zhuhe/litchi-performance-0968/capture/census-v5/capture-manifest-v2.json",
+      "sha256": "0a5e41cf25d56d4c5dd805bfef3744c4e04e739c8dc0c10d8fd54a2d592c98e5"
+    },
+    "capture_status": "complete_with_failures",
+    "children_by_edits": {
+      "1": 12,
+      "2": 12,
+      "32": 12,
+      "8": 12
+    },
+    "packet_count": 48,
+    "plan": {
+      "bytes": 32380,
+      "path": "/home/zhuhe/litchi-performance-0968/plans/plan-0968-prospective-v5.json",
+      "sha256": "d78f51678ec7fe26ec2caa118154391fd59d1ef69df299c208ac284da73b1dbb"
+    },
+    "raw_rows": [
+      {
+        "capture_attempted": 1,
+        "child_id": "cfb-r01-docfloat-e01-default",
+        "commit_attempts": 1,
+        "edits": 1,
+        "returncode": 0,
+        "runner_parse_status": "accepted"
+      },
+      {
+        "capture_attempted": 1,
+        "child_id": "cfb-r01-docfloat-e01-release",
+        "commit_attempts": 1,
+        "edits": 1,
+        "returncode": 0,
+        "runner_parse_status": "accepted"
+      },
+      {
+        "capture_attempted": 1,
+        "child_id": "cfb-r01-docfloat-e01-zero",
+        "commit_attempts": 1,
+        "edits": 1,
+        "returncode": 0,
+        "runner_parse_status": "accepted"
+      },
+      {
+        "capture_attempted": 2,
+        "child_id": "cfb-r01-docfloat-e02-default",
+        "commit_attempts": 2,
+        "edits": 2,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 2,
+        "child_id": "cfb-r01-docfloat-e02-release",
+        "commit_attempts": 2,
+        "edits": 2,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 2,
+        "child_id": "cfb-r01-docfloat-e02-zero",
+        "commit_attempts": 2,
+        "edits": 2,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 8,
+        "child_id": "cfb-r01-docfloat-e08-default",
+        "commit_attempts": 8,
+        "edits": 8,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 8,
+        "child_id": "cfb-r01-docfloat-e08-release",
+        "commit_attempts": 8,
+        "edits": 8,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 8,
+        "child_id": "cfb-r01-docfloat-e08-zero",
+        "commit_attempts": 8,
+        "edits": 8,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 32,
+        "child_id": "cfb-r01-docfloat-e32-default",
+        "commit_attempts": 32,
+        "edits": 32,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 32,
+        "child_id": "cfb-r01-docfloat-e32-release",
+        "commit_attempts": 32,
+        "edits": 32,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 32,
+        "child_id": "cfb-r01-docfloat-e32-zero",
+        "commit_attempts": 32,
+        "edits": 32,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 1,
+        "child_id": "cfb-r01-docnohf-e01-default",
+        "commit_attempts": 1,
+        "edits": 1,
+        "returncode": 0,
+        "runner_parse_status": "accepted"
+      },
+      {
+        "capture_attempted": 1,
+        "child_id": "cfb-r01-docnohf-e01-release",
+        "commit_attempts": 1,
+        "edits": 1,
+        "returncode": 0,
+        "runner_parse_status": "accepted"
+      },
+      {
+        "capture_attempted": 1,
+        "child_id": "cfb-r01-docnohf-e01-zero",
+        "commit_attempts": 1,
+        "edits": 1,
+        "returncode": 0,
+        "runner_parse_status": "accepted"
+      },
+      {
+        "capture_attempted": 2,
+        "child_id": "cfb-r01-docnohf-e02-default",
+        "commit_attempts": 2,
+        "edits": 2,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 2,
+        "child_id": "cfb-r01-docnohf-e02-release",
+        "commit_attempts": 2,
+        "edits": 2,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 2,
+        "child_id": "cfb-r01-docnohf-e02-zero",
+        "commit_attempts": 2,
+        "edits": 2,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 8,
+        "child_id": "cfb-r01-docnohf-e08-default",
+        "commit_attempts": 8,
+        "edits": 8,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 8,
+        "child_id": "cfb-r01-docnohf-e08-release",
+        "commit_attempts": 8,
+        "edits": 8,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 8,
+        "child_id": "cfb-r01-docnohf-e08-zero",
+        "commit_attempts": 8,
+        "edits": 8,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 32,
+        "child_id": "cfb-r01-docnohf-e32-default",
+        "commit_attempts": 32,
+        "edits": 32,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 32,
+        "child_id": "cfb-r01-docnohf-e32-release",
+        "commit_attempts": 32,
+        "edits": 32,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 32,
+        "child_id": "cfb-r01-docnohf-e32-zero",
+        "commit_attempts": 32,
+        "edits": 32,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 1,
+        "child_id": "cfb-r02-docfloat-e01-default",
+        "commit_attempts": 1,
+        "edits": 1,
+        "returncode": 0,
+        "runner_parse_status": "accepted"
+      },
+      {
+        "capture_attempted": 1,
+        "child_id": "cfb-r02-docfloat-e01-release",
+        "commit_attempts": 1,
+        "edits": 1,
+        "returncode": 0,
+        "runner_parse_status": "accepted"
+      },
+      {
+        "capture_attempted": 1,
+        "child_id": "cfb-r02-docfloat-e01-zero",
+        "commit_attempts": 1,
+        "edits": 1,
+        "returncode": 0,
+        "runner_parse_status": "accepted"
+      },
+      {
+        "capture_attempted": 2,
+        "child_id": "cfb-r02-docfloat-e02-default",
+        "commit_attempts": 2,
+        "edits": 2,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 2,
+        "child_id": "cfb-r02-docfloat-e02-release",
+        "commit_attempts": 2,
+        "edits": 2,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 2,
+        "child_id": "cfb-r02-docfloat-e02-zero",
+        "commit_attempts": 2,
+        "edits": 2,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 8,
+        "child_id": "cfb-r02-docfloat-e08-default",
+        "commit_attempts": 8,
+        "edits": 8,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 8,
+        "child_id": "cfb-r02-docfloat-e08-release",
+        "commit_attempts": 8,
+        "edits": 8,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 8,
+        "child_id": "cfb-r02-docfloat-e08-zero",
+        "commit_attempts": 8,
+        "edits": 8,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 32,
+        "child_id": "cfb-r02-docfloat-e32-default",
+        "commit_attempts": 32,
+        "edits": 32,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 32,
+        "child_id": "cfb-r02-docfloat-e32-release",
+        "commit_attempts": 32,
+        "edits": 32,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 32,
+        "child_id": "cfb-r02-docfloat-e32-zero",
+        "commit_attempts": 32,
+        "edits": 32,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 1,
+        "child_id": "cfb-r02-docnohf-e01-default",
+        "commit_attempts": 1,
+        "edits": 1,
+        "returncode": 0,
+        "runner_parse_status": "accepted"
+      },
+      {
+        "capture_attempted": 1,
+        "child_id": "cfb-r02-docnohf-e01-release",
+        "commit_attempts": 1,
+        "edits": 1,
+        "returncode": 0,
+        "runner_parse_status": "accepted"
+      },
+      {
+        "capture_attempted": 1,
+        "child_id": "cfb-r02-docnohf-e01-zero",
+        "commit_attempts": 1,
+        "edits": 1,
+        "returncode": 0,
+        "runner_parse_status": "accepted"
+      },
+      {
+        "capture_attempted": 2,
+        "child_id": "cfb-r02-docnohf-e02-default",
+        "commit_attempts": 2,
+        "edits": 2,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 2,
+        "child_id": "cfb-r02-docnohf-e02-release",
+        "commit_attempts": 2,
+        "edits": 2,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 2,
+        "child_id": "cfb-r02-docnohf-e02-zero",
+        "commit_attempts": 2,
+        "edits": 2,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 8,
+        "child_id": "cfb-r02-docnohf-e08-default",
+        "commit_attempts": 8,
+        "edits": 8,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 8,
+        "child_id": "cfb-r02-docnohf-e08-release",
+        "commit_attempts": 8,
+        "edits": 8,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 8,
+        "child_id": "cfb-r02-docnohf-e08-zero",
+        "commit_attempts": 8,
+        "edits": 8,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 32,
+        "child_id": "cfb-r02-docnohf-e32-default",
+        "commit_attempts": 32,
+        "edits": 32,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 32,
+        "child_id": "cfb-r02-docnohf-e32-release",
+        "commit_attempts": 32,
+        "edits": 32,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      },
+      {
+        "capture_attempted": 32,
+        "child_id": "cfb-r02-docnohf-e32-zero",
+        "commit_attempts": 32,
+        "edits": 32,
+        "returncode": 0,
+        "runner_parse_status": "rejected_by_v2_checker"
+      }
+    ],
+    "raw_stdout_reports_audited": 48,
+    "retry_count": 0,
+    "returncodes": {
+      "0": 48
+    },
+    "run_terminal": {
+      "bytes": 1450,
+      "path": "/home/zhuhe/litchi-performance-0968/capture/census-v5/run-terminal.json",
+      "sha256": "60484570aff121d6130b3b94d71d530c01161cf3c3b2c574b26397ee9d088e00"
+    },
+    "runner_tool": {
+      "bytes": 15853,
+      "path": "/home/zhuhe/litchi-performance-0968/tools/run_cfb_commit_census_0968_v2.py",
+      "sha256": "3db734abcdae8f4c03610ea3dd3b4031c9b008736cc2a33ef4cf7ec177133d93"
+    },
+    "schema_tool": {
+      "bytes": 33527,
+      "path": "/home/zhuhe/litchi-performance-0968/tools/cfb_census_schema_0968_v2.py",
+      "sha256": "cb102e433efa11180f31ca78a6808f8365999753aaa5549d3de2fe0c717311ef"
+    }
+  },
+  "schema": "litchi.performance.0968.cfb_commit_census_incident.v1",
+  "status": "protocol_bug_confirmed_pending_v3_review_and_go"
+}

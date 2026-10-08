@@ -1,0 +1,87 @@
+{
+  "schema": "litchi.performance.0968.source_provenance.v1",
+  "status": "design_only_no_build_no_workload",
+  "created_utc": "2026-10-08",
+  "source_revision": "6493e26155ee05e554f1371dd2fad707cd4bca0e",
+  "source_revision_expected": "6493e26155ee05e554f1371dd2fad707cd4bca0e",
+  "source_export": {
+    "path": "/home/zhuhe/litchi-performance-0968/source-baseline",
+    "method": "git archive --format=tar HEAD | tar -x",
+    "archive_sha256": "afa888cbe5f38d69d29cd96fb41d08b43ac95c76b7bdea1dd3127d1a5b5be749",
+    "working_tree_changes_excluded": true
+  },
+  "working_tree_observation": {
+    "main_checkout_dirty": true,
+    "status_lines": [
+      " M .github/workflows/perf-baseline.yml",
+      " M tools/check_iwork_leaf_public_api.py",
+      "?? crates/litchi/examples/bench_word_parse.rs",
+      "?? docs/UNIFIED_OPS_API_DESIGN.md",
+      "?? tools/perf_decision.md",
+      "?? tools/perf_decision.py",
+      "?? tools/test_perf_decision.py"
+    ],
+    "rule": "source-baseline contains tracked HEAD only; no dirty files were copied"
+  },
+  "selected_source_hashes": [
+    {
+      "path": "crates/litchi-ole-common/src/object/editor.rs",
+      "sha256": "ee6079567bf85a0ff68a335fb43999d780fab335a09a9cec8b845c16b7b5b319"
+    },
+    {
+      "path": "crates/litchi-ole-common/src/object/codec.rs",
+      "sha256": "99dc73a358cbe5a76c6fc242e42af6524ba6d0954c2ae508cf55f84cb6a5cafd"
+    },
+    {
+      "path": "crates/litchi-ole-common/src/object/discovery.rs",
+      "sha256": "830fa39ca65ef5073d14dabcc60513bca6a1f221eaaa1e28e62e9644bbeffdea"
+    },
+    {
+      "path": "crates/litchi-ole-common/src/object/model.rs",
+      "sha256": "83389ca205916eb65b36607bb2f15f13541821989f20abfd1e6b3236ef6aa352"
+    },
+    {
+      "path": "crates/litchi-ole-common/src/object/directory/model.rs",
+      "sha256": "63342c1da1ed1ac79de4f029b8023e6e27a3d5ec07b356583b908403a8f4a196"
+    },
+    {
+      "path": "crates/litchi-ole-common/src/object/directory/codec.rs",
+      "sha256": "afd82d7568246ed6dbff202b6525c96329f5061547eadcc360f9d840e2659a0a"
+    },
+    {
+      "path": "crates/litchi-cfb/src/writer/core.rs",
+      "sha256": "a5ead3dded13baa8bdaa350742bfe79185e39cc2f16f86e433701e939fb2b19c"
+    },
+    {
+      "path": "crates/litchi-cfb/src/writer/layout.rs",
+      "sha256": "480b30fb1c6c018c3182fc5e0ab1f53bb55f61169396e2f2d8bce257c7d1460c"
+    },
+    {
+      "path": "crates/litchi-cfb/src/file.rs",
+      "sha256": "0cc789bfd893a0cd9a10e9d7488c4a8409a54021995dc44c20c29c8baaede5bd"
+    },
+    {
+      "path": "crates/litchi-cfb/src/writer/mod.rs",
+      "sha256": "f06b215aa63bf9e80160b38fb683ec692a482e2898f8f86e8f48fa881d4b3618"
+    }
+  ],
+  "accepted_adr_digest": {
+    "manifest_path": "/home/zhuhe/litchi-performance-0968/adr-sha256-v1.txt",
+    "manifest_sha256": "25fc1d3085b40b5851ae4a3b12d27a80988784f2997834ede8731fc977fd7c57",
+    "entries": 33,
+    "matches_0966_manifest": true
+  },
+  "historical_binary_reuse": {
+    "0967_source_revision": "893072657ad8b1d726bfce351b5ec2e98f084e94",
+    "current_source_differs": true,
+    "disposition": "0967 binaries are not reusable for 0968 unless a later byte/source provenance check proves exact equivalence"
+  },
+  "retained_0942": {
+    "formal_reduction": "/home/zhuhe/litchi-performance-0942/reports/formal-reduction-v5.json",
+    "formal_reduction_sha256": "5619db9dd6b81b0cc6c71d4d5143f97a69aa628a5678e673bf268483c5e9a366",
+    "marker_scope_json": "/home/zhuhe/litchi-performance-0942/analysis/cfb-marker-scope-v1.json",
+    "marker_scope_json_sha256": "d34f9db937c0f28c5fbcf0f27c3dc73960d27682e7979b61653a629912e5974fb",
+    "marker_scope_addendum_sha256": "77ac222cb2b2a3d5cabfb0c457867730ff66f24af3d2e88ce9964611401aaac4",
+    "binary_sha256": "92f85ce6019405fa1b0d97ec796947cd7ec240d2b8143f9cf06356d97409e70e"
+  }
+}

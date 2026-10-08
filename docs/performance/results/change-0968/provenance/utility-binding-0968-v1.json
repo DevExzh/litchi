@@ -1,0 +1,54 @@
+{
+  "schema": "litchi.performance.0968.utility-binding.v1",
+  "status": "main_checkout_utility_bound",
+  "main_checkout_paths": [
+    {
+      "bytes": 18112,
+      "path": "/home/zhuhe/code/litchi/tools/perf_decision.py",
+      "sha256": "abf9ac42ee7a37475f3985a7202356d41fa13830f595a5366b9abfa78ef92064"
+    },
+    {
+      "bytes": 12095,
+      "path": "/home/zhuhe/code/litchi/tools/test_perf_decision.py",
+      "sha256": "b7ff827ed55104888720eb9550f06c5e2cf279ab255715fceb5a124fbfe5c986"
+    },
+    {
+      "bytes": 1355,
+      "path": "/home/zhuhe/code/litchi/tools/perf_decision.md",
+      "sha256": "21ff7b105d2576d5f2f526ff0b5becad80390f8095bef5a0891386b0be95b6e7"
+    },
+    {
+      "bytes": 134890,
+      "path": "/home/zhuhe/code/litchi/.github/workflows/perf-baseline.yml",
+      "sha256": "dfba2361db77e7fa497047a1ca768d46744fa6e28e7403da828a3dec7dbaa2ff"
+    }
+  ],
+  "approval_receipt": {
+    "packet_path": "review/perf-decision-independent-approval-v1.json",
+    "sha256": "a1af06aa16eaa79bba2a6a683567855aec64d662a0d961c491dfd0229ffb3b98"
+  },
+  "replay": {
+    "input": {
+      "packet_path": "replay/decision-input-0967-v2-normalized-v1.json",
+      "bytes": 1227,
+      "sha256": "53d42e9150ceb4d2995c1303f15213f439444d26e98acbf61e9ed15a3c7c30e2"
+    },
+    "output": {
+      "packet_path": "replay/decision-output-0967-v2-v1.json",
+      "bytes": 1530,
+      "sha256": "87871e6dc8eb28c5fc5f7eee9dd39225931e9aa92c153d52eb1b82199b1a3259"
+    },
+    "receipt": {
+      "packet_path": "replay/decision-replay-receipt-v1.json",
+      "bytes": 1201,
+      "sha256": "dbf0f8bd132af2429f50950ca60341476ea1457350047873a64b3c9e7f99ed88"
+    }
+  },
+  "prohibited_actions": [
+    "builds",
+    "workloads",
+    "new captures",
+    "historical evidence modification",
+    "performance or adoption claim"
+  ]
+}

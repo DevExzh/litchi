@@ -1,0 +1,17 @@
+{
+  "authoritative_audit_path": "/home/zhuhe/litchi-performance-0967/review/independent-raw-audit-0967-v2.json",
+  "authoritative_audit_sha256": "2712e39c456d7528c4c9347d6f085dd33253bf43d389d265b979ffee606b29ea",
+  "candidate_adoption": false,
+  "command": "/usr/bin/python3 tools/perf_decision.py --input /home/zhuhe/litchi-performance-0968/decision-input-0967-v2-normalized-v1.json --json-out /home/zhuhe/litchi-performance-0968/decision-output-0967-v2-v1.json",
+  "decision": "reject_candidate",
+  "exit_status": 0,
+  "historical_evidence_modified": false,
+  "input_path": "/home/zhuhe/litchi-performance-0968/decision-input-0967-v2-normalized-v1.json",
+  "input_sha256": "53d42e9150ceb4d2995c1303f15213f439444d26e98acbf61e9ed15a3c7c30e2",
+  "output_path": "/home/zhuhe/litchi-performance-0968/decision-output-0967-v2-v1.json",
+  "output_sha256": "87871e6dc8eb28c5fc5f7eee9dd39225931e9aa92c153d52eb1b82199b1a3259",
+  "schema": "litchi.performance.0968.decision_replay_receipt.v1",
+  "source_revision": "893072657ad8b1d726bfce351b5ec2e98f084e94",
+  "stdout": "{\"candidate_adoption\": false, \"decision\": \"reject_candidate\"}",
+  "utility_schema": "litchi.performance.qualification_decision.v1"
+}

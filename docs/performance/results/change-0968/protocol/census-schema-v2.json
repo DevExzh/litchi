@@ -1,0 +1,39 @@
+{
+  "schema": "litchi.performance.0968.cfb_commit_census.v2",
+  "schema_version": 2,
+  "timing_claim": false,
+  "warmups": 0,
+  "samples_requested": 1,
+  "one_variant": "instrumented_current_baseline",
+  "formal_children": 48,
+  "matrix": {
+    "cases": ["docnohf", "docfloat"],
+    "edits": [1, 2, 8, 32],
+    "retentions": ["zero", "default_8mib", "release_8mib"],
+    "repetitions_per_cell": 2
+  },
+  "census_fields": [
+    "commit_attempts", "commit_successes", "commit_errors",
+    "overlay_attempted", "overlay_success", "overlay_declined",
+    "overlay_error", "overlay_not_attempted",
+    "layout_attempted", "layout_reuse_success", "layout_non_reuse",
+    "layout_error", "capture_attempted", "capture_success",
+    "capture_error", "capture_streams", "capture_payload_bytes", "saturated"
+  ],
+  "forbidden_fields": ["elapsed_ns", "allocation", "allocator_instrumented", "metadata_projection"],
+  "successful_sample_conservation": [
+    "commit_attempts = commit_successes",
+    "overlay_attempted + overlay_not_attempted = commit_successes",
+    "overlay_attempted = overlay_success + overlay_declined",
+    "layout_attempted = layout_reuse_success + layout_non_reuse",
+    "capture_attempted = capture_success"
+  ],
+  "argv": [
+    "--case {docnohf|docfloat}",
+    "--input <fixture>",
+    "--edits {1|2|8|32}",
+    "--retention {zero|default|release}",
+    "--warmup 0",
+    "--samples 1"
+  ]
+}

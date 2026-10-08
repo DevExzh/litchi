@@ -1,0 +1,23 @@
+{
+  "schema": "litchi.performance.0968.seal_v4_validation.v1",
+  "artifact": {
+    "path": "/home/zhuhe/litchi-performance-0968/seal-v4.json",
+    "sha256": "a80424d394e36849a3abbb6d0c415dbd513e150fb9494f061e124137215e3245"
+  },
+  "duplicate_key_policy": "reject",
+  "parser": {
+    "implementation": "json.loads(object_pairs_hook=reject_duplicate_keys)",
+    "result": "pass",
+    "top_level_schema": "litchi.performance.0968.cfb_commit_census.seal.v4",
+    "schema_receipt_id": "litchi.performance.0968.cfb_commit_census.v2",
+    "top_level_duplicate_keys": false
+  },
+  "v3_preservation": {
+    "path": "/home/zhuhe/litchi-performance-0968/seal-v3.json",
+    "sha256": "d70f3ec086e8c590dd2af18177321da37f11ce5e848c14bfbe462065a487b72",
+    "preserved": true
+  },
+  "source_or_build_changes": false,
+  "formal_capture": false,
+  "review_state": "ready_for_staging_protocol_and_doc_census_review"
+}

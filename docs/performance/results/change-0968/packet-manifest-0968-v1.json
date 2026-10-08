@@ -1,0 +1,321 @@
+{
+  "schema": "litchi.performance.0968.packet-manifest.v1",
+  "status": "sealed_authoritative_audit_and_cleanup_complete",
+  "packet_root": "docs/performance/results/change-0968",
+  "self_excluded": true,
+  "file_count": 47,
+  "total_bytes": 759762,
+  "maximum_file_bytes": 117123,
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 6376,
+      "sha256": "3e6f2f154389a1ba6a0cb522bdfd44170b0ccc7640f63e26e3c68eadb3d32637"
+    },
+    {
+      "path": "analysis/census-summary-v1.json",
+      "bytes": 50259,
+      "sha256": "48fc947ac31ce136ea45f3c2b55143e00543e65ad6accd02f054424ab4304035"
+    },
+    {
+      "path": "analysis/v2/cfb-commit-attribution-v1.json",
+      "bytes": 85297,
+      "sha256": "e6f937fee96738866b0a19e8d0356bbe97397b346f21ecd02f5a397491863d49"
+    },
+    {
+      "path": "analysis/v2/cfb-commit-attribution-v1.md",
+      "bytes": 3837,
+      "sha256": "1e612750df98818e2a94e7bd4a5e9b7294a06d11ed519add06f3ba60bb1f3c7e"
+    },
+    {
+      "path": "protocol/census-plan-v2.md",
+      "bytes": 5344,
+      "sha256": "4abfb7a7aa32f9243bf818b8a0a28ceb86ddf5fb280a2ad36d32f8f1facd8881"
+    },
+    {
+      "path": "protocol/census-schema-v2.json",
+      "bytes": 1407,
+      "sha256": "bb0004a8cdf200d27099c4624a5226366de5024b279ed74f1f2f210de29dd963"
+    },
+    {
+      "path": "protocol/plan-0968-prospective-v6.json",
+      "bytes": 32587,
+      "sha256": "3ffcc37e7078f716082844ed0689bdfaf500e820ec5d2ca11a1c61bd47638797"
+    },
+    {
+      "path": "protocol/protocol-seal-0968-v3.json",
+      "bytes": 4689,
+      "sha256": "bc970a5f03fb45ec8c6257d1ea452b71db2d4e1babfa3a79dcd3135449a81a42"
+    },
+    {
+      "path": "protocol/seal-v4.json",
+      "bytes": 2883,
+      "sha256": "a80424d394e36849a3abbb6d0c415dbd513e150fb9494f061e124137215e3245"
+    },
+    {
+      "path": "provenance/adr-sha256-v1.txt",
+      "bytes": 3584,
+      "sha256": "25fc1d3085b40b5851ae4a3b12d27a80988784f2997834ede8731fc977fd7c57"
+    },
+    {
+      "path": "provenance/census-v6-binding-0968-v1.json",
+      "bytes": 8550,
+      "sha256": "ac49d66ae611daddfd5e809d351bf985939930756f29c6a97b8dd9c2222ab505"
+    },
+    {
+      "path": "provenance/pending-census-descriptor-0968-v1.json",
+      "bytes": 4819,
+      "sha256": "cb71693688ae67500c3ce04edde2eadd39c6048d86d1e5498bfd88b7561d4386"
+    },
+    {
+      "path": "provenance/provenance-diagnostic-v3.json",
+      "bytes": 7748,
+      "sha256": "64d7018c047b42389ba9e5b01d07d3ade1634ef55ca6bb2a8797d94d14de30e2"
+    },
+    {
+      "path": "provenance/retained-cpu-binding-0968-v1.json",
+      "bytes": 6035,
+      "sha256": "b9b3bf35b3a03a846a15257eba0b8196eb56f0c01f6bae8581c13eef024466f4"
+    },
+    {
+      "path": "provenance/source-provenance-v1.json",
+      "bytes": 3791,
+      "sha256": "af610d8430f11e0aac2907cd33f50a0229c3f2b44e69681ea9d95b29e5988140"
+    },
+    {
+      "path": "provenance/utility-binding-0968-v1.json",
+      "bytes": 1819,
+      "sha256": "1360a51420d784d74a2edf88b403bdb08bb4dc3233371fbffefc5de46057e63b"
+    },
+    {
+      "path": "receipts/build-cache-cleanup-v1.json",
+      "bytes": 8359,
+      "sha256": "0c45dde744f4f0488c0e737a6bdd46e1321db8f800b8d506ce63a0b956b8d5ee"
+    },
+    {
+      "path": "receipts/build-config-v3.json",
+      "bytes": 3339,
+      "sha256": "9796161240ae976e43f0b2c5a96749398f2f52097d6c022e99f27c58737bbc58"
+    },
+    {
+      "path": "receipts/cleanup-plan-v1.json",
+      "bytes": 8887,
+      "sha256": "53a0f919ed99a49751a0ab3ba6f0e51df836a23a3a0abb5306505ccad88dfef7"
+    },
+    {
+      "path": "receipts/root-go-v2.json",
+      "bytes": 958,
+      "sha256": "3ec3b54400bea1bef26522a974fb7494d66d58f2193a71913aff02e2371c5ab3"
+    },
+    {
+      "path": "replay/cfb-commit-attribution-v1.json",
+      "bytes": 85297,
+      "sha256": "ace7d5a9656613bfbe8c31149a8c8263710c5393516023908063f02e9e34ed01"
+    },
+    {
+      "path": "replay/cfb-commit-attribution-v1.md",
+      "bytes": 3837,
+      "sha256": "1e612750df98818e2a94e7bd4a5e9b7294a06d11ed519add06f3ba60bb1f3c7e"
+    },
+    {
+      "path": "replay/decision-input-0967-v2-normalized-v1.json",
+      "bytes": 1227,
+      "sha256": "53d42e9150ceb4d2995c1303f15213f439444d26e98acbf61e9ed15a3c7c30e2"
+    },
+    {
+      "path": "replay/decision-output-0967-v2-v1.json",
+      "bytes": 1530,
+      "sha256": "87871e6dc8eb28c5fc5f7eee9dd39225931e9aa92c153d52eb1b82199b1a3259"
+    },
+    {
+      "path": "replay/decision-replay-receipt-v1.json",
+      "bytes": 1201,
+      "sha256": "dbf0f8bd132af2429f50950ca60341476ea1457350047873a64b3c9e7f99ed88"
+    },
+    {
+      "path": "repro/README.md",
+      "bytes": 1183,
+      "sha256": "b8301d33ca8a3983ab423f02bd6521391706a1fb9bf5dddccdccc5e7422aea34"
+    },
+    {
+      "path": "repro/source-diagnostic-v2-code.patch",
+      "bytes": 117123,
+      "sha256": "039a76ea250adcdf5eaa11d5d7a2bef2a7f4b4c041e22450e9a83c4cf7f5cf68"
+    },
+    {
+      "path": "review/census-v2-incident-v1.json",
+      "bytes": 13939,
+      "sha256": "6a2e274d2b6bc34ad4d3c5aefba2966d18c945d711cc88f86e33955f3ce4e48d"
+    },
+    {
+      "path": "review/diagnostic-source-approval-v2.json",
+      "bytes": 3979,
+      "sha256": "fbde1c957dbe48ae6485c131a81cd5a59a950465243eeb3594b7e58eba1e0c6c"
+    },
+    {
+      "path": "review/incident-census-v5-per-edit-count-v2.json",
+      "bytes": 11066,
+      "sha256": "fe4656845ff26a4a3e1fc188c7739136b7dcd9fa8027da2fdcec157b88cbd6f4"
+    },
+    {
+      "path": "review/independent-raw-census-audit-v2-final-v1.json",
+      "bytes": 27912,
+      "sha256": "1fb1c5b5aaad32d8b55770d3e06917927b7cc6e4f7b7100ae02b2d58f6bb0333"
+    },
+    {
+      "path": "review/independent-review-0968-v1.json",
+      "bytes": 7716,
+      "sha256": "71b475363d4b62558115cfe3a152508e2c6fe724dd354836c08a18576a1553ed"
+    },
+    {
+      "path": "review/ordinary-oracle-equivalence-v1.json",
+      "bytes": 28337,
+      "sha256": "b01f9a3d76ad5a4a11537c21c3d84a78421cc449018f0acc084a173976020a75"
+    },
+    {
+      "path": "review/ordinary-output-oracle-v1.json",
+      "bytes": 6281,
+      "sha256": "2bfe13300e26560b191c9d624e5dc8e7e1c9aa2f07f0fb7fe130729b25d79d20"
+    },
+    {
+      "path": "review/perf-decision-independent-approval-v1.json",
+      "bytes": 4065,
+      "sha256": "a1af06aa16eaa79bba2a6a683567855aec64d662a0d961c491dfd0229ffb3b98"
+    },
+    {
+      "path": "review/protocol-approval-custody-incident-v1.json",
+      "bytes": 2965,
+      "sha256": "ed51390508d8795432637c954d2eeb58a9d9536dc8ebd865be646725056cd949"
+    },
+    {
+      "path": "review/protocol-approval-v2.json",
+      "bytes": 9628,
+      "sha256": "2d8468789f99de61042d74183ce8e680e1326d4d213e43f13995ae7d54150225"
+    },
+    {
+      "path": "review/protocol-approval-v3-amended-retained-v1.json",
+      "bytes": 10086,
+      "sha256": "dbd51169792a19350b2c308b6eb0d21746a72be08645bfab3ac9161a618bc70c"
+    },
+    {
+      "path": "review/seal-v4-validation-correction-v1.json",
+      "bytes": 900,
+      "sha256": "44fa159ec9c1fdd6f4776be6961c5979f47038a62b8bddf6304ce75300cbfbee"
+    },
+    {
+      "path": "review/seal-v4-validation-v1.json",
+      "bytes": 900,
+      "sha256": "fd5bad4dec9ef59a7294ea455a29f9ed80d5d655a2fe981b8b8f76bf1d21432c"
+    },
+    {
+      "path": "tools/analyze_cfb_commit_v1.py",
+      "bytes": 32759,
+      "sha256": "a7c720784f8dc82f68e02ad3dff576ce60ed9593d5dc99ad2fd0996771510fc0"
+    },
+    {
+      "path": "tools/cfb_census_schema_0968_v3.py",
+      "bytes": 37259,
+      "sha256": "e0a9c9e7a853acda3fe81a5a80e6ba480d30b15b0e27a3005b596d27e1a801ab"
+    },
+    {
+      "path": "tools/independent_raw_census_audit_0968_v2.py",
+      "bytes": 53670,
+      "sha256": "5d26d4dbdee0a4b9edda5a91a4d25a15c09aa8cdab83320e0e31f3303946b5c0"
+    },
+    {
+      "path": "tools/prepare_cfb_commit_census_0968_v3.py",
+      "bytes": 10747,
+      "sha256": "7b2578f23773f57445fc39e791f444e11e2ca46957a6157af9d34bffdc964040"
+    },
+    {
+      "path": "tools/reduce_cfb_commit_census_0968_v3.py",
+      "bytes": 13852,
+      "sha256": "934d4aed6b29ecb9c942102a7b3620d36e9b82a530618f56b9c68ac0ecacdf78"
+    },
+    {
+      "path": "tools/run_cfb_commit_census_0968_v3.py",
+      "bytes": 16072,
+      "sha256": "4da008925026dd95769ee9758017fe02b6c1d9795ee1393e80364322d0791567"
+    },
+    {
+      "path": "tools/test_cfb_commit_census_0968_v3.py",
+      "bytes": 5663,
+      "sha256": "1e039f7a400a5be791c3262e9522c943c5d2ac66a121b05132a2eee532f9c1b7"
+    }
+  ],
+  "external_roots": {
+    "performance_root": "/home/zhuhe/litchi-performance-0968",
+    "retained_0942_root": "/home/zhuhe/litchi-performance-0942",
+    "raw_capture_copied": false,
+    "binaries_copied": false,
+    "v6_capture_manifest": {
+      "path": "/home/zhuhe/litchi-performance-0968/capture/census-v6/capture-manifest-v3.json",
+      "bytes": 94568,
+      "sha256": "7f36d3ed05d89ab1ede777703c27536518116c47e8bef91955396c573ed715d9"
+    },
+    "v6_raw_children": "/home/zhuhe/litchi-performance-0968/capture/census-v6 (external only)"
+  },
+  "canonical_cpu": {
+    "json_sha256": "e6f937fee96738866b0a19e8d0356bbe97397b346f21ecd02f5a397491863d49",
+    "markdown_sha256": "1e612750df98818e2a94e7bd4a5e9b7294a06d11ed519add06f3ba60bb1f3c7e",
+    "analyzer_sha256": "a7c720784f8dc82f68e02ad3dff576ce60ed9593d5dc99add2fd0996771510fc0",
+    "independent_review_sha256": "71b475363d4b62558115cfe3a1525085e2c6fe724dd354836c08a18576a1553ed",
+    "utility_approval_sha256": "a1af06aa16eaa79bba2a6a683567855aec64d662a0d961c491dfd0229ffb3b98"
+  },
+  "canonical_census": {
+    "summary_sha256": "48fc947ac31ce136ea45f3c2b55143e00543e65ad6accd02f054424ab4304035",
+    "plan_sha256": "3ffcc37e7078f716082844ed0689bdfaf500e820ec5d2ca11a1c61bd47638797",
+    "protocol_seal_sha256": "bc970a5f03fb45ec8c6257d1ea452b71db2d4e1babfa3a79dcd3135449a81a42",
+    "root_go_sha256": "3ec3b54400bea1bef26522a974fb7494d66d58f2193a71913aff02e2371c5ab3",
+    "protocol_approval_v2_sha256": "2d8468789f99de61042d74183ce8e680e1326d4d213e43f13995ae7d54150225",
+    "protocol_approval_v3_amended_sha256": "dbd51169792a19350b2c308b6eb0d21746a72be08645bfab3ac9161a618bc70c",
+    "protocol_approval_custody_incident_sha256": "ed51390508d8795432637c954d2eeb58a9d9536dc8ebd865be646725056cd949",
+    "raw_audit_sha256": "1fb1c5b5aaad32d8b55770d3e06917927b7cc6e4f7b7100ae02b2d58f6bb0333",
+    "raw_audit_helper_sha256": "5d26d4dbdee0a4b9edda5a91a4d25a15c09aa8cdab83320e0e31f3303946b5c0",
+    "v5_incident_sha256": "6a2e274d2b6bc34ad4d3c5aefba2966d18c945d711cc88f86e33955f3ce4e48d",
+    "v5_independent_incident_sha256": "fe4656845ff26a4a3e1fc188c7739136b7dcd9fa8027da2fdcec157b88cbd6f4"
+  },
+  "cleanup": {
+    "path": "receipts/build-cache-cleanup-v1.json",
+    "external_path": "/home/zhuhe/litchi-performance-0968/receipts/build-cache-cleanup-v1.json",
+    "bytes": 8359,
+    "sha256": "0c45dde744f4f0488c0e737a6bdd46e1321db8f800b8d506ce63a0b956b8d5ee",
+    "status": "completed",
+    "total_disk_bytes_freed": 8896917504,
+    "total_apparent_bytes_freed": 8873491101,
+    "retained_executable_sha256": "50693dd8d2e7562f69c86d08872246f1a5d040be9f4f42fc850ed9c0a309dac9"
+  },
+  "record_links": [
+    {
+      "repository_path": "docs/performance/0968-cfb-commit-census.md",
+      "packet_relative_link": "../../0968-cfb-commit-census.md",
+      "status": "diagnostic_only_no_adoption"
+    }
+  ],
+  "source_seal": {
+    "path": "protocol/seal-v4.json",
+    "sha256": "a80424d394e36849a3abbb6d0c415dbd513e150fb9494f061e124137215e3245",
+    "excluded_historical_duplicates": [
+      "seal-v2.json",
+      "seal-v3.json"
+    ],
+    "validation_receipt": {
+      "path": "review/seal-v4-validation-v1.json",
+      "sha256": "fd5bad4dec9ef59a7294ea455a29f9ed80d5d655a2fe981b8b8f76bf1d21432c"
+    },
+    "validation_correction": {
+      "path": "review/seal-v4-validation-correction-v1.json",
+      "sha256": "44fa159ec9c1fdd6f4776be6961c5979f47038a62b8bddf6304ce75300cbfbee",
+      "corrected_field": "v3_preservation.sha256",
+      "corrected_descriptor_sha256": "d70f3ec086e8c590dd2af18177321da37f11ce5e848c14bfbe462065a487b72d"
+    }
+  },
+  "claim_scope": {
+    "diagnostic_only": true,
+    "performance": false,
+    "timing": false,
+    "allocation_total": false,
+    "causality": false,
+    "adoption": false
+  }
+}

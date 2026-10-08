@@ -1,0 +1,98 @@
+{
+  "canonical_sealed_artifacts": [
+    {
+      "bytes": 32587,
+      "external_path": "/home/zhuhe/litchi-performance-0968/plans/plan-0968-prospective-v6.json",
+      "packet_path": "protocol/plan-0968-prospective-v6.json",
+      "sha256": "3ffcc37e7078f716082844ed0689bdfaf500e820ec5d2ca11a1c61bd47638797"
+    },
+    {
+      "bytes": 4689,
+      "external_path": "/home/zhuhe/litchi-performance-0968/receipts/protocol-seal-0968-v3.json",
+      "packet_path": "protocol/protocol-seal-0968-v3.json",
+      "sha256": "bc970a5f03fb45ec8c6257d1ea452b71db2d4e1babfa3a79dcd3135449a81a42"
+    },
+    {
+      "bytes": 958,
+      "external_path": "/home/zhuhe/litchi-performance-0968/receipts/root-go-v2.json",
+      "packet_path": "receipts/root-go-v2.json",
+      "sha256": "3ec3b54400bea1bef26522a974fb7494d66d58f2193a71913aff02e2371c5ab3"
+    },
+    {
+      "bytes": 50259,
+      "external_path": "/home/zhuhe/litchi-performance-0968/analysis/census-summary-v1.json",
+      "packet_path": "analysis/census-summary-v1.json",
+      "sha256": "48fc947ac31ce136ea45f3c2b55143e00543e65ad6accd02f054424ab4304035"
+    },
+    {
+      "bytes": 27912,
+      "external_path": "/home/zhuhe/litchi-performance-0968/review/independent-raw-census-audit-v2-final-v1.json",
+      "packet_path": "review/independent-raw-census-audit-v2-final-v1.json",
+      "sha256": "1fb1c5b5aaad32d8b55770d3e06917927b7cc6e4f7b7100ae02b2d58f6bb0333"
+    }
+  ],
+  "cleanup_receipt": {
+    "bytes": 8359,
+    "external_path": "/home/zhuhe/litchi-performance-0968/receipts/build-cache-cleanup-v1.json",
+    "packet_path": "receipts/build-cache-cleanup-v1.json",
+    "retained_executable_sha256": "50693dd8d2e7562f69c86d08872246f1a5d040be9f4f42fc850ed9c0a309dac9",
+    "sha256": "0c45dde744f4f0488c0e737a6bdd46e1321db8f800b8d506ce63a0b956b8d5ee",
+    "status": "completed",
+    "total_apparent_bytes_freed": 8873491101,
+    "total_disk_bytes_freed": 8896917504
+  },
+  "final_audit": {
+    "decision": "diagnostic_only_no_adoption",
+    "packet_path": "review/independent-raw-census-audit-v2-final-v1.json",
+    "sha256": "1fb1c5b5aaad32d8b55770d3e06917927b7cc6e4f7b7100ae02b2d58f6bb0333",
+    "status": "pass"
+  },
+  "historical_invalid_v5": {
+    "incident_packet_path": "review/census-v2-incident-v1.json",
+    "incident_sha256": "6a2e274d2b6bc34ad4d3c5aefba2966d18c945d711cc88f86e33955f3ce4e48d",
+    "independent_incident_packet_path": "review/incident-census-v5-per-edit-count-v2.json",
+    "independent_incident_sha256": "fe4656845ff26a4a3e1fc188c7739136b7dcd9fa8027da2fdcec157b88cbd6f4",
+    "status": "preserved_invalid_excluded_from_formal_evidence"
+  },
+  "protocol_reviews": {
+    "amended_v3": {
+      "binding": "supplemental_history",
+      "bytes": 10086,
+      "external_path": "/home/zhuhe/litchi-performance-0968/review/protocol-approval-v3-amended-retained-v1.json",
+      "packet_path": "review/protocol-approval-v3-amended-retained-v1.json",
+      "sha256": "dbd51169792a19350b2c308b6eb0d21746a72be08645bfab3ac9161a618bc70c"
+    },
+    "custody_incident": {
+      "bytes": 2965,
+      "external_path": "/home/zhuhe/litchi-performance-0968/review/protocol-approval-custody-incident-v1.json",
+      "packet_path": "review/protocol-approval-custody-incident-v1.json",
+      "sha256": "ed51390508d8795432637c954d2eeb58a9d9536dc8ebd865be646725056cd949"
+    },
+    "original_v2": {
+      "binding": "root-go-v2",
+      "bytes": 9628,
+      "external_path": "/home/zhuhe/litchi-performance-0968/review/protocol-approval-v2.json",
+      "packet_path": "review/protocol-approval-v2.json",
+      "sha256": "2d8468789f99de61042d74183ce8e680e1326d4d213e43f13995ae7d54150225"
+    }
+  },
+  "rule": "Raw capture children, profiler/raw streams, source exports, target directories, and compiled executables remain external. Only bounded descriptors, summaries, plans, reviews, helpers, and receipts are canonical packet files. v5 is historical incident evidence and is excluded from formal claims. Cleanup is complete under the receipt binding above.",
+  "schema": "litchi.performance.0968.pending-census-descriptor.v1",
+  "source_baseline": "/home/zhuhe/litchi-performance-0968/source-baseline",
+  "source_diagnostic": "/home/zhuhe/litchi-performance-0968/source-diagnostic",
+  "status": "v6_capture_and_independent_audit_and_cleanup_complete",
+  "v6_capture": {
+    "cells": 24,
+    "children": 48,
+    "manifest": {
+      "bytes": 94568,
+      "path": "/home/zhuhe/litchi-performance-0968/capture/census-v6/capture-manifest-v3.json",
+      "sha256": "7f36d3ed05d89ab1ede777703c27536518116c47e8bef91955396c573ed715d9"
+    },
+    "raw_capture_copied": false,
+    "raw_children_external_only": true,
+    "retry_count": 0,
+    "root": "/home/zhuhe/litchi-performance-0968/capture/census-v6",
+    "status": "complete_reduced_and_independently_audited"
+  }
+}

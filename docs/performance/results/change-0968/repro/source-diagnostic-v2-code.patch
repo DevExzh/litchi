@@ -1,0 +1,3242 @@
+--- a/crates/litchi-ole-common/src/lib.rs
++++ b/crates/litchi-ole-common/src/lib.rs
+@@ -9,6 +9,8 @@
+ pub mod dataspaces;
+ pub mod leniency;
+ pub mod object;
++#[cfg(feature = "performance-diagnostics")]
++pub use object::census as performance_census;
+ pub mod ole1;
+ pub mod ole_streams;
+ pub mod property_set;
+--- a/crates/litchi-ole-common/src/object/mod.rs
++++ b/crates/litchi-ole-common/src/object/mod.rs
+@@ -8,6 +8,8 @@
+ //! metadata also have inert typed projections so format crates do not need to
+ //! rescan CFB names or reimplement bounded stream validation.
+ 
++#[cfg(feature = "performance-diagnostics")]
++pub mod census;
+ mod cfb_path;
+ mod codec;
+ pub mod directory;
+--- a/crates/litchi-ole-common/src/object/census.rs
++++ b/crates/litchi-ole-common/src/object/census.rs
+@@ -0,0 +1,465 @@
++//! Fixed-size diagnostics for the staged CFB commit path.
++//!
++//! The observer is intentionally feature gated.  It records only scalar
++//! route and capture counters while an operation-local commit is active; it
++//! never retains input bytes, stream names, or event records.
++
++use std::cell::RefCell;
++
++/// One bounded operation-local CFB commit census.
++#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
++pub struct Census {
++    pub commit_attempts: u64,
++    pub commit_successes: u64,
++    pub commit_errors: u64,
++    pub overlay_attempted: u64,
++    pub overlay_success: u64,
++    pub overlay_declined: u64,
++    pub overlay_error: u64,
++    pub overlay_not_attempted: u64,
++    pub layout_attempted: u64,
++    pub layout_reuse_success: u64,
++    pub layout_non_reuse: u64,
++    pub layout_error: u64,
++    pub capture_attempted: u64,
++    pub capture_success: u64,
++    pub capture_error: u64,
++    pub capture_streams: u64,
++    pub capture_payload_bytes: u64,
++    pub saturated: bool,
++}
++
++#[derive(Clone, Copy, Debug, Default)]
++struct State {
++    census: Census,
++    session_active: bool,
++    commit_active: bool,
++    render_active: bool,
++    capture_active: bool,
++}
++
++impl State {
++    const fn new() -> Self {
++        Self {
++            census: Census {
++                commit_attempts: 0,
++                commit_successes: 0,
++                commit_errors: 0,
++                overlay_attempted: 0,
++                overlay_success: 0,
++                overlay_declined: 0,
++                overlay_error: 0,
++                overlay_not_attempted: 0,
++                layout_attempted: 0,
++                layout_reuse_success: 0,
++                layout_non_reuse: 0,
++                layout_error: 0,
++                capture_attempted: 0,
++                capture_success: 0,
++                capture_error: 0,
++                capture_streams: 0,
++                capture_payload_bytes: 0,
++                saturated: false,
++            },
++            session_active: false,
++            commit_active: false,
++            render_active: false,
++            capture_active: false,
++        }
++    }
++}
++
++thread_local! {
++    static STATE: RefCell<State> = RefCell::new(State::new());
++}
++
++fn with_state(function: impl FnOnce(&mut State)) {
++    STATE.with(|state| function(&mut state.borrow_mut()));
++}
++
++fn add(value: &mut u64, amount: u64) -> bool {
++    match value.checked_add(amount) {
++        Some(next) => {
++            *value = next;
++            false
++        },
++        None => {
++            *value = u64::MAX;
++            true
++        },
++    }
++}
++
++/// Starts a fresh operation-local census on the current thread.
++#[must_use]
++pub fn begin() -> Session {
++    with_state(|state| {
++        state.census = Census::default();
++        state.session_active = true;
++        state.commit_active = false;
++        state.render_active = false;
++        state.capture_active = false;
++    });
++    Session { finished: false }
++}
++
++/// Owns one operation-local census.
++#[derive(Debug)]
++pub struct Session {
++    finished: bool,
++}
++
++impl Session {
++    /// Finishes and returns the bounded counters.
++    #[must_use]
++    pub fn finish(mut self) -> Census {
++        self.finished = true;
++        STATE.with(|state| {
++            let mut state = state.borrow_mut();
++            state.session_active = false;
++            state.commit_active = false;
++            state.render_active = false;
++            state.capture_active = false;
++            state.census
++        })
++    }
++}
++
++impl Drop for Session {
++    fn drop(&mut self) {
++        if !self.finished {
++            with_state(|state| {
++                state.session_active = false;
++                state.commit_active = false;
++                state.render_active = false;
++                state.capture_active = false;
++            });
++        }
++    }
++}
++
++/// Scope for one staged object commit.  An uncompleted scope is an error,
++/// including every early-return path in the renderer, parser, or discovery.
++pub(crate) struct CommitScope {
++    active: bool,
++    finished: bool,
++}
++
++pub(crate) fn begin_commit() -> CommitScope {
++    let active = STATE.with(|state| {
++        let mut state = state.borrow_mut();
++        if !state.session_active || state.commit_active {
++            return false;
++        }
++        state.commit_active = true;
++        state.render_active = false;
++        if add(&mut state.census.commit_attempts, 1) {
++            state.census.saturated = true;
++        }
++        true
++    });
++    CommitScope {
++        active,
++        finished: false,
++    }
++}
++
++impl CommitScope {
++    pub(crate) fn overlay_not_attempted(&self) {
++        if self.active {
++            with_state(|state| {
++                if add(&mut state.census.overlay_not_attempted, 1) {
++                    state.census.saturated = true;
++                }
++            });
++        }
++    }
++
++    pub(crate) fn overlay_attempted(&self) {
++        if self.active {
++            with_state(|state| {
++                if add(&mut state.census.overlay_attempted, 1) {
++                    state.census.saturated = true;
++                }
++            });
++        }
++    }
++
++    pub(crate) fn overlay_success(&self) {
++        if self.active {
++            with_state(|state| {
++                if add(&mut state.census.overlay_success, 1) {
++                    state.census.saturated = true;
++                }
++            });
++        }
++    }
++
++    pub(crate) fn overlay_declined(&self) {
++        if self.active {
++            with_state(|state| {
++                if add(&mut state.census.overlay_declined, 1) {
++                    state.census.saturated = true;
++                }
++            });
++        }
++    }
++
++    pub(crate) fn overlay_error(&self) {
++        if self.active {
++            with_state(|state| {
++                if add(&mut state.census.overlay_error, 1) {
++                    state.census.saturated = true;
++                }
++            });
++        }
++    }
++
++    pub(crate) fn finish_success(&mut self) {
++        if self.active && !self.finished {
++            with_state(|state| {
++                if add(&mut state.census.commit_successes, 1) {
++                    state.census.saturated = true;
++                }
++                state.commit_active = false;
++                state.render_active = false;
++            });
++            self.finished = true;
++        }
++    }
++}
++
++impl Drop for CommitScope {
++    fn drop(&mut self) {
++        if self.active && !self.finished {
++            with_state(|state| {
++                if add(&mut state.census.commit_errors, 1) {
++                    state.census.saturated = true;
++                }
++                state.commit_active = false;
++                state.render_active = false;
++            });
++        }
++    }
++}
++
++/// Scope for one post-render package capture.
++pub(crate) struct CaptureScope {
++    active: bool,
++    finished: bool,
++}
++
++pub(crate) fn begin_capture() -> CaptureScope {
++    let active = STATE.with(|state| {
++        let mut state = state.borrow_mut();
++        if !state.session_active || !state.commit_active {
++            return false;
++        }
++        state.capture_active = true;
++        if add(&mut state.census.capture_attempted, 1) {
++            state.census.saturated = true;
++        }
++        true
++    });
++    CaptureScope {
++        active,
++        finished: false,
++    }
++}
++
++/// Scope for the main candidate renderer. Discovery can serialize selected
++/// objects later in the commit, so layout observations require this narrower
++/// phase in addition to the whole commit scope.
++pub(crate) struct RenderScope {
++    active: bool,
++}
++
++pub(crate) fn begin_render() -> RenderScope {
++    let active = STATE.with(|state| {
++        let mut state = state.borrow_mut();
++        if !state.session_active || !state.commit_active || state.render_active {
++            return false;
++        }
++        state.render_active = true;
++        true
++    });
++    RenderScope { active }
++}
++
++impl Drop for RenderScope {
++    fn drop(&mut self) {
++        if self.active {
++            with_state(|state| {
++                state.render_active = false;
++            });
++        }
++    }
++}
++
++pub(crate) fn record_capture_stream(bytes: usize) {
++    STATE.with(|state| {
++        let mut state = state.borrow_mut();
++        if !state.session_active || !state.commit_active || !state.capture_active {
++            return;
++        }
++        if add(&mut state.census.capture_streams, 1) {
++            state.census.saturated = true;
++        }
++        if add(&mut state.census.capture_payload_bytes, bytes as u64) {
++            state.census.saturated = true;
++        }
++    });
++}
++
++impl CaptureScope {
++    pub(crate) fn finish_success(&mut self) {
++        if self.active && !self.finished {
++            with_state(|state| {
++                if add(&mut state.census.capture_success, 1) {
++                    state.census.saturated = true;
++                }
++                state.capture_active = false;
++            });
++            self.finished = true;
++        }
++    }
++}
++
++impl Drop for CaptureScope {
++    fn drop(&mut self) {
++        if self.active && !self.finished {
++            with_state(|state| {
++                if add(&mut state.census.capture_error, 1) {
++                    state.census.saturated = true;
++                }
++                state.capture_active = false;
++            });
++        }
++    }
++}
++
++/// One serialization route observation.  An uncompleted scope records an
++/// error, including writer setup and write failures.
++pub(crate) struct LayoutScope {
++    active: bool,
++    finished: bool,
++}
++
++pub(crate) fn begin_layout() -> LayoutScope {
++    let active = STATE.with(|state| {
++        let mut state = state.borrow_mut();
++        if !state.session_active || !state.commit_active || !state.render_active {
++            return false;
++        }
++        if add(&mut state.census.layout_attempted, 1) {
++            state.census.saturated = true;
++        }
++        true
++    });
++    LayoutScope {
++        active,
++        finished: false,
++    }
++}
++
++impl LayoutScope {
++    pub(crate) fn reused(&mut self) {
++        if self.active && !self.finished {
++            with_state(|state| {
++                if add(&mut state.census.layout_reuse_success, 1) {
++                    state.census.saturated = true;
++                }
++            });
++            self.finished = true;
++        }
++    }
++
++    pub(crate) fn non_reused(&mut self) {
++        if self.active && !self.finished {
++            with_state(|state| {
++                if add(&mut state.census.layout_non_reuse, 1) {
++                    state.census.saturated = true;
++                }
++            });
++            self.finished = true;
++        }
++    }
++
++    pub(crate) fn error(&mut self) {
++        if self.active && !self.finished {
++            with_state(|state| {
++                if add(&mut state.census.layout_error, 1) {
++                    state.census.saturated = true;
++                }
++            });
++            self.finished = true;
++        }
++    }
++}
++
++impl Drop for LayoutScope {
++    fn drop(&mut self) {
++        if self.active && !self.finished {
++            with_state(|state| {
++                if add(&mut state.census.layout_error, 1) {
++                    state.census.saturated = true;
++                }
++            });
++        }
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::{begin, begin_commit, begin_layout, begin_render};
++
++    #[test]
++    fn census_resets_and_balances_success() {
++        let session = begin();
++        let mut commit = begin_commit();
++        commit.overlay_not_attempted();
++        commit.finish_success();
++        let census = session.finish();
++        assert_eq!(census.commit_attempts, 1);
++        assert_eq!(census.commit_successes, 1);
++        assert_eq!(census.commit_errors, 0);
++        assert_eq!(census.overlay_not_attempted, 1);
++
++        let session = begin();
++        let census = session.finish();
++        assert_eq!(census, super::Census::default());
++    }
++
++    #[test]
++    fn abandoned_commit_is_an_error() {
++        let session = begin();
++        {
++            let _commit = begin_commit();
++        }
++        let census = session.finish();
++        assert_eq!(census.commit_attempts, 1);
++        assert_eq!(census.commit_errors, 1);
++    }
++
++    #[test]
++    fn layout_requires_the_narrow_render_phase() {
++        let session = begin();
++        let mut commit = begin_commit();
++        let _render = begin_render();
++        let mut layout = begin_layout();
++        layout.non_reused();
++        commit.finish_success();
++        let census = session.finish();
++        assert_eq!(census.layout_attempted, 1);
++        assert_eq!(census.layout_non_reuse, 1);
++
++        let session = begin();
++        let mut commit = begin_commit();
++        let mut layout = begin_layout();
++        layout.error();
++        commit.finish_success();
++        let census = session.finish();
++        assert_eq!(census.layout_attempted, 0);
++        assert_eq!(census.layout_error, 0);
++    }
++}
+--- a/crates/litchi-ole-common/src/object/editor.rs
++++ b/crates/litchi-ole-common/src/object/editor.rs
+@@ -975,20 +975,43 @@
+     }
+ 
+     fn commit_candidate_with_rendered(mut self) -> Result<(Self, Vec<u8>), OleError> {
++        #[cfg(feature = "performance-diagnostics")]
++        let mut census = super::census::begin_commit();
+         self.package.check(self.limits)?;
+-        let rendered = if self.layout == SectorLayoutPolicy::Reuse {
+-            self.package
+-                .render_copy_through(&self.base_package, &self.original, self.limits)?
+-                .map_or_else(
+-                    || {
++        let rendered = {
++            #[cfg(feature = "performance-diagnostics")]
++            let _render = super::census::begin_render();
++            if self.layout == SectorLayoutPolicy::Reuse {
++                #[cfg(feature = "performance-diagnostics")]
++                census.overlay_attempted();
++                match self.package.render_copy_through(
++                    &self.base_package,
++                    &self.original,
++                    self.limits,
++                ) {
++                    Ok(Some(rendered)) => {
++                        #[cfg(feature = "performance-diagnostics")]
++                        census.overlay_success();
++                        rendered
++                    },
++                    Ok(None) => {
++                        #[cfg(feature = "performance-diagnostics")]
++                        census.overlay_declined();
+                         self.package
+-                            .render_with_layout(Some(self.original.as_slice()), self.layout)
++                            .render_with_layout(Some(self.original.as_slice()), self.layout)?
+                     },
+-                    Ok,
+-                )?
+-        } else {
+-            self.package
+-                .render_with_layout(Some(self.original.as_slice()), self.layout)?
++                    Err(error) => {
++                        #[cfg(feature = "performance-diagnostics")]
++                        census.overlay_error();
++                        return Err(error);
++                    },
++                }
++            } else {
++                #[cfg(feature = "performance-diagnostics")]
++                census.overlay_not_attempted();
++                self.package
++                    .render_with_layout(Some(self.original.as_slice()), self.layout)?
++            }
+         };
+         let mut check = OleFile::open(Cursor::new(rendered.as_slice()))?;
+         codec::open(&check, self.limits.max_package_directory_entries())?;
+@@ -997,6 +1020,8 @@
+         self.package = parsed;
+         self.objects = discovery::from_package(&self.package, &self.targets, self.limits)?;
+         self.changed = true;
++        #[cfg(feature = "performance-diagnostics")]
++        census.finish_success();
+         Ok((self, rendered))
+     }
+ }
+--- a/crates/litchi-ole-common/src/object/codec.rs
++++ b/crates/litchi-ole-common/src/object/codec.rs
+@@ -29,14 +29,21 @@
+         ole: &mut OleFile<R>,
+         limits: Limits,
+     ) -> Result<Self, OleError> {
+-        Self::capture_with_budget(
++        #[cfg(feature = "performance-diagnostics")]
++        let mut census = super::census::begin_capture();
++        let result = Self::capture_with_budget(
+             ole,
+             limits,
+             limits.max_package_storages(),
+             limits.max_streams,
+             limits.max_total_size,
+             true,
+-        )
++        );
++        #[cfg(feature = "performance-diagnostics")]
++        if result.is_ok() {
++            census.finish_success();
++        }
++        result
+     }
+ 
+     /// Captures a standalone replacement/object compound file.  The file is
+@@ -641,6 +648,8 @@
+         source: Option<&[u8]>,
+         policy: SectorLayoutPolicy,
+     ) -> Result<Vec<u8>, OleError> {
++        #[cfg(feature = "performance-diagnostics")]
++        let mut census = super::census::begin_layout();
+         let mut writer = OleWriter::with_sector_size(self.sector_size)?;
+         writer.set_sector_layout_policy(policy);
+         if let Some(source) = source {
+@@ -719,6 +728,12 @@
+         }
+         let mut output = Cursor::new(Vec::new());
+         writer.write_to(&mut output)?;
++        #[cfg(feature = "performance-diagnostics")]
++        match writer.last_sector_layout() {
++            Some(report) if report.reused_source_layout() => census.reused(),
++            Some(_) => census.non_reused(),
++            None => census.error(),
++        }
+         Ok(output.into_inner())
+     }
+ 
+@@ -1203,6 +1218,8 @@
+                         "stream {child:?} size changed during capture"
+                     )));
+                 }
++                #[cfg(feature = "performance-diagnostics")]
++                super::census::record_capture_stream(data.len());
+                 package
+                     .streams
+                     .try_reserve(1)
+@@ -1276,6 +1293,8 @@
+                         "object stream size changed during capture".into(),
+                     ));
+                 }
++                #[cfg(feature = "performance-diagnostics")]
++                super::census::record_capture_stream(data.len());
+                 package
+                     .streams
+                     .try_reserve(1)
+--- a/tools/perf-cfb-census-0968/Cargo.toml
++++ b/tools/perf-cfb-census-0968/Cargo.toml
+@@ -0,0 +1,23 @@
++[package]
++name = "doc-cfb-commit-census-0968"
++version = "0.1.0"
++edition = "2024"
++publish = false
++
++[workspace]
++
++[[bin]]
++name = "doc_cfb_commit_census_0968"
++path = "src/main.rs"
++
++[dependencies]
++litchi-cfb = { path = "../../crates/litchi-cfb" }
++litchi-core = { path = "../../crates/litchi-core" }
++litchi-doc = { path = "../../crates/litchi-doc", features = ["performance-diagnostics"] }
++litchi-ole-common = { path = "../../crates/litchi-ole-common", features = ["performance-diagnostics"] }
++serde = { version = "1", features = ["derive"] }
++serde_json = "1"
++sha2 = "0.11"
++
++[profile.release]
++debug = 1
+--- a/tools/perf-cfb-census-0968/README.md
++++ b/tools/perf-cfb-census-0968/README.md
+@@ -0,0 +1,4 @@
++# 0968 staged CFB commit census
++
++Diagnostic-only external harness. It reports fixed route and post-render capture
++counters with `timing_claim: false`; it has no clock or allocator lane.
+--- a/tools/perf-cfb-census-0968/src/main.rs
++++ b/tools/perf-cfb-census-0968/src/main.rs
+@@ -0,0 +1,3 @@
++fn main() -> Result<(), doc_cfb_commit_census_0968::BoxError> {
++    doc_cfb_commit_census_0968::run()
++}
+--- a/tools/perf-cfb-census-0968/src/lib.rs
++++ b/tools/perf-cfb-census-0968/src/lib.rs
+@@ -0,0 +1,998 @@
++//! Current-source staged CFB commit census for the 0968 handoff investigation.
++//!
++//! This crate is an evidence harness. It does not add production code or
++//! call a private optimization seam. The public lifecycle under observation
++//! is `Snapshot::open_bounded` -> one `Edit` with repeated paragraph-zero
++//! replacements -> `commit` -> output `Vec` copy. The ordinary binary reports
++//! The diagnostic binary reports only fixed route and post-render capture
++//! counters. It has no clock and no allocator lane; correctness and output
++//! hashing happen outside the counter session.
++
++use std::error::Error;
++use std::fmt::{Display, Formatter};
++use std::hint::black_box;
++use std::io::Cursor;
++use std::path::PathBuf;
++use std::sync::Arc;
++
++use litchi_core::Position;
++use litchi_doc::Package;
++use litchi_doc::body_text::{Error as BodyError, Projection, Refusal, Snapshot, TransactionLimits};
++use litchi_doc::tracked_revision::Limits;
++use litchi_ole_common::performance_census;
++use serde::Serialize;
++use sha2::{Digest, Sha256};
++
++mod oracle_0730;
++
++pub type BoxError = Box<dyn Error>;
++
++const MAX_EDIT_STAGES: usize = 32;
++const DEFAULT_RETAINED_RENDER_BYTES: usize = 8 * 1024 * 1024;
++const DEFAULT_WARMUPS: usize = 0;
++const DEFAULT_SAMPLES: usize = 1;
++const MAX_WARMUPS: usize = 10_000;
++const MAX_SAMPLES: usize = 10_000;
++
++// These are intentionally the exact two texts retained by the 0730 probe.
++const FIRST_TEXT: &str = "litchi copy-through baseline replacement text";
++const SECOND_TEXT: &str = "litchi retained render second replacement text";
++
++const NO_HEAD_FOOT_SHA256: &str =
++    "45e5df073f34314da6f39d2dad119fb2ef23470878fd2df67f632864cd92ea48";
++const FLOATING_PICTURES_SHA256: &str =
++    "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d";
++
++#[derive(Debug)]
++struct ProbeError(String);
++
++impl Display for ProbeError {
++    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
++        formatter.write_str(&self.0)
++    }
++}
++
++impl Error for ProbeError {}
++
++fn failure<T>(message: impl Into<String>) -> Result<T, BoxError> {
++    Err(Box::new(ProbeError(message.into())))
++}
++
++#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
++enum Case {
++    #[serde(rename = "docnohf")]
++    DocNoHf,
++    #[serde(rename = "docfloat")]
++    DocFloat,
++}
++
++impl Case {
++    fn parse(value: &str) -> Result<Self, BoxError> {
++        match value {
++            "docnohf" => Ok(Self::DocNoHf),
++            "docfloat" => Ok(Self::DocFloat),
++            other => failure(format!("unknown --case {other:?}")),
++        }
++    }
++
++    const fn name(self) -> &'static str {
++        match self {
++            Self::DocNoHf => "docnohf",
++            Self::DocFloat => "docfloat",
++        }
++    }
++
++    const fn expected_bytes(self) -> usize {
++        match self {
++            Self::DocNoHf => 26_112,
++            Self::DocFloat => 335_360,
++        }
++    }
++
++    const fn expected_sha256(self) -> &'static str {
++        match self {
++            Self::DocNoHf => NO_HEAD_FOOT_SHA256,
++            Self::DocFloat => FLOATING_PICTURES_SHA256,
++        }
++    }
++}
++
++#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
++enum EditCount {
++    #[serde(rename = "1")]
++    One,
++    #[serde(rename = "2")]
++    Two,
++    #[serde(rename = "8")]
++    Eight,
++    #[serde(rename = "32")]
++    ThirtyTwo,
++}
++
++impl EditCount {
++    fn parse(value: &str) -> Result<Self, BoxError> {
++        match value {
++            "1" => Ok(Self::One),
++            "2" => Ok(Self::Two),
++            "8" => Ok(Self::Eight),
++            "32" => Ok(Self::ThirtyTwo),
++            other => failure(format!(
++                "unknown --edits {other:?}; expected 1, 2, 8, or 32"
++            )),
++        }
++    }
++
++    const fn count(self) -> usize {
++        match self {
++            Self::One => 1,
++            Self::Two => 2,
++            Self::Eight => 8,
++            Self::ThirtyTwo => 32,
++        }
++    }
++}
++
++#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
++enum Retention {
++    #[serde(rename = "zero")]
++    Zero,
++    #[serde(rename = "default_8mib")]
++    Default,
++    #[serde(rename = "release_8mib")]
++    Release,
++}
++
++impl Retention {
++    fn parse(value: &str) -> Result<Self, BoxError> {
++        match value {
++            "zero" => Ok(Self::Zero),
++            "default" | "8mib" => Ok(Self::Default),
++            "release" => Ok(Self::Release),
++            other => failure(format!("unknown --retention {other:?}")),
++        }
++    }
++
++    const fn name(self) -> &'static str {
++        match self {
++            Self::Zero => "zero",
++            Self::Default => "default_8mib",
++            Self::Release => "release_8mib",
++        }
++    }
++
++    const fn ceiling(self) -> usize {
++        match self {
++            Self::Zero => 0,
++            Self::Default | Self::Release => DEFAULT_RETAINED_RENDER_BYTES,
++        }
++    }
++
++    const fn releases_after_stage(self) -> bool {
++        matches!(self, Self::Release)
++    }
++}
++
++#[derive(Clone, Debug)]
++struct Args {
++    case: Case,
++    input: PathBuf,
++    edits: EditCount,
++    retention: Retention,
++    warmup: usize,
++    samples: usize,
++}
++
++fn parse_count(flag: &str, value: &str, maximum: usize) -> Result<usize, BoxError> {
++    let count = value.parse::<usize>().map_err(|error| {
++        Box::new(ProbeError(format!(
++            "invalid {flag} value {value:?}: {error}"
++        ))) as BoxError
++    })?;
++    if count > maximum {
++        return failure(format!("{flag} exceeds probe bound {maximum}"));
++    }
++    Ok(count)
++}
++
++fn parse_args() -> Result<Args, BoxError> {
++    let mut case = None;
++    let mut input = None;
++    let mut edits = None;
++    let mut retention = None;
++    let mut warmup = DEFAULT_WARMUPS;
++    let mut samples = DEFAULT_SAMPLES;
++    let mut arguments = std::env::args().skip(1);
++    while let Some(flag) = arguments.next() {
++        let mut value = || -> Result<String, BoxError> {
++            arguments.next().ok_or_else(|| {
++                Box::new(ProbeError(format!("missing value for {flag}"))) as BoxError
++            })
++        };
++        match flag.as_str() {
++            "--case" => case = Some(Case::parse(&value()?)?),
++            "--input" => input = Some(PathBuf::from(value()?)),
++            "--edits" => edits = Some(EditCount::parse(&value()?)?),
++            "--retention" => retention = Some(Retention::parse(&value()?)?),
++            "--warmup" => warmup = parse_count("--warmup", &value()?, MAX_WARMUPS)?,
++            "--samples" => samples = parse_count("--samples", &value()?, MAX_SAMPLES)?,
++            other => return failure(format!("unknown flag {other:?}")),
++        }
++    }
++    Ok(Args {
++        case: case.ok_or_else(|| Box::new(ProbeError("missing --case".into())) as BoxError)?,
++        input: input.ok_or_else(|| Box::new(ProbeError("missing --input".into())) as BoxError)?,
++        edits: edits.ok_or_else(|| Box::new(ProbeError("missing --edits".into())) as BoxError)?,
++        retention: retention
++            .ok_or_else(|| Box::new(ProbeError("missing --retention".into())) as BoxError)?,
++        warmup,
++        samples,
++    })
++}
++
++fn sha256_hex(bytes: &[u8]) -> String {
++    let digest = Sha256::digest(bytes);
++    let mut output = String::with_capacity(64);
++    for byte in digest {
++        output.push_str(&format!("{byte:02x}"));
++    }
++    output
++}
++
++const fn stage_text(stage: usize) -> &'static str {
++    if stage.is_multiple_of(2) {
++        FIRST_TEXT
++    } else {
++        SECOND_TEXT
++    }
++}
++
++const fn final_text(edits: EditCount) -> &'static str {
++    stage_text(edits.count() - 1)
++}
++
++#[derive(Clone, Copy, Debug, Serialize)]
++struct StageObservation {
++    stage: usize,
++    requested_text: &'static str,
++    before: Option<usize>,
++    after: Option<usize>,
++    after_release: Option<usize>,
++}
++
++impl StageObservation {
++    const fn empty() -> Self {
++        Self {
++            stage: 0,
++            requested_text: "",
++            before: None,
++            after: None,
++            after_release: None,
++        }
++    }
++}
++
++#[derive(Debug)]
++struct CaseResult {
++    output: Vec<u8>,
++    output_capacity: usize,
++    semantic_change_count: usize,
++    stages: [StageObservation; MAX_EDIT_STAGES],
++    final_retained_before_commit: Option<usize>,
++    census: Option<performance_census::Census>,
++}
++
++fn transaction_limits(retention: Retention) -> TransactionLimits {
++    TransactionLimits::default().with_max_retained_render_bytes(retention.ceiling())
++}
++
++fn run_case(source: &[u8], args: &Args, retention: Retention) -> Result<CaseResult, BoxError> {
++    let snapshot = Snapshot::open_bounded(
++        source.to_vec(),
++        Limits::default(),
++        transaction_limits(retention),
++    )?;
++    let mut edit = snapshot.edit()?;
++    let mut stages = [StageObservation::empty(); MAX_EDIT_STAGES];
++    for (stage, observation) in stages.iter_mut().enumerate().take(args.edits.count()) {
++        let requested_text = stage_text(stage);
++        let before = edit.retained_render_bytes();
++        edit.replace_paragraph(Position::new(0), requested_text)?;
++        let after = edit.retained_render_bytes();
++        let after_release = if retention.releases_after_stage() {
++            edit.release_retained_render();
++            edit.retained_render_bytes()
++        } else {
++            None
++        };
++        *observation = StageObservation {
++            stage: stage + 1,
++            requested_text,
++            before,
++            after,
++            after_release,
++        };
++    }
++    let final_retained_before_commit = edit.retained_render_bytes();
++    let commit = edit.commit()?;
++    let semantic_change_count = commit.patch().changes().len();
++    let output = commit.snapshot().bytes().to_vec();
++    let output_capacity = output.capacity();
++    black_box(output.len());
++    Ok(CaseResult {
++        output,
++        output_capacity,
++        semantic_change_count,
++        stages,
++        final_retained_before_commit,
++        census: None,
++    })
++}
++
++/// Keeps a unique, stable callchain marker around the measured lifecycle.
++///
++/// Preparation, correctness routes, and per-sample validation call
++/// `run_case` directly. The post-call barrier prevents the marker from
++/// collapsing into a tail call while preserving the measured result.
++#[inline(never)]
++fn profiled_measured_case(
++    source: &[u8],
++    args: &Args,
++    retention: Retention,
++) -> Result<CaseResult, BoxError> {
++    let session = performance_census::begin();
++    let result = run_case(source, args, retention);
++    let census = session.finish();
++    let mut result = result?;
++    result.census = Some(census);
++    black_box(result.output_capacity);
++    Ok(result)
++}
++
++struct MeasuredResult {
++    result: CaseResult,
++}
++
++fn measure_one(source: &[u8], args: &Args) -> Result<MeasuredResult, BoxError> {
++    Ok(MeasuredResult {
++        result: profiled_measured_case(source, args, args.retention)?,
++    })
++}
++
++#[derive(Clone, Debug, Serialize)]
++struct RouteReport {
++    retention: &'static str,
++    retention_ceiling_bytes: usize,
++    output_sha256: String,
++    output_bytes: usize,
++    output_capacity: usize,
++    semantic_change_count: usize,
++    final_retained_before_commit: Option<usize>,
++    stages: [StageObservation; MAX_EDIT_STAGES],
++    oracle: oracle_0730::Check,
++}
++
++#[derive(Debug)]
++struct RouteResult {
++    retention: Retention,
++    result: CaseResult,
++    oracle: oracle_0730::Check,
++}
++
++fn route_result(
++    source: &[u8],
++    args: &Args,
++    retention: Retention,
++    expected: Option<&[u8]>,
++) -> Result<RouteResult, BoxError> {
++    let result = run_case(source, args, retention)?;
++    let oracle_expected = expected.unwrap_or(&result.output);
++    let oracle = oracle_0730::check_doc_output(
++        source,
++        oracle_expected,
++        &result.output,
++        final_text(args.edits),
++    )?;
++    Ok(RouteResult {
++        retention,
++        result,
++        oracle,
++    })
++}
++
++#[derive(Clone, Debug, Serialize)]
++struct CorrectnessGates {
++    all_stages_change_text: bool,
++    exact_cross_route_outputs: bool,
++    final_paragraph_semantic_readback: bool,
++    final_public_reader_reopen: bool,
++    exact_noop_source: bool,
++    noop_shares_source_allocation: bool,
++    forward_patch_exact_output: bool,
++    inverse_patch_exact_source: bool,
++    foreign_patch_refused: bool,
++    stale_patch_refused: bool,
++    same_value_preserves_retention: bool,
++    operation_limit_refusal_atomic: bool,
++    retained_capacities_within_ceiling: bool,
++    zero_route_clears_retention: bool,
++    release_route_clears_every_stage: bool,
++    untouched_streams_preserved: bool,
++    directory_metadata_preserved: bool,
++    semantic_oracles_passed: bool,
++    semantic_change_count_matches_edit_count: bool,
++    allocator_retained_matches_output_capacity: bool,
++}
++
++struct Prepared {
++    routes: [RouteResult; 3],
++    gates: CorrectnessGates,
++}
++
++fn paragraph_zero_text(snapshot: &Snapshot) -> Result<String, BoxError> {
++    let paragraphs = snapshot.paragraphs(Projection::All)?;
++    paragraphs
++        .into_iter()
++        .find(|paragraph| paragraph.position() == Position::new(0))
++        .map(|paragraph| paragraph.text().to_owned())
++        .ok_or_else(|| Box::new(ProbeError("DOC paragraph zero is unavailable".into())) as BoxError)
++}
++
++fn all_stages_change_text(original: &str, edits: EditCount) -> bool {
++    let mut previous = original;
++    for stage in 0..edits.count() {
++        let next = stage_text(stage);
++        if next == previous {
++            return false;
++        }
++        previous = next;
++    }
++    true
++}
++
++fn route_capacities_within_ceiling(route: &RouteResult, edits: EditCount) -> bool {
++    let ceiling = route.retention.ceiling();
++    route.result.stages.iter().take(edits.count()).all(|stage| {
++        stage.after.is_none_or(|capacity| capacity <= ceiling)
++            && stage
++                .after_release
++                .is_none_or(|capacity| capacity <= ceiling)
++    }) && route
++        .result
++        .final_retained_before_commit
++        .is_none_or(|capacity| capacity <= ceiling)
++}
++
++fn semantic_change_count_matches(route: &RouteResult, edits: EditCount) -> bool {
++    route.result.semantic_change_count == edits.count()
++}
++
++fn zero_route_clears(route: &RouteResult, edits: EditCount) -> bool {
++    route.retention == Retention::Zero
++        && route.result.final_retained_before_commit.is_none()
++        && route
++            .result
++            .stages
++            .iter()
++            .take(edits.count())
++            .all(|stage| stage.before.is_none() && stage.after.is_none())
++}
++
++fn release_route_clears(route: &RouteResult, edits: EditCount) -> bool {
++    route.retention == Retention::Release
++        && route.result.final_retained_before_commit.is_none()
++        && route
++            .result
++            .stages
++            .iter()
++            .take(edits.count())
++            .all(|stage| stage.after_release.is_none())
++}
++
++fn final_paragraph_matches(result: &CaseResult, edits: EditCount) -> Result<bool, BoxError> {
++    let snapshot = Snapshot::open(result.output.clone(), Limits::default())?;
++    Ok(paragraph_zero_text(&snapshot)? == final_text(edits))
++}
++
++fn public_reader_reopens(result: &CaseResult) -> Result<bool, BoxError> {
++    let mut package = Package::from_reader(Cursor::new(result.output.clone()))?;
++    package.document()?;
++    Ok(true)
++}
++
++fn source_for_other_case(case: Case, input: &std::path::Path) -> Result<Vec<u8>, BoxError> {
++    let other_name = match case {
++        Case::DocNoHf => "FloatingPictures.doc",
++        Case::DocFloat => "NoHeadFoot.doc",
++    };
++    let other = input
++        .parent()
++        .unwrap_or_else(|| std::path::Path::new("."))
++        .join(other_name);
++    Ok(std::fs::read(other)?)
++}
++
++fn patch_and_refusal_gates(
++    source: &[u8],
++    args: &Args,
++) -> Result<(bool, bool, bool, bool), BoxError> {
++    let source_snapshot = Snapshot::open_bounded(
++        source.to_vec(),
++        Limits::default(),
++        transaction_limits(Retention::Zero),
++    )?;
++    let mut edit = source_snapshot.edit()?;
++    edit.replace_paragraph(Position::new(0), FIRST_TEXT)?;
++    let commit = edit.commit()?;
++    let patch = commit.patch().clone();
++    let forward = patch.apply(&source_snapshot)?;
++    let forward_exact = forward.bytes() == commit.snapshot().bytes();
++    let inverse = patch.inverse().apply(commit.snapshot())?;
++    let inverse_exact = inverse.bytes() == source_snapshot.bytes();
++
++    let foreign_bytes = source_for_other_case(args.case, &args.input)?;
++    let foreign = Snapshot::open_bounded(
++        foreign_bytes,
++        Limits::default(),
++        transaction_limits(Retention::Zero),
++    )?;
++    let foreign_refused = patch.apply(&foreign).is_err();
++    let stale_refused = patch.apply(commit.snapshot()).is_err();
++    Ok((forward_exact, inverse_exact, foreign_refused, stale_refused))
++}
++
++fn exact_noop_gate(
++    source: &[u8],
++    original: &str,
++    retention: Retention,
++) -> Result<(bool, bool), BoxError> {
++    let source_snapshot = Snapshot::open_bounded(
++        source.to_vec(),
++        Limits::default(),
++        transaction_limits(retention),
++    )?;
++    let mut edit = source_snapshot.edit()?;
++    edit.replace_paragraph(Position::new(0), original)?;
++    let no_retained_token = edit.retained_render_bytes().is_none();
++    let commit = edit.commit()?;
++    let exact_source = !commit.changed()
++        && commit.patch().is_noop()
++        && commit.patch().changes().len() == 0
++        && commit.snapshot().bytes() == source
++        && no_retained_token;
++    let shares_source_allocation = Arc::ptr_eq(
++        &source_snapshot.bytes_shared(),
++        &commit.snapshot().bytes_shared(),
++    );
++    Ok((exact_source, shares_source_allocation))
++}
++
++fn atomic_edit_controls(source: &[u8]) -> Result<(bool, bool), BoxError> {
++    let source_snapshot = Snapshot::open_bounded(
++        source.to_vec(),
++        Limits::default(),
++        transaction_limits(Retention::Default),
++    )?;
++    let mut one_operation = source_snapshot.edit()?;
++    one_operation.replace_paragraph(Position::new(0), FIRST_TEXT)?;
++    let one_operation_commit = one_operation.commit()?;
++    let one_operation_bytes = one_operation_commit.snapshot().bytes().to_vec();
++    let one_operation_patch_count = one_operation_commit.patch().changes().len();
++
++    let mut same_value = source_snapshot.edit()?;
++    same_value.replace_paragraph(Position::new(0), FIRST_TEXT)?;
++    let held_before_same_value = same_value.retained_render_bytes();
++    same_value.replace_paragraph(Position::new(0), FIRST_TEXT)?;
++    let same_value_retention_unchanged =
++        same_value.retained_render_bytes() == held_before_same_value;
++    let same_value_commit = same_value.commit()?;
++    let same_value_snapshot = Snapshot::open(
++        same_value_commit.snapshot().bytes().to_vec(),
++        Limits::default(),
++    )?;
++    let same_value_matches_one_operation = same_value_commit.changed()
++        && !same_value_commit.patch().is_noop()
++        && same_value_commit.patch().changes().len() == one_operation_patch_count
++        && same_value_commit.snapshot().bytes() == one_operation_bytes
++        && paragraph_zero_text(&same_value_snapshot)? == FIRST_TEXT;
++
++    let limited = TransactionLimits::new(1, 4096, 4096)
++        .with_max_retained_render_bytes(DEFAULT_RETAINED_RENDER_BYTES);
++    let limited_snapshot = Snapshot::open_bounded(source.to_vec(), Limits::default(), limited)?;
++    let mut limited_control = limited_snapshot.edit()?;
++    limited_control.replace_paragraph(Position::new(0), FIRST_TEXT)?;
++    let limited_control_commit = limited_control.commit()?;
++    let limited_control_bytes = limited_control_commit.snapshot().bytes().to_vec();
++    let limited_control_patch_count = limited_control_commit.patch().changes().len();
++
++    let mut refused = limited_snapshot.edit()?;
++    refused.replace_paragraph(Position::new(0), FIRST_TEXT)?;
++    let held_before_refusal = refused.retained_render_bytes();
++    let error = refused.replace_paragraph(Position::new(0), SECOND_TEXT);
++    let typed_operation_refusal = matches!(
++        error,
++        Err(BodyError::Refused(Refusal::OperationLimit { .. }))
++    );
++    let refusal_retention_unchanged = refused.retained_render_bytes() == held_before_refusal;
++    let refusal_commit = refused.commit()?;
++    let refusal_snapshot = Snapshot::open(
++        refusal_commit.snapshot().bytes().to_vec(),
++        Limits::default(),
++    )?;
++    let refusal_output_matches_one_operation = refusal_commit.changed()
++        && !refusal_commit.patch().is_noop()
++        && refusal_commit.patch().changes().len() == limited_control_patch_count
++        && refusal_commit.snapshot().bytes() == limited_control_bytes
++        && refusal_snapshot.bytes() == limited_control_bytes
++        && paragraph_zero_text(&refusal_snapshot)? == FIRST_TEXT;
++    Ok((
++        same_value_retention_unchanged && same_value_matches_one_operation,
++        typed_operation_refusal
++            && refusal_retention_unchanged
++            && refusal_output_matches_one_operation,
++    ))
++}
++
++fn prepare(source: &[u8], args: &Args) -> Result<Prepared, BoxError> {
++    let source_snapshot = Snapshot::open_bounded(
++        source.to_vec(),
++        Limits::default(),
++        transaction_limits(Retention::Zero),
++    )?;
++    let original = paragraph_zero_text(&source_snapshot)?;
++    let all_stages_change = all_stages_change_text(&original, args.edits);
++
++    let zero = route_result(source, args, Retention::Zero, None)?;
++    let default = route_result(source, args, Retention::Default, Some(&zero.result.output))?;
++    let release = route_result(source, args, Retention::Release, Some(&zero.result.output))?;
++    let routes = [zero, default, release];
++
++    let exact_cross_route_outputs = routes
++        .iter()
++        .skip(1)
++        .all(|route| route.result.output == routes[0].result.output);
++    let final_paragraph_semantic_readback = routes
++        .iter()
++        .map(|route| final_paragraph_matches(&route.result, args.edits))
++        .collect::<Result<Vec<_>, _>>()?
++        .into_iter()
++        .all(|match_| match_);
++    let final_public_reader_reopen = routes
++        .iter()
++        .map(|route| public_reader_reopens(&route.result))
++        .collect::<Result<Vec<_>, _>>()?
++        .into_iter()
++        .all(|reopened| reopened);
++    let mut exact_noop_source = true;
++    let mut noop_shares_source_allocation = true;
++    for retention in [Retention::Zero, Retention::Default, Retention::Release] {
++        let (exact, shares) = exact_noop_gate(source, &original, retention)?;
++        exact_noop_source &= exact;
++        noop_shares_source_allocation &= shares;
++    }
++    let (
++        forward_patch_exact_output,
++        inverse_patch_exact_source,
++        foreign_patch_refused,
++        stale_patch_refused,
++    ) = patch_and_refusal_gates(source, args)?;
++    let (same_value_preserves_retention, operation_limit_refusal_atomic) =
++        atomic_edit_controls(source)?;
++    let retained_capacities_within_ceiling = routes
++        .iter()
++        .all(|route| route_capacities_within_ceiling(route, args.edits));
++    let zero_route_clears_retention = zero_route_clears(&routes[0], args.edits);
++    let release_route_clears_every_stage = release_route_clears(&routes[2], args.edits);
++    let untouched_streams_preserved = routes.iter().all(|route| {
++        route.oracle.unchanged_stream_bytes_match_expected
++            && route.oracle.unchanged_source_output_stream_bytes_match
++            && route.oracle.output_stream_bytes_match_expected
++    });
++    let directory_metadata_preserved = routes.iter().all(|route| {
++        route.oracle.semantic_directory_metadata_matches_expected
++            && route.oracle.root_clsid_preserved
++            && route.oracle.storage_clsids_preserved
++    });
++    let semantic_oracles_passed = routes
++        .iter()
++        .all(|route| route.oracle.oracle_ok && route.oracle.semantic_reopen_ok);
++    let semantic_change_count_matches_edit_count = routes
++        .iter()
++        .all(|route| semantic_change_count_matches(route, args.edits));
++    let gates = CorrectnessGates {
++        all_stages_change_text: all_stages_change,
++        exact_cross_route_outputs,
++        final_paragraph_semantic_readback,
++        final_public_reader_reopen,
++        exact_noop_source,
++        noop_shares_source_allocation,
++        forward_patch_exact_output,
++        inverse_patch_exact_source,
++        foreign_patch_refused,
++        stale_patch_refused,
++        same_value_preserves_retention,
++        operation_limit_refusal_atomic,
++        retained_capacities_within_ceiling,
++        zero_route_clears_retention,
++        release_route_clears_every_stage,
++        untouched_streams_preserved,
++        directory_metadata_preserved,
++        semantic_oracles_passed,
++        semantic_change_count_matches_edit_count,
++        allocator_retained_matches_output_capacity: true,
++    };
++    if !gates.all_stages_change_text
++        || !gates.exact_cross_route_outputs
++        || !gates.final_paragraph_semantic_readback
++        || !gates.final_public_reader_reopen
++        || !gates.exact_noop_source
++        || !gates.noop_shares_source_allocation
++        || !gates.forward_patch_exact_output
++        || !gates.inverse_patch_exact_source
++        || !gates.foreign_patch_refused
++        || !gates.stale_patch_refused
++        || !gates.same_value_preserves_retention
++        || !gates.operation_limit_refusal_atomic
++        || !gates.retained_capacities_within_ceiling
++        || !gates.zero_route_clears_retention
++        || !gates.release_route_clears_every_stage
++        || !gates.untouched_streams_preserved
++        || !gates.directory_metadata_preserved
++        || !gates.semantic_oracles_passed
++        || !gates.semantic_change_count_matches_edit_count
++    {
++        return failure(format!("functional correctness gates failed: {gates:?}"));
++    }
++    Ok(Prepared { routes, gates })
++}
++
++fn route_report(route: &RouteResult) -> RouteReport {
++    RouteReport {
++        retention: route.retention.name(),
++        retention_ceiling_bytes: route.retention.ceiling(),
++        output_sha256: sha256_hex(&route.result.output),
++        output_bytes: route.result.output.len(),
++        output_capacity: route.result.output_capacity,
++        semantic_change_count: route.result.semantic_change_count,
++        final_retained_before_commit: route.result.final_retained_before_commit,
++        stages: route.result.stages,
++        oracle: route.oracle.clone(),
++    }
++}
++
++#[derive(Clone, Debug, Serialize)]
++struct SampleReport {
++    index: usize,
++    output_sha256: String,
++    output_bytes: usize,
++    output_capacity: usize,
++    semantic_change_count: usize,
++    exact_output_equal_reference: bool,
++    final_paragraph_semantic_readback: bool,
++    final_public_reader_reopen: bool,
++    retained_capacities_within_ceiling: bool,
++    allocator_retained_matches_output_capacity: bool,
++    oracle: oracle_0730::Check,
++    stages: [StageObservation; MAX_EDIT_STAGES],
++    census: CensusReport,
++}
++
++#[derive(Clone, Copy, Debug, Serialize)]
++struct CensusReport {
++    commit_attempts: u64,
++    commit_successes: u64,
++    commit_errors: u64,
++    overlay_attempted: u64,
++    overlay_success: u64,
++    overlay_declined: u64,
++    overlay_error: u64,
++    overlay_not_attempted: u64,
++    layout_attempted: u64,
++    layout_reuse_success: u64,
++    layout_non_reuse: u64,
++    layout_error: u64,
++    capture_attempted: u64,
++    capture_success: u64,
++    capture_error: u64,
++    capture_streams: u64,
++    capture_payload_bytes: u64,
++    saturated: bool,
++}
++
++impl From<performance_census::Census> for CensusReport {
++    fn from(census: performance_census::Census) -> Self {
++        Self {
++            commit_attempts: census.commit_attempts,
++            commit_successes: census.commit_successes,
++            commit_errors: census.commit_errors,
++            overlay_attempted: census.overlay_attempted,
++            overlay_success: census.overlay_success,
++            overlay_declined: census.overlay_declined,
++            overlay_error: census.overlay_error,
++            overlay_not_attempted: census.overlay_not_attempted,
++            layout_attempted: census.layout_attempted,
++            layout_reuse_success: census.layout_reuse_success,
++            layout_non_reuse: census.layout_non_reuse,
++            layout_error: census.layout_error,
++            capture_attempted: census.capture_attempted,
++            capture_success: census.capture_success,
++            capture_error: census.capture_error,
++            capture_streams: census.capture_streams,
++            capture_payload_bytes: census.capture_payload_bytes,
++            saturated: census.saturated,
++        }
++    }
++}
++
++fn sample_report_with_source(
++    source: &[u8],
++    index: usize,
++    measured: MeasuredResult,
++    args: &Args,
++    prepared: &Prepared,
++) -> Result<SampleReport, BoxError> {
++    let census = measured.result.census.ok_or_else(|| {
++        Box::new(ProbeError("measured sample has no census".to_owned())) as BoxError
++    })?;
++    let expected = &prepared.routes[0].result.output;
++    let exact_output_equal_reference = measured.result.output == *expected;
++    let final_paragraph_semantic_readback = final_paragraph_matches(&measured.result, args.edits)?;
++    let final_public_reader_reopen = public_reader_reopens(&measured.result)?;
++    let oracle = oracle_0730::check_doc_output(
++        source,
++        expected,
++        &measured.result.output,
++        final_text(args.edits),
++    )?;
++    let route = RouteResult {
++        retention: args.retention,
++        result: measured.result,
++        oracle: oracle.clone(),
++    };
++    let retained_capacities_within_ceiling = route_capacities_within_ceiling(&route, args.edits);
++    let semantic_change_count_matches_edit_count =
++        semantic_change_count_matches(&route, args.edits);
++    let allocator_retained_matches_output_capacity = true;
++    if !exact_output_equal_reference
++        || !final_paragraph_semantic_readback
++        || !final_public_reader_reopen
++        || !retained_capacities_within_ceiling
++        || !allocator_retained_matches_output_capacity
++        || !semantic_change_count_matches_edit_count
++        || !oracle.oracle_ok
++    {
++        return failure(format!(
++            "measured sample {index} failed output, semantic, retention, or oracle gate"
++        ));
++    }
++    Ok(SampleReport {
++        index,
++        output_sha256: sha256_hex(&route.result.output),
++        output_bytes: route.result.output.len(),
++        output_capacity: route.result.output_capacity,
++        semantic_change_count: route.result.semantic_change_count,
++        exact_output_equal_reference,
++        final_paragraph_semantic_readback,
++        final_public_reader_reopen,
++        retained_capacities_within_ceiling,
++        allocator_retained_matches_output_capacity,
++        oracle,
++        stages: route.result.stages,
++        census: census.into(),
++    })
++}
++
++#[derive(Debug, Serialize)]
++struct ProbeOutput {
++    schema_version: u32,
++    schema: &'static str,
++    change: &'static str,
++    case: &'static str,
++    input: String,
++    source_sha256: String,
++    source_bytes: usize,
++    selected_paragraph: usize,
++    edits: usize,
++    alternating_texts: [&'static str; 2],
++    retention: &'static str,
++    retention_ceiling_bytes: usize,
++    timing_claim: bool,
++    region_definition: &'static str,
++    warmups: usize,
++    samples_requested: usize,
++    output_sha256: String,
++    output_bytes: usize,
++    output_capacity: usize,
++    reference_output_sha256: String,
++    reference_output_bytes: usize,
++    exact_output_equal_reference: bool,
++    route_outputs: [RouteReport; 3],
++    correctness: CorrectnessGates,
++    samples: Vec<SampleReport>,
++}
++
++fn verify_fixture(args: &Args, source: &[u8]) -> Result<(), BoxError> {
++    let actual = sha256_hex(source);
++    if source.len() != args.case.expected_bytes() || actual != args.case.expected_sha256() {
++        return failure(format!(
++            "fixture identity mismatch for {}: got {} bytes / {}, expected {} bytes / {}",
++            args.case.name(),
++            source.len(),
++            actual,
++            args.case.expected_bytes(),
++            args.case.expected_sha256()
++        ));
++    }
++    Ok(())
++}
++
++pub fn run() -> Result<(), BoxError> {
++    let args = parse_args()?;
++    let source = std::fs::read(&args.input)?;
++    verify_fixture(&args, &source)?;
++    let source_sha256 = sha256_hex(&source);
++    let prepared = prepare(&source, &args)?;
++
++    // Expected outputs and all correctness controls are complete before any
++    // diagnostic sample. Their allocations never enter the census session.
++    let mut samples = Vec::with_capacity(args.samples);
++    for _ in 0..args.warmup {
++        let warmup = measure_one(&source, &args)?;
++        drop(warmup);
++    }
++    for index in 0..args.samples {
++        let measured = measure_one(&source, &args)?;
++        samples.push(sample_report_with_source(
++            &source, index, measured, &args, &prepared,
++        )?);
++    }
++    let selected_route = &prepared.routes[match args.retention {
++        Retention::Zero => 0,
++        Retention::Default => 1,
++        Retention::Release => 2,
++    }];
++    let measured_sample = samples.last();
++    let output_sha256 = measured_sample
++        .map(|sample| sample.output_sha256.clone())
++        .unwrap_or_else(|| sha256_hex(&selected_route.result.output));
++    let output_bytes = measured_sample.map_or(selected_route.result.output.len(), |sample| {
++        sample.output_bytes
++    });
++    let output_capacity = measured_sample.map_or(selected_route.result.output_capacity, |sample| {
++        sample.output_capacity
++    });
++    let route_outputs = [
++        route_report(&prepared.routes[0]),
++        route_report(&prepared.routes[1]),
++        route_report(&prepared.routes[2]),
++    ];
++    let output = ProbeOutput {
++        schema_version: 2,
++        schema: "litchi.performance.0968.cfb_commit_census.v2",
++        change: "0968",
++        case: args.case.name(),
++        input: args.input.display().to_string(),
++        source_sha256,
++        source_bytes: source.len(),
++        selected_paragraph: 0,
++        edits: args.edits.count(),
++        alternating_texts: [FIRST_TEXT, SECOND_TEXT],
++        retention: args.retention.name(),
++        retention_ceiling_bytes: args.retention.ceiling(),
++        timing_claim: false,
++        region_definition: "one fresh diagnostic session around Snapshot::open_bounded, one Edit with all paragraph-0 replacements and retention releases, commit, output Vec copy, and local snapshot/edit/commit destruction; counters are active only inside ObjectEditor::commit_candidate_with_rendered and capture stream reads; source file read, references, correctness checks, hashing and JSON excluded",
++        warmups: args.warmup,
++        samples_requested: args.samples,
++        output_sha256,
++        output_bytes,
++        output_capacity,
++        reference_output_sha256: sha256_hex(&prepared.routes[0].result.output),
++        reference_output_bytes: prepared.routes[0].result.output.len(),
++        exact_output_equal_reference: measured_sample
++            .is_none_or(|sample| sample.exact_output_equal_reference),
++        route_outputs,
++        correctness: prepared.gates,
++        samples,
++    };
++    println!("{}", serde_json::to_string(&output)?);
++    Ok(())
++}
+--- a/tools/perf-cfb-census-0968/src/oracle_0730.rs
++++ b/tools/perf-cfb-census-0968/src/oracle_0730.rs
+@@ -0,0 +1,1577 @@
++//! DOC preservation oracle reused by the change-0917 retention probe.
++//!
++//! This module keeps the qualified 0730 DOC checks that are meaningful for the
++//! current repeated-edit probe: complete CFB stream inventories, directory
++//! metadata and normalized directory images, public DOC projections, and
++//! survivor collections.  Timing, allocator instrumentation, PPT support, and
++//! the old 0730 executable are intentionally outside this module.
++
++use std::collections::{BTreeMap, BTreeSet};
++use std::error::Error;
++use std::fmt::{Display, Formatter};
++use std::io::Cursor;
++use std::sync::Arc;
++
++use litchi_cfb::{DirectoryEntry, OleFile, validate_source};
++use litchi_core::{OwnedSource, Position};
++use serde::Serialize;
++use sha2::{Digest, Sha256};
++
++const CFB_END_OF_CHAIN: u32 = 0xffff_fffe;
++const CFB_FREE_SECTOR: u32 = 0xffff_ffff;
++const CFB_HEADER_SIZE: usize = 512;
++const CFB_HEADER_DIFAT_OFFSET: usize = 0x4c;
++const CFB_HEADER_DIFAT_ENTRIES: usize = 109;
++const CFB_DIRECTORY_ENTRY_SIZE: usize = 128;
++const CFB_ENTRY_START_SECTOR_OFFSET: usize = 0x74;
++const CFB_ENTRY_STREAM_SIZE_OFFSET: usize = 0x78;
++const CFB_MAX_DIRECTORY_SECTORS: usize = 1_000_000;
++
++pub type BoxError = Box<dyn Error>;
++
++#[derive(Debug)]
++struct ProbeError(String);
++
++impl Display for ProbeError {
++    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
++        formatter.write_str(&self.0)
++    }
++}
++
++impl Error for ProbeError {}
++
++fn failure<T>(message: impl Into<String>) -> Result<T, BoxError> {
++    Err(Box::new(ProbeError(message.into())))
++}
++
++fn sha256_hex(bytes: &[u8]) -> String {
++    let digest = Sha256::digest(bytes);
++    let mut output = String::with_capacity(64);
++    for byte in digest {
++        output.push_str(&format!("{byte:02x}"));
++    }
++    output
++}
++
++#[derive(Clone, Debug, Serialize)]
++struct StreamSummary {
++    path: Vec<String>,
++    bytes: usize,
++    sha256: String,
++}
++
++#[derive(Clone, Debug, Serialize)]
++struct StorageSummary {
++    path: Vec<String>,
++    clsid: String,
++}
++
++#[derive(Clone, Debug, Serialize)]
++struct InventorySummary {
++    file_bytes: usize,
++    sector_size: usize,
++    root_clsid: String,
++    streams: Vec<StreamSummary>,
++    storages: Vec<StorageSummary>,
++    directory_entries: Vec<DirectoryEntrySummary>,
++    raw_directory_image_bytes: usize,
++    raw_directory_image_sha256: String,
++}
++
++#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
++struct DirectoryEntrySummary {
++    path: Vec<String>,
++    sid: u32,
++    entry_type: u8,
++    clsid: String,
++    bytes: usize,
++    start_sector: u32,
++    is_minifat: bool,
++}
++
++#[derive(Clone, Debug)]
++struct Inventory {
++    summary: InventorySummary,
++    stream_bytes: BTreeMap<Vec<String>, Vec<u8>>,
++    storage_clsids: BTreeMap<Vec<String>, String>,
++    directory_entries: BTreeMap<Vec<String>, DirectoryEntrySummary>,
++    raw_directory_image: RawDirectoryImage,
++}
++
++#[derive(Clone, Debug)]
++struct RawDirectoryImage {
++    bytes: Vec<u8>,
++    sector_size: usize,
++    cfb_version: u16,
++}
++
++fn raw_u16(bytes: &[u8], offset: usize, field: &str) -> Result<u16, BoxError> {
++    let end = offset
++        .checked_add(2)
++        .ok_or_else(|| Box::new(ProbeError(format!("{field} offset overflow"))) as BoxError)?;
++    let data = bytes.get(offset..end).ok_or_else(|| {
++        Box::new(ProbeError(format!("CFB header is truncated at {field}"))) as BoxError
++    })?;
++    Ok(u16::from_le_bytes(data.try_into().map_err(|_| {
++        Box::new(ProbeError(format!("{field} width mismatch"))) as BoxError
++    })?))
++}
++
++fn raw_u32(bytes: &[u8], offset: usize, field: &str) -> Result<u32, BoxError> {
++    let end = offset
++        .checked_add(4)
++        .ok_or_else(|| Box::new(ProbeError(format!("{field} offset overflow"))) as BoxError)?;
++    let data = bytes.get(offset..end).ok_or_else(|| {
++        Box::new(ProbeError(format!("CFB header is truncated at {field}"))) as BoxError
++    })?;
++    Ok(u32::from_le_bytes(data.try_into().map_err(|_| {
++        Box::new(ProbeError(format!("{field} width mismatch"))) as BoxError
++    })?))
++}
++
++fn raw_sector(bytes: &[u8], sector_size: usize, sector: u32) -> Result<&[u8], BoxError> {
++    let sector = usize::try_from(sector)
++        .map_err(|_| Box::new(ProbeError("CFB sector does not fit usize".into())) as BoxError)?;
++    let start = sector
++        .checked_add(1)
++        .and_then(|value| value.checked_mul(sector_size))
++        .ok_or_else(|| Box::new(ProbeError("CFB sector offset overflow".into())) as BoxError)?;
++    let end = start
++        .checked_add(sector_size)
++        .ok_or_else(|| Box::new(ProbeError("CFB sector end overflow".into())) as BoxError)?;
++    bytes.get(start..end).ok_or_else(|| {
++        Box::new(ProbeError("CFB sector lies outside the input bytes".into())) as BoxError
++    })
++}
++
++fn raw_fat(bytes: &[u8], sector_size: usize) -> Result<Vec<u32>, BoxError> {
++    let fat_count = usize::try_from(raw_u32(bytes, 0x2c, "FAT sector count")?).map_err(|_| {
++        Box::new(ProbeError("FAT sector count does not fit usize".into())) as BoxError
++    })?;
++    let difat_count =
++        usize::try_from(raw_u32(bytes, 0x48, "DIFAT sector count")?).map_err(|_| {
++            Box::new(ProbeError("DIFAT sector count does not fit usize".into())) as BoxError
++        })?;
++    if fat_count == 0 || fat_count > CFB_MAX_DIRECTORY_SECTORS {
++        return failure("CFB FAT sector count is outside the probe bound");
++    }
++    let mut fat_sectors = Vec::with_capacity(fat_count.min(CFB_HEADER_DIFAT_ENTRIES));
++    for index in 0..CFB_HEADER_DIFAT_ENTRIES {
++        let sector = raw_u32(
++            bytes,
++            CFB_HEADER_DIFAT_OFFSET + index * 4,
++            "header DIFAT entry",
++        )?;
++        if sector != CFB_FREE_SECTOR {
++            fat_sectors.push(sector);
++            if fat_sectors.len() == fat_count {
++                break;
++            }
++        }
++    }
++    let difat_entries_per_sector = sector_size / 4 - 1;
++    let mut next_difat = raw_u32(bytes, 0x44, "first DIFAT sector")?;
++    let mut seen_difat = BTreeSet::new();
++    while fat_sectors.len() < fat_count && next_difat != CFB_END_OF_CHAIN {
++        if difat_count == 0 || !seen_difat.insert(next_difat) || seen_difat.len() > difat_count {
++            return failure("CFB DIFAT chain is cyclic or exceeds its declared bound");
++        }
++        let sector = raw_sector(bytes, sector_size, next_difat)?;
++        for index in 0..difat_entries_per_sector {
++            let entry =
++                u32::from_le_bytes(sector[index * 4..index * 4 + 4].try_into().map_err(|_| {
++                    Box::new(ProbeError("DIFAT entry width mismatch".into())) as BoxError
++                })?);
++            if entry != CFB_FREE_SECTOR {
++                fat_sectors.push(entry);
++                if fat_sectors.len() == fat_count {
++                    break;
++                }
++            }
++        }
++        next_difat = u32::from_le_bytes(
++            sector[difat_entries_per_sector * 4..difat_entries_per_sector * 4 + 4]
++                .try_into()
++                .map_err(|_| {
++                    Box::new(ProbeError("DIFAT next pointer width mismatch".into())) as BoxError
++                })?,
++        );
++    }
++    if fat_sectors.len() != fat_count {
++        return failure("CFB DIFAT does not enumerate every declared FAT sector");
++    }
++    let mut fat = Vec::new();
++    fat.try_reserve(fat_count.checked_mul(sector_size / 4).ok_or_else(|| {
++        Box::new(ProbeError("CFB FAT allocation size overflow".into())) as BoxError
++    })?)
++    .map_err(|_| {
++        Box::new(ProbeError(
++            "CFB FAT exceeds the probe allocation bound".into(),
++        )) as BoxError
++    })?;
++    for sector in fat_sectors {
++        for word in raw_sector(bytes, sector_size, sector)?.chunks_exact(4) {
++            fat.push(u32::from_le_bytes(word.try_into().map_err(|_| {
++                Box::new(ProbeError("FAT word width mismatch".into())) as BoxError
++            })?));
++        }
++    }
++    Ok(fat)
++}
++
++fn raw_directory_image(bytes: &[u8]) -> Result<RawDirectoryImage, BoxError> {
++    if bytes.len() < CFB_HEADER_SIZE {
++        return failure("CFB header is shorter than one sector");
++    }
++    let version = raw_u16(bytes, 0x1a, "CFB major version")?;
++    let sector_shift = raw_u16(bytes, 0x1e, "CFB sector shift")?;
++    if version != 3 && version != 4 {
++        return failure("CFB directory image has an unsupported version");
++    }
++    let sector_size = match sector_shift {
++        9 => 512,
++        12 => 4096,
++        _ => return failure("CFB directory image has an unsupported sector size"),
++    };
++    let fat = raw_fat(bytes, sector_size)?;
++    let mut sector = raw_u32(bytes, 0x30, "first directory sector")?;
++    let mut seen = BTreeSet::new();
++    let mut image = Vec::new();
++    while sector != CFB_END_OF_CHAIN {
++        if !seen.insert(sector) || seen.len() > CFB_MAX_DIRECTORY_SECTORS {
++            return failure("CFB directory sector chain is cyclic or exceeds the probe bound");
++        }
++        image.extend_from_slice(raw_sector(bytes, sector_size, sector)?);
++        let index = usize::try_from(sector).map_err(|_| {
++            Box::new(ProbeError("CFB directory sector does not fit usize".into())) as BoxError
++        })?;
++        sector = *fat.get(index).ok_or_else(|| {
++            Box::new(ProbeError("CFB directory sector is outside FAT".into())) as BoxError
++        })?;
++    }
++    if image.is_empty() || image.len() % CFB_DIRECTORY_ENTRY_SIZE != 0 {
++        return failure("CFB directory image is not entry aligned");
++    }
++    Ok(RawDirectoryImage {
++        bytes: image,
++        sector_size,
++        cfb_version: version,
++    })
++}
++
++fn collect_directory_entry(
++    ole: &OleFile<Cursor<Vec<u8>>>,
++    path: &[String],
++    entry: &DirectoryEntry,
++    output: &mut BTreeMap<Vec<String>, DirectoryEntrySummary>,
++) -> Result<(), BoxError> {
++    output.insert(
++        path.to_vec(),
++        DirectoryEntrySummary {
++            path: path.to_vec(),
++            sid: entry.sid,
++            entry_type: entry.entry_type,
++            clsid: entry.clsid.clone(),
++            bytes: usize::try_from(entry.size).unwrap_or(usize::MAX),
++            start_sector: entry.start_sector,
++            is_minifat: entry.is_minifat,
++        },
++    );
++    if entry.entry_type == litchi_cfb::consts::STGTY_STORAGE
++        || entry.entry_type == litchi_cfb::consts::STGTY_ROOT
++    {
++        let refs = path.iter().map(String::as_str).collect::<Vec<_>>();
++        let children = ole.list_directory_entries(&refs)?;
++        for child in children {
++            let mut child_path = path.to_vec();
++            child_path.push(child.name.clone());
++            collect_directory_entry(ole, &child_path, child, output)?;
++        }
++    }
++    Ok(())
++}
++
++fn inventory(bytes: &[u8]) -> Result<Inventory, BoxError> {
++    let mut ole = OleFile::open(Cursor::new(bytes.to_vec()))?;
++    let sector_size = ole.sector_size();
++    let raw_directory = raw_directory_image(bytes)?;
++    let root = ole.root_entry().cloned().ok_or_else(|| {
++        Box::new(ProbeError("CFB has no root directory entry".into())) as BoxError
++    })?;
++    let mut storage_clsids = BTreeMap::new();
++    let mut directory_entries = BTreeMap::new();
++    collect_directory_entry(&ole, &[], &root, &mut directory_entries)?;
++    for (path, entry) in &directory_entries {
++        if entry.entry_type == litchi_cfb::consts::STGTY_STORAGE {
++            storage_clsids.insert(path.clone(), entry.clsid.clone());
++        }
++    }
++
++    let mut paths = ole.list_streams();
++    paths.sort();
++    let mut stream_bytes = BTreeMap::new();
++    let mut streams = Vec::with_capacity(paths.len());
++    for path in paths {
++        let refs = path.iter().map(String::as_str).collect::<Vec<_>>();
++        let data = ole.open_stream(&refs)?;
++        streams.push(StreamSummary {
++            path: path.clone(),
++            bytes: data.len(),
++            sha256: sha256_hex(&data),
++        });
++        stream_bytes.insert(path, data);
++    }
++    let storages = storage_clsids
++        .iter()
++        .map(|(path, clsid)| StorageSummary {
++            path: path.clone(),
++            clsid: clsid.clone(),
++        })
++        .collect();
++    let directory_entries_json = directory_entries.values().cloned().collect();
++    Ok(Inventory {
++        summary: InventorySummary {
++            file_bytes: bytes.len(),
++            sector_size,
++            root_clsid: root.clsid,
++            streams,
++            storages,
++            directory_entries: directory_entries_json,
++            raw_directory_image_bytes: raw_directory.bytes.len(),
++            raw_directory_image_sha256: sha256_hex(&raw_directory.bytes),
++        },
++        stream_bytes,
++        storage_clsids,
++        directory_entries,
++        raw_directory_image: raw_directory,
++    })
++}
++
++fn structural_valid(bytes: &[u8]) -> bool {
++    validate_source(Arc::new(OwnedSource::new(bytes.to_vec())))
++        .map(|report| report.is_complete() && !report.has_errors())
++        .unwrap_or(false)
++}
++
++#[derive(Clone, Debug, Serialize)]
++struct DirectoryMetadataDifference {
++    path: Vec<String>,
++    field: String,
++    expected: String,
++    actual: String,
++}
++
++fn directory_shape_matches(source: &Inventory, expected: &Inventory) -> bool {
++    source.directory_entries.keys().collect::<BTreeSet<_>>()
++        == expected.directory_entries.keys().collect::<BTreeSet<_>>()
++        && source.directory_entries.iter().all(|(path, entry)| {
++            expected.directory_entries.get(path).is_some_and(|other| {
++                entry.entry_type == other.entry_type && entry.clsid == other.clsid
++            })
++        })
++}
++
++fn allocation_sids(left: &Inventory, right: &Inventory) -> (BTreeSet<u32>, BTreeSet<u32>) {
++    let paths = left
++        .directory_entries
++        .keys()
++        .chain(right.directory_entries.keys())
++        .cloned()
++        .collect::<BTreeSet<_>>();
++    let mut left_sids = BTreeSet::new();
++    let mut right_sids = BTreeSet::new();
++    if let Some(entry) = left.directory_entries.get(&Vec::new()) {
++        left_sids.insert(entry.sid);
++    }
++    if let Some(entry) = right.directory_entries.get(&Vec::new()) {
++        right_sids.insert(entry.sid);
++    }
++    for path in paths {
++        let left_entry = left.directory_entries.get(&path);
++        let right_entry = right.directory_entries.get(&path);
++        let changed = match (left_entry, right_entry) {
++            (Some(left_entry), Some(right_entry)) => {
++                left_entry.bytes != right_entry.bytes
++                    || left_entry.start_sector != right_entry.start_sector
++                    || left_entry.is_minifat != right_entry.is_minifat
++            },
++            _ => true,
++        };
++        if changed {
++            if let Some(entry) = left_entry {
++                left_sids.insert(entry.sid);
++            }
++            if let Some(entry) = right_entry {
++                right_sids.insert(entry.sid);
++            }
++        }
++    }
++    (left_sids, right_sids)
++}
++
++fn v3_size_sids(inventory: &Inventory) -> BTreeSet<u32> {
++    if inventory.raw_directory_image.cfb_version != 3 {
++        return BTreeSet::new();
++    }
++    inventory
++        .directory_entries
++        .values()
++        .filter(|entry| entry.entry_type == litchi_cfb::consts::STGTY_STREAM)
++        .map(|entry| entry.sid)
++        .collect()
++}
++
++fn normalized_directory_bytes(inventory: &Inventory, allocation: &BTreeSet<u32>) -> Vec<u8> {
++    let mut image = inventory.raw_directory_image.bytes.clone();
++    let high_size_sids = v3_size_sids(inventory);
++    for sid in allocation {
++        let Ok(sid) = usize::try_from(*sid) else {
++            continue;
++        };
++        let Some(start) = sid.checked_mul(CFB_DIRECTORY_ENTRY_SIZE) else {
++            continue;
++        };
++        let Some(end) = start.checked_add(CFB_DIRECTORY_ENTRY_SIZE) else {
++            continue;
++        };
++        let Some(entry) = image.get_mut(start..end) else {
++            continue;
++        };
++        entry[CFB_ENTRY_START_SECTOR_OFFSET..CFB_ENTRY_STREAM_SIZE_OFFSET + 8].fill(0);
++    }
++    for sid in high_size_sids {
++        if allocation.contains(&sid) {
++            continue;
++        }
++        let Ok(sid) = usize::try_from(sid) else {
++            continue;
++        };
++        let Some(start) = sid
++            .checked_mul(CFB_DIRECTORY_ENTRY_SIZE)
++            .and_then(|value| value.checked_add(CFB_ENTRY_STREAM_SIZE_OFFSET + 4))
++        else {
++            continue;
++        };
++        let Some(end) = start.checked_add(4) else {
++            continue;
++        };
++        if let Some(field) = image.get_mut(start..end) {
++            field.fill(0);
++        }
++    }
++    image
++}
++
++fn normalized_directory_comparison(left: &Inventory, right: &Inventory) -> (String, usize) {
++    if left.raw_directory_image.cfb_version != right.raw_directory_image.cfb_version
++        || left.raw_directory_image.sector_size != right.raw_directory_image.sector_size
++    {
++        return ("incomparable_cfb_geometry".into(), usize::MAX);
++    }
++    let (left_sids, right_sids) = allocation_sids(left, right);
++    let left_image = normalized_directory_bytes(left, &left_sids);
++    let right_image = normalized_directory_bytes(right, &right_sids);
++    let difference_bytes = left_image
++        .iter()
++        .zip(&right_image)
++        .filter(|(left, right)| left != right)
++        .count()
++        + left_image.len().abs_diff(right_image.len());
++    if difference_bytes == 0 {
++        ("match_after_allocation_normalization".into(), 0)
++    } else {
++        (
++            "differ_after_allocation_normalization".into(),
++            difference_bytes,
++        )
++    }
++}
++
++#[derive(Clone, Debug, Serialize)]
++struct RawDirectoryOracle {
++    mode: String,
++    source_sha256: String,
++    expected_sha256: String,
++    output_sha256: String,
++    source_expected_normalized: String,
++    expected_output_normalized: String,
++    source_output_normalized: String,
++    source_expected_difference_bytes: usize,
++    expected_output_difference_bytes: usize,
++    source_output_difference_bytes: usize,
++    source_expected_ok: bool,
++    source_output_ok: bool,
++    policy_gate: String,
++}
++
++fn raw_directory_oracle(
++    source: &Inventory,
++    expected: &Inventory,
++    output: &Inventory,
++) -> (RawDirectoryOracle, bool) {
++    let (source_expected_normalized, source_expected_difference_bytes) =
++        normalized_directory_comparison(source, expected);
++    let (expected_output_normalized, expected_output_difference_bytes) =
++        normalized_directory_comparison(expected, output);
++    let (source_output_normalized, source_output_difference_bytes) =
++        normalized_directory_comparison(source, output);
++    let source_expected_ok = source_expected_normalized == "match_after_allocation_normalization";
++    let source_output_ok = source_output_normalized == "match_after_allocation_normalization";
++    let policy_gate = if !source_expected_ok {
++        "failed_source_expected_model"
++    } else if !source_output_ok {
++        "failed_public_source_model"
++    } else {
++        "passed_source_expected_model"
++    };
++    (
++        RawDirectoryOracle {
++            mode: "public_format_source_model_gate".into(),
++            source_sha256: source.summary.raw_directory_image_sha256.clone(),
++            expected_sha256: expected.summary.raw_directory_image_sha256.clone(),
++            output_sha256: output.summary.raw_directory_image_sha256.clone(),
++            source_expected_normalized,
++            expected_output_normalized,
++            source_output_normalized,
++            source_expected_difference_bytes,
++            expected_output_difference_bytes,
++            source_output_difference_bytes,
++            source_expected_ok,
++            source_output_ok,
++            policy_gate: policy_gate.into(),
++        },
++        source_expected_ok && source_output_ok,
++    )
++}
++
++fn directory_metadata_differences(
++    expected: &Inventory,
++    actual: &Inventory,
++) -> Vec<DirectoryMetadataDifference> {
++    let paths = expected
++        .directory_entries
++        .keys()
++        .chain(actual.directory_entries.keys())
++        .cloned()
++        .collect::<BTreeSet<_>>();
++    let mut differences = Vec::new();
++    for path in paths {
++        let expected_entry = expected.directory_entries.get(&path);
++        let actual_entry = actual.directory_entries.get(&path);
++        match (expected_entry, actual_entry) {
++            (Some(expected_entry), Some(actual_entry)) => {
++                if expected_entry.entry_type != actual_entry.entry_type {
++                    differences.push(DirectoryMetadataDifference {
++                        path: path.clone(),
++                        field: "entry_type".into(),
++                        expected: expected_entry.entry_type.to_string(),
++                        actual: actual_entry.entry_type.to_string(),
++                    });
++                }
++                if expected_entry.clsid != actual_entry.clsid {
++                    differences.push(DirectoryMetadataDifference {
++                        path: path.clone(),
++                        field: "clsid".into(),
++                        expected: expected_entry.clsid.clone(),
++                        actual: actual_entry.clsid.clone(),
++                    });
++                }
++                if expected_entry.bytes != actual_entry.bytes {
++                    differences.push(DirectoryMetadataDifference {
++                        path: path.clone(),
++                        field: "bytes".into(),
++                        expected: expected_entry.bytes.to_string(),
++                        actual: actual_entry.bytes.to_string(),
++                    });
++                }
++                if expected_entry.start_sector != actual_entry.start_sector {
++                    differences.push(DirectoryMetadataDifference {
++                        path: path.clone(),
++                        field: "start_sector".into(),
++                        expected: expected_entry.start_sector.to_string(),
++                        actual: actual_entry.start_sector.to_string(),
++                    });
++                }
++                if expected_entry.is_minifat != actual_entry.is_minifat {
++                    differences.push(DirectoryMetadataDifference {
++                        path: path.clone(),
++                        field: "is_minifat".into(),
++                        expected: expected_entry.is_minifat.to_string(),
++                        actual: actual_entry.is_minifat.to_string(),
++                    });
++                }
++            },
++            (Some(expected_entry), None) => differences.push(DirectoryMetadataDifference {
++                path: path.clone(),
++                field: "directory_entry".into(),
++                expected: format!("present type {}", expected_entry.entry_type),
++                actual: "missing".into(),
++            }),
++            (None, Some(actual_entry)) => differences.push(DirectoryMetadataDifference {
++                path: path.clone(),
++                field: "directory_entry".into(),
++                expected: "missing".into(),
++                actual: format!("present type {}", actual_entry.entry_type),
++            }),
++            (None, None) => {},
++        }
++    }
++    differences
++}
++
++fn semantic_directory_metadata_matches(expected: &Inventory, actual: &Inventory) -> bool {
++    let expected_paths = expected.directory_entries.keys().collect::<BTreeSet<_>>();
++    let actual_paths = actual.directory_entries.keys().collect::<BTreeSet<_>>();
++    expected_paths == actual_paths
++        && expected.directory_entries.iter().all(|(path, entry)| {
++            actual
++                .directory_entries
++                .get(path)
++                .is_some_and(|actual_entry| {
++                    entry.entry_type == actual_entry.entry_type
++                        && entry.clsid == actual_entry.clsid
++                        && entry.bytes == actual_entry.bytes
++                        && entry.is_minifat == actual_entry.is_minifat
++                })
++        })
++}
++
++fn exact_output_streams(expected: &Inventory, actual: &Inventory) -> (bool, bool) {
++    let expected_paths = expected.stream_bytes.keys().collect::<BTreeSet<_>>();
++    let actual_paths = actual.stream_bytes.keys().collect::<BTreeSet<_>>();
++    let paths_match = expected_paths == actual_paths;
++    let bytes_match = paths_match
++        && expected
++            .stream_bytes
++            .iter()
++            .all(|(path, bytes)| actual.stream_bytes.get(path) == Some(bytes));
++    (paths_match, bytes_match)
++}
++
++fn preserved_clsids(source: &Inventory, expected: &Inventory, actual: &Inventory) -> (bool, bool) {
++    (
++        source.summary.root_clsid == expected.summary.root_clsid
++            && actual.summary.root_clsid == source.summary.root_clsid,
++        source.storage_clsids == expected.storage_clsids
++            && actual.storage_clsids == source.storage_clsids,
++    )
++}
++
++fn doc_text_projection_matches(source: &[String], output: &[String], replacement: &str) -> bool {
++    source.len() == output.len()
++        && source.iter().enumerate().all(|(index, before)| {
++            let expected = if index == 0 {
++                replacement
++            } else {
++                before.as_str()
++            };
++            output.get(index).is_some_and(|after| after == expected)
++        })
++}
++
++fn debug_digest<T: std::fmt::Debug>(value: &T) -> String {
++    sha256_hex(format!("{value:?}").as_bytes())
++}
++
++#[derive(Clone, Debug, Serialize, Default)]
++struct CollectionWitness {
++    name: String,
++    source_status: String,
++    output_status: String,
++    source_count: usize,
++    output_count: usize,
++    source_sha256: String,
++    output_sha256: String,
++    result: String,
++    direct_match: bool,
++    direct_result: String,
++}
++
++#[derive(Clone, Debug, Serialize, Default)]
++struct DocSemanticWitness {
++    target_position: usize,
++    source_paragraph_count: usize,
++    output_paragraph_count: usize,
++    source_target_text_sha256: String,
++    output_target_text_sha256: String,
++    requested_text_sha256: String,
++    source_target_utf16_units: usize,
++    output_target_utf16_units: usize,
++    requested_text_utf16_units: usize,
++    target_text_difference: String,
++    target_utf16_length_difference: String,
++    all_projection: String,
++    comparison_basis: String,
++    accepted_projection: CollectionWitness,
++    rejected_projection: CollectionWitness,
++    stories: Vec<CollectionWitness>,
++    table_cells: CollectionWitness,
++    field_results: CollectionWitness,
++    revisions: CollectionWitness,
++    revision_authors_source: Vec<String>,
++    revision_authors_output: Vec<String>,
++    embedded_objects: CollectionWitness,
++    error: Option<String>,
++}
++
++#[derive(Clone, Debug)]
++struct CollectionState {
++    status: String,
++    count: usize,
++    sha256: String,
++}
++
++fn collection_state<T: std::fmt::Debug>(result: Result<(usize, T), String>) -> CollectionState {
++    match result {
++        Ok((count, value)) => CollectionState {
++            status: if count == 0 { "empty" } else { "ok" }.into(),
++            count,
++            sha256: debug_digest(&value),
++        },
++        Err(error) => CollectionState {
++            status: format!("unavailable:{error}"),
++            count: 0,
++            sha256: String::new(),
++        },
++    }
++}
++
++fn collection_witness(
++    name: &str,
++    source: CollectionState,
++    output: CollectionState,
++) -> CollectionWitness {
++    let result = if source.status == "empty" && output.status == "empty" {
++        "absent_equal"
++    } else if source.status.starts_with("unavailable:") && source.status == output.status {
++        "unavailable_equal"
++    } else if (source.status == "ok" || source.status == "empty")
++        && (output.status == "ok" || output.status == "empty")
++        && source.count == output.count
++        && source.sha256 == output.sha256
++    {
++        "equal"
++    } else {
++        "changed_or_unavailable"
++    };
++    CollectionWitness {
++        name: name.into(),
++        source_status: source.status,
++        output_status: output.status,
++        source_count: source.count,
++        output_count: output.count,
++        source_sha256: source.sha256,
++        output_sha256: output.sha256,
++        result: result.into(),
++        direct_match: false,
++        direct_result: "not_compared".into(),
++    }
++}
++
++fn set_direct_result(witness: &mut CollectionWitness, comparison: Option<bool>) {
++    match comparison {
++        Some(true) => {
++            witness.direct_match = true;
++            witness.direct_result = "equal".into();
++        },
++        Some(false) => {
++            witness.direct_match = false;
++            witness.direct_result = "different".into();
++        },
++        None if witness.result == "unavailable_equal" => {
++            witness.direct_match = true;
++            witness.direct_result = "unavailable_equal".into();
++        },
++        None => {
++            witness.direct_match = false;
++            witness.direct_result = "unavailable_or_not_compared".into();
++        },
++    }
++}
++
++fn direct_slice_match<T: PartialEq>(
++    witness: &mut CollectionWitness,
++    source: Option<&[T]>,
++    output: Option<&[T]>,
++) {
++    set_direct_result(
++        witness,
++        source.zip(output).map(|(source, output)| source == output),
++    );
++}
++
++fn direct_value_match<T: PartialEq>(
++    witness: &mut CollectionWitness,
++    source: Option<&T>,
++    output: Option<&T>,
++) {
++    set_direct_result(
++        witness,
++        source.zip(output).map(|(source, output)| source == output),
++    );
++}
++
++fn paragraph_projection_witness(
++    name: &str,
++    source: Result<Vec<String>, String>,
++    output: Result<Vec<String>, String>,
++    replacement: &str,
++) -> CollectionWitness {
++    let source_values = source.as_ref().ok();
++    let output_values = output.as_ref().ok();
++    let source_state = match source_values {
++        Some(values) => collection_state(Ok((values.len(), values.clone()))),
++        None => collection_state::<Vec<String>>(Err(source
++            .as_ref()
++            .err()
++            .cloned()
++            .unwrap_or_else(|| "projection unavailable".into()))),
++    };
++    let output_state = match output_values {
++        Some(values) => collection_state(Ok((values.len(), values.clone()))),
++        None => collection_state::<Vec<String>>(Err(output
++            .as_ref()
++            .err()
++            .cloned()
++            .unwrap_or_else(|| "projection unavailable".into()))),
++    };
++    let mut witness = collection_witness(name, source_state, output_state);
++    if let (Some(source_values), Some(output_values)) = (source_values, output_values) {
++        let expected = source_values
++            .iter()
++            .enumerate()
++            .map(|(index, value)| {
++                if index == 0 {
++                    replacement.to_string()
++                } else {
++                    value.clone()
++                }
++            })
++            .collect::<Vec<_>>();
++        if output_values == &expected {
++            witness.result = "target_replaced".into();
++            set_direct_result(&mut witness, Some(true));
++        } else if output_values == source_values {
++            witness.result = "equal".into();
++            set_direct_result(&mut witness, Some(true));
++        } else {
++            set_direct_result(&mut witness, Some(false));
++        }
++    } else {
++        set_direct_result(&mut witness, None);
++    }
++    witness
++}
++
++fn story_collection_witness(
++    name: &str,
++    story: litchi_doc::body_text::Story,
++    source: CollectionState,
++    output: CollectionState,
++    source_items: Option<&[litchi_doc::body_text::TextItem]>,
++    output_items: Option<&[litchi_doc::body_text::TextItem]>,
++    replacement: &str,
++) -> CollectionWitness {
++    let mut witness = collection_witness(name, source, output);
++    let Some((source_items, output_items)) = source_items.zip(output_items) else {
++        set_direct_result(&mut witness, None);
++        return witness;
++    };
++    if story == litchi_doc::body_text::Story::Main {
++        let matches_target = source_items.len() == output_items.len()
++            && source_items
++                .iter()
++                .zip(output_items)
++                .all(|(before, after)| {
++                    let expected = if before.target()
++                        == litchi_doc::body_text::TextTarget::body_paragraph(Position::new(0))
++                    {
++                        replacement
++                    } else {
++                        before.text()
++                    };
++                    after.target() == before.target() && after.text() == expected
++                });
++        if matches_target {
++            witness.result = "target_replaced".into();
++            set_direct_result(&mut witness, Some(true));
++        } else {
++            set_direct_result(&mut witness, Some(false));
++        }
++    } else if source_items == output_items {
++        set_direct_result(&mut witness, Some(true));
++    } else {
++        set_direct_result(&mut witness, Some(false));
++    }
++    witness
++}
++
++fn doc_collection_state<T: std::fmt::Debug + Clone>(
++    result: Result<Vec<T>, String>,
++) -> (CollectionState, Option<Vec<T>>) {
++    match result {
++        Ok(values) => {
++            let state = collection_state(Ok((values.len(), values.clone())));
++            (state, Some(values))
++        },
++        Err(error) => (collection_state::<Vec<T>>(Err(error)), None),
++    }
++}
++
++fn value_collection_state<T: std::fmt::Debug + Clone>(
++    result: Result<(usize, T), String>,
++) -> (CollectionState, Option<T>) {
++    match result {
++        Ok((count, value)) => {
++            let state = collection_state(Ok((count, value.clone())));
++            (state, Some(value))
++        },
++        Err(error) => (collection_state::<T>(Err(error)), None),
++    }
++}
++
++fn doc_semantic_witness(
++    source: &litchi_doc::body_text::Snapshot,
++    output: &litchi_doc::body_text::Snapshot,
++    replacement: &str,
++) -> (bool, String, DocSemanticWitness) {
++    let mut witness = DocSemanticWitness {
++        target_position: 0,
++        requested_text_sha256: sha256_hex(replacement.as_bytes()),
++        requested_text_utf16_units: replacement.encode_utf16().count(),
++        comparison_basis: "direct_text_and_collection_values_with_sha256_report_fields".into(),
++        ..DocSemanticWitness::default()
++    };
++    let source_paragraphs = match source.paragraphs(litchi_doc::body_text::Projection::All) {
++        Ok(value) => value,
++        Err(error) => {
++            let message = format!("DOC source paragraph read failed: {error}");
++            witness.error = Some(message.clone());
++            return (false, message, witness);
++        },
++    };
++    let output_paragraphs = match output.paragraphs(litchi_doc::body_text::Projection::All) {
++        Ok(value) => value,
++        Err(error) => {
++            let message = format!("DOC output paragraph read failed: {error}");
++            witness.error = Some(message.clone());
++            return (false, message, witness);
++        },
++    };
++    witness.source_paragraph_count = source_paragraphs.len();
++    witness.output_paragraph_count = output_paragraphs.len();
++    let Some(source_target) = source_paragraphs.first().map(|value| value.text()) else {
++        let message = "DOC source has no ordinary main-story paragraph 0".to_string();
++        witness.error = Some(message.clone());
++        return (false, message, witness);
++    };
++    let Some(output_target) = output_paragraphs.first().map(|value| value.text()) else {
++        let message = "DOC output has no ordinary main-story paragraph 0".to_string();
++        witness.error = Some(message.clone());
++        return (false, message, witness);
++    };
++    witness.source_target_text_sha256 = sha256_hex(source_target.as_bytes());
++    witness.output_target_text_sha256 = sha256_hex(output_target.as_bytes());
++    witness.source_target_utf16_units = source_target.encode_utf16().count();
++    witness.output_target_utf16_units = output_target.encode_utf16().count();
++    witness.target_text_difference = if source_target != replacement {
++        "changed".into()
++    } else {
++        "same_as_requested".into()
++    };
++    witness.target_utf16_length_difference =
++        if witness.source_target_utf16_units != witness.requested_text_utf16_units {
++            "changed".into()
++        } else {
++            "same_length".into()
++        };
++    let projection_ok = doc_text_projection_matches(
++        &source_paragraphs
++            .iter()
++            .map(|paragraph| paragraph.text().to_string())
++            .collect::<Vec<_>>(),
++        &output_paragraphs
++            .iter()
++            .map(|paragraph| paragraph.text().to_string())
++            .collect::<Vec<_>>(),
++        replacement,
++    );
++    witness.all_projection = if projection_ok {
++        "target_replaced_and_survivors_equal".into()
++    } else {
++        "mismatch".into()
++    };
++
++    witness.accepted_projection = paragraph_projection_witness(
++        "accepted_projection",
++        source
++            .paragraphs(litchi_doc::body_text::Projection::Accepted)
++            .map(|paragraphs| {
++                paragraphs
++                    .iter()
++                    .map(|paragraph| paragraph.text().to_string())
++                    .collect()
++            })
++            .map_err(|error| error.to_string()),
++        output
++            .paragraphs(litchi_doc::body_text::Projection::Accepted)
++            .map(|paragraphs| {
++                paragraphs
++                    .iter()
++                    .map(|paragraph| paragraph.text().to_string())
++                    .collect()
++            })
++            .map_err(|error| error.to_string()),
++        replacement,
++    );
++    witness.rejected_projection = paragraph_projection_witness(
++        "rejected_projection",
++        source
++            .paragraphs(litchi_doc::body_text::Projection::Rejected)
++            .map(|paragraphs| {
++                paragraphs
++                    .iter()
++                    .map(|paragraph| paragraph.text().to_string())
++                    .collect()
++            })
++            .map_err(|error| error.to_string()),
++        output
++            .paragraphs(litchi_doc::body_text::Projection::Rejected)
++            .map(|paragraphs| {
++                paragraphs
++                    .iter()
++                    .map(|paragraph| paragraph.text().to_string())
++                    .collect()
++            })
++            .map_err(|error| error.to_string()),
++        replacement,
++    );
++
++    let story_specs = [
++        (litchi_doc::body_text::Story::Main, "main"),
++        (litchi_doc::body_text::Story::Footnote, "footnote"),
++        (litchi_doc::body_text::Story::Header, "header"),
++        (litchi_doc::body_text::Story::Comment, "comment"),
++        (litchi_doc::body_text::Story::Endnote, "endnote"),
++        (litchi_doc::body_text::Story::Textbox, "textbox"),
++        (
++            litchi_doc::body_text::Story::HeaderTextbox,
++            "header_textbox",
++        ),
++    ];
++    let mut collections_ok = true;
++    for (story, name) in story_specs {
++        let source_result = source
++            .story_paragraphs(story)
++            .map_err(|error| error.to_string());
++        let output_result = output
++            .story_paragraphs(story)
++            .map_err(|error| error.to_string());
++        let (source_state, source_items) = doc_collection_state(source_result);
++        let (output_state, output_items) = doc_collection_state(output_result);
++        let item_witness = story_collection_witness(
++            name,
++            story,
++            source_state,
++            output_state,
++            source_items.as_deref(),
++            output_items.as_deref(),
++            replacement,
++        );
++        collections_ok &= item_witness.direct_match;
++        witness.stories.push(item_witness);
++    }
++
++    let (source_state, source_items) =
++        doc_collection_state(source.table_cells().map_err(|error| error.to_string()));
++    let (output_state, output_items) =
++        doc_collection_state(output.table_cells().map_err(|error| error.to_string()));
++    witness.table_cells = collection_witness("table_cells", source_state, output_state);
++    direct_slice_match(
++        &mut witness.table_cells,
++        source_items.as_deref(),
++        output_items.as_deref(),
++    );
++    collections_ok &= witness.table_cells.direct_match;
++    drop((source_items, output_items));
++
++    let (source_state, source_items) =
++        doc_collection_state(source.field_results().map_err(|error| error.to_string()));
++    let (output_state, output_items) =
++        doc_collection_state(output.field_results().map_err(|error| error.to_string()));
++    witness.field_results = collection_witness("field_results", source_state, output_state);
++    direct_slice_match(
++        &mut witness.field_results,
++        source_items.as_deref(),
++        output_items.as_deref(),
++    );
++    collections_ok &= witness.field_results.direct_match;
++    drop((source_items, output_items));
++
++    let (source_state, source_items) =
++        doc_collection_state(source.revisions().map_err(|error| error.to_string()));
++    let (output_state, output_items) =
++        doc_collection_state(output.revisions().map_err(|error| error.to_string()));
++    witness.revisions = collection_witness("revisions", source_state, output_state);
++    direct_slice_match(
++        &mut witness.revisions,
++        source_items.as_deref(),
++        output_items.as_deref(),
++    );
++    collections_ok &= witness.revisions.direct_match;
++    witness.revision_authors_source = source_items
++        .as_ref()
++        .map(|items| {
++            items
++                .iter()
++                .map(|revision| format!("{}:{}", revision.author_index, revision.author))
++                .collect()
++        })
++        .unwrap_or_default();
++    witness.revision_authors_output = output_items
++        .as_ref()
++        .map(|items| {
++            items
++                .iter()
++                .map(|revision| format!("{}:{}", revision.author_index, revision.author))
++                .collect()
++        })
++        .unwrap_or_default();
++    drop((source_items, output_items));
++
++    let source_objects = source
++        .embedded_objects()
++        .map(|value| (value.len(), value))
++        .map_err(|error| error.to_string());
++    let output_objects = output
++        .embedded_objects()
++        .map(|value| (value.len(), value))
++        .map_err(|error| error.to_string());
++    let (source_state, source_objects) = value_collection_state(source_objects);
++    let (output_state, output_objects) = value_collection_state(output_objects);
++    witness.embedded_objects = collection_witness("embedded_objects", source_state, output_state);
++    direct_value_match(
++        &mut witness.embedded_objects,
++        source_objects.as_ref(),
++        output_objects.as_ref(),
++    );
++    collections_ok &= witness.embedded_objects.direct_match;
++    collections_ok &= witness.accepted_projection.direct_match;
++    collections_ok &= witness.rejected_projection.direct_match;
++
++    let semantic_ok = projection_ok
++        && source_target != replacement
++        && witness.source_target_utf16_units != witness.requested_text_utf16_units
++        && collections_ok;
++    if !semantic_ok {
++        let message = "DOC semantic witness did not prove a changed paragraph-0 replacement with unchanged applicable collections".to_string();
++        witness.error = Some(message.clone());
++        return (false, message, witness);
++    }
++    (true, String::new(), witness)
++}
++
++#[derive(Clone, Debug, Serialize)]
++enum SemanticWitness {
++    Doc(Box<DocSemanticWitness>),
++}
++
++fn doc_witness(value: DocSemanticWitness) -> SemanticWitness {
++    SemanticWitness::Doc(Box::new(value))
++}
++
++fn allowed_changed_stream(path: &[String]) -> bool {
++    let Some(name) = path.last() else {
++        return false;
++    };
++    name.eq_ignore_ascii_case("WordDocument")
++        || name.eq_ignore_ascii_case("0Table")
++        || name.eq_ignore_ascii_case("1Table")
++}
++
++fn changed_stream_paths_allowed(source: &Inventory, expected: &Inventory) -> bool {
++    source
++        .stream_bytes
++        .keys()
++        .filter(|path| source.stream_bytes.get(*path) != expected.stream_bytes.get(*path))
++        .all(|path| allowed_changed_stream(path))
++}
++
++fn unchanged_stream_bytes_match(
++    source: &Inventory,
++    expected: &Inventory,
++    replacement_paths: &BTreeSet<Vec<String>>,
++) -> bool {
++    let source_paths = source.stream_bytes.keys().collect::<BTreeSet<_>>();
++    let expected_paths = expected.stream_bytes.keys().collect::<BTreeSet<_>>();
++    if source_paths != expected_paths {
++        return false;
++    }
++    source.stream_bytes.iter().all(|(path, before)| {
++        replacement_paths.contains(path) || expected.stream_bytes.get(path) == Some(before)
++    })
++}
++
++fn derive_replacement_paths(
++    source: &Inventory,
++    expected: &Inventory,
++) -> Result<BTreeSet<Vec<String>>, BoxError> {
++    let source_paths = source.stream_bytes.keys().collect::<BTreeSet<_>>();
++    let expected_paths = expected.stream_bytes.keys().collect::<BTreeSet<_>>();
++    if source_paths != expected_paths {
++        return failure(
++            "public edit added or deleted CFB streams; no explicit stream mapping is available",
++        );
++    }
++    if !changed_stream_paths_allowed(source, expected) {
++        return failure(
++            "public edit changed an unapproved stream; explicit stream mapping is required",
++        );
++    }
++    Ok(source
++        .stream_bytes
++        .keys()
++        .filter(|path| source.stream_bytes.get(*path) != expected.stream_bytes.get(*path))
++        .cloned()
++        .collect())
++}
++
++fn semantic_reopen_check(
++    source_bytes: &[u8],
++    output_bytes: &[u8],
++    replacement: &str,
++) -> (bool, String, SemanticWitness) {
++    let source = match litchi_doc::body_text::Snapshot::open(
++        source_bytes.to_vec(),
++        litchi_doc::tracked_revision::Limits::default(),
++    ) {
++        Ok(snapshot) => snapshot,
++        Err(error) => {
++            let message = format!("DOC source public reopen failed: {error}");
++            return (
++                false,
++                message.clone(),
++                doc_witness(DocSemanticWitness {
++                    error: Some(message),
++                    ..DocSemanticWitness::default()
++                }),
++            );
++        },
++    };
++    let output = match litchi_doc::body_text::Snapshot::open(
++        output_bytes.to_vec(),
++        litchi_doc::tracked_revision::Limits::default(),
++    ) {
++        Ok(snapshot) => snapshot,
++        Err(error) => {
++            let message = format!("DOC output public reopen failed: {error}");
++            return (
++                false,
++                message.clone(),
++                doc_witness(DocSemanticWitness {
++                    error: Some(message),
++                    ..DocSemanticWitness::default()
++                }),
++            );
++        },
++    };
++    let (ok, failure, witness) = doc_semantic_witness(&source, &output, replacement);
++    (ok, failure, doc_witness(witness))
++}
++
++#[derive(Clone, Debug, Serialize)]
++struct Oracle {
++    source_structurally_valid: bool,
++    expected_structurally_valid: bool,
++    output_structurally_valid: bool,
++    semantic_reopen_ok: bool,
++    semantic_witness: SemanticWitness,
++    semantic_directory_metadata_matches_expected: bool,
++    source_directory_shape_matches_expected: bool,
++    source_directory_metadata_differences: Vec<DirectoryMetadataDifference>,
++    directory_metadata_differences: Vec<DirectoryMetadataDifference>,
++    raw_directory: RawDirectoryOracle,
++    raw_directory_policy_ok: bool,
++    source_stream_paths_match_expected: bool,
++    output_stream_paths_match_expected: bool,
++    output_stream_bytes_match_expected: bool,
++    unchanged_stream_bytes_match_expected: bool,
++    unchanged_source_output_stream_bytes_match: bool,
++    changed_stream_paths_allowed: bool,
++    actual_changed_stream_paths_allowed: bool,
++    root_clsid_preserved: bool,
++    storage_clsids_preserved: bool,
++    no_deleted_or_new_streams: bool,
++    oracle_ok: bool,
++    failure_reasons: Vec<String>,
++}
++
++fn oracle_for_output(
++    source: &Inventory,
++    expected: &Inventory,
++    output: &Inventory,
++    source_bytes: &[u8],
++    expected_bytes: &[u8],
++    output_bytes: &[u8],
++    replacement_paths: &BTreeSet<Vec<String>>,
++    replacement: &str,
++) -> Oracle {
++    let source_paths = source.stream_bytes.keys().collect::<BTreeSet<_>>();
++    let expected_paths = expected.stream_bytes.keys().collect::<BTreeSet<_>>();
++    let source_stream_paths_match_expected = source_paths == expected_paths;
++    let (output_stream_paths_match_expected, output_stream_bytes_match_expected) =
++        exact_output_streams(expected, output);
++    let unchanged_stream_bytes_match_expected =
++        unchanged_stream_bytes_match(source, expected, replacement_paths);
++    let unchanged_source_output_stream_bytes_match =
++        unchanged_stream_bytes_match(source, output, replacement_paths);
++    let actual_changed_stream_paths_allowed = changed_stream_paths_allowed(source, output);
++    let changed_stream_paths_allowed = changed_stream_paths_allowed(source, expected);
++    let (root_clsid_preserved, storage_clsids_preserved) =
++        preserved_clsids(source, expected, output);
++    let (semantic_reopen_ok, semantic_failure, semantic_witness) =
++        semantic_reopen_check(source_bytes, output_bytes, replacement);
++    let source_directory_metadata_differences = directory_metadata_differences(source, expected);
++    let directory_metadata_differences = directory_metadata_differences(expected, output);
++    let semantic_directory_metadata_matches_expected =
++        semantic_directory_metadata_matches(expected, output);
++    let source_directory_shape_matches_expected = directory_shape_matches(source, expected);
++    let (raw_directory, raw_directory_policy_ok) = raw_directory_oracle(source, expected, output);
++    let source_structurally_valid = structural_valid(source_bytes);
++    let expected_structurally_valid = structural_valid(expected_bytes);
++    let output_structurally_valid = structural_valid(output_bytes);
++    let no_deleted_or_new_streams =
++        source_stream_paths_match_expected && output_stream_paths_match_expected;
++    let mut failure_reasons = Vec::new();
++    if !source_structurally_valid {
++        failure_reasons.push("source CFB structural validation failed".into());
++    }
++    if !expected_structurally_valid {
++        failure_reasons.push("expected format output CFB structural validation failed".into());
++    }
++    if !output_structurally_valid {
++        failure_reasons.push("output CFB structural validation failed".into());
++    }
++    if !source_stream_paths_match_expected {
++        failure_reasons.push("public edit changed the stream path set".into());
++    }
++    if !source_directory_shape_matches_expected {
++        failure_reasons.push("public edit changed the CFB directory path/type/CLSID shape".into());
++    }
++    if !output_stream_paths_match_expected {
++        failure_reasons.push("output stream path set differs from expected format output".into());
++    }
++    if !output_stream_bytes_match_expected {
++        failure_reasons.push("one or more output stream bytes differ from expected".into());
++    }
++    if !unchanged_stream_bytes_match_expected {
++        failure_reasons
++            .push("one or more source streams changed outside the reported replacement set".into());
++    }
++    if !unchanged_source_output_stream_bytes_match {
++        failure_reasons.push(
++            "one or more source streams changed outside the replacement set in the measured output"
++                .into(),
++        );
++    }
++    if !changed_stream_paths_allowed {
++        failure_reasons
++            .push("a changed stream is outside the allowed public-edit stream set".into());
++    }
++    if !actual_changed_stream_paths_allowed {
++        failure_reasons
++            .push("a measured output stream is outside the allowed public-edit stream set".into());
++    }
++    if !semantic_reopen_ok {
++        failure_reasons.push(semantic_failure);
++    }
++    if !semantic_directory_metadata_matches_expected {
++        failure_reasons.push("semantic CFB directory metadata differs from expected".into());
++    }
++    if !raw_directory_policy_ok {
++        failure_reasons.push(
++            "raw directory source/model policy gate failed outside planner-owned allocation fields"
++                .into(),
++        );
++    }
++    if !root_clsid_preserved {
++        failure_reasons.push("root CLSID was not preserved from the source".into());
++    }
++    if !storage_clsids_preserved {
++        failure_reasons.push("storage CLSIDs were not preserved from the source".into());
++    }
++    let oracle_ok = source_structurally_valid
++        && expected_structurally_valid
++        && output_structurally_valid
++        && no_deleted_or_new_streams
++        && source_directory_shape_matches_expected
++        && output_stream_bytes_match_expected
++        && unchanged_stream_bytes_match_expected
++        && unchanged_source_output_stream_bytes_match
++        && changed_stream_paths_allowed
++        && actual_changed_stream_paths_allowed
++        && root_clsid_preserved
++        && storage_clsids_preserved
++        && semantic_reopen_ok
++        && semantic_directory_metadata_matches_expected
++        && raw_directory_policy_ok;
++    Oracle {
++        source_structurally_valid,
++        expected_structurally_valid,
++        output_structurally_valid,
++        semantic_reopen_ok,
++        semantic_witness,
++        semantic_directory_metadata_matches_expected,
++        source_directory_shape_matches_expected,
++        source_directory_metadata_differences,
++        directory_metadata_differences,
++        raw_directory,
++        raw_directory_policy_ok,
++        source_stream_paths_match_expected,
++        output_stream_paths_match_expected,
++        output_stream_bytes_match_expected,
++        unchanged_stream_bytes_match_expected,
++        unchanged_source_output_stream_bytes_match,
++        changed_stream_paths_allowed,
++        actual_changed_stream_paths_allowed,
++        root_clsid_preserved,
++        storage_clsids_preserved,
++        no_deleted_or_new_streams,
++        oracle_ok,
++        failure_reasons,
++    }
++}
++
++#[derive(Clone, Debug, Serialize)]
++pub struct Check {
++    pub oracle_ok: bool,
++    pub source_structurally_valid: bool,
++    pub expected_structurally_valid: bool,
++    pub output_structurally_valid: bool,
++    pub semantic_reopen_ok: bool,
++    pub semantic_directory_metadata_matches_expected: bool,
++    pub unchanged_stream_bytes_match_expected: bool,
++    pub unchanged_source_output_stream_bytes_match: bool,
++    pub output_stream_paths_match_expected: bool,
++    pub output_stream_bytes_match_expected: bool,
++    pub root_clsid_preserved: bool,
++    pub storage_clsids_preserved: bool,
++    pub failure_reasons: Vec<String>,
++}
++
++/// Applies the focused 0730 DOC oracle to one repeated-edit output.
++///
++/// `expected_bytes` is the zero-retention output for the same fixture and
++/// edit count.  The oracle compares complete stream bytes, directory metadata,
++/// normalized directory images, and public DOC survivor projections.
++pub fn check_doc_output(
++    source_bytes: &[u8],
++    expected_bytes: &[u8],
++    output_bytes: &[u8],
++    replacement: &str,
++) -> Result<Check, BoxError> {
++    let source = inventory(source_bytes)?;
++    let expected = inventory(expected_bytes)?;
++    let output = inventory(output_bytes)?;
++    let replacement_paths = derive_replacement_paths(&source, &expected)?;
++    let oracle = oracle_for_output(
++        &source,
++        &expected,
++        &output,
++        source_bytes,
++        expected_bytes,
++        output_bytes,
++        &replacement_paths,
++        replacement,
++    );
++    Ok(Check {
++        oracle_ok: oracle.oracle_ok,
++        source_structurally_valid: oracle.source_structurally_valid,
++        expected_structurally_valid: oracle.expected_structurally_valid,
++        output_structurally_valid: oracle.output_structurally_valid,
++        semantic_reopen_ok: oracle.semantic_reopen_ok,
++        semantic_directory_metadata_matches_expected: oracle
++            .semantic_directory_metadata_matches_expected,
++        unchanged_stream_bytes_match_expected: oracle.unchanged_stream_bytes_match_expected,
++        unchanged_source_output_stream_bytes_match: oracle
++            .unchanged_source_output_stream_bytes_match,
++        output_stream_paths_match_expected: oracle.output_stream_paths_match_expected,
++        output_stream_bytes_match_expected: oracle.output_stream_bytes_match_expected,
++        root_clsid_preserved: oracle.root_clsid_preserved,
++        storage_clsids_preserved: oracle.storage_clsids_preserved,
++        failure_reasons: oracle.failure_reasons,
++    })
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn fake_inventory(streams: &[(&str, &[u8])], root_clsid: &str) -> Inventory {
++        let mut stream_bytes = BTreeMap::new();
++        let mut summaries = Vec::new();
++        for (path, bytes) in streams {
++            let path = vec![(*path).to_string()];
++            stream_bytes.insert(path.clone(), bytes.to_vec());
++            summaries.push(StreamSummary {
++                path,
++                bytes: bytes.len(),
++                sha256: sha256_hex(bytes),
++            });
++        }
++        summaries.sort_by(|left, right| left.path.cmp(&right.path));
++        Inventory {
++            summary: InventorySummary {
++                file_bytes: 0,
++                sector_size: 512,
++                root_clsid: root_clsid.into(),
++                streams: summaries,
++                storages: Vec::new(),
++                directory_entries: Vec::new(),
++                raw_directory_image_bytes: 0,
++                raw_directory_image_sha256: String::new(),
++            },
++            stream_bytes,
++            storage_clsids: BTreeMap::new(),
++            directory_entries: BTreeMap::new(),
++            raw_directory_image: RawDirectoryImage {
++                bytes: Vec::new(),
++                sector_size: 512,
++                cfb_version: 3,
++            },
++        }
++    }
++
++    #[test]
++    fn oracle_control_rejects_missing_stream() {
++        let expected = fake_inventory(
++            &[("WordDocument", b"document"), ("0Table", b"table")],
++            "root",
++        );
++        let actual = fake_inventory(&[("WordDocument", b"document")], "root");
++        let (paths_match, bytes_match) = exact_output_streams(&expected, &actual);
++        assert!(!paths_match);
++        assert!(!bytes_match);
++    }
++
++    #[test]
++    fn oracle_control_rejects_wrong_doc_target() {
++        let source = vec!["first".to_string(), "second".to_string()];
++        let wrong_target = vec!["first".to_string(), "replacement".to_string()];
++        assert!(!doc_text_projection_matches(
++            &source,
++            &wrong_target,
++            "replacement"
++        ));
++    }
++
++    #[test]
++    fn oracle_control_rejects_metadata_change() {
++        let source = fake_inventory(&[("WordDocument", b"before")], "root-a");
++        let expected = fake_inventory(&[("WordDocument", b"after")], "root-a");
++        let output = fake_inventory(&[("WordDocument", b"after")], "root-b");
++        let (root_preserved, storage_preserved) = preserved_clsids(&source, &expected, &output);
++        assert!(!root_preserved);
++        assert!(storage_preserved);
++    }
++}

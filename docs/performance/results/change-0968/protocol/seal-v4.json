@@ -1,0 +1,59 @@
+{
+  "schema": "litchi.performance.0968.cfb_commit_census.seal.v4",
+  "status": "SEALED_DIAGNOSTIC_SOURCE_HARNESS",
+  "source_variant": "instrumented_current_baseline_only",
+  "source_baseline_head": "6493e26155ee05e554f1371dd2fad707cd4bca0e",
+  "code_patch": {
+    "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic-v2-code.patch",
+    "sha256": "039a76ea250adcdf5eaa11d5d7a2bef2a7f4b4c041e22450e9a83c4cf7f5cf68",
+    "bytes": 117123
+  },
+  "plan": {
+    "path": "/home/zhuhe/litchi-performance-0968/census-plan-v2.md",
+    "sha256": "4abfb7a7aa32f9243bf818b8a0a28ceb86ddf5fb280a2ad36d32f8f1facd8881"
+  },
+  "schema_receipt": {
+    "id": "litchi.performance.0968.cfb_commit_census.v2",
+    "path": "/home/zhuhe/litchi-performance-0968/census-schema-v2.json",
+    "sha256": "bb0004a8cdf200d27099c4624a5226366de5024b279ed74f1f2f210de29dd963"
+  },
+  "provenance": {
+    "path": "/home/zhuhe/litchi-performance-0968/provenance-diagnostic-v3.json",
+    "sha256": "64d7018c047b42389ba9e5b01d07d3ade1634ef55ca6bb2a8797d94d14de30e2"
+  },
+  "build_config": {
+    "path": "/home/zhuhe/litchi-performance-0968/build-config-v3.json",
+    "sha256": "9796161240ae976e43f0b2c5a96749398f2f52097d6c022e99f27c58737bbc58"
+  },
+  "binary": {
+    "path": "/home/zhuhe/litchi-performance-0968/source-diagnostic/tools/perf-cfb-census-0968/target/release/doc_cfb_commit_census_0968",
+    "sha256": "50693dd8d2e7562f69c86d08872246f1a5d040be9f4f42fc850ed9c0a309dac9"
+  },
+  "scope": {
+    "timing_claim": false,
+    "allocator_instrumentation": false,
+    "metadata_projection": false,
+    "formal_children": 48,
+    "formal_capture_authorized": false,
+    "argv": "--case {docnohf|docfloat} --input <fixture> --edits {1|2|8|32} --retention {zero|default|release} --warmup 0 --samples 1"
+  },
+  "verification": {
+    "cargo_check_feature": "pass",
+    "cargo_check_normal": "pass",
+    "focused_census_controls": "3 pass",
+    "litchi_ole_common": "200 pass, 1 ignored doctest",
+    "litchi_doc": "1130 pass, 2 ignored",
+    "smoke_docnohf": "all 20 correctness gates, output parity, census deterministic",
+    "smoke_docfloat": "all 20 correctness gates, output parity",
+    "repeat": "docnohf e1 zero packets byte-identical after input path normalization"
+  },
+  "ordinary_0967": {
+    "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+    "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb",
+    "runtime_key_files_equal": true,
+    "control_harness_byte_identical": false,
+    "dependency_lock_byte_identical": false,
+    "role": "retained output-oracle candidate only; not used for diagnostic counters; cpu_review must independently qualify cross-harness output identity"
+  },
+  "next_gate": "staging_protocol checker and cpu_review oracle review, then root GO before any formal 48-child launch"
+}

@@ -1,0 +1,52 @@
+{
+  "candidate": "0967-doc-sprm-vector-free",
+  "completeness": {
+    "reason_codes": [
+      "terminal_packets_complete"
+    ],
+    "status": "complete"
+  },
+  "facets": {
+    "benefit": {
+      "reason_codes": [
+        "allocation_benefit_observed"
+      ],
+      "status": "pass"
+    },
+    "correctness": {
+      "reason_codes": [
+        "semantic_controls_pass"
+      ],
+      "status": "pass"
+    },
+    "custody": {
+      "reason_codes": [
+        "custody_and_schema_complete"
+      ],
+      "status": "pass"
+    },
+    "performance": {
+      "reason_codes": [
+        "native_noninferiority_failed",
+        "allocator_memory_rss_guard_failed",
+        "timed_allocator_guard_failed"
+      ],
+      "status": "fail"
+    },
+    "readiness": {
+      "reason_codes": [
+        "aa_readiness"
+      ],
+      "status": "pass"
+    }
+  },
+  "provenance": [
+    {
+      "kind": "independent_raw_audit",
+      "path": "/home/zhuhe/litchi-performance-0967/review/independent-raw-audit-0967-v2.json",
+      "sha256": "2712e39c456d7528c4c9347d6f085dd33253bf43d389d265b979ffee606b29ea"
+    }
+  ],
+  "schema": "litchi.performance.qualification_decision_input.v1",
+  "source_revision": "893072657ad8b1d726bfce351b5ec2e98f084e94"
+}
