@@ -1,0 +1,67 @@
+{
+  "created_utc": "2026-10-08T06:01:19Z",
+  "helpers": {
+    "bridge": {
+      "bytes": 16721,
+      "path": "/home/zhuhe/litchi-performance-0976/tools/affinity_bridge_0976_v2.py",
+      "sha256": "6b19f065d3a4183cad9d5ed6ae020628c7512c49e92b8a07dbdf338cc069270a"
+    },
+    "control_plan_generator": {
+      "bytes": 15910,
+      "path": "/home/zhuhe/litchi-performance-0976/tools/prepare_control_plan_0976_v6.py",
+      "sha256": "525e9f454bfec83ac78a04e534641f1dae9947d463cc235a5bf00a36e8c6a89d"
+    },
+    "python": {
+      "bytes": 7468968,
+      "path": "/usr/bin/python3.14",
+      "sha256": "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd"
+    },
+    "stdlib_target": {
+      "bytes": 8942,
+      "path": "/home/zhuhe/litchi-performance-0976/tools/stdlib_cpu_burn_0976_v2.py",
+      "sha256": "330eb4e14fb9d1a1504927cb369e28b495072beb775e2af21326bc63c7486670"
+    },
+    "taskset": {
+      "bytes": 31184,
+      "path": "/usr/bin/taskset",
+      "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2"
+    }
+  },
+  "protocol": {
+    "all_recorder_tids": true,
+    "mode": "continuous_event_mode",
+    "native_settings": {
+      "callgraph": "dwarf,32768",
+      "event": "instructions:u",
+      "period": 1000000,
+      "record_memory": [
+        "-m",
+        "16M"
+      ],
+      "record_mode": [
+        "--per-thread"
+      ]
+    },
+    "parent_identity": [
+      "pid",
+      "uid",
+      "starttime",
+      "comm",
+      "exe",
+      "sha256"
+    ],
+    "recorder_cpu": 30,
+    "startup_samples": "retained and classified as startup/handoff; no FIFO filter",
+    "target_cpu": 31
+  },
+  "schema": "litchi.performance.0976.affinity_helper_seal.v6",
+  "scope": "0976 harmless continuous affinity handoff control only; no perf/workload execution",
+  "self_test_contract": {
+    "affinity_negative_control": true,
+    "identity_negative_control": true,
+    "perf_started": false,
+    "periodic_parent_checks": true,
+    "workload_started": false
+  },
+  "status": "sealed"
+}

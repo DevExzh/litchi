@@ -1,0 +1,640 @@
+{
+  "authorization": {
+    "basis": "explicit parent GO: remove only safely unbound generated caches/temp artifacts after all replays terminal",
+    "main_checkout_touched": false,
+    "no_build_or_workload_started": true,
+    "raw_output_source_binary_history_removal": false,
+    "targeted_tmp_removal_authorized": false
+  },
+  "bytes_freed": {
+    "allocated_disk_bytes": 61440,
+    "apparent_tree_bytes": 61117,
+    "logical_regular_file_bytes": 57021
+  },
+  "candidate_after": {
+    "exists": false,
+    "path": "/home/zhuhe/litchi-performance-0973/tools-v2/__pycache__"
+  },
+  "candidate_allowlist": [
+    "/home/zhuhe/litchi-performance-0976/**/__pycache__",
+    "/home/zhuhe/litchi-performance-0976/**/*.pyc",
+    "/home/zhuhe/litchi-performance-0973/tools/**/__pycache__",
+    "/home/zhuhe/litchi-performance-0973/tools-v2/**/*.pyc"
+  ],
+  "candidate_before": {
+    "allocated_bytes": 4096,
+    "allocated_tree_bytes": 61440,
+    "apparent_tree_bytes": 61117,
+    "bytes": 4096,
+    "entries": [
+      {
+        "allocated_bytes": 57344,
+        "bytes": 57021,
+        "exists": true,
+        "inode": 10859740,
+        "mode": "0o664",
+        "mtime_ns": 1791441179281876437,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0973/tools-v2/__pycache__/protocol_common_0973_v2.cpython-314.pyc",
+        "sha256": "71537e97570c4ff7dff6ee2554fb876199fa3f42bac4efbf2fce9d010059557d",
+        "type": "file"
+      }
+    ],
+    "entry_count": 1,
+    "exists": true,
+    "inode": 10859739,
+    "logical_regular_file_bytes": 57021,
+    "mode": "0o775",
+    "mtime_ns": 1791441179281876437,
+    "nlink": 2,
+    "path": "/home/zhuhe/litchi-performance-0973/tools-v2/__pycache__",
+    "type": "dir"
+  },
+  "cleanup_commands": [
+    "PYTHONDONTWRITEBYTECODE=1 python3: fresh process/open-handle and exact candidate inventory.",
+    "PYTHONDONTWRITEBYTECODE=1 python3: remove only /home/zhuhe/litchi-performance-0973/tools-v2/__pycache__.",
+    "PYTHONDONTWRITEBYTECODE=1 python3: terminal scan for remaining 0976/imported-0973 cache/temp candidates and retained-tree integrity."
+  ],
+  "created_utc": "2026-10-08T06:40:49.657818+00:00",
+  "deleted_paths": [
+    "/home/zhuhe/litchi-performance-0973/tools-v2/__pycache__"
+  ],
+  "preflight": {
+    "all_relevant_process_matches_after": [],
+    "all_relevant_process_matches_before": [],
+    "candidate_non_symlink": true,
+    "candidate_regular_pyc_only": true,
+    "lsof_candidate_before": {
+      "records": 0,
+      "returncode": 1,
+      "stderr": "lsof: WARNING: can't stat() overlay file system /var/lib/docker/rootfs/overlayfs/26a68ec01941e4aa53e6a51ba7effee610db5a50716e8f127549c38e3eb0febd\n      Output information may be incomplete.\nlsof: WARNING: can't stat() nsfs file system /run/docker/netns/e41d5a8804a6\n      Output information may be incomplete.\n"
+    },
+    "workload_matches_after": [],
+    "workload_matches_before": []
+  },
+  "preserved_custody": {
+    "0976_tree_excluding_receipt_after": {
+      "allocated_bytes": 3471929344,
+      "entry_count": 194,
+      "logical_bytes": 3471455146,
+      "metadata_sha256": "42c9f8c601639a0ea526b7f7ede990b4cd6bdf0c633c37a5c6eae4975f4b55bb",
+      "regular_file_count": 194,
+      "root": "/home/zhuhe/litchi-performance-0976"
+    },
+    "0976_tree_excluding_receipt_before": {
+      "allocated_bytes": 3471929344,
+      "entry_count": 194,
+      "logical_bytes": 3471455146,
+      "metadata_sha256": "42c9f8c601639a0ea526b7f7ede990b4cd6bdf0c633c37a5c6eae4975f4b55bb",
+      "regular_file_count": 194,
+      "root": "/home/zhuhe/litchi-performance-0976"
+    },
+    "0976_tree_unchanged": true,
+    "bound_paths_after": [
+      {
+        "allocated_bytes": 28672,
+        "bytes": 26296,
+        "exists": true,
+        "inode": 10859689,
+        "mode": "0o775",
+        "mtime_ns": 1791439841020885319,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0976/tools/dwfl_dynamic_shim_0976_cache_final_v2.so",
+        "sha256": "2acdc5c06ac672dca0e5a34bf204e0a45451b4bfe2d31c304f4c791f5b2a0a12",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 16384,
+        "bytes": 15808,
+        "exists": true,
+        "inode": 10859674,
+        "mode": "0o775",
+        "mtime_ns": 1791439778773900437,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0976/tools/cache_guard_dladdr_stub_0976.so",
+        "sha256": "04744f8a0c90ec50c9d7a8eac67f49c9445e212639395dcba18447d747d4f2ac",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 20480,
+        "bytes": 17008,
+        "exists": true,
+        "inode": 10859675,
+        "mode": "0o775",
+        "mtime_ns": 1791439778821071722,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0976/tools/cache_guard_driver_0976",
+        "sha256": "05538aa9dcecb0534c4adf6c790bd703215b53f3270c910e8a9aca59d7d550cd",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 40960,
+        "bytes": 40748,
+        "exists": true,
+        "inode": 10859659,
+        "mode": "0o775",
+        "mtime_ns": 1791440704211037006,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0976/tools/test_aslr_translation_cache_final_v2_0976_v3.py",
+        "sha256": "0b839ab821d0a8cf4bc9d82ac21d7ad7f6cce214400afb2873829a714f3249cb",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 229220352,
+        "bytes": 229215080,
+        "exists": true,
+        "inode": 10859701,
+        "mode": "0o664",
+        "mtime_ns": 1791441082517852508,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/child-01.translated.perf.data",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 213549056,
+        "bytes": 213543177,
+        "exists": true,
+        "inode": 10859737,
+        "mode": "0o644",
+        "mtime_ns": 1791441116765248468,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/translated.dwfl.jsonl",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 11350016,
+        "bytes": 11346285,
+        "exists": true,
+        "inode": 10859735,
+        "mode": "0o664",
+        "mtime_ns": 1791441116766829606,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/translated.corrected.script.txt",
+        "sha256": "e8af015e82a2dcb0e5f1d3af52b44d27d6c6e3e3e8187280651b273a68e6f9db",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 40960,
+        "bytes": 39589,
+        "exists": true,
+        "inode": 3333322,
+        "mode": "0o664",
+        "mtime_ns": 1791434184216155444,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0973/tools-v2/protocol_common_0973_v2.py",
+        "sha256": "56b509fde01bbd66702ac8cd835da0d09d74d332935926078c6545093ed52bf4",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 20480,
+        "bytes": 16672,
+        "exists": true,
+        "inode": 3333329,
+        "mode": "0o664",
+        "mtime_ns": 1791432840400765936,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0973/tools-v2/dwfl_dynamic_shim_v2.so",
+        "sha256": "92b256588622a97b0e32a8de2a6149d3e5dce0b2eda3e614ff42daf91279bb03",
+        "type": "file"
+      }
+    ],
+    "bound_paths_before": [
+      {
+        "allocated_bytes": 28672,
+        "bytes": 26296,
+        "exists": true,
+        "inode": 10859689,
+        "mode": "0o775",
+        "mtime_ns": 1791439841020885319,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0976/tools/dwfl_dynamic_shim_0976_cache_final_v2.so",
+        "sha256": "2acdc5c06ac672dca0e5a34bf204e0a45451b4bfe2d31c304f4c791f5b2a0a12",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 16384,
+        "bytes": 15808,
+        "exists": true,
+        "inode": 10859674,
+        "mode": "0o775",
+        "mtime_ns": 1791439778773900437,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0976/tools/cache_guard_dladdr_stub_0976.so",
+        "sha256": "04744f8a0c90ec50c9d7a8eac67f49c9445e212639395dcba18447d747d4f2ac",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 20480,
+        "bytes": 17008,
+        "exists": true,
+        "inode": 10859675,
+        "mode": "0o775",
+        "mtime_ns": 1791439778821071722,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0976/tools/cache_guard_driver_0976",
+        "sha256": "05538aa9dcecb0534c4adf6c790bd703215b53f3270c910e8a9aca59d7d550cd",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 40960,
+        "bytes": 40748,
+        "exists": true,
+        "inode": 10859659,
+        "mode": "0o775",
+        "mtime_ns": 1791440704211037006,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0976/tools/test_aslr_translation_cache_final_v2_0976_v3.py",
+        "sha256": "0b839ab821d0a8cf4bc9d82ac21d7ad7f6cce214400afb2873829a714f3249cb",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 229220352,
+        "bytes": 229215080,
+        "exists": true,
+        "inode": 10859701,
+        "mode": "0o664",
+        "mtime_ns": 1791441082517852508,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/child-01.translated.perf.data",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 213549056,
+        "bytes": 213543177,
+        "exists": true,
+        "inode": 10859737,
+        "mode": "0o644",
+        "mtime_ns": 1791441116765248468,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/translated.dwfl.jsonl",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 11350016,
+        "bytes": 11346285,
+        "exists": true,
+        "inode": 10859735,
+        "mode": "0o664",
+        "mtime_ns": 1791441116766829606,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/translated.corrected.script.txt",
+        "sha256": "e8af015e82a2dcb0e5f1d3af52b44d27d6c6e3e3e8187280651b273a68e6f9db",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 40960,
+        "bytes": 39589,
+        "exists": true,
+        "inode": 3333322,
+        "mode": "0o664",
+        "mtime_ns": 1791434184216155444,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0973/tools-v2/protocol_common_0973_v2.py",
+        "sha256": "56b509fde01bbd66702ac8cd835da0d09d74d332935926078c6545093ed52bf4",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 20480,
+        "bytes": 16672,
+        "exists": true,
+        "inode": 3333329,
+        "mode": "0o664",
+        "mtime_ns": 1791432840400765936,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0973/tools-v2/dwfl_dynamic_shim_v2.so",
+        "sha256": "92b256588622a97b0e32a8de2a6149d3e5dce0b2eda3e614ff42daf91279bb03",
+        "type": "file"
+      }
+    ],
+    "bound_paths_unchanged": true,
+    "imported_0973_tools_v2_excluding_cache_after": {
+      "allocated_bytes": 163840,
+      "entry_count": 9,
+      "logical_bytes": 143658,
+      "metadata_sha256": "049bd0fc3329e12228fd0b71a0a03c458ad214929d33b98310dd5dc0bd12fe9d",
+      "regular_file_count": 9,
+      "root": "/home/zhuhe/litchi-performance-0973/tools-v2"
+    },
+    "imported_0973_tools_v2_excluding_cache_before": {
+      "allocated_bytes": 163840,
+      "entry_count": 9,
+      "logical_bytes": 143658,
+      "metadata_sha256": "049bd0fc3329e12228fd0b71a0a03c458ad214929d33b98310dd5dc0bd12fe9d",
+      "regular_file_count": 9,
+      "root": "/home/zhuhe/litchi-performance-0973/tools-v2"
+    },
+    "imported_0973_tools_v2_unchanged": true
+  },
+  "schema": "litchi.performance.0976.temporary_cleanup.v1",
+  "status": "completed",
+  "targeted_tmp_custody": {
+    "after": [
+      {
+        "allocated_bytes": 0,
+        "bytes": 0,
+        "exists": true,
+        "inode": 4074517,
+        "mode": "0o664",
+        "mtime_ns": 1791439543277392699,
+        "nlink": 1,
+        "path": "/tmp/0976-cmd.err",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 4096,
+        "bytes": 488,
+        "exists": true,
+        "inode": 4074516,
+        "mode": "0o664",
+        "mtime_ns": 1791439543510393861,
+        "nlink": 1,
+        "path": "/tmp/0976-cmd.out",
+        "sha256": "a5ca16aa4bd5022b94b86d1310bd5961ab147842a7d56d5b6817db9fdb75ce29",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 385024,
+        "bytes": 384581,
+        "exists": true,
+        "inode": 4074520,
+        "mode": "0o664",
+        "mtime_ns": 1791439552478637578,
+        "nlink": 1,
+        "path": "/tmp/0976-control-perf-script.txt",
+        "sha256": "06349f075c76e561e43b481769294fd4fac13818b23c0c4ced6eb8644668bfd7",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 0,
+        "bytes": 0,
+        "exists": true,
+        "inode": 4074523,
+        "mode": "0o664",
+        "mtime_ns": 1791439562142486756,
+        "nlink": 1,
+        "path": "/tmp/0976-raw-dump.err",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 4096,
+        "bytes": 390,
+        "exists": true,
+        "inode": 4074512,
+        "mode": "0o664",
+        "mtime_ns": 1791439373729547866,
+        "nlink": 1,
+        "path": "/tmp/0976-v6-bridge-selftest.json",
+        "sha256": "dfec40fb158f0c2cd80d8a61f7ceab7b3f0492441550110cf55a5524701fae41",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 4096,
+        "bytes": 514,
+        "exists": true,
+        "inode": 4074514,
+        "mode": "0o664",
+        "mtime_ns": 1791439373835548394,
+        "nlink": 1,
+        "path": "/tmp/0976-v6-plan-check.json",
+        "sha256": "fae3162a71cc7e7b1a7872422734c9d4713b7be68e5b0a6d16820cdd7b85b077",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 4096,
+        "bytes": 184,
+        "exists": true,
+        "inode": 4074513,
+        "mode": "0o664",
+        "mtime_ns": 1791439373760548020,
+        "nlink": 1,
+        "path": "/tmp/0976-v6-target-selftest.json",
+        "sha256": "680ca17f3920a72976aae911f1cb2e55e193f628c860ddc35dece9c960eddabe",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 12288,
+        "bytes": 9564,
+        "exists": true,
+        "inode": 4074526,
+        "mode": "0o664",
+        "mtime_ns": 1791439633353841840,
+        "nlink": 1,
+        "path": "/tmp/audit_0976_control.py",
+        "sha256": "f858ff0621dc7de9aca7ec9774381f755f6f317dd820845085cdb366b30d9e80",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 12288,
+        "bytes": 8745,
+        "exists": true,
+        "inode": 4074509,
+        "mode": "0o664",
+        "mtime_ns": 1791439159240475898,
+        "nlink": 1,
+        "path": "/tmp/write_0976_control_review.py",
+        "sha256": "4573136f60e4715d3dd6581551b926210a076cb58e2dd1512502581d407a8bf3",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 8192,
+        "bytes": 7867,
+        "exists": true,
+        "inode": 4074515,
+        "mode": "0o664",
+        "mtime_ns": 1791439394928653734,
+        "nlink": 1,
+        "path": "/tmp/write_0976_control_review_v2.py",
+        "sha256": "833f50957c8a0a16e11d46811677509880364937105822997d6b689121625d11",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 4096,
+        "bytes": 3657,
+        "exists": true,
+        "inode": 4074511,
+        "mode": "0o664",
+        "mtime_ns": 1791439369227525437,
+        "nlink": 1,
+        "path": "/tmp/write_0976_custody_correction.py",
+        "sha256": "e18fa00b3b501a69bab3fdb67a1a912a3a146f79e70c4d439aeb78f2ca5ec5fb",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 12288,
+        "bytes": 9058,
+        "exists": true,
+        "inode": 4074481,
+        "mode": "0o664",
+        "mtime_ns": 1791438856882971016,
+        "nlink": 1,
+        "path": "/tmp/write_0976_receipt.py",
+        "sha256": "b46221054c24b0b9fb810115169732fadd341b3d435e982b0396f4283eaf39cf",
+        "type": "file"
+      }
+    ],
+    "before": [
+      {
+        "allocated_bytes": 0,
+        "bytes": 0,
+        "exists": true,
+        "inode": 4074517,
+        "mode": "0o664",
+        "mtime_ns": 1791439543277392699,
+        "nlink": 1,
+        "path": "/tmp/0976-cmd.err",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 4096,
+        "bytes": 488,
+        "exists": true,
+        "inode": 4074516,
+        "mode": "0o664",
+        "mtime_ns": 1791439543510393861,
+        "nlink": 1,
+        "path": "/tmp/0976-cmd.out",
+        "sha256": "a5ca16aa4bd5022b94b86d1310bd5961ab147842a7d56d5b6817db9fdb75ce29",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 385024,
+        "bytes": 384581,
+        "exists": true,
+        "inode": 4074520,
+        "mode": "0o664",
+        "mtime_ns": 1791439552478637578,
+        "nlink": 1,
+        "path": "/tmp/0976-control-perf-script.txt",
+        "sha256": "06349f075c76e561e43b481769294fd4fac13818b23c0c4ced6eb8644668bfd7",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 0,
+        "bytes": 0,
+        "exists": true,
+        "inode": 4074523,
+        "mode": "0o664",
+        "mtime_ns": 1791439562142486756,
+        "nlink": 1,
+        "path": "/tmp/0976-raw-dump.err",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 4096,
+        "bytes": 390,
+        "exists": true,
+        "inode": 4074512,
+        "mode": "0o664",
+        "mtime_ns": 1791439373729547866,
+        "nlink": 1,
+        "path": "/tmp/0976-v6-bridge-selftest.json",
+        "sha256": "dfec40fb158f0c2cd80d8a61f7ceab7b3f0492441550110cf55a5524701fae41",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 4096,
+        "bytes": 514,
+        "exists": true,
+        "inode": 4074514,
+        "mode": "0o664",
+        "mtime_ns": 1791439373835548394,
+        "nlink": 1,
+        "path": "/tmp/0976-v6-plan-check.json",
+        "sha256": "fae3162a71cc7e7b1a7872422734c9d4713b7be68e5b0a6d16820cdd7b85b077",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 4096,
+        "bytes": 184,
+        "exists": true,
+        "inode": 4074513,
+        "mode": "0o664",
+        "mtime_ns": 1791439373760548020,
+        "nlink": 1,
+        "path": "/tmp/0976-v6-target-selftest.json",
+        "sha256": "680ca17f3920a72976aae911f1cb2e55e193f628c860ddc35dece9c960eddabe",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 12288,
+        "bytes": 9564,
+        "exists": true,
+        "inode": 4074526,
+        "mode": "0o664",
+        "mtime_ns": 1791439633353841840,
+        "nlink": 1,
+        "path": "/tmp/audit_0976_control.py",
+        "sha256": "f858ff0621dc7de9aca7ec9774381f755f6f317dd820845085cdb366b30d9e80",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 12288,
+        "bytes": 8745,
+        "exists": true,
+        "inode": 4074509,
+        "mode": "0o664",
+        "mtime_ns": 1791439159240475898,
+        "nlink": 1,
+        "path": "/tmp/write_0976_control_review.py",
+        "sha256": "4573136f60e4715d3dd6581551b926210a076cb58e2dd1512502581d407a8bf3",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 8192,
+        "bytes": 7867,
+        "exists": true,
+        "inode": 4074515,
+        "mode": "0o664",
+        "mtime_ns": 1791439394928653734,
+        "nlink": 1,
+        "path": "/tmp/write_0976_control_review_v2.py",
+        "sha256": "833f50957c8a0a16e11d46811677509880364937105822997d6b689121625d11",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 4096,
+        "bytes": 3657,
+        "exists": true,
+        "inode": 4074511,
+        "mode": "0o664",
+        "mtime_ns": 1791439369227525437,
+        "nlink": 1,
+        "path": "/tmp/write_0976_custody_correction.py",
+        "sha256": "e18fa00b3b501a69bab3fdb67a1a912a3a146f79e70c4d439aeb78f2ca5ec5fb",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 12288,
+        "bytes": 9058,
+        "exists": true,
+        "inode": 4074481,
+        "mode": "0o664",
+        "mtime_ns": 1791438856882971016,
+        "nlink": 1,
+        "path": "/tmp/write_0976_receipt.py",
+        "sha256": "b46221054c24b0b9fb810115169732fadd341b3d435e982b0396f4283eaf39cf",
+        "type": "file"
+      }
+    ],
+    "deleted": [],
+    "unchanged": true
+  },
+  "terminal_scan": {
+    "command": "find /home/zhuhe/litchi-performance-0976 /home/zhuhe/litchi-performance-0973/tools /home/zhuhe/litchi-performance-0973/tools-v2 -xdev for __pycache__, *.pyc, *.pyo, temp/tmp/scratch/selftest/sentinel/swap names, excluding this receipt",
+    "compiled_shims_and_test_binary_preserved": true,
+    "excluded_paths": [
+      "/home/zhuhe/litchi-performance-0976/receipts/temporary-cleanup-0976-v1.json"
+    ],
+    "failure_and_history_preserved": true,
+    "main_checkout_touched": false,
+    "raw_translated_outputs_preserved": true,
+    "remaining_0976_or_imported_0973_cache_temp_candidates": [],
+    "remaining_after_excluding_receipt": [],
+    "source_preserved": true,
+    "verified_utc": "2026-10-08T06:41:02.839461+00:00"
+  }
+}

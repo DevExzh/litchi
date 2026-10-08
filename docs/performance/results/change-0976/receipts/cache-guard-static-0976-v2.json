@@ -1,0 +1,63 @@
+{
+  "controls": {
+    "add_p_vaddr": {
+      "admitted": false,
+      "expected": false
+    },
+    "bad_build_or_delta": {
+      "admitted": false,
+      "expected": false
+    },
+    "baseline_initial": {
+      "admitted": true,
+      "expected": true
+    },
+    "baseline_reuse": {
+      "admitted": true,
+      "expected": true
+    },
+    "fd_reuse": {
+      "admitted": false,
+      "expected": false
+    },
+    "wrong_base": {
+      "admitted": false,
+      "expected": false
+    },
+    "wrong_caller": {
+      "admitted": false,
+      "expected": false
+    },
+    "wrong_name": {
+      "admitted": false,
+      "expected": false
+    },
+    "wrong_path": {
+      "admitted": false,
+      "expected": false
+    }
+  },
+  "lifecycle_contracts": {
+    "dwfl_end": "clear before underlying free",
+    "report_begin": "clear before underlying call",
+    "report_begin_add": "ELFUTILS_0.127 and clear before underlying call",
+    "report_end": "clear after underlying call"
+  },
+  "limitations": [
+    "source/static controls do not prove runtime libdw symbol behavior",
+    "positive replay and translated raw control remain pending reviewer release"
+  ],
+  "map": {
+    "bytes": 233,
+    "path": "/home/zhuhe/litchi-performance-0976/tools/dwfl_dynamic_shim_0976_cache_final_v2.map",
+    "sha256": "173dd1902d46a378e713cd794ede6c4fdac2a184124e8aefecc0c2fda7494883"
+  },
+  "native_workload_started": false,
+  "offline_only": true,
+  "schema": "litchi.performance.0976.cache_guard_static.v2",
+  "source": {
+    "bytes": 33461,
+    "path": "/home/zhuhe/litchi-performance-0976/tools/dwfl_dynamic_shim_0976_cache_final_v2.c",
+    "sha256": "a30536989f1fcc3e28c5bbe5876b9f01159841ba0a6d6c3aa22706cdcfd23d1a"
+  }
+}

@@ -1,0 +1,1044 @@
+{
+  "controls": {
+    "0973_corrected_noop_headers_equal": true,
+    "0973_corrected_stock_headers_equal": true,
+    "0973_stock_noop_script_byte_identical": true,
+    "0975_corrected_noop_headers_equal": true,
+    "0975_corrected_stock_headers_equal": true,
+    "0975_stock_noop_script_byte_identical": true,
+    "period_value": 1000000
+  },
+  "inputs": {
+    "0973_noop": {
+      "artifact": {
+        "bytes": 1137729,
+        "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.noop.perf-script-no-inline.txt",
+        "sha256": "03f2d314e734608d6ea71dbdf6be1a186ca03dd0cf5f3c37f8a979f4fcf5d1c3"
+      },
+      "empty_count": 4540,
+      "empty_fraction": 0.6550281344683306,
+      "empty_runs": {
+        "count": 1553,
+        "first": [
+          [
+            204,
+            204
+          ],
+          [
+            207,
+            208
+          ],
+          [
+            210,
+            211
+          ],
+          [
+            214,
+            216
+          ],
+          [
+            218,
+            225
+          ],
+          [
+            228,
+            228
+          ],
+          [
+            230,
+            230
+          ],
+          [
+            232,
+            234
+          ],
+          [
+            236,
+            244
+          ],
+          [
+            246,
+            249
+          ]
+        ],
+        "max_length": 19,
+        "singleton_count": 553
+      },
+      "first_empty": {
+        "index": 204,
+        "time": 300158.301422
+      },
+      "last_empty": {
+        "index": 6930,
+        "time": 300159.016886
+      },
+      "sample_count": 6931,
+      "target_frame_lines": 69,
+      "total_frame_lines": 10035,
+      "unknown_frame_lines": 3372
+    },
+    "0973_old_corrected": {
+      "artifact": {
+        "bytes": 11270952,
+        "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.corrected.perf-script-no-inline.txt",
+        "sha256": "b8d2022b0caa77b02e9fb5a0c4c75c75f7830a7de5a00a037c84eb418583961b"
+      },
+      "empty_count": 0,
+      "empty_fraction": 0.0,
+      "empty_runs": {
+        "count": 0,
+        "first": [],
+        "max_length": 0,
+        "singleton_count": 0
+      },
+      "first_empty": null,
+      "last_empty": null,
+      "sample_count": 6931,
+      "target_frame_lines": 53035,
+      "total_frame_lines": 62987,
+      "unknown_frame_lines": 3357
+    },
+    "0973_raw_ip": {
+      "bins_250": [
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 0,
+          "last_index_exclusive": 250,
+          "raw_pf_x": 70
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 250,
+          "last_index_exclusive": 500,
+          "raw_pf_x": 146
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 500,
+          "last_index_exclusive": 750,
+          "raw_pf_x": 173
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 750,
+          "last_index_exclusive": 1000,
+          "raw_pf_x": 164
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 1000,
+          "last_index_exclusive": 1250,
+          "raw_pf_x": 158
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 1250,
+          "last_index_exclusive": 1500,
+          "raw_pf_x": 166
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 1500,
+          "last_index_exclusive": 1750,
+          "raw_pf_x": 178
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 1750,
+          "last_index_exclusive": 2000,
+          "raw_pf_x": 172
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 2000,
+          "last_index_exclusive": 2250,
+          "raw_pf_x": 166
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 2250,
+          "last_index_exclusive": 2500,
+          "raw_pf_x": 178
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 2500,
+          "last_index_exclusive": 2750,
+          "raw_pf_x": 174
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 2750,
+          "last_index_exclusive": 3000,
+          "raw_pf_x": 161
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 3000,
+          "last_index_exclusive": 3250,
+          "raw_pf_x": 163
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 3250,
+          "last_index_exclusive": 3500,
+          "raw_pf_x": 170
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 3500,
+          "last_index_exclusive": 3750,
+          "raw_pf_x": 175
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 3750,
+          "last_index_exclusive": 4000,
+          "raw_pf_x": 170
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 4000,
+          "last_index_exclusive": 4250,
+          "raw_pf_x": 170
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 4250,
+          "last_index_exclusive": 4500,
+          "raw_pf_x": 163
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 4500,
+          "last_index_exclusive": 4750,
+          "raw_pf_x": 180
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 4750,
+          "last_index_exclusive": 5000,
+          "raw_pf_x": 158
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 5000,
+          "last_index_exclusive": 5250,
+          "raw_pf_x": 165
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 5250,
+          "last_index_exclusive": 5500,
+          "raw_pf_x": 170
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 5500,
+          "last_index_exclusive": 5750,
+          "raw_pf_x": 174
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 5750,
+          "last_index_exclusive": 6000,
+          "raw_pf_x": 170
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 6000,
+          "last_index_exclusive": 6250,
+          "raw_pf_x": 175
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 6250,
+          "last_index_exclusive": 6500,
+          "raw_pf_x": 165
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 6500,
+          "last_index_exclusive": 6750,
+          "raw_pf_x": 166
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 6750,
+          "last_index_exclusive": 6931,
+          "raw_pf_x": 116
+        }
+      ],
+      "empty_count": 0,
+      "empty_raw_non_pf_x_count": 0,
+      "empty_raw_pf_x_count": 0,
+      "interval": [
+        "0x5632918fc9f0",
+        "0x563291b83960"
+      ],
+      "nonempty_raw_pf_x_count": 4556,
+      "raw_pf_x_count": 4556,
+      "raw_sample_count": 6931
+    },
+    "0973_stock": {
+      "artifact": {
+        "bytes": 1137729,
+        "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.stock.perf-script-no-inline.txt",
+        "sha256": "03f2d314e734608d6ea71dbdf6be1a186ca03dd0cf5f3c37f8a979f4fcf5d1c3"
+      },
+      "empty_count": 4540,
+      "empty_fraction": 0.6550281344683306,
+      "empty_runs": {
+        "count": 1553,
+        "first": [
+          [
+            204,
+            204
+          ],
+          [
+            207,
+            208
+          ],
+          [
+            210,
+            211
+          ],
+          [
+            214,
+            216
+          ],
+          [
+            218,
+            225
+          ],
+          [
+            228,
+            228
+          ],
+          [
+            230,
+            230
+          ],
+          [
+            232,
+            234
+          ],
+          [
+            236,
+            244
+          ],
+          [
+            246,
+            249
+          ]
+        ],
+        "max_length": 19,
+        "singleton_count": 553
+      },
+      "first_empty": {
+        "index": 204,
+        "time": 300158.301422
+      },
+      "last_empty": {
+        "index": 6930,
+        "time": 300159.016886
+      },
+      "sample_count": 6931,
+      "target_frame_lines": 69,
+      "total_frame_lines": 10035,
+      "unknown_frame_lines": 3372
+    },
+    "0975_noop": {
+      "artifact": {
+        "bytes": 1169880,
+        "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.noop.perf-script-no-inline.txt",
+        "sha256": "a41b5f6aa9ab569957746cb33137a31b1120be6685f4dbe7fad7d950a57202fb"
+      },
+      "empty_count": 4434,
+      "empty_fraction": 0.6389048991354467,
+      "empty_runs": {
+        "count": 1515,
+        "first": [
+          [
+            347,
+            347
+          ],
+          [
+            351,
+            356
+          ],
+          [
+            358,
+            359
+          ],
+          [
+            361,
+            361
+          ],
+          [
+            363,
+            363
+          ],
+          [
+            365,
+            366
+          ],
+          [
+            368,
+            368
+          ],
+          [
+            371,
+            372
+          ],
+          [
+            375,
+            380
+          ],
+          [
+            382,
+            382
+          ]
+        ],
+        "max_length": 19,
+        "singleton_count": 532
+      },
+      "first_empty": {
+        "index": 347,
+        "time": 303382.345797
+      },
+      "last_empty": {
+        "index": 6939,
+        "time": 303383.215444
+      },
+      "sample_count": 6940,
+      "target_frame_lines": 263,
+      "total_frame_lines": 10192,
+      "unknown_frame_lines": 3379
+    },
+    "0975_old_corrected": {
+      "artifact": {
+        "bytes": 3008278,
+        "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.corrected.perf-script-no-inline.txt",
+        "sha256": "0d0f1c7a64654fddb9d78855b4ee82727df640f07a50e8ce71a695ccfbe19dda"
+      },
+      "empty_count": 3745,
+      "empty_fraction": 0.5396253602305475,
+      "empty_runs": {
+        "count": 1270,
+        "first": [
+          [
+            1389,
+            1397
+          ],
+          [
+            1399,
+            1400
+          ],
+          [
+            1405,
+            1407
+          ],
+          [
+            1409,
+            1412
+          ],
+          [
+            1414,
+            1415
+          ],
+          [
+            1418,
+            1418
+          ],
+          [
+            1421,
+            1424
+          ],
+          [
+            1427,
+            1428
+          ],
+          [
+            1432,
+            1432
+          ],
+          [
+            1434,
+            1440
+          ]
+        ],
+        "max_length": 19,
+        "singleton_count": 445
+      },
+      "first_empty": {
+        "index": 1389,
+        "time": 303382.496301
+      },
+      "last_empty": {
+        "index": 6939,
+        "time": 303383.215444
+      },
+      "sample_count": 6940,
+      "target_frame_lines": 9879,
+      "total_frame_lines": 19713,
+      "unknown_frame_lines": 3284
+    },
+    "0975_raw_ip": {
+      "bins_250": [
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 0,
+          "last_index_exclusive": 250,
+          "raw_pf_x": 60
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 250,
+          "last_index_exclusive": 500,
+          "raw_pf_x": 173
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 500,
+          "last_index_exclusive": 750,
+          "raw_pf_x": 160
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 750,
+          "last_index_exclusive": 1000,
+          "raw_pf_x": 172
+        },
+        {
+          "empty": 0,
+          "empty_raw_pf_x": 0,
+          "first_index": 1000,
+          "last_index_exclusive": 1250,
+          "raw_pf_x": 159
+        },
+        {
+          "empty": 74,
+          "empty_raw_pf_x": 73,
+          "first_index": 1250,
+          "last_index_exclusive": 1500,
+          "raw_pf_x": 164
+        },
+        {
+          "empty": 164,
+          "empty_raw_pf_x": 163,
+          "first_index": 1500,
+          "last_index_exclusive": 1750,
+          "raw_pf_x": 163
+        },
+        {
+          "empty": 171,
+          "empty_raw_pf_x": 171,
+          "first_index": 1750,
+          "last_index_exclusive": 2000,
+          "raw_pf_x": 171
+        },
+        {
+          "empty": 183,
+          "empty_raw_pf_x": 182,
+          "first_index": 2000,
+          "last_index_exclusive": 2250,
+          "raw_pf_x": 182
+        },
+        {
+          "empty": 161,
+          "empty_raw_pf_x": 161,
+          "first_index": 2250,
+          "last_index_exclusive": 2500,
+          "raw_pf_x": 161
+        },
+        {
+          "empty": 166,
+          "empty_raw_pf_x": 166,
+          "first_index": 2500,
+          "last_index_exclusive": 2750,
+          "raw_pf_x": 166
+        },
+        {
+          "empty": 153,
+          "empty_raw_pf_x": 153,
+          "first_index": 2750,
+          "last_index_exclusive": 3000,
+          "raw_pf_x": 153
+        },
+        {
+          "empty": 167,
+          "empty_raw_pf_x": 167,
+          "first_index": 3000,
+          "last_index_exclusive": 3250,
+          "raw_pf_x": 167
+        },
+        {
+          "empty": 160,
+          "empty_raw_pf_x": 159,
+          "first_index": 3250,
+          "last_index_exclusive": 3500,
+          "raw_pf_x": 159
+        },
+        {
+          "empty": 162,
+          "empty_raw_pf_x": 162,
+          "first_index": 3500,
+          "last_index_exclusive": 3750,
+          "raw_pf_x": 162
+        },
+        {
+          "empty": 172,
+          "empty_raw_pf_x": 170,
+          "first_index": 3750,
+          "last_index_exclusive": 4000,
+          "raw_pf_x": 170
+        },
+        {
+          "empty": 164,
+          "empty_raw_pf_x": 164,
+          "first_index": 4000,
+          "last_index_exclusive": 4250,
+          "raw_pf_x": 164
+        },
+        {
+          "empty": 171,
+          "empty_raw_pf_x": 170,
+          "first_index": 4250,
+          "last_index_exclusive": 4500,
+          "raw_pf_x": 170
+        },
+        {
+          "empty": 161,
+          "empty_raw_pf_x": 161,
+          "first_index": 4500,
+          "last_index_exclusive": 4750,
+          "raw_pf_x": 161
+        },
+        {
+          "empty": 178,
+          "empty_raw_pf_x": 177,
+          "first_index": 4750,
+          "last_index_exclusive": 5000,
+          "raw_pf_x": 177
+        },
+        {
+          "empty": 164,
+          "empty_raw_pf_x": 163,
+          "first_index": 5000,
+          "last_index_exclusive": 5250,
+          "raw_pf_x": 163
+        },
+        {
+          "empty": 178,
+          "empty_raw_pf_x": 177,
+          "first_index": 5250,
+          "last_index_exclusive": 5500,
+          "raw_pf_x": 177
+        },
+        {
+          "empty": 165,
+          "empty_raw_pf_x": 165,
+          "first_index": 5500,
+          "last_index_exclusive": 5750,
+          "raw_pf_x": 165
+        },
+        {
+          "empty": 157,
+          "empty_raw_pf_x": 157,
+          "first_index": 5750,
+          "last_index_exclusive": 6000,
+          "raw_pf_x": 157
+        },
+        {
+          "empty": 172,
+          "empty_raw_pf_x": 171,
+          "first_index": 6000,
+          "last_index_exclusive": 6250,
+          "raw_pf_x": 171
+        },
+        {
+          "empty": 183,
+          "empty_raw_pf_x": 183,
+          "first_index": 6250,
+          "last_index_exclusive": 6500,
+          "raw_pf_x": 183
+        },
+        {
+          "empty": 178,
+          "empty_raw_pf_x": 178,
+          "first_index": 6500,
+          "last_index_exclusive": 6750,
+          "raw_pf_x": 178
+        },
+        {
+          "empty": 141,
+          "empty_raw_pf_x": 141,
+          "first_index": 6750,
+          "last_index_exclusive": 6940,
+          "raw_pf_x": 141
+        }
+      ],
+      "empty_count": 3745,
+      "empty_raw_non_pf_x_count": 11,
+      "empty_raw_pf_x_count": 3734,
+      "interval": [
+        "0x5f33d2a419f0",
+        "0x5f33d2cc8960"
+      ],
+      "nonempty_raw_pf_x_count": 815,
+      "raw_pf_x_count": 4549,
+      "raw_sample_count": 6940
+    },
+    "0975_stock": {
+      "artifact": {
+        "bytes": 1169880,
+        "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.stock.perf-script-no-inline.txt",
+        "sha256": "a41b5f6aa9ab569957746cb33137a31b1120be6685f4dbe7fad7d950a57202fb"
+      },
+      "empty_count": 4434,
+      "empty_fraction": 0.6389048991354467,
+      "empty_runs": {
+        "count": 1515,
+        "first": [
+          [
+            347,
+            347
+          ],
+          [
+            351,
+            356
+          ],
+          [
+            358,
+            359
+          ],
+          [
+            361,
+            361
+          ],
+          [
+            363,
+            363
+          ],
+          [
+            365,
+            366
+          ],
+          [
+            368,
+            368
+          ],
+          [
+            371,
+            372
+          ],
+          [
+            375,
+            380
+          ],
+          [
+            382,
+            382
+          ]
+        ],
+        "max_length": 19,
+        "singleton_count": 532
+      },
+      "first_empty": {
+        "index": 347,
+        "time": 303382.345797
+      },
+      "last_empty": {
+        "index": 6939,
+        "time": 303383.215444
+      },
+      "sample_count": 6940,
+      "target_frame_lines": 263,
+      "total_frame_lines": 10192,
+      "unknown_frame_lines": 3379
+    },
+    "layouts": {
+      "0973": {
+        "binary": {
+          "bytes": 47909224,
+          "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+          "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+        },
+        "build_id": "e5c457384eeebd057932c444efda77618f137399",
+        "corrected_base": "0x563291817000",
+        "layout_artifact": {
+          "bytes": 4457,
+          "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.target-layout.json",
+          "sha256": "8540ad7c5b20faacb687679a92a2f6636fcfbecb34b2254eedf5f926f9099e3e"
+        },
+        "perf_expected_start": "0x563291818000",
+        "target_mmap2_count": 4,
+        "target_mmap2_permissions_offsets": [
+          [
+            "r--p",
+            0,
+            3649536
+          ],
+          [
+            "r-xp",
+            933888,
+            2654208
+          ],
+          [
+            "rw-p",
+            3584000,
+            53248
+          ],
+          [
+            "rw-p",
+            3633152,
+            4096
+          ]
+        ]
+      },
+      "0975": {
+        "binary": {
+          "bytes": 47909224,
+          "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+          "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+        },
+        "build_id": "e5c457384eeebd057932c444efda77618f137399",
+        "corrected_base": "0x5f33d295c000",
+        "layout_artifact": {
+          "bytes": 4462,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.target-layout.json",
+          "sha256": "17371d3a1a2d5acb18539eda3b80ee2558d0f07345f6b57bdd8d79744ef2f001"
+        },
+        "perf_expected_start": "0x5f33d295d000",
+        "target_mmap2_count": 4,
+        "target_mmap2_permissions_offsets": [
+          [
+            "r--p",
+            0,
+            3649536
+          ],
+          [
+            "r-xp",
+            933888,
+            2654208
+          ],
+          [
+            "rw-p",
+            3584000,
+            53248
+          ],
+          [
+            "rw-p",
+            3633152,
+            4096
+          ]
+        ]
+      }
+    }
+  },
+  "mechanism": {
+    "0973_first_target_failure": null,
+    "0975_first_target_failure": {
+      "dwfl_errno_after": 21,
+      "forwarded_base": "0x5f33d295c000",
+      "line": 70522,
+      "original_base": "0x5f33d295c000",
+      "result_module": "(nil)"
+    },
+    "control_variant": "Reuse is accepted only for same Dwfl pointer, exact target path, exact expected/corrected bases, and dwfl_addrmodule(corrected_base+0x1000) returning the cached module. The variant logs this as reused_existing and never calls the underlying report for those duplicates.",
+    "libdw_errors": {
+      "196610": "No such file or directory",
+      "21": "address range overlaps an existing module"
+    },
+    "limitations": [
+      "Retained DWFL logs have no sample index, so report-line 70522 and corrected sample index 1389 are ordered evidence, not a timestamp-level causal join.",
+      "0975 child-01 has zero raw loss; 0975 child-02 is not used for lifetime claims because its raw loss gate failed.",
+      "The cache variant demonstrates an offline control on retained perf.data; it is not a production patch or a performance claim."
+    ],
+    "measured": "The retained 0975 corrected log reports the exact target path 7,310 times. The first corrected report succeeds; 7,309 later reports return nil with libdw error 21. Each forwards the target to corrected_base, and the common original base is the perf_expected_start. The adjacent build-id fallback returns errno 2 / libdw 196610.",
+    "source": {
+      "libdw": {
+        "bytes": 823824,
+        "path": "/usr/lib/x86_64-linux-gnu/libdw-0.194.so",
+        "sha256": "86a59c8071ab57c25daacb275cedae072de83151bd358d4ffdc7844afbd31109"
+      },
+      "retained_parser": {
+        "bytes": 39589,
+        "path": "/home/zhuhe/litchi-performance-0973/tools-v2/protocol_common_0973_v2.py",
+        "sha256": "56b509fde01bbd66702ac8cd835da0d09d74d332935926078c6545093ed52bf4"
+      },
+      "shim_map": {
+        "bytes": 107,
+        "path": "/home/zhuhe/litchi-performance-0973/tools-v2/dwfl_dynamic_shim_v2.map",
+        "sha256": "d0a7914c5cb02770073db94dc4d2b207a95ae513b436c661d8a9c9a206aefef6"
+      },
+      "shim_so": {
+        "bytes": 20944,
+        "path": "/home/zhuhe/litchi-performance-0976/tools/dwfl_dynamic_shim_0976_cache.so",
+        "sha256": "cc177d6b0cfeb0d06405883a5b8cd191402be742c9685a648ed74a03e92c1609"
+      },
+      "shim_source": {
+        "bytes": 13376,
+        "path": "/home/zhuhe/litchi-performance-0976/tools/dwfl_dynamic_shim_0976_cache.c",
+        "sha256": "6608a6f6ca85deea8206910d7083b1f4fa080b0c797970998ac382cbff95e9f6"
+      }
+    }
+  },
+  "replays": {
+    "0973": {
+      "dwfl_log": {
+        "artifact": {
+          "bytes": 107306893,
+          "path": "/home/zhuhe/litchi-performance-0976/replay-cache-v1/0973-child-01/dwfl.jsonl",
+          "sha256": "75ee60fc73792cfb958071cef80a65bf8b0d921d8d2f0d9fd092e990a90454de"
+        },
+        "buildid_fallback_count": 0,
+        "first_target_failure": null,
+        "first_target_success": {
+          "dwfl_errno_after": 0,
+          "forwarded_base": "0x563291817000",
+          "line": 26605,
+          "original_base": "0x563291818000",
+          "result_module": "0x562e4cf0eeb0"
+        },
+        "schema_counts": {
+          "litchi.performance.0973.dwfl_info.v1": 265751,
+          "litchi.performance.0976.dwfl_report.v1": 7
+        },
+        "target_failure_count": 0,
+        "target_failure_errno_counts": {},
+        "target_replacement_count": 1,
+        "target_report_count": 1,
+        "target_reuse_count": 0,
+        "target_success_count": 1
+      },
+      "empty_count": 0,
+      "headers_equal_old_corrected": true,
+      "periods_equal_old_corrected": true,
+      "sample_count": 6931,
+      "sample_times_equal_old_corrected": true,
+      "script": {
+        "bytes": 11270952,
+        "path": "/home/zhuhe/litchi-performance-0976/replay-cache-v1/0973-child-01/perf-script.txt",
+        "sha256": "b8d2022b0caa77b02e9fb5a0c4c75c75f7830a7de5a00a037c84eb418583961b"
+      },
+      "stderr": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0976/replay-cache-v1/0973-child-01/perf.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "0975": {
+      "aslr_second": {
+        "dwfl_log": {
+          "bytes": 107817905,
+          "path": "/home/zhuhe/litchi-performance-0976/replay-cache-v1/0975-child-01-aslr-2/dwfl.jsonl",
+          "sha256": "6d007f115e301eecc862fd0240c9cb841962ab2956fcc9edd13417f5a56be2d8"
+        },
+        "same_script_sha256": true,
+        "script": {
+          "bytes": 11346285,
+          "path": "/home/zhuhe/litchi-performance-0976/replay-cache-v1/0975-child-01-aslr-2/perf-script.txt",
+          "sha256": "532faee13c26d6a3790e7ffc81e64ab72ef2138faa2e7ded6e75864ad746a9a9"
+        }
+      },
+      "dwfl_log": {
+        "artifact": {
+          "bytes": 107817905,
+          "path": "/home/zhuhe/litchi-performance-0976/replay-cache-v1/0975-child-01/dwfl.jsonl",
+          "sha256": "7cbfe6c2a2fca9809adce2ba82812e28213e4c25675687c558accf257b86c81c"
+        },
+        "buildid_fallback_count": 0,
+        "first_target_failure": null,
+        "first_target_success": {
+          "dwfl_errno_after": 40,
+          "forwarded_base": "0x5f33d295c000",
+          "line": 26007,
+          "original_base": "0x5f33d295d000",
+          "result_module": "0x5cd446e5f6e0"
+        },
+        "schema_counts": {
+          "litchi.performance.0973.dwfl_info.v1": 266969,
+          "litchi.performance.0976.dwfl_report.v1": 9
+        },
+        "target_failure_count": 0,
+        "target_failure_errno_counts": {},
+        "target_replacement_count": 3,
+        "target_report_count": 3,
+        "target_reuse_count": 2,
+        "target_success_count": 3
+      },
+      "empty_count": 0,
+      "headers_equal_old_corrected": true,
+      "periods_equal_old_corrected": true,
+      "sample_count": 6940,
+      "sample_times_equal_old_corrected": true,
+      "script": {
+        "bytes": 11346285,
+        "path": "/home/zhuhe/litchi-performance-0976/replay-cache-v1/0975-child-01/perf-script.txt",
+        "sha256": "532faee13c26d6a3790e7ffc81e64ab72ef2138faa2e7ded6e75864ad746a9a9"
+      },
+      "stderr": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0976/replay-cache-v1/0975-child-01/perf.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  },
+  "reproduction": {
+    "outputs": [
+      "/home/zhuhe/litchi-performance-0976/replay-cache-v1/0975-child-01",
+      "/home/zhuhe/litchi-performance-0976/replay-cache-v1/0975-child-01-aslr-2",
+      "/home/zhuhe/litchi-performance-0976/replay-cache-v1/0973-child-01"
+    ],
+    "perf_script_argv": [
+      "/usr/bin/perf",
+      "script",
+      "--show-lost-events",
+      "--no-inline",
+      "-F",
+      "cpu,pid,tid,time,event,period,ip,sym,symoff,dso",
+      "-i",
+      "<retained perf.data>"
+    ]
+  },
+  "schema": "litchi.performance.0976.decoder_empty_transition.v1",
+  "scope": "offline replay and retained artifact analysis; no workload, build of benchmark, or repository edit",
+  "sizes": {
+    "json_bytes_before_write": 18377
+  },
+  "status": "pass"
+}

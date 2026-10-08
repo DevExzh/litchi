@@ -1,0 +1,2 @@
+[ perf record: Woken up 19 times to write data ]
+[ perf record: Captured and wrote 147.512 MB /home/zhuhe/litchi-performance-0976/control/affinity-control-v6/control.perf.data ]

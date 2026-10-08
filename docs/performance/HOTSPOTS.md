@@ -1,5 +1,22 @@
 # Performance hotspot inventory
 
+## 0976 — decoder coverage and affinity remain diagnostic
+
+[0976](0976-decoder-cache-and-affinity-control.md) locates the immutable 0975
+empty-chain transition after sample 1,389 and records repeated libdw module
+overlap failures. A guarded cache replay removes the empty chains in the
+retained 0975/0973 streams, identifying a bounded decoder overlap/reuse
+mechanism without assigning a capture-loss or source cause. The final v2
+raw-target ASLR replay passes with zero empty/lost samples and identical
+normalized canonical stack sequences under the tested target delta;
+each records one initial cache store, 111,448 identity-valid reuses, and zero
+fallback. A harmless
+control demonstrates one observed perf TID can move to CPU 30 with the target
+and all 4,685 samples on CPU 31. Static/dynamic guards and the posthoc ASLR
+receipt pass; the checker-only v3 failure remains review history, and the
+corrected 0973/no-op regression posthoc passes. No source, host, timing, or
+performance hotspot is assigned.
+
 ## 0975 — per-thread capture remains blocked by raw loss
 
 [0975](0975-per-thread-profile-loss-gate.md) obtains one zero-loss child with

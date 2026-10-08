@@ -1,0 +1,16 @@
+{
+  "action": "validator already terminal; no signal sent",
+  "created_utc": "2026-10-08T06:22:57.551182+00:00",
+  "outputs_preserved": true,
+  "pid": 3790351,
+  "raw_input_mutated": false,
+  "reasons": [
+    "ORIGINAL_SCRIPT is old incomplete decoder output instead of final-v2 original replay",
+    "EXPECTED_DELTA confuses ASLR translation shift with ELF base gap",
+    "raw_sample_headers copies the entire 229MB capture once per sample"
+  ],
+  "schema": "litchi.performance.0976.invalid_aslr_stop.v1",
+  "scope": "offline helper only; no Office/native capture retry",
+  "script": "/home/zhuhe/litchi-performance-0976/tools/test_aslr_translation_cache_final_v2_0976_v1.py",
+  "script_sha256": "f50a15ffa5b19e02034daa33097b1972f7a35e422662333e7be90b4b74576b1e"
+}

@@ -1,0 +1,16 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 4K of event 'instructions:u'
+# Event count (approx.): 4685000000
+#
+# Children      Self  Command     Shared Object                             Symbol                                   
+# ........  ........  ..........  ........................................  .........................................
+#
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

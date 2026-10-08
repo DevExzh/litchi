@@ -1,0 +1,186 @@
+{
+  "aslr_translation": {
+    "canonical": {
+      "equal": true,
+      "frame_count": 63282,
+      "sample_count": 6940,
+      "sha256_original_and_translated": "1f7335d982514a9f586e0a3a001343ce7332deb650a9bf6ebae41f60f62dca3c"
+    },
+    "helper": {
+      "bytes": 40748,
+      "path": "/home/zhuhe/litchi-performance-0976/tools/test_aslr_translation_cache_final_v2_0976_v3.py",
+      "sha256": "0b839ab821d0a8cf4bc9d82ac21d7ad7f6cce214400afb2873829a714f3249cb"
+    },
+    "layout_gap": "0x1000",
+    "mutation_checks": {
+      "raw_headers_invariant": true,
+      "register_pointer_shifted": 6593,
+      "sample_count": 6940,
+      "sample_ip_shifted": 4549,
+      "sample_period_sum": 6940000000,
+      "stack_exec_return_word_shifted": 289267,
+      "stack_word_shifted": 486080,
+      "target_mapping_count": 5,
+      "target_mmaps_invariant_except_delta": true
+    },
+    "posthoc_receipt": {
+      "bytes": 9816,
+      "path": "/home/zhuhe/litchi-performance-0976/receipts/aslr-cache-final-v2-0975-v3-posthoc-v2.json",
+      "sha256": "54657f748f73e16709f795f5ceb0e76dd4d2c07afb4e487e5af2102ca2f4cac2"
+    },
+    "preserved_checker_failure": {
+      "bytes": 5180,
+      "interpretation": "checker-only failure: initial_rewrite is a per-call expected-base predicate; cache_stored and reused_existing are lifecycle events",
+      "path": "/home/zhuhe/litchi-performance-0976/receipts/aslr-cache-final-v2-0975-v3-failure.json",
+      "sha256": "af9a0d49a5e56f7e9ed16b2886004db9126188d071ccc53ed292313b9f716a0a"
+    },
+    "raw_input_sha256": "51b16775fd0f72e154a74acad963c99e2169284ad1e31f78bcabab2bc6d75368",
+    "recovery": {
+      "empty_callchains": 0,
+      "lost_events": 0,
+      "marker_period": 951000000,
+      "marker_samples": 951,
+      "samples": 6940,
+      "total_period": 6940000000,
+      "unresolved_frames": 3289,
+      "unresolved_scope": "descriptive retained coverage; no zero-unresolved claim"
+    },
+    "replay_and_cache_checks": {
+      "original_base": "0x5f33d295c000",
+      "per_side_all_exact_admitted_identity_config_valid": true,
+      "per_side_cache_reuses": 111448,
+      "per_side_cache_stores": 1,
+      "per_side_exact_target_rows": 111449,
+      "per_side_fallback_exact_target_rows": 0,
+      "per_side_other_dso_rows": 6,
+      "translated_base": "0x5f43d295c000"
+    },
+    "scope_limit": "synthetic metadata translation of a retained perf.data file; no relocated binary execution and no performance claim",
+    "translation_delta": "0x1000000000"
+  },
+  "claim_boundary": [
+    "The evidence supports guarded offline DWFL decoder/cache behavior and retained-input replay invariants.",
+    "It does not establish production performance, speedup, allocation improvement, or adoption readiness."
+  ],
+  "created_utc": "2026-10-08T06:41:23.232043+00:00",
+  "decision": "pass_for_offline_decoder_evidence_only",
+  "dynamic_guard": {
+    "checks": {
+      "caller_stub_exact_rows": 4,
+      "caller_stub_initial_store_rows": 2,
+      "caller_stub_rejected_argument_rows": 5,
+      "caller_stub_reuse_rows": 2,
+      "rejections_forwarded_unchanged_and_cache_untouched": true,
+      "wrong_build_id_all_rejected_without_rewrite": true,
+      "wrong_caller_all_rejected": true
+    },
+    "receipt": {
+      "bytes": 42627,
+      "path": "/home/zhuhe/litchi-performance-0976/receipts/dynamic-cache-guard-0976-v5.json",
+      "sha256": "d78b58de8667c8d7fe511b9bed60028e0eb2491cf1f8445d7c86531c14df77ff"
+    },
+    "scope_limit": "caller stub is an isolated admission control; target is opened for libdw identity checks but never executed"
+  },
+  "findings": [],
+  "goal_adr_revalidation": {
+    "accepted_adr_count": 32,
+    "adr_readme_sha256": "2af0e5814378c2765c12213e495d02c2895a27f142bc618ca1f3037824bbe028",
+    "goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+    "receipt": {
+      "path": "/home/zhuhe/litchi-performance-0976/receipts/adr-goal-revalidation-0976-v1.json",
+      "sha256": "364dc685aa3c1f91471602a89fddcc48f17e92aec2f6824461608ad2f0c4b3e2"
+    },
+    "relevant_accepted_adrs": {
+      "0005": "8279fd2dc0b074aa104bf0c83df6187d12e18756cd8c8d7f25750b2a997cb0aa",
+      "0006": "ae21189eda0acc9524a7c5a57e87bb3566405ede5c015c87105e01337666f44b",
+      "0008": "5c72d79a7ba78a044471b40ba22ab3f32f7b8f4f878614ab05b416e60b0163a2"
+    }
+  },
+  "regression_0973": {
+    "corrected_replay": {
+      "cache_reuses": 110645,
+      "cache_stores": 1,
+      "canonical_equal_to_retained_legacy_corrected": true,
+      "canonical_sha256": "56cf8e63a673b1eb71a49539df84525b5ab2b1afdc6430d946dab946d1b80574",
+      "empty_callchains": 0,
+      "fallback_exact_target_rows": 0,
+      "lost_events": 8,
+      "marker_period": 947000000,
+      "marker_samples": 947,
+      "samples": 6931,
+      "total_period": 6931000000,
+      "unresolved_frames": 3357
+    },
+    "loss_scope": "eight lost events are a known property of the retained 0973 input and are preserved; no zero-loss claim is made for that historical control",
+    "noop_control": {
+      "all_exact_target_rows_rejected": true,
+      "cache_store_or_reuse": false,
+      "final_v2_noop_canonical_equals_stock": true,
+      "forwarded_base_unchanged": true,
+      "fresh_final_v2_noop_output_sha256": "03f2d314e734608d6ea71dbdf6be1a186ca03dd0cf5f3c37f8a979f4fcf5d1c3",
+      "historical_noop_mode_verified": true,
+      "retained_stock_and_noop_byte_identical": true,
+      "summary": {
+        "empty_callchains": 4540,
+        "lost_events": 8,
+        "marker_period": 0,
+        "marker_samples": 0,
+        "samples": 6931,
+        "total_period": 6931000000,
+        "unresolved_frames": 3372
+      }
+    },
+    "posthoc_receipt": {
+      "bytes": 15832,
+      "path": "/home/zhuhe/litchi-performance-0976/receipts/final-v2-regression-0973-v2-posthoc-v3.json",
+      "sha256": "04dea96e90eb5ab9cfc9718154ce7e49004fb6ea5dd25f1b6c9cac0d367bd621"
+    },
+    "posthoc_validator": {
+      "bytes": 15934,
+      "path": "/home/zhuhe/litchi-performance-0976/tools/validate_and_noop_final_v2_0973_v3.py",
+      "sha256": "2dabb747dbee8ae3a1152b6c553b9f25c2b0d5f76ad540358f6305152d906edb"
+    },
+    "validator_execution_binding": {
+      "bytes": 15388,
+      "path": "/home/zhuhe/litchi-performance-0976/tools/validate_and_noop_final_v2_0973.py",
+      "sha256": "cdd01bf23ef83c730ca4a5f44f7898ee9475237fab1784abaf80c5e8ad2e132e"
+    }
+  },
+  "reviewer": "staging_review",
+  "schema": "litchi.performance.0976.independent_decoder_review.v1",
+  "scope": {
+    "native_build_started": false,
+    "native_capture_started": false,
+    "native_workload_started": false,
+    "performance_or_speedup_claim": false,
+    "production_adoption": false,
+    "review_type": "independent read-only review of final-v2 DWFL cache shim controls and retained offline replays",
+    "target_executed": false
+  },
+  "source_binding": {
+    "shim": {
+      "bytes": 26296,
+      "path": "/home/zhuhe/litchi-performance-0976/tools/dwfl_dynamic_shim_0976_cache_final_v2.so",
+      "sha256": "2acdc5c06ac672dca0e5a34bf204e0a45451b4bfe2d31c304f4c791f5b2a0a12"
+    },
+    "shim_source": {
+      "bytes": 33461,
+      "path": "/home/zhuhe/litchi-performance-0976/tools/dwfl_dynamic_shim_0976_cache_final_v2.c",
+      "sha256": "a30536989f1fcc3e28c5bbe5876b9f01159841ba0a6d6c3aa22706cdcfd23d1a"
+    },
+    "static_findings": {
+      "cache_identity_guards": "Dwfl lifetime, DSO name/path, fd/add_p_vaddr/base, stat dev/inode/size, build ID, module name/path/range and executable probes",
+      "exact_admission_scope": "corrected mode, exact target path/name, caller /usr/bin/perf, fd=-1, add_p_vaddr=false, allowed base, exact retained build ID and external SHA custody",
+      "failure_behavior": "non-admitted calls delegate unchanged; invalid identity invalidates cache and does not reuse",
+      "lifecycle_and_synchronization": "report begin/add/end and dwfl_end invalidation with mutex-protected cache"
+    },
+    "target_binary_sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb",
+    "target_build_id": "e5c457384eeebd057932c444efda77618f137399",
+    "version_script": {
+      "bytes": 233,
+      "path": "/home/zhuhe/litchi-performance-0976/tools/dwfl_dynamic_shim_0976_cache_final_v2.map",
+      "sha256": "173dd1902d46a378e713cd794ede6c4fdac2a184124e8aefecc0c2fda7494883"
+    }
+  },
+  "status": "pass"
+}

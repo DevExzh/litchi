@@ -1,0 +1,55 @@
+{
+  "created_utc": "2026-10-08T06:37:32.778459+00:00",
+  "failure": {
+    "final_summary": {
+      "empty_callchain_count": 0,
+      "explicit_stack_truncated_count": 0,
+      "lost_events": 8,
+      "marker_period": 947000000,
+      "marker_sample_count": 947,
+      "sample_count": 6931,
+      "total_period": 6931000000,
+      "unresolved_frames": 3357
+    },
+    "interpretation": "The retained 0973 historical packet carries eight lost events in both final-v2 output and the retained corrected stream; this is a known invalid-loss control and is not converted into a zero-loss claim.",
+    "message": "0973 final-v2 recovery check lost_events_zero failed",
+    "retained_legacy_summary": {
+      "empty_callchain_count": 0,
+      "explicit_stack_truncated_count": 0,
+      "lost_events": 8,
+      "marker_period": 947000000,
+      "marker_sample_count": 947,
+      "sample_count": 6931,
+      "total_period": 6931000000,
+      "unresolved_frames": 3357
+    }
+  },
+  "helper": {
+    "bytes": 11715,
+    "path": "/home/zhuhe/litchi-performance-0976/tools/replay_final_v2_0973_regression.py",
+    "sha256": "0d49377d02018a10a7a606992241c7386e93c17e37f2e7ebbafec66cbf92e682"
+  },
+  "native_build_started": false,
+  "native_capture_started": false,
+  "native_workload_started": false,
+  "output_bindings": {
+    "/home/zhuhe/litchi-performance-0976/final-v2-regression-0973-v1/child-01.final-v2.dwfl.jsonl": {
+      "bytes": 212326183,
+      "path": "/home/zhuhe/litchi-performance-0976/final-v2-regression-0973-v1/child-01.final-v2.dwfl.jsonl",
+      "sha256": "9e5a346c6fa2fbc4187b09a58525b8a2dfb7272730b62329f6ff977215e7f6c3"
+    },
+    "/home/zhuhe/litchi-performance-0976/final-v2-regression-0973-v1/child-01.final-v2.perf-script-no-inline.txt": {
+      "bytes": 11270952,
+      "path": "/home/zhuhe/litchi-performance-0976/final-v2-regression-0973-v1/child-01.final-v2.perf-script-no-inline.txt",
+      "sha256": "b8d2022b0caa77b02e9fb5a0c4c75c75f7830a7de5a00a037c84eb418583961b"
+    },
+    "/home/zhuhe/litchi-performance-0976/final-v2-regression-0973-v1/child-01.final-v2.perf.stderr": {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0976/final-v2-regression-0973-v1/child-01.final-v2.perf.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "schema": "litchi.performance.0976.final_v2_regression_0973.v1_attempt",
+  "status": "failed_checker_only_historical_loss_gate",
+  "target_executed": false
+}

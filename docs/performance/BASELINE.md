@@ -1,5 +1,25 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0976 — decoder cache transition and affinity control
+
+[0976](0976-decoder-cache-and-affinity-control.md) is an offline replay and
+control diagnostic on the immutable 0975 child-01 stream plus one harmless
+stdlib control. The replay's 3,745 empty chains begin at sample 1,389 after
+repeated target `dwfl_report_elf` overlap failures; a guarded cache replay
+reaches zero empty chains for the retained 0975 and 0973 streams. The final
+v2 raw-target ASLR replay also passes: both outputs have 6,940 samples, zero
+empty samples, 951 marker samples, zero loss, 3,289 unresolved frames, and
+63,282 canonical frames. The canonical stack sequences match after
+normalization under the tested target delta; details and the receipt are in
+the record. The checker-only v3 failure remains review history and its
+posthoc receipt passes; the corrected 0973/no-op regression posthoc also
+passes, and no decoder change is adopted. The control moves the one
+observed perf TID 31→30 while the target remains 31, records 4,685 CPU-31
+period-1M samples, and has raw and terminal loss zero under the explicit
+`# Total Lost Samples: 0` report field. This is capability and decoder
+evidence only: no Office workload, source owner, speedup, or production
+baseline follows.
+
 ## 0975 — per-thread profile pilot stops on child-02 raw loss
 
 [0975](0975-per-thread-profile-loss-gate.md) runs the retained native target

@@ -1,0 +1,154 @@
+{
+  "adr_goal_revalidation": {
+    "path": "/home/zhuhe/litchi-performance-0976/receipts/adr-goal-revalidation-0976-v1.json",
+    "scope": "offline decoder investigation; no native capture, workload, build, or production edit",
+    "sha256": "364dc685aa3c1f91471602a89fddcc48f17e92aec2f6824461608ad2f0c4b3e2",
+    "status": "pass"
+  },
+  "build_started": false,
+  "control_started": false,
+  "created_utc": "2026-10-08T05:50:56.967256+00:00",
+  "host_bindings_observed_read_only": {
+    "cpu_online": "0-31",
+    "cpu_possible": "0-31",
+    "perf": {
+      "bytes": 25221960,
+      "path": "/usr/bin/perf",
+      "sha256": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b",
+      "version": "perf version 7.0.14"
+    },
+    "proposed_recorder_cpu": 30,
+    "proposed_target_cpu": 31,
+    "python": {
+      "bytes": 7468968,
+      "path": "/usr/bin/python3.14",
+      "sha256": "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd"
+    },
+    "taskset": {
+      "bytes": 31184,
+      "path": "/usr/bin/taskset",
+      "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2"
+    }
+  },
+  "minimum_admission_obligations": [
+    {
+      "id": "recorder_identity_and_affinity",
+      "must": [
+        "capture parent PID, TID, /proc comm/exe, starttime, and the complete /proc/<pid>/task TID set before and after the handoff",
+        "set every observed recorder TID to exactly [30], preferably with an all-tasks operation or per-TID calls, then read back each TID mask",
+        "reject if parent is not the bound /usr/bin/perf, if any set/readback fails, if any TID remains outside [30], or if the TID set changes unexpectedly",
+        "bind the exact perf SHA and forbid --threads, --aio, --affinity, -C, BPF sideband, and other options that add/move streaming threads unless separately bound and checked"
+      ],
+      "reason": "sched_setaffinity and sched_getaffinity are per-thread; process-level PID syntax addresses the main thread"
+    },
+    {
+      "id": "startup_sequence",
+      "must": [
+        "record monotonic sequence and timestamps for launcher start, parent identity, parent TIDs-before, affinity set/readback, parent TIDs-after, launcher readback, and native exec",
+        "perform the parent handoff before native exec and abort before native exec on EPERM, ESRCH, identity mismatch, or incomplete readback",
+        "retain same target PID/TID across launcher and native exec; bind native executable/build ID and cwd/env",
+        "do not use an inner taskset launched while recorder is CPU30 unless startup samples are explicitly excluded and independently validated; that ordering can create CPU30 samples before taskset applies CPU31"
+      ],
+      "reason": "enable_on_exec starts measurement at the launcher Python exec; the clean proposed ordering keeps launcher/native target on CPU31 throughout"
+    },
+    {
+      "id": "sample_scope_and_cpu",
+      "must": [
+        "retain --per-thread with inherit disabled and no -C; verify header fields and CPU_MAP/dummy per-thread scope",
+        "require every decoded target sample PID/TID to equal native exec PID/TID and every sample CPU to equal 31",
+        "separate launcher/pre-native records from native marker records; do not infer recorder CPU from sample CPU",
+        "reject any target sample CPU30, unexpected fork/clone/descendant exit, or DSO/build-ID drift"
+      ],
+      "reason": "sample CPU identifies target execution, while recorder placement is proven by live/sideband affinity records"
+    },
+    {
+      "id": "loss_and_run_protocol",
+      "must": [
+        "retain raw PERF_RECORD_LOST sum == 0 and terminal PERF_RECORD_LOST_SAMPLES == 0 as separate gates; never add the two domains",
+        "retain raw STACK_USER bounds and marker-count/share gates unchanged",
+        "serial execution, fresh exclusive output roots, stop on first child failure, no retry or selective replacement",
+        "bind all helper/plan/runner/launcher/perf/taskset/python/source/binary hashes before GO and recheck source/binary custody"
+      ],
+      "reason": "CPU separation tests placement only and cannot relax the failed 0975 loss or ancestry gates"
+    },
+    {
+      "id": "harmless_boundary_control",
+      "must": [
+        "before any native cohort, execute one authorized harmless exact-wrapper control through the real perf/Python launch boundary",
+        "make the control write parent PID/TID/starttime and before/after masks from the launcher, verify native exec identity, and retain raw perf/header/terminal evidence",
+        "exercise actual Popen/exec and all-TID affinity code rather than only mocks; a control with no samples cannot establish a sample-CPU claim, so sample CPU remains a gate in native children"
+      ],
+      "reason": "the proposed cross-process affinity handoff is the new behavior and needs real boundary evidence"
+    }
+  ],
+  "native_admission": false,
+  "non_claims": [
+    "No native workload, build, or harmless control was run for this review.",
+    "No claim is made that CPU30 is idle, that all PMU overflow/interrupt work moved to CPU30, or that the split will eliminate loss.",
+    "No period, buffer, marker, ancestry, or no-retry gate is relaxed.",
+    "No CPU split design is admitted until a frozen plan/helper set and the exact boundary control satisfy the obligations above."
+  ],
+  "primary_sources": [
+    "https://man7.org/linux/man-pages/man1/perf-record.1.html",
+    "https://man7.org/linux/man-pages/man2/sched_setaffinity.2.html",
+    "https://man7.org/linux/man-pages/man2/perf_event_open.2.html",
+    "https://www.kernel.org/doc/html/latest/userspace-api/perf_ring_buffer.html",
+    "https://github.com/torvalds/linux/blob/master/tools/perf/builtin-record.c"
+  ],
+  "proposal_assessed": {
+    "feasibility": "conditionally viable",
+    "limits": [
+      "moving only getppid() changes the perf thread-group leader/main thread; it does not move other perf TIDs",
+      "a recorder-side helper could remain on CPU31 unless the exact perf topology proves it cannot exist or every recorder TID is moved and verified",
+      "a loss-free split is a diagnostic comparison, not proof that CPU31 contention caused the earlier loss"
+    ],
+    "ordering": [
+      "outer taskset starts perf and target launcher with inherited CPU31",
+      "launcher verifies its own affinity is exactly [31]",
+      "launcher identifies parent as the actual perf process and moves the parent recorder thread set to CPU30",
+      "launcher verifies its own affinity remains [31] and recorder thread set is [30]",
+      "launcher execs the native target without changing the target PID/TID"
+    ],
+    "why_no_native_sample_cpu30_is_plausible": [
+      "perf_event_attr.enable_on_exec enables the target event after execve; with the launcher Python exec started under CPU31, startup and native execution begin with target affinity [31]",
+      "sched_setaffinity changes the identified parent/main thread, while execve preserves the calling target thread affinity",
+      "PERF_SAMPLE_CPU reports the CPU where the target sample was taken, not the CPU on which perf drains its mmap"
+    ]
+  },
+  "repository": {
+    "head": "0f71adbf26ec050277ec0bc718aecd8501554132",
+    "path": "/home/zhuhe/code/litchi",
+    "production_edits": false,
+    "unrelated_worktree_changes_preserved": true
+  },
+  "retained_evidence": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0975/analysis/next-capture-feasibility-v3.md",
+      "role": "prior bounded placement analysis; not a capture admission",
+      "sha256": "a49309d77ef3e051b2166fffba42d3a679ffe3b6af0f8047b37f117de2b4d586"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0975/receipts/root-terminal-0975-v1.json",
+      "role": "prior serial run stopped on child 02 raw loss; no retry/all-12 conclusion",
+      "sha256": "57b2ac380aba4e23fc24638e30a63a326f6a935306cfc3c1c70b7bafc07ecfbe"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0975/receipts/independent-failed-pilot-audit-0975-v2.json",
+      "role": "prior corrected audit; child-02 retained task records pass but lifetime task history not proven after raw loss",
+      "sha256": "2695cb583aee152d98bc460163c6d11256ed796ba9bb2691440c63903396a75d"
+    }
+  ],
+  "schema": "litchi.performance.0976.independent_design_review.v1",
+  "source_interpretation": {
+    "key_points": [
+      "--per-thread uses per-thread mmaps and disables inheritance; -C is ignored with --per-thread",
+      "--affinity controls the trace reading thread policy and is not a dedicated spare-CPU placement guarantee",
+      "--threads is a parallel streaming mode and is mutually exclusive with per-thread",
+      "sched_setaffinity is per-thread; fork inherits affinity and execve preserves it",
+      "enable_on_exec enables the event after execve and PERF_SAMPLE_CPU records the executing CPU"
+    ],
+    "local_installed_docs": "perf 7.0.14 man perf-record and man perf_event_open were inspected; upstream source link is a semantic cross-check, not an exact binary provenance claim"
+  },
+  "status": "design_feasible_with_blockers",
+  "workload_started": false
+}

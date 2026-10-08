@@ -1,0 +1,297 @@
+{
+  "schema": "litchi.performance.0976.packet_manifest.final.v1",
+  "status": "sealed",
+  "scope": "Final bounded affinity-control and offline decoder/cache/ASLR evidence for retained inputs; no Office/native performance, speedup, allocation, causal, production, or adoption claim.",
+  "external_root": "/home/zhuhe/litchi-performance-0976",
+  "manifest_excludes_self": true,
+  "payload_file_count": 54,
+  "payload_total_bytes": 547091,
+  "constraints": {
+    "all_repository_files_below_1_mib": true,
+    "compiled_binaries_copied": false,
+    "raw_perf_captures_copied": false,
+    "raw_packets_copied": false,
+    "max_payload_file_bytes": 80708
+  },
+  "authoritative_receipts": {
+    "control_audit_sha256": "b3c8d22275c76a369acb64c9fa09f05357225126120e3cabae3ae380c5f2eb6c",
+    "control_review_sha256": "cc813e02fdba61bed32eb6d8adeaaf2590affe6f35e648573964acfbbef74ebb",
+    "decoder_review_sha256": "b3e85c60ffdf4c61d8d2350d5088fc169c4c9a691d7bb4dd8beae304390aa442",
+    "translation_posthoc_v2_sha256": "54657f748f73e16709f795f5ceb0e76dd4d2c07afb4e487e5af2102ca2f4cac2",
+    "regression_posthoc_v3_sha256": "04dea96e90eb5ab9cfc9718154ce7e49004fb6ea5dd25f1b6c9cac0d367bd621",
+    "cleanup_sha256": "3eaf5fa2ceb4884768e8027e81212a925d8cccd3dd1b99b46336bc9efcb4927f",
+    "descriptor_sha256": "9ad883dd70a89a5fba568239a607bd9ef61a1059c38c83ad60fd38a492018439"
+  },
+  "files": [
+    {
+      "path": "docs/performance/results/change-0976/README.md",
+      "bytes": 3583,
+      "sha256": "bd011bfb948985d6da29f5c03b9940f8cb315b35b98b16c6db1756f322374e35"
+    },
+    {
+      "path": "docs/performance/results/change-0976/analysis/control-perf-header-0976-v1.txt",
+      "bytes": 1720,
+      "sha256": "16df8d9c04a8436bd8c18f02f600ad34fd32c6b38b4aab4c72c13c39cfb76cf1"
+    },
+    {
+      "path": "docs/performance/results/change-0976/analysis/control-perf-report-percent100-0976-v1.txt",
+      "bytes": 487,
+      "sha256": "956155405ee747da2f2617aa497abdfbb732852a0299e752da008c3746484e62"
+    },
+    {
+      "path": "docs/performance/results/change-0976/analysis/control-perf-stats-0976-v1.txt",
+      "bytes": 611,
+      "sha256": "82084cf7d306420ba5b84f7aaf0bd374171899e8d28640274acf156586381835"
+    },
+    {
+      "path": "docs/performance/results/change-0976/analysis/decoder-empty-transition-0976-v1.json",
+      "bytes": 27925,
+      "sha256": "f3ff6bf39b47273a94f870564f4a97a40f3bd41351ca1fb56c9f425bb249355b"
+    },
+    {
+      "path": "docs/performance/results/change-0976/analysis/decoder-empty-transition-0976-v1.md",
+      "bytes": 1055,
+      "sha256": "d0a964420c48dd5d383b02d244560ca50fb2fc2724358623fac0fbe3f73e9259"
+    },
+    {
+      "path": "docs/performance/results/change-0976/analysis/independent-affinity-control-review-v2.json",
+      "bytes": 12177,
+      "sha256": "cc813e02fdba61bed32eb6d8adeaaf2590affe6f35e648573964acfbbef74ebb"
+    },
+    {
+      "path": "docs/performance/results/change-0976/analysis/independent-control-audit-0976-v4.json",
+      "bytes": 14056,
+      "sha256": "b3c8d22275c76a369acb64c9fa09f05357225126120e3cabae3ae380c5f2eb6c"
+    },
+    {
+      "path": "docs/performance/results/change-0976/analysis/independent-decoder-review-0976-v1.json",
+      "bytes": 8353,
+      "sha256": "b3e85c60ffdf4c61d8d2350d5088fc169c4c9a691d7bb4dd8beae304390aa442"
+    },
+    {
+      "path": "docs/performance/results/change-0976/analysis/independent-design-review-0976-v1.json",
+      "bytes": 9153,
+      "sha256": "6345fa31f00012b216e8557edef07150830116201e8927d5ec9b5cc4b6a2b9a9"
+    },
+    {
+      "path": "docs/performance/results/change-0976/analysis/supersession-v5-v6-custody-v1.md",
+      "bytes": 2791,
+      "sha256": "fab24df313a493644578911fb1e7c26b02efd5e814ccff839bd98f379afc3571"
+    },
+    {
+      "path": "docs/performance/results/change-0976/control/affinity-control-v6/bridge-receipt.json",
+      "bytes": 3297,
+      "sha256": "7fc8af88bbc5f99f4bcebf9ed9ca89e99917255abb071264b69a55c69e1a821d"
+    },
+    {
+      "path": "docs/performance/results/change-0976/control/affinity-control-v6/command-receipt.json",
+      "bytes": 1777,
+      "sha256": "c8c0b1babcc11b04ce401573f420975071ec3146047e75adaa9c660e3976a000"
+    },
+    {
+      "path": "docs/performance/results/change-0976/control/affinity-control-v6/perf-header.txt",
+      "bytes": 1720,
+      "sha256": "16df8d9c04a8436bd8c18f02f600ad34fd32c6b38b4aab4c72c13c39cfb76cf1"
+    },
+    {
+      "path": "docs/performance/results/change-0976/control/affinity-control-v6/perf-record.stderr",
+      "bytes": 178,
+      "sha256": "f6790daf54329a6a2b92350498dafb32fec2b736f8f27d7ded7da1da43521cb2"
+    },
+    {
+      "path": "docs/performance/results/change-0976/control/affinity-control-v6/perf-record.stdout",
+      "bytes": 4627,
+      "sha256": "d62409b562e778e9ee80cb4ba1251a12f5b668f96b4d5354eed181a946aba3cc"
+    },
+    {
+      "path": "docs/performance/results/change-0976/control/affinity-control-v6/target-receipt.json",
+      "bytes": 7667,
+      "sha256": "0dcac8748bb1e89fa6a3f012b65fa5d028ed9b85b7a286fb7b9c89bfb573abc5"
+    },
+    {
+      "path": "docs/performance/results/change-0976/control/affinity-control-v6/terminal-receipt.json",
+      "bytes": 1126,
+      "sha256": "14c93c60bbc165188c7726d5e4cf52ca98a0f314b9a1007427f93f31d650b747"
+    },
+    {
+      "path": "docs/performance/results/change-0976/design/design-affinity-ordering-v1.md",
+      "bytes": 7121,
+      "sha256": "5033971234f0fb449c2fc3dcbd12512a24782535696387355864ad20870e89f7"
+    },
+    {
+      "path": "docs/performance/results/change-0976/design/design-affinity-ordering-v2-addendum.md",
+      "bytes": 4986,
+      "sha256": "3304f2124f3ba4590acb733133f8672ab568c92c5c0c51f639711dbd54208dbc"
+    },
+    {
+      "path": "docs/performance/results/change-0976/plans/control-plan-0976-v6.json",
+      "bytes": 9996,
+      "sha256": "92b40f397df1aa2c3ea8f3cb78e938d9e32d250e97990ffed4478b4da70e9991"
+    },
+    {
+      "path": "docs/performance/results/change-0976/provenance/external-artifact-descriptor-final-v1.json",
+      "bytes": 80708,
+      "sha256": "9ad883dd70a89a5fba568239a607bd9ef61a1059c38c83ad60fd38a492018439"
+    },
+    {
+      "path": "docs/performance/results/change-0976/provenance/reproduction-v1.md",
+      "bytes": 3686,
+      "sha256": "eef6579afced84cb329089a02873cac19d75ee5933c6d942bd9359c5ee15045c"
+    },
+    {
+      "path": "docs/performance/results/change-0976/receipts/adr-goal-revalidation-0976-v1.json",
+      "bytes": 8092,
+      "sha256": "364dc685aa3c1f91471602a89fddcc48f17e92aec2f6824461608ad2f0c4b3e2"
+    },
+    {
+      "path": "docs/performance/results/change-0976/receipts/aslr-cache-final-v2-0975-v1-failure.json",
+      "bytes": 1835,
+      "sha256": "e6c540e8ae48ac517c5e3e1de5f73a3db7960814e33628ab9a4b81eb66eef2c6"
+    },
+    {
+      "path": "docs/performance/results/change-0976/receipts/aslr-cache-final-v2-0975-v3-failure.json",
+      "bytes": 5180,
+      "sha256": "af9a0d49a5e56f7e9ed16b2886004db9126188d071ccc53ed292313b9f716a0a"
+    },
+    {
+      "path": "docs/performance/results/change-0976/receipts/aslr-cache-final-v2-0975-v3-posthoc-v1-failure.json",
+      "bytes": 1002,
+      "sha256": "b78d3c78c0455f8ad1603986dfc060d853dfa75f4651ff4269a59ee38fb47a59"
+    },
+    {
+      "path": "docs/performance/results/change-0976/receipts/aslr-cache-final-v2-0975-v3-posthoc-v2.json",
+      "bytes": 9816,
+      "sha256": "54657f748f73e16709f795f5ceb0e76dd4d2c07afb4e487e5af2102ca2f4cac2"
+    },
+    {
+      "path": "docs/performance/results/change-0976/receipts/cache-guard-static-0976-v2.json",
+      "bytes": 1707,
+      "sha256": "e43589d4131f3a95c4e51acc3408cce356ce11f2c8ea1ed59ee278d5bc8ea667"
+    },
+    {
+      "path": "docs/performance/results/change-0976/receipts/dynamic-cache-guard-0976-v5.json",
+      "bytes": 42627,
+      "sha256": "d78b58de8667c8d7fe511b9bed60028e0eb2491cf1f8445d7c86531c14df77ff"
+    },
+    {
+      "path": "docs/performance/results/change-0976/receipts/final-v2-regression-0973-v1-failure.json",
+      "bytes": 2479,
+      "sha256": "a105c5ad519128672f83fe2dbc97c083c4ce5bdfcb3dd58587f7412fc01a9746"
+    },
+    {
+      "path": "docs/performance/results/change-0976/receipts/final-v2-regression-0973-v2-failure.json",
+      "bytes": 2783,
+      "sha256": "2b3d43f460755b14f7563636e8d45687e21cfcc1306570c79ec2cddb43b69bbd"
+    },
+    {
+      "path": "docs/performance/results/change-0976/receipts/final-v2-regression-0973-v2-posthoc-v3.json",
+      "bytes": 15832,
+      "sha256": "04dea96e90eb5ab9cfc9718154ce7e49004fb6ea5dd25f1b6c9cac0d367bd621"
+    },
+    {
+      "path": "docs/performance/results/change-0976/receipts/helper-path-overwrite-correction-0976-v1.json",
+      "bytes": 4949,
+      "sha256": "e33e22fdea3a65face3eae1f93dd45a597d8273526eaad29641776332496ee11"
+    },
+    {
+      "path": "docs/performance/results/change-0976/receipts/helper-seal-0976-v6.json",
+      "bytes": 2024,
+      "sha256": "1ca27c37ff5ad54d870496249b4015a2f8cddef76c3af1c44f7c1a3ffe7f1e62"
+    },
+    {
+      "path": "docs/performance/results/change-0976/receipts/preflight-0976-v4.json",
+      "bytes": 3952,
+      "sha256": "6662670f69ac473d8a76cfdac596f4798f76440ae3753328514c5128aac50542"
+    },
+    {
+      "path": "docs/performance/results/change-0976/receipts/root-control-go-0976-v1.json",
+      "bytes": 2761,
+      "sha256": "a03e3d9a55f1306a4eaae7963ca8e61997f3eea5c9a9dbfa5d6ea522aa28aea0"
+    },
+    {
+      "path": "docs/performance/results/change-0976/receipts/root-invalid-aslr-stop-0976-v1.json",
+      "bytes": 766,
+      "sha256": "2a9ee2ca7118cb1dc368aa6da81d9d3a00b24fae2713a2513ad0a12c1176f226"
+    },
+    {
+      "path": "docs/performance/results/change-0976/receipts/temporary-cleanup-0976-v1.json",
+      "bytes": 21471,
+      "sha256": "3eaf5fa2ceb4884768e8027e81212a925d8cccd3dd1b99b46336bc9efcb4927f"
+    },
+    {
+      "path": "docs/performance/results/change-0976/tools/affinity_bridge_0976_v2.py",
+      "bytes": 16721,
+      "sha256": "6b19f065d3a4183cad9d5ed6ae020628c7512c49e92b8a07dbdf338cc069270a"
+    },
+    {
+      "path": "docs/performance/results/change-0976/tools/analyze_decoder_empty_transition_0976_v1.py",
+      "bytes": 18253,
+      "sha256": "31d6edcafa578d9eff743f8ed2f0978cdf6634440abb0b41b4c15e7d6c3a136e"
+    },
+    {
+      "path": "docs/performance/results/change-0976/tools/cache_guard_dladdr_stub_0976.c",
+      "bytes": 679,
+      "sha256": "cdfe5fe9bdd1b0358c8db9d109eb038b5fe85dd96491bb358bb22a9722f48e3f"
+    },
+    {
+      "path": "docs/performance/results/change-0976/tools/cache_guard_driver_0976.c",
+      "bytes": 3457,
+      "sha256": "fcd58e4bcbf8de662b199c1d103d19e589210dd8c898ffab4c9b21baa147ee6d"
+    },
+    {
+      "path": "docs/performance/results/change-0976/tools/dwfl_dynamic_shim_0976_cache_final_v2.c",
+      "bytes": 33461,
+      "sha256": "a30536989f1fcc3e28c5bbe5876b9f01159841ba0a6d6c3aa22706cdcfd23d1a"
+    },
+    {
+      "path": "docs/performance/results/change-0976/tools/dwfl_dynamic_shim_0976_cache_final_v2.map",
+      "bytes": 233,
+      "sha256": "173dd1902d46a378e713cd794ede6c4fdac2a184124e8aefecc0c2fda7494883"
+    },
+    {
+      "path": "docs/performance/results/change-0976/tools/prepare_control_plan_0976_v6.py",
+      "bytes": 15910,
+      "sha256": "525e9f454bfec83ac78a04e534641f1dae9947d463cc235a5bf00a36e8c6a89d"
+    },
+    {
+      "path": "docs/performance/results/change-0976/tools/replay_final_v2_0973_regression.py",
+      "bytes": 11715,
+      "sha256": "0d49377d02018a10a7a606992241c7386e93c17e37f2e7ebbafec66cbf92e682"
+    },
+    {
+      "path": "docs/performance/results/change-0976/tools/run_cache_guard_dynamic_0976_v5.py",
+      "bytes": 12346,
+      "sha256": "714fe852b126219d7dd1763dd4359623559fb283681a1b61349ddc4c5aadf1f2"
+    },
+    {
+      "path": "docs/performance/results/change-0976/tools/stdlib_cpu_burn_0976_v2.py",
+      "bytes": 8942,
+      "sha256": "330eb4e14fb9d1a1504927cb369e28b495072beb775e2af21326bc63c7486670"
+    },
+    {
+      "path": "docs/performance/results/change-0976/tools/test_aslr_translation_cache_final_v2_0976_v3.py",
+      "bytes": 40748,
+      "sha256": "0b839ab821d0a8cf4bc9d82ac21d7ad7f6cce214400afb2873829a714f3249cb"
+    },
+    {
+      "path": "docs/performance/results/change-0976/tools/test_cache_guards_0976_v2.py",
+      "bytes": 5659,
+      "sha256": "003961857414dca9c8c0f2bcac7ea460300a542b159f4ca5bc147b3cb74760ec"
+    },
+    {
+      "path": "docs/performance/results/change-0976/tools/validate_and_noop_final_v2_0973.py",
+      "bytes": 15388,
+      "sha256": "cdd01bf23ef83c730ca4a5f44f7898ee9475237fab1784abaf80c5e8ad2e132e"
+    },
+    {
+      "path": "docs/performance/results/change-0976/tools/validate_and_noop_final_v2_0973_v3.py",
+      "bytes": 15978,
+      "sha256": "2dabb747dbee8ae3a1152b6c553b9f25c2b0d5f76ad540358f6305152d906edb"
+    },
+    {
+      "path": "docs/performance/results/change-0976/tools/validate_aslr_translation_cache_final_v2_0976_v2.py",
+      "bytes": 11525,
+      "sha256": "b75da8df6671b8f407b1f00b6c4d130142f3826271764c2742a1d9e4d6c7e7ec"
+    }
+  ]
+}

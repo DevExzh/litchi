@@ -1,0 +1,279 @@
+{
+  "accepted_observation_limit": {
+    "claim": "all recorded start/periodic/end observations passed",
+    "future_requirement": "Native attribution still requires decoded sample/loss/task-scope gates and final handoff evidence.",
+    "interval_seconds": 0.02,
+    "not_claimed": "No claim of continuous absence of a transient TID creation, exit, or affinity change entirely between polls; no claim that the split prevents loss."
+  },
+  "authorized_scope": "Exactly one harmless stdlib CPU-burn continuous affinity control; no Office/native workload, build, qualification, retry, or FIFO mode.",
+  "control_acceptance_after_run": {
+    "bridge_receipt": "status ready_to_exec; all before/after/final parent identities and TID masks present",
+    "decoded_perf": "positive target sample count > 0; positive period count > 0; every admitted target sample CPU=31; every admitted target period=1000000",
+    "failure": "stop on first failed gate, preserve outputs, no retry or selective replacement",
+    "loss": "raw PERF_RECORD_LOST sum=0 and terminal PERF_RECORD_LOST_SAMPLES=0, retained as separate domains",
+    "scope": "no unexpected target child observed; exact parent/TID scope and lifecycle evidence must be reported",
+    "target_receipt": "status pass; same PID/starttime, interpreter identity, target CPU31, parent checks and checksum present"
+  },
+  "control_admission": true,
+  "created_utc": "2026-10-08T06:03:14.942994+00:00",
+  "custody_history": {
+    "correction_receipt": {
+      "bytes": 4949,
+      "path": "/home/zhuhe/litchi-performance-0976/receipts/helper-path-overwrite-correction-0976-v1.json",
+      "sha256": "e33e22fdea3a65face3eae1f93dd45a597d8273526eaad29641776332496ee11"
+    },
+    "important_caveat": "The correction receipt documents the path overwrite and hashes; it does not recover the old v5 bytes.",
+    "v5_status": "historical superseded plan/seal; bridge and target paths were overwritten before v6",
+    "v6_status": "self-contained current helper/plan/seal bindings; no v5 helper bytes are treated as current"
+  },
+  "environment": {
+    "LD_PRELOAD": "absent",
+    "secrets": "not copied into child environment",
+    "whitelist": {
+      "LANG": "C",
+      "LC_ALL": "C",
+      "PATH": "/usr/bin:/bin",
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "TZ": "UTC"
+    }
+  },
+  "exact_command": [
+    "/usr/bin/taskset",
+    "--cpu-list",
+    "31",
+    "/usr/bin/perf",
+    "record",
+    "--per-thread",
+    "-e",
+    "instructions:u",
+    "-c",
+    "1000000",
+    "-m",
+    "16M",
+    "--call-graph",
+    "dwarf,32768",
+    "--period",
+    "--timestamp",
+    "--sample-cpu",
+    "--buildid-all",
+    "--no-buildid-cache",
+    "--user-callchains",
+    "-o",
+    "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/control.perf.data",
+    "--",
+    "/usr/bin/python3.14",
+    "/home/zhuhe/litchi-performance-0976/tools/affinity_bridge_0976_v2.py",
+    "--expected-perf-exe",
+    "/usr/bin/perf",
+    "--expected-perf-sha256",
+    "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b",
+    "--expected-interpreter-exe",
+    "/usr/bin/python3.14",
+    "--expected-interpreter-sha256",
+    "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd",
+    "--target-cpu",
+    "31",
+    "--recorder-cpu",
+    "30",
+    "--bridge-receipt",
+    "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/bridge-receipt.json",
+    "--target-exe",
+    "/usr/bin/python3.14",
+    "--target-script",
+    "/home/zhuhe/litchi-performance-0976/tools/stdlib_cpu_burn_0976_v2.py",
+    "--target-receipt",
+    "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/target-receipt.json",
+    "--",
+    "--seconds",
+    "0.25"
+  ],
+  "execution_at_review": {
+    "active_0976_processes_observed": false,
+    "build_started": false,
+    "control_started": false,
+    "native_workload_started": false,
+    "output_freshness_observed": {
+      "bridge_receipt": true,
+      "command_receipt": true,
+      "control_root": true,
+      "perf_data": true,
+      "perf_header": true,
+      "perf_record_stderr": true,
+      "perf_record_stdout": true,
+      "target_receipt": true,
+      "terminal_receipt": true
+    },
+    "perf_started": false,
+    "repository_edits": false
+  },
+  "fresh_output_contract": "all files below control_root are created exclusively after root GO; no overwrite or retry",
+  "future_native_scope": {
+    "marker_gates": [
+      "minimum_marker_samples_each_child >= 100",
+      "positive marker-period share"
+    ],
+    "native_admission": "still false; this control cannot establish Office attribution or performance benefit",
+    "status": "unchanged and not applied to this stdlib control"
+  },
+  "identity_and_affinity_controls": {
+    "handoff": "all currently observed parent perf TIDs are set to CPU30, read back, and rechecked before exec; leader-only operation is not accepted",
+    "parent_identity": [
+      "pid",
+      "uid",
+      "starttime",
+      "comm",
+      "resolved_exe",
+      "bound_sha256"
+    ],
+    "parent_tid_identity": [
+      "tid",
+      "starttime",
+      "affinity"
+    ],
+    "periodic_checks": "target rechecks parent identity and every parent TID mask at start, approximately every 0.02 seconds, and end",
+    "recorder_cpu": [
+      30
+    ],
+    "same_exec": "bridge and target retain PID/starttime; target is execed in place and checks its interpreter identity",
+    "target_cpu": [
+      31
+    ]
+  },
+  "independent_static_and_offline_checks": [
+    {
+      "command": "python3.14 tools/affinity_bridge_0976_v2.py --self-test",
+      "negative_controls": [
+        "identity_starttime",
+        "affinity_mask"
+      ],
+      "perf_started": false,
+      "status": "pass",
+      "workload_started": false
+    },
+    {
+      "command": "python3.14 tools/stdlib_cpu_burn_0976_v2.py --self-test",
+      "perf_started": false,
+      "status": "pass",
+      "workload_started": false
+    },
+    {
+      "command": "python3.14 tools/prepare_control_plan_0976_v6.py --check-plan plans/control-plan-0976-v6.json",
+      "control_started": false,
+      "status": "pass",
+      "workload_started": false
+    },
+    {
+      "check": "bridge source performs parent PID/UID/starttime/comm/exe/SHA validation; all observed TIDs are moved/read back; same TID/starttime key set and final masks are required before exec",
+      "status": "pass"
+    },
+    {
+      "check": "target source performs same-PID/starttime and interpreter validation, parent identity/TID-key/mask validation at start, 0.02-second intervals, and end",
+      "status": "pass"
+    }
+  ],
+  "native_admission": false,
+  "outputs": {
+    "bridge_receipt": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/bridge-receipt.json",
+    "command_receipt": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/command-receipt.json",
+    "control_root": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6",
+    "perf_data": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/control.perf.data",
+    "perf_header": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/perf-header.txt",
+    "perf_record_stderr": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/perf-record.stderr",
+    "perf_record_stdout": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/perf-record.stdout",
+    "target_receipt": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/target-receipt.json",
+    "terminal_receipt": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/terminal-receipt.json"
+  },
+  "primary_sources": [
+    "https://man7.org/linux/man-pages/man1/perf-record.1.html",
+    "https://man7.org/linux/man-pages/man2/sched_setaffinity.2.html",
+    "https://man7.org/linux/man-pages/man2/perf_event_open.2.html"
+  ],
+  "root_go_required_fields": [
+    "bind this review receipt SHA and the v6 plan/seal/preflight hashes",
+    "recheck current perf/taskset/python hashes and helper bytes immediately before launch",
+    "verify every output file other than the existing control directory is absent",
+    "launch argv directly with the recorded whitelist/cwd and record actual environment, launcher PID, terminal status, and all output hashes",
+    "do not launch any Office/native workload after this control unless a separate fresh review and GO are issued"
+  ],
+  "schema": "litchi.performance.0976.independent_affinity_control_review.v2",
+  "sealed_inputs": {
+    "adr_goal_revalidation": {
+      "bytes": 8092,
+      "path": "/home/zhuhe/litchi-performance-0976/receipts/adr-goal-revalidation-0976-v1.json",
+      "sha256": "364dc685aa3c1f91471602a89fddcc48f17e92aec2f6824461608ad2f0c4b3e2"
+    },
+    "bridge": {
+      "bytes": 16721,
+      "path": "/home/zhuhe/litchi-performance-0976/tools/affinity_bridge_0976_v2.py",
+      "sha256": "6b19f065d3a4183cad9d5ed6ae020628c7512c49e92b8a07dbdf338cc069270a"
+    },
+    "custody_correction": {
+      "bytes": 4949,
+      "path": "/home/zhuhe/litchi-performance-0976/receipts/helper-path-overwrite-correction-0976-v1.json",
+      "sha256": "e33e22fdea3a65face3eae1f93dd45a597d8273526eaad29641776332496ee11"
+    },
+    "design": {
+      "bytes": 7121,
+      "path": "/home/zhuhe/litchi-performance-0976/design-affinity-ordering-v1.md",
+      "sha256": "5033971234f0fb449c2fc3dcbd12512a24782535696387355864ad20870e89f7"
+    },
+    "design_review": {
+      "bytes": 9023,
+      "path": "/home/zhuhe/litchi-performance-0976/analysis/independent-affinity-ordering-review-v1.json",
+      "sha256": "a5b5f9a6409cc83e18ec4967bfb3a7967456b23c4f299e794ea7402ffae83555"
+    },
+    "helper_seal": {
+      "bytes": 2024,
+      "path": "/home/zhuhe/litchi-performance-0976/receipts/helper-seal-0976-v6.json",
+      "sha256": "1ca27c37ff5ad54d870496249b4015a2f8cddef76c3af1c44f7c1a3ffe7f1e62"
+    },
+    "perf": {
+      "bytes": 25221960,
+      "path": "/usr/bin/perf",
+      "sha256": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b",
+      "version": "perf version 7.0.14"
+    },
+    "plan": {
+      "bytes": 9996,
+      "path": "/home/zhuhe/litchi-performance-0976/plans/control-plan-0976-v6.json",
+      "sha256": "92b40f397df1aa2c3ea8f3cb78e938d9e32d250e97990ffed4478b4da70e9991"
+    },
+    "plan_generator": {
+      "bytes": 15910,
+      "path": "/home/zhuhe/litchi-performance-0976/tools/prepare_control_plan_0976_v6.py",
+      "sha256": "525e9f454bfec83ac78a04e534641f1dae9947d463cc235a5bf00a36e8c6a89d"
+    },
+    "preflight": {
+      "bytes": 3952,
+      "path": "/home/zhuhe/litchi-performance-0976/receipts/preflight-0976-v4.json",
+      "sha256": "6662670f69ac473d8a76cfdac596f4798f76440ae3753328514c5128aac50542"
+    },
+    "prior_control_review": {
+      "bytes": 10442,
+      "path": "/home/zhuhe/litchi-performance-0976/analysis/independent-affinity-control-review-v1.json",
+      "sha256": "959126669bd27a2c07ae58343fa3e6e77e95a3e840758e2fb9ddfe2af6537ebd"
+    },
+    "python": {
+      "bytes": 7468968,
+      "path": "/usr/bin/python3.14",
+      "sha256": "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd"
+    },
+    "stdlib_target": {
+      "bytes": 8942,
+      "path": "/home/zhuhe/litchi-performance-0976/tools/stdlib_cpu_burn_0976_v2.py",
+      "sha256": "330eb4e14fb9d1a1504927cb369e28b495072beb775e2af21326bc63c7486670"
+    },
+    "taskset": {
+      "bytes": 31184,
+      "path": "/usr/bin/taskset",
+      "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2"
+    }
+  },
+  "status": "pass_harmless_control_authorized",
+  "v6_corrections_verified": [
+    "The exact argv starts with /usr/bin/taskset and the plan/helper seal bind taskset and /usr/bin/python3.14 hashes.",
+    "The bridge verifies its own interpreter path/SHA before handoff; the target verifies its interpreter path/SHA after same-PID exec and records that identity.",
+    "control_gates contain positive decoded sample/period requirements and no marker gates; future_native_gates carries the marker requirements with explicit inapplicable scope.",
+    "The plan records the 0.02-second periodic observation window and explicitly states that it is not proof of continuous absence between polls."
+  ]
+}

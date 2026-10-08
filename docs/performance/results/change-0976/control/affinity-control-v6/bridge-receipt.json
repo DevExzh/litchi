@@ -1,0 +1,150 @@
+{
+  "bridge_interpreter": {
+    "observed": {
+      "comm": "python3.14",
+      "exe": "/usr/bin/python3.14",
+      "pid": 3786018,
+      "starttime": 30518338,
+      "uid": 1001
+    },
+    "path": "/usr/bin/python3.14",
+    "sha256": "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd"
+  },
+  "bridge_pid": 3786018,
+  "bridge_starttime": 30518338,
+  "continuous_event_mode": true,
+  "created_utc": "2026-10-08T06:05:04Z",
+  "events": [
+    {
+      "monotonic_ns": 305183468782197,
+      "name": "bridge_started"
+    },
+    {
+      "identity": {
+        "comm": "perf",
+        "exe": "/usr/bin/perf",
+        "pid": 3786017,
+        "starttime": 30518336,
+        "uid": 1001
+      },
+      "monotonic_ns": 305183468782937,
+      "name": "parent_identified"
+    },
+    {
+      "monotonic_ns": 305183468783237,
+      "name": "parent_tasks_before",
+      "tasks": [
+        {
+          "affinity": [
+            31
+          ],
+          "starttime": 30518336,
+          "tid": 3786017
+        }
+      ]
+    },
+    {
+      "monotonic_ns": 305183468836978,
+      "name": "parent_affinity_set"
+    },
+    {
+      "monotonic_ns": 305183468896118,
+      "name": "parent_tasks_after",
+      "tasks": [
+        {
+          "affinity": [
+            30
+          ],
+          "starttime": 30518336,
+          "tid": 3786017
+        }
+      ]
+    }
+  ],
+  "expected_perf_exe": "/usr/bin/perf",
+  "expected_perf_sha256": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b",
+  "expected_recorder_cpu": 30,
+  "expected_target_cpu": 31,
+  "native_exec_same_pid": true,
+  "parent_after": {
+    "comm": "perf",
+    "exe": "/usr/bin/perf",
+    "pid": 3786017,
+    "starttime": 30518336,
+    "uid": 1001
+  },
+  "parent_before": {
+    "comm": "perf",
+    "exe": "/usr/bin/perf",
+    "pid": 3786017,
+    "starttime": 30518336,
+    "uid": 1001
+  },
+  "parent_final": {
+    "comm": "perf",
+    "exe": "/usr/bin/perf",
+    "pid": 3786017,
+    "starttime": 30518336,
+    "uid": 1001
+  },
+  "schema": "litchi.performance.0976.affinity_bridge.v2",
+  "startup_handoff_samples_retained": true,
+  "status": "ready_to_exec",
+  "target_argv": [
+    "/usr/bin/python3.14",
+    "/home/zhuhe/litchi-performance-0976/tools/stdlib_cpu_burn_0976_v2.py",
+    "--receipt",
+    "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/target-receipt.json",
+    "--expected-pid",
+    "3786018",
+    "--expected-starttime",
+    "30518338",
+    "--expected-parent-pid",
+    "3786017",
+    "--expected-parent-starttime",
+    "30518336",
+    "--expected-parent-uid",
+    "1001",
+    "--expected-parent-exe",
+    "/usr/bin/perf",
+    "--expected-exe",
+    "/usr/bin/python3.14",
+    "--expected-exe-sha256",
+    "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd",
+    "--expected-task-keys",
+    "[[3786017,30518336]]",
+    "--recorder-cpu",
+    "30",
+    "--cpu",
+    "31",
+    "--seconds",
+    "0.25"
+  ],
+  "tasks_after": [
+    {
+      "affinity": [
+        30
+      ],
+      "starttime": 30518336,
+      "tid": 3786017
+    }
+  ],
+  "tasks_before": [
+    {
+      "affinity": [
+        31
+      ],
+      "starttime": 30518336,
+      "tid": 3786017
+    }
+  ],
+  "tasks_final": [
+    {
+      "affinity": [
+        30
+      ],
+      "starttime": 30518336,
+      "tid": 3786017
+    }
+  ]
+}

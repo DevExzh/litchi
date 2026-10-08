@@ -1,0 +1,261 @@
+{
+  "admission": {
+    "build_started": false,
+    "control_started": false,
+    "independent_review_required": true,
+    "native_workload_started": false,
+    "qualification_claim": false,
+    "root_go_required": true,
+    "speed_claim": false
+  },
+  "adr_goal_revalidation": {
+    "bytes": 8092,
+    "path": "/home/zhuhe/litchi-performance-0976/receipts/adr-goal-revalidation-0976-v1.json",
+    "sha256": "364dc685aa3c1f91471602a89fddcc48f17e92aec2f6824461608ad2f0c4b3e2"
+  },
+  "command": [
+    "/usr/bin/taskset",
+    "--cpu-list",
+    "31",
+    "/usr/bin/perf",
+    "record",
+    "--per-thread",
+    "-e",
+    "instructions:u",
+    "-c",
+    "1000000",
+    "-m",
+    "16M",
+    "--call-graph",
+    "dwarf,32768",
+    "--period",
+    "--timestamp",
+    "--sample-cpu",
+    "--buildid-all",
+    "--no-buildid-cache",
+    "--user-callchains",
+    "-o",
+    "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/control.perf.data",
+    "--",
+    "/usr/bin/python3.14",
+    "/home/zhuhe/litchi-performance-0976/tools/affinity_bridge_0976_v2.py",
+    "--expected-perf-exe",
+    "/usr/bin/perf",
+    "--expected-perf-sha256",
+    "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b",
+    "--expected-interpreter-exe",
+    "/usr/bin/python3.14",
+    "--expected-interpreter-sha256",
+    "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd",
+    "--target-cpu",
+    "31",
+    "--recorder-cpu",
+    "30",
+    "--bridge-receipt",
+    "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/bridge-receipt.json",
+    "--target-exe",
+    "/usr/bin/python3.14",
+    "--target-script",
+    "/home/zhuhe/litchi-performance-0976/tools/stdlib_cpu_burn_0976_v2.py",
+    "--target-receipt",
+    "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/target-receipt.json",
+    "--",
+    "--seconds",
+    "0.25"
+  ],
+  "control_gates": {
+    "all_perf_tids_moved_and_verified": true,
+    "no_retry": true,
+    "no_unexpected_fork_clone_descendant": true,
+    "parent_identity_exact": true,
+    "periodic_parent_checks": true,
+    "positive_decoded_sample_count": "> 0",
+    "positive_period_count": "> 0",
+    "raw_loss_domains_are_separate": true,
+    "raw_perf_record_lost_sum": 0,
+    "same_pid_and_tid": true,
+    "sample_cpu_exact": 31,
+    "sample_period_exact": 1000000,
+    "stop_on_first_failure": true,
+    "target_cpu_exact": 31,
+    "terminal_perf_record_lost_samples": 0
+  },
+  "created_utc": "2026-10-08T06:01:19Z",
+  "design": {
+    "bytes": 7121,
+    "path": "/home/zhuhe/litchi-performance-0976/design-affinity-ordering-v1.md",
+    "sha256": "5033971234f0fb449c2fc3dcbd12512a24782535696387355864ad20870e89f7"
+  },
+  "design_review": {
+    "bytes": 9023,
+    "path": "/home/zhuhe/litchi-performance-0976/analysis/independent-affinity-ordering-review-v1.json",
+    "sha256": "a5b5f9a6409cc83e18ec4967bfb3a7967456b23c4f299e794ea7402ffae83555"
+  },
+  "environment": {
+    "LD_PRELOAD": "absent",
+    "secrets": "not copied into child environment",
+    "whitelist": {
+      "LANG": "C",
+      "LC_ALL": "C",
+      "PATH": "/usr/bin:/bin",
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "TZ": "UTC"
+    }
+  },
+  "forbidden_perf_options": [
+    "--threads",
+    "--aio",
+    "--affinity",
+    "-C",
+    "--cpu",
+    "-a",
+    "--all-cpus",
+    "BPF sideband",
+    "--off-cpu"
+  ],
+  "fresh_output_contract": "all files below control_root are created exclusively after root GO; no overwrite or retry",
+  "future_native_gates": {
+    "minimum_marker_samples_each_child": 100,
+    "positive_marker_period_share": true,
+    "scope": "future Office/native cohort only; impossible and inapplicable to this stdlib control"
+  },
+  "handoff_sequence": [
+    "outer taskset starts perf and bridge on CPU31 with continuous enable_on_exec",
+    "bridge verifies own CPU31 and exact perf parent PID/UID/starttime/comm/exe",
+    "bridge snapshots every perf TID and verifies each starts on CPU31",
+    "bridge moves every observed perf TID to CPU30 and reads every mask back",
+    "bridge rejects any TID set/starttime change or mask mismatch",
+    "bridge rechecks itself and every perf TID immediately before same-PID target exec",
+    "bridge execs the stdlib target without changing PID/TID",
+    "target periodically rechecks its CPU31 mask and every perf TID CPU30 mask"
+  ],
+  "helper_seal": {
+    "bytes": 2024,
+    "path": "/home/zhuhe/litchi-performance-0976/receipts/helper-seal-0976-v6.json",
+    "sha256": "1ca27c37ff5ad54d870496249b4015a2f8cddef76c3af1c44f7c1a3ffe7f1e62"
+  },
+  "helpers": {
+    "bridge": {
+      "bytes": 16721,
+      "path": "/home/zhuhe/litchi-performance-0976/tools/affinity_bridge_0976_v2.py",
+      "sha256": "6b19f065d3a4183cad9d5ed6ae020628c7512c49e92b8a07dbdf338cc069270a"
+    },
+    "control_plan_generator": {
+      "bytes": 15910,
+      "path": "/home/zhuhe/litchi-performance-0976/tools/prepare_control_plan_0976_v6.py",
+      "sha256": "525e9f454bfec83ac78a04e534641f1dae9947d463cc235a5bf00a36e8c6a89d"
+    },
+    "python": {
+      "bytes": 7468968,
+      "path": "/usr/bin/python3.14",
+      "sha256": "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd"
+    },
+    "stdlib_target": {
+      "bytes": 8942,
+      "path": "/home/zhuhe/litchi-performance-0976/tools/stdlib_cpu_burn_0976_v2.py",
+      "sha256": "330eb4e14fb9d1a1504927cb369e28b495072beb775e2af21326bc63c7486670"
+    },
+    "taskset": {
+      "bytes": 31184,
+      "path": "/usr/bin/taskset",
+      "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2"
+    }
+  },
+  "negative_controls": {
+    "offline_self_test": "identity starttime mismatch and recorder mask mismatch must reject",
+    "runtime_identity_negative": "not run before review/GO; mismatched parent must produce failed_pre_exec receipt and no target exec"
+  },
+  "outputs": {
+    "bridge_receipt": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/bridge-receipt.json",
+    "command_receipt": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/command-receipt.json",
+    "control_root": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6",
+    "perf_data": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/control.perf.data",
+    "perf_header": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/perf-header.txt",
+    "perf_record_stderr": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/perf-record.stderr",
+    "perf_record_stdout": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/perf-record.stdout",
+    "target_receipt": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/target-receipt.json",
+    "terminal_receipt": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/terminal-receipt.json"
+  },
+  "perf": {
+    "bytes": 25221960,
+    "path": "/usr/bin/perf",
+    "sha256": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b"
+  },
+  "perf_manual": {
+    "bytes": 15283,
+    "path": "/usr/share/man/man1/perf-record.1.gz",
+    "sha256": "82b366662e48210cd62ff60e556f0fd673217a08768030a7d6eb3b6dafa5b73d"
+  },
+  "periodic_observation_window": {
+    "between_poll_transient": "outside this control proof",
+    "claim": "all recorded observations passed",
+    "interval_seconds": 0.02,
+    "native_requirement": "final identity/mask checks plus decoded sample, loss, and task-scope gates remain required",
+    "not_proof_of_continuous_absence": true,
+    "scope": "start, periodic, and end observations of parent identity/TID masks"
+  },
+  "plan_path": "/home/zhuhe/litchi-performance-0976/plans/control-plan-0976-v6.json",
+  "prior_design_review": {
+    "bytes": 9153,
+    "path": "/home/zhuhe/litchi-performance-0976/analysis/independent-design-review-0976-v1.json",
+    "sha256": "6345fa31f00012b216e8557edef07150830116201e8927d5ec9b5cc4b6a2b9a9"
+  },
+  "schema": "litchi.performance.0976.affinity_control_plan.v6",
+  "scope": "one harmless stdlib CPU-burn continuous affinity control; no Office/native workload, build, or qualification",
+  "startup_semantics": {
+    "enable_on_exec": true,
+    "events_continuously_enabled": true,
+    "fifo_mode": "optional diagnostic only; not part of this plan",
+    "startup_handoff_samples": "retained; classify and report startup/handoff records rather than filter",
+    "target_sample_cpu_gate": "all admitted target samples must still be CPU31"
+  },
+  "status": "pre_review",
+  "target": {
+    "check_interval_seconds": 0.02,
+    "cpu": 31,
+    "interpreter": {
+      "bytes": 7468968,
+      "path": "/usr/bin/python3.14",
+      "sha256": "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd"
+    },
+    "kind": "stdlib_only_cpu_burn",
+    "no_office_or_baseline_binary": true,
+    "path": "/home/zhuhe/litchi-performance-0976/tools/stdlib_cpu_burn_0976_v2.py",
+    "recorder_cpu": 30,
+    "seconds": 0.25,
+    "target_receipt": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/target-receipt.json"
+  },
+  "toolchain": {
+    "python": {
+      "bytes": 7468968,
+      "path": "/usr/bin/python3.14",
+      "sha256": "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd"
+    },
+    "taskset": {
+      "bytes": 31184,
+      "path": "/usr/bin/taskset",
+      "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2"
+    }
+  },
+  "topology": {
+    "bridge_affinity_before_and_after": [
+      31
+    ],
+    "mode": "continuous_event_mode",
+    "outer_affinity": [
+      31
+    ],
+    "parent_identity": "exact PID plus UID/starttime, comm=perf, resolved /usr/bin/perf path, and bound SHA-256",
+    "perf_parent_affinity_after_handoff": [
+      30
+    ],
+    "perf_parent_affinity_before_handoff": [
+      31
+    ],
+    "perf_tids": "enumerate /proc/<perf_pid>/task and move/verify every TID; leader-only move rejects",
+    "same_pid": "bridge execs /usr/bin/python3.14 target; target PID/starttime equals bridge PID/starttime",
+    "target_affinity_before_exec_and_after_exec": [
+      31
+    ]
+  }
+}

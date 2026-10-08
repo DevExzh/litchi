@@ -1,0 +1,98 @@
+{
+  "created_utc": "2026-10-08T06:32:41.312947+00:00",
+  "failure": {
+    "cause": "The final replay emits one report row per target sample/module-report call. initial_rewrite is cumulative true on all exact rows; cache_stored marks the sole initial store and reused_existing marks the remaining 111448 rows.",
+    "exception": "AssertionError",
+    "first_target": {
+      "admission": true,
+      "cache_stored": true,
+      "initial_rewrite": true,
+      "reused_existing": false
+    },
+    "message": "original final-v2 target reports: expected one initial and two target reuse reports, got 111449",
+    "observed_per_replay": {
+      "admission_true": 111449,
+      "cache_stored_true": 1,
+      "config_valid_true": 111449,
+      "exact_path_name_rows": 111449,
+      "fallback_rows": 0,
+      "identity_valid_true": 111449,
+      "non_target_reports": 6,
+      "reused_existing_true": 111448
+    },
+    "subsequent_target": {
+      "admission": true,
+      "cache_stored": false,
+      "initial_rewrite": true,
+      "reused_existing": true
+    }
+  },
+  "helper": {
+    "bytes": 40748,
+    "path": "/home/zhuhe/litchi-performance-0976/tools/test_aslr_translation_cache_final_v2_0976_v3.py",
+    "sha256": "0b839ab821d0a8cf4bc9d82ac21d7ad7f6cce214400afb2873829a714f3249cb"
+  },
+  "native_build_started": false,
+  "native_capture_started": false,
+  "native_workload_started": false,
+  "output_bindings": {
+    "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/child-01.translated.perf.data": {
+      "bytes": 229215080,
+      "path": "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/child-01.translated.perf.data",
+      "sha256": "7a77198252c22786fef42530f8716f0c62fdf7d61b869be5bc9aad0a955834b0"
+    },
+    "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/mutation-map.json": {
+      "bytes": 102334757,
+      "path": "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/mutation-map.json",
+      "sha256": "2e2e7580a698574b7b9270414d54a7a005fa661b548ac3905efa9749d0304ff6"
+    },
+    "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/original.final-v2.corrected.script.txt": {
+      "bytes": 11346285,
+      "path": "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/original.final-v2.corrected.script.txt",
+      "sha256": "532faee13c26d6a3790e7ffc81e64ab72ef2138faa2e7ded6e75864ad746a9a9"
+    },
+    "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/original.final-v2.corrected.stderr.txt": {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/original.final-v2.corrected.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/original.final-v2.dwfl.jsonl": {
+      "bytes": 213543177,
+      "path": "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/original.final-v2.dwfl.jsonl",
+      "sha256": "455a66b4a37020c39455728a049056c28f3f2643cd3d5fc376cbcdf4726fa641"
+    },
+    "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/translated.corrected.script.txt": {
+      "bytes": 11346285,
+      "path": "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/translated.corrected.script.txt",
+      "sha256": "e8af015e82a2dcb0e5f1d3af52b44d27d6c6e3e3e8187280651b273a68e6f9db"
+    },
+    "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/translated.corrected.stderr.txt": {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/translated.corrected.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/translated.dwfl.jsonl": {
+      "bytes": 213543177,
+      "path": "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/translated.dwfl.jsonl",
+      "sha256": "5c9ffa0721199e0fc74c68fe2c9aa6b00355e8382b1f26ab8651f996dfc70045"
+    },
+    "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/translated.perf-mmap-dump.stderr": {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/translated.perf-mmap-dump.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/translated.perf-mmap-dump.txt": {
+      "bytes": 1097888081,
+      "path": "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/translated.perf-mmap-dump.txt",
+      "sha256": "70b4841b96ebc14a4bef6f797d2379ffb7161c6aed096806b979e602e37dac91"
+    },
+    "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/translated.target-layout.json": {
+      "bytes": 4460,
+      "path": "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/translated.target-layout.json",
+      "sha256": "ac7e397f33258b04d9caa3588e8ff465ed2da8c5843e4e2632f8a76eeaf13be3"
+    }
+  },
+  "schema": "litchi.performance.0976.aslr_translation.final_v2.v2_attempt",
+  "status": "failed_checker_only_output_preserved",
+  "target_executed": false
+}

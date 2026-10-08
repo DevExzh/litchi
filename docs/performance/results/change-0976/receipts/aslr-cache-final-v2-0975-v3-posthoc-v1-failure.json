@@ -1,0 +1,21 @@
+{
+  "created_utc": "2026-10-08T06:36:07.387533+00:00",
+  "failure": {
+    "correctness": "No decoder replay was run by this checker.",
+    "reason": "posthoc checker used O(N^2) dict membership against 111449 exact rows; stopped before receipt and before modifying replay outputs",
+    "returncode": 130,
+    "signal": "SIGINT",
+    "traceback_tail": "KeyboardInterrupt in log_summary Counter(... for row in final if row not in exact)"
+  },
+  "helper": {
+    "bytes": 11447,
+    "path": "/home/zhuhe/litchi-performance-0976/tools/validate_aslr_translation_cache_final_v2_0976_v1.py",
+    "sha256": "9b6cb6b20c8bd32ee299e64dfd487a23e0364e74bb5092ec0d99775350106c5b"
+  },
+  "native_build_started": false,
+  "native_capture_started": false,
+  "native_workload_started": false,
+  "preserved_replay_output": "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3",
+  "schema": "litchi.performance.0976.aslr_translation.final_v2.posthoc.v1_attempt",
+  "status": "failed_interrupted_checker_only"
+}

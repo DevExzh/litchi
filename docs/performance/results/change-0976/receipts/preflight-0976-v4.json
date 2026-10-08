@@ -1,0 +1,109 @@
+{
+  "bindings": {
+    "adr_goal_revalidation": {
+      "bytes": 8092,
+      "path": "/home/zhuhe/litchi-performance-0976/receipts/adr-goal-revalidation-0976-v1.json",
+      "sha256": "364dc685aa3c1f91471602a89fddcc48f17e92aec2f6824461608ad2f0c4b3e2"
+    },
+    "bridge": {
+      "bytes": 16721,
+      "path": "/home/zhuhe/litchi-performance-0976/tools/affinity_bridge_0976_v2.py",
+      "sha256": "6b19f065d3a4183cad9d5ed6ae020628c7512c49e92b8a07dbdf338cc069270a"
+    },
+    "control_review": {
+      "bytes": 10442,
+      "path": "/home/zhuhe/litchi-performance-0976/analysis/independent-affinity-control-review-v1.json",
+      "sha256": "959126669bd27a2c07ae58343fa3e6e77e95a3e840758e2fb9ddfe2af6537ebd"
+    },
+    "design": {
+      "bytes": 7121,
+      "path": "/home/zhuhe/litchi-performance-0976/design-affinity-ordering-v1.md",
+      "sha256": "5033971234f0fb449c2fc3dcbd12512a24782535696387355864ad20870e89f7"
+    },
+    "design_review": {
+      "bytes": 9023,
+      "path": "/home/zhuhe/litchi-performance-0976/analysis/independent-affinity-ordering-review-v1.json",
+      "sha256": "a5b5f9a6409cc83e18ec4967bfb3a7967456b23c4f299e794ea7402ffae83555"
+    },
+    "helper_seal": {
+      "bytes": 2024,
+      "path": "/home/zhuhe/litchi-performance-0976/receipts/helper-seal-0976-v6.json",
+      "sha256": "1ca27c37ff5ad54d870496249b4015a2f8cddef76c3af1c44f7c1a3ffe7f1e62"
+    },
+    "plan": {
+      "bytes": 9996,
+      "path": "/home/zhuhe/litchi-performance-0976/plans/control-plan-0976-v6.json",
+      "sha256": "92b40f397df1aa2c3ea8f3cb78e938d9e32d250e97990ffed4478b4da70e9991"
+    },
+    "plan_generator": {
+      "bytes": 15910,
+      "path": "/home/zhuhe/litchi-performance-0976/tools/prepare_control_plan_0976_v6.py",
+      "sha256": "525e9f454bfec83ac78a04e534641f1dae9947d463cc235a5bf00a36e8c6a89d"
+    },
+    "prior_design_review": {
+      "bytes": 9153,
+      "path": "/home/zhuhe/litchi-performance-0976/analysis/independent-design-review-0976-v1.json",
+      "sha256": "6345fa31f00012b216e8557edef07150830116201e8927d5ec9b5cc4b6a2b9a9"
+    },
+    "python": {
+      "bytes": 7468968,
+      "path": "/usr/bin/python3.14",
+      "sha256": "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd"
+    },
+    "stdlib_target": {
+      "bytes": 8942,
+      "path": "/home/zhuhe/litchi-performance-0976/tools/stdlib_cpu_burn_0976_v2.py",
+      "sha256": "330eb4e14fb9d1a1504927cb369e28b495072beb775e2af21326bc63c7486670"
+    },
+    "taskset": {
+      "bytes": 31184,
+      "path": "/usr/bin/taskset",
+      "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2"
+    }
+  },
+  "created_utc": "2026-10-08T06:01:30Z",
+  "schema": "litchi.performance.0976.preflight.v4",
+  "scope": "continuous-mode helper/self-tests and custody checks only; no perf, control, workload, build, or native execution",
+  "status": "pass",
+  "tests": [
+    {
+      "files": [
+        "tools/affinity_bridge_0976_v2.py",
+        "tools/stdlib_cpu_burn_0976_v2.py",
+        "tools/prepare_control_plan_0976_v6.py"
+      ],
+      "name": "in_memory_compile",
+      "status": "pass"
+    },
+    {
+      "affinity_mask_negative": "pass",
+      "continuous_event_mode": true,
+      "identity_starttime_negative": "pass",
+      "name": "affinity_bridge_self_test",
+      "perf_started": false,
+      "status": "pass",
+      "workload_started": false
+    },
+    {
+      "name": "stdlib_target_self_test",
+      "periodic_parent_checks": true,
+      "status": "pass",
+      "workload_started": false
+    },
+    {
+      "absolute_taskset_and_python_bindings": true,
+      "control_started": false,
+      "gate_partition": "pass",
+      "mode": "continuous_event_mode",
+      "name": "plan_binding_check",
+      "status": "pass",
+      "workload_started": false
+    },
+    {
+      "control_started": false,
+      "name": "perf_manual_control_syntax_read",
+      "source": "/usr/share/man/man1/perf-record.1.gz",
+      "status": "pass"
+    }
+  ]
+}

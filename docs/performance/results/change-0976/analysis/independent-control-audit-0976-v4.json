@@ -1,0 +1,404 @@
+{
+  "bridge": {
+    "bridge_interpreter": {
+      "observed": {
+        "comm": "python3.14",
+        "exe": "/usr/bin/python3.14",
+        "pid": 3786018,
+        "starttime": 30518338,
+        "uid": 1001
+      },
+      "path": "/usr/bin/python3.14",
+      "sha256": "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd"
+    },
+    "bridge_pid": 3786018,
+    "bridge_starttime": 30518338,
+    "interpretation": "The algorithm is all-TID generic, but this control observed only the perf leader TID; it does not demonstrate a distinct reader pthread or its placement.",
+    "native_exec_same_pid": true,
+    "observed_parent_tid_count": 1,
+    "parent_after": {
+      "comm": "perf",
+      "exe": "/usr/bin/perf",
+      "pid": 3786017,
+      "starttime": 30518336,
+      "uid": 1001
+    },
+    "parent_before": {
+      "comm": "perf",
+      "exe": "/usr/bin/perf",
+      "pid": 3786017,
+      "starttime": 30518336,
+      "uid": 1001
+    },
+    "parent_final": {
+      "comm": "perf",
+      "exe": "/usr/bin/perf",
+      "pid": 3786017,
+      "starttime": 30518336,
+      "uid": 1001
+    },
+    "reader_placement_demonstrated": false,
+    "separate_reader_tid_observed": false,
+    "status": "ready_to_exec",
+    "tasks_after": [
+      {
+        "affinity": [
+          30
+        ],
+        "starttime": 30518336,
+        "tid": 3786017
+      }
+    ],
+    "tasks_before": [
+      {
+        "affinity": [
+          31
+        ],
+        "starttime": 30518336,
+        "tid": 3786017
+      }
+    ],
+    "tasks_final": [
+      {
+        "affinity": [
+          30
+        ],
+        "starttime": 30518336,
+        "tid": 3786017
+      }
+    ]
+  },
+  "created_utc": "2026-10-08T06:09:26.194766+00:00",
+  "custody": {
+    "bridge": {
+      "bytes": 3297,
+      "path": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/bridge-receipt.json",
+      "sha256": "7fc8af88bbc5f99f4bcebf9ed9ca89e99917255abb071264b69a55c69e1a821d"
+    },
+    "command": {
+      "bytes": 1777,
+      "path": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/command-receipt.json",
+      "sha256": "c8c0b1babcc11b04ce401573f420975071ec3146047e75adaa9c660e3976a000"
+    },
+    "helper_seal": {
+      "bytes": 2024,
+      "path": "/home/zhuhe/litchi-performance-0976/receipts/helper-seal-0976-v6.json",
+      "sha256": "1ca27c37ff5ad54d870496249b4015a2f8cddef76c3af1c44f7c1a3ffe7f1e62"
+    },
+    "plan": {
+      "bytes": 9996,
+      "path": "/home/zhuhe/litchi-performance-0976/plans/control-plan-0976-v6.json",
+      "sha256": "92b40f397df1aa2c3ea8f3cb78e938d9e32d250e97990ffed4478b4da70e9991"
+    },
+    "raw_perf_data": {
+      "bytes": 154718360,
+      "path": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/control.perf.data",
+      "sha256": "7bbd06c5293915f2d01a8bf756d296fbd55a1ea40fa36cda8dbec9c8a2bb6970"
+    },
+    "review": {
+      "bytes": 12177,
+      "path": "/home/zhuhe/litchi-performance-0976/analysis/independent-affinity-control-review-v2.json",
+      "sha256": "cc813e02fdba61bed32eb6d8adeaaf2590affe6f35e648573964acfbbef74ebb"
+    },
+    "root_go": {
+      "bytes": 2761,
+      "path": "/home/zhuhe/litchi-performance-0976/receipts/root-control-go-0976-v1.json",
+      "sha256": "a03e3d9a55f1306a4eaae7963ca8e61997f3eea5c9a9dbfa5d6ea522aa28aea0"
+    },
+    "stderr": {
+      "bytes": 178,
+      "path": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/perf-record.stderr",
+      "sha256": "f6790daf54329a6a2b92350498dafb32fec2b736f8f27d7ded7da1da43521cb2"
+    },
+    "stdout": {
+      "bytes": 4627,
+      "path": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/perf-record.stdout",
+      "sha256": "d62409b562e778e9ee80cb4ba1251a12f5b668f96b4d5354eed181a946aba3cc"
+    },
+    "target": {
+      "bytes": 7667,
+      "path": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/target-receipt.json",
+      "sha256": "0dcac8748bb1e89fa6a3f012b65fa5d028ed9b85b7a286fb7b9c89bfb573abc5"
+    },
+    "terminal": {
+      "bytes": 1126,
+      "path": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/terminal-receipt.json",
+      "sha256": "14c93c60bbc165188c7726d5e4cf52ca98a0f314b9a1007427f93f31d650b747"
+    }
+  },
+  "findings": [
+    {
+      "detail": "The required exact perf report command emitted the explicit field # Total Lost Samples: 0.",
+      "id": "F-terminal-loss",
+      "severity": "gate",
+      "status": "pass"
+    },
+    {
+      "detail": "Only one parent perf TID (the leader) was observed. The all-TID algorithm passed for the observed set, but no distinct reader pthread placement was demonstrated.",
+      "id": "F-reader-tid-scope",
+      "severity": "interpretation",
+      "status": "bounded"
+    },
+    {
+      "detail": "Start, 13 periodic, and end checks passed at a nominal 20 ms interval; a transient TID or mask change wholly between polls is outside proof.",
+      "id": "F-poll-window",
+      "severity": "interpretation",
+      "status": "bounded"
+    },
+    {
+      "detail": "The planned perf-header.txt was intentionally produced by post-exit offline decode from the immutable raw perf.data and copied byte-for-byte to the declared output path.",
+      "id": "F-header-origin",
+      "severity": "custody",
+      "status": "resolved"
+    }
+  ],
+  "gate_result": {
+    "all_observed_parent_tids_cpu30": true,
+    "future_marker_gates": "not applicable to this stdlib control",
+    "header_continuous_enable": true,
+    "native_admission": false,
+    "positive_samples": true,
+    "raw_lost_zero": true,
+    "same_target_pid_tid": true,
+    "sample_cpu31": true,
+    "sample_period_exact": true,
+    "target_cpu31": true,
+    "terminal_lost_samples_zero": true,
+    "terminal_success": true
+  },
+  "header": {
+    "bytes": 1720,
+    "facts": {
+      "disabled": 1,
+      "enable_on_exec": 1,
+      "event": "instructions:u",
+      "inherit_field": "not printed (zero/default in this header); --per-thread scope retained",
+      "perf_version": "7.0.14",
+      "sample_id_all": 1,
+      "sample_period": 1000000,
+      "sample_stack_user": 32768,
+      "sample_type": [
+        "IP",
+        "TID",
+        "TIME",
+        "CALLCHAIN",
+        "CPU",
+        "PERIOD",
+        "REGS_USER",
+        "STACK_USER"
+      ],
+      "task": 1
+    },
+    "path": "/home/zhuhe/litchi-performance-0976/analysis/control-perf-header-0976-v1.txt",
+    "sha256": "16df8d9c04a8436bd8c18f02f600ad34fd32c6b38b4aab4c72c13c39cfb76cf1"
+  },
+  "limits": [
+    "Only one perf TID was observed; this run does not prove placement of a separate reader pthread.",
+    "The periodic control does not prove continuous absence between polls.",
+    "This is a placement/control validation only; it makes no Office attribution, performance, loss-causality, or optimization claim."
+  ],
+  "planned_output_completeness": {
+    "disposition": "expected_deferred_decode_completed",
+    "exists_after_terminal": true,
+    "finding": "The runner intentionally captured raw perf data and terminal records; header sidecar was generated offline after exit from that raw data and then placed at the declared path. This is complete custody, not a capture failure.",
+    "origin": {
+      "byte_identical": true,
+      "decode_command": "/usr/bin/perf report --header-only -i /home/zhuhe/litchi-performance-0976/control/affinity-control-v6/control.perf.data",
+      "decoded_header_sidecar": {
+        "bytes": 1720,
+        "path": "/home/zhuhe/litchi-performance-0976/analysis/control-perf-header-0976-v1.txt",
+        "sha256": "16df8d9c04a8436bd8c18f02f600ad34fd32c6b38b4aab4c72c13c39cfb76cf1"
+      },
+      "decoded_sidecar_mtime_utc": "2026-10-08T06:07:13.385340498Z",
+      "planned_header_copy": {
+        "bytes": 1720,
+        "path": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/perf-header.txt",
+        "sha256": "16df8d9c04a8436bd8c18f02f600ad34fd32c6b38b4aab4c72c13c39cfb76cf1"
+      },
+      "planned_header_copy_mtime_utc": "2026-10-08T06:08:10.732416476Z",
+      "source_raw_perf_data": {
+        "bytes": 154718360,
+        "path": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/control.perf.data",
+        "sha256": "7bbd06c5293915f2d01a8bf756d296fbd55a1ea40fa36cda8dbec9c8a2bb6970"
+      }
+    },
+    "plan_declared_header": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/perf-header.txt"
+  },
+  "raw_event_scan": {
+    "comm_records": 3,
+    "decoder": "/usr/bin/perf script -D",
+    "event_counts": {
+      "PERF_RECORD_COMM": 3,
+      "PERF_RECORD_CPU_MAP": 1,
+      "PERF_RECORD_EVENT_UPDATE": 1,
+      "PERF_RECORD_EXIT": 1,
+      "PERF_RECORD_FINISHED_INIT": 1,
+      "PERF_RECORD_FINISHED_ROUND": 60,
+      "PERF_RECORD_ID_INDEX": 1,
+      "PERF_RECORD_MMAP": 267,
+      "PERF_RECORD_SAMPLE": 4685,
+      "PERF_RECORD_THREAD_MAP": 1
+    },
+    "exit_records": 1,
+    "fork_records": 0,
+    "lost_record_lines": [],
+    "raw_perf_record_lost_sum": 0,
+    "returncode": 0,
+    "stats_excerpt": [
+      "Aggregated stats:",
+      "               TOTAL events:       5021",
+      "                COMM events:          3  ( 0.1%)",
+      "                EXIT events:          1  ( 0.0%)",
+      "              SAMPLE events:       4685  (93.3%)",
+      "               MMAP2 events:        267  ( 5.3%)",
+      "      FINISHED_ROUND events:         60  ( 1.2%)",
+      "            ID_INDEX events:          1  ( 0.0%)",
+      "          THREAD_MAP events:          1  ( 0.0%)",
+      "             CPU_MAP events:          1  ( 0.0%)",
+      "        EVENT_UPDATE events:          1  ( 0.0%)",
+      "       FINISHED_INIT events:          1  ( 0.0%)",
+      "instructions:u stats:",
+      "              SAMPLE events:       4685"
+    ],
+    "task_event_lines": [
+      "0 0 0x198 [0x38]: PERF_RECORD_COMM: perf-exec:3786018/3786018",
+      "31 305182166317471 0x1d8 [0x38]: PERF_RECORD_COMM exec: python3.14:3786018/3786018",
+      "31 305182218312911 0x843c18 [0x38]: PERF_RECORD_COMM exec: python3.14:3786018/3786018",
+      "31 305182508269049 0x9383168 [0x38]: PERF_RECORD_EXIT(3786018:3786018):(3786017:3786017)"
+    ],
+    "terminal_loss_report_explicit_field": "# Total Lost Samples: 0",
+    "terminal_loss_report_path": "/home/zhuhe/litchi-performance-0976/analysis/control-perf-report-percent100-0976-v1.txt",
+    "terminal_loss_report_value": 0,
+    "terminal_perf_record_lost_samples": 0
+  },
+  "samples": {
+    "all_cpu31": true,
+    "all_period_1000000": true,
+    "all_target_pid_tid": true,
+    "clock_note": "perf sample timestamps and Python monotonic receipt timestamps are retained as separate clocks; no cross-clock boundary claim is made.",
+    "comm_set": [
+      "python3.14"
+    ],
+    "count": 4685,
+    "cpu_counts": {
+      "31": 4685
+    },
+    "period_counts": {
+      "1000000": 4685
+    },
+    "pid_set": [
+      3786018
+    ],
+    "pid_tid_pairs": [
+      [
+        3786018,
+        3786018
+      ]
+    ],
+    "positive_period_count": true,
+    "positive_sample_count": true,
+    "tid_set": [
+      3786018
+    ],
+    "time_first_perf_clock": 305182.166975,
+    "time_last_perf_clock": 305182.508184
+  },
+  "schema": "litchi.performance.0976.independent_control_audit.v4",
+  "scope": "Offline audit of exactly one harmless stdlib control; no rerun, no Office/native workload, no build.",
+  "status": "pass_control_only_native_withheld",
+  "target": {
+    "all_parent_masks_cpu30": true,
+    "check_count": 15,
+    "check_interval_ns_max": 20030430,
+    "check_interval_ns_median": 20002729.0,
+    "check_interval_ns_min": 44810,
+    "check_interval_seconds": 0.02,
+    "control_only": true,
+    "elapsed_ns": 250113437,
+    "iterations": 760327,
+    "native_workload_started": false,
+    "parent_perf": {
+      "affinity": [
+        30
+      ],
+      "comm": "perf",
+      "exe": "/usr/bin/perf",
+      "pid": 3786017,
+      "starttime": 30518336,
+      "uid": 1001
+    },
+    "periodic_check_count": 13,
+    "periodic_limit": "Start/periodic/end observations passed; a transient TID or mask change entirely between 20 ms polls is outside this proof.",
+    "recorder_cpu": 30,
+    "requested_seconds": 0.25,
+    "status": "pass",
+    "target": {
+      "affinity": [
+        31
+      ],
+      "comm": "python3.14",
+      "exe": "/usr/bin/python3.14",
+      "pid": 3786018,
+      "starttime": 30518338,
+      "uid": 1001
+    },
+    "target_cpu": 31,
+    "target_executable": {
+      "observed": {
+        "affinity": [
+          31
+        ],
+        "comm": "python3.14",
+        "exe": "/usr/bin/python3.14",
+        "pid": 3786018,
+        "starttime": 30518338,
+        "uid": 1001
+      },
+      "path": "/usr/bin/python3.14",
+      "sha256": "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd"
+    },
+    "target_mask_cpu31": true,
+    "unique_parent_observations": [
+      [
+        3786017,
+        1001,
+        30518336,
+        "perf",
+        "/usr/bin/perf",
+        [
+          30
+        ]
+      ]
+    ],
+    "unique_task_observations": [
+      [
+        3786017,
+        30518336,
+        [
+          30
+        ]
+      ]
+    ]
+  },
+  "terminal": {
+    "no_retry": true,
+    "office_workload_started": false,
+    "perf_pid": 3786017,
+    "returncode": 0,
+    "timed_out": false
+  },
+  "terminal_loss_report": {
+    "command": "/usr/bin/perf report --stdio --percent-limit 100 -i /home/zhuhe/litchi-performance-0976/control/affinity-control-v6/control.perf.data",
+    "event_count_approx": 4685000000,
+    "explicit_field": "# Total Lost Samples: 0",
+    "interpretation": "This explicit perf report field is the terminal readout required by the protocol. It is independent of the raw PERF_RECORD_LOST scan; both are retained as separate loss domains.",
+    "report": {
+      "bytes": 487,
+      "path": "/home/zhuhe/litchi-performance-0976/analysis/control-perf-report-percent100-0976-v1.txt",
+      "sha256": "956155405ee747da2f2617aa497abdfbb732852a0299e752da008c3746484e62"
+    },
+    "returncode": 0,
+    "sample_count_reported": "# Samples: 4K of event 'instructions:u'",
+    "terminal_lost_samples": 0
+  }
+}

@@ -1,0 +1,99 @@
+{
+  "admission_effect": "No v5 evidence is reused as current helper bytes. Any v6 control must bind the v6 plan, v6 seal, and these current hashes; v5 remains superseded historical design evidence.",
+  "created_utc": "2026-10-08T06:02:49.245809+00:00",
+  "current_v6": {
+    "helper_seal": {
+      "bytes": 2024,
+      "path": "/home/zhuhe/litchi-performance-0976/receipts/helper-seal-0976-v6.json",
+      "sha256": "1ca27c37ff5ad54d870496249b4015a2f8cddef76c3af1c44f7c1a3ffe7f1e62"
+    },
+    "interpretation": "The v6 plan/seal bind the current bridge/target/generator bytes and add absolute taskset/Python toolchain bindings. This receipt does not claim the historical v5 bytes are recoverable from the overwritten paths.",
+    "plan": {
+      "bytes": 9996,
+      "path": "/home/zhuhe/litchi-performance-0976/plans/control-plan-0976-v6.json",
+      "sha256": "92b40f397df1aa2c3ea8f3cb78e938d9e32d250e97990ffed4478b4da70e9991"
+    },
+    "sealed_helper_rows": {
+      "bridge": {
+        "bytes": 16721,
+        "path": "/home/zhuhe/litchi-performance-0976/tools/affinity_bridge_0976_v2.py",
+        "sha256": "6b19f065d3a4183cad9d5ed6ae020628c7512c49e92b8a07dbdf338cc069270a"
+      },
+      "control_plan_generator": {
+        "bytes": 15910,
+        "path": "/home/zhuhe/litchi-performance-0976/tools/prepare_control_plan_0976_v6.py",
+        "sha256": "525e9f454bfec83ac78a04e534641f1dae9947d463cc235a5bf00a36e8c6a89d"
+      },
+      "python": {
+        "bytes": 7468968,
+        "path": "/usr/bin/python3.14",
+        "sha256": "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd"
+      },
+      "stdlib_target": {
+        "bytes": 8942,
+        "path": "/home/zhuhe/litchi-performance-0976/tools/stdlib_cpu_burn_0976_v2.py",
+        "sha256": "330eb4e14fb9d1a1504927cb369e28b495072beb775e2af21326bc63c7486670"
+      },
+      "taskset": {
+        "bytes": 31184,
+        "path": "/usr/bin/taskset",
+        "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2"
+      }
+    }
+  },
+  "historical_v5": {
+    "helper_seal": {
+      "path": "/home/zhuhe/litchi-performance-0976/receipts/helper-seal-0976-v5.json",
+      "sha256": "727aea6589e70fdabefce226e35476dde156fdcc3de699930e2b346e6de4984e"
+    },
+    "interpretation": "The v5 plan/seal are immutable historical records. The bridge and stdlib target paths named there were later overwritten, so their current bytes no longer match the v5 rows. The v5 generator used a distinct path and remains present as an old file.",
+    "plan": {
+      "path": "/home/zhuhe/litchi-performance-0976/plans/control-plan-0976-v5.json",
+      "sha256": "541e2e4d708421a47ec63660e7cadaa56ab9ba9e3595f2139262a6aa5346dbfd"
+    },
+    "sealed_helper_rows": {
+      "bridge": {
+        "bytes": 15330,
+        "path": "/home/zhuhe/litchi-performance-0976/tools/affinity_bridge_0976_v2.py",
+        "sha256": "51bb0483957ea8e9ba656aa886a554e765aa90ae40ec8c98155165b54faf79b7"
+      },
+      "control_plan_generator": {
+        "bytes": 13900,
+        "path": "/home/zhuhe/litchi-performance-0976/tools/prepare_control_plan_0976_v5.py",
+        "sha256": "808bf5dd4b577c033c7f488a4e6793ba96fe110ae9c332064f43ec9dc2091a59"
+      },
+      "stdlib_target": {
+        "bytes": 7985,
+        "path": "/home/zhuhe/litchi-performance-0976/tools/stdlib_cpu_burn_0976_v2.py",
+        "sha256": "7b7397d015e6ad4b11c15306549766775ca4ed03768cd2f6baa7e6138cc68044"
+      }
+    }
+  },
+  "path_transitions": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0976/tools/affinity_bridge_0976_v2.py",
+      "role": "bridge",
+      "transition": "same path overwritten before v6 seal",
+      "v5_sha256": "51bb0483957ea8e9ba656aa886a554e765aa90ae40ec8c98155165b54faf79b7",
+      "v6_sha256": "6b19f065d3a4183cad9d5ed6ae020628c7512c49e92b8a07dbdf338cc069270a"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0976/tools/stdlib_cpu_burn_0976_v2.py",
+      "role": "stdlib_target",
+      "transition": "same path overwritten before v6 seal",
+      "v5_sha256": "7b7397d015e6ad4b11c15306549766775ca4ed03768cd2f6baa7e6138cc68044",
+      "v6_sha256": "330eb4e14fb9d1a1504927cb369e28b495072beb775e2af21326bc63c7486670"
+    },
+    {
+      "role": "control_plan_generator",
+      "transition": "new versioned path; v5 path remains historical",
+      "v5_path": "/home/zhuhe/litchi-performance-0976/tools/prepare_control_plan_0976_v5.py",
+      "v5_sha256": "808bf5dd4b577c033c7f488a4e6793ba96fe110ae9c332064f43ec9dc2091a59",
+      "v6_path": "/home/zhuhe/litchi-performance-0976/tools/prepare_control_plan_0976_v6.py",
+      "v6_sha256": "525e9f454bfec83ac78a04e534641f1dae9947d463cc235a5bf00a36e8c6a89d"
+    }
+  ],
+  "schema": "litchi.performance.0976.helper_path_overwrite_correction.v1",
+  "scope": "Custody correction for the v5-to-v6 helper revision; no perf, control, workload, build, or helper mutation performed by this receipt.",
+  "status": "historical_path_overwrite_documented"
+}

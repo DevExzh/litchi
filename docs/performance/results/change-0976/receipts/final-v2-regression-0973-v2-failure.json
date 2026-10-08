@@ -1,0 +1,65 @@
+{
+  "created_utc": "2026-10-08T06:39:09.114349+00:00",
+  "failure": {
+    "corrected_summary": {
+      "empty_callchain_count": 0,
+      "explicit_stack_truncated_count": 0,
+      "lost_events": 8,
+      "marker_period": 947000000,
+      "marker_sample_count": 947,
+      "sample_count": 6931,
+      "total_period": 6931000000,
+      "unresolved_frames": 3357
+    },
+    "message": "final-v2 noop recovery incorrectly required empty_callchains_zero",
+    "noop_summary": {
+      "empty_callchain_count": 4540,
+      "explicit_stack_truncated_count": 0,
+      "lost_events": 8,
+      "marker_period": 0,
+      "marker_sample_count": 0,
+      "sample_count": 6931,
+      "total_period": 6931000000,
+      "unresolved_frames": 3372
+    },
+    "reason": "MODE=noop correctly preserves stock/noop uncorrected empty-chain behavior; output has sample/period/lost identity but empty_callchains=4540, matching stock/noop byte-for-byte. No decoder replay is needed.",
+    "stock_summary": {
+      "empty_callchain_count": 4540,
+      "explicit_stack_truncated_count": 0,
+      "lost_events": 8,
+      "marker_period": 0,
+      "marker_sample_count": 0,
+      "sample_count": 6931,
+      "total_period": 6931000000,
+      "unresolved_frames": 3372
+    }
+  },
+  "helper": {
+    "bytes": 15388,
+    "path": "/home/zhuhe/litchi-performance-0976/tools/validate_and_noop_final_v2_0973.py",
+    "sha256": "cdd01bf23ef83c730ca4a5f44f7898ee9475237fab1784abaf80c5e8ad2e132e"
+  },
+  "native_build_started": false,
+  "native_capture_started": false,
+  "native_workload_started": false,
+  "output_bindings": {
+    "/home/zhuhe/litchi-performance-0976/final-v2-regression-0973-v2/child-01.final-v2-noop.dwfl.jsonl": {
+      "bytes": 37438458,
+      "path": "/home/zhuhe/litchi-performance-0976/final-v2-regression-0973-v2/child-01.final-v2-noop.dwfl.jsonl",
+      "sha256": "8d64a4a08850ae146d18940f1b3a2a8d8680f4da81a28c4188d125c8a754fb4c"
+    },
+    "/home/zhuhe/litchi-performance-0976/final-v2-regression-0973-v2/child-01.final-v2-noop.perf-script-no-inline.txt": {
+      "bytes": 1137729,
+      "path": "/home/zhuhe/litchi-performance-0976/final-v2-regression-0973-v2/child-01.final-v2-noop.perf-script-no-inline.txt",
+      "sha256": "03f2d314e734608d6ea71dbdf6be1a186ca03dd0cf5f3c37f8a979f4fcf5d1c3"
+    },
+    "/home/zhuhe/litchi-performance-0976/final-v2-regression-0973-v2/child-01.final-v2-noop.perf.stderr": {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0976/final-v2-regression-0973-v2/child-01.final-v2-noop.perf.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "schema": "litchi.performance.0976.final_v2_regression_0973.v2_attempt",
+  "status": "failed_checker_only_noop_quality_gate",
+  "target_executed": false
+}

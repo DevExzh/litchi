@@ -1,0 +1,30 @@
+{
+  "finished_utc": "2026-10-08T06:05:04.770081+00:00",
+  "no_retry": true,
+  "office_workload_started": false,
+  "pid": 3786017,
+  "plan": {
+    "bytes": 9996,
+    "path": "/home/zhuhe/litchi-performance-0976/plans/control-plan-0976-v6.json",
+    "sha256": "92b40f397df1aa2c3ea8f3cb78e938d9e32d250e97990ffed4478b4da70e9991"
+  },
+  "returncode": 0,
+  "root_go": {
+    "bytes": 2761,
+    "path": "/home/zhuhe/litchi-performance-0976/receipts/root-control-go-0976-v1.json",
+    "sha256": "a03e3d9a55f1306a4eaae7963ca8e61997f3eea5c9a9dbfa5d6ea522aa28aea0"
+  },
+  "schema": "litchi.performance.0976.control_terminal.v1",
+  "started_utc": "2026-10-08T06:05:04.355755+00:00",
+  "stderr": {
+    "bytes": 178,
+    "path": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/perf-record.stderr",
+    "sha256": "f6790daf54329a6a2b92350498dafb32fec2b736f8f27d7ded7da1da43521cb2"
+  },
+  "stdout": {
+    "bytes": 4627,
+    "path": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/perf-record.stdout",
+    "sha256": "d62409b562e778e9ee80cb4ba1251a12f5b668f96b4d5354eed181a946aba3cc"
+  },
+  "timed_out": false
+}
