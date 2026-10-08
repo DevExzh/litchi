@@ -154,6 +154,8 @@ semantic-limit migrations.
 - Facade: `sheet::Workbook` returns typed `litchi_core::Error` (the
   `Box<dyn Error + Send + Sync>` split is removed); facade wrappers preserve
   leaf errors as typed sources. Folded into the UNIFIED_OPS M0a migration.
+  Owning DOCX publication preserves OPC causes and accepted-output counts
+  (0043); broader leaf error cleanup remains pending.
 - Content redaction: errors, diagnostics, and `Debug` never carry authored
   content (user text, entry names, sheet names); structural metadata (part
   paths, limit figures, positions, `FileFormat`) is allowed. ✅ iWork ·

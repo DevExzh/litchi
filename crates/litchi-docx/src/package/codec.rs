@@ -608,6 +608,9 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
+    /// OPC publication errors retain their typed cause. After the sink accepts
+    /// bytes, failures report [`litchi_opc::OpcError::IncompleteOutput`] with
+    /// the accepted byte count. The package can be retried with another sink.
     pub fn write_to<W: Write>(&mut self, writer: W) -> Result<()> {
         self.ensure_plain_output("write_to")?;
         self.write_plain(writer)
@@ -1314,11 +1317,7 @@ impl Package {
                 None
             };
 
-            self.opc.to_stream(writer).map_err(|e| {
-                Error::Io(std::io::Error::other(format!(
-                    "Failed to save package: {e}"
-                )))
-            })?;
+            self.opc.to_stream(writer)?;
             if let Some(staged_properties) = staged_properties {
                 staged_properties.commit();
             }

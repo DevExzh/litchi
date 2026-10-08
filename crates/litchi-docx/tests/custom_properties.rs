@@ -218,7 +218,12 @@ fn dirty_custom_properties_survive_a_failed_stream_and_retry() {
     let custom_uri = PackURI::new("/docProps/custom.xml").expect("static custom-properties URI");
     assert!(package.opc_package().get_part(&custom_uri).is_err());
 
-    assert!(package.write_to(FailingSink { remaining: 1 }).is_err());
+    assert!(matches!(
+        package.write_to(FailingSink { remaining: 1 }),
+        Err(litchi_docx::Error::Opc(
+            litchi_opc::OpcError::IncompleteOutput { written: 1, .. }
+        ))
+    ));
     assert!(
         package.opc_package().get_part(&custom_uri).is_err(),
         "failed publication must roll back the staged custom-properties part"
@@ -306,4 +311,37 @@ fn raw_opc_empty_custom_properties_part_is_preserved_until_explicit_clear() {
             .iter()
             .all(|relationship| relationship.reltype() != rt::CUSTOM_PROPERTIES)
     );
+}
+
+#[test]
+fn exact_source_stream_failure_keeps_typed_cause_and_accepted_count() {
+    let mut authored = Package::new().unwrap();
+    let mut original = Vec::new();
+    authored.write_to(&mut original).unwrap();
+    for accepted in [0, 17] {
+        let mut package = Package::from_bytes(&original).unwrap();
+        let error = package
+            .write_to(FailingSink {
+                remaining: accepted,
+            })
+            .unwrap_err();
+        let litchi_docx::Error::Opc(error) = error else {
+            panic!("publication lost its OPC error type");
+        };
+        let cause = if accepted == 0 {
+            error
+        } else {
+            let litchi_opc::OpcError::IncompleteOutput { written, source } = error else {
+                panic!("partial output lost its accepted-byte count");
+            };
+            assert_eq!(written, accepted as u64);
+            *source
+        };
+        assert!(
+            matches!(cause, litchi_opc::OpcError::IoError(ref error) if error.kind() == io::ErrorKind::Other)
+        );
+        let mut retry = Vec::new();
+        package.write_to(&mut retry).unwrap();
+        assert_eq!(retry, original);
+    }
 }

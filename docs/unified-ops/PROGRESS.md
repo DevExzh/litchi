@@ -502,3 +502,14 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
   property staging and retry behavior. Record 0042 lists verification.
 - Owner consolidation, immutable owning publication, specialized APIs and the
   broader all-format unified goal remain active.
+
+
+## 0043 — typed owning DOCX publication failures
+
+- Removed the owning publisher's conversion of OPC failures into formatted I/O
+  strings. Error::Opc now preserves typed causes and IncompleteOutput counts.
+- Regression tests distinguish zero-byte and partial exact-source failures,
+  prove byte-exact retry, and check typed partial-output errors while custom
+  property staging rolls back and remains retryable.
+- Record 0043 documents verification. Broader error normalization and the
+  complete unified goal remain active.
