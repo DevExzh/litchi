@@ -1,0 +1,162 @@
+{
+  "created_utc": "2026-10-08T05:31:00.866906+00:00",
+  "dependency_bindings": {
+    "plan_binding_0975": {
+      "bytes": 6849,
+      "path": "/home/zhuhe/litchi-performance-0975/tools/plan_binding_0975.py",
+      "sha256": "489699a6e94bb88eb6d5dd911d6959d4d1859e80590cac1cd2f3d2d92bb547e2"
+    },
+    "reused_adapter_v1": {
+      "bytes": 25841,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/protocol_adapter_0974_v1.py",
+      "sha256": "6c2032e2d1cc04990f6f4be0df4542d393ce55f1c1c7d45b97ea62eb5f05269e"
+    },
+    "reused_adapter_v3": {
+      "bytes": 30542,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/protocol_adapter_0974_v3.py",
+      "sha256": "e798f3e5628cab21c019f90d793754ef5930a0ce9e222569f53861eed83e8dd6"
+    },
+    "reused_adapter_v5": {
+      "bytes": 35075,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/protocol_adapter_0974_v5.py",
+      "sha256": "e3725cbc027d2a063f32b926e3fb4024d640aab2a2fbd7493ed5325de9ea2ac6"
+    },
+    "reused_generator_v5": {
+      "bytes": 8470,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/prepare_plan_0974_v5.py",
+      "sha256": "eb5d0f42055b8917078602d1329b1aafdec3eef453370816aec102a9e0ef486e"
+    },
+    "reused_helper_seal_v5": {
+      "bytes": 4177,
+      "path": "/home/zhuhe/litchi-performance-0974/receipts/helper-seal-0974-v5.json",
+      "sha256": "4cc5ef36a28c6b254a580abd01b21792daef317b383ac5dc718ea544bb3668a3"
+    },
+    "reused_plan_v5": {
+      "bytes": 19568,
+      "path": "/home/zhuhe/litchi-performance-0974/plans/plan-0974-pre-capture-v5.json",
+      "sha256": "dddd126895d04cd1738719d99aa00ff1b68dcd551233a5c2391f37f7c30e71ee"
+    },
+    "reused_reducer_v4": {
+      "bytes": 12565,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/reduce_0974_v4.py",
+      "sha256": "7c6e7162e406aecf13868b264da29f2d5b6e07f0212bed1099298a464bb9ade5"
+    },
+    "reused_runner_v5": {
+      "bytes": 1841,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/run_0974_v5.py",
+      "sha256": "519a7b88cf6df7688d1b4555fbd3b2d682c2459bc6c070817308ba38031d4fe1"
+    }
+  },
+  "fresh_output_root": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1",
+  "helpers": {
+    "plan_generator": {
+      "bytes": 5729,
+      "path": "/home/zhuhe/litchi-performance-0975/tools/prepare_plan_0975.py",
+      "sha256": "4ff18125bc1584f5fc82d72a865985db0f4163743092f3a8b76ec236d4295275"
+    },
+    "protocol": {
+      "bytes": 35075,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/protocol_adapter_0974_v5.py",
+      "sha256": "e3725cbc027d2a063f32b926e3fb4024d640aab2a2fbd7493ed5325de9ea2ac6"
+    },
+    "raw_stack": {
+      "bytes": 35075,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/protocol_adapter_0974_v5.py",
+      "sha256": "e3725cbc027d2a063f32b926e3fb4024d640aab2a2fbd7493ed5325de9ea2ac6"
+    },
+    "reducer": {
+      "bytes": 1758,
+      "path": "/home/zhuhe/litchi-performance-0975/tools/reduce_0975.py",
+      "sha256": "5848148172f1d36c9aa6cb9ab67367c3ec8e702d4343fbafa6e5c303fd0f378a"
+    },
+    "runner": {
+      "bytes": 1787,
+      "path": "/home/zhuhe/litchi-performance-0975/tools/run_0975.py",
+      "sha256": "1dd23f2d38ff9c7333f92d3ab54bd6ae68fb870c5e8d1fc89a743cdec339f125"
+    },
+    "shim_map": {
+      "bytes": 107,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/dwfl_dynamic_shim_v2.map",
+      "sha256": "d0a7914c5cb02770073db94dc4d2b207a95ae513b436c661d8a9c9a206aefef6"
+    },
+    "shim_so": {
+      "bytes": 16672,
+      "path": "/home/zhuhe/litchi-performance-0973/replay-dwfl-v2/dwfl_dynamic_shim_v2.so",
+      "sha256": "92b256588622a97b0e32a8de2a6149d3e5dce0b2eda3e614ff42daf91279bb03"
+    },
+    "shim_source": {
+      "bytes": 10001,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/dwfl_dynamic_shim_v2.c",
+      "sha256": "6600804eb94fbb81c6b26facc07ff28dc6df101cc75e7a2d2859eb12167f1551"
+    }
+  },
+  "loss_contract": {
+    "double_counting": "the two zero gates are not added",
+    "raw_field": "raw_lost_sum",
+    "terminal_field": "lost_samples_summary"
+  },
+  "no_build_or_workload": true,
+  "record_memory": {
+    "bytes": 16777216,
+    "position": "immediately before --call-graph",
+    "tokens": [
+      "-m",
+      "16M"
+    ]
+  },
+  "record_mode": {
+    "forbidden_tokens": [
+      "-a",
+      "--all-cpus",
+      "-C",
+      "--cpu",
+      "--inherit"
+    ],
+    "inheritance": "disabled_by_per_thread",
+    "tokens": [
+      "--per-thread"
+    ]
+  },
+  "retained_0973": {
+    "plan_generator": {
+      "bytes": 7927,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/prepare_plan_0973_v2.py",
+      "sha256": "c3beab19960e0a7b4d73f252aa015c6b398508f2bf4e33cb6ace4b271129f65f"
+    },
+    "protocol": {
+      "bytes": 39589,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/protocol_common_0973_v2.py",
+      "sha256": "56b509fde01bbd66702ac8cd835da0d09d74d332935926078c6545093ed52bf4"
+    },
+    "raw_stack": {
+      "bytes": 13746,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/raw_stack_0973_v2.py",
+      "sha256": "3a8e36ebc5f21f4f0b8293cafa675d722f2264fb1cfd6c7f48271b4f0a5056d2"
+    },
+    "reducer": {
+      "bytes": 31359,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/reduce_0973_v2.py",
+      "sha256": "f33f14724f6264d87b2c3a0082c16bca711787140d06f3c7cfdd6e78b6f4c63b"
+    },
+    "runner": {
+      "bytes": 20510,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/run_0973_v2.py",
+      "sha256": "f4f7af4ec8b8bb1818f3ce25dec046c8b8ad7c23d0a2611c76e24bf10b6aef5d"
+    }
+  },
+  "retained_v1_helper_seal": {
+    "bytes": 3778,
+    "path": "/home/zhuhe/litchi-performance-0974/receipts/helper-seal-0974-v1.json",
+    "sha256": "3f22b7b069d8c8be0e5db1720b76b1cc0ed50998e26b84fc0b5680994ea41e4b"
+  },
+  "retained_v1_plan": {
+    "bytes": 16093,
+    "path": "/home/zhuhe/litchi-performance-0974/plans/plan-0974-pre-capture-v1.json",
+    "sha256": "2710fde102dabd08885aca8021e97620d7fb859376adc3535d8f7b6bc38b4668"
+  },
+  "schema": "litchi.performance.0974.helper_seal.v3",
+  "scope": "fresh 0975 pre-capture wrapper; repaired 0974 v5 native protocol and v4 reducer are reused without source/build changes",
+  "status": "sealed",
+  "task_scope": "same launcher/native PID and one thread; raw task stream is lifetime authority",
+  "version": "0975-reuse-0974-v5"
+}

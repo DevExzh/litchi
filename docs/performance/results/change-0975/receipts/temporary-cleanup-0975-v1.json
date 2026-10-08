@@ -1,0 +1,727 @@
+{
+  "0975_disposable_scan": {
+    "owned_temp_cache_names_after": [],
+    "owned_temp_cache_names_before": [],
+    "result": "no additional 0975 cache/temp/scratch/selftest/sentinel/pyc paths found; all 0975 capture, probes, fixtures, analysis, drafts, receipts, helpers, and failed-capture history retained"
+  },
+  "already_absent_before": [
+    "/home/zhuhe/litchi-performance-0975/tools/__pycache__",
+    "/home/zhuhe/litchi-performance-0975/tools-v2/__pycache__",
+    "/home/zhuhe/litchi-performance-0973/tools/__pycache__",
+    "/home/zhuhe/litchi-performance-0974/tools/__pycache__",
+    "/home/zhuhe/litchi-performance-0974/tools-v2/__pycache__"
+  ],
+  "authorization": {
+    "basis": "explicit parent task: clean only unbound 0975 disposable caches/temp artifacts and reused 0973/0974 tool __pycache__ paths",
+    "main_checkout_touched": false,
+    "no_build_or_workload_started": true,
+    "other_repo_or_user_paths_touched": false,
+    "root_go_required": false
+  },
+  "bytes_freed": {
+    "allocated_disk_bytes": 163840,
+    "apparent_tree_bytes": 158297,
+    "logical_regular_file_bytes": 154201,
+    "post_cleanup_candidate_allocated_bytes": 0
+  },
+  "candidate_allowlist": [
+    "/home/zhuhe/litchi-performance-0975/tools/__pycache__",
+    "/home/zhuhe/litchi-performance-0975/tools-v2/__pycache__",
+    "/home/zhuhe/litchi-performance-0973/tools/__pycache__",
+    "/home/zhuhe/litchi-performance-0973/tools-v2/__pycache__",
+    "/home/zhuhe/litchi-performance-0974/tools/__pycache__",
+    "/home/zhuhe/litchi-performance-0974/tools-v2/__pycache__"
+  ],
+  "candidate_inventory_after": [
+    {
+      "exists": false,
+      "path": "/home/zhuhe/litchi-performance-0975/tools/__pycache__"
+    },
+    {
+      "exists": false,
+      "path": "/home/zhuhe/litchi-performance-0975/tools-v2/__pycache__"
+    },
+    {
+      "exists": false,
+      "path": "/home/zhuhe/litchi-performance-0973/tools/__pycache__"
+    },
+    {
+      "exists": false,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/__pycache__"
+    },
+    {
+      "exists": false,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/__pycache__"
+    },
+    {
+      "exists": false,
+      "path": "/home/zhuhe/litchi-performance-0974/tools-v2/__pycache__"
+    }
+  ],
+  "cleanup_commands": [
+    "PYTHONDONTWRITEBYTECODE=1 python3: inventory the six exact __pycache__ candidates, validate regular .pyc entries, scan non-cleanup metadata references, and check lsof/process quiescence.",
+    "PYTHONDONTWRITEBYTECODE=1 python3: remove only the validated present candidate directory /home/zhuhe/litchi-performance-0973/tools-v2/__pycache__.",
+    "PYTHONDONTWRITEBYTECODE=1 python3: verify candidate absence, retained 0975 tree/raw metadata, source/helper hashes, and targeted /tmp custody."
+  ],
+  "created_utc": "2026-10-08T05:44:37.367030+00:00",
+  "deleted_candidate_inventory_before": [
+    {
+      "allocated_bytes": 4096,
+      "allocated_tree_bytes": 163840,
+      "apparent_tree_bytes": 158297,
+      "bytes": 4096,
+      "entries": [
+        {
+          "allocated_bytes": 57344,
+          "bytes": 57021,
+          "exists": true,
+          "inode": 10608953,
+          "mode": "0o664",
+          "mtime_ns": 1791435289647877690,
+          "nlink": 1,
+          "path": "/home/zhuhe/litchi-performance-0973/tools-v2/__pycache__/protocol_common_0973_v2.cpython-314.pyc",
+          "sha256": "71537e97570c4ff7dff6ee2554fb876199fa3f42bac4efbf2fce9d010059557d",
+          "type": "file"
+        },
+        {
+          "allocated_bytes": 20480,
+          "bytes": 19714,
+          "exists": true,
+          "inode": 10608954,
+          "mode": "0o664",
+          "mtime_ns": 1791435289650232872,
+          "nlink": 1,
+          "path": "/home/zhuhe/litchi-performance-0973/tools-v2/__pycache__/raw_stack_0973_v2.cpython-314.pyc",
+          "sha256": "ea73637e9eed9cf28a27eb4a5bccf385cc44db11b74f9f61e26cddf36a494ab9",
+          "type": "file"
+        },
+        {
+          "allocated_bytes": 45056,
+          "bytes": 43846,
+          "exists": true,
+          "inode": 10608956,
+          "mode": "0o664",
+          "mtime_ns": 1791435289659002994,
+          "nlink": 1,
+          "path": "/home/zhuhe/litchi-performance-0973/tools-v2/__pycache__/reduce_0973_v2.cpython-314.pyc",
+          "sha256": "a3c879c18112df10f7cc9df1b799f9e878059d2039d981f43cdddd87ae0dcb68",
+          "type": "file"
+        },
+        {
+          "allocated_bytes": 36864,
+          "bytes": 33620,
+          "exists": true,
+          "inode": 10608955,
+          "mode": "0o664",
+          "mtime_ns": 1791435289655820349,
+          "nlink": 1,
+          "path": "/home/zhuhe/litchi-performance-0973/tools-v2/__pycache__/run_0973_v2.cpython-314.pyc",
+          "sha256": "ac8ba51720ebc5f0d06fd45cc53699b1560cf99c07e7f5e10b7ebf72cb638600",
+          "type": "file"
+        }
+      ],
+      "entry_count": 4,
+      "exists": true,
+      "inode": 10608951,
+      "logical_regular_file_bytes": 154201,
+      "mode": "0o775",
+      "mtime_ns": 1791435289659002994,
+      "nlink": 2,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/__pycache__",
+      "type": "dir"
+    }
+  ],
+  "deleted_paths": [
+    "/home/zhuhe/litchi-performance-0973/tools-v2/__pycache__"
+  ],
+  "integrity": {
+    "all_required_preserved_paths_exist_after": true,
+    "failed_capture_raw_and_history_preserved": true,
+    "new_analyzer_helper_preserved": true,
+    "status": "passed"
+  },
+  "preflight": {
+    "all_present_candidates_non_symlink": true,
+    "all_present_candidates_regular_pyc_only": true,
+    "lsof_candidate_checks_before": {
+      "/home/zhuhe/litchi-performance-0973/tools-v2/__pycache__": {
+        "exists": true,
+        "records": 0,
+        "returncode": 1,
+        "stderr": "lsof: WARNING: can't stat() overlay file system /var/lib/docker/rootfs/overlayfs/26a68ec01941e4aa53e6a51ba7effee610db5a50716e8f127549c38e3eb0febd\n      Output information may be incomplete.\nlsof: WARNING: can't stat() nsfs file system /run/docker/netns/e41d5a8804a6\n      Output information may be incomplete.\n",
+        "stdout": ""
+      }
+    },
+    "process_check_after_delete": [],
+    "process_check_before": [],
+    "unbound_reference_scan": {
+      "protocol_common_0973_v2.cpython-314.pyc": {
+        "allowed_prior_cleanup_receipts": [
+          "/home/zhuhe/litchi-performance-0973/receipts/temporary-cleanup-0973-v1.json"
+        ],
+        "unexpected": []
+      },
+      "raw_stack_0973_v2.cpython-314.pyc": {
+        "allowed_prior_cleanup_receipts": [
+          "/home/zhuhe/litchi-performance-0973/receipts/temporary-cleanup-0973-v1.json"
+        ],
+        "unexpected": []
+      },
+      "reduce_0973_v2.cpython-314.pyc": {
+        "allowed_prior_cleanup_receipts": [
+          "/home/zhuhe/litchi-performance-0973/receipts/temporary-cleanup-0973-v1.json"
+        ],
+        "unexpected": []
+      },
+      "run_0973_v2.cpython-314.pyc": {
+        "allowed_prior_cleanup_receipts": [
+          "/home/zhuhe/litchi-performance-0973/receipts/temporary-cleanup-0973-v1.json"
+        ],
+        "unexpected": []
+      }
+    }
+  },
+  "preserved_custody": {
+    "0975_raw_capture_root": {
+      "after": {
+        "allocated_bytes": 2837643264,
+        "entry_count": 44,
+        "exists": true,
+        "logical_bytes": 2837521054,
+        "metadata_sha256": "640be10515e3a096267af5a41d74b239ebb5e01054994cffb5ab726561cfbf28",
+        "regular_file_count": 44,
+        "root": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1"
+      },
+      "before": {
+        "allocated_bytes": 2837643264,
+        "entry_count": 44,
+        "exists": true,
+        "logical_bytes": 2837521054,
+        "metadata_sha256": "640be10515e3a096267af5a41d74b239ebb5e01054994cffb5ab726561cfbf28",
+        "regular_file_count": 44,
+        "root": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1"
+      },
+      "metadata_unchanged": true,
+      "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1"
+    },
+    "0975_retained_tree_excluding_this_receipt": {
+      "after": {
+        "allocated_bytes": 2838261760,
+        "entry_count": 82,
+        "exists": true,
+        "logical_bytes": 2838054779,
+        "metadata_sha256": "bf024bcc3a99f26879db89ea7ead4abec1f55532d0cc7fe98d3a1ac6247a75c3",
+        "regular_file_count": 82,
+        "root": "/home/zhuhe/litchi-performance-0975"
+      },
+      "before": {
+        "allocated_bytes": 2838261760,
+        "entry_count": 82,
+        "exists": true,
+        "logical_bytes": 2838054779,
+        "metadata_sha256": "bf024bcc3a99f26879db89ea7ead4abec1f55532d0cc7fe98d3a1ac6247a75c3",
+        "regular_file_count": 82,
+        "root": "/home/zhuhe/litchi-performance-0975"
+      },
+      "metadata_unchanged": true
+    },
+    "selected_bound_paths_after": [
+      {
+        "allocated_bytes": 4096,
+        "bytes": 644,
+        "exists": true,
+        "inode": 10859516,
+        "mode": "0o664",
+        "mtime_ns": 1791437836983099907,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/capture-manifest-v2.json",
+        "sha256": "8e56977349b453fc805b4a83f6b4c2d856652fcbb1eca4a63180ea14597ee128",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 229220352,
+        "bytes": 229215080,
+        "exists": true,
+        "inode": 10859475,
+        "mode": "0o600",
+        "mtime_ns": 1791437705456247597,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.perf.data",
+        "sha256": "51b16775fd0f72e154a74acad963c99e2169284ad1e31f78bcabab2bc6d75368",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 223051776,
+        "bytes": 223044216,
+        "exists": true,
+        "inode": 10859498,
+        "mode": "0o600",
+        "mtime_ns": 1791437779191610770,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.perf.data",
+        "sha256": "ed9d2970672312d10c1676b242ad33f61bea42ee659082dc33e1d68581b0103b",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 4096,
+        "bytes": 1342,
+        "exists": true,
+        "inode": 10859517,
+        "mode": "0o664",
+        "mtime_ns": 1791437883424972289,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/receipts/root-terminal-0975-v1.json",
+        "sha256": "57b2ac380aba4e23fc24638e30a63a326f6a935306cfc3c1c70b7bafc07ecfbe",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 69632,
+        "bytes": 65816,
+        "exists": true,
+        "inode": 10859526,
+        "mode": "0o664",
+        "mtime_ns": 1791438117299304878,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/receipts/failed-capture-analysis-0975-v3.json",
+        "sha256": "9f272a9de0430db03cfee3c27f41af861dd0c7b9663ddd2dff429b1fa2f0cea3",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 28672,
+        "bytes": 26335,
+        "exists": true,
+        "inode": 10859523,
+        "mode": "0o664",
+        "mtime_ns": 1791438072353569499,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/receipts/independent-failed-pilot-audit-0975-v2.json",
+        "sha256": "2695cb583aee152d98bc460163c6d11256ed796ba9bb2691440c63903396a75d",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 8192,
+        "bytes": 6340,
+        "exists": true,
+        "inode": 10859455,
+        "mode": "0o664",
+        "mtime_ns": 1791437460867699756,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/receipts/helper-seal-0975-v3.json",
+        "sha256": "9af5da6061066645d1b7d8e40b712f39113f7c7b53e16c5b3c713793f5ac5687",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 28672,
+        "bytes": 26108,
+        "exists": true,
+        "inode": 10859525,
+        "mode": "0o755",
+        "mtime_ns": 1791438115242446663,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/tools/analyze_failed_capture_0975_v3.py",
+        "sha256": "860ede12c2e9c9ce80dd394ec9195b291743354066404d6652eb390b6c42c85f",
+        "type": "file"
+      }
+    ],
+    "selected_bound_paths_before": [
+      {
+        "allocated_bytes": 4096,
+        "bytes": 644,
+        "exists": true,
+        "inode": 10859516,
+        "mode": "0o664",
+        "mtime_ns": 1791437836983099907,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/capture-manifest-v2.json",
+        "sha256": "8e56977349b453fc805b4a83f6b4c2d856652fcbb1eca4a63180ea14597ee128",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 229220352,
+        "bytes": 229215080,
+        "exists": true,
+        "inode": 10859475,
+        "mode": "0o600",
+        "mtime_ns": 1791437705456247597,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.perf.data",
+        "sha256": "51b16775fd0f72e154a74acad963c99e2169284ad1e31f78bcabab2bc6d75368",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 223051776,
+        "bytes": 223044216,
+        "exists": true,
+        "inode": 10859498,
+        "mode": "0o600",
+        "mtime_ns": 1791437779191610770,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.perf.data",
+        "sha256": "ed9d2970672312d10c1676b242ad33f61bea42ee659082dc33e1d68581b0103b",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 4096,
+        "bytes": 1342,
+        "exists": true,
+        "inode": 10859517,
+        "mode": "0o664",
+        "mtime_ns": 1791437883424972289,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/receipts/root-terminal-0975-v1.json",
+        "sha256": "57b2ac380aba4e23fc24638e30a63a326f6a935306cfc3c1c70b7bafc07ecfbe",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 69632,
+        "bytes": 65816,
+        "exists": true,
+        "inode": 10859526,
+        "mode": "0o664",
+        "mtime_ns": 1791438117299304878,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/receipts/failed-capture-analysis-0975-v3.json",
+        "sha256": "9f272a9de0430db03cfee3c27f41af861dd0c7b9663ddd2dff429b1fa2f0cea3",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 28672,
+        "bytes": 26335,
+        "exists": true,
+        "inode": 10859523,
+        "mode": "0o664",
+        "mtime_ns": 1791438072353569499,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/receipts/independent-failed-pilot-audit-0975-v2.json",
+        "sha256": "2695cb583aee152d98bc460163c6d11256ed796ba9bb2691440c63903396a75d",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 8192,
+        "bytes": 6340,
+        "exists": true,
+        "inode": 10859455,
+        "mode": "0o664",
+        "mtime_ns": 1791437460867699756,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/receipts/helper-seal-0975-v3.json",
+        "sha256": "9af5da6061066645d1b7d8e40b712f39113f7c7b53e16c5b3c713793f5ac5687",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 28672,
+        "bytes": 26108,
+        "exists": true,
+        "inode": 10859525,
+        "mode": "0o755",
+        "mtime_ns": 1791438115242446663,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/tools/analyze_failed_capture_0975_v3.py",
+        "sha256": "860ede12c2e9c9ce80dd394ec9195b291743354066404d6652eb390b6c42c85f",
+        "type": "file"
+      }
+    ],
+    "selected_bound_paths_unchanged": true,
+    "source_and_helpers_after": [
+      {
+        "allocated_bytes": 24576,
+        "bytes": 24171,
+        "exists": true,
+        "inode": 10859518,
+        "mode": "0o755",
+        "mtime_ns": 1791438047482954998,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/tools/analyze_failed_capture_0975_v1.py",
+        "sha256": "29a5c7d52c29d8cce09a07c8ef08e429714fd62919a2f9785af4fd701f003a48",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 24576,
+        "bytes": 24411,
+        "exists": true,
+        "inode": 10859521,
+        "mode": "0o755",
+        "mtime_ns": 1791438068410883507,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/tools/analyze_failed_capture_0975_v2.py",
+        "sha256": "6fe0479d839da2801d650afc5b91abf21157e23c84de010f08b0dd1701eef7b0",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 28672,
+        "bytes": 26108,
+        "exists": true,
+        "inode": 10859525,
+        "mode": "0o755",
+        "mtime_ns": 1791438115242446663,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/tools/analyze_failed_capture_0975_v3.py",
+        "sha256": "860ede12c2e9c9ce80dd394ec9195b291743354066404d6652eb390b6c42c85f",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 16384,
+        "bytes": 12471,
+        "exists": true,
+        "inode": 10859457,
+        "mode": "0o664",
+        "mtime_ns": 1791437566995564562,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/tools/launch_boundary_regression_0975_v1.py",
+        "sha256": "9bbdb1acf9e35a000bbf75818e1f7c6986ee77cc4d577f902be1043194dd0e36",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 8192,
+        "bytes": 6849,
+        "exists": true,
+        "inode": 10859450,
+        "mode": "0o664",
+        "mtime_ns": 1791437435788916588,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/tools/plan_binding_0975.py",
+        "sha256": "489699a6e94bb88eb6d5dd911d6959d4d1859e80590cac1cd2f3d2d92bb547e2",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 8192,
+        "bytes": 5729,
+        "exists": true,
+        "inode": 10859452,
+        "mode": "0o664",
+        "mtime_ns": 1791437419522836322,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/tools/prepare_plan_0975.py",
+        "sha256": "4ff18125bc1584f5fc82d72a865985db0f4163743092f3a8b76ec236d4295275",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 4096,
+        "bytes": 1758,
+        "exists": true,
+        "inode": 10859454,
+        "mode": "0o664",
+        "mtime_ns": 1791437410713792764,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/tools/reduce_0975.py",
+        "sha256": "5848148172f1d36c9aa6cb9ab67367c3ec8e702d4343fbafa6e5c303fd0f378a",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 4096,
+        "bytes": 1787,
+        "exists": true,
+        "inode": 10859453,
+        "mode": "0o664",
+        "mtime_ns": 1791437455914015970,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/tools/run_0975.py",
+        "sha256": "1dd23f2d38ff9c7333f92d3ab54bd6ae68fb870c5e8d1fc89a743cdec339f125",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 40960,
+        "bytes": 39589,
+        "exists": true,
+        "inode": 3333322,
+        "mode": "0o664",
+        "mtime_ns": 1791434184216155444,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0973/tools-v2/protocol_common_0973_v2.py",
+        "sha256": "56b509fde01bbd66702ac8cd835da0d09d74d332935926078c6545093ed52bf4",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 16384,
+        "bytes": 13746,
+        "exists": true,
+        "inode": 3333330,
+        "mode": "0o664",
+        "mtime_ns": 1791433077220083066,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0973/tools-v2/raw_stack_0973_v2.py",
+        "sha256": "3a8e36ebc5f21f4f0b8293cafa675d722f2264fb1cfd6c7f48271b4f0a5056d2",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 32768,
+        "bytes": 31359,
+        "exists": true,
+        "inode": 3333324,
+        "mode": "0o664",
+        "mtime_ns": 1791433873324750946,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0973/tools-v2/reduce_0973_v2.py",
+        "sha256": "f33f14724f6264d87b2c3a0082c16bca711787140d06f3c7cfdd6e78b6f4c63b",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 24576,
+        "bytes": 20510,
+        "exists": true,
+        "inode": 3333323,
+        "mode": "0o664",
+        "mtime_ns": 1791434184216155444,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0973/tools-v2/run_0973_v2.py",
+        "sha256": "f4f7af4ec8b8bb1818f3ce25dec046c8b8ad7c23d0a2611c76e24bf10b6aef5d",
+        "type": "file"
+      }
+    ],
+    "source_and_helpers_before": [
+      {
+        "allocated_bytes": 24576,
+        "bytes": 24171,
+        "exists": true,
+        "inode": 10859518,
+        "mode": "0o755",
+        "mtime_ns": 1791438047482954998,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/tools/analyze_failed_capture_0975_v1.py",
+        "sha256": "29a5c7d52c29d8cce09a07c8ef08e429714fd62919a2f9785af4fd701f003a48",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 24576,
+        "bytes": 24411,
+        "exists": true,
+        "inode": 10859521,
+        "mode": "0o755",
+        "mtime_ns": 1791438068410883507,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/tools/analyze_failed_capture_0975_v2.py",
+        "sha256": "6fe0479d839da2801d650afc5b91abf21157e23c84de010f08b0dd1701eef7b0",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 28672,
+        "bytes": 26108,
+        "exists": true,
+        "inode": 10859525,
+        "mode": "0o755",
+        "mtime_ns": 1791438115242446663,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/tools/analyze_failed_capture_0975_v3.py",
+        "sha256": "860ede12c2e9c9ce80dd394ec9195b291743354066404d6652eb390b6c42c85f",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 16384,
+        "bytes": 12471,
+        "exists": true,
+        "inode": 10859457,
+        "mode": "0o664",
+        "mtime_ns": 1791437566995564562,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/tools/launch_boundary_regression_0975_v1.py",
+        "sha256": "9bbdb1acf9e35a000bbf75818e1f7c6986ee77cc4d577f902be1043194dd0e36",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 8192,
+        "bytes": 6849,
+        "exists": true,
+        "inode": 10859450,
+        "mode": "0o664",
+        "mtime_ns": 1791437435788916588,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/tools/plan_binding_0975.py",
+        "sha256": "489699a6e94bb88eb6d5dd911d6959d4d1859e80590cac1cd2f3d2d92bb547e2",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 8192,
+        "bytes": 5729,
+        "exists": true,
+        "inode": 10859452,
+        "mode": "0o664",
+        "mtime_ns": 1791437419522836322,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/tools/prepare_plan_0975.py",
+        "sha256": "4ff18125bc1584f5fc82d72a865985db0f4163743092f3a8b76ec236d4295275",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 4096,
+        "bytes": 1758,
+        "exists": true,
+        "inode": 10859454,
+        "mode": "0o664",
+        "mtime_ns": 1791437410713792764,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/tools/reduce_0975.py",
+        "sha256": "5848148172f1d36c9aa6cb9ab67367c3ec8e702d4343fbafa6e5c303fd0f378a",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 4096,
+        "bytes": 1787,
+        "exists": true,
+        "inode": 10859453,
+        "mode": "0o664",
+        "mtime_ns": 1791437455914015970,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0975/tools/run_0975.py",
+        "sha256": "1dd23f2d38ff9c7333f92d3ab54bd6ae68fb870c5e8d1fc89a743cdec339f125",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 40960,
+        "bytes": 39589,
+        "exists": true,
+        "inode": 3333322,
+        "mode": "0o664",
+        "mtime_ns": 1791434184216155444,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0973/tools-v2/protocol_common_0973_v2.py",
+        "sha256": "56b509fde01bbd66702ac8cd835da0d09d74d332935926078c6545093ed52bf4",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 16384,
+        "bytes": 13746,
+        "exists": true,
+        "inode": 3333330,
+        "mode": "0o664",
+        "mtime_ns": 1791433077220083066,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0973/tools-v2/raw_stack_0973_v2.py",
+        "sha256": "3a8e36ebc5f21f4f0b8293cafa675d722f2264fb1cfd6c7f48271b4f0a5056d2",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 32768,
+        "bytes": 31359,
+        "exists": true,
+        "inode": 3333324,
+        "mode": "0o664",
+        "mtime_ns": 1791433873324750946,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0973/tools-v2/reduce_0973_v2.py",
+        "sha256": "f33f14724f6264d87b2c3a0082c16bca711787140d06f3c7cfdd6e78b6f4c63b",
+        "type": "file"
+      },
+      {
+        "allocated_bytes": 24576,
+        "bytes": 20510,
+        "exists": true,
+        "inode": 3333323,
+        "mode": "0o664",
+        "mtime_ns": 1791434184216155444,
+        "nlink": 1,
+        "path": "/home/zhuhe/litchi-performance-0973/tools-v2/run_0973_v2.py",
+        "sha256": "f4f7af4ec8b8bb1818f3ce25dec046c8b8ad7c23d0a2611c76e24bf10b6aef5d",
+        "type": "file"
+      }
+    ],
+    "source_and_helpers_unchanged": true
+  },
+  "schema": "litchi.performance.0975.temporary_cleanup.v1",
+  "status": "completed",
+  "targeted_tmp_custody": {
+    "after": [],
+    "before": [],
+    "deleted": [],
+    "result": "targeted /tmp entries were inspected and left untouched"
+  }
+}

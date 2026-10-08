@@ -1,0 +1,253 @@
+{
+  "binary": {
+    "bytes": 47909224,
+    "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+    "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+  },
+  "bounds_rule": "0 <= dyn_size <= captured_stack_size <= 32768",
+  "bounds_valid": true,
+  "command_scope": "offline perf script -D text scan; no STACK_USER unwind or ancestry claim",
+  "dump": {
+    "bytes": 1097895982,
+    "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.perf-mmap-dump.txt",
+    "sha256": "f90b3f0ef9894cdda707d4fbbecc3f905c840a54206eed459b0cdb987a5f5925"
+  },
+  "dyn_size_counts": {
+    "12288": 1,
+    "13872": 1,
+    "14048": 1,
+    "14176": 1,
+    "14368": 1,
+    "14416": 1,
+    "14520": 1,
+    "14752": 1,
+    "14832": 1,
+    "14864": 1,
+    "15696": 1,
+    "15888": 1,
+    "15912": 1,
+    "16144": 1,
+    "16624": 1,
+    "16640": 1,
+    "16720": 1,
+    "16768": 1,
+    "16880": 1,
+    "16928": 1,
+    "17120": 1,
+    "17248": 1,
+    "17416": 1,
+    "17504": 1,
+    "17632": 1,
+    "17656": 1,
+    "18032": 1,
+    "18144": 1,
+    "18224": 1,
+    "18304": 1,
+    "18528": 1,
+    "18720": 1,
+    "18752": 1,
+    "18784": 1,
+    "18840": 1,
+    "18896": 1,
+    "19200": 1,
+    "19248": 1,
+    "19296": 1,
+    "19344": 1,
+    "19376": 1,
+    "19536": 1,
+    "19568": 2,
+    "19616": 1,
+    "19744": 2,
+    "19768": 1,
+    "19824": 1,
+    "19920": 1,
+    "20128": 1,
+    "20144": 1,
+    "20192": 1,
+    "20208": 2,
+    "20256": 1,
+    "20272": 1,
+    "20328": 1,
+    "20384": 1,
+    "20448": 1,
+    "20544": 1,
+    "20752": 1,
+    "20768": 1,
+    "20912": 1,
+    "20944": 1,
+    "20952": 1,
+    "20976": 1,
+    "20984": 1,
+    "20992": 3,
+    "21088": 1,
+    "21128": 1,
+    "21248": 1,
+    "21280": 1,
+    "21296": 1,
+    "21320": 1,
+    "21328": 1,
+    "21352": 1,
+    "21680": 1,
+    "21792": 2,
+    "21824": 1,
+    "22144": 1,
+    "22224": 1,
+    "22368": 1,
+    "22576": 1,
+    "22608": 1,
+    "22712": 1,
+    "22736": 1,
+    "22832": 2,
+    "22976": 3,
+    "22992": 1,
+    "23072": 1,
+    "23136": 1,
+    "23328": 1,
+    "23672": 1,
+    "23712": 1,
+    "23728": 1,
+    "23760": 1,
+    "23968": 1,
+    "24048": 1,
+    "24160": 1,
+    "24208": 2,
+    "24656": 1,
+    "25088": 1,
+    "25184": 1,
+    "25216": 1,
+    "25392": 1,
+    "25536": 1,
+    "25552": 1,
+    "25976": 1,
+    "26000": 1,
+    "26064": 1,
+    "26144": 1,
+    "26208": 1,
+    "26384": 1,
+    "26416": 1,
+    "26720": 1,
+    "27160": 1,
+    "27232": 1,
+    "27296": 1,
+    "27360": 1,
+    "27368": 1,
+    "27440": 1,
+    "27448": 1,
+    "27584": 2,
+    "27712": 1,
+    "28008": 1,
+    "28056": 1,
+    "28096": 1,
+    "28256": 1,
+    "28272": 1,
+    "28416": 1,
+    "28992": 1,
+    "30168": 1,
+    "30416": 1,
+    "30432": 2,
+    "31728": 1,
+    "32744": 1,
+    "32768": 6794
+  },
+  "missing": {},
+  "perf_data": {
+    "bytes": 229215080,
+    "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.perf.data",
+    "sha256": "51b16775fd0f72e154a74acad963c99e2169284ad1e31f78bcabab2bc6d75368"
+  },
+  "period": 1000000,
+  "period_valid": true,
+  "pf_x": {
+    "interval_count": 1,
+    "intervals": [
+      [
+        "0x5f33d2a419f0",
+        "0x5f33d2cc8960"
+      ]
+    ],
+    "sample_ip_in_interval_count": 4549,
+    "scope": "raw sample IP only; no STACK_USER ancestry claim"
+  },
+  "pid_tid_cpu_counts": {
+    "3763764/3763764@31": 6940
+  },
+  "pid_tid_cpu_valid": true,
+  "raw_event_count": 7901,
+  "raw_lost_record_count": 0,
+  "raw_lost_scope": "sum of PERF_RECORD_LOST lost fields; PERF_RECORD_LOST_SAMPLES is not added",
+  "raw_lost_sum": 0,
+  "record_size_counts": {
+    "33008": 6940
+  },
+  "record_type_counts": {
+    "9": 6940
+  },
+  "sample_count": 6940,
+  "sample_line_count": 6940,
+  "sample_type": "IP|TID|TIME|CALLCHAIN|CPU|PERIOD|REGS_USER|STACK_USER",
+  "schema": "litchi.performance.0973.raw_stack.v2",
+  "scope": {
+    "all_perf_record_sample_records": true,
+    "misc_filter": null,
+    "no_live_ancestry_claim": true,
+    "stack_bytes_are_potential_values_only": true
+  },
+  "stack_cap": 32768,
+  "stack_size_counts": {
+    "32768": 6940
+  },
+  "status": "complete",
+  "task_stream": {
+    "authority": "zero-loss raw task stream is lifetime authority; /proc snapshots are bounded observations only",
+    "comm_records": [
+      {
+        "comm": "perf-exec",
+        "pid": 3763764,
+        "tid": 3763764
+      },
+      {
+        "comm": "python3.14",
+        "pid": 3763764,
+        "tid": 3763764
+      },
+      {
+        "comm": "doc_retention_p",
+        "pid": 3763764,
+        "tid": 3763764
+      }
+    ],
+    "cpu_maps": [
+      "-1"
+    ],
+    "errors": [],
+    "event_counts": {
+      "COMM": 3,
+      "CPU_MAP": 1,
+      "EXIT": 1,
+      "THREAD_MAP": 1
+    },
+    "exit_records": [
+      {
+        "pid": 3763764,
+        "ppid": 3763763,
+        "ptid": 3763763,
+        "tid": 3763764
+      }
+    ],
+    "expected_pid": 3763764,
+    "main_exit_allowed": true,
+    "missing_required_comm_names": [],
+    "scope": "raw perf task/lifecycle records for target PID only; no unrelated process scan",
+    "status": "pass",
+    "thread_maps": [
+      {
+        "nr": 1,
+        "threads": [
+          3763764
+        ]
+      }
+    ]
+  },
+  "unconsumed_raw_count": 961,
+  "violations": []
+}

@@ -1,0 +1,158 @@
+{
+  "artifacts": {
+    "host-facts.txt": {
+      "bytes": 531,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0975/host-facts.txt",
+      "sha256": "3baa7b541c23877cbc363664f088f74ef16929759effabdf5b64dc9ce0416314"
+    },
+    "observed-utc.txt": {
+      "bytes": 21,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0975/observed-utc.txt",
+      "sha256": "07d73de48c92732b45c83a6b4bfd427f2b47ccf99acfd20d7e3ae6351fbf2da1"
+    },
+    "targeted-processes.txt": {
+      "bytes": 91,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0975/targeted-processes.txt",
+      "sha256": "1be0f917993ece2a1e04c50f7f5da5b4ad3970d83c5c3fa266d9afdaa80c5786"
+    },
+    "terminal.txt": {
+      "bytes": 863,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0975/terminal.txt",
+      "sha256": "d9125f5c8ee04c66ac4e02d9f945366c4b90e7bc3d8f3b5e7f23aadb89a29b6c"
+    },
+    "tool-and-cgroup.txt": {
+      "bytes": 1531,
+      "exists": true,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0975/tool-and-cgroup.txt",
+      "sha256": "412b3668357de2446421e7e59b583cd403e63f4bc144db9f23e974e20524e377"
+    }
+  },
+  "cgroup_current": {
+    "comparison_note": "The same path and cpu.max=max 100000 are documented in the retained 0970 host audit; this is read-only current readiness evidence, not a quota guarantee during a future run.",
+    "cpu_max": "max 100000",
+    "cpu_weight": "100",
+    "cpuset_cpus_effective": "0-31 at the mounted ancestor/root observation",
+    "memory_max": "max",
+    "mount": "/sys/fs/cgroup (cgroup2)",
+    "path": "/user.slice/user-1001.slice/user@1001.service/tmux-spawn-3a22b971-8fd0-4c28-9367-732dd8523549.scope",
+    "source": "tool-and-cgroup.txt"
+  },
+  "commands": {
+    "cgroup_snapshot": "cat /proc/self/cgroup; findmnt -T /sys/fs/cgroup; read resolved cgroup cpu.max,cpu.weight,cpuset.cpus.effective,memory.max,memory.current",
+    "host_snapshot": "date -u; uname -a; cat /sys/devices/system/cpu/{online,possible}; taskset -pc $$; grep Cpus_allowed_list /proc/self/status; cat perf sysctls; ulimit -l/-s; df -B1 -P",
+    "process_snapshot": "ps -C perf -C cargo -C rustc -C doc_retention_probe_0942_cfb_profile -o pid=,ppid=,stat=,comm=,args=; ps -eo pid=,ppid=,stat=,comm=,args= | awk targeted filters"
+  },
+  "created_utc": "2026-10-08T05:29:36Z",
+  "disk": {
+    "available_bytes": 361308348416,
+    "available_bytes_provenance": "df -B1 snapshot in host-facts.txt",
+    "capacity_percent": "83% per df snapshot",
+    "df_available_bytes": 361308348416,
+    "evidence": "df -B1 -P in host-facts.txt",
+    "mount": "/",
+    "statvfs_available_bytes": 361307807744,
+    "total_bytes": 2081881157632,
+    "used_bytes": 1720556572672
+  },
+  "host_comparison_to_0974": {
+    "flags": {
+      "cpu_online": true,
+      "kernel": true,
+      "perf_event_mlock_kb": true,
+      "perf_event_paranoid": true,
+      "perf_hash": true,
+      "python_hash_comparable": false,
+      "rlimit_memlock_bytes": true,
+      "rlimit_stack_hard_bytes_comparable": false,
+      "rlimit_stack_soft_bytes": true,
+      "taskset_hash": true,
+      "true_hash": true
+    },
+    "interpretation": "Kernel, CPU online/possible and allowed set, perf sysctls, shell RLIMIT_MEMLOCK, the RLIMIT_STACK soft value, and bound perf/taskset/true hashes match the retained 0974 capability host facts. The retained 0974 receipt did not independently capture the RLIMIT_STACK hard value and recorded the soft value twice, so the current hard value is reported but not compared. The current Python hash is newly bound below.",
+    "settings_unchanged": true
+  },
+  "host_current": {
+    "cpu31_allowed": true,
+    "cpu_online": "0-31",
+    "cpu_possible": "0-31",
+    "cpus_allowed_list": "0-31",
+    "kernel": "Linux 7.0.0-1013-aws #13-Ubuntu SMP PREEMPT Fri Sep 4 17:02:11 UTC 2026",
+    "perf_event_mlock_kb": 516,
+    "perf_event_paranoid": 1,
+    "rlimit_memlock_bytes": [
+      8388608,
+      8388608
+    ],
+    "rlimit_stack_bytes": [
+      8388608,
+      -1
+    ]
+  },
+  "next_step": "Root may schedule the reviewed 0975 runner after its own GO checks. This receipt authorizes no capture, build, probe, setting change, or fallback.",
+  "observed_utc": "2026-10-08T05:29:09Z",
+  "prior_binding": {
+    "receipt_path": "/home/zhuhe/litchi-performance-0974/capability-perthread-mmap16m-v1/capability-receipt-v1.json",
+    "receipt_sha256": "503cacc304daf95d8e7254feb1bf074d01cf707bfbeb6c11b049a857522705fd",
+    "receipt_status": "setup_succeeded_no_workload_samples",
+    "source_observation": "0974 per-thread capability receipt"
+  },
+  "schema": "litchi.performance.0975.host_readiness.v1",
+  "scope": {
+    "benchmark_started": false,
+    "build_started": false,
+    "capability_probe_started": false,
+    "capture_started": false,
+    "read_only": true,
+    "repository_changed": false,
+    "settings_changed": false
+  },
+  "status": "ready_readonly_no_workload",
+  "targeted_process_check": {
+    "active_perf_build_benchmark_processes": false,
+    "limitations": "This is a point-in-time targeted check and does not claim historical quiescence.",
+    "method": "ps -C exact comm filters plus ps argument filters; output was empty",
+    "process_classes": [
+      "perf",
+      "cargo",
+      "rustc",
+      "doc_retention_probe_0942_cfb_profile",
+      "launch_baseline_v2.py",
+      "instruction-profile"
+    ]
+  },
+  "tool_bindings_current": {
+    "perf": {
+      "bytes": 25221960,
+      "mode": "0o755",
+      "path": "/usr/bin/perf",
+      "sha256": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b"
+    },
+    "python3.14": {
+      "bytes": 7468968,
+      "mode": "0o755",
+      "path": "/usr/bin/python3.14",
+      "sha256": "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd"
+    },
+    "taskset": {
+      "bytes": 31184,
+      "mode": "0o755",
+      "path": "/usr/bin/taskset",
+      "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2"
+    },
+    "true": {
+      "bytes": 35288,
+      "mode": "0o755",
+      "path": "/usr/bin/true",
+      "sha256": "deadd5bb984a1153139afd09ee4e01100fbe2196d4f98ec7978674e2c83a4b97"
+    }
+  }
+}

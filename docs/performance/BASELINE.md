@@ -1,5 +1,20 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0975 — per-thread profile pilot stops on child-02 raw loss
+
+[0975](0975-per-thread-profile-loss-gate.md) runs the retained native target
+with `--per-thread -m 16M`, period-1M instructions, CPU 31, five warmups, and
+80 measured samples. Child 01 passes the zero-loss gate with 180 marker
+samples and 6,940 parsed samples, but the audited corrected decode retains
+3,745 empty callchains; stock/no-op have 4,434 each, so it supplies no source
+attribution. Child 02 returns 0 yet has 23 raw `PERF_RECORD_LOST` records
+totaling 184; the terminal lost-sample value is the same loss and is not added.
+Its corrected 6,755-sample/895-marker/129-empty decode is descriptive only
+because lifetime completeness is invalidated. The runner stops at child 02,
+does not retry, and never starts children 03–12. Per-thread large-buffer
+operation is shown for one native child, not a zero-loss cohort or performance
+baseline; the independent audit records `failed_pilot_no_adoption`.
+
 ## 0974 — per-thread mmap capability and prelaunch failure
 
 [0974](0974-per-thread-profile-prelaunch.md) tests the 0973 loss follow-up

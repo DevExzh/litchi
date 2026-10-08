@@ -1,0 +1,50 @@
+{
+  "all_12_reduction_performed": false,
+  "capture_manifest": {
+    "bytes": 644,
+    "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/capture-manifest-v2.json",
+    "sha256": "8e56977349b453fc805b4a83f6b4c2d856652fcbb1eca4a63180ea14597ee128"
+  },
+  "child_01_gate": "pass",
+  "child_02_failure": {
+    "child": 2,
+    "error": "raw PERF_RECORD_LOST sum is nonzero: 184",
+    "reason": "child_failed",
+    "type": "ProtocolError"
+  },
+  "children_not_launched": [
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12
+  ],
+  "created_utc": "2026-10-08T05:38:03.424793+00:00",
+  "diagnostic_only": true,
+  "exec_session_id": 89825,
+  "exec_session_terminal": true,
+  "native_children_launched": [
+    1,
+    2
+  ],
+  "no_retry": true,
+  "performance_or_adoption_claim": false,
+  "root_go": {
+    "bytes": 5060,
+    "path": "/home/zhuhe/litchi-performance-0975/receipts/root-go-0975-v1.json",
+    "sha256": "4b10643a983b525d9169e1a09697806bf76ba8eb7df7db2783349b88c3b23c54"
+  },
+  "runner_log": {
+    "bytes": 965,
+    "path": "/home/zhuhe/litchi-performance-0975/runner-0975-v1.log",
+    "sha256": "79ded9e944305d9abe9a53bf8e29a8d9d7cf97594f71ccf2a2059dffc78b5983"
+  },
+  "runner_returncode": 2,
+  "schema": "litchi.performance.0975.root_terminal.v1",
+  "status": "stopped_on_child_02_raw_loss"
+}

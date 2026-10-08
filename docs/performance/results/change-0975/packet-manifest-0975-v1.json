@@ -1,0 +1,270 @@
+{
+  "schema": "litchi.performance.0975.packet_manifest.final.v1",
+  "status": "sealed",
+  "scope": "Final bounded failed-pilot evidence, descriptive child summaries, independent raw audit, and read-only feasibility note; no all-12 qualification, performance, causal, retry, or adoption claim.",
+  "external_root": "/home/zhuhe/litchi-performance-0975",
+  "source_commit": "76dcaa09c525d8463f4e596c6ff1ef13febeec75",
+  "manifest_excludes_self": true,
+  "payload_file_count": 47,
+  "payload_total_bytes": 940729,
+  "constraints": {
+    "all_repository_files_below_1_mib": true,
+    "compiled_binaries_copied": false,
+    "raw_perf_captures_copied": false,
+    "raw_packets_copied": false,
+    "max_payload_file_bytes": 292316
+  },
+  "authoritative_receipts": {
+    "helper_seal_sha256": "9af5da6061066645d1b7d8e40b712f39113f7c7b53e16c5b3c713793f5ac5687",
+    "plan_sha256": "4873e502f09a3f4572ecd28d7545541e7cf7d27738c788d46fecb97293d36f97",
+    "pre_capture_independent_review_sha256": "0720fae7e26c12dfbc8d06594b5fe1eb30b041d240ddf824808e955ee1bac3bf",
+    "launch_boundary_author_sha256": "a9359c2da7b298b1a49b01c33378b5ca182736c7793877e668bc8bbc38b850e5",
+    "launch_boundary_independent_sha256": "f7569b13aafda769589eac636632a4f16d62c77d550d0f997598208eb446a756",
+    "root_go_sha256": "4b10643a983b525d9169e1a09697806bf76ba8eb7df7db2783349b88c3b23c54",
+    "root_terminal_sha256": "57b2ac380aba4e23fc24638e30a63a326f6a935306cfc3c1c70b7bafc07ecfbe",
+    "capture_manifest_sha256": "8e56977349b453fc805b4a83f6b4c2d856652fcbb1eca4a63180ea14597ee128",
+    "independent_audit_sha256": "2695cb583aee152d98bc460163c6d11256ed796ba9bb2691440c63903396a75d",
+    "analysis_receipt_sha256": "9f272a9de0430db03cfee3c27f41af861dd0c7b9663ddd2dff429b1fa2f0cea3",
+    "analysis_helper_sha256": "860ede12c2e9c9ce80dd394ec9195b291743354066404d6652eb390b6c42c85f",
+    "feasibility_note_sha256": "a49309d77ef3e051b2166fffba42d3a679ffe3b6af0f8047b37f117de2b4d586",
+    "cleanup_sha256": "6903e7a1916904ed5edefb5cfb6fbeb13843f86e0a274796b1d0796c5a73a229",
+    "descriptor_sha256": "865012aa0ccf86844d58c15d3bee69420d09b8f1dedf5c8eda325dd83b720e69"
+  },
+  "files": [
+    {
+      "path": "docs/performance/results/change-0975/README.md",
+      "bytes": 3401,
+      "sha256": "fd4b9cf8179aceda0261f7127ccf6d71663b49f5ebbfeb64ce1db3c0c72582c8"
+    },
+    {
+      "path": "docs/performance/results/change-0975/analysis/next-capture-feasibility-v3.md",
+      "bytes": 8062,
+      "sha256": "a49309d77ef3e051b2166fffba42d3a679ffe3b6af0f8047b37f117de2b4d586"
+    },
+    {
+      "path": "docs/performance/results/change-0975/capture/capture-manifest-v2.json",
+      "bytes": 644,
+      "sha256": "8e56977349b453fc805b4a83f6b4c2d856652fcbb1eca4a63180ea14597ee128"
+    },
+    {
+      "path": "docs/performance/results/change-0975/capture/child-01/child-01.command.json",
+      "bytes": 1326,
+      "sha256": "1999ff22736b32752ed315f4287252115b76c00f4cc437840463e7e45a3784cd"
+    },
+    {
+      "path": "docs/performance/results/change-0975/capture/child-01/child-01.launch.json",
+      "bytes": 1126,
+      "sha256": "62a3c3feb180d96d9c382fc127e93dc28b38e870eae4af886c1482e3a3061bb3"
+    },
+    {
+      "path": "docs/performance/results/change-0975/capture/child-01/child-01.perf-buildid.txt",
+      "bytes": 571,
+      "sha256": "6c7729316b6a54fc6ac338ceedfb960f4bb4fc669effac870d8ae58a34902925"
+    },
+    {
+      "path": "docs/performance/results/change-0975/capture/child-01/child-01.perf-header.txt",
+      "bytes": 1720,
+      "sha256": "d6e67725718e2cc1e0d2e59e7e24413cbd6b37b54bf12fb023918ea8c19aac36"
+    },
+    {
+      "path": "docs/performance/results/change-0975/capture/child-01/child-01.raw-stack.json",
+      "bytes": 5342,
+      "sha256": "8892aa72490fba8937961542ac444122975ce78972322ed3c999ba78299b1adc"
+    },
+    {
+      "path": "docs/performance/results/change-0975/capture/child-01/child-01.report.json",
+      "bytes": 292316,
+      "sha256": "136eee9256d5c531cf6d65a373edb7510d0e40e4466f3ed390bb579d1ac56da7"
+    },
+    {
+      "path": "docs/performance/results/change-0975/capture/child-01/child-01.target-layout.json",
+      "bytes": 4462,
+      "sha256": "17371d3a1a2d5acb18539eda3b80ee2558d0f07345f6b57bdd8d79744ef2f001"
+    },
+    {
+      "path": "docs/performance/results/change-0975/capture/child-01/child-01.terminal.json",
+      "bytes": 1794,
+      "sha256": "dac7cbbba5a40ecf3595d800fe0704f66a6901e08d6c879f86035edd5ee06ff0"
+    },
+    {
+      "path": "docs/performance/results/change-0975/capture/child-02/child-02.command.json",
+      "bytes": 1326,
+      "sha256": "f289856ac302f41c3c70e09bd316d21e5f38e2204e123931c52b08617cdfed22"
+    },
+    {
+      "path": "docs/performance/results/change-0975/capture/child-02/child-02.launch.json",
+      "bytes": 1126,
+      "sha256": "bbc3e30f537aa1eec29e67baa012c0a32ad30ac8177ee9faa93b440b21571e02"
+    },
+    {
+      "path": "docs/performance/results/change-0975/capture/child-02/child-02.perf-buildid.txt",
+      "bytes": 571,
+      "sha256": "6c7729316b6a54fc6ac338ceedfb960f4bb4fc669effac870d8ae58a34902925"
+    },
+    {
+      "path": "docs/performance/results/change-0975/capture/child-02/child-02.perf-header.txt",
+      "bytes": 1720,
+      "sha256": "8c5752cdd12d18819b6cd745d25a0abe030bd0c058e02117a62662048b31e031"
+    },
+    {
+      "path": "docs/performance/results/change-0975/capture/child-02/child-02.raw-stack.json",
+      "bytes": 5489,
+      "sha256": "474083e6891eaf37569e805cbc370eb85a886b9668574a7e6ac379966009ce11"
+    },
+    {
+      "path": "docs/performance/results/change-0975/capture/child-02/child-02.report.json",
+      "bytes": 292316,
+      "sha256": "30fc186214b4cfbaae10e0fae66f5f6eef883e20952e91892e36d6efd6dcbed9"
+    },
+    {
+      "path": "docs/performance/results/change-0975/capture/child-02/child-02.target-layout.json",
+      "bytes": 4457,
+      "sha256": "56976da599aa2e94e1d84195049d1783027f6c1d3b24797073f0200f2fc9051a"
+    },
+    {
+      "path": "docs/performance/results/change-0975/capture/child-02/child-02.terminal.json",
+      "bytes": 1796,
+      "sha256": "df0d0acd1879cb384d460e44b389f64a21a1417c7ffe80c9669fca0acde40796"
+    },
+    {
+      "path": "docs/performance/results/change-0975/design/design-0975-v1.md",
+      "bytes": 2118,
+      "sha256": "41a7678d226872aef1eeb346d51eb764c4261362fff2c856c510af97532d1d77"
+    },
+    {
+      "path": "docs/performance/results/change-0975/plans/plan-0975-pre-capture-v3.json",
+      "bytes": 22790,
+      "sha256": "4873e502f09a3f4572ecd28d7545541e7cf7d27738c788d46fecb97293d36f97"
+    },
+    {
+      "path": "docs/performance/results/change-0975/provenance/external-artifact-descriptor-final-v1.json",
+      "bytes": 40251,
+      "sha256": "865012aa0ccf86844d58c15d3bee69420d09b8f1dedf5c8eda325dd83b720e69"
+    },
+    {
+      "path": "docs/performance/results/change-0975/provenance/host-facts.txt",
+      "bytes": 531,
+      "sha256": "3baa7b541c23877cbc363664f088f74ef16929759effabdf5b64dc9ce0416314"
+    },
+    {
+      "path": "docs/performance/results/change-0975/provenance/observed-utc.txt",
+      "bytes": 21,
+      "sha256": "07d73de48c92732b45c83a6b4bfd427f2b47ccf99acfd20d7e3ae6351fbf2da1"
+    },
+    {
+      "path": "docs/performance/results/change-0975/provenance/reproduction-v1.md",
+      "bytes": 2213,
+      "sha256": "a4bc08249e9f56f2af01c41f4e0549e5c41d2b1e10b4d9fd35001cf6182a4483"
+    },
+    {
+      "path": "docs/performance/results/change-0975/provenance/targeted-processes.txt",
+      "bytes": 91,
+      "sha256": "1be0f917993ece2a1e04c50f7f5da5b4ad3970d83c5c3fa266d9afdaa80c5786"
+    },
+    {
+      "path": "docs/performance/results/change-0975/provenance/tool-and-cgroup.txt",
+      "bytes": 1531,
+      "sha256": "412b3668357de2446421e7e59b583cd403e63f4bc144db9f23e974e20524e377"
+    },
+    {
+      "path": "docs/performance/results/change-0975/receipts/adr-goal-revalidation-0975-v2.json",
+      "bytes": 8781,
+      "sha256": "38ced3248880f17d4072353f6aa6fc426edcc4086995926d004d6cedade2091d"
+    },
+    {
+      "path": "docs/performance/results/change-0975/receipts/failed-capture-analysis-0975-v3.json",
+      "bytes": 65816,
+      "sha256": "9f272a9de0430db03cfee3c27f41af861dd0c7b9663ddd2dff429b1fa2f0cea3"
+    },
+    {
+      "path": "docs/performance/results/change-0975/receipts/helper-seal-0975-v3.json",
+      "bytes": 6340,
+      "sha256": "9af5da6061066645d1b7d8e40b712f39113f7c7b53e16c5b3c713793f5ac5687"
+    },
+    {
+      "path": "docs/performance/results/change-0975/receipts/independent-failed-pilot-audit-0975-v2.json",
+      "bytes": 26335,
+      "sha256": "2695cb583aee152d98bc460163c6d11256ed796ba9bb2691440c63903396a75d"
+    },
+    {
+      "path": "docs/performance/results/change-0975/receipts/independent-review-0975-v1.json",
+      "bytes": 12546,
+      "sha256": "0720fae7e26c12dfbc8d06594b5fe1eb30b041d240ddf824808e955ee1bac3bf"
+    },
+    {
+      "path": "docs/performance/results/change-0975/receipts/launch-boundary-regression-0975-independent-v1.json",
+      "bytes": 11814,
+      "sha256": "f7569b13aafda769589eac636632a4f16d62c77d550d0f997598208eb446a756"
+    },
+    {
+      "path": "docs/performance/results/change-0975/receipts/launch-boundary-regression-0975-v1.json",
+      "bytes": 11817,
+      "sha256": "a9359c2da7b298b1a49b01c33378b5ca182736c7793877e668bc8bbc38b850e5"
+    },
+    {
+      "path": "docs/performance/results/change-0975/receipts/preflight-tests-0975-v1.json",
+      "bytes": 3131,
+      "sha256": "76cfa0d2483869c1c5da6a9a6ea8bfc0bab5f18ccc97dc996c8c10d44967126e"
+    },
+    {
+      "path": "docs/performance/results/change-0975/receipts/readiness-receipt-v1.json",
+      "bytes": 6280,
+      "sha256": "9dcb54ca8c920dd0728794b7ca699a7e8f9723a254152c3ce7f4ed751b0f30a3"
+    },
+    {
+      "path": "docs/performance/results/change-0975/receipts/root-go-0975-v1.json",
+      "bytes": 5060,
+      "sha256": "4b10643a983b525d9169e1a09697806bf76ba8eb7df7db2783349b88c3b23c54"
+    },
+    {
+      "path": "docs/performance/results/change-0975/receipts/root-terminal-0975-v1.json",
+      "bytes": 1342,
+      "sha256": "57b2ac380aba4e23fc24638e30a63a326f6a935306cfc3c1c70b7bafc07ecfbe"
+    },
+    {
+      "path": "docs/performance/results/change-0975/receipts/temporary-cleanup-0975-v1.json",
+      "bytes": 25826,
+      "sha256": "6903e7a1916904ed5edefb5cfb6fbeb13843f86e0a274796b1d0796c5a73a229"
+    },
+    {
+      "path": "docs/performance/results/change-0975/run/runner-0975-v1.log",
+      "bytes": 965,
+      "sha256": "79ded9e944305d9abe9a53bf8e29a8d9d7cf97594f71ccf2a2059dffc78b5983"
+    },
+    {
+      "path": "docs/performance/results/change-0975/run/terminal.txt",
+      "bytes": 863,
+      "sha256": "d9125f5c8ee04c66ac4e02d9f945366c4b90e7bc3d8f3b5e7f23aadb89a29b6c"
+    },
+    {
+      "path": "docs/performance/results/change-0975/tools/analyze_failed_capture_0975_v3.py",
+      "bytes": 26108,
+      "sha256": "860ede12c2e9c9ce80dd394ec9195b291743354066404d6652eb390b6c42c85f"
+    },
+    {
+      "path": "docs/performance/results/change-0975/tools/launch_boundary_regression_0975_v1.py",
+      "bytes": 12471,
+      "sha256": "9bbdb1acf9e35a000bbf75818e1f7c6986ee77cc4d577f902be1043194dd0e36"
+    },
+    {
+      "path": "docs/performance/results/change-0975/tools/plan_binding_0975.py",
+      "bytes": 6849,
+      "sha256": "489699a6e94bb88eb6d5dd911d6959d4d1859e80590cac1cd2f3d2d92bb547e2"
+    },
+    {
+      "path": "docs/performance/results/change-0975/tools/prepare_plan_0975.py",
+      "bytes": 5729,
+      "sha256": "4ff18125bc1584f5fc82d72a865985db0f4163743092f3a8b76ec236d4295275"
+    },
+    {
+      "path": "docs/performance/results/change-0975/tools/reduce_0975.py",
+      "bytes": 1758,
+      "sha256": "5848148172f1d36c9aa6cb9ab67367c3ec8e702d4343fbafa6e5c303fd0f378a"
+    },
+    {
+      "path": "docs/performance/results/change-0975/tools/run_0975.py",
+      "bytes": 1787,
+      "sha256": "1dd23f2d38ff9c7333f92d3ab54bd6ae68fb870c5e8d1fc89a743cdec339f125"
+    }
+  ]
+}

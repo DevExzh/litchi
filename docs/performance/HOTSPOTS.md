@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0975 — per-thread capture remains blocked by raw loss
+
+[0975](0975-per-thread-profile-loss-gate.md) obtains one zero-loss child with
+180 marker samples, then stops on child 02 after 23 raw loss records totaling
+184. The terminal 184 counter corroborates that loss rather than adding to it;
+children 03–12 never start. Child 01's 3,745 current empty-callchain count
+also prevents treating its marker coverage as source attribution; child 02's
+895 markers and 129 empty chains are descriptive only because raw loss breaks
+lifetime proof. Preserve the zero-loss and single-PID gates; the independent
+audit rejects adoption and establishes no host, buffer, source, timing, or
+performance cause.
+
 ## 0974 — per-thread mmap remains unqualified
 
 [0974](0974-per-thread-profile-prelaunch.md) separates perf setup capability

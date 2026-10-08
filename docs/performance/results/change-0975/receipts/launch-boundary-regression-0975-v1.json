@@ -1,0 +1,352 @@
+{
+  "bindings_after": {
+    "generator": {
+      "bytes": 5729,
+      "path": "/home/zhuhe/litchi-performance-0975/tools/prepare_plan_0975.py",
+      "sha256": "4ff18125bc1584f5fc82d72a865985db0f4163743092f3a8b76ec236d4295275"
+    },
+    "helper_seal": {
+      "bytes": 6340,
+      "path": "/home/zhuhe/litchi-performance-0975/receipts/helper-seal-0975-v3.json",
+      "sha256": "9af5da6061066645d1b7d8e40b712f39113f7c7b53e16c5b3c713793f5ac5687"
+    },
+    "plan": {
+      "bytes": 22790,
+      "path": "/home/zhuhe/litchi-performance-0975/plans/plan-0975-pre-capture-v3.json",
+      "sha256": "4873e502f09a3f4572ecd28d7545541e7cf7d27738c788d46fecb97293d36f97"
+    },
+    "plan_binding": {
+      "bytes": 6849,
+      "path": "/home/zhuhe/litchi-performance-0975/tools/plan_binding_0975.py",
+      "sha256": "489699a6e94bb88eb6d5dd911d6959d4d1859e80590cac1cd2f3d2d92bb547e2"
+    },
+    "protocol_v5": {
+      "bytes": 35075,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/protocol_adapter_0974_v5.py",
+      "sha256": "e3725cbc027d2a063f32b926e3fb4024d640aab2a2fbd7493ed5325de9ea2ac6"
+    },
+    "record_spec": {
+      "bytes": 2191,
+      "path": "/home/zhuhe/litchi-performance-0974/analysis/native-record-spec-v2.json",
+      "sha256": "3d9f5bd12c2d20b4853f5601359d18c6051a4da2b8d3b7e87b25112cbb2dcb9d"
+    },
+    "reducer": {
+      "bytes": 1758,
+      "path": "/home/zhuhe/litchi-performance-0975/tools/reduce_0975.py",
+      "sha256": "5848148172f1d36c9aa6cb9ab67367c3ec8e702d4343fbafa6e5c303fd0f378a"
+    },
+    "runner": {
+      "bytes": 1787,
+      "path": "/home/zhuhe/litchi-performance-0975/tools/run_0975.py",
+      "sha256": "1dd23f2d38ff9c7333f92d3ab54bd6ae68fb870c5e8d1fc89a743cdec339f125"
+    }
+  },
+  "bindings_before": {
+    "generator": {
+      "bytes": 5729,
+      "path": "/home/zhuhe/litchi-performance-0975/tools/prepare_plan_0975.py",
+      "sha256": "4ff18125bc1584f5fc82d72a865985db0f4163743092f3a8b76ec236d4295275"
+    },
+    "helper_seal": {
+      "bytes": 6340,
+      "path": "/home/zhuhe/litchi-performance-0975/receipts/helper-seal-0975-v3.json",
+      "sha256": "9af5da6061066645d1b7d8e40b712f39113f7c7b53e16c5b3c713793f5ac5687"
+    },
+    "plan": {
+      "bytes": 22790,
+      "path": "/home/zhuhe/litchi-performance-0975/plans/plan-0975-pre-capture-v3.json",
+      "sha256": "4873e502f09a3f4572ecd28d7545541e7cf7d27738c788d46fecb97293d36f97"
+    },
+    "plan_binding": {
+      "bytes": 6849,
+      "path": "/home/zhuhe/litchi-performance-0975/tools/plan_binding_0975.py",
+      "sha256": "489699a6e94bb88eb6d5dd911d6959d4d1859e80590cac1cd2f3d2d92bb547e2"
+    },
+    "protocol_v5": {
+      "bytes": 35075,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/protocol_adapter_0974_v5.py",
+      "sha256": "e3725cbc027d2a063f32b926e3fb4024d640aab2a2fbd7493ed5325de9ea2ac6"
+    },
+    "record_spec": {
+      "bytes": 2191,
+      "path": "/home/zhuhe/litchi-performance-0974/analysis/native-record-spec-v2.json",
+      "sha256": "3d9f5bd12c2d20b4853f5601359d18c6051a4da2b8d3b7e87b25112cbb2dcb9d"
+    },
+    "reducer": {
+      "bytes": 1758,
+      "path": "/home/zhuhe/litchi-performance-0975/tools/reduce_0975.py",
+      "sha256": "5848148172f1d36c9aa6cb9ab67367c3ec8e702d4343fbafa6e5c303fd0f378a"
+    },
+    "runner": {
+      "bytes": 1787,
+      "path": "/home/zhuhe/litchi-performance-0975/tools/run_0975.py",
+      "sha256": "1dd23f2d38ff9c7333f92d3ab54bd6ae68fb870c5e8d1fc89a743cdec339f125"
+    }
+  },
+  "bindings_unchanged": true,
+  "boundary": {
+    "argv_match": true,
+    "exception": {
+      "message": "Popen sentinel reached real launch boundary",
+      "type": "LaunchReached"
+    },
+    "launch_reached": true,
+    "popen_calls": 1,
+    "sentinel_call": {
+      "argv": [
+        "/usr/bin/taskset",
+        "--cpu-list",
+        "31",
+        "/usr/bin/perf",
+        "record",
+        "--per-thread",
+        "-e",
+        "instructions:u",
+        "-c",
+        "1000000",
+        "-m",
+        "16M",
+        "--call-graph",
+        "dwarf,32768",
+        "--period",
+        "--timestamp",
+        "--sample-cpu",
+        "--buildid-all",
+        "--no-buildid-cache",
+        "--user-callchains",
+        "-o",
+        "/tmp/litchi-0975-launch-boundary-ayc5j39c/capture/child-01/child-01.perf.data",
+        "--",
+        "/usr/bin/python3.14",
+        "/home/zhuhe/litchi-performance-0970/tools/launch_baseline_v2.py",
+        "--metadata",
+        "/tmp/litchi-0975-launch-boundary-ayc5j39c/capture/child-01/child-01.launch.json",
+        "--requested-affinity",
+        "[31]",
+        "--",
+        "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+        "--case",
+        "docfloat",
+        "--input",
+        "/home/zhuhe/litchi-performance-0969/qa-core/test-data/ole/doc/FloatingPictures.doc",
+        "--edits",
+        "1",
+        "--retention",
+        "default",
+        "--warmup",
+        "5",
+        "--samples",
+        "80"
+      ],
+      "kwargs": {
+        "env_subset": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "LD_PRELOAD": null,
+          "TZ": "UTC"
+        },
+        "preexec_fn": "<function pin_cpu at 0x700ddae11a60>",
+        "start_new_session": true,
+        "stderr_name": "/tmp/litchi-0975-launch-boundary-ayc5j39c/capture/child-01/child-01.perf.stderr",
+        "stdin": "-3",
+        "stdout_name": "/tmp/litchi-0975-launch-boundary-ayc5j39c/capture/child-01/child-01.report.json"
+      }
+    }
+  },
+  "build_started": false,
+  "created_utc": "2026-10-08T05:32:50.043855+00:00",
+  "helper_seal": {
+    "bytes": 6340,
+    "path": "/home/zhuhe/litchi-performance-0975/receipts/helper-seal-0975-v3.json",
+    "sha256": "9af5da6061066645d1b7d8e40b712f39113f7c7b53e16c5b3c713793f5ac5687"
+  },
+  "independent_argv": {
+    "binding": {
+      "bytes": 2191,
+      "path": "/home/zhuhe/litchi-performance-0974/analysis/native-record-spec-v2.json",
+      "sha256": "3d9f5bd12c2d20b4853f5601359d18c6051a4da2b8d3b7e87b25112cbb2dcb9d"
+    },
+    "canonical_argv": [
+      "/usr/bin/taskset",
+      "--cpu-list",
+      "31",
+      "/usr/bin/perf",
+      "record",
+      "--per-thread",
+      "-e",
+      "instructions:u",
+      "-c",
+      "1000000",
+      "-m",
+      "16M",
+      "--call-graph",
+      "dwarf,32768",
+      "--period",
+      "--timestamp",
+      "--sample-cpu",
+      "--buildid-all",
+      "--no-buildid-cache",
+      "--user-callchains",
+      "-o",
+      "<child_dir>/child-01.perf.data",
+      "--",
+      "/usr/bin/python3.14",
+      "/home/zhuhe/litchi-performance-0970/tools/launch_baseline_v2.py",
+      "--metadata",
+      "<child_dir>/child-01.launch.json",
+      "--requested-affinity",
+      "[31]",
+      "--",
+      "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "--case",
+      "docfloat",
+      "--input",
+      "/home/zhuhe/litchi-performance-0969/qa-core/test-data/ole/doc/FloatingPictures.doc",
+      "--edits",
+      "1",
+      "--retention",
+      "default",
+      "--warmup",
+      "5",
+      "--samples",
+      "80"
+    ],
+    "expected_argv": [
+      "/usr/bin/taskset",
+      "--cpu-list",
+      "31",
+      "/usr/bin/perf",
+      "record",
+      "--per-thread",
+      "-e",
+      "instructions:u",
+      "-c",
+      "1000000",
+      "-m",
+      "16M",
+      "--call-graph",
+      "dwarf,32768",
+      "--period",
+      "--timestamp",
+      "--sample-cpu",
+      "--buildid-all",
+      "--no-buildid-cache",
+      "--user-callchains",
+      "-o",
+      "/tmp/litchi-0975-launch-boundary-ayc5j39c/capture/child-01/child-01.perf.data",
+      "--",
+      "/usr/bin/python3.14",
+      "/home/zhuhe/litchi-performance-0970/tools/launch_baseline_v2.py",
+      "--metadata",
+      "/tmp/litchi-0975-launch-boundary-ayc5j39c/capture/child-01/child-01.launch.json",
+      "--requested-affinity",
+      "[31]",
+      "--",
+      "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "--case",
+      "docfloat",
+      "--input",
+      "/home/zhuhe/litchi-performance-0969/qa-core/test-data/ole/doc/FloatingPictures.doc",
+      "--edits",
+      "1",
+      "--retention",
+      "default",
+      "--warmup",
+      "5",
+      "--samples",
+      "80"
+    ]
+  },
+  "native_capture_started": false,
+  "offline_only": true,
+  "old_0974_regression": {
+    "bytes": 15879,
+    "path": "/home/zhuhe/litchi-performance-0974/receipts/launch-boundary-regression-0974-v3.json",
+    "sha256": "68c3c2b1df6027218d7407253a255bf770b5d7d875a9e48125c4134fac89cdd4"
+  },
+  "patch_composition": {
+    "after_first_install": {
+      "child_builder_alias": true,
+      "child_repr": "<function native_record_argv at 0x700ddae6b320>",
+      "raw_module_alias": true,
+      "scan_alias": true,
+      "scan_repr": "<function install_runner_patches.<locals>.scan at 0x700ddad24ca0>"
+    },
+    "after_second_install": {
+      "child_builder_alias": true,
+      "child_repr": "<function native_record_argv at 0x700ddae6b320>",
+      "raw_module_alias": true,
+      "scan_alias": true,
+      "scan_repr": "<function install_runner_patches.<locals>.scan at 0x700ddad24ca0>"
+    },
+    "before_install": {
+      "child_builder_alias": false,
+      "child_repr": "<function child_record_argv at 0x700ddae12140>",
+      "raw_module_alias": true,
+      "scan_alias": true,
+      "scan_repr": "<function scan_dump at 0x700ddae11430>"
+    },
+    "clear": {
+      "after": {
+        "child_builder_alias": false,
+        "child_repr": "<function child_record_argv at 0x700ddae15fe0>",
+        "raw_module_alias": true,
+        "scan_alias": true,
+        "scan_repr": "<function scan_dump at 0x700ddae6ae50>"
+      },
+      "before": {
+        "child_builder_alias": true,
+        "child_repr": "<function native_record_argv at 0x700ddae6b320>",
+        "raw_module_alias": true,
+        "scan_alias": true,
+        "scan_repr": "<function install_runner_patches.<locals>.scan at 0x700ddad24ca0>"
+      },
+      "patch_state_cleared": true,
+      "runner_child_restored": true,
+      "runner_scan_restored": true,
+      "runner_write_restored": true
+    },
+    "clear_ok": true,
+    "install_idempotent": true,
+    "raw_aliases_ok": true
+  },
+  "plan": {
+    "bytes": 22790,
+    "path": "/home/zhuhe/litchi-performance-0975/plans/plan-0975-pre-capture-v3.json",
+    "sha256": "4873e502f09a3f4572ecd28d7545541e7cf7d27738c788d46fecb97293d36f97"
+  },
+  "plan_and_cli": {
+    "cli": {
+      "argv": [
+        "/usr/bin/python3.14",
+        "-B",
+        "/home/zhuhe/litchi-performance-0975/tools/run_0975.py",
+        "--check-plan",
+        "/home/zhuhe/litchi-performance-0975/plans/plan-0975-pre-capture-v3.json"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": {
+        "plan": "/home/zhuhe/litchi-performance-0975/plans/plan-0975-pre-capture-v3.json",
+        "schema": "litchi.performance.0974.plan.v3",
+        "sha256": "4873e502f09a3f4572ecd28d7545541e7cf7d27738c788d46fecb97293d36f97",
+        "status": "pass"
+      }
+    },
+    "plan_binding_checker": {
+      "dependency_count": 9,
+      "helper_seal": {
+        "bytes": 6340,
+        "path": "/home/zhuhe/litchi-performance-0975/receipts/helper-seal-0975-v3.json",
+        "sha256": "9af5da6061066645d1b7d8e40b712f39113f7c7b53e16c5b3c713793f5ac5687"
+      },
+      "plan": "/home/zhuhe/litchi-performance-0975/plans/plan-0975-pre-capture-v3.json",
+      "plan_sha256": "4873e502f09a3f4572ecd28d7545541e7cf7d27738c788d46fecb97293d36f97",
+      "status": "pass"
+    }
+  },
+  "schema": "litchi.performance.0975.launch_boundary_regression.v1",
+  "scope": "actual retained BASE_RUNNER.run_child with only Popen intercepted; no run_child replacement, native process, workload, build, or capture",
+  "status": "pass",
+  "workload_started": false
+}

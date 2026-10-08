@@ -1,0 +1,344 @@
+{
+  "authoritative_artifacts": {
+    "author_boundary": {
+      "bytes": 11817,
+      "path": "/home/zhuhe/litchi-performance-0975/receipts/launch-boundary-regression-0975-v1.json",
+      "sha256": "a9359c2da7b298b1a49b01c33378b5ca182736c7793877e668bc8bbc38b850e5"
+    },
+    "design": {
+      "bytes": 2118,
+      "path": "/home/zhuhe/litchi-performance-0975/design-0975-v1.md",
+      "sha256": "41a7678d226872aef1eeb346d51eb764c4261362fff2c856c510af97532d1d77"
+    },
+    "helper_seal": {
+      "bytes": 6340,
+      "path": "/home/zhuhe/litchi-performance-0975/receipts/helper-seal-0975-v3.json",
+      "sha256": "9af5da6061066645d1b7d8e40b712f39113f7c7b53e16c5b3c713793f5ac5687"
+    },
+    "plan": {
+      "bytes": 22790,
+      "path": "/home/zhuhe/litchi-performance-0975/plans/plan-0975-pre-capture-v3.json",
+      "sha256": "4873e502f09a3f4572ecd28d7545541e7cf7d27738c788d46fecb97293d36f97"
+    },
+    "readiness": {
+      "bytes": 6280,
+      "path": "/home/zhuhe/litchi-performance-0975/readiness-receipt-v1.json",
+      "sha256": "9dcb54ca8c920dd0728794b7ca699a7e8f9723a254152c3ce7f4ed751b0f30a3"
+    },
+    "reviewer_boundary": {
+      "bytes": 11814,
+      "path": "/home/zhuhe/litchi-performance-0975/receipts/launch-boundary-regression-0975-independent-v1.json",
+      "sha256": "f7569b13aafda769589eac636632a4f16d62c77d550d0f997598208eb446a756"
+    }
+  },
+  "boundary_assertions": {
+    "argv_contract": [
+      "--per-thread",
+      "-m",
+      "16M immediately before --call-graph",
+      "instructions:u",
+      "period=1000000",
+      "dwarf,32768",
+      "CPU31 outer taskset"
+    ],
+    "argv_match": true,
+    "author_receipt_status": "pass",
+    "clear_restores_child_scan_write_and_patch_state": true,
+    "install_idempotent": true,
+    "launch_reached": true,
+    "native_process_started": false,
+    "popen_calls": 1,
+    "production_bindings_unchanged": true,
+    "reviewer_receipt_status": "pass"
+  },
+  "created_utc": "2026-10-08T05:33:53.192370+00:00",
+  "dependency_closure": {
+    "adapter_lineage_hashes": {
+      "adapter_v1": {
+        "bytes": 25841,
+        "path": "/home/zhuhe/litchi-performance-0974/tools/protocol_adapter_0974_v1.py",
+        "sha256": "6c2032e2d1cc04990f6f4be0df4542d393ce55f1c1c7d45b97ea62eb5f05269e"
+      },
+      "adapter_v3": {
+        "bytes": 30542,
+        "path": "/home/zhuhe/litchi-performance-0974/tools/protocol_adapter_0974_v3.py",
+        "sha256": "e798f3e5628cab21c019f90d793754ef5930a0ce9e222569f53861eed83e8dd6"
+      },
+      "reducer_v4": {
+        "bytes": 12565,
+        "path": "/home/zhuhe/litchi-performance-0974/tools/reduce_0974_v4.py",
+        "sha256": "7c6e7162e406aecf13868b264da29f2d5b6e07f0212bed1099298a464bb9ade5"
+      }
+    },
+    "adapter_v3_imports_adapter_v1": true,
+    "constraint": "Keep these hashes bound for any later offline reduction; the v5 runner boundary is independently repaired and does not delegate capture through adapter-v3.",
+    "count": 9,
+    "helper_seal_checks_all_helper_rows": true,
+    "plan_binding_checks_all_rows": true,
+    "reducer_v4_imports_adapter_v3": true
+  },
+  "findings": [
+    {
+      "detail": "Plan v3 binds a distinct 0975 capture root, full wrapper/dependency closure, and the existing capture root is absent.",
+      "id": "fresh-plan-and-output-custody",
+      "status": "pass"
+    },
+    {
+      "detail": "Both the author and independent sentinel receipts reach exactly one Popen with exact frozen argv and no native process.",
+      "id": "repaired-command-boundary",
+      "status": "pass"
+    },
+    {
+      "detail": "Reducer-v4 adapter-v3/v1 lineage is explicitly hash-bound in the plan/seal and must remain bound for offline reduction.",
+      "id": "reducer-lineage",
+      "status": "pass-with-custody-constraint"
+    },
+    {
+      "detail": "This review does not authorize capture; root must issue a fresh GO with the exact fields and command constraints above.",
+      "id": "go-not-yet-issued",
+      "status": "pending"
+    }
+  ],
+  "fresh_outputs": {
+    "analysis_root": "/home/zhuhe/litchi-performance-0975/analysis",
+    "analysis_root_empty_at_review": true,
+    "capture_root": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1",
+    "capture_root_absent_at_review": true,
+    "exclusive_policy": "runner refuses an existing capture root; reducer output must be a new exclusive file under this analysis root",
+    "not_a_retry_of": "/home/zhuhe/litchi-performance-0974"
+  },
+  "frozen_inputs": {
+    "adapter_v1": {
+      "bytes": 25841,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/protocol_adapter_0974_v1.py",
+      "sha256": "6c2032e2d1cc04990f6f4be0df4542d393ce55f1c1c7d45b97ea62eb5f05269e"
+    },
+    "adapter_v3": {
+      "bytes": 30542,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/protocol_adapter_0974_v3.py",
+      "sha256": "e798f3e5628cab21c019f90d793754ef5930a0ce9e222569f53861eed83e8dd6"
+    },
+    "design": {
+      "bytes": 2118,
+      "path": "/home/zhuhe/litchi-performance-0975/design-0975-v1.md",
+      "sha256": "41a7678d226872aef1eeb346d51eb764c4261362fff2c856c510af97532d1d77"
+    },
+    "generator_v5": {
+      "bytes": 8470,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/prepare_plan_0974_v5.py",
+      "sha256": "eb5d0f42055b8917078602d1329b1aafdec3eef453370816aec102a9e0ef486e"
+    },
+    "generator_wrapper_0975": {
+      "bytes": 5729,
+      "path": "/home/zhuhe/litchi-performance-0975/tools/prepare_plan_0975.py",
+      "sha256": "4ff18125bc1584f5fc82d72a865985db0f4163743092f3a8b76ec236d4295275"
+    },
+    "helper_seal": {
+      "bytes": 6340,
+      "path": "/home/zhuhe/litchi-performance-0975/receipts/helper-seal-0975-v3.json",
+      "sha256": "9af5da6061066645d1b7d8e40b712f39113f7c7b53e16c5b3c713793f5ac5687"
+    },
+    "helper_seal_v5": {
+      "bytes": 4177,
+      "path": "/home/zhuhe/litchi-performance-0974/receipts/helper-seal-0974-v5.json",
+      "sha256": "4cc5ef36a28c6b254a580abd01b21792daef317b383ac5dc718ea544bb3668a3"
+    },
+    "plan": {
+      "bytes": 22790,
+      "path": "/home/zhuhe/litchi-performance-0975/plans/plan-0975-pre-capture-v3.json",
+      "sha256": "4873e502f09a3f4572ecd28d7545541e7cf7d27738c788d46fecb97293d36f97"
+    },
+    "plan_binding_0975": {
+      "bytes": 6849,
+      "path": "/home/zhuhe/litchi-performance-0975/tools/plan_binding_0975.py",
+      "sha256": "489699a6e94bb88eb6d5dd911d6959d4d1859e80590cac1cd2f3d2d92bb547e2"
+    },
+    "plan_v5": {
+      "bytes": 19568,
+      "path": "/home/zhuhe/litchi-performance-0974/plans/plan-0974-pre-capture-v5.json",
+      "sha256": "dddd126895d04cd1738719d99aa00ff1b68dcd551233a5c2391f37f7c30e71ee"
+    },
+    "protocol_v5": {
+      "bytes": 35075,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/protocol_adapter_0974_v5.py",
+      "sha256": "e3725cbc027d2a063f32b926e3fb4024d640aab2a2fbd7493ed5325de9ea2ac6"
+    },
+    "record_spec": {
+      "bytes": 2191,
+      "path": "/home/zhuhe/litchi-performance-0974/analysis/native-record-spec-v2.json",
+      "sha256": "3d9f5bd12c2d20b4853f5601359d18c6051a4da2b8d3b7e87b25112cbb2dcb9d"
+    },
+    "reducer_v4": {
+      "bytes": 12565,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/reduce_0974_v4.py",
+      "sha256": "7c6e7162e406aecf13868b264da29f2d5b6e07f0212bed1099298a464bb9ade5"
+    },
+    "reducer_wrapper_0975": {
+      "bytes": 1758,
+      "path": "/home/zhuhe/litchi-performance-0975/tools/reduce_0975.py",
+      "sha256": "5848148172f1d36c9aa6cb9ab67367c3ec8e702d4343fbafa6e5c303fd0f378a"
+    },
+    "runner_v5": {
+      "bytes": 1841,
+      "path": "/home/zhuhe/litchi-performance-0974/tools/run_0974_v5.py",
+      "sha256": "519a7b88cf6df7688d1b4555fbd3b2d682c2459bc6c070817308ba38031d4fe1"
+    },
+    "runner_wrapper_0975": {
+      "bytes": 1787,
+      "path": "/home/zhuhe/litchi-performance-0975/tools/run_0975.py",
+      "sha256": "1dd23f2d38ff9c7333f92d3ab54bd6ae68fb870c5e8d1fc89a743cdec339f125"
+    }
+  },
+  "independent_checks": [
+    {
+      "argv": [
+        "python3",
+        "/home/zhuhe/litchi-performance-0975/tools/plan_binding_0975.py",
+        "--plan",
+        "/home/zhuhe/litchi-performance-0975/plans/plan-0975-pre-capture-v3.json"
+      ],
+      "name": "plan_binding",
+      "result": {
+        "dependency_count": 9,
+        "helper_seal_sha256": "9af5da6061066645d1b7d8e40b712f39113f7c7b53e16c5b3c713793f5ac5687",
+        "plan_sha256": "4873e502f09a3f4572ecd28d7545541e7cf7d27738c788d46fecb97293d36f97",
+        "status": "pass"
+      },
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "python3",
+        "/home/zhuhe/litchi-performance-0975/tools/run_0975.py",
+        "--check-plan",
+        "/home/zhuhe/litchi-performance-0975/plans/plan-0975-pre-capture-v3.json"
+      ],
+      "name": "runner_check_plan",
+      "result": {
+        "schema": "litchi.performance.0974.plan.v3",
+        "sha256": "4873e502f09a3f4572ecd28d7545541e7cf7d27738c788d46fecb97293d36f97",
+        "status": "pass"
+      },
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "python3",
+        "/home/zhuhe/litchi-performance-0975/tools/run_0975.py",
+        "--self-test"
+      ],
+      "name": "runner_self_test",
+      "result": {
+        "record_memory": [
+          "-m",
+          "16M"
+        ],
+        "record_mode": [
+          "--per-thread"
+        ],
+        "status": "pass",
+        "workload_started": false
+      },
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "python3",
+        "/home/zhuhe/litchi-performance-0975/tools/reduce_0975.py",
+        "--self-test"
+      ],
+      "name": "reducer_self_test",
+      "result": {
+        "children": 12,
+        "status": "pass",
+        "workload_started": false
+      },
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "python3",
+        "/home/zhuhe/litchi-performance-0975/tools/reduce_0975.py",
+        "--admission-self-test",
+        "--plan",
+        "/home/zhuhe/litchi-performance-0975/plans/plan-0975-pre-capture-v3.json"
+      ],
+      "name": "reducer_admission_self_test",
+      "result": {
+        "checks": [
+          "raw/header reparse",
+          "recorded post-exit snapshots",
+          "exact native argv",
+          "environment/cwd custody",
+          "separate loss gates",
+          "missing --per-thread rejection"
+        ],
+        "children": 12,
+        "status": "pass",
+        "workload_started": false
+      },
+      "returncode": 0
+    }
+  ],
+  "plan_gates_verified": {
+    "diagnostic_only": true,
+    "marker_minimum_each_child": 100,
+    "no_build_or_workload": true,
+    "no_retry": true,
+    "positive_marker_period_share_each_child": true,
+    "raw_lost_sum_required": 0,
+    "raw_stack_bounds": "0 <= dyn_size <= captured_stack_size <= 32768",
+    "same_pid_tid_and_task_lifecycle_fail_closed": true,
+    "schema_status": "litchi.performance.0974.plan.v3/pre_capture",
+    "serial_children": 12,
+    "stop_on_first_failure": true,
+    "terminal_lost_samples_required": 0
+  },
+  "reviewer": "/root/cpu_review",
+  "root_go_requirements_before_any_native_run": {
+    "authorized": true,
+    "binary": "exact plan binary binding including build_id",
+    "dependency_fields": [
+      "libdw",
+      "libelf",
+      "compiler",
+      "header",
+      "shim_source",
+      "shim_version_script"
+    ],
+    "fixture": "exact plan fixture binding",
+    "helper_seal": "exact plan helper_seal binding",
+    "must_not_use": [
+      "/home/zhuhe/litchi-performance-0974/tools/run_0974_v5.py directly"
+    ],
+    "outer_command": [
+      "/usr/bin/python3.14",
+      "-B",
+      "/home/zhuhe/litchi-performance-0975/tools/run_0975.py",
+      "--run",
+      "--plan",
+      "/home/zhuhe/litchi-performance-0975/plans/plan-0975-pre-capture-v3.json",
+      "--go",
+      "<fresh-root-go.json>"
+    ],
+    "plan": "exact file binding of plan-0975-pre-capture-v3.json",
+    "quiescence": "status=pass immediately before run",
+    "record_memory": "exact plan perf.record_memory",
+    "record_mode": "exact plan perf.record_mode",
+    "schema": "litchi.performance.0974.root_go.v3",
+    "status": "authorized"
+  },
+  "schema": "litchi.performance.0975.independent_review.v1",
+  "scope": {
+    "build_started": false,
+    "capability_probe_started": false,
+    "capture_admission": false,
+    "dependency_closure_reviewed": true,
+    "design_and_plan_reviewed": true,
+    "native_capture_started": false,
+    "native_workload_started": false,
+    "sealed_artifacts_mutated_by_reviewer": false,
+    "wrapper_and_launch_boundary_reviewed": true
+  },
+  "status": "pass_pre_capture_go_pending"
+}

@@ -1,0 +1,1556 @@
+{
+  "capture_outcome": {
+    "manifest_failure": {
+      "child": 2,
+      "error": "raw PERF_RECORD_LOST sum is nonzero: 184",
+      "reason": "child_failed",
+      "type": "ProtocolError"
+    },
+    "manifest_status": "failed",
+    "native_children_launched": [
+      1,
+      2
+    ],
+    "no_retry": true,
+    "packet_children": [
+      1
+    ],
+    "root_terminal_status": "stopped_on_child_02_raw_loss",
+    "runner_log_lines": [
+      "{\"child\": 1, \"empty_callchain_count\": 3745, \"gate\": \"pass\", \"lost_events\": 0, \"marker_sample_count\": 180, \"schema\": \"litchi.performance.0973.child_progress.v2\", \"status\": \"gated\"}",
+      "{\"child\": 2, \"error\": \"raw PERF_RECORD_LOST sum is nonzero: 184\", \"schema\": \"litchi.performance.0973.child_progress.v2\", \"status\": \"failed\"}",
+      "{",
+      "  \"children_requested\": 12,",
+      "  \"created_utc\": \"2026-10-08T05:37:16.982742+00:00\",",
+      "  \"failure\": {",
+      "    \"child\": 2,",
+      "    \"error\": \"raw PERF_RECORD_LOST sum is nonzero: 184\",",
+      "    \"reason\": \"child_failed\",",
+      "    \"type\": \"ProtocolError\"",
+      "  },",
+      "  \"no_retry\": true,",
+      "  \"packets\": [",
+      "    \"/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.packet.json\"",
+      "  ],",
+      "  \"plan\": {",
+      "    \"path\": \"/home/zhuhe/litchi-performance-0975/plans/plan-0975-pre-capture-v3.json\",",
+      "    \"sha256\": \"4873e502f09a3f4572ecd28d7545541e7cf7d27738c788d46fecb97293d36f97\"",
+      "  },",
+      "  \"schema\": \"litchi.performance.0973.capture_manifest.v2\",",
+      "  \"status\": \"failed\"",
+      "}"
+    ],
+    "runner_returncode": 2
+  },
+  "children": [
+    {
+      "artifact_bindings": {
+        "buildid": {
+          "bytes": 571,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.perf-buildid.txt",
+          "sha256": "6c7729316b6a54fc6ac338ceedfb960f4bb4fc669effac870d8ae58a34902925"
+        },
+        "command": {
+          "bytes": 1326,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.command.json",
+          "sha256": "1999ff22736b32752ed315f4287252115b76c00f4cc437840463e7e45a3784cd"
+        },
+        "corrected_log": {
+          "bytes": 40142743,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.corrected.dwfl.jsonl",
+          "sha256": "c836685cc08912a9df9d11574d549f06b6d56978d3328c3fa2bb95e49ecc6ff2"
+        },
+        "corrected_script": {
+          "bytes": 3008278,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.corrected.perf-script-no-inline.txt",
+          "sha256": "0d0f1c7a64654fddb9d78855b4ee82727df640f07a50e8ce71a695ccfbe19dda"
+        },
+        "corrected_stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.corrected.perf.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "header": {
+          "bytes": 1720,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.perf-header.txt",
+          "sha256": "d6e67725718e2cc1e0d2e59e7e24413cbd6b37b54bf12fb023918ea8c19aac36"
+        },
+        "inline": {
+          "bytes": 1271656,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.perf-script-inline.txt",
+          "sha256": "a506aab26c9b000514a38e742b0e783e3373e41ba312d87c75b57b1885bf4277"
+        },
+        "launch": {
+          "bytes": 1126,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.launch.json",
+          "sha256": "62a3c3feb180d96d9c382fc127e93dc28b38e870eae4af886c1482e3a3061bb3"
+        },
+        "layout": {
+          "bytes": 4462,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.target-layout.json",
+          "sha256": "17371d3a1a2d5acb18539eda3b80ee2558d0f07345f6b57bdd8d79744ef2f001"
+        },
+        "mmap_dump": {
+          "bytes": 1097895982,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.perf-mmap-dump.txt",
+          "sha256": "f90b3f0ef9894cdda707d4fbbecc3f905c840a54206eed459b0cdb987a5f5925"
+        },
+        "noop_log": {
+          "bytes": 28424166,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.noop.dwfl.jsonl",
+          "sha256": "a1a5d4b761b42476fad1eb565d495e724f3d7cdd01dbb1d8f8ba1f787eb8ee1e"
+        },
+        "noop_script": {
+          "bytes": 1169880,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.noop.perf-script-no-inline.txt",
+          "sha256": "a41b5f6aa9ab569957746cb33137a31b1120be6685f4dbe7fad7d950a57202fb"
+        },
+        "noop_stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.noop.perf.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "packet": {
+          "bytes": 17303724,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.packet.json",
+          "sha256": "6f3e04eb616fee3cd726773bad0278e8d4f0a8cb94ef323f64b486424e3c14b7"
+        },
+        "perf_data": {
+          "bytes": 229215080,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.perf.data",
+          "sha256": "51b16775fd0f72e154a74acad963c99e2169284ad1e31f78bcabab2bc6d75368"
+        },
+        "raw_stack": {
+          "bytes": 5342,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.raw-stack.json",
+          "sha256": "8892aa72490fba8937961542ac444122975ce78972322ed3c999ba78299b1adc"
+        },
+        "report": {
+          "bytes": 292316,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.report.json",
+          "sha256": "136eee9256d5c531cf6d65a373edb7510d0e40e4466f3ed390bb579d1ac56da7"
+        },
+        "stderr": {
+          "bytes": 191,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.perf.stderr",
+          "sha256": "5d685f6b7ad973dbae92a5aba7c277da839bc839391304ba78f75293e46b0241"
+        },
+        "stock_no_log": {
+          "bytes": 44,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.stock-no-log",
+          "sha256": "a384cfd115707fcd837ef0e3bb68771e20b54d0339cd8f13b871df8d86910d43"
+        },
+        "stock_script": {
+          "bytes": 1169880,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.stock.perf-script-no-inline.txt",
+          "sha256": "a41b5f6aa9ab569957746cb33137a31b1120be6685f4dbe7fad7d950a57202fb"
+        },
+        "stock_stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.stock.perf.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "target_layout": {
+          "bytes": 4462,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.target-layout.json",
+          "sha256": "17371d3a1a2d5acb18539eda3b80ee2558d0f07345f6b57bdd8d79744ef2f001"
+        },
+        "terminal": {
+          "bytes": 1794,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.terminal.json",
+          "sha256": "dac7cbbba5a40ecf3595d800fe0704f66a6901e08d6c879f86035edd5ee06ff0"
+        }
+      },
+      "child": 1,
+      "command": {
+        "argv": [
+          "/usr/bin/taskset",
+          "--cpu-list",
+          "31",
+          "/usr/bin/perf",
+          "record",
+          "--per-thread",
+          "-e",
+          "instructions:u",
+          "-c",
+          "1000000",
+          "-m",
+          "16M",
+          "--call-graph",
+          "dwarf,32768",
+          "--period",
+          "--timestamp",
+          "--sample-cpu",
+          "--buildid-all",
+          "--no-buildid-cache",
+          "--user-callchains",
+          "-o",
+          "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.perf.data",
+          "--",
+          "/usr/bin/python3.14",
+          "/home/zhuhe/litchi-performance-0970/tools/launch_baseline_v2.py",
+          "--metadata",
+          "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.launch.json",
+          "--requested-affinity",
+          "[31]",
+          "--",
+          "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+          "--case",
+          "docfloat",
+          "--input",
+          "/home/zhuhe/litchi-performance-0969/qa-core/test-data/ole/doc/FloatingPictures.doc",
+          "--edits",
+          "1",
+          "--retention",
+          "default",
+          "--warmup",
+          "5",
+          "--samples",
+          "80"
+        ],
+        "command_binding": {
+          "bytes": 1326,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.command.json",
+          "sha256": "1999ff22736b32752ed315f4287252115b76c00f4cc437840463e7e45a3784cd"
+        },
+        "cwd_policy": "inherited runner cwd; recorded before launch",
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "LD_PRELOAD": "absent",
+          "TZ": "UTC"
+        },
+        "launch": {
+          "actual_affinity": [
+            31
+          ],
+          "exec_path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+          "exec_pid": 3763764,
+          "execve": true,
+          "pid": 3763764,
+          "requested_affinity": [
+            31
+          ]
+        },
+        "launch_binding": {
+          "bytes": 1126,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.launch.json",
+          "sha256": "62a3c3feb180d96d9c382fc127e93dc28b38e870eae4af886c1482e3a3061bb3"
+        },
+        "working_directory": "/home/zhuhe/code/litchi"
+      },
+      "decoder_controls": {
+        "all_mode_period_sum_equal_raw": true,
+        "all_mode_sample_count_equal_raw": true,
+        "corrected_has_marker_ancestry": true,
+        "raw_vs_terminal_loss": {
+          "kept_as_separate_gates": true,
+          "raw_perf_record_lost_sum": 0,
+          "terminal_perf_record_lost_samples": 0
+        },
+        "stock_noop_control_stdout_sha256": [
+          null,
+          null
+        ],
+        "stock_noop_file_byte_identical": true,
+        "stock_noop_metric_identity": true
+      },
+      "decoder_modes": {
+        "corrected": {
+          "deepest_resolved_proxy_owner_count": 56,
+          "deepest_resolved_proxy_top10": [
+            {
+              "owner": "/usr/lib/x86_64-linux-gnu/libc.so.6::__memmove_avx512_unaligned_erms",
+              "period": 33000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::sprm::parse_sprms",
+              "period": 25000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::parts::text::TextExtractor::new",
+              "period": 14000000
+            },
+            {
+              "owner": "/usr/lib/x86_64-linux-gnu/libc.so.6::_int_malloc",
+              "period": 12000000
+            },
+            {
+              "owner": "/usr/lib/x86_64-linux-gnu/libc.so.6::_int_free_merge_chunk",
+              "period": 10000000
+            },
+            {
+              "owner": "/usr/lib/x86_64-linux-gnu/libc.so.6::cfree@GLIBC_2.2.5",
+              "period": 7000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_cfb::file::SectorChainScratch::collect_bounded",
+              "period": 5000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::parts::piece_table::PieceTable::fc_range_to_cp_ranges",
+              "period": 4000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::tracked_revision::package::RevisionEditor::decode_text_range",
+              "period": 4000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::parts::chp_bin_table::ChpBinTable::parse",
+              "period": 3000000
+            }
+          ],
+          "empty_callchain_count": 3745,
+          "explicit_stack_truncated_count": 0,
+          "inclusive_marker_ancestor_coverage_period_sum": 1798000000,
+          "inclusive_marker_ancestor_note": "per-owner marker coverage; owners overlap and must not be summed as attribution",
+          "inclusive_marker_ancestor_owner_count": 157,
+          "inclusive_marker_ancestor_top10": [
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::doc_retention_probe_0942_cfb_profile::profiled_measured_case",
+              "period": 180000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::doc_retention_probe_0942_cfb_profile::run_case",
+              "period": 180000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::doc_retention_probe_0942_cfb_profile::measure_one",
+              "period": 175000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::doc_retention_probe_0942_cfb_profile::run",
+              "period": 153000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::package::codec::<impl litchi_doc::package::model::Package<R>>::validate_ole_file",
+              "period": 82000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::body_text::Edit::commit",
+              "period": 63000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::body_text::Snapshot::open_bounded_with_policy",
+              "period": 60000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::body_text::Snapshot::open_bounded",
+              "period": 59000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::tracked_revision::package::RevisionEditor::open_with_ole_file_with_policy",
+              "period": 53000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::document::package::<impl litchi_doc::document::model::state::Document>::from_ole_with_options",
+              "period": 41000000
+            }
+          ],
+          "lost_events": 0,
+          "marker_ancestry": "observed",
+          "marker_no_resolved_frame_samples": 0,
+          "marker_period": 180000000,
+          "marker_period_share": 0.025936599423631124,
+          "marker_sample_count": 180,
+          "marker_unknown_physical_leaf_samples": 0,
+          "physical_leaf_classified_period": 180000000,
+          "physical_leaf_owner_count": 56,
+          "physical_leaf_top10": [
+            {
+              "owner": "/usr/lib/x86_64-linux-gnu/libc.so.6::__memmove_avx512_unaligned_erms",
+              "period": 33000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::sprm::parse_sprms",
+              "period": 25000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::parts::text::TextExtractor::new",
+              "period": 14000000
+            },
+            {
+              "owner": "/usr/lib/x86_64-linux-gnu/libc.so.6::_int_malloc",
+              "period": 12000000
+            },
+            {
+              "owner": "/usr/lib/x86_64-linux-gnu/libc.so.6::_int_free_merge_chunk",
+              "period": 10000000
+            },
+            {
+              "owner": "/usr/lib/x86_64-linux-gnu/libc.so.6::cfree@GLIBC_2.2.5",
+              "period": 7000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_cfb::file::SectorChainScratch::collect_bounded",
+              "period": 5000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::parts::piece_table::PieceTable::fc_range_to_cp_ranges",
+              "period": 4000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::tracked_revision::package::RevisionEditor::decode_text_range",
+              "period": 4000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::parts::chp_bin_table::ChpBinTable::parse",
+              "period": 3000000
+            }
+          ],
+          "physical_leaf_unknown_period": 0,
+          "physical_leaf_unknown_samples": 0,
+          "sample_count": 6940,
+          "stack_truncated": 0,
+          "total_period": 6940000000,
+          "unresolved_frames": 3284
+        },
+        "noop": {
+          "deepest_resolved_proxy_owner_count": 0,
+          "deepest_resolved_proxy_top10": [],
+          "empty_callchain_count": 4434,
+          "explicit_stack_truncated_count": 0,
+          "inclusive_marker_ancestor_coverage_period_sum": 0,
+          "inclusive_marker_ancestor_note": "per-owner marker coverage; owners overlap and must not be summed as attribution",
+          "inclusive_marker_ancestor_owner_count": 0,
+          "inclusive_marker_ancestor_top10": [],
+          "lost_events": 0,
+          "marker_ancestry": "no observed marker ancestry",
+          "marker_no_resolved_frame_samples": 0,
+          "marker_period": 0,
+          "marker_period_share": 0.0,
+          "marker_sample_count": 0,
+          "marker_unknown_physical_leaf_samples": 0,
+          "physical_leaf_classified_period": 0,
+          "physical_leaf_owner_count": 0,
+          "physical_leaf_top10": [],
+          "physical_leaf_unknown_period": 0,
+          "physical_leaf_unknown_samples": 0,
+          "sample_count": 6940,
+          "stack_truncated": 0,
+          "total_period": 6940000000,
+          "unresolved_frames": 3379
+        },
+        "stock": {
+          "deepest_resolved_proxy_owner_count": 0,
+          "deepest_resolved_proxy_top10": [],
+          "empty_callchain_count": 4434,
+          "explicit_stack_truncated_count": 0,
+          "inclusive_marker_ancestor_coverage_period_sum": 0,
+          "inclusive_marker_ancestor_note": "per-owner marker coverage; owners overlap and must not be summed as attribution",
+          "inclusive_marker_ancestor_owner_count": 0,
+          "inclusive_marker_ancestor_top10": [],
+          "lost_events": 0,
+          "marker_ancestry": "no observed marker ancestry",
+          "marker_no_resolved_frame_samples": 0,
+          "marker_period": 0,
+          "marker_period_share": 0.0,
+          "marker_sample_count": 0,
+          "marker_unknown_physical_leaf_samples": 0,
+          "physical_leaf_classified_period": 0,
+          "physical_leaf_owner_count": 0,
+          "physical_leaf_top10": [],
+          "physical_leaf_unknown_period": 0,
+          "physical_leaf_unknown_samples": 0,
+          "sample_count": 6940,
+          "stack_truncated": 0,
+          "total_period": 6940000000,
+          "unresolved_frames": 3379
+        }
+      },
+      "empty_chain_coverage": {
+        "corrected_empty": 3745,
+        "coverage_limit": "These are exported/decoded callchain coverage counts, not a causal diagnosis of perf capture, unwinding, or symbolization loss.",
+        "definition": "empty_callchain_count is the parser count of decoded sample records with no parsed frame lines; explicit stack truncation is counted separately",
+        "noop_empty": 4434,
+        "not_established": [
+          "why individual samples have no frame lines",
+          "whether missing frames arose during capture, unwind, export, or resolution"
+        ],
+        "raw_sample_denominator": 6940,
+        "stock_empty": 4434,
+        "stock_noop_scripts_byte_identical": true
+      },
+      "failure_record": null,
+      "packet_admission": "admitted",
+      "packet_present": true,
+      "packet_reconciliation": {
+        "artifact_binding_mismatches": [],
+        "artifact_bindings_match": true,
+        "gate": {
+          "passed": true,
+          "reasons": []
+        },
+        "present": true,
+        "reparse_metric_mismatches": [],
+        "reparse_metrics_match": true,
+        "schema": "litchi.performance.0973.child_packet.v2",
+        "status": "complete",
+        "task_audit_status": "pass"
+      },
+      "raw_stack": {
+        "binding": {
+          "bytes": 5342,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.raw-stack.json",
+          "sha256": "8892aa72490fba8937961542ac444122975ce78972322ed3c999ba78299b1adc"
+        },
+        "bounds_valid": true,
+        "period": 1000000,
+        "period_valid": true,
+        "pid_tid_cpu_counts": {
+          "3763764/3763764@31": 6940
+        },
+        "pid_tid_cpu_valid": true,
+        "raw_event_count": 7901,
+        "raw_lost_record_count": 0,
+        "raw_lost_scope": "sum of PERF_RECORD_LOST lost fields; PERF_RECORD_LOST_SAMPLES is not added",
+        "raw_lost_sum": 0,
+        "record_type_counts": {
+          "9": 6940
+        },
+        "sample_count": 6940,
+        "sample_line_count": 6940,
+        "sample_type": "IP|TID|TIME|CALLCHAIN|CPU|PERIOD|REGS_USER|STACK_USER",
+        "schema": "litchi.performance.0973.raw_stack.v2",
+        "scope": {
+          "all_perf_record_sample_records": true,
+          "misc_filter": null,
+          "no_live_ancestry_claim": true,
+          "stack_bytes_are_potential_values_only": true
+        },
+        "stack_cap": 32768,
+        "status": "complete",
+        "task_scope_interpretation": {
+          "complete_lifetime_proof": true,
+          "kind": "complete_lifetime_task_stream_for_admission",
+          "reason": "zero raw PERF_RECORD_LOST sum permits the retained raw task stream to serve as lifetime authority; /proc snapshots remain bounded observations"
+        },
+        "task_stream": {
+          "authority": "zero-loss raw task stream is lifetime authority; /proc snapshots are bounded observations only",
+          "comm_records": [
+            {
+              "comm": "perf-exec",
+              "pid": 3763764,
+              "tid": 3763764
+            },
+            {
+              "comm": "python3.14",
+              "pid": 3763764,
+              "tid": 3763764
+            },
+            {
+              "comm": "doc_retention_p",
+              "pid": 3763764,
+              "tid": 3763764
+            }
+          ],
+          "cpu_maps": [
+            "-1"
+          ],
+          "errors": [],
+          "event_counts": {
+            "COMM": 3,
+            "CPU_MAP": 1,
+            "EXIT": 1,
+            "THREAD_MAP": 1
+          },
+          "exit_records": [
+            {
+              "pid": 3763764,
+              "ppid": 3763763,
+              "ptid": 3763763,
+              "tid": 3763764
+            }
+          ],
+          "expected_pid": 3763764,
+          "missing_required_comm_names": [],
+          "scope": "raw perf task/lifecycle records for target PID only; no unrelated process scan",
+          "status": "pass",
+          "thread_maps": [
+            {
+              "nr": 1,
+              "threads": [
+                3763764
+              ]
+            }
+          ]
+        },
+        "unconsumed_raw_count": 961,
+        "violations": []
+      },
+      "report": {
+        "allocator_instrumented": false,
+        "allocator_timing_claim": false,
+        "binding": {
+          "bytes": 292316,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.report.json",
+          "sha256": "136eee9256d5c531cf6d65a373edb7510d0e40e4466f3ed390bb579d1ac56da7"
+        },
+        "case": "docfloat",
+        "correctness": {
+          "false_keys": [],
+          "gate_count": 20,
+          "true_count": 20
+        },
+        "edits": 1,
+        "elapsed_ns": {
+          "count": 80,
+          "max": 5445607,
+          "min": 1089726,
+          "sum": 145070729
+        },
+        "output": {
+          "bytes": 342528,
+          "capacity": 342528,
+          "exact_output_equal_reference": true,
+          "sha256": "6ba1bc972d66715e76d882f47c587b22000100f47abaa88428990619fc59fa20"
+        },
+        "retention": "default_8mib",
+        "retention_ceiling_bytes": 8388608,
+        "routes": [
+          {
+            "final_retained_before_commit": null,
+            "output_bytes": 342528,
+            "output_capacity": 342528,
+            "retention": "zero",
+            "retention_ceiling_bytes": 0,
+            "semantic_change_count": 1
+          },
+          {
+            "final_retained_before_commit": 587776,
+            "output_bytes": 342528,
+            "output_capacity": 342528,
+            "retention": "default_8mib",
+            "retention_ceiling_bytes": 8388608,
+            "semantic_change_count": 1
+          },
+          {
+            "final_retained_before_commit": null,
+            "output_bytes": 342528,
+            "output_capacity": 342528,
+            "retention": "release_8mib",
+            "retention_ceiling_bytes": 8388608,
+            "semantic_change_count": 1
+          }
+        ],
+        "samples_requested": 80,
+        "schema": "litchi.performance.0917.doc_retention.v1",
+        "source": {
+          "bytes": 335360,
+          "path": "/home/zhuhe/litchi-performance-0969/qa-core/test-data/ole/doc/FloatingPictures.doc",
+          "sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d"
+        },
+        "timing_claim": true,
+        "warmups": 5
+      },
+      "target_layout": {
+        "binary": {
+          "bytes": 47909224,
+          "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+          "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+        },
+        "binding": {
+          "bytes": 4462,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.target-layout.json",
+          "sha256": "17371d3a1a2d5acb18539eda3b80ee2558d0f07345f6b57bdd8d79744ef2f001"
+        },
+        "corrected_base": "0x5f33d295c000",
+        "executable_mapping": {
+          "build_id": "e5c457384eeebd057932c444efda77618f137399",
+          "length": 2654208,
+          "line": 327003,
+          "meta": "<e5c457384eeebd057932c444efda77618f137399>",
+          "offset": 933888,
+          "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+          "permissions": "r-xp",
+          "pid": 3763764,
+          "start": 104676181938176
+        },
+        "perf_expected_start": "0x5f33d295d000",
+        "process_tree": {
+          "fork_records": [],
+          "unexpected_children": 0
+        },
+        "schema": "litchi.performance.0973.target_layout.v2"
+      },
+      "terminal": {
+        "binding": {
+          "bytes": 1794,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.terminal.json",
+          "sha256": "dac7cbbba5a40ecf3595d800fe0704f66a6901e08d6c879f86035edd5ee06ff0"
+        },
+        "finished_utc": "2026-10-08T05:35:05.471275+00:00",
+        "launch_error": false,
+        "lost_samples_summary": {
+          "argv": [
+            "/usr/bin/perf",
+            "report",
+            "--stdio",
+            "--percent-limit",
+            "100",
+            "-i",
+            "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.perf.data"
+          ],
+          "lost_samples": 0,
+          "record_type": "PERF_RECORD_LOST_SAMPLES",
+          "source": "perf report --stdio terminal summary"
+        },
+        "native_ld_preload": "absent",
+        "perf_record_stderr": {
+          "binding": {
+            "bytes": 191,
+            "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.perf.stderr",
+            "sha256": "5d685f6b7ad973dbae92a5aba7c277da839bc839391304ba78f75293e46b0241"
+          },
+          "tail_lines": [
+            "[ perf record: Woken up 28 times to write data ]",
+            "[ perf record: Captured and wrote 218.558 MB /home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.perf.data ]"
+          ]
+        },
+        "process_pid": 3763763,
+        "returncode": 0,
+        "schema": "litchi.performance.0973.terminal.v2",
+        "started_utc": "2026-10-08T05:35:04.454667+00:00",
+        "timed_out": false
+      }
+    },
+    {
+      "artifact_bindings": {
+        "buildid": {
+          "bytes": 571,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.perf-buildid.txt",
+          "sha256": "6c7729316b6a54fc6ac338ceedfb960f4bb4fc669effac870d8ae58a34902925"
+        },
+        "command": {
+          "bytes": 1326,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.command.json",
+          "sha256": "f289856ac302f41c3c70e09bd316d21e5f38e2204e123931c52b08617cdfed22"
+        },
+        "corrected_log": {
+          "bytes": 95389556,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.corrected.dwfl.jsonl",
+          "sha256": "a4343cfd77dbabeb0554a324bb052068051bb6fb1c81a93b8fcc4558a071a6f7"
+        },
+        "corrected_script": {
+          "bytes": 10653182,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.corrected.perf-script-no-inline.txt",
+          "sha256": "77b423581167c6a1cb26d9245715ef6a6a8b24303924b88cc337f4ea671124b9"
+        },
+        "corrected_stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.corrected.perf.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "header": {
+          "bytes": 1720,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.perf-header.txt",
+          "sha256": "8c5752cdd12d18819b6cd745d25a0abe030bd0c058e02117a62662048b31e031"
+        },
+        "inline": {
+          "bytes": 799508,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.perf-script-inline.txt",
+          "sha256": "a9719b8d589eb1a72615b025b765d93bb437120d32f60c0296235e73734969e4"
+        },
+        "launch": {
+          "bytes": 1126,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.launch.json",
+          "sha256": "bbc3e30f537aa1eec29e67baa012c0a32ad30ac8177ee9faa93b440b21571e02"
+        },
+        "layout": {
+          "bytes": 4457,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.target-layout.json",
+          "sha256": "56976da599aa2e94e1d84195049d1783027f6c1d3b24797073f0200f2fc9051a"
+        },
+        "mmap_dump": {
+          "bytes": 1067696569,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.perf-mmap-dump.txt",
+          "sha256": "e36c766b465db187c676915b8e48fc20efe14cdb9b583de012638a2180923100"
+        },
+        "noop_log": {
+          "bytes": 18254684,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.noop.dwfl.jsonl",
+          "sha256": "6876d05e11580679612a57a761265c2f426f21e88b88fbe44622c448735427a1"
+        },
+        "noop_script": {
+          "bytes": 731689,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.noop.perf-script-no-inline.txt",
+          "sha256": "0e76ef6321841901bf3962073988bd09eb379414411c44f3ea383aba9a653b69"
+        },
+        "noop_stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.noop.perf.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "perf_data": {
+          "bytes": 223044216,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.perf.data",
+          "sha256": "ed9d2970672312d10c1676b242ad33f61bea42ee659082dc33e1d68581b0103b"
+        },
+        "raw_stack": {
+          "bytes": 5489,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.raw-stack.json",
+          "sha256": "474083e6891eaf37569e805cbc370eb85a886b9668574a7e6ac379966009ce11"
+        },
+        "report": {
+          "bytes": 292316,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.report.json",
+          "sha256": "30fc186214b4cfbaae10e0fae66f5f6eef883e20952e91892e36d6efd6dcbed9"
+        },
+        "stderr": {
+          "bytes": 191,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.perf.stderr",
+          "sha256": "541576e0329edea2ab0dd549b2431cb6d406e44ad52db16fdc5b1a87fe31efe5"
+        },
+        "stock_no_log": {
+          "bytes": 44,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.stock-no-log",
+          "sha256": "a384cfd115707fcd837ef0e3bb68771e20b54d0339cd8f13b871df8d86910d43"
+        },
+        "stock_script": {
+          "bytes": 731689,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.stock.perf-script-no-inline.txt",
+          "sha256": "0e76ef6321841901bf3962073988bd09eb379414411c44f3ea383aba9a653b69"
+        },
+        "stock_stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.stock.perf.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "target_layout": {
+          "bytes": 4457,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.target-layout.json",
+          "sha256": "56976da599aa2e94e1d84195049d1783027f6c1d3b24797073f0200f2fc9051a"
+        },
+        "terminal": {
+          "bytes": 1796,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.terminal.json",
+          "sha256": "df0d0acd1879cb384d460e44b389f64a21a1417c7ffe80c9669fca0acde40796"
+        }
+      },
+      "child": 2,
+      "command": {
+        "argv": [
+          "/usr/bin/taskset",
+          "--cpu-list",
+          "31",
+          "/usr/bin/perf",
+          "record",
+          "--per-thread",
+          "-e",
+          "instructions:u",
+          "-c",
+          "1000000",
+          "-m",
+          "16M",
+          "--call-graph",
+          "dwarf,32768",
+          "--period",
+          "--timestamp",
+          "--sample-cpu",
+          "--buildid-all",
+          "--no-buildid-cache",
+          "--user-callchains",
+          "-o",
+          "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.perf.data",
+          "--",
+          "/usr/bin/python3.14",
+          "/home/zhuhe/litchi-performance-0970/tools/launch_baseline_v2.py",
+          "--metadata",
+          "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.launch.json",
+          "--requested-affinity",
+          "[31]",
+          "--",
+          "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+          "--case",
+          "docfloat",
+          "--input",
+          "/home/zhuhe/litchi-performance-0969/qa-core/test-data/ole/doc/FloatingPictures.doc",
+          "--edits",
+          "1",
+          "--retention",
+          "default",
+          "--warmup",
+          "5",
+          "--samples",
+          "80"
+        ],
+        "command_binding": {
+          "bytes": 1326,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.command.json",
+          "sha256": "f289856ac302f41c3c70e09bd316d21e5f38e2204e123931c52b08617cdfed22"
+        },
+        "cwd_policy": "inherited runner cwd; recorded before launch",
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "LD_PRELOAD": "absent",
+          "TZ": "UTC"
+        },
+        "launch": {
+          "actual_affinity": [
+            31
+          ],
+          "exec_path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+          "exec_pid": 3764466,
+          "execve": true,
+          "pid": 3764466,
+          "requested_affinity": [
+            31
+          ]
+        },
+        "launch_binding": {
+          "bytes": 1126,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.launch.json",
+          "sha256": "bbc3e30f537aa1eec29e67baa012c0a32ad30ac8177ee9faa93b440b21571e02"
+        },
+        "working_directory": "/home/zhuhe/code/litchi"
+      },
+      "decoder_controls": {
+        "all_mode_period_sum_equal_raw": true,
+        "all_mode_sample_count_equal_raw": true,
+        "corrected_has_marker_ancestry": true,
+        "raw_vs_terminal_loss": {
+          "kept_as_separate_gates": true,
+          "raw_perf_record_lost_sum": 184,
+          "terminal_perf_record_lost_samples": 184
+        },
+        "stock_noop_control_stdout_sha256": [
+          null,
+          null
+        ],
+        "stock_noop_file_byte_identical": true,
+        "stock_noop_metric_identity": true
+      },
+      "decoder_modes": {
+        "corrected": {
+          "deepest_resolved_proxy_owner_count": 139,
+          "deepest_resolved_proxy_top10": [
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::sprm::parse_sprms",
+              "period": 125000000
+            },
+            {
+              "owner": "/usr/lib/x86_64-linux-gnu/libc.so.6::__memmove_avx512_unaligned_erms",
+              "period": 110000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::parts::text::TextExtractor::new",
+              "period": 71000000
+            },
+            {
+              "owner": "/usr/lib/x86_64-linux-gnu/libc.so.6::_int_malloc",
+              "period": 52000000
+            },
+            {
+              "owner": "/usr/lib/x86_64-linux-gnu/libc.so.6::_int_free_merge_chunk",
+              "period": 42000000
+            },
+            {
+              "owner": "/usr/lib/x86_64-linux-gnu/libc.so.6::cfree@GLIBC_2.2.5",
+              "period": 38000000
+            },
+            {
+              "owner": "/usr/lib/x86_64-linux-gnu/libc.so.6::unlink_chunk.isra.0",
+              "period": 29000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::parts::pap_bin_table::PapBinTable::parse",
+              "period": 28000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::parts::proofing::ProofingStateTable::parse_bytes_with_max_cp",
+              "period": 17000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_cfb::file::SectorChainScratch::collect_bounded",
+              "period": 15000000
+            }
+          ],
+          "empty_callchain_count": 129,
+          "explicit_stack_truncated_count": 0,
+          "inclusive_marker_ancestor_coverage_period_sum": 8873000000,
+          "inclusive_marker_ancestor_note": "per-owner marker coverage; owners overlap and must not be summed as attribution",
+          "inclusive_marker_ancestor_owner_count": 264,
+          "inclusive_marker_ancestor_top10": [
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::doc_retention_probe_0942_cfb_profile::profiled_measured_case",
+              "period": 895000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::doc_retention_probe_0942_cfb_profile::run_case",
+              "period": 895000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::doc_retention_probe_0942_cfb_profile::measure_one",
+              "period": 862000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::doc_retention_probe_0942_cfb_profile::run",
+              "period": 755000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::package::codec::<impl litchi_doc::package::model::Package<R>>::validate_ole_file",
+              "period": 414000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::body_text::Edit::commit",
+              "period": 310000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::body_text::Snapshot::open_bounded",
+              "period": 307000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::body_text::Snapshot::open_bounded_with_policy",
+              "period": 302000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::tracked_revision::package::RevisionEditor::open_with_ole_file_with_policy",
+              "period": 253000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::document::package::<impl litchi_doc::document::model::state::Document>::from_ole_with_options",
+              "period": 196000000
+            }
+          ],
+          "lost_events": 184,
+          "marker_ancestry": "observed",
+          "marker_no_resolved_frame_samples": 0,
+          "marker_period": 895000000,
+          "marker_period_share": 0.13249444855662473,
+          "marker_sample_count": 895,
+          "marker_unknown_physical_leaf_samples": 0,
+          "physical_leaf_classified_period": 895000000,
+          "physical_leaf_owner_count": 139,
+          "physical_leaf_top10": [
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::sprm::parse_sprms",
+              "period": 125000000
+            },
+            {
+              "owner": "/usr/lib/x86_64-linux-gnu/libc.so.6::__memmove_avx512_unaligned_erms",
+              "period": 110000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::parts::text::TextExtractor::new",
+              "period": 71000000
+            },
+            {
+              "owner": "/usr/lib/x86_64-linux-gnu/libc.so.6::_int_malloc",
+              "period": 52000000
+            },
+            {
+              "owner": "/usr/lib/x86_64-linux-gnu/libc.so.6::_int_free_merge_chunk",
+              "period": 42000000
+            },
+            {
+              "owner": "/usr/lib/x86_64-linux-gnu/libc.so.6::cfree@GLIBC_2.2.5",
+              "period": 38000000
+            },
+            {
+              "owner": "/usr/lib/x86_64-linux-gnu/libc.so.6::unlink_chunk.isra.0",
+              "period": 29000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::parts::pap_bin_table::PapBinTable::parse",
+              "period": 28000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::parts::proofing::ProofingStateTable::parse_bytes_with_max_cp",
+              "period": 17000000
+            },
+            {
+              "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_cfb::file::SectorChainScratch::collect_bounded",
+              "period": 15000000
+            }
+          ],
+          "physical_leaf_unknown_period": 0,
+          "physical_leaf_unknown_samples": 0,
+          "sample_count": 6755,
+          "stack_truncated": 0,
+          "total_period": 6755000000,
+          "unresolved_frames": 80
+        },
+        "noop": {
+          "deepest_resolved_proxy_owner_count": 0,
+          "deepest_resolved_proxy_top10": [],
+          "empty_callchain_count": 4557,
+          "explicit_stack_truncated_count": 0,
+          "inclusive_marker_ancestor_coverage_period_sum": 0,
+          "inclusive_marker_ancestor_note": "per-owner marker coverage; owners overlap and must not be summed as attribution",
+          "inclusive_marker_ancestor_owner_count": 0,
+          "inclusive_marker_ancestor_top10": [],
+          "lost_events": 184,
+          "marker_ancestry": "no observed marker ancestry",
+          "marker_no_resolved_frame_samples": 0,
+          "marker_period": 0,
+          "marker_period_share": 0.0,
+          "marker_sample_count": 0,
+          "marker_unknown_physical_leaf_samples": 0,
+          "physical_leaf_classified_period": 0,
+          "physical_leaf_owner_count": 0,
+          "physical_leaf_top10": [],
+          "physical_leaf_unknown_period": 0,
+          "physical_leaf_unknown_samples": 0,
+          "sample_count": 6755,
+          "stack_truncated": 0,
+          "total_period": 6755000000,
+          "unresolved_frames": 101
+        },
+        "stock": {
+          "deepest_resolved_proxy_owner_count": 0,
+          "deepest_resolved_proxy_top10": [],
+          "empty_callchain_count": 4557,
+          "explicit_stack_truncated_count": 0,
+          "inclusive_marker_ancestor_coverage_period_sum": 0,
+          "inclusive_marker_ancestor_note": "per-owner marker coverage; owners overlap and must not be summed as attribution",
+          "inclusive_marker_ancestor_owner_count": 0,
+          "inclusive_marker_ancestor_top10": [],
+          "lost_events": 184,
+          "marker_ancestry": "no observed marker ancestry",
+          "marker_no_resolved_frame_samples": 0,
+          "marker_period": 0,
+          "marker_period_share": 0.0,
+          "marker_sample_count": 0,
+          "marker_unknown_physical_leaf_samples": 0,
+          "physical_leaf_classified_period": 0,
+          "physical_leaf_owner_count": 0,
+          "physical_leaf_top10": [],
+          "physical_leaf_unknown_period": 0,
+          "physical_leaf_unknown_samples": 0,
+          "sample_count": 6755,
+          "stack_truncated": 0,
+          "total_period": 6755000000,
+          "unresolved_frames": 101
+        }
+      },
+      "empty_chain_coverage": {
+        "corrected_empty": 129,
+        "coverage_limit": "These are exported/decoded callchain coverage counts, not a causal diagnosis of perf capture, unwinding, or symbolization loss.",
+        "definition": "empty_callchain_count is the parser count of decoded sample records with no parsed frame lines; explicit stack truncation is counted separately",
+        "noop_empty": 4557,
+        "not_established": [
+          "why individual samples have no frame lines",
+          "whether missing frames arose during capture, unwind, export, or resolution"
+        ],
+        "raw_sample_denominator": 6755,
+        "stock_empty": 4557,
+        "stock_noop_scripts_byte_identical": true
+      },
+      "failure_record": {
+        "child": 2,
+        "error": "raw PERF_RECORD_LOST sum is nonzero: 184",
+        "reason": "child_failed",
+        "type": "ProtocolError"
+      },
+      "packet_admission": "absent_after_decoder_outputs",
+      "packet_present": false,
+      "packet_reconciliation": {
+        "present": false
+      },
+      "raw_stack": {
+        "binding": {
+          "bytes": 5489,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.raw-stack.json",
+          "sha256": "474083e6891eaf37569e805cbc370eb85a886b9668574a7e6ac379966009ce11"
+        },
+        "bounds_valid": true,
+        "period": 1000000,
+        "period_valid": true,
+        "pid_tid_cpu_counts": {
+          "3764466/3764466@31": 6755
+        },
+        "pid_tid_cpu_valid": true,
+        "raw_event_count": 7097,
+        "raw_lost_record_count": 23,
+        "raw_lost_scope": "sum of PERF_RECORD_LOST lost fields; PERF_RECORD_LOST_SAMPLES is not added",
+        "raw_lost_sum": 184,
+        "record_type_counts": {
+          "9": 6755
+        },
+        "sample_count": 6755,
+        "sample_line_count": 6755,
+        "sample_type": "IP|TID|TIME|CALLCHAIN|CPU|PERIOD|REGS_USER|STACK_USER",
+        "schema": "litchi.performance.0973.raw_stack.v2",
+        "scope": {
+          "all_perf_record_sample_records": true,
+          "misc_filter": null,
+          "no_live_ancestry_claim": true,
+          "stack_bytes_are_potential_values_only": true
+        },
+        "stack_cap": 32768,
+        "status": "complete",
+        "task_scope_interpretation": {
+          "complete_lifetime_proof": false,
+          "kind": "parser_of_retained_records_only",
+          "reason": "nonzero raw PERF_RECORD_LOST means task/lifecycle records may be missing; parser pass is only an observation of retained records"
+        },
+        "task_stream": {
+          "authority": "zero-loss raw task stream is lifetime authority; /proc snapshots are bounded observations only",
+          "comm_records": [
+            {
+              "comm": "perf-exec",
+              "pid": 3764466,
+              "tid": 3764466
+            },
+            {
+              "comm": "python3.14",
+              "pid": 3764466,
+              "tid": 3764466
+            },
+            {
+              "comm": "doc_retention_p",
+              "pid": 3764466,
+              "tid": 3764466
+            }
+          ],
+          "cpu_maps": [
+            "-1"
+          ],
+          "errors": [],
+          "event_counts": {
+            "COMM": 3,
+            "CPU_MAP": 1,
+            "EXIT": 1,
+            "THREAD_MAP": 1
+          },
+          "exit_records": [
+            {
+              "pid": 3764466,
+              "ppid": 3764465,
+              "ptid": 3764465,
+              "tid": 3764466
+            }
+          ],
+          "expected_pid": 3764466,
+          "missing_required_comm_names": [],
+          "scope": "raw perf task/lifecycle records for target PID only; no unrelated process scan",
+          "status": "pass",
+          "thread_maps": [
+            {
+              "nr": 1,
+              "threads": [
+                3764466
+              ]
+            }
+          ]
+        },
+        "unconsumed_raw_count": 342,
+        "violations": []
+      },
+      "report": {
+        "allocator_instrumented": false,
+        "allocator_timing_claim": false,
+        "binding": {
+          "bytes": 292316,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.report.json",
+          "sha256": "30fc186214b4cfbaae10e0fae66f5f6eef883e20952e91892e36d6efd6dcbed9"
+        },
+        "case": "docfloat",
+        "correctness": {
+          "false_keys": [],
+          "gate_count": 20,
+          "true_count": 20
+        },
+        "edits": 1,
+        "elapsed_ns": {
+          "count": 80,
+          "max": 5405827,
+          "min": 1137985,
+          "sum": 107516015
+        },
+        "output": {
+          "bytes": 342528,
+          "capacity": 342528,
+          "exact_output_equal_reference": true,
+          "sha256": "6ba1bc972d66715e76d882f47c587b22000100f47abaa88428990619fc59fa20"
+        },
+        "retention": "default_8mib",
+        "retention_ceiling_bytes": 8388608,
+        "routes": [
+          {
+            "final_retained_before_commit": null,
+            "output_bytes": 342528,
+            "output_capacity": 342528,
+            "retention": "zero",
+            "retention_ceiling_bytes": 0,
+            "semantic_change_count": 1
+          },
+          {
+            "final_retained_before_commit": 587776,
+            "output_bytes": 342528,
+            "output_capacity": 342528,
+            "retention": "default_8mib",
+            "retention_ceiling_bytes": 8388608,
+            "semantic_change_count": 1
+          },
+          {
+            "final_retained_before_commit": null,
+            "output_bytes": 342528,
+            "output_capacity": 342528,
+            "retention": "release_8mib",
+            "retention_ceiling_bytes": 8388608,
+            "semantic_change_count": 1
+          }
+        ],
+        "samples_requested": 80,
+        "schema": "litchi.performance.0917.doc_retention.v1",
+        "source": {
+          "bytes": 335360,
+          "path": "/home/zhuhe/litchi-performance-0969/qa-core/test-data/ole/doc/FloatingPictures.doc",
+          "sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d"
+        },
+        "timing_claim": true,
+        "warmups": 5
+      },
+      "target_layout": {
+        "binary": {
+          "bytes": 47909224,
+          "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+          "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+        },
+        "binding": {
+          "bytes": 4457,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.target-layout.json",
+          "sha256": "56976da599aa2e94e1d84195049d1783027f6c1d3b24797073f0200f2fc9051a"
+        },
+        "corrected_base": "0x592345caf000",
+        "executable_mapping": {
+          "build_id": "e5c457384eeebd057932c444efda77618f137399",
+          "length": 2654208,
+          "line": 320737,
+          "meta": "<e5c457384eeebd057932c444efda77618f137399>",
+          "offset": 933888,
+          "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+          "permissions": "r-xp",
+          "pid": 3764466,
+          "start": 98008030593024
+        },
+        "perf_expected_start": "0x592345cb0000",
+        "process_tree": {
+          "fork_records": [],
+          "unexpected_children": 0
+        },
+        "schema": "litchi.performance.0973.target_layout.v2"
+      },
+      "terminal": {
+        "binding": {
+          "bytes": 1796,
+          "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.terminal.json",
+          "sha256": "df0d0acd1879cb384d460e44b389f64a21a1417c7ffe80c9669fca0acde40796"
+        },
+        "finished_utc": "2026-10-08T05:36:19.238988+00:00",
+        "launch_error": false,
+        "lost_samples_summary": {
+          "argv": [
+            "/usr/bin/perf",
+            "report",
+            "--stdio",
+            "--percent-limit",
+            "100",
+            "-i",
+            "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.perf.data"
+          ],
+          "lost_samples": 184,
+          "record_type": "PERF_RECORD_LOST_SAMPLES",
+          "source": "perf report --stdio terminal summary"
+        },
+        "native_ld_preload": "absent",
+        "perf_record_stderr": {
+          "binding": {
+            "bytes": 191,
+            "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.perf.stderr",
+            "sha256": "541576e0329edea2ab0dd549b2431cb6d406e44ad52db16fdc5b1a87fe31efe5"
+          },
+          "tail_lines": [
+            "[ perf record: Woken up 27 times to write data ]",
+            "[ perf record: Captured and wrote 212.673 MB /home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.perf.data ]"
+          ]
+        },
+        "process_pid": 3764465,
+        "returncode": 0,
+        "schema": "litchi.performance.0973.terminal.v2",
+        "started_utc": "2026-10-08T05:36:18.319503+00:00",
+        "timed_out": false
+      }
+    }
+  ],
+  "created_utc": "2026-10-08T05:41:57.299613+00:00",
+  "custody": {
+    "analysis_helper": {
+      "bytes": 26108,
+      "path": "/home/zhuhe/litchi-performance-0975/tools/analyze_failed_capture_0975_v3.py",
+      "sha256": "860ede12c2e9c9ce80dd394ec9195b291743354066404d6652eb390b6c42c85f"
+    },
+    "decoder_empty_chain_definition": {
+      "empty_callchain_assignment_lines": [
+        348
+      ],
+      "empty_callchain_definition_lines": [
+        346
+      ],
+      "explicit_truncation_definition_lines": [
+        341
+      ],
+      "meaning": "the count is made from decoded samples whose parser frame list is empty; it does not identify why frames were absent",
+      "parser_binding": {
+        "bytes": 39589,
+        "path": "/home/zhuhe/litchi-performance-0973/tools-v2/protocol_common_0973_v2.py",
+        "sha256": "56b509fde01bbd66702ac8cd835da0d09d74d332935926078c6545093ed52bf4"
+      }
+    },
+    "decoder_parser": {
+      "bytes": 39589,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/protocol_common_0973_v2.py",
+      "sha256": "56b509fde01bbd66702ac8cd835da0d09d74d332935926078c6545093ed52bf4"
+    },
+    "design": {
+      "bytes": 2118,
+      "path": "/home/zhuhe/litchi-performance-0975/design-0975-v1.md",
+      "sha256": "41a7678d226872aef1eeb346d51eb764c4261362fff2c856c510af97532d1d77"
+    },
+    "manifest": {
+      "bytes": 644,
+      "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/capture-manifest-v2.json",
+      "sha256": "8e56977349b453fc805b4a83f6b4c2d856652fcbb1eca4a63180ea14597ee128"
+    },
+    "plan": {
+      "bytes": 22790,
+      "path": "/home/zhuhe/litchi-performance-0975/plans/plan-0975-pre-capture-v3.json",
+      "sha256": "4873e502f09a3f4572ecd28d7545541e7cf7d27738c788d46fecb97293d36f97"
+    },
+    "root_go": {
+      "bytes": 5060,
+      "path": "/home/zhuhe/litchi-performance-0975/receipts/root-go-0975-v1.json",
+      "sha256": "4b10643a983b525d9169e1a09697806bf76ba8eb7df7db2783349b88c3b23c54"
+    },
+    "root_terminal": {
+      "bytes": 1342,
+      "path": "/home/zhuhe/litchi-performance-0975/receipts/root-terminal-0975-v1.json",
+      "sha256": "57b2ac380aba4e23fc24638e30a63a326f6a935306cfc3c1c70b7bafc07ecfbe"
+    },
+    "runner_log": {
+      "bytes": 965,
+      "path": "/home/zhuhe/litchi-performance-0975/runner-0975-v1.log",
+      "sha256": "79ded9e944305d9abe9a53bf8e29a8d9d7cf97594f71ccf2a2059dffc78b5983"
+    },
+    "write_admission_order": {
+      "adapter_binding": {
+        "bytes": 35075,
+        "path": "/home/zhuhe/litchi-performance-0974/tools/protocol_adapter_0974_v5.py",
+        "sha256": "e3725cbc027d2a063f32b926e3fb4024d640aab2a2fbd7493ed5325de9ea2ac6"
+      },
+      "interpretation": "retained adapter checks raw/task artifacts and calls require_zero_loss while admitting a complete packet; a nonzero raw sum therefore raises after decoder artifacts exist and before a packet is written",
+      "packet_write_hook_line": [
+        466
+      ],
+      "raw_summary_load_line": [
+        477
+      ],
+      "require_zero_loss_line": [
+        483
+      ],
+      "runner_binding": {
+        "bytes": 1841,
+        "path": "/home/zhuhe/litchi-performance-0974/tools/run_0974_v5.py",
+        "sha256": "519a7b88cf6df7688d1b4555fbd3b2d682c2459bc6c070817308ba38031d4fe1"
+      }
+    }
+  },
+  "interpretation": {
+    "child_01": "one admitted child with descriptive decoder coverage; no cohort or speed claim",
+    "child_02": "decoder outputs are retained for audit only; raw loss 184 makes the child inadmissible and no packet was written",
+    "empty_callchains": "remaining empty counts quantify exported/decoded frame coverage only; no cause is assigned",
+    "owners": "corrected physical/deepest tables are bounded descriptive observations; inclusive owner rows overlap and are not additive"
+  },
+  "raw_loss_audit": {
+    "child_01_zero_loss": true,
+    "child_02_packet_absence_reason": "raw PERF_RECORD_LOST sum is nonzero; complete decoder outputs exist, then packet admission require_zero_loss raised before packet write",
+    "child_02_zero_loss": false,
+    "children": [
+      {
+        "child": 1,
+        "raw_and_terminal_are_separate": true,
+        "raw_gate_passed": true,
+        "raw_perf_record_lost_record_count": 0,
+        "raw_perf_record_lost_sum": 0,
+        "terminal_gate_passed": true,
+        "terminal_perf_record_lost_samples": 0,
+        "terminal_trailer": {
+          "argv": [
+            "/usr/bin/perf",
+            "report",
+            "--stdio",
+            "--percent-limit",
+            "100",
+            "-i",
+            "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.perf.data"
+          ],
+          "lost_samples": 0,
+          "record_type": "PERF_RECORD_LOST_SAMPLES",
+          "source": "perf report --stdio terminal summary"
+        }
+      },
+      {
+        "child": 2,
+        "raw_and_terminal_are_separate": true,
+        "raw_gate_passed": false,
+        "raw_perf_record_lost_record_count": 23,
+        "raw_perf_record_lost_sum": 184,
+        "terminal_gate_passed": false,
+        "terminal_perf_record_lost_samples": 184,
+        "terminal_trailer": {
+          "argv": [
+            "/usr/bin/perf",
+            "report",
+            "--stdio",
+            "--percent-limit",
+            "100",
+            "-i",
+            "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.perf.data"
+          ],
+          "lost_samples": 184,
+          "record_type": "PERF_RECORD_LOST_SAMPLES",
+          "source": "perf report --stdio terminal summary"
+        }
+      }
+    ],
+    "raw_record_count_vector": [
+      0,
+      23
+    ],
+    "raw_sum_vector": [
+      0,
+      184
+    ],
+    "terminal_lost_samples_vector": [
+      0,
+      184
+    ]
+  },
+  "schema": "litchi.performance.0975.failed_capture_analysis.v1",
+  "scope": {
+    "all_12_reduction_performed": false,
+    "capture_root": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1",
+    "children_examined": [
+      1,
+      2
+    ],
+    "children_not_launched": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "children_requested": 12,
+    "native_or_build_invoked_by_this_tool": false,
+    "performance_or_adoption_claim": false
+  },
+  "status": "complete_descriptive_only"
+}

@@ -1,0 +1,146 @@
+{
+  "binary": {
+    "bytes": 47909224,
+    "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+    "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+  },
+  "corrected_base": "0x592345caf000",
+  "elf": {
+    "class": "ELF64",
+    "data": "little",
+    "lowest_load_vaddr_page": 0,
+    "machine": 62,
+    "page_size": 4096,
+    "pt_loads": [
+      {
+        "align": 4096,
+        "filesz": 936428,
+        "flags": 4,
+        "index": 2,
+        "memsz": 936428,
+        "offset": 0,
+        "offset_page": 0,
+        "vaddr": 0,
+        "vaddr_page": 0
+      },
+      {
+        "align": 4096,
+        "filesz": 2649968,
+        "flags": 5,
+        "index": 3,
+        "memsz": 2649968,
+        "offset": 936432,
+        "offset_page": 933888,
+        "vaddr": 940528,
+        "vaddr_page": 937984
+      },
+      {
+        "align": 4096,
+        "filesz": 47664,
+        "flags": 6,
+        "index": 4,
+        "memsz": 50848,
+        "offset": 3586400,
+        "offset_page": 3584000,
+        "vaddr": 3594592,
+        "vaddr_page": 3592192
+      },
+      {
+        "align": 4096,
+        "filesz": 2568,
+        "flags": 6,
+        "index": 5,
+        "memsz": 2888,
+        "offset": 3634064,
+        "offset_page": 3633152,
+        "vaddr": 3646352,
+        "vaddr_page": 3645440
+      }
+    ],
+    "type": 3
+  },
+  "executable_mapping": {
+    "build_id": "e5c457384eeebd057932c444efda77618f137399",
+    "length": 2654208,
+    "line": 320737,
+    "meta": "<e5c457384eeebd057932c444efda77618f137399>",
+    "offset": 933888,
+    "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+    "permissions": "r-xp",
+    "pid": 3764466,
+    "start": 98008030593024
+  },
+  "formulas": {
+    "corrected_base": "selected_mmap.start - page_down(PT_LOAD.p_vaddr); equal for every PT_LOAD",
+    "perf_expected_start": "executable_selected_mmap.start - executable_selected_mmap.offset"
+  },
+  "perf_data": {
+    "bytes": 223044216,
+    "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.perf.data",
+    "sha256": "ed9d2970672312d10c1676b242ad33f61bea42ee659082dc33e1d68581b0103b"
+  },
+  "perf_expected_start": "0x592345cb0000",
+  "perf_mmap_dump": {
+    "argv": [
+      "/usr/bin/perf",
+      "script",
+      "-D",
+      "-i",
+      "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-02/child-02.perf.data"
+    ],
+    "bytes": 1067696569,
+    "returncode": 0,
+    "sha256": "e36c766b465db187c676915b8e48fc20efe14cdb9b583de012638a2180923100"
+  },
+  "process_tree": {
+    "fork_records": [],
+    "unexpected_children": 0
+  },
+  "schema": "litchi.performance.0973.target_layout.v2",
+  "target_mmap2": [
+    {
+      "build_id": "e5c457384eeebd057932c444efda77618f137399",
+      "length": 3649536,
+      "line": 320718,
+      "meta": "<e5c457384eeebd057932c444efda77618f137399>",
+      "offset": 0,
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "permissions": "r--p",
+      "pid": 3764466,
+      "start": 98008029655040
+    },
+    {
+      "build_id": "e5c457384eeebd057932c444efda77618f137399",
+      "length": 2654208,
+      "line": 320737,
+      "meta": "<e5c457384eeebd057932c444efda77618f137399>",
+      "offset": 933888,
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "permissions": "r-xp",
+      "pid": 3764466,
+      "start": 98008030593024
+    },
+    {
+      "build_id": "e5c457384eeebd057932c444efda77618f137399",
+      "length": 53248,
+      "line": 320756,
+      "meta": "<e5c457384eeebd057932c444efda77618f137399>",
+      "offset": 3584000,
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "permissions": "rw-p",
+      "pid": 3764466,
+      "start": 98008033247232
+    },
+    {
+      "build_id": "e5c457384eeebd057932c444efda77618f137399",
+      "length": 4096,
+      "line": 320775,
+      "meta": "<e5c457384eeebd057932c444efda77618f137399>",
+      "offset": 3633152,
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "permissions": "rw-p",
+      "pid": 3764466,
+      "start": 98008033300480
+    }
+  ]
+}

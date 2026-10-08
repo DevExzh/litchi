@@ -1,0 +1,107 @@
+{
+  "build_started": false,
+  "commands": [
+    {
+      "argv": [
+        "python3",
+        "-m",
+        "py_compile",
+        "tools/plan_binding_0975.py",
+        "tools/prepare_plan_0975.py",
+        "tools/run_0975.py",
+        "tools/reduce_0975.py"
+      ],
+      "name": "python_compile",
+      "output": "no output",
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "python3",
+        "tools/plan_binding_0975.py",
+        "--plan",
+        "/home/zhuhe/litchi-performance-0975/plans/plan-0975-pre-capture-v3.json"
+      ],
+      "name": "plan_binding",
+      "output": {
+        "dependency_count": 9,
+        "status": "pass"
+      },
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "python3",
+        "tools/run_0975.py",
+        "--check-plan",
+        "/home/zhuhe/litchi-performance-0975/plans/plan-0975-pre-capture-v3.json"
+      ],
+      "name": "runner_check_plan",
+      "output": {
+        "plan_sha256": "4873e502f09a3f4572ecd28d7545541e7cf7d27738c788d46fecb97293d36f97",
+        "schema": "litchi.performance.0974.plan.v3",
+        "status": "pass"
+      },
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "python3",
+        "tools/reduce_0975.py",
+        "--self-test"
+      ],
+      "name": "reducer_self_test",
+      "output": {
+        "children": 12,
+        "schema": "litchi.performance.0974.reducer_self_test.v4",
+        "status": "pass",
+        "workload_started": false
+      },
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "python3",
+        "tools/reduce_0975.py",
+        "--admission-self-test",
+        "--plan",
+        "/home/zhuhe/litchi-performance-0975/plans/plan-0975-pre-capture-v3.json"
+      ],
+      "name": "reducer_admission_self_test",
+      "output": {
+        "checks": [
+          "raw/header reparse",
+          "recorded post-exit snapshots",
+          "exact native argv",
+          "environment/cwd custody",
+          "separate loss gates",
+          "missing --per-thread rejection"
+        ],
+        "children": 12,
+        "schema": "litchi.performance.0974.reducer_admission_self_test.v4",
+        "status": "pass",
+        "workload_started": false
+      },
+      "returncode": 0
+    }
+  ],
+  "helper_seal": {
+    "bytes": 6340,
+    "path": "/home/zhuhe/litchi-performance-0975/receipts/helper-seal-0975-v3.json",
+    "sha256": "9af5da6061066645d1b7d8e40b712f39113f7c7b53e16c5b3c713793f5ac5687"
+  },
+  "launch_boundary_receipt": {
+    "bytes": 11817,
+    "path": "/home/zhuhe/litchi-performance-0975/receipts/launch-boundary-regression-0975-v1.json",
+    "sha256": "a9359c2da7b298b1a49b01c33378b5ca182736c7793877e668bc8bbc38b850e5"
+  },
+  "launch_boundary_scope": "actual retained BASE_RUNNER.run_child with only Popen intercepted; no run_child replacement, native process, workload, build, or capture",
+  "plan": {
+    "bytes": 22790,
+    "path": "/home/zhuhe/litchi-performance-0975/plans/plan-0975-pre-capture-v3.json",
+    "sha256": "4873e502f09a3f4572ecd28d7545541e7cf7d27738c788d46fecb97293d36f97"
+  },
+  "schema": "litchi.performance.0975.preflight_tests.v1",
+  "status": "pass",
+  "workload_started": false
+}

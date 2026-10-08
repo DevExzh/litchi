@@ -1,0 +1,18 @@
+--- tool hashes ---
+174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b  /usr/bin/perf
+f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2  /usr/bin/taskset
+be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd  /usr/bin/python3.14
+deadd5bb984a1153139afd09ee4e01100fbe2196d4f98ec7978674e2c83a4b97  /usr/bin/true
+--- cgroup identity ---
+0::/user.slice/user-1001.slice/user@1001.service/tmux-spawn-3a22b971-8fd0-4c28-9367-732dd8523549.scope
+TARGET         FSTYPE  OPTIONS
+/sys/fs/cgroup cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate,memory_recursiveprot,memory_hugetlb_accounting
+/sys/fs/cgroup/cpu.max absent
+/sys/fs/cgroup/cpu.weight absent
+/sys/fs/cgroup/cpuset.cpus.effective=0-31
+resolved_cgroup=/sys/fs/cgroup/user.slice/user-1001.slice/user@1001.service/tmux-spawn-3a22b971-8fd0-4c28-9367-732dd8523549.scope
+/sys/fs/cgroup/user.slice/user-1001.slice/user@1001.service/tmux-spawn-3a22b971-8fd0-4c28-9367-732dd8523549.scope/cpu.max=max 100000
+/sys/fs/cgroup/user.slice/user-1001.slice/user@1001.service/tmux-spawn-3a22b971-8fd0-4c28-9367-732dd8523549.scope/cpu.weight=100
+/sys/fs/cgroup/user.slice/user-1001.slice/user@1001.service/tmux-spawn-3a22b971-8fd0-4c28-9367-732dd8523549.scope/cpuset.cpus.effective absent
+/sys/fs/cgroup/user.slice/user-1001.slice/user@1001.service/tmux-spawn-3a22b971-8fd0-4c28-9367-732dd8523549.scope/memory.max=max
+/sys/fs/cgroup/user.slice/user-1001.slice/user@1001.service/tmux-spawn-3a22b971-8fd0-4c28-9367-732dd8523549.scope/memory.current=120543727616

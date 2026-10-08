@@ -1,0 +1,18 @@
+--- uname ---
+Linux ip-172-31-39-190 7.0.0-1013-aws #13-Ubuntu SMP PREEMPT Fri Sep  4 17:02:11 UTC 2026 x86_64 GNU/Linux
+--- cpu online/possible ---
+0-31
+0-31
+--- shell affinity ---
+pid 3760083's current affinity list: 0-31
+Cpus_allowed_list:	0-31
+--- perf settings ---
+1
+516
+--- shell rlimits ---
+8192
+8192
+--- disk ---
+Filesystem          1-blocks          Used    Available Capacity Mounted on
+/dev/root      2081881157632 1720556032000 361308348416      83% /
+/dev/root      2081881157632 1720556032000 361308348416      83% /
