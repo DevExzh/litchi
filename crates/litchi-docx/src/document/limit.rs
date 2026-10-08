@@ -7,6 +7,8 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum LimitKind {
+    /// Conservative staging bound for generated formatting XML and property plans.
+    FormattingStagingBytes,
     /// Aggregate payload bytes in a durable transfer graph.
     TransferGraphBytes,
     /// XML bytes.
@@ -138,6 +140,7 @@ pub enum LimitKind {
 impl std::fmt::Display for LimitKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
+            Self::FormattingStagingBytes => "formatting staging bytes",
             Self::TransferGraphBytes => "transfer graph bytes",
             Self::XmlBytes => "XML bytes",
             Self::XmlDepth => "XML depth",

@@ -63,6 +63,20 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "formatting"
+path = "fuzz_targets/formatting.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "smoke_formatting"
+path = "fuzz_targets/smoke_formatting.rs"
+test = false
+doc = false
+bench = false
+
 [profile.release]
 debug = 1
 codegen-units = 1

@@ -478,5 +478,26 @@ inert inline content by resolved namespace and name. Retained XML views resolve
 ancestor namespace bindings. Property values that fail supported schema parsing
 are reported through `invalid_properties`, not repaired into defaults.
 
-Formatting writes, effective relationship integration, caller semantic limits,
-canonical owner consolidation and complete family registration remain pending.
+Record 0046 adds direct-body formatting and paragraph/run structural writes.
+Effective relationship integration, caller semantic limits, canonical owner
+consolidation and complete family registration remain pending.
+
+
+## 27. DOCX formatting and body structure (record 0046)
+
+Package-bound `document::Edit<P>` now exposes `format_run`, `format_paragraph`,
+`insert_formatted_paragraph`, `move_paragraph`, `remove_paragraph`, `insert_run`,
+`append_run` and `remove_run`. `BodyAnchor` addresses a gap relative to a typed
+`BodyBlock` or the body end; block kinds retain separate checked `Position`
+sequences. Run positions here count direct run children, matching
+`replace_run_text`; the broader navigation set remains `addressable_runs`.
+
+`NewParagraph` and `NewRun` carry text and typed local properties for these edit
+operations. They are not additional package owners or transaction families.
+Public transactions retain the existing `commit().into_package()` and immutable
+`apply(&patch)` paths. XML-only callers still use `document::snapshot::Edit`.
+
+`LimitKind::FormattingStagingBytes` identifies a conservative fixed staging
+bound for property plans and generated markup. Managed formatting operations
+currently refuse; caller-selected semantic limits and managed retention remain
+required before the primary transaction family can be registered complete.

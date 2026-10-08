@@ -4,6 +4,9 @@
 mod attribute_tests;
 mod debug;
 mod durable;
+mod formatting;
+#[cfg(test)]
+mod formatting_tests;
 #[cfg(test)]
 mod publication_proof_tests;
 #[cfg(test)]
@@ -34,6 +37,7 @@ use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 pub(crate) use durable::durable_transfer_operations;
 pub use durable::{Composition, History, JoinError, PreparedEdit, ThreeWayError, ThreeWayPlan};
+pub use formatting::{BodyAnchor, BodyBlock, NewParagraph, NewRun};
 pub use litchi_core::patch::{
     CompositionLimits, HistoryLimits, MergeChoice, SubEditConflict, SubEditJoinFailure,
     ThreeWayMergeFailure,
@@ -119,6 +123,38 @@ pub enum Refusal {
     /// The requested text needs structural run elements such as `w:tab` or
     /// `w:br`, which this focused text operation does not synthesize.
     StructuralText,
+    /// A requested property value is outside the schema domain the property
+    /// readers accept (a negative size, a text scale above 600 percent, an
+    /// outline level above 9, a character XML cannot carry).
+    InvalidPropertyValue,
+    /// A requested property value has only a Transitional spelling (`left`
+    /// or `right` alignment, indentation, or tab stops, or a Transitional
+    /// text direction) and the document is Strict.
+    TransitionalValue,
+    /// The property element that has to change is written more than once,
+    /// so which occurrence a consumer honours is not proven.
+    DuplicateProperty,
+    /// The change would drop change-tracking markup (`w:ins`, `w:del`,
+    /// `w:moveFrom`, `w:moveTo`, a property-change snapshot, or a paragraph
+    /// mark revision).
+    TrackedChange,
+    /// No prefix bound to the WordprocessingML namespace is available for
+    /// the attributes the change has to write.
+    NamespaceBinding,
+    /// The paragraph carries section properties, so removing or moving it
+    /// would change the document's sections.
+    SectionBreak,
+    /// The content holds one end of a bookmark, comment, permission, move,
+    /// custom-XML or complex-field range whose other end lies outside it.
+    OpenRange,
+    /// Removing the content would orphan the comment, footnote or endnote
+    /// its reference anchors, or one side of a tracked move.
+    StoryReference,
+    /// The insertion point lies inside a complex field.
+    FieldInterior,
+    /// The body block an insertion or move is anchored to does not exist;
+    /// the error's position is the block's own position.
+    BlockNotFound,
 }
 
 impl std::fmt::Display for Refusal {
@@ -140,6 +176,24 @@ impl std::fmt::Display for Refusal {
             Self::ContentControlNotFound => "direct inline content control was not found",
             Self::CellNotFound => "table cell was not found",
             Self::StructuralText => "text requires structural WordprocessingML elements",
+            Self::InvalidPropertyValue => "property value is outside its schema domain",
+            Self::TransitionalValue => {
+                "property value has only a Transitional spelling and the document is Strict"
+            },
+            Self::DuplicateProperty => "property element is written more than once",
+            Self::TrackedChange => "change would drop change-tracking markup",
+            Self::NamespaceBinding => {
+                "no prefix is bound to the WordprocessingML namespace for the new attributes"
+            },
+            Self::SectionBreak => "paragraph carries section properties",
+            Self::OpenRange => {
+                "content holds one end of a range whose other end lies outside it"
+            },
+            Self::StoryReference => {
+                "removal would orphan a comment, note, or tracked move the content anchors"
+            },
+            Self::FieldInterior => "insertion point lies inside a complex field",
+            Self::BlockNotFound => "anchor block was not found",
         })
     }
 }
@@ -1058,7 +1112,17 @@ impl Snapshot {
         xml: Vec<u8>,
         splices: &[ParagraphSplice<'_>],
     ) -> Result<Self> {
-        match self.spliced_layout(xml.len(), splices)? {
+        self.with_spliced_paragraphs_under(xml, splices, SplicePolicy::SameShape)
+    }
+
+    /// [`Self::with_spliced_paragraphs`] under an explicit [`SplicePolicy`].
+    fn with_spliced_paragraphs_under(
+        &self,
+        xml: Vec<u8>,
+        splices: &[ParagraphSplice<'_>],
+        policy: SplicePolicy,
+    ) -> Result<Self> {
+        match self.spliced_layout_under(xml.len(), splices, policy)? {
             Some(layout) => Ok(self.with_spliced_layout(xml, layout)),
             None => self.with_rewritten_xml(xml),
         }
@@ -1069,10 +1133,21 @@ impl Snapshot {
     ///
     /// `None` is never a refusal: it routes the caller back to the full rescan,
     /// which keeps every typed error, limit and refusal exactly where it was.
+    #[cfg(test)]
     fn spliced_layout(
         &self,
         xml_len: usize,
         splices: &[ParagraphSplice<'_>],
+    ) -> Result<Option<SplicedLayout>> {
+        self.spliced_layout_under(xml_len, splices, SplicePolicy::SameShape)
+    }
+
+    /// [`Self::spliced_layout`] under an explicit [`SplicePolicy`].
+    fn spliced_layout_under(
+        &self,
+        xml_len: usize,
+        splices: &[ParagraphSplice<'_>],
+        policy: SplicePolicy,
     ) -> Result<Option<SplicedLayout>> {
         if splices.is_empty() || xml_len > MAX_DOCUMENT_XML_BYTES {
             return Ok(None);
@@ -1093,7 +1168,7 @@ impl Snapshot {
             let Some(before) = source.get(splice.start..splice.end) else {
                 return Ok(None);
             };
-            if !preserves_body_child_shape(before, splice.replacement) {
+            if !policy.admits(before, splice.replacement, xml_len) {
                 return Ok(None);
             }
             // Each paragraph's inherited-namespace snapshot is carried over
@@ -1178,6 +1253,328 @@ impl Snapshot {
         Ok(Some(SplicedLayout {
             paragraphs: paragraphs.into(),
             paragraph_namespaces: Arc::clone(&self.paragraph_namespaces),
+            tables,
+            block_controls,
+            content_end,
+        }))
+    }
+
+    /// Insert `fragment` at `offset`, a boundary between direct body children
+    /// at or before the body-final section properties, as direct-body
+    /// paragraph `position`, deriving the new layout instead of rescanning
+    /// the part when [`Self::inserted_layout`] proves it.
+    ///
+    /// The caller guarantees the boundary: an offset inside another body
+    /// child would make the derived layout wrong, so only the structure
+    /// operations, which take it from the body's own child list, call this.
+    fn with_inserted_paragraph(
+        &self,
+        xml: Vec<u8>,
+        offset: usize,
+        position: usize,
+        fragment: &[u8],
+        element: usize,
+    ) -> Result<Self> {
+        match self.inserted_layout(xml.len(), offset, position, fragment, element)? {
+            Some(layout) => Ok(self.with_spliced_layout(xml, layout)),
+            None => self.with_rewritten_xml(xml),
+        }
+    }
+
+    /// The layout [`scan_document`] would produce after inserting `fragment`
+    /// at body boundary `offset`, its first `element` bytes becoming
+    /// paragraph `position` and the rest whitespace the paragraph owns, or
+    /// `None` when it is not proven, which routes the caller to the rescan.
+    ///
+    /// The scanner's verdicts about the new child are those of
+    /// [`grows_body_child_within_limits`]: the fragment must be one balanced
+    /// element without declarations, processing instructions or a `body`
+    /// name, within the depth limit, in a part small enough that the element
+    /// limit cannot be reached. Its classification must be a
+    /// WordprocessingML `p`: its root's prefix must resolve to a
+    /// WordprocessingML namespace in the body's scope, which a neighbouring
+    /// direct-body paragraph without declarations of its own records, and the
+    /// new paragraph inherits exactly that scope. The body-final section
+    /// properties stay last because the offset is at or before them, and no
+    /// other child's classification or scope changes.
+    fn inserted_layout(
+        &self,
+        xml_len: usize,
+        offset: usize,
+        position: usize,
+        fragment: &[u8],
+        element: usize,
+    ) -> Result<Option<SplicedLayout>> {
+        let (Some(paragraph), Some(owned)) = (fragment.get(..element), fragment.get(element..))
+        else {
+            return Ok(None);
+        };
+        if xml_len > MAX_DOCUMENT_XML_BYTES
+            || xml_len / 4 > MAX_DOCUMENT_NODES
+            || contains_namespace_declaration_marker(fragment)
+            || !owned.iter().all(u8::is_ascii_whitespace)
+        {
+            return Ok(None);
+        }
+        let Some(shape) = body_child_shape(paragraph) else {
+            return Ok(None);
+        };
+        if shape.names_body
+            || shape
+                .max_depth
+                .checked_add(2)
+                .is_none_or(|depth| depth > MAX_DOCUMENT_DEPTH)
+        {
+            return Ok(None);
+        }
+        let (Ok(at), Ok(length), Ok(paragraph_length)) = (
+            u32::try_from(offset),
+            u32::try_from(fragment.len()),
+            u32::try_from(paragraph.len()),
+        ) else {
+            return Ok(None);
+        };
+        let end_of = |range: &Range| range.start.checked_add(range.length);
+        let before = position
+            .checked_sub(1)
+            .and_then(|index| self.paragraphs.get(index));
+        let after = self.paragraphs.get(position);
+        if position > self.paragraphs.len()
+            || before.is_some_and(|range| end_of(range).is_none_or(|end| end > at))
+            || after.is_some_and(|range| range.start < at)
+            || at > self.content_end
+        {
+            return Ok(None);
+        }
+        // The scope of a direct-body paragraph that declares nothing is the
+        // body's own.
+        let source = self.xml.bytes();
+        let declares_nothing = |index: usize| {
+            self.paragraphs.get(index).is_some_and(|range| {
+                let start = usize::try_from(range.start).unwrap_or(usize::MAX);
+                let end = usize::try_from(range.length)
+                    .ok()
+                    .and_then(|length| start.checked_add(length))
+                    .unwrap_or(usize::MAX);
+                source.get(start..end).is_some_and(|paragraph| {
+                    paragraph
+                        .iter()
+                        .position(|byte| *byte == b'>')
+                        .is_some_and(|tag_end| {
+                            !contains_namespace_declaration_marker(&paragraph[..tag_end])
+                        })
+                })
+            })
+        };
+        let neighbour = position
+            .checked_sub(1)
+            .filter(|index| declares_nothing(*index))
+            .or_else(|| declares_nothing(position).then_some(position));
+        let Some(scope) = neighbour.and_then(|index| self.paragraph_namespaces.get(index)) else {
+            return Ok(None);
+        };
+        let name_end = shape.root_tag_len.min(paragraph.len());
+        let name = paragraph
+            .get(1..name_end)
+            .and_then(|tag| {
+                tag.iter()
+                    .position(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n' | b'/' | b'>'))
+                    .map(|length| &tag[..length])
+            })
+            .unwrap_or_default();
+        let (prefix, local) = split_qualified_name(name);
+        let bound = scope
+            .iter()
+            .find(|(declared, _)| declared.as_deref() == prefix)
+            .map(|(_, namespace)| namespace.as_slice());
+        if local != b"p"
+            || !bound.is_some_and(|namespace| {
+                namespace == WORDPROCESSINGML_NAMESPACE
+                    || namespace == STRICT_WORDPROCESSINGML_NAMESPACE
+            })
+        {
+            return Ok(None);
+        }
+        let shift = |ranges: &Arc<[Range]>| -> Option<Arc<[Range]>> {
+            let mut shifted = Vec::with_capacity(ranges.len());
+            for range in ranges.iter() {
+                let end = end_of(range)?;
+                if range.start < at && at < end {
+                    return None;
+                }
+                let start = if range.start >= at {
+                    range.start.checked_add(length)?
+                } else {
+                    range.start
+                };
+                shifted.push(Range {
+                    start,
+                    length: range.length,
+                });
+            }
+            Some(shifted.into())
+        };
+        let (Some(tables), Some(block_controls), Some(content_end)) = (
+            shift(&self.tables),
+            shift(&self.block_controls),
+            self.content_end.checked_add(length),
+        ) else {
+            return Ok(None);
+        };
+        let mut paragraphs = Vec::new();
+        let mut namespaces = Vec::new();
+        paragraphs
+            .try_reserve_exact(self.paragraphs.len() + 1)
+            .and_then(|()| namespaces.try_reserve_exact(self.paragraphs.len() + 1))
+            .map_err(|source| crate::Error::Allocation {
+                resource: "inserted document paragraph ranges",
+                source,
+            })?;
+        for (index, (range, scope_of)) in self
+            .paragraphs
+            .iter()
+            .zip(self.paragraph_namespaces.iter())
+            .enumerate()
+        {
+            if index == position {
+                paragraphs.push(Range {
+                    start: at,
+                    length: paragraph_length,
+                });
+                namespaces.push(Arc::clone(scope));
+            }
+            let Some(start) = (if index >= position {
+                range.start.checked_add(length)
+            } else {
+                Some(range.start)
+            }) else {
+                return Ok(None);
+            };
+            paragraphs.push(Range {
+                start,
+                length: range.length,
+            });
+            namespaces.push(Arc::clone(scope_of));
+        }
+        if position == self.paragraphs.len() {
+            paragraphs.push(Range {
+                start: at,
+                length: paragraph_length,
+            });
+            namespaces.push(Arc::clone(scope));
+        }
+        Ok(Some(SplicedLayout {
+            paragraphs: paragraphs.into(),
+            paragraph_namespaces: namespaces.into(),
+            tables,
+            block_controls,
+            content_end,
+        }))
+    }
+
+    /// Remove direct-body paragraph `position` whole, deriving the new
+    /// layout: removing a direct body child changes no other child's
+    /// classification or scope, adds nothing the scanner limits, and keeps
+    /// the body-final section properties last.
+    fn with_removed_paragraph(
+        &self,
+        xml: Vec<u8>,
+        position: usize,
+        removed: usize,
+    ) -> Result<Self> {
+        match self.removed_layout(xml.len(), position, removed)? {
+            Some(layout) => Ok(self.with_spliced_layout(xml, layout)),
+            None => self.with_rewritten_xml(xml),
+        }
+    }
+
+    /// The layout after removing direct-body paragraph `position` with the
+    /// whitespace it owns, `removed` bytes from its start, or `None` when the
+    /// bookkeeping does not add up.
+    fn removed_layout(
+        &self,
+        xml_len: usize,
+        position: usize,
+        removed: usize,
+    ) -> Result<Option<SplicedLayout>> {
+        let Some(paragraph) = self.paragraphs.get(position).copied() else {
+            return Ok(None);
+        };
+        let Ok(length) = u32::try_from(removed) else {
+            return Ok(None);
+        };
+        let removed = Range {
+            start: paragraph.start,
+            length,
+        };
+        let Some(end) = removed.start.checked_add(removed.length) else {
+            return Ok(None);
+        };
+        if length < paragraph.length
+            || self.content_end < end
+            || usize::try_from(self.content_end - removed.length)
+                .is_ok_and(|offset| offset > xml_len)
+            || self
+                .paragraphs
+                .get(position + 1)
+                .is_some_and(|next| next.start < end)
+        {
+            return Ok(None);
+        }
+        let shift = |ranges: &Arc<[Range]>| -> Option<Arc<[Range]>> {
+            let mut shifted = Vec::with_capacity(ranges.len());
+            for range in ranges.iter() {
+                let start = if range.start >= end {
+                    range.start - removed.length
+                } else if range.start.checked_add(range.length)? <= removed.start {
+                    range.start
+                } else {
+                    return None;
+                };
+                shifted.push(Range {
+                    start,
+                    length: range.length,
+                });
+            }
+            Some(shifted.into())
+        };
+        let (Some(tables), Some(block_controls)) =
+            (shift(&self.tables), shift(&self.block_controls))
+        else {
+            return Ok(None);
+        };
+        let mut paragraphs = Vec::new();
+        let mut namespaces = Vec::new();
+        paragraphs
+            .try_reserve_exact(self.paragraphs.len().saturating_sub(1))
+            .and_then(|()| namespaces.try_reserve_exact(self.paragraphs.len().saturating_sub(1)))
+            .map_err(|source| crate::Error::Allocation {
+                resource: "removed document paragraph ranges",
+                source,
+            })?;
+        for (index, (range, scope)) in self
+            .paragraphs
+            .iter()
+            .zip(self.paragraph_namespaces.iter())
+            .enumerate()
+        {
+            if index == position {
+                continue;
+            }
+            paragraphs.push(Range {
+                start: if index > position {
+                    range.start - removed.length
+                } else {
+                    range.start
+                },
+                length: range.length,
+            });
+            namespaces.push(Arc::clone(scope));
+        }
+        let content_end = self.content_end - removed.length;
+        Ok(Some(SplicedLayout {
+            paragraphs: paragraphs.into(),
+            paragraph_namespaces: namespaces.into(),
             tables,
             block_controls,
             content_end,
@@ -1823,6 +2220,94 @@ pub enum Operation {
         /// Complete receiver-local dependency closure removed by publication.
         graph: Arc<TransferGraph>,
     },
+    /// Replace the head of one direct run: its start tag through its direct
+    /// property container (`w:rPr`).
+    ///
+    /// Recorded by [`Edit::format_run`]. The head is the run's start tag
+    /// through its first direct `w:rPr` child, only the start tag when the
+    /// run has no container, and the whole element for an empty run
+    /// (`<w:r/>`); the run's content is not part of the operation, so the
+    /// operation composes with text edits of the same run.
+    ReplaceRunProperties {
+        /// Direct-body paragraph position.
+        paragraph: Position,
+        /// Direct run position within the paragraph.
+        run: Position,
+        /// Exact head bytes required before the operation.
+        before: Arc<Vec<u8>>,
+        /// Exact head bytes the operation writes.
+        after: Arc<Vec<u8>>,
+    },
+    /// Replace the head of one direct-body paragraph: its start tag through
+    /// its direct property container (`w:pPr`).
+    ///
+    /// Recorded by [`Edit::format_paragraph`]; see
+    /// [`Self::ReplaceRunProperties`].
+    ReplaceParagraphProperties {
+        /// Direct-body paragraph position.
+        paragraph: Position,
+        /// Exact head bytes required before the operation.
+        before: Arc<Vec<u8>>,
+        /// Exact head bytes the operation writes.
+        after: Arc<Vec<u8>>,
+    },
+    /// Insert one exact paragraph as a direct child of `w:body`.
+    ///
+    /// Recorded by [`Edit::insert_formatted_paragraph`] and
+    /// [`Edit::move_paragraph`], and by the inverse of
+    /// [`Self::RemoveParagraphFragment`].
+    InsertParagraphFragment {
+        /// Index among the direct element children of `w:body` (every
+        /// element, not only blocks) that the paragraph has after the
+        /// insertion; it is inserted before the child that held the index.
+        child: Position,
+        /// Direct-body paragraph position the paragraph has after the
+        /// insertion.
+        position: Position,
+        /// Exact paragraph XML.
+        xml: Arc<Vec<u8>>,
+    },
+    /// Remove one exact direct-body paragraph.
+    ///
+    /// Recorded by [`Edit::remove_paragraph`] and [`Edit::move_paragraph`];
+    /// see [`Self::InsertParagraphFragment`].
+    RemoveParagraphFragment {
+        /// Index of the paragraph among the direct element children of
+        /// `w:body`.
+        child: Position,
+        /// Direct-body paragraph position of the paragraph.
+        position: Position,
+        /// Exact paragraph XML required at the position.
+        xml: Arc<Vec<u8>>,
+    },
+    /// Insert one exact run as a direct child of a direct-body paragraph.
+    ///
+    /// Recorded by [`Edit::insert_run`] and [`Edit::append_run`], and by the
+    /// inverse of [`Self::RemoveRun`].
+    InsertRun {
+        /// Direct-body paragraph position.
+        paragraph: Position,
+        /// Index among the paragraph's direct element children (`w:pPr`
+        /// included) that the run has after the insertion.
+        child: Position,
+        /// Direct run position the run has after the insertion.
+        run: Position,
+        /// Exact run XML.
+        xml: Arc<Vec<u8>>,
+    },
+    /// Remove one exact direct run of a direct-body paragraph.
+    ///
+    /// Recorded by [`Edit::remove_run`]; see [`Self::InsertRun`].
+    RemoveRun {
+        /// Direct-body paragraph position.
+        paragraph: Position,
+        /// Index of the run among the paragraph's direct element children.
+        child: Position,
+        /// Direct run position of the run.
+        run: Position,
+        /// Exact run XML required at the position.
+        xml: Arc<Vec<u8>>,
+    },
 }
 
 impl Operation {
@@ -1845,11 +2330,33 @@ impl Operation {
             | Self::ReplaceNestedCellParagraphText { .. }
             | Self::ReplaceNestedCellParagraphHyperlinkText { .. }
             | Self::InsertParagraph { .. }
-            | Self::RemoveParagraph { .. } => true,
+            | Self::RemoveParagraph { .. }
+            | Self::ReplaceRunProperties { .. }
+            | Self::ReplaceParagraphProperties { .. }
+            | Self::InsertParagraphFragment { .. }
+            | Self::RemoveParagraphFragment { .. }
+            | Self::InsertRun { .. }
+            | Self::RemoveRun { .. } => true,
             Self::InsertTransferredParagraph { .. } | Self::RemoveTransferredParagraph { .. } => {
                 false
             },
         }
+    }
+
+    /// Whether the operation records exact markup that a commit must publish
+    /// as staged: compacting it would make the operation's own bytes, and so
+    /// its inverse and replay, disagree with the published document.
+    const fn retains_exact_markup(&self) -> bool {
+        matches!(
+            self,
+            Self::ApplyRevision { .. }
+                | Self::ReplaceRunProperties { .. }
+                | Self::ReplaceParagraphProperties { .. }
+                | Self::InsertParagraphFragment { .. }
+                | Self::RemoveParagraphFragment { .. }
+                | Self::InsertRun { .. }
+                | Self::RemoveRun { .. }
+        )
     }
 
     fn inverse(&self) -> Self {
@@ -2075,6 +2582,66 @@ impl Operation {
                 dependency_digest: Arc::clone(inverse_dependency_digest),
                 inverse_dependency_digest: Arc::clone(dependency_digest),
                 graph: Arc::clone(graph),
+            },
+            Self::ReplaceRunProperties {
+                paragraph,
+                run,
+                before,
+                after,
+            } => Self::ReplaceRunProperties {
+                paragraph: *paragraph,
+                run: *run,
+                before: Arc::clone(after),
+                after: Arc::clone(before),
+            },
+            Self::ReplaceParagraphProperties {
+                paragraph,
+                before,
+                after,
+            } => Self::ReplaceParagraphProperties {
+                paragraph: *paragraph,
+                before: Arc::clone(after),
+                after: Arc::clone(before),
+            },
+            Self::InsertParagraphFragment {
+                child,
+                position,
+                xml,
+            } => Self::RemoveParagraphFragment {
+                child: *child,
+                position: *position,
+                xml: Arc::clone(xml),
+            },
+            Self::RemoveParagraphFragment {
+                child,
+                position,
+                xml,
+            } => Self::InsertParagraphFragment {
+                child: *child,
+                position: *position,
+                xml: Arc::clone(xml),
+            },
+            Self::InsertRun {
+                paragraph,
+                child,
+                run,
+                xml,
+            } => Self::RemoveRun {
+                paragraph: *paragraph,
+                child: *child,
+                run: *run,
+                xml: Arc::clone(xml),
+            },
+            Self::RemoveRun {
+                paragraph,
+                child,
+                run,
+                xml,
+            } => Self::InsertRun {
+                paragraph: *paragraph,
+                child: *child,
+                run: *run,
+                xml: Arc::clone(xml),
             },
         }
     }
@@ -4736,6 +5303,39 @@ impl Edit {
                 inverse_dependency_digest,
                 graph,
             ),
+            Operation::ReplaceRunProperties {
+                paragraph,
+                run,
+                before,
+                after,
+            } => self.replace_run_properties(*paragraph, *run, before, after),
+            Operation::ReplaceParagraphProperties {
+                paragraph,
+                before,
+                after,
+            } => self.replace_paragraph_properties(*paragraph, before, after),
+            Operation::InsertParagraphFragment {
+                child,
+                position,
+                xml,
+            } => self.insert_paragraph_fragment(*child, *position, xml),
+            Operation::RemoveParagraphFragment {
+                child,
+                position,
+                xml,
+            } => self.remove_paragraph_fragment(*child, *position, xml),
+            Operation::InsertRun {
+                paragraph,
+                child,
+                run,
+                xml,
+            } => self.insert_run_fragment(*paragraph, *child, *run, xml),
+            Operation::RemoveRun {
+                paragraph,
+                child,
+                run,
+                xml,
+            } => self.remove_run_fragment(*paragraph, *child, *run, xml),
         }
     }
 
@@ -5035,12 +5635,12 @@ impl Edit {
         if let Some(context) = managed_context.as_ref() {
             context.check().map_err(managed_execution)?;
         }
-        // Revision dispositions preserve retained opaque payload bytes, including
-        // whitespace and attribute spelling. Global compaction would rewrite them.
-        let preserve_revision_source = self
-            .operations
-            .iter()
-            .any(|operation| matches!(operation, Operation::ApplyRevision { .. }));
+        // Revision dispositions, and the formatting and structure operations
+        // of `formatting`, record exact markup, including whitespace and
+        // attribute spelling. Compaction would rewrite it, so their own bytes
+        // (and with them replay and the inverse) would disagree with the
+        // published document.
+        let preserve_revision_source = self.operations.iter().any(Operation::retains_exact_markup);
         let projected = if self.base.same_source(&self.projected) {
             self.projected
         } else if self.base.is_source_backed() && self.projected.is_source_backed() {
@@ -5051,12 +5651,22 @@ impl Edit {
             self.projected
         } else if preserve_revision_source {
             // The preserved bytes skip compaction but not its UTF-8 check: a
-            // changed document that is not UTF-8 is refused either way.
-            std::str::from_utf8(self.projected.xml_bytes()).map_err(|error| {
-                crate::Error::InvalidFormat(format!(
-                    "changed main-document XML is not UTF-8: {error}"
-                ))
-            })?;
+            // changed document that is not UTF-8 is refused either way. The
+            // formatting and structure operations check every paragraph and
+            // fragment they write when they stage it, as the preserving
+            // compaction checks only the paragraphs an edit changed, so the
+            // whole part is checked here only for a revision disposition.
+            if self
+                .operations
+                .iter()
+                .any(|operation| matches!(operation, Operation::ApplyRevision { .. }))
+            {
+                std::str::from_utf8(self.projected.xml_bytes()).map_err(|error| {
+                    crate::Error::InvalidFormat(format!(
+                        "changed main-document XML is not UTF-8: {error}"
+                    ))
+                })?;
+            }
             self.projected
         } else {
             match self.compaction {
@@ -5458,6 +6068,14 @@ fn operation_string_bytes(operation: &Operation) -> usize {
         },
         Operation::InsertTransferredParagraph { .. }
         | Operation::RemoveTransferredParagraph { .. } => 0,
+        Operation::ReplaceRunProperties { before, after, .. }
+        | Operation::ReplaceParagraphProperties { before, after, .. } => {
+            before.capacity().saturating_add(after.capacity())
+        },
+        Operation::InsertParagraphFragment { xml, .. }
+        | Operation::RemoveParagraphFragment { xml, .. }
+        | Operation::InsertRun { xml, .. }
+        | Operation::RemoveRun { xml, .. } => xml.capacity(),
     }
 }
 
@@ -5588,6 +6206,66 @@ struct BodyChildShape {
     nodes: usize,
     max_depth: usize,
     root_tag_len: usize,
+    /// Whether any element of the fragment has the local name `body`, which
+    /// the document scanner checks wherever it appears.
+    names_body: bool,
+}
+
+/// Which rewrites of a direct-body paragraph may keep a derived layout
+/// instead of a rescan.
+#[derive(Clone, Copy)]
+enum SplicePolicy {
+    /// Only replacements that add no element and no nesting
+    /// ([`preserves_body_child_shape`]): the text operations.
+    SameShape,
+    /// Also replacements that grow within proven document bounds
+    /// ([`grows_body_child_within_limits`]): the formatting and run
+    /// operations, which add property elements and runs.
+    BoundedGrowth,
+}
+
+impl SplicePolicy {
+    fn admits(self, before: &[u8], after: &[u8], xml_len: usize) -> bool {
+        preserves_body_child_shape(before, after)
+            || (matches!(self, Self::BoundedGrowth)
+                && grows_body_child_within_limits(before, after, xml_len))
+    }
+}
+
+/// Whether splicing `after` in place of `before` into a document of
+/// `xml_len` bytes leaves every verdict of [`scan_document`] unchanged even
+/// though `after` may hold more elements or deeper nesting.
+///
+/// [`preserves_body_child_shape`] lists the four kinds of conclusion the
+/// scanner reaches about the inside of a direct body child. With identical
+/// root start tags and no namespace declaration on either side (the caller
+/// checks that), the child is classified identically. Two of the others are
+/// proven here instead of by "no growth":
+///
+/// - **Depth.** A direct body child starts at depth 3 (`w:document` is 1 and
+///   `w:body`, which the scanner requires there, is 2), so its deepest element
+///   is at most `2 + max_depth`; at most `MAX_DOCUMENT_DEPTH` cannot fail.
+/// - **Elements.** Every counted element takes at least four bytes (`<a/>`,
+///   or `<a>` with `</a>`), so a document of `xml_len` bytes holds at most
+///   `xml_len / 4` of them; when that is at most `MAX_DOCUMENT_NODES`, the
+///   count cannot exceed the limit.
+///
+/// The remaining verdicts — declarations, processing instructions and
+/// unbalanced nesting — are refused by [`body_child_shape`] itself. The
+/// scanner also refuses a WordprocessingML `body` element anywhere but under
+/// the root, so a fragment naming `body` takes the rescan.
+fn grows_body_child_within_limits(before: &[u8], after: &[u8], xml_len: usize) -> bool {
+    let (Some(previous), Some(next)) = (body_child_shape(before), body_child_shape(after)) else {
+        return false;
+    };
+    next.root_tag_len == previous.root_tag_len
+        && before.get(..previous.root_tag_len) == after.get(..next.root_tag_len)
+        && !next.names_body
+        && next
+            .max_depth
+            .checked_add(2)
+            .is_some_and(|depth| depth <= MAX_DOCUMENT_DEPTH)
+        && xml_len / 4 <= MAX_DOCUMENT_NODES
 }
 
 /// Shift direct-body sibling ranges across the accepted paragraph splices.
@@ -5935,6 +6613,7 @@ fn preserves_body_child_shape(before: &[u8], after: &[u8]) -> bool {
         && next.max_depth <= previous.max_depth
         && next.root_tag_len == previous.root_tag_len
         && before.get(..previous.root_tag_len) == after.get(..next.root_tag_len)
+        && !next.names_body
 }
 
 /// Measure one direct-body child fragment, or decline to measure it.
@@ -5951,6 +6630,7 @@ fn body_child_shape(fragment: &[u8]) -> Option<BodyChildShape> {
         nodes: 0,
         max_depth: 0,
         root_tag_len: 0,
+        names_body: false,
     };
     let mut depth = 0usize;
     let mut root_seen = false;
@@ -5960,10 +6640,11 @@ fn body_child_shape(fragment: &[u8]) -> Option<BodyChildShape> {
         let event = reader.read_event().ok()?;
         let event_end = origin.offset(reader.buffer_position())?;
         match event {
-            Event::Start(_) => {
+            Event::Start(element) => {
                 if root_closed {
                     return None;
                 }
+                shape.names_body |= split_qualified_name(element.name().into_inner()).1 == b"body";
                 depth = depth.checked_add(1)?;
                 shape.nodes = shape.nodes.checked_add(1)?;
                 shape.max_depth = shape.max_depth.max(depth);
@@ -5975,10 +6656,11 @@ fn body_child_shape(fragment: &[u8]) -> Option<BodyChildShape> {
                     root_seen = true;
                 }
             },
-            Event::Empty(_) => {
+            Event::Empty(element) => {
                 if root_closed {
                     return None;
                 }
+                shape.names_body |= split_qualified_name(element.name().into_inner()).1 == b"body";
                 shape.nodes = shape.nodes.checked_add(1)?;
                 shape.max_depth = shape.max_depth.max(depth.checked_add(1)?);
                 if !root_seen {

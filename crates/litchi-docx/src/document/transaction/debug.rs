@@ -97,6 +97,12 @@ impl fmt::Debug for Operation {
             Self::ReplaceNestedCellParagraphHyperlinkText { .. } => {
                 "ReplaceNestedCellParagraphHyperlinkText"
             },
+            Self::ReplaceRunProperties { .. } => "ReplaceRunProperties",
+            Self::ReplaceParagraphProperties { .. } => "ReplaceParagraphProperties",
+            Self::InsertParagraphFragment { .. } => "InsertParagraphFragment",
+            Self::RemoveParagraphFragment { .. } => "RemoveParagraphFragment",
+            Self::InsertRun { .. } => "InsertRun",
+            Self::RemoveRun { .. } => "RemoveRun",
             Self::InsertParagraph { .. } => "InsertParagraph",
             Self::RemoveParagraph { .. } => "RemoveParagraph",
             Self::InsertTransferredParagraph { .. } => "InsertTransferredParagraph",

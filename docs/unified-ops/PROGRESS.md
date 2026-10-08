@@ -537,3 +537,16 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 - Added bounded fuzz coverage and corpus/regression checks. Record 0045 lists
   source provenance, verification and remaining scope. M1/M2 and the complete
   all-format goal remain active; no candidate branch history was merged.
+
+
+## 0046 — reversible DOCX formatting and body structure
+
+- Adapted the earlier formatting-engine leaf into the current package-bound
+  Edit API: typed run/paragraph properties and paragraph/run insert/remove/move.
+  Exact patch inverses, durable replay and composition use the same operations.
+- Threaded inherited namespaces through existing-fragment readers and splicers;
+  added strict replay checks, opaque-comment preservation, namespace-checked
+  dependency attributes, bounded generation and content-free Debug output.
+- Corpus, owner publication, inverse and policy tests are recorded in 0046.
+  This advances the DOCX write kernel; the property registry, managed formatting,
+  caller semantic limits, performance acceptance and all-format goal remain open.

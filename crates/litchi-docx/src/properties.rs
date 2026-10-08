@@ -89,6 +89,7 @@
 //! [`crate::Paragraph::division_id`]), floating-table positioning, and
 //! revision attribution.
 
+mod edit;
 mod paragraph;
 mod run;
 mod scan;
@@ -119,7 +120,14 @@ pub use value::{
     VerticalAlign,
 };
 
+#[cfg(test)]
+pub(crate) use edit::paragraph_rank_for_tests;
+pub(crate) use edit::{
+    SpliceError, admit_paragraph, admit_run, paragraph_properties_element, run_properties_element,
+    same_paragraph, same_run, splice_paragraph, splice_run,
+};
 pub(crate) use paragraph::parse as parse_paragraph;
+pub(crate) use run::parse as parse_run;
 pub(crate) use table::{parse_cell, parse_row, parse_table};
 
 use crate::error::Result;

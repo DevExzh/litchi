@@ -384,6 +384,34 @@ pub struct Shading {
     pub theme_fill_shade: Option<u8>,
 }
 
+impl Shading {
+    /// Shading with `pattern` and no colour, the starting point for writing
+    /// one with [`crate::document::Edit::format_paragraph`] or
+    /// [`crate::document::Edit::format_run`].
+    ///
+    /// ```
+    /// use litchi_docx::properties::{HexColor, Shading, ShadingPattern};
+    ///
+    /// let mut shading = Shading::new(ShadingPattern::Clear);
+    /// shading.fill = Some(HexColor::Rgb([0xD9, 0xD9, 0xD9]));
+    /// assert_eq!(shading.pattern, ShadingPattern::Clear);
+    /// ```
+    #[must_use]
+    pub const fn new(pattern: ShadingPattern) -> Self {
+        Self {
+            pattern,
+            color: None,
+            theme_color: None,
+            theme_tint: None,
+            theme_shade: None,
+            fill: None,
+            theme_fill: None,
+            theme_fill_tint: None,
+            theme_fill_shade: None,
+        }
+    }
+}
+
 /// Every `ST_Border` token, sorted by byte value for binary search.
 const BORDER_STYLES: [&str; 193] = [
     "apples",
@@ -674,6 +702,33 @@ pub struct Border {
     pub shadow: Option<bool>,
     /// `w:frame`
     pub frame: Option<bool>,
+}
+
+impl Border {
+    /// A border of `style` with no other attribute, the starting point for
+    /// writing one.
+    ///
+    /// ```
+    /// use litchi_docx::properties::{Border, BorderStyle, EighthPoints};
+    ///
+    /// let mut border = Border::new(BorderStyle::from_xml("single").unwrap());
+    /// border.size = Some(EighthPoints(8));
+    /// assert_eq!(border.style.as_str(), "single");
+    /// ```
+    #[must_use]
+    pub const fn new(style: BorderStyle) -> Self {
+        Self {
+            style,
+            color: None,
+            theme_color: None,
+            theme_tint: None,
+            theme_shade: None,
+            size: None,
+            space: None,
+            shadow: None,
+            frame: None,
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

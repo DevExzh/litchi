@@ -38,14 +38,14 @@ const MAX_ELEMENTS: usize = 1_000_000;
 
 /// How a name resolved; an undeclared prefix is not copied.
 #[derive(Clone, Copy)]
-enum Resolution<'r> {
+pub(super) enum Resolution<'r> {
     Bound(&'r [u8]),
     Undeclared,
     Unbound,
 }
 
 /// How the fragment's root is written.
-enum Root {
+pub(super) enum Root {
     /// Bound to a namespace: only bound WordprocessingML names count.
     Bound,
     /// An undeclared prefix: names with that prefix count.
@@ -55,7 +55,7 @@ enum Root {
 }
 
 impl Root {
-    fn is_word(&self, prefix: Option<&[u8]>, resolution: Resolution<'_>) -> bool {
+    pub(super) fn is_word(&self, prefix: Option<&[u8]>, resolution: Resolution<'_>) -> bool {
         match resolution {
             Resolution::Bound(namespace) => {
                 namespace == WORDPROCESSINGML_NAMESPACE
@@ -71,7 +71,7 @@ impl Root {
 
 /// Resolve `prefix` against the declarations in scope. `element` names use
 /// the default namespace for no prefix; attribute names do not.
-fn resolve<'r>(
+pub(super) fn resolve<'r>(
     resolver: &'r NamespaceResolver,
     prefix: Option<&[u8]>,
     element: bool,
@@ -102,7 +102,7 @@ fn resolve<'r>(
 }
 
 /// The name, split into local name and prefix bytes.
-fn split<'n>(name: QName<'n>) -> (&'n [u8], Option<&'n [u8]>) {
+pub(super) fn split<'n>(name: QName<'n>) -> (&'n [u8], Option<&'n [u8]>) {
     let (local, prefix) = name.decompose();
     (local.into_inner(), prefix.map(|prefix| prefix.into_inner()))
 }

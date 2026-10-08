@@ -202,6 +202,32 @@ pub struct TabStop {
     pub position: Twips,
 }
 
+impl TabStop {
+    /// A tab stop of `kind` at `position`, without a leader.
+    ///
+    /// ```
+    /// use litchi_docx::properties::{TabKind, TabLeader, TabStop, Twips};
+    ///
+    /// let tab = TabStop::new(TabKind::Decimal, Twips(1440)).with_leader(TabLeader::Dot);
+    /// assert_eq!(tab.leader, Some(TabLeader::Dot));
+    /// ```
+    #[must_use]
+    pub const fn new(kind: TabKind, position: Twips) -> Self {
+        Self {
+            kind,
+            leader: None,
+            position,
+        }
+    }
+
+    /// The same tab stop with `leader`.
+    #[must_use]
+    pub const fn with_leader(mut self, leader: TabLeader) -> Self {
+        self.leader = Some(leader);
+        self
+    }
+}
+
 /// Direct paragraph numbering (`w:numPr`), as authored.
 ///
 /// An empty `w:numPr`, or one with only a level, names no numbering
@@ -378,7 +404,7 @@ pub struct Paragraph {
     pub outline_level: Option<u8>,
     /// `w:rPr`: the run properties of the paragraph mark.
     pub mark: Option<Box<run::Run>>,
-    invalid: Invalid,
+    pub(super) invalid: Invalid,
 }
 
 impl Paragraph {

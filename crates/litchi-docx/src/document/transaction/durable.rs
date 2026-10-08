@@ -870,7 +870,13 @@ fn history_graph_transition(
             | Operation::ReplaceNestedCellParagraphText { .. }
             | Operation::ReplaceNestedCellParagraphHyperlinkText { .. }
             | Operation::InsertParagraph { .. }
-            | Operation::RemoveParagraph { .. } => None,
+            | Operation::RemoveParagraph { .. }
+            | Operation::ReplaceRunProperties { .. }
+            | Operation::ReplaceParagraphProperties { .. }
+            | Operation::InsertParagraphFragment { .. }
+            | Operation::RemoveParagraphFragment { .. }
+            | Operation::InsertRun { .. }
+            | Operation::RemoveRun { .. } => None,
         };
         if let Some(selected_transition) = candidate {
             if selected.is_some() {
@@ -1143,8 +1149,35 @@ fn operation_effects(
             Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::InsertTransferredParagraph { .. }
-            | Operation::RemoveTransferredParagraph { .. } => {
+            | Operation::RemoveTransferredParagraph { .. }
+            | Operation::InsertParagraphFragment { .. }
+            | Operation::RemoveParagraphFragment { .. } => {
                 writes.push("body/paragraph-order".to_owned());
+            },
+            Operation::ReplaceRunProperties { paragraph, run, .. } => {
+                // A property container changes neither the run's text nor
+                // the paragraph's run order, so it composes with text edits
+                // of the same paragraph; whole-paragraph rewrites (revision
+                // dispositions, run insertion and removal) write the
+                // paragraph's `all-text` key and conflict.
+                reads.push("body/paragraph-order".to_owned());
+                reads.push(format!("body/paragraph:{}/all-text", paragraph.get()));
+                writes.push(format!(
+                    "body/paragraph:{}/run:{}/properties",
+                    paragraph.get(),
+                    run.get()
+                ));
+            },
+            Operation::ReplaceParagraphProperties { paragraph, .. } => {
+                reads.push("body/paragraph-order".to_owned());
+                reads.push(format!("body/paragraph:{}/all-text", paragraph.get()));
+                writes.push(format!("body/paragraph:{}/properties", paragraph.get()));
+            },
+            Operation::InsertRun { paragraph, .. } | Operation::RemoveRun { paragraph, .. } => {
+                // The run order of the paragraph changes: every inline
+                // selector of the paragraph reads this key.
+                reads.push("body/paragraph-order".to_owned());
+                writes.push(format!("body/paragraph:{}/all-text", paragraph.get()));
             },
         }
     }
@@ -1520,8 +1553,94 @@ fn durable_operation(
                 Value::String(identifier.as_hex()),
             )
         },
+        Operation::ReplaceRunProperties {
+            paragraph,
+            run,
+            before,
+            after,
+        } => {
+            preconditions.insert("before".to_owned(), markup_value(before, "run properties")?);
+            (
+                "run.properties.replace",
+                format!("paragraph:{}/run:{}", paragraph.get(), run.get()),
+                markup_value(after, "run properties")?,
+            )
+        },
+        Operation::ReplaceParagraphProperties {
+            paragraph,
+            before,
+            after,
+        } => {
+            preconditions.insert(
+                "before".to_owned(),
+                markup_value(before, "paragraph properties")?,
+            );
+            (
+                "paragraph.properties.replace",
+                format!("paragraph:{}", paragraph.get()),
+                markup_value(after, "paragraph properties")?,
+            )
+        },
+        Operation::InsertParagraphFragment {
+            child,
+            position,
+            xml,
+        } => (
+            "paragraph.fragment.insert",
+            format!("body-child:{}/paragraph:{}", child.get(), position.get()),
+            markup_value(xml, "paragraph")?,
+        ),
+        Operation::RemoveParagraphFragment {
+            child,
+            position,
+            xml,
+        } => (
+            "paragraph.fragment.remove",
+            format!("body-child:{}/paragraph:{}", child.get(), position.get()),
+            markup_value(xml, "paragraph")?,
+        ),
+        Operation::InsertRun {
+            paragraph,
+            child,
+            run,
+            xml,
+        } => (
+            "run.fragment.insert",
+            format!(
+                "paragraph:{}/child:{}/run:{}",
+                paragraph.get(),
+                child.get(),
+                run.get()
+            ),
+            markup_value(xml, "run")?,
+        ),
+        Operation::RemoveRun {
+            paragraph,
+            child,
+            run,
+            xml,
+        } => (
+            "run.fragment.remove",
+            format!(
+                "paragraph:{}/child:{}/run:{}",
+                paragraph.get(),
+                child.get(),
+                run.get()
+            ),
+            markup_value(xml, "run")?,
+        ),
     };
     PatchOperation::new(limits, name, target, preconditions, value)
+}
+
+/// Exact markup carried in a durable operation as a JSON string.
+fn markup_value(
+    xml: &Arc<Vec<u8>>,
+    field: &'static str,
+) -> Result<Value, litchi_core::patch::PatchError> {
+    String::from_utf8(xml.as_slice().to_vec())
+        .map(Value::String)
+        .map_err(|_error| litchi_core::patch::PatchError::InvalidText { field })
 }
 
 fn noop_operation(
@@ -1606,7 +1725,13 @@ fn restore_transfer_operation(
         | Operation::ReplaceNestedCellParagraphText { .. }
         | Operation::ReplaceNestedCellParagraphHyperlinkText { .. }
         | Operation::InsertParagraph { .. }
-        | Operation::RemoveParagraph { .. } => return Ok(None),
+        | Operation::RemoveParagraph { .. }
+        | Operation::ReplaceRunProperties { .. }
+        | Operation::ReplaceParagraphProperties { .. }
+        | Operation::InsertParagraphFragment { .. }
+        | Operation::RemoveParagraphFragment { .. }
+        | Operation::InsertRun { .. }
+        | Operation::RemoveRun { .. } => return Ok(None),
     };
     let graph_identifier = blobs.insert(encode_transfer_graph(graph)?)?;
     let mut preconditions = artifact_precondition(artifact);
@@ -1951,6 +2076,78 @@ fn parse_durable_operation(
             Ok(Operation::RemoveParagraph {
                 position: parse_single_target(&operation.target, "paragraph:")?,
                 text: after()?,
+            })
+        },
+        "run.properties.replace" if operation.preconditions.len() == 3 => {
+            let (paragraph, run) = parse_paragraph_child_target(&operation.target, "/run:")?;
+            Ok(Operation::ReplaceRunProperties {
+                paragraph,
+                run,
+                before: Arc::new(before()?.into_bytes()),
+                after: Arc::new(after()?.into_bytes()),
+            })
+        },
+        "paragraph.properties.replace" if operation.preconditions.len() == 3 => {
+            Ok(Operation::ReplaceParagraphProperties {
+                paragraph: parse_single_target(&operation.target, "paragraph:")?,
+                before: Arc::new(before()?.into_bytes()),
+                after: Arc::new(after()?.into_bytes()),
+            })
+        },
+        "paragraph.fragment.insert" | "paragraph.fragment.remove"
+            if operation.preconditions.len() == 2 =>
+        {
+            let rest = operation
+                .target
+                .strip_prefix("body-child:")
+                .ok_or_else(|| invalid_durable("invalid paragraph fragment target"))?;
+            let (child, position) = rest
+                .split_once("/paragraph:")
+                .ok_or_else(|| invalid_durable("invalid paragraph fragment target"))?;
+            let (child, position) = (parse_position(child)?, parse_position(position)?);
+            let xml = Arc::new(after()?.into_bytes());
+            Ok(if operation.op == "paragraph.fragment.insert" {
+                Operation::InsertParagraphFragment {
+                    child,
+                    position,
+                    xml,
+                }
+            } else {
+                Operation::RemoveParagraphFragment {
+                    child,
+                    position,
+                    xml,
+                }
+            })
+        },
+        "run.fragment.insert" | "run.fragment.remove" if operation.preconditions.len() == 2 => {
+            let target = || invalid_durable("invalid run fragment target");
+            let rest = operation
+                .target
+                .strip_prefix("paragraph:")
+                .ok_or_else(target)?;
+            let (paragraph, rest) = rest.split_once("/child:").ok_or_else(target)?;
+            let (child, run) = rest.split_once("/run:").ok_or_else(target)?;
+            let (paragraph, child, run) = (
+                parse_position(paragraph)?,
+                parse_position(child)?,
+                parse_position(run)?,
+            );
+            let xml = Arc::new(after()?.into_bytes());
+            Ok(if operation.op == "run.fragment.insert" {
+                Operation::InsertRun {
+                    paragraph,
+                    child,
+                    run,
+                    xml,
+                }
+            } else {
+                Operation::RemoveRun {
+                    paragraph,
+                    child,
+                    run,
+                    xml,
+                }
             })
         },
         "paragraph.transfer.insert" | "paragraph.transfer.remove"

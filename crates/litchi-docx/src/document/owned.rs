@@ -31,6 +31,120 @@ impl<P: Clone> Edit<P> {
         Self { package, inner }
     }
 
+    /// Change one direct run's local properties while preserving unrelated markup.
+    ///
+    /// See [`super::snapshot::Edit::format_run`] for selection and preservation rules.
+    ///
+    /// # Errors
+    /// Returns a typed selection, property, dependency or resource refusal without
+    /// changing the staged document. Managed snapshots currently refuse this operation.
+    pub fn format_run(
+        &mut self,
+        paragraph: Position,
+        run: Position,
+        change: impl FnOnce(&mut crate::properties::Run),
+    ) -> Result<&mut Self> {
+        self.inner.format_run(paragraph, run, change)?;
+        Ok(self)
+    }
+
+    /// Change one direct-body paragraph's local properties.
+    ///
+    /// See [`super::snapshot::Edit::format_paragraph`] for selection and preservation rules.
+    ///
+    /// # Errors
+    /// Returns a typed selection, property, dependency or resource refusal without
+    /// changing the staged document. Managed snapshots currently refuse this operation.
+    pub fn format_paragraph(
+        &mut self,
+        paragraph: Position,
+        change: impl FnOnce(&mut crate::properties::Paragraph),
+    ) -> Result<&mut Self> {
+        self.inner.format_paragraph(paragraph, change)?;
+        Ok(self)
+    }
+
+    /// Insert a paragraph with typed direct properties at a body anchor.
+    ///
+    /// See [`super::snapshot::Edit::insert_formatted_paragraph`] for selection and preservation rules.
+    ///
+    /// # Errors
+    /// Returns a typed selection, property, dependency or resource refusal without
+    /// changing the staged document. Managed snapshots currently refuse this operation.
+    pub fn insert_formatted_paragraph(
+        &mut self,
+        at: super::BodyAnchor,
+        paragraph: &super::NewParagraph,
+    ) -> Result<Position> {
+        self.inner.insert_formatted_paragraph(at, paragraph)
+    }
+
+    /// Remove a paragraph after checking ranges, section breaks and story references.
+    ///
+    /// See [`super::snapshot::Edit::remove_paragraph`] for selection and preservation rules.
+    ///
+    /// # Errors
+    /// Returns a typed selection, property, dependency or resource refusal without
+    /// changing the staged document. Managed snapshots currently refuse this operation.
+    pub fn remove_paragraph(&mut self, position: Position) -> Result<&mut Self> {
+        self.inner.remove_paragraph(position)?;
+        Ok(self)
+    }
+
+    /// Move a paragraph atomically, preserving its exact XML.
+    ///
+    /// See [`super::snapshot::Edit::move_paragraph`] for selection and preservation rules.
+    ///
+    /// # Errors
+    /// Returns a typed selection, property, dependency or resource refusal without
+    /// changing the staged document. Managed snapshots currently refuse this operation.
+    pub fn move_paragraph(
+        &mut self,
+        position: Position,
+        to: super::BodyAnchor,
+    ) -> Result<Position> {
+        self.inner.move_paragraph(position, to)
+    }
+
+    /// Insert a typed run before a direct run position.
+    ///
+    /// See [`super::snapshot::Edit::insert_run`] for selection and preservation rules.
+    ///
+    /// # Errors
+    /// Returns a typed selection, property, dependency or resource refusal without
+    /// changing the staged document. Managed snapshots currently refuse this operation.
+    pub fn insert_run(
+        &mut self,
+        paragraph: Position,
+        run: Position,
+        new_run: &super::NewRun,
+    ) -> Result<Position> {
+        self.inner.insert_run(paragraph, run, new_run)
+    }
+
+    /// Append a typed run after a paragraph's last child.
+    ///
+    /// See [`super::snapshot::Edit::append_run`] for selection and preservation rules.
+    ///
+    /// # Errors
+    /// Returns a typed selection, property, dependency or resource refusal without
+    /// changing the staged document. Managed snapshots currently refuse this operation.
+    pub fn append_run(&mut self, paragraph: Position, new_run: &super::NewRun) -> Result<Position> {
+        self.inner.append_run(paragraph, new_run)
+    }
+
+    /// Remove one direct run after checking field and story dependencies.
+    ///
+    /// See [`super::snapshot::Edit::remove_run`] for selection and preservation rules.
+    ///
+    /// # Errors
+    /// Returns a typed selection, property, dependency or resource refusal without
+    /// changing the staged document. Managed snapshots currently refuse this operation.
+    pub fn remove_run(&mut self, paragraph: Position, run: Position) -> Result<&mut Self> {
+        self.inner.remove_run(paragraph, run)?;
+        Ok(self)
+    }
+
     /// Borrow the source main-document projection.
     #[must_use]
     pub const fn source(&self) -> &Snapshot {

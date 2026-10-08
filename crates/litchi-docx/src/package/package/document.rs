@@ -564,7 +564,13 @@ fn transfer_graph_transition(
             | crate::document::Operation::ReplaceNestedCellParagraphText { .. }
             | crate::document::Operation::ReplaceNestedCellParagraphHyperlinkText { .. }
             | crate::document::Operation::InsertParagraph { .. }
-            | crate::document::Operation::RemoveParagraph { .. } => None,
+            | crate::document::Operation::RemoveParagraph { .. }
+            | crate::document::Operation::ReplaceRunProperties { .. }
+            | crate::document::Operation::ReplaceParagraphProperties { .. }
+            | crate::document::Operation::InsertParagraphFragment { .. }
+            | crate::document::Operation::RemoveParagraphFragment { .. }
+            | crate::document::Operation::InsertRun { .. }
+            | crate::document::Operation::RemoveRun { .. } => None,
         };
         if let Some(selected_transition) = candidate {
             if selected.is_some() {

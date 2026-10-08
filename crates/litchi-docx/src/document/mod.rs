@@ -55,10 +55,10 @@ pub(crate) use transaction::{TransferPart, TransferRelationship, durable_transfe
 
 pub use model::{Block, Document, Element, ImageWatermarkPart, OpaqueBlock};
 pub use transaction::{
-    CompactionPolicy, Composition, CompositionLimits, Diagnostics, Error, History, HistoryLimits,
-    HyperlinkTextReplacement, JoinError, MergeChoice, Operation, ParagraphHyperlinkAddress,
-    ParagraphTextReplacement, ParagraphTransfer, Patch, PreparedEdit, Refusal, Result,
-    RevisionAction, RevisionKind, RevisionSelector, Snapshot, SubEditConflict, SubEditJoinFailure,
-    TableCellAddress, ThreeWayError, ThreeWayMergeFailure, ThreeWayPlan, TransferGraph,
-    TransferRefusal,
+    BodyAnchor, BodyBlock, CompactionPolicy, Composition, CompositionLimits, Diagnostics, Error,
+    History, HistoryLimits, HyperlinkTextReplacement, JoinError, MergeChoice, NewParagraph, NewRun,
+    Operation, ParagraphHyperlinkAddress, ParagraphTextReplacement, ParagraphTransfer, Patch,
+    PreparedEdit, Refusal, Result, RevisionAction, RevisionKind, RevisionSelector, Snapshot,
+    SubEditConflict, SubEditJoinFailure, TableCellAddress, ThreeWayError, ThreeWayMergeFailure,
+    ThreeWayPlan, TransferGraph, TransferRefusal,
 };
