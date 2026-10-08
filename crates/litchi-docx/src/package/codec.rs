@@ -19,14 +19,15 @@
 )]
 //! OPC construction, validation, and publication codecs for DOCX packages.
 
+#[cfg(feature = "encryption")]
+pub(super) use super::model::Mode;
 use super::model::{
     CustomProps, CustomPropsHost, DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL,
     DIAGRAM_QUICK_STYLE_REL, Error, MutableDocument, OpcPackage, PackURI, Package,
     ParagraphIndexCache, Path, Read, Result, Slot, Write, WriteRollbackGuard, ct, docx_web,
     validate_document_main_content_type,
 };
-#[cfg(feature = "encryption")]
-pub(super) use super::model::{Limits, Mode};
+use crate::OpenOptions;
 use litchi_core::Durability;
 use litchi_opc::OpcError;
 use std::sync::Arc;
@@ -276,7 +277,7 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        Self::open_with_limits(path, litchi_opc::SourceLimits::default())
+        Self::open_with_options(path, OpenOptions::default())
     }
 
     /// Open a DOCX package from a file path with explicit OPC resource limits.
@@ -284,66 +285,34 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn open_with_limits<P: AsRef<Path>>(
-        path: P,
-        limits: litchi_opc::SourceLimits,
-    ) -> Result<Self> {
-        Self::from_opc_package(OpcPackage::open_with_limits(path, limits)?)
+    pub fn open_with_options<P: AsRef<Path>>(path: P, options: OpenOptions) -> Result<Self> {
+        Self::from_opc_package(OpcPackage::open_with_limits(path, options.source_limits)?)
     }
 
-    #[cfg(feature = "encryption")]
+    /// Open a password-bearing DOCX path with standard finite policies.
     ///
     /// # Errors
     ///
-    /// Returns an error if the operation cannot be completed.
+    /// Returns an error on I/O, failed decryption, exceeded limits or invalid DOCX.
+    #[cfg(feature = "encryption")]
     pub fn open_with_password<P: AsRef<Path>>(path: P, password: &str) -> Result<Self> {
-        Self::open_with_password_and_limits(
-            path,
-            password,
-            &Limits::default(),
-            litchi_opc::SourceLimits::default(),
-        )
+        Self::open_with_password_and_options(path, password, OpenOptions::default())
     }
 
-    /// Open with explicit outer-encryption limits.
-    ///
-    /// The decrypted OPC archive uses [`litchi_opc::SourceLimits::default`].
-    /// Use [`Self::open_with_password_and_limits`] to select both independent
-    /// resource policies.
-    #[cfg(feature = "encryption")]
+    /// Open a password-bearing DOCX with independent outer encryption and
+    /// clear OPC archive policies.
     ///
     /// # Errors
     ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn open_with<P: AsRef<Path>>(path: P, password: &str, limits: &Limits) -> Result<Self> {
-        Self::open_with_password_and_limits(
-            path,
-            password,
-            limits,
-            litchi_opc::SourceLimits::default(),
-        )
-    }
-
-    /// Open an encrypted DOCX with independent outer-encryption and inner-OPC
-    /// resource policies.
-    ///
-    /// `encryption_limits` bounds encrypted input and decryption. `opc_limits`
-    /// is applied to the decrypted archive before it is adopted as a DOCX
-    /// package.
+    /// Returns an error on I/O, failed decryption, exceeded limits or invalid DOCX.
     #[cfg(feature = "encryption")]
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn open_with_password_and_limits<P: AsRef<Path>>(
+    pub fn open_with_password_and_options<P: AsRef<Path>>(
         path: P,
         password: &str,
-        encryption_limits: &Limits,
-        opc_limits: litchi_opc::SourceLimits,
+        options: OpenOptions,
     ) -> Result<Self> {
         let file = std::fs::File::open(path.as_ref()).map_err(Error::Io)?;
-        let opened = crate::encryption::load_with(file, password, encryption_limits)?;
-        Self::from_opened_with_limits(opened, opc_limits)
+        Self::from_reader_with_password_and_options(file, password, options)
     }
 
     /// Create a Package from an already-parsed OPC package.
@@ -420,7 +389,7 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
-        Self::from_reader_with_limits(reader, litchi_opc::SourceLimits::default())
+        Self::from_reader_with_options(reader, OpenOptions::default())
     }
 
     /// Create a DOCX package from a reader with explicit OPC resource limits.
@@ -428,61 +397,79 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn from_reader_with_limits<R: Read>(
-        reader: R,
-        limits: litchi_opc::SourceLimits,
-    ) -> Result<Self> {
-        Self::from_opc_package(OpcPackage::from_reader_with_limits(reader, limits)?)
+    pub fn from_reader_with_options<R: Read>(reader: R, options: OpenOptions) -> Result<Self> {
+        Self::from_opc_package(OpcPackage::from_reader_with_limits(
+            reader,
+            options.source_limits,
+        )?)
     }
 
-    #[cfg(feature = "encryption")]
+    /// Open a password-bearing DOCX reader with standard finite policies.
     ///
     /// # Errors
     ///
-    /// Returns an error if the operation cannot be completed.
+    /// Returns an error on I/O, failed decryption, exceeded limits or invalid DOCX.
+    #[cfg(feature = "encryption")]
     pub fn from_reader_with_password<R: Read>(reader: R, password: &str) -> Result<Self> {
-        Self::from_reader_with_password_and_limits(
-            reader,
-            password,
-            &Limits::default(),
-            litchi_opc::SourceLimits::default(),
-        )
+        Self::from_reader_with_password_and_options(reader, password, OpenOptions::default())
     }
 
-    /// Open a reader with explicit outer-encryption limits.
-    ///
-    /// The decrypted OPC archive uses [`litchi_opc::SourceLimits::default`].
-    /// Use [`Self::from_reader_with_password_and_limits`] to select both
-    /// independent resource policies.
-    #[cfg(feature = "encryption")]
+    /// Open a password-bearing reader with independent outer encryption and
+    /// clear OPC archive policies.
     ///
     /// # Errors
     ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn from_reader_with<R: Read>(reader: R, password: &str, limits: &Limits) -> Result<Self> {
-        Self::from_reader_with_password_and_limits(
-            reader,
-            password,
-            limits,
-            litchi_opc::SourceLimits::default(),
-        )
-    }
-
-    /// Open an encrypted DOCX reader with independent outer-encryption and
-    /// inner-OPC resource policies.
+    /// Returns an error on I/O, failed decryption, exceeded limits or invalid DOCX.
     #[cfg(feature = "encryption")]
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn from_reader_with_password_and_limits<R: Read>(
+    pub fn from_reader_with_password_and_options<R: Read>(
         reader: R,
         password: &str,
-        encryption_limits: &Limits,
-        opc_limits: litchi_opc::SourceLimits,
+        options: OpenOptions,
     ) -> Result<Self> {
-        let opened = crate::encryption::load_with(reader, password, encryption_limits)?;
-        Self::from_opened_with_limits(opened, opc_limits)
+        let opened = crate::encryption::load_with(reader, password, &options.encryption_limits)?;
+        Self::from_decrypted(opened, options)
+    }
+
+    /// Open a DOCX package from a byte slice with standard finite limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input exceeds limits or is not a valid DOCX.
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        Self::from_bytes_with_options(bytes, OpenOptions::default())
+    }
+
+    /// Open a byte slice with caller-selected source limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input exceeds limits or is not a valid DOCX.
+    pub fn from_bytes_with_options(bytes: &[u8], options: OpenOptions) -> Result<Self> {
+        Self::from_reader_with_options(bytes, options)
+    }
+
+    /// Open a password-bearing byte slice with standard finite policies.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error on failed decryption, exceeded limits or invalid DOCX.
+    #[cfg(feature = "encryption")]
+    pub fn from_bytes_with_password(bytes: &[u8], password: &str) -> Result<Self> {
+        Self::from_bytes_with_password_and_options(bytes, password, OpenOptions::default())
+    }
+
+    /// Open a password-bearing byte slice with caller-selected policies.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error on failed decryption, exceeded limits or invalid DOCX.
+    #[cfg(feature = "encryption")]
+    pub fn from_bytes_with_password_and_options(
+        bytes: &[u8],
+        password: &str,
+        options: OpenOptions,
+    ) -> Result<Self> {
+        Self::from_reader_with_password_and_options(bytes, password, options)
     }
 
     /// Open a package that was already decrypted, keeping its encryption
@@ -490,30 +477,19 @@ impl Package {
     ///
     /// `opened` comes from [`crate::encryption::open`] or one of its limit
     /// and policy variants. The package keeps the source profile exactly as
-    /// [`Self::from_reader_with_password_and_limits`] does, so plain output
+    /// [`Self::from_reader_with_password_and_options`] does, so plain output
     /// stays refused until the caller chooses re-encryption or plaintext.
     /// This lets one decryption serve both a caller's own classification of
     /// the clear package and the open.
     ///
     /// # Errors
     ///
-    /// Returns an error if the clear package violates `limits` or is not a
+    /// Returns an error if the clear package violates the source limits or is not a
     /// valid DOCX package.
     #[cfg(feature = "encryption")]
-    pub fn from_decrypted(
-        opened: crate::encryption::Opened,
-        limits: litchi_opc::SourceLimits,
-    ) -> Result<Self> {
-        Self::from_opened_with_limits(opened, limits)
-    }
-
-    #[cfg(feature = "encryption")]
-    fn from_opened_with_limits(
-        opened: crate::encryption::Opened,
-        limits: litchi_opc::SourceLimits,
-    ) -> Result<Self> {
+    pub fn from_decrypted(opened: crate::encryption::Opened, options: OpenOptions) -> Result<Self> {
         let source_encryption = opened.mode();
-        let opc = OpcPackage::from_vec_with_limits(opened.into_bytes(), limits)?;
+        let opc = OpcPackage::from_vec_with_limits(opened.into_bytes(), options.source_limits)?;
         let mut package = Self::from_opc_package(opc)?;
         package.source_encryption = source_encryption;
         Ok(package)

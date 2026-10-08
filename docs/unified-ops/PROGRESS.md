@@ -437,3 +437,16 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 - Migrated consumers, tests, active fuzz/performance tools and added exact-scope
   glossary bans. Record 0037 documents verification and remaining work.
 - OpenOptions, semantic profiles and the wider unified goal remain active.
+
+
+## 0038 — owning DOCX OpenOptions
+
+- Added one crate-root OpenOptions envelope for owning DOCX ingress, canonical
+  byte-slice constructors and configured password routes; removed the replaced
+  limit-taking and ad-hoc constructors without aliases.
+- Migrated unified decrypted adoption and consumers. The same source policy
+  reaches clear OPC parsing while encryption mode remains retained.
+- Added path/reader/bytes boundary and independent encryption/source limit
+  checks; glossary rules ban the retired owning-Package methods.
+- Record 0038 records evidence and remaining lazy-owner, semantic and crypto
+  policy work. The broader unified goal remains active.

@@ -462,8 +462,11 @@ fn assert_effects_add_rejected_under_cap(
         },
         MutationCap::RelationshipXmlBytes => litchi_opc::SourceLimitKind::TotalRelationshipXmlBytes,
     };
-    let mut package = Package::from_reader_with_limits(Cursor::new(source.to_vec()), limits)
-        .map_err(|error| FixtureError(format!("open baseline under {label}: {error}")))?;
+    let mut package = Package::from_reader_with_options(
+        Cursor::new(source.to_vec()),
+        litchi_docx::OpenOptions::default().source_limits(limits),
+    )
+    .map_err(|error| FixtureError(format!("open baseline under {label}: {error}")))?;
     let baseline = package_bytes(&mut package);
     assert_eq!(baseline, source, "baseline changed under {label} cap");
     assert!(
@@ -528,8 +531,11 @@ fn assert_effects_add_rejected_under_cap(
         baseline,
         "failed patch changed bytes under {label} cap"
     );
-    let reopened = Package::from_reader_with_limits(Cursor::new(baseline), limits)
-        .map_err(|error| FixtureError(format!("reopen baseline under {label}: {error}")))?;
+    let reopened = Package::from_reader_with_options(
+        Cursor::new(baseline),
+        litchi_docx::OpenOptions::default().source_limits(limits),
+    )
+    .map_err(|error| FixtureError(format!("reopen baseline under {label}: {error}")))?;
     assert!(
         reopened
             .styles_with_effects(Owner::MainDocument)
@@ -1192,7 +1198,13 @@ fn effects_resource_limits_and_malformed_grammar_fail_closed() -> FixtureResult<
         .map_err(|error| FixtureError(format!("part limit: {error:?}")))?
         .build()
         .map_err(|error| FixtureError(format!("build read limits: {error:?}")))?;
-    assert!(Package::from_reader_with_limits(Cursor::new(bytes.clone()), limit).is_err());
+    assert!(
+        Package::from_reader_with_options(
+            Cursor::new(bytes.clone()),
+            litchi_docx::OpenOptions::default().source_limits(limit)
+        )
+        .is_err()
+    );
 
     let malformed = b"<w:styles xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:style></w:styles>";
     assert!(Resource::from_xml(malformed.to_vec()).is_err());
@@ -1533,8 +1545,11 @@ fn effects_addition_honors_public_package_caps_atomically() -> FixtureResult<()>
         .map_err(|error| FixtureError(format!("set exact XML byte cap: {error:?}")))?
         .build()
         .map_err(|error| FixtureError(format!("build exact mutation caps: {error:?}")))?;
-    let mut exact = Package::from_reader_with_limits(Cursor::new(source.clone()), exact_limits)
-        .map_err(|error| FixtureError(format!("open exact-fit baseline: {error}")))?;
+    let mut exact = Package::from_reader_with_options(
+        Cursor::new(source.clone()),
+        litchi_docx::OpenOptions::default().source_limits(exact_limits),
+    )
+    .map_err(|error| FixtureError(format!("open exact-fit baseline: {error}")))?;
     assert_eq!(package_bytes(&mut exact), source);
     assert!(
         exact
@@ -1546,9 +1561,11 @@ fn effects_addition_honors_public_package_caps_atomically() -> FixtureResult<()>
         projected_metrics
     );
 
-    let mut exact_patch =
-        Package::from_reader_with_limits(Cursor::new(source.clone()), exact_limits)
-            .map_err(|error| FixtureError(format!("open exact-fit patch baseline: {error}")))?;
+    let mut exact_patch = Package::from_reader_with_options(
+        Cursor::new(source.clone()),
+        litchi_docx::OpenOptions::default().source_limits(exact_limits),
+    )
+    .map_err(|error| FixtureError(format!("open exact-fit patch baseline: {error}")))?;
     let snapshot = exact_patch
         .styles_with_effects(Owner::MainDocument)
         .map_err(|error| FixtureError(format!("read exact-fit patch baseline: {error}")))?;
@@ -1635,8 +1652,11 @@ fn effects_addition_honors_relationship_part_and_graph_caps_with_source_less_own
         .map_err(|error| FixtureError(format!("set exact graph-node cap: {error:?}")))?
         .build()
         .map_err(|error| FixtureError(format!("build exact topology caps: {error:?}")))?;
-    let mut exact = Package::from_reader_with_limits(Cursor::new(source.clone()), exact_limits)
-        .map_err(|error| FixtureError(format!("open source-less exact-fit baseline: {error}")))?;
+    let mut exact = Package::from_reader_with_options(
+        Cursor::new(source.clone()),
+        litchi_docx::OpenOptions::default().source_limits(exact_limits),
+    )
+    .map_err(|error| FixtureError(format!("open source-less exact-fit baseline: {error}")))?;
     assert_eq!(package_bytes(&mut exact), source);
     assert!(
         exact
@@ -1648,12 +1668,15 @@ fn effects_addition_honors_relationship_part_and_graph_caps_with_source_less_own
         projected_metrics
     );
 
-    let mut exact_patch = Package::from_reader_with_limits(Cursor::new(source), exact_limits)
-        .map_err(|error| {
-            FixtureError(format!(
-                "open source-less exact-fit patch baseline: {error}"
-            ))
-        })?;
+    let mut exact_patch = Package::from_reader_with_options(
+        Cursor::new(source),
+        litchi_docx::OpenOptions::default().source_limits(exact_limits),
+    )
+    .map_err(|error| {
+        FixtureError(format!(
+            "open source-less exact-fit patch baseline: {error}"
+        ))
+    })?;
     let snapshot = exact_patch
         .styles_with_effects(Owner::MainDocument)
         .map_err(|error| {
@@ -1742,10 +1765,11 @@ fn assert_replacement_honors_total_part_bytes_cap(
         .map_err(|error| {
             FixtureError(format!("build exact {owner:?} total-part cap: {error:?}"))
         })?;
-    let mut exact = Package::from_reader_with_limits(Cursor::new(source.to_vec()), exact_limits)
-        .map_err(|error| {
-            FixtureError(format!("open exact {owner:?} replacement source: {error}"))
-        })?;
+    let mut exact = Package::from_reader_with_options(
+        Cursor::new(source.to_vec()),
+        litchi_docx::OpenOptions::default().source_limits(exact_limits),
+    )
+    .map_err(|error| FixtureError(format!("open exact {owner:?} replacement source: {error}")))?;
     assert_eq!(package_bytes(&mut exact), source);
     let exact_base = exact.styles_with_effects(owner).map_err(|error| {
         FixtureError(format!("load exact {owner:?} replacement source: {error}"))
@@ -1773,8 +1797,11 @@ fn assert_replacement_honors_total_part_bytes_cap(
         exact_total,
         "exact {owner:?} cap changed the final part-byte metric"
     );
-    let reopened = Package::from_reader_with_limits(Cursor::new(exact_output), exact_limits)
-        .map_err(|error| FixtureError(format!("reopen exact {owner:?} replacement: {error}")))?;
+    let reopened = Package::from_reader_with_options(
+        Cursor::new(exact_output),
+        litchi_docx::OpenOptions::default().source_limits(exact_limits),
+    )
+    .map_err(|error| FixtureError(format!("reopen exact {owner:?} replacement: {error}")))?;
     assert_eq!(
         reopened
             .styles_with_effects(owner)
@@ -1796,14 +1823,15 @@ fn assert_replacement_honors_total_part_bytes_cap(
                 "build one-under {owner:?} total-part cap: {error:?}"
             ))
         })?;
-    let mut limited =
-        Package::from_reader_with_limits(Cursor::new(source.to_vec()), one_under_limits).map_err(
-            |error| {
-                FixtureError(format!(
-                    "open one-under {owner:?} replacement source: {error}"
-                ))
-            },
-        )?;
+    let mut limited = Package::from_reader_with_options(
+        Cursor::new(source.to_vec()),
+        litchi_docx::OpenOptions::default().source_limits(one_under_limits),
+    )
+    .map_err(|error| {
+        FixtureError(format!(
+            "open one-under {owner:?} replacement source: {error}"
+        ))
+    })?;
     let baseline = package_bytes(&mut limited);
     assert_eq!(baseline, source);
     let limited_base = limited.styles_with_effects(owner).map_err(|error| {
@@ -1834,10 +1862,11 @@ fn assert_replacement_honors_total_part_bytes_cap(
         baseline,
         "one-under {owner:?} commit changed package output"
     );
-    let reopened_baseline =
-        Package::from_reader_with_limits(Cursor::new(baseline), one_under_limits).map_err(
-            |error| FixtureError(format!("reopen one-under {owner:?} baseline: {error}")),
-        )?;
+    let reopened_baseline = Package::from_reader_with_options(
+        Cursor::new(baseline),
+        litchi_docx::OpenOptions::default().source_limits(one_under_limits),
+    )
+    .map_err(|error| FixtureError(format!("reopen one-under {owner:?} baseline: {error}")))?;
     assert_eq!(
         reopened_baseline
             .styles_with_effects(owner)

@@ -517,7 +517,7 @@ fn unlock_ooxml(
         match detected {
             #[cfg(feature = "docx")]
             FileFormat::Docx => {
-                let package = litchi_docx::Package::from_decrypted(opened, limits)?;
+                let package = litchi_docx::Package::from_decrypted(opened, litchi_docx::OpenOptions::default().source_limits(limits))?;
                 let signed = package.is_signed();
                 let docx = crate::format::docx::Docx::from_owned_package(package, options)?;
                 Ok(signed_if(

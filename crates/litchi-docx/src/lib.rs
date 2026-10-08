@@ -37,6 +37,7 @@ pub mod modern_comments;
 mod namespace;
 pub mod numbering;
 pub mod object;
+mod open_options;
 pub mod package;
 pub mod paragraph;
 pub mod parts;
@@ -179,6 +180,7 @@ pub use variables::{Variables, parse_variables};
 // collapsing the owner modules back into host aliases.
 pub use document::{Block, Document, Element, ImageWatermarkPart, OpaqueBlock};
 pub use math::{OfficeMath, OfficeMathParagraph};
+pub use open_options::OpenOptions;
 pub use package::Package;
 pub use paragraph::{
     Collapsed, Inline, InlineHyperlink, OpaqueInline, OpaqueRunContent, Paragraph, Run, RunBreak,

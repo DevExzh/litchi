@@ -79,9 +79,13 @@ fn bounded_reader_rejects_input_before_package_parsing() {
         max_input_bytes: 4,
         ..Limits::default()
     };
-    let error = Package::from_reader_with(std::io::Cursor::new(vec![0u8; 5]), PASSWORD, &limits)
-        .err()
-        .expect("bounded reader must fail");
+    let error = Package::from_reader_with_password_and_options(
+        std::io::Cursor::new(vec![0u8; 5]),
+        PASSWORD,
+        litchi_docx::OpenOptions::default().encryption_limits(limits),
+    )
+    .err()
+    .expect("bounded reader must fail");
     assert!(matches!(
         error,
         Error::Encryption(CryptoError::Limit {

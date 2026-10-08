@@ -84,6 +84,36 @@
           "name": "ReadResource",
           "scope": "litchi_docx",
           "replacement": "use SourceLimitKind"
+        },
+        {
+          "name": "open_with",
+          "scope": "litchi_docx::Package",
+          "replacement": "use the corresponding *_with_options constructor"
+        },
+        {
+          "name": "from_reader_with",
+          "scope": "litchi_docx::Package",
+          "replacement": "use the corresponding *_with_options constructor"
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_docx::Package",
+          "replacement": "use the corresponding *_with_options constructor"
+        },
+        {
+          "name": "from_reader_with_limits",
+          "scope": "litchi_docx::Package",
+          "replacement": "use the corresponding *_with_options constructor"
+        },
+        {
+          "name": "open_with_password_and_limits",
+          "scope": "litchi_docx::Package",
+          "replacement": "use the corresponding *_with_options constructor"
+        },
+        {
+          "name": "from_reader_with_password_and_limits",
+          "scope": "litchi_docx::Package",
+          "replacement": "use the corresponding *_with_options constructor"
         }
       ],
       "families": []
@@ -168,6 +198,36 @@
           "name": "ReadResource",
           "scope": "litchi_docx",
           "replacement": "use SourceLimitKind"
+        },
+        {
+          "name": "open_with",
+          "scope": "litchi_docx::Package",
+          "replacement": "use the corresponding *_with_options constructor"
+        },
+        {
+          "name": "from_reader_with",
+          "scope": "litchi_docx::Package",
+          "replacement": "use the corresponding *_with_options constructor"
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_docx::Package",
+          "replacement": "use the corresponding *_with_options constructor"
+        },
+        {
+          "name": "from_reader_with_limits",
+          "scope": "litchi_docx::Package",
+          "replacement": "use the corresponding *_with_options constructor"
+        },
+        {
+          "name": "open_with_password_and_limits",
+          "scope": "litchi_docx::Package",
+          "replacement": "use the corresponding *_with_options constructor"
+        },
+        {
+          "name": "from_reader_with_password_and_limits",
+          "scope": "litchi_docx::Package",
+          "replacement": "use the corresponding *_with_options constructor"
         }
       ],
       "families": []

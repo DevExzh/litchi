@@ -54,7 +54,8 @@ Every failure is one `litchi::Error` with a stable `litchi::Code`.
 `docx`, `pptx`, `xlsx`, and `xlsb` re-export `SourceLimits`, the shared checked
 OPC package-ingestion policy. Ordinary constructors use bounded defaults.
 Construct a profile from those defaults with `SourceLimits::builder()` and supply
-it to the matching contextual API: DOCX and PPTX `Package::*_with_limits`,
+it to the matching contextual API: DOCX `Package::*_with_options` via
+`OpenOptions::source_limits`, PPTX `Package::*_with_limits`,
 XLSX `Package::*_with_limits` or `Workbook::*_with_limits`, and XLSB
 `Workbook::new_with_limits`.
 
@@ -66,13 +67,16 @@ MS-OI29500 §2.1.1749-1752 for hostile input; it is a Litchi safety policy,
 not a specification maximum.
 
 ```rust
-use litchi::docx::{Package, SourceLimits};
+use litchi::docx::{OpenOptions, Package, SourceLimits};
 
 let limits = SourceLimits::builder()
     .max_input_bytes(32 * 1024 * 1024)?
     .max_members(10_000)?
     .build()?;
-let package = Package::open_with_limits("untrusted.docx", limits)?;
+let package = Package::open_with_options(
+    "untrusted.docx",
+    OpenOptions::default().source_limits(limits),
+)?;
 # let _ = package;
 # Ok::<(), litchi::Error>(())
 ```

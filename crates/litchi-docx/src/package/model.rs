@@ -26,7 +26,7 @@ pub(super) use crate::bibliography::{
 pub(super) use crate::custom_xml::{Binding, NewStore};
 pub(super) use crate::document::Document;
 #[cfg(feature = "encryption")]
-pub(super) use crate::encryption::{Limits, Mode};
+pub(super) use crate::encryption::Mode;
 /// Package implementation for Word documents.
 pub(super) use crate::error::{Error, Result};
 pub(super) use crate::mail_merge::{
