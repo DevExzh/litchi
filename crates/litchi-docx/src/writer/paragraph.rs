@@ -52,7 +52,7 @@ use super::textbox::MutableTextBox;
 use super::vml_shape::MutableVmlShape;
 
 /// Elements that can appear in a paragraph.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum ParagraphElement {
     Run(MutableRun),
     /// Display `<m:oMathPara>` content directly inside the paragraph.
@@ -365,7 +365,7 @@ impl ParagraphElement {
 }
 
 /// A mutable paragraph in a document.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MutableParagraph {
     /// Elements (runs and hyperlinks) in this paragraph
     pub(crate) elements: Vec<ParagraphElement>,

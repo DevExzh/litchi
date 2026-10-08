@@ -339,7 +339,7 @@ fn changed_commit(file: &File) -> (Vec<u8>, String) {
     match file {
         #[cfg(feature = "docx")]
         File::Docx(handle) => {
-            let Ok(crate::format::docx::DocxEditor::Unsigned(mut package)) = handle.edit() else {
+            let Ok(crate::format::docx::DocxEditor::Unsigned(package)) = handle.edit() else {
                 panic!("an unsigned DOCX builds an owning unsigned copy");
             };
             // Append a paragraph: Office's signed fixture keeps its only
@@ -348,7 +348,7 @@ fn changed_commit(file: &File) -> (Vec<u8>, String) {
             let count = edit.source().paragraph_count();
             edit.insert_paragraph(Position::new(count), MARKER).unwrap();
             let commit = edit.commit().unwrap();
-            package.apply_document_patch(commit.patch()).unwrap();
+            let mut package = package.apply(commit.patch()).unwrap();
             let mut output = Vec::new();
             package.to_stream(&mut output).unwrap();
             (output, MARKER.to_owned())
@@ -541,9 +541,9 @@ fn assert_exact_noop(input: &Input) {
                 .unwrap();
             assert_eq!(&output, bytes, "{label}: source-backed no-op");
 
-            let mut package = litchi_docx::Package::from_reader(Cursor::new(bytes)).unwrap();
+            let package = litchi_docx::Package::from_reader(Cursor::new(bytes)).unwrap();
             let commit = package.edit().unwrap().commit().unwrap();
-            package.apply_document_patch(commit.patch()).unwrap();
+            let mut package = package.apply(commit.patch()).unwrap();
             let mut output = Vec::new();
             package.to_stream(&mut output).unwrap();
             assert_eq!(&output, bytes, "{label}: eager no-op");

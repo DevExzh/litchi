@@ -60,7 +60,7 @@ pub(crate) const MAX_TEXT_BYTES: usize = 1024 * 1024;
 /// package.save("out.docx")?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MutableTextBox {
     /// Drawing element ID written to `wp:docPr@id`.
     pub(crate) id: u32,

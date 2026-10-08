@@ -6,7 +6,7 @@ use super::transfer::{
 };
 use litchi_opc::OpcError;
 
-/// The main-document bytes `apply_document_patch` publishes.
+/// The main-document bytes `apply` publishes.
 enum MainReplacement {
     /// The candidate's own allocation, with the proof that it passed the
     /// writer's source publication audit.
@@ -15,7 +15,7 @@ enum MainReplacement {
     Copied(Vec<u8>),
 }
 
-/// How `apply_document_patch` obtained the snapshot it publishes.
+/// How `apply` obtained the snapshot it publishes.
 enum DocumentPatchSource {
     /// The opened package still retains the patch's exact source bytes, so the
     /// patch handed back its own retained target and no snapshot was built.
@@ -54,7 +54,7 @@ impl Package {
     /// mutates a part payload in place, so a snapshot taken here keeps the
     /// bytes it was built from for as long as it lives even after the package
     /// publishes a different main document. Sharing also lets
-    /// [`Self::apply_document_patch`]'s exact-source proof settle on pointer
+    /// [`Self::apply`]'s exact-source proof settle on pointer
     /// identity instead of a whole-part byte comparison.
     ///
     /// # Errors
@@ -129,14 +129,28 @@ impl Package {
             // a reused candidate is held to the same admission before it is
             // published, however its source snapshot was built.
             if patch.changed() {
-                self.admit_main_document(&main.blob_arc(), "apply_document_patch")?;
+                self.admit_main_document(&main.blob_arc(), "apply")?;
             }
             return Ok(DocumentPatchSource::Reused(candidate));
         }
         Ok(DocumentPatchSource::Rescanned(self.document_snapshot()?))
     }
 
-    /// Apply a main-document patch atomically to its exact source package.
+    /// Apply a main-document patch and return a new package.
+    ///
+    /// The source is retained unchanged on success and failure. An exact
+    /// no-op shares its physical graph, metadata and retained writer state.
+    ///
+    /// ```
+    /// use litchi_docx::Package;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let package = Package::new()?;
+    /// let commit = package.edit()?.commit()?;
+    /// let next = package.apply(commit.patch())?;
+    /// assert_eq!(package.document()?.text()?, next.document()?.text()?);
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// A stale patch leaves the package untouched. An exact no-op preserves
     /// signatures and the main-part payload allocation; a real edit validates
@@ -150,7 +164,15 @@ impl Package {
     ///
     /// Returns a stale-source or package-validation error without publishing
     /// any partial package mutation.
-    pub fn apply_document_patch(
+    pub fn apply(&self, patch: &crate::document::Patch) -> crate::document::Result<Self> {
+        let mut package = self.clone();
+        package.publish_patch(patch)?;
+        Ok(package)
+    }
+
+    // Internal publication engine for the remaining legacy/history adapters.
+    // The public patch entry always works on a share and returns a new owner.
+    fn publish_patch(
         &mut self,
         patch: &crate::document::Patch,
     ) -> std::result::Result<crate::document::Snapshot, crate::document::Error> {
@@ -176,7 +198,7 @@ impl Package {
             Some(proof) => MainReplacement::Proven(proof.clone()),
             None => MainReplacement::Copied(candidate.xml_bytes().to_vec()),
         };
-        self.edit_semantic_opc("apply_document_patch", move |opc| {
+        self.edit_semantic_opc("apply", move |opc| {
             if let Some((graph, insert, expected_digest)) = graph_transition {
                 apply_transfer_graph(opc, &graph, insert)
                     .map_err(|error| Error::InvalidFormat(error.to_string()))?;
@@ -226,7 +248,7 @@ impl Package {
         &mut self,
         commit: crate::document::Commit,
     ) -> std::result::Result<crate::document::Commit, crate::document::Error> {
-        self.apply_document_patch(commit.patch())?;
+        self.publish_patch(commit.patch())?;
         Ok(commit)
     }
 
@@ -247,11 +269,11 @@ impl Package {
             return Err(crate::document::Error::StaleSource);
         }
         if !commit.patch().changed() {
-            self.apply_document_patch(commit.patch())?;
+            self.publish_patch(commit.patch())?;
             return Ok(Vec::new());
         }
         history.ensure_can_record(&commit)?;
-        self.apply_document_patch(commit.patch())?;
+        self.publish_patch(commit.patch())?;
         history.record(commit)
     }
 
@@ -503,17 +525,17 @@ impl Package {
                 Ok(part) => {
                     let xml = std::str::from_utf8(part.blob())
                         .map_err(|error| Error::InvalidFormat(format!("Invalid UTF-8: {error}")))?;
-                    self.mutable_doc = Some(MutableDocument::from_xml(xml)?);
+                    self.mutable_doc = Some(MutableDocument::from_xml(xml)?.into());
                 },
                 Err(OpcError::PartNotFound(_)) => {
                     // Create a new empty document
-                    self.mutable_doc = Some(MutableDocument::new());
+                    self.mutable_doc = Some(MutableDocument::new().into());
                 },
                 Err(error) => return Err(error.into()),
             }
         }
 
-        self.mutable_doc.as_mut().ok_or_else(|| {
+        self.mutable_doc.as_deref_mut().ok_or_else(|| {
             Error::InvalidFormat("mutable document initialization did not complete".into())
         })
     }

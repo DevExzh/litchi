@@ -38,8 +38,9 @@ DOCX behavior.
 `Package::document()` returns an owned, read-only `Document`. It retains the
 physical snapshot used for related-part resolution and remains readable after
 package drop or later edits. Secondary style and raw-part views borrow this
-projection. Eager package mutation APIs are still being migrated to the
-immutable package/commit contract; an owned projection does not imply that
+projection. Eager `Package` is cheaply cloneable and `apply(&patch)` returns a new package
+without changing the source. Other eager mutation APIs are still being migrated
+to the immutable package/commit contract; an owned projection does not imply that
 migration is complete.
 
 ## Core WordprocessingML document model

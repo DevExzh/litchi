@@ -53,6 +53,7 @@ use super::package::{
 ///
 /// Provides methods to add and modify document content including paragraphs,
 /// runs, tables, sections, and other elements.
+#[derive(Clone)]
 pub struct MutableDocument {
     /// Document body content (paragraphs, tables, etc.)
     pub(crate) body: DocumentBody,

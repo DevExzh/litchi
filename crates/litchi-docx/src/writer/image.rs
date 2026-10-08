@@ -14,7 +14,7 @@ pub use super::super::format::ImageFormat;
 /// A mutable inline image in a document.
 ///
 /// Inline images are embedded within paragraphs as part of runs.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MutableInlineImage {
     /// Image binary data
     pub(crate) data: Vec<u8>,

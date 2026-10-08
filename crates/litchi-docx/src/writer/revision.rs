@@ -313,7 +313,7 @@ fn validate_nonempty_xml(label: &str, value: &str) -> Result<()> {
     Ok(())
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum RevisionChild {
     Element(ParagraphElement),
     CommentRangeStart(u32),
@@ -322,7 +322,7 @@ enum RevisionChild {
     ContentControl(RevisionContentControl),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RevisionContentControl {
     control: MutableContentControl,
     elements: Vec<ParagraphElement>,
@@ -376,7 +376,7 @@ impl RevisionContentControl {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MutableRevision {
     kind: RevisionKind,
     metadata: RevisionMetadata,
@@ -388,7 +388,7 @@ pub struct MutableRevision {
 /// The legal child surface intentionally mirrors [`MutableRevision`]. Nested
 /// revision or conflict wrappers are not exposed because `WordprocessingML` does
 /// not permit those wrappers in this context.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MutableConflict {
     kind: ConflictKind,
     metadata: ConflictMetadata,
@@ -525,7 +525,7 @@ impl MutableConflict {
 ///
 /// The matching end marker is generated from the start metadata, so callers
 /// cannot create an orphan or mismatched marker through this API.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MutableCustomXmlConflictRange {
     kind: ConflictKind,
     metadata: ConflictMetadata,

@@ -56,7 +56,7 @@ const MAX_SHAPE_ID_LENGTH: usize = 255;
 /// package.save("out.docx")?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MutableOleObject {
     /// COM `ProgID` of the embedded object (e.g. `Package`, `Excel.Sheet.12`).
     pub(crate) prog_id: String,

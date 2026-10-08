@@ -388,7 +388,7 @@ fn document_patch_publishes_atomically_and_reopens() {
     );
 
     let before_stale = package.opc.main_document_part().unwrap().blob().to_vec();
-    assert!(package.apply_document_patch(commit.patch()).is_err());
+    assert!(package.apply(commit.patch()).is_err());
     assert_eq!(
         package.opc.main_document_part().unwrap().blob(),
         before_stale
@@ -402,9 +402,7 @@ fn document_patch_publishes_atomically_and_reopens() {
         "after and longer"
     );
 
-    package
-        .apply_document_patch(&commit.patch().inverse())
-        .unwrap();
+    package = package.apply(&commit.patch().inverse()).unwrap();
     assert_eq!(package.opc.main_document_part().unwrap().blob(), source_xml);
 }
 
@@ -993,7 +991,7 @@ fn failed_stream_keeps_document_and_properties_retryable() {
         package
             .mutable_doc
             .as_ref()
-            .is_some_and(MutableDocument::is_modified)
+            .is_some_and(|document| document.is_modified())
     );
     assert!(package.properties.is_dirty());
 
@@ -1045,7 +1043,7 @@ fn panicking_stream_restores_package_and_retryable_state() {
         package
             .mutable_doc
             .as_ref()
-            .is_some_and(MutableDocument::is_modified)
+            .is_some_and(|document| document.is_modified())
     );
     assert!(package.properties.is_dirty());
 
@@ -1229,7 +1227,8 @@ fn exact_source_patch_reuse_keeps_noop_arcs_stale_conflicts_and_scan_errors() {
     let main_before = package.opc.main_document_part().unwrap().blob_arc();
     let noop = package.edit().unwrap().commit().unwrap();
     assert!(!noop.patch().changed());
-    let published = package.apply_document_patch(noop.patch()).unwrap();
+    let next = package.apply(noop.patch()).unwrap();
+    let published = next.document_snapshot().unwrap();
     let main_after_noop = package.opc.main_document_part().unwrap().blob_arc();
     assert!(std::sync::Arc::ptr_eq(&main_before, &main_after_noop));
     assert_eq!(published.xml_bytes(), source_xml);
@@ -1250,7 +1249,7 @@ fn exact_source_patch_reuse_keeps_noop_arcs_stale_conflicts_and_scan_errors() {
     let commit = package.publish_document_edit(edit).unwrap();
     let republished = package.opc.main_document_part().unwrap().blob().to_vec();
     assert!(matches!(
-        package.apply_document_patch(commit.patch()),
+        package.apply(commit.patch()),
         Err(crate::document::Error::StaleSource)
     ));
     assert_eq!(
@@ -1260,9 +1259,7 @@ fn exact_source_patch_reuse_keeps_noop_arcs_stale_conflicts_and_scan_errors() {
 
     // Reapplying the inverse still reaches the exact original bytes through the
     // reuse proof.
-    package
-        .apply_document_patch(&commit.patch().inverse())
-        .unwrap();
+    package = package.apply(&commit.patch().inverse()).unwrap();
     assert_eq!(package.opc.main_document_part().unwrap().blob(), source_xml);
 
     // When the main part no longer parses, the byte proof declines and the full
@@ -1276,7 +1273,7 @@ fn exact_source_patch_reuse_keeps_noop_arcs_stale_conflicts_and_scan_errors() {
         })
         .unwrap();
     assert!(matches!(
-        package.apply_document_patch(commit.patch()),
+        package.apply(commit.patch()),
         Err(crate::document::Error::Document(_))
     ));
 }
@@ -1366,4 +1363,139 @@ fn the_compaction_policy_reaches_publication_through_the_package_route() {
     let mut published = Vec::new();
     compacting.to_stream(&mut published).unwrap();
     assert!(!published.is_empty());
+}
+
+#[test]
+fn immutable_apply_shares_noops_and_keeps_each_package_revision_readable() {
+    fn assert_shared<T: Clone + Send + Sync + 'static>() {}
+    assert_shared::<Package>();
+    let package = Package::new().unwrap();
+    let source_xml = package.document_snapshot().unwrap();
+    let noop = package.edit().unwrap().commit().unwrap();
+    let mut unchanged = package.apply(noop.patch()).unwrap();
+    assert!(std::ptr::eq(&*package.opc, &*unchanged.opc));
+    assert!(std::ptr::eq(&*package.properties, &*unchanged.properties));
+    assert!(std::ptr::eq(
+        &*package.custom_props,
+        &*unchanged.custom_props
+    ));
+    assert!(std::ptr::eq(
+        package.mutable_doc.as_deref().unwrap(),
+        unchanged.mutable_doc.as_deref().unwrap()
+    ));
+
+    unchanged.to_plain_stream(Vec::new()).unwrap();
+    assert!(std::ptr::eq(&*package.opc, &*unchanged.opc));
+    assert!(std::ptr::eq(
+        package.mutable_doc.as_deref().unwrap(),
+        unchanged.mutable_doc.as_deref().unwrap()
+    ));
+
+    let mut edit = package.edit().unwrap();
+    edit.insert_paragraph(litchi_core::Position::new(0), "new paragraph")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let changed = package.apply(commit.patch()).unwrap();
+    assert_eq!(package.document().unwrap().text().unwrap(), "");
+    assert_eq!(changed.document().unwrap().text().unwrap(), "new paragraph");
+    assert!(!std::ptr::eq(&*package.opc, &*changed.opc));
+    changed.document_snapshot().unwrap();
+    // The shared admission memo must never confuse a changed allocation
+    // with the still-live original package.
+    assert_eq!(
+        package.document_snapshot().unwrap().xml_bytes(),
+        source_xml.xml_bytes()
+    );
+    assert!(matches!(
+        changed.apply(commit.patch()),
+        Err(crate::document::Error::StaleSource)
+    ));
+    let restored = changed.apply(&commit.patch().inverse()).unwrap();
+    assert_eq!(
+        restored.document_snapshot().unwrap().xml_bytes(),
+        source_xml.xml_bytes()
+    );
+    assert_eq!(changed.document().unwrap().text().unwrap(), "new paragraph");
+}
+
+#[test]
+fn cloned_dirty_writer_and_metadata_detach_and_remain_retryable() {
+    let mut source = Package::new().unwrap();
+    source
+        .document_mut()
+        .unwrap()
+        .add_paragraph_with_text("source");
+    source.put_props(Props::new().title("source title"));
+    source
+        .custom_props_mut()
+        .insert("Marker", "source value")
+        .unwrap();
+    let mut changed = source.clone();
+    assert!(std::ptr::eq(
+        source.mutable_doc.as_deref().unwrap(),
+        changed.mutable_doc.as_deref().unwrap()
+    ));
+    assert!(std::ptr::eq(&*source.properties, &*changed.properties));
+    assert!(std::ptr::eq(&*source.custom_props, &*changed.custom_props));
+    changed
+        .document_mut()
+        .unwrap()
+        .add_paragraph_with_text("changed");
+    changed.props_mut().unwrap().title = Some("changed title".into());
+    changed
+        .custom_props_mut()
+        .insert("Marker", "changed value")
+        .unwrap();
+    assert!(changed.to_plain_stream(FailingWriter).is_err());
+    assert!(source.properties.is_dirty());
+    assert!(changed.properties.is_dirty());
+    assert!(source.custom_props_dirty);
+    assert!(changed.custom_props_dirty);
+    assert_eq!(
+        source.props().unwrap().title.as_deref(),
+        Some("source title")
+    );
+    assert_ne!(
+        source.custom_props().get("Marker"),
+        changed.custom_props().get("Marker")
+    );
+    let mut changed_bytes = Vec::new();
+    changed.to_plain_stream(&mut changed_bytes).unwrap();
+    assert!(!changed.properties.is_dirty());
+    assert!(source.properties.is_dirty());
+    let changed_read = Package::from_reader(Cursor::new(changed_bytes)).unwrap();
+    assert_eq!(
+        changed_read.document().unwrap().text().unwrap(),
+        "sourcechanged"
+    );
+    assert_eq!(
+        changed_read.props().unwrap().title.as_deref(),
+        Some("changed title")
+    );
+    let mut source_bytes = Vec::new();
+    source.to_plain_stream(&mut source_bytes).unwrap();
+    let source_read = Package::from_reader(Cursor::new(source_bytes)).unwrap();
+    assert_eq!(source_read.document().unwrap().text().unwrap(), "source");
+    assert_eq!(
+        source_read.props().unwrap().title.as_deref(),
+        Some("source title")
+    );
+    assert_eq!(
+        source_read.custom_props().get("Marker"),
+        source.custom_props().get("Marker")
+    );
+
+    let mut replaced = source.clone();
+    replaced.put_props(Props::new().title("replacement"));
+    let mut cleared = source.clone();
+    cleared.clear_props();
+    assert_eq!(
+        source.props().unwrap().title.as_deref(),
+        Some("source title")
+    );
+    assert_eq!(
+        replaced.props().unwrap().title.as_deref(),
+        Some("replacement")
+    );
+    assert!(cleared.props().is_none());
 }

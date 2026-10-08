@@ -24,6 +24,7 @@ use std::fmt::Write as FmtWrite;
     clippy::large_enum_variant,
     reason = "writer-internal variants are moved and boxing would add churn"
 )] // writer-internal type; boxing would churn all match sites
+#[derive(Clone)]
 pub(crate) enum HyperlinkElement {
     Run(MutableRun),
     Field(MutableField),
@@ -32,7 +33,7 @@ pub(crate) enum HyperlinkElement {
 /// A mutable hyperlink in a document.
 ///
 /// Hyperlinks can be added to paragraphs to create clickable links to URLs or document anchors.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MutableHyperlink {
     /// Hyperlink URL (for external links)
     pub(crate) url: Option<String>,

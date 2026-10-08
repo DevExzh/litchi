@@ -5,7 +5,7 @@
 use super::paragraph::MutableParagraph;
 
 /// Footnote or endnote entry.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Note {
     /// Note ID (starting from 1)
     pub(crate) id: u32,

@@ -113,6 +113,10 @@ pub(crate) fn validate_document_main_content_type(content_type: &str) -> Result<
 /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
 /// ```
 ///
+/// Cloning shares the physical graph, metadata and retained writer state.
+/// Mutating a clone detaches that state before writing; the other handles
+/// and their owned document projections retain their original contents.
+///
 /// ## Creating a new document
 ///
 /// ```rust,no_run
@@ -130,9 +134,10 @@ pub(crate) fn validate_document_main_content_type(content_type: &str) -> Result<
 /// pkg.save("output.docx")?;
 /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
 /// ```
+#[derive(Clone)]
 pub struct Package {
     /// The underlying OPC package
-    pub(super) opc: SharedOpc,
+    pub(super) opc: Shared<OpcPackage>,
     /// Package-scoped clean paragraph memo; entries are invalidated by source
     /// allocation identity when the main relationship or payload changes.
     pub(super) paragraph_index_cache: std::sync::Arc<ParagraphIndexCache>,
@@ -140,15 +145,15 @@ pub struct Package {
     /// proved for a transaction. Payloads are replaced, never mutated in
     /// place, so a live allocation that is still this one holds the same
     /// bytes; the weak reference keeps nothing alive.
-    pub(super) main_admission: std::sync::Mutex<std::sync::Weak<Vec<u8>>>,
+    pub(super) main_admission: std::sync::Arc<std::sync::Mutex<std::sync::Weak<Vec<u8>>>>,
     /// Mutable document for writing (cached)
-    pub(super) mutable_doc: Option<MutableDocument>,
+    pub(super) mutable_doc: Option<Shared<MutableDocument>>,
     /// Whether a committed raw edit has disabled the legacy document writer.
     pub(super) raw_edit_committed: bool,
     /// Authoritative, mutation-tracked core properties.
-    pub(super) properties: Slot,
+    pub(super) properties: Shared<Slot>,
     /// Custom document properties
-    pub(super) custom_props: CustomProps,
+    pub(super) custom_props: Shared<CustomProps>,
     /// Whether the custom-property facade has unmaterialized changes.
     pub(super) custom_props_dirty: bool,
     /// Optional managed font-publication policy.
@@ -160,32 +165,36 @@ pub struct Package {
     pub(super) source_encryption: Option<Mode>,
 }
 
-/// Shared physical snapshot. Legacy mutation paths detach before writing so
-/// an owned semantic projection always keeps the graph it was created from.
-#[derive(Clone)]
-pub(super) struct SharedOpc(std::sync::Arc<OpcPackage>);
+/// Shared immutable state; legacy mutations detach before writing.
+pub(super) struct Shared<T>(std::sync::Arc<T>);
 
-impl SharedOpc {
-    pub(super) fn shared(&self) -> std::sync::Arc<OpcPackage> {
+impl<T> Clone for Shared<T> {
+    fn clone(&self) -> Self {
+        Self(std::sync::Arc::clone(&self.0))
+    }
+}
+
+impl<T> Shared<T> {
+    pub(super) fn shared(&self) -> std::sync::Arc<T> {
         std::sync::Arc::clone(&self.0)
     }
 }
 
-impl From<OpcPackage> for SharedOpc {
-    fn from(package: OpcPackage) -> Self {
-        Self(std::sync::Arc::new(package))
+impl<T> From<T> for Shared<T> {
+    fn from(value: T) -> Self {
+        Self(std::sync::Arc::new(value))
     }
 }
 
-impl std::ops::Deref for SharedOpc {
-    type Target = OpcPackage;
+impl<T> std::ops::Deref for Shared<T> {
+    type Target = T;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl std::ops::DerefMut for SharedOpc {
+impl<T: Clone> std::ops::DerefMut for Shared<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         std::sync::Arc::make_mut(&mut self.0)
     }
@@ -213,8 +222,8 @@ pub(super) struct SettingsPartSnapshot {
 /// their `Arc` allocations. The mutable document stays owned by this guard while
 /// materialization runs, so an error or unwind cannot drop the retryable writer.
 pub(super) struct WriteRollbackGuard {
-    package_before: SharedOpc,
-    mutable_doc: Option<MutableDocument>,
+    package_before: Shared<OpcPackage>,
+    mutable_doc: Option<Shared<MutableDocument>>,
 }
 
 impl WriteRollbackGuard {
@@ -225,8 +234,19 @@ impl WriteRollbackGuard {
         }
     }
 
-    pub(super) fn mutable_doc_mut(&mut self) -> Option<&mut MutableDocument> {
-        self.mutable_doc.as_mut()
+    pub(super) fn mutable_doc(&self) -> Option<&MutableDocument> {
+        self.mutable_doc.as_deref()
+    }
+
+    pub(super) fn modified_doc_mut(&mut self) -> Option<&mut MutableDocument> {
+        if self
+            .mutable_doc()
+            .is_some_and(|document| document.is_modified())
+        {
+            self.mutable_doc.as_deref_mut()
+        } else {
+            None
+        }
     }
 
     pub(super) fn publish(self, package: &mut Package) {

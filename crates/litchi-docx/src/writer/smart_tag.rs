@@ -59,7 +59,7 @@ impl MutableSmartTagAttribute {
 }
 
 /// A mutable run-level Word smart tag.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MutableSmartTag {
     uri: Option<String>,
     element: String,

@@ -165,7 +165,7 @@ fn write_property_conflict_markers(
 }
 
 /// A mutable table.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MutableTable {
     /// Table rows
     pub(crate) rows: Vec<MutableRow>,
@@ -457,7 +457,7 @@ impl MutableTable {
 }
 
 /// A mutable table row.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MutableRow {
     /// Table cells in this row
     pub(crate) cells: Vec<MutableCell>,
@@ -778,7 +778,7 @@ mod tests {
 }
 
 /// A mutable table cell.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MutableCell {
     /// Paragraphs in this cell
     pub(crate) paragraphs: Vec<MutableParagraph>,

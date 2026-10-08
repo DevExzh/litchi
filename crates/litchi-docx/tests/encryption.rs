@@ -91,3 +91,25 @@ fn bounded_reader_rejects_input_before_package_parsing() {
         })
     ));
 }
+
+#[test]
+fn cloned_encrypted_package_retains_policy_and_refuses_plain_apply() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("encrypted.docx");
+    let mut plain = Package::new().unwrap();
+    let noop = plain.edit().unwrap().commit().unwrap();
+    plain
+        .save_encrypted(&path, PASSWORD, Mode::Standard)
+        .unwrap();
+    let encrypted = Package::open_with_password(&path, PASSWORD).unwrap();
+    let mut shared = encrypted.clone();
+    assert_eq!(shared.encryption(), Some(Mode::Standard));
+    assert!(shared.apply(noop.patch()).is_err());
+    let mut output = Vec::new();
+    assert!(shared.to_stream(&mut output).is_err());
+    assert!(output.is_empty());
+    shared.to_plain_stream(&mut output).unwrap();
+    assert!(output.starts_with(b"PK"));
+    assert_eq!(encrypted.encryption(), Some(Mode::Standard));
+    assert_eq!(shared.encryption(), Some(Mode::Standard));
+}

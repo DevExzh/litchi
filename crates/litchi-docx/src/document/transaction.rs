@@ -5704,7 +5704,7 @@ fn publication_accepts_preserved_xml(xml: &[u8]) -> bool {
 /// returned exactly where it was. A candidate whose bytes cannot be shared
 /// (a managed projection) takes the historical gate and carries no proof.
 ///
-/// Only [`crate::Package::apply_document_patch`] consumes the proof, and it
+/// Only [`crate::Package::apply`] consumes the proof, and it
 /// publishes only patches whose source snapshot carries no source identity
 /// (`Package::document_snapshot`'s). A snapshot with a source identity is
 /// published by the source-backed writer, which audits its own pair, so for

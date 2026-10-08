@@ -215,7 +215,7 @@ impl Package {
         opc.add_part(Box::new(numbering_part));
 
         // Create a mutable document for writing
-        let mutable_doc = Some(MutableDocument::new());
+        let mutable_doc = Some(MutableDocument::new().into());
 
         // Initialize document properties
         let properties = Slot::load(&opc)?;
@@ -226,11 +226,11 @@ impl Package {
         Ok(Self {
             opc: opc.into(),
             paragraph_index_cache: Arc::new(ParagraphIndexCache::new()),
-            main_admission: std::sync::Mutex::new(std::sync::Weak::new()),
+            main_admission: Arc::new(std::sync::Mutex::new(std::sync::Weak::new())),
             mutable_doc,
             raw_edit_committed: false,
-            properties,
-            custom_props,
+            properties: properties.into(),
+            custom_props: custom_props.into(),
             custom_props_dirty: false,
             #[cfg(feature = "automatic-fonts")]
             font_embedding: None,
@@ -385,11 +385,11 @@ impl Package {
         Ok(Self {
             opc: opc.into(),
             paragraph_index_cache: Arc::new(ParagraphIndexCache::new()),
-            main_admission: std::sync::Mutex::new(std::sync::Weak::new()),
+            main_admission: Arc::new(std::sync::Mutex::new(std::sync::Weak::new())),
             mutable_doc: None,
             raw_edit_committed: false,
-            properties,
-            custom_props,
+            properties: properties.into(),
+            custom_props: custom_props.into(),
             custom_props_dirty: false,
             #[cfg(feature = "automatic-fonts")]
             font_embedding: None,
@@ -716,7 +716,7 @@ impl Package {
         if self
             .mutable_doc
             .as_ref()
-            .is_some_and(MutableDocument::is_modified)
+            .is_some_and(|document| document.is_modified())
         {
             return Err(Error::UnsafeEdit {
                 format: "DOCX",
@@ -780,9 +780,7 @@ impl Package {
         // intent for the next attempt.
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> Result<()> {
             // If we have a mutable document, update the document.xml part
-            if let Some(mutable_doc) = rollback.mutable_doc_mut()
-                && mutable_doc.is_modified()
-            {
+            if let Some(mutable_doc) = rollback.modified_doc_mut() {
                 // Generate TOC if configured (must happen before serialization)
                 mutable_doc.generate_toc_if_needed()?;
 
@@ -1313,7 +1311,7 @@ impl Package {
             // Embed fonts if feature enabled and requested in options
             #[cfg(feature = "automatic-fonts")]
             {
-                if let Some(mutable_doc) = rollback.mutable_doc_mut() {
+                if let Some(mutable_doc) = rollback.mutable_doc() {
                     self.embed_fonts_for_document(mutable_doc)?;
                 } else {
                     self.embed_fonts()?;

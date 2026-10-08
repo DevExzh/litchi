@@ -29,6 +29,11 @@
           "name": "TransactionResult",
           "scope": "litchi_docx::document",
           "replacement": "use document::Result"
+        },
+        {
+          "name": "apply_document_patch",
+          "scope": "litchi_docx",
+          "replacement": "use immutable Package::apply(&patch)"
         }
       ],
       "families": []
@@ -58,6 +63,11 @@
           "name": "TransactionResult",
           "scope": "litchi_docx::document",
           "replacement": "use document::Result"
+        },
+        {
+          "name": "apply_document_patch",
+          "scope": "litchi_docx",
+          "replacement": "use immutable Package::apply(&patch)"
         }
       ],
       "families": []

@@ -256,8 +256,8 @@ impl Package {
         let custom_props = CustomProps::read_for(&candidate, CustomPropsHost::Word)?;
 
         self.opc = candidate;
-        self.properties = properties;
-        self.custom_props = custom_props;
+        self.properties = properties.into();
+        self.custom_props = custom_props.into();
         self.custom_props_dirty = false;
         self.mutable_doc = None;
         if raw {

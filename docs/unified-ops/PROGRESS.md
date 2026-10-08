@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0020 | Cheap eager DOCX package shares and immutable primary patch application | eager apply migrated; package-owning commit W2 work pending |
 | 0019 | Owned eager DOCX read projection and shared physical graph | projection migrated; immutable package and commit W2 work pending |
 | 0018 | DOCX primary edit entry and focused error/result names; minimal/full glossary bans | names migrated; package-owned commit/projection W2 work pending |
 | 0017 | W0 rustdoc API glossary gate, scoped rules, six-type family checks and CI | complete; profiles for leaf migration waves pending |
@@ -196,3 +197,16 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
   glossary status and ownership/rollback/no-op regression coverage.
 - This completes the eager projection shape, not the immutable package or
   package-owning commit contract. Evidence and remaining work are in 0019.
+
+## 0020 — immutable eager DOCX patch application
+
+- Eager `Package::apply(&patch)` returns a new package and replaces the removed
+  mutating `apply_document_patch`. Active consumers and the glossary gate move
+  together; the existing validation/publication engine stays private.
+- Package clones share the physical graph, metadata and legacy writer state.
+  Mutations detach state; failed saves retain edit intent on the affected clone.
+- Regression coverage includes immutable apply/inverse/stale rejection, no-op
+  sharing, writer/metadata isolation, signatures and encrypted-source policy.
+- This is the publication prerequisite for package-bound `Edit`/`Commit`.
+  Those shapes, source-backed package publication and writer removal remain
+  required; evidence and limits are recorded in 0020.

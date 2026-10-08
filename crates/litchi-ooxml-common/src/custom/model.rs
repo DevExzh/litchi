@@ -155,7 +155,7 @@ impl WireKind {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Property {
     pub(crate) pid: i32,
     pub(crate) format_id: String,
@@ -168,7 +168,7 @@ pub(crate) struct Property {
 /// Names are unique case-insensitively. Exact-name insertion replaces a value
 /// while retaining its PID; insertion with different casing is rejected as
 /// ambiguous. Iterators use lexical name order, while XML output uses PID order.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Props {
     pub(crate) properties: BTreeMap<String, Property>,
     pub(crate) folded_names: BTreeMap<String, String>,

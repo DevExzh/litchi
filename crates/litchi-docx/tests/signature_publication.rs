@@ -49,14 +49,18 @@ fn revision_publication_requires_explicit_unsign_and_keeps_noops_exact() {
     let mut package = Package::from_reader(Cursor::new(original.as_slice())).unwrap();
     let snapshot = package.document_snapshot().unwrap();
     let noop = snapshot.edit().commit().unwrap();
-    package.apply_document_patch(noop.patch()).unwrap();
+    let mut unchanged = package.apply(noop.patch()).unwrap();
+    assert!(std::ptr::eq(package.opc_package(), unchanged.opc_package()));
+    assert!(package.is_signed());
+    assert!(unchanged.is_signed());
+    assert_eq!(bytes(&mut unchanged), original);
     assert_eq!(bytes(&mut package), original);
 
     let mut edit = snapshot.edit();
     edit.accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(0))
         .unwrap();
     let commit = edit.commit().unwrap();
-    assert!(package.apply_document_patch(commit.patch()).is_err());
+    assert!(package.apply(commit.patch()).is_err());
     assert!(package.is_signed());
     assert_eq!(bytes(&mut package), original);
     let durable = commit.patch().to_durable(durable_limits()).unwrap();
@@ -74,6 +78,12 @@ fn revision_publication_requires_explicit_unsign_and_keeps_noops_exact() {
     assert_eq!(history.current().xml_bytes(), snapshot.xml_bytes());
     assert_eq!(bytes(&mut package), original);
 
+    let mut unsigned = package.clone();
+    unsigned.unsign();
+    let published = unsigned.apply(commit.patch()).unwrap();
+    assert!(!published.is_signed());
+    assert!(package.is_signed());
+    assert_eq!(bytes(&mut package), original);
     package.unsign();
     package.apply_durable_document_patch(&durable).unwrap();
     assert!(!package.is_signed());
@@ -265,7 +275,7 @@ fn opaque_signature_members_allow_noop_but_refuse_raw_and_semantic_changes() {
     let commit = edit.commit().unwrap();
     package.unsign();
     assert!(package.is_signed());
-    assert!(package.apply_document_patch(commit.patch()).is_err());
+    assert!(package.apply(commit.patch()).is_err());
     assert_eq!(
         package.document_snapshot().unwrap().xml_bytes(),
         snapshot.xml_bytes()

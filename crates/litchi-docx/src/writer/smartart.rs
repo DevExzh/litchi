@@ -85,7 +85,7 @@ pub(crate) struct SmartArtPartXml {
 /// package.save("out.docx")?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MutableSmartArt {
     /// The semantic diagram model (nodes, type, layout name).
     pub(crate) smartart: SmartArt,

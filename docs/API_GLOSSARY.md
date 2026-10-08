@@ -49,7 +49,7 @@ transaction is the bare `Package::edit()`.
 | New snapshot accessor | `Commit::package()` / `Commit::into_package()` | `Commit::snapshot()` (docx/pptx), `Commit::{workbook, into_workbook}` (xlsx) | ✅ iWork · 🔴 W2 |
 | Diagnostics on every commit | `Commit::diagnostics()` | commits without diagnostics (xlsx, pptx) | ✅ docx/iWork · 🔴 xlsx/pptx (W2) |
 | Split commit | `Commit::into_parts() -> (Package, Patch)` | — | ✅ xlsx/docx/pptx exist; name fixed |
-| Patch application | `Package::apply(&patch)`; scoped `Package::apply_x(&patch)` | `publish_document_commit()`, `apply_document_patch()` (docx), `apply_opened_presentation_commit/patch()` (pptx), `Workbook::apply` (xlsx — moves) | ✅ iWork · 🔴 W2 |
+| Patch application | `Package::apply(&patch)`; scoped `Package::apply_x(&patch)` | `publish_document_commit()`, `apply_document_patch()` (docx), `apply_opened_presentation_commit/patch()` (pptx), `Workbook::apply` (xlsx — moves) | ✅ iWork · ✅ docx eager immutable `apply` (0020); 🔴 source-backed package publication and other W2 owners |
 | No-op introspection | `commit.diagnostics().changed()`; `patch.is_noop()` | `Transaction::is_changed()`, `Commit::is_changed()` (pptx), `Patch::is_empty()` (xlsx) | ✅ iWork/docx · 🔴 W2 |
 | Inverse patch | `Patch::inverse()` | — | ✅ everywhere |
 | Rollback | *dropping the `Edit`* | `Transaction::rollback()` (pptx) | 🔴 W2 |
@@ -252,12 +252,24 @@ error/result names. Old public names are removed, with no compatibility
 aliases. Private imports may use disambiguating local names when a module
 also handles the package ingress error.
 
-`docx-minimal` and `docx-full` enforce these three retired names. The full
+`docx-minimal` and `docx-full` enforce these three retired names and the
+eager `apply_document_patch` removal (0020). The full
 profile enables `automatic-fonts`, `encryption`, `sign` and `vba-inspection`,
 which include every optional DOCX feature. Neither profile registers the
 complete document family yet: `Commit` still carries a document `Snapshot`,
 not the immutable package required by ADR 0034. The eager read-only
-projection is now owned (0019). Immutable package ownership, primary `apply`,
-publication replacement, `LimitKind`,
+projection is now owned (0019), and eager `apply(&patch) -> Result<Package>`
+is immutable (0020). Full immutable package ownership, package-bound commit
+and source-backed publication replacement, `LimitKind`,
 and mutable-writer removal remain pending. Scoped transactions and other
 formats are not marked migrated by this step.
+
+## 13. W2 DOCX immutable eager patch application (record 0020)
+
+Eager `Package` is cheaply cloneable: the physical graph, metadata and retained
+legacy authoring state are shared until mutation. `apply(&patch)` returns a new
+package without changing its source; a no-op shares state and keeps signatures.
+`apply_document_patch` is removed from the public DOCX surface. The source-backed
+publisher, legacy commit/history publication methods and mutable authoring
+entries still require migration. The complete transaction-family contract is
+not yet registered as conformant.

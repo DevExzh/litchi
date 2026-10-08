@@ -99,7 +99,7 @@ pub enum VmlShapePosition {
 /// package.save("out.docx")?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MutableVmlShape {
     /// The VML preset shape element.
     pub(crate) kind: VmlShapeKind,

@@ -348,7 +348,7 @@ impl From<Props> for Metadata {
 /// This is public so host crates can share the implementation, but ordinary
 /// callers should use their DOCX, PPTX, or XLSX package facade.
 #[doc(hidden)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Slot {
     props: Option<Props>,
     dirty: bool,

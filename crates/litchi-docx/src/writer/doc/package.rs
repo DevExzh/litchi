@@ -24,7 +24,7 @@ use super::super::toc::TableOfContents;
 use litchi_core::xml::ReaderOrigin;
 
 /// The document body containing all content elements.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct DocumentBody {
     /// Content elements (paragraphs, tables, etc.) in document order
     pub(crate) elements: Vec<BodyElement>,
@@ -1330,6 +1330,7 @@ fn push_raw_body_xml(
     clippy::large_enum_variant,
     reason = "writer-internal variants are moved and boxing would add churn"
 )] // writer-internal type; variants are moved, not compared
+#[derive(Clone)]
 pub(crate) enum BodyElement {
     Paragraph(MutableParagraph),
     Table(MutableTable),
