@@ -48,6 +48,7 @@ use std::sync::{Arc, Condvar, Mutex, OnceLock};
 use std::time::Duration;
 
 mod artifact_restore;
+mod materialize;
 mod revision;
 mod view;
 pub use artifact_restore::SourceArtifactRestoreProof;

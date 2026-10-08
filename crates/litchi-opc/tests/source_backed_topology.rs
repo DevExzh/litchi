@@ -1677,3 +1677,39 @@ fn topology_remove_part_refuses_dangling_inbound_relationship_before_output() {
     assert!(matches!(error, OpcError::InvalidRelationship(_)));
     assert!(output.is_empty());
 }
+
+#[test]
+fn prepared_materialization_preserves_signature_and_non_part_policy() {
+    for source in [
+        signed_source_bytes(),
+        source_bytes_with_non_part_signature_member("_xmlsignatures/orphan.sigs"),
+    ] {
+        let package = open(&source);
+        let non_parts: Vec<_> = package
+            .non_part_members()
+            .iter()
+            .map(|member| (member.name().to_owned(), member.reason()))
+            .collect();
+        let candidate = package.prepare_topology(SourceTopologyPlan::new()).unwrap();
+        let mut owned = candidate.to_opc_package().unwrap();
+        assert!(owned.is_signed());
+        assert_eq!(
+            owned
+                .non_part_members()
+                .iter()
+                .map(|member| (member.name().to_owned(), member.reason()))
+                .collect::<Vec<_>>(),
+            non_parts
+        );
+        owned
+            .get_part_mut(&pack("/word/document.xml"))
+            .unwrap()
+            .set_blob(b"<after/>".to_vec());
+        let mut output = Vec::new();
+        assert!(matches!(
+            owned.to_stream(&mut output),
+            Err(OpcError::SignedSourceRequiresExplicitPolicy)
+        ));
+        assert!(output.is_empty());
+    }
+}

@@ -55,6 +55,7 @@ struct VersionedSource {
     denied_start: AtomicU64,
     denied_end: AtomicU64,
     checks_before_change: AtomicU64,
+    fail_and_change_on_read: AtomicBool,
 }
 
 impl VersionedSource {
@@ -66,6 +67,7 @@ impl VersionedSource {
             denied_start: AtomicU64::new(0),
             denied_end: AtomicU64::new(0),
             checks_before_change: AtomicU64::new(0),
+            fail_and_change_on_read: AtomicBool::new(false),
         }
     }
 
@@ -94,6 +96,12 @@ impl ReadAt for VersionedSource {
 
     fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
         self.reads.fetch_add(1, Ordering::SeqCst);
+        if self.fail_and_change_on_read.swap(false, Ordering::SeqCst) {
+            self.bump();
+            return Err(io::Error::other(
+                "source changed during failed payload read",
+            ));
+        }
         let read_end = offset.saturating_add(output.len() as u64);
         let denied_start = self.denied_start.load(Ordering::SeqCst);
         let denied_end = self.denied_end.load(Ordering::SeqCst);
@@ -2030,4 +2038,206 @@ fn owned_missing_lookup_rechecks_source_before_reporting_absence() {
         Err(OpcError::SourceChanged { .. })
     ));
     assert!(candidate.check_source().is_err());
+}
+
+#[test]
+fn materialization_uses_effective_graph_and_outlives_candidate() {
+    let package = open(Arc::new(VersionedSource::new(source_bytes())));
+    let mut plan = mutation_plan();
+    plan.try_remove_relationship(pack(DOCUMENT), "rId1")
+        .unwrap();
+    plan.try_remove_part(pack(UNTOUCHED)).unwrap();
+    plan.try_replace_internal_relationship(pack("/"), "rId1", rt::OFFICE_DOCUMENT, pack(ADDED))
+        .unwrap();
+    let candidate = package.prepare_topology(plan).unwrap();
+    let retained = candidate.part(&pack(DOCUMENT)).unwrap().data().unwrap();
+    let owned = candidate.to_opc_package().unwrap();
+    assert!(owned.get_part(&pack(UNTOUCHED)).is_err());
+    let main = owned.get_part(&pack(DOCUMENT)).unwrap();
+    assert_eq!(main.blob(), b"<after/>");
+    assert_eq!(main.blob().as_ptr(), retained.as_bytes().as_ptr());
+    assert!(main.rels().get("rId1").is_none());
+    assert!(main.rels().get("rIdAdded").is_some());
+    let added = owned.get_part(&pack(ADDED)).unwrap();
+    assert_eq!(added.content_type(), "application/example+xml");
+    assert_eq!(added.blob(), b"<added/>");
+    assert!(owned.rels().get("rIdAdded").is_some());
+    assert_eq!(
+        owned.rels().get("rId1").unwrap().target_ref(),
+        "custom/added.xml"
+    );
+    drop(candidate);
+    drop(retained);
+    let bytes = PackageWriter::to_bytes(&owned).unwrap();
+    let reopened = SourceBackedPackage::from_vec(bytes).unwrap();
+    assert_eq!(
+        reopened.main_document_part().unwrap().partname(),
+        &pack(ADDED)
+    );
+    assert_eq!(
+        reopened
+            .part(&pack(DOCUMENT))
+            .unwrap()
+            .data()
+            .unwrap()
+            .as_bytes(),
+        b"<after/>"
+    );
+}
+
+#[test]
+fn materialization_noop_and_changed_preserve_unchanged_parts() {
+    for changed in [false, true] {
+        let source = Arc::new(VersionedSource::new(source_bytes()));
+        let candidate = open(Arc::clone(&source))
+            .prepare_topology(if changed {
+                mutation_plan()
+            } else {
+                SourceTopologyPlan::new()
+            })
+            .unwrap();
+        let owned = candidate.to_opc_package().unwrap();
+        assert_eq!(
+            owned.get_part(&pack(UNTOUCHED)).unwrap().blob(),
+            b"<untouched source='yes'/>"
+        );
+        assert_eq!(
+            owned.get_part(&pack(DOCUMENT)).unwrap().blob(),
+            if changed {
+                b"<after/>".as_slice()
+            } else {
+                b"<before/>".as_slice()
+            }
+        );
+        source.bump();
+        assert!(matches!(
+            candidate.to_opc_package(),
+            Err(OpcError::SourceChanged { .. })
+        ));
+        assert_eq!(
+            owned.get_part(&pack(UNTOUCHED)).unwrap().blob(),
+            b"<untouched source='yes'/>"
+        );
+    }
+}
+
+#[test]
+fn materialization_refuses_managed_candidates_before_cold_reads() {
+    for changed in [false, true] {
+        let source = Arc::new(VersionedSource::new(source_bytes()));
+        let (_budget, cancel, context) = managed_context();
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source.clone(),
+            litchi_opc::ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let candidate = package
+            .prepare_topology(if changed {
+                mutation_plan()
+            } else {
+                SourceTopologyPlan::new()
+            })
+            .unwrap();
+        let before = source.read_count();
+        assert!(matches!(
+            candidate.to_opc_package(),
+            Err(OpcError::ManagedPackageMaterialization)
+        ));
+        assert_eq!(before, source.read_count());
+        cancel.cancel();
+        assert!(matches!(
+            candidate.to_opc_package(),
+            Err(OpcError::Cancelled)
+        ));
+    }
+}
+
+#[test]
+fn materialization_rechecks_transfer_sources() {
+    let donor_source = Arc::new(VersionedSource::new(source_bytes()));
+    let donor = open(donor_source.clone());
+    let (_, token) = donor
+        .part(&pack(UNTOUCHED))
+        .unwrap()
+        .data_and_authorize_precompressed()
+        .unwrap();
+    let mut plan = SourceTopologyPlan::new();
+    plan.try_add_precompressed_part(pack(ADDED), "application/xml", token)
+        .unwrap();
+    let candidate = open(Arc::new(VersionedSource::new(source_bytes())))
+        .prepare_topology(plan)
+        .unwrap();
+    let owned = candidate.to_opc_package().unwrap();
+    assert_eq!(
+        owned.get_part(&pack(ADDED)).unwrap().blob(),
+        b"<untouched source='yes'/>"
+    );
+    donor_source.bump();
+    assert!(matches!(
+        candidate.to_opc_package(),
+        Err(OpcError::SourceChanged { .. })
+    ));
+}
+
+#[test]
+fn materialization_source_change_wins_over_failed_cold_read() {
+    for changed in [false, true] {
+        let source = Arc::new(VersionedSource::new(source_bytes()));
+        let candidate = open(source.clone())
+            .prepare_topology(if changed {
+                mutation_plan()
+            } else {
+                SourceTopologyPlan::new()
+            })
+            .unwrap();
+        source.fail_and_change_on_read.store(true, Ordering::SeqCst);
+        assert!(matches!(
+            candidate.to_opc_package(),
+            Err(OpcError::SourceChanged { .. })
+        ));
+    }
+}
+
+#[test]
+fn materialization_refuses_managed_donor_on_unmanaged_base() {
+    for xml_transfer in [false, true] {
+        let donor_source = Arc::new(VersionedSource::new(source_bytes()));
+        let (_budget, cancel, context) = managed_context();
+        let donor = SourceBackedPackage::from_read_at_with_execution_context(
+            donor_source.clone(),
+            litchi_opc::ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let mut plan = SourceTopologyPlan::new();
+        if xml_transfer {
+            let xml = donor.part(&pack(UNTOUCHED)).unwrap().source_xml().unwrap();
+            plan.try_add_source_xml_part(pack(ADDED), xml).unwrap();
+        } else {
+            let (_, token) = donor
+                .part(&pack(UNTOUCHED))
+                .unwrap()
+                .data_and_authorize_precompressed()
+                .unwrap();
+            plan.try_add_precompressed_part(pack(ADDED), "application/xml", token)
+                .unwrap();
+        }
+        let base_source = Arc::new(VersionedSource::new(source_bytes()));
+        let candidate = open(base_source.clone()).prepare_topology(plan).unwrap();
+        let before = (base_source.read_count(), donor_source.read_count());
+        assert!(matches!(
+            candidate.to_opc_package(),
+            Err(OpcError::ManagedPackageMaterialization)
+        ));
+        assert_eq!(
+            before,
+            (base_source.read_count(), donor_source.read_count())
+        );
+        cancel.cancel();
+        assert!(matches!(
+            candidate.to_opc_package(),
+            Err(OpcError::Cancelled)
+        ));
+    }
 }

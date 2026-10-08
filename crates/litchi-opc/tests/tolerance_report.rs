@@ -813,3 +813,36 @@ fn source_backed_topology_edits_accept_admitted_ids_but_check_added_ones() {
             .is_err()
     );
 }
+
+#[test]
+fn prepared_materialization_retains_ingress_repairs_after_edit() {
+    let rels = DOCUMENT_RELS.replace("</Relationships>", r#"<Relationship Id="rId1" Type="http://example.invalid/duplicate" Target="ignored.xml"/></Relationships>"#);
+    for changed in [false, true] {
+        let source =
+            SourceBackedPackage::from_vec(package(CONTENT_TYPES, ROOT_RELS, &rels)).unwrap();
+        let report = source.tolerance_report().clone();
+        assert!(!report.is_clean());
+        let mut plan = litchi_opc::SourceTopologyPlan::new();
+        if changed {
+            plan.try_replace_part(
+                PackURI::new("/word/document.xml").unwrap(),
+                b"<after/>".to_vec(),
+            )
+            .unwrap();
+        }
+        let candidate = source.prepare_topology(plan).unwrap();
+        let owned = candidate.to_opc_package().unwrap();
+        assert_eq!(owned.tolerance_report(), &report);
+        assert_eq!(
+            owned
+                .get_part(&PackURI::new("/word/document.xml").unwrap())
+                .unwrap()
+                .blob(),
+            if changed {
+                b"<after/>".as_slice()
+            } else {
+                DOCUMENT.as_bytes()
+            }
+        );
+    }
+}

@@ -304,3 +304,14 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 - Regression tests cover compact/pretty output and byte-vector disclosure.
   Display and shared-core diagnostics remain separate open policy work.
 - Record 0027 contains verification and the remaining canonical owner scope.
+
+## 0028 — explicit effective graph materialization
+
+- Retained OPC candidates can materialize their effective graph into an owning
+  package, preserving edits, additions/removals, relationships and content types.
+- Conversion shares retained payloads, checks base/transfer fences and refuses
+  managed base or donor escape before payload reads. Signature and ingress
+  repair policy survives conversion.
+- This supplies DOCX's future effective `to_owned_package` route. Canonical
+  source ownership and logical caches remain open; record 0028 also records
+  the empty-topology/read-ahead migration hazard.

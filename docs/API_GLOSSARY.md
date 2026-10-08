@@ -352,3 +352,10 @@ method is removed and banned in both DOCX profiles. Commit diagnostics retain
 Main-document transaction Debug output now omits XML, authored text, transfer
 metadata and local composition identifiers/conflicts. Error Display and shared
 core diagnostics remain pending; this does not register a complete family.
+
+## 21. Effective owning conversion (record 0028)
+
+`PreparedTopology::to_opc_package()` explicitly materializes the current effective
+catalog, preserving retained graph changes. It refuses managed base and donor
+sources and rechecks all source guards. Source DOCX integration remains pending;
+this is a conversion seam, not a complete transaction-family registration.
