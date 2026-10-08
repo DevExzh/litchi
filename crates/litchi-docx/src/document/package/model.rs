@@ -483,6 +483,85 @@ impl Document {
         self.part.alts()
     }
 
+    /// The direct block children of the main document's `w:body`, indexed in
+    /// visible order (see [`crate::Blocks`]).
+    ///
+    /// The index is built in one pass over the visible main document the
+    /// first time any view of an unchanged main part asks for it, and every
+    /// later view shares it; it is a clean, evictable package memo.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the visible XML is malformed or a bound on the
+    /// index is reached; nothing is retained then.
+    pub fn body_blocks(&self) -> Result<crate::Blocks> {
+        self.part.body_blocks()
+    }
+
+    /// The number of direct body blocks of every kind.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Self::body_blocks`].
+    pub fn body_block_count(&self) -> Result<usize> {
+        Ok(self.body_blocks()?.len())
+    }
+
+    /// The direct body block at zero-based `index`, counting every kind.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Self::body_blocks`].
+    pub fn body_block(&self, index: litchi_core::Position) -> Result<Option<crate::IndexedBlock>> {
+        Ok(self.body_blocks()?.get(index))
+    }
+
+    /// The direct body paragraph at zero-based `index`: `/body/p[index + 1]`,
+    /// with `w:customXml` wrappers flattened and display equations excluded.
+    ///
+    /// Unlike [`Self::paragraph`], which counts every outermost paragraph of
+    /// the main story (table cells and content controls included), this
+    /// counts only the body's own paragraphs.
+    ///
+    /// ```no_run
+    /// use litchi_docx::Package;
+    ///
+    /// let package = Package::open("report.docx")?;
+    /// let document = package.document()?;
+    /// if let Some(paragraph) = document.body_paragraph(litchi_core::Position::new(0))? {
+    ///     println!("{}", paragraph.text()?);
+    /// }
+    /// # Ok::<(), litchi_docx::Error>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Self::body_blocks`].
+    pub fn body_paragraph(&self, index: litchi_core::Position) -> Result<Option<Paragraph>> {
+        Ok(self.body_blocks()?.paragraph(index))
+    }
+
+    /// The direct body table at zero-based `index`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Self::body_blocks`].
+    pub fn body_table(&self, index: litchi_core::Position) -> Result<Option<Table>> {
+        Ok(self.body_blocks()?.table(index))
+    }
+
+    /// The direct body content control (`w:sdt`) at zero-based `index`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Self::body_blocks`].
+    pub fn body_sdt(
+        &self,
+        index: litchi_core::Position,
+    ) -> Result<Option<crate::BlockContentControl>> {
+        Ok(self.body_blocks()?.content_control(index))
+    }
+
     /// Get a specific paragraph by index.
     ///
     /// # Arguments

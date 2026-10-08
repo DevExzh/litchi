@@ -236,7 +236,7 @@ impl Package {
                 Err(error) => return Err(error),
             };
             let source_version = topology.physical_source_version()?;
-            let (xml, paragraph_memo, index_admission, paragraph_route, retained) =
+            let (xml, paragraph_memo, index_admission, paragraph_route, retained, positions) =
                 if let Some(context) = &self.execution {
                     let build = self.paragraph_index_cache.get_or_build_source(
                         source_version,
@@ -261,6 +261,7 @@ impl Package {
                         build.admission,
                         ParagraphIndexRoute::Managed,
                         Some(data),
+                        RawPositions::Preserved,
                     )
                 } else {
                     let mut bytes = Vec::new();
@@ -271,13 +272,16 @@ impl Package {
                             source,
                         })?;
                     bytes.extend_from_slice(data.as_bytes());
-                    let xml = visible_document_xml(Arc::new(bytes))?;
+                    let raw = Arc::new(bytes);
+                    let payload = VisiblePayload::project(raw.as_slice())?;
+                    let xml = payload.xml(raw);
                     (
                         DocumentPayload::Owned(xml),
                         OnceLock::new(),
                         None,
                         ParagraphIndexRoute::Visible,
                         Some(data),
+                        payload.positions(),
                     )
                 };
             Ok(Document {
@@ -289,6 +293,9 @@ impl Package {
                 execution: self.execution.clone(),
                 paragraph_index_cache: Arc::clone(&self.paragraph_index_cache),
                 paragraph_route,
+                positions,
+                body_memo: OnceLock::new(),
+                allows_detached_views: !topology.is_managed(),
                 tolerance: Arc::new(Mutex::new(self.opened_tolerance())),
             })
         })();

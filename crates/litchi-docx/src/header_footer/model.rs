@@ -168,6 +168,29 @@ impl Story {
         extract_word_text(xml.as_slice())
     }
 
+    /// The story's direct block children, indexed with the scanner the
+    /// document body uses (see [`crate::Blocks`]) over its
+    /// markup-compatibility-visible XML.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the story's XML is malformed or a bound on the
+    /// index is reached.
+    pub fn blocks(&self) -> Result<crate::Blocks> {
+        let xml = self.semantic_xml()?;
+        let length = u32::try_from(xml.len()).map_err(|_source_error| {
+            crate::Error::InvalidFormat("header/footer XML exceeds u32".to_string())
+        })?;
+        crate::Blocks::index(
+            xml,
+            0,
+            length,
+            &[],
+            crate::document::ContainerRoot::HEADER_FOOTER,
+            crate::parts::memo::RawPositions::Unproven,
+        )
+    }
+
     /// Return all paragraphs in authored order.
     ///
     /// # Errors

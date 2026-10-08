@@ -540,3 +540,22 @@ characters; explicit Display and data accessors retain content rendering.
 
 This is shared resolution infrastructure with test-only adapters. Concrete
 format navigation, File get/find/query and capability generation remain pending.
+
+## 30. DOCX indexed blocks (record 0049)
+
+`Blocks`, `IndexedBlock` and `BlockContentControl` are leaf-owned read views.
+Block selection and returned ordinals use `Position`; kind-specific ordinals
+count direct visible children, flattening custom-XML wrappers. Display equations
+have their own kind. `transaction_position()` refuses unless raw addressing is
+proven, and never treats a wrapped child as a direct body edit target.
+
+Native paragraph/control identity access added by this record lives under
+`document::raw`. Paragraph identifier lookup returns the first matching block;
+it is not an ordinary semantic selector. Existing legacy identity methods remain
+migration debt. Namespace bindings are retained with indexed ranges.
+
+Generation memos are bounded clean-value caches. `trim_document_memos()` releases
+unpinned entries. Managed source projections refuse detachable semantic values,
+including effective documents backed by managed donor parts. Configurable
+semantic limits, concrete unified nodes and complete family registration remain
+pending.

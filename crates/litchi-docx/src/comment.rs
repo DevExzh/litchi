@@ -173,6 +173,31 @@ impl Comment {
         self.xml_data.self_contained_xml()
     }
 
+    /// The comment's direct block children, indexed with the scanner the
+    /// document body uses (see [`crate::Blocks`]).
+    ///
+    /// The comment's XML is first made self-contained, so the blocks parse
+    /// without `word/comments.xml`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the comment's XML is malformed or a bound on the
+    /// index is reached.
+    pub fn blocks(&self) -> Result<crate::Blocks> {
+        let xml = self.self_contained_xml()?;
+        let length = u32::try_from(xml.len()).map_err(|_source_error| {
+            Error::InvalidFormat("Word comment exceeds u32".to_string())
+        })?;
+        crate::Blocks::index(
+            Arc::new(xml),
+            0,
+            length,
+            &[],
+            crate::document::ContainerRoot::COMMENT,
+            crate::parts::memo::RawPositions::Unproven,
+        )
+    }
+
     /// Extract all text content from this comment.
     ///
     /// # Examples

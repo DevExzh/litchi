@@ -135,6 +135,8 @@ pub enum Block {
     Paragraph(Box<Paragraph>),
     /// A table block.
     Table(Box<Table>),
+    /// A block-level content control (`w:sdt`) with its identity and content.
+    Sdt(Box<super::BlockContentControl>),
     /// An opaque alternative-format anchor.
     Alt(Box<Chunk>),
     /// An active but unmodeled body child retained as exact XML.

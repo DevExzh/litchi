@@ -661,6 +661,16 @@ impl Package {
         Ok(Document::new(doc_part, self.opc.shared(), tolerance))
     }
 
+    /// Release the package's clean document memos: the visible main-document
+    /// projection, the paragraph offsets and the body block index that no
+    /// live document view or value still holds.
+    ///
+    /// Views keep what they hold; the next [`Self::document`] rebuilds what
+    /// was released. Results never depend on what the memos hold.
+    pub fn trim_document_memos(&self) {
+        self.paragraph_index_cache.trim_clean_all();
+    }
+
     /// A snapshot of the repairs made while this package was opened, in
     /// discovery order: the OPC packaging repairs
     /// ([`Defect::Package`](crate::Defect::Package)) followed by the core-

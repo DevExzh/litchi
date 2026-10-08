@@ -145,6 +145,17 @@ pub enum Error {
         source: TryReserveError,
     },
 
+    /// A block read exceeded a finite resource ceiling.
+    #[error("DOCX block {resource} limit exceeded: {actual} > {maximum}")]
+    BlockReadLimit {
+        /// Bounded resource.
+        resource: &'static str,
+        /// Observed value.
+        actual: usize,
+        /// Maximum accepted value.
+        maximum: usize,
+    },
+
     /// A tracked-revision read exceeded a finite resource ceiling.
     #[error("DOCX revision {resource} limit exceeded: {actual} > {maximum}")]
     RevisionLimit {

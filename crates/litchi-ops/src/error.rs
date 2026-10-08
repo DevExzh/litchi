@@ -875,6 +875,7 @@ impl Classify for litchi_docx::Error {
             Self::Io(error) => error.classify(),
             Self::InkLimit { .. }
             | Self::RevisionLimit { .. }
+            | Self::BlockReadLimit { .. }
             | Self::ExternalHyperlinkDetachmentLimit { .. }
             | Self::ExternalHyperlinkRedactionLimit { .. }
             | Self::SectionInventoryLimit { .. } => Class::of(Code::LimitExceeded),

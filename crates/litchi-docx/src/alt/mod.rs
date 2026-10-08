@@ -19,8 +19,8 @@ mod package;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use codec::scan_with_block_ranges;
 pub use codec::{active, is_relationship, scan};
+pub(crate) use codec::{parse_element, scan_with_block_ranges};
 pub use model::{
     Chunk, Conformance, Data, Import, Kind, MAX_CHUNKS, MAX_DATA_BYTES, MAX_XML_BYTES,
     MAX_XML_DEPTH, Rel, Uri,

@@ -12,6 +12,7 @@
 )]
 //! DocumentPart - the main document.xml part of a Word document.
 
+use super::memo::{GenerationMemo, RawPositions, VisiblePayload};
 use crate::alt::{Chunk, scan};
 use crate::error::Result;
 use crate::namespace::{
@@ -163,7 +164,10 @@ struct ParagraphIndexCacheEntry {
     memo: Arc<ParagraphIndexMemo>,
 }
 
-enum ParagraphIndexCacheKey {
+/// Identity of the payload generation a memoized value was derived from: the
+/// raw main-part allocation (eager package) or the immutable source revision
+/// (source-backed package), with the semantic route.
+pub(crate) enum ParagraphIndexCacheKey {
     Allocation {
         raw: Weak<Vec<u8>>,
         route: ParagraphIndexRoute,
@@ -175,18 +179,27 @@ enum ParagraphIndexCacheKey {
 }
 
 impl ParagraphIndexCacheKey {
-    fn allocation(raw: &Arc<Vec<u8>>, route: ParagraphIndexRoute) -> Self {
+    pub(crate) fn allocation(raw: &Arc<Vec<u8>>, route: ParagraphIndexRoute) -> Self {
         Self::Allocation {
             raw: Arc::downgrade(raw),
             route,
         }
     }
 
-    const fn source(version: SourceVersion, route: ParagraphIndexRoute) -> Self {
+    pub(crate) const fn source(version: SourceVersion, route: ParagraphIndexRoute) -> Self {
         Self::Source { version, route }
     }
 
-    fn matches(&self, other: &Self) -> bool {
+    /// Whether this key names a raw allocation that no longer exists, so no
+    /// later request can match it.
+    pub(crate) fn is_dead(&self) -> bool {
+        match self {
+            Self::Allocation { raw, .. } => raw.strong_count() == 0,
+            Self::Source { .. } => false,
+        }
+    }
+
+    pub(crate) fn matches(&self, other: &Self) -> bool {
         match (self, other) {
             (
                 Self::Allocation {
@@ -231,22 +244,124 @@ struct ParagraphIndexCacheState {
     oversized_bypasses: u64,
 }
 
-/// Package-scoped, single-entry memo for paragraph offsets.
+/// Logical clean-retention ceiling for one MCE-visible main-document payload.
 ///
-/// The cache retains only a weak identity key and the bounded offset memo. It
-/// never keeps XML alive by itself. Holding the state lock while building
-/// coalesces concurrent first queries without exposing an in-progress or
-/// failed result to another caller; malformed input and admission failures
-/// remain retryable and are never negatively cached.
+/// A larger projection is still returned to its document view but is not
+/// retained, so each such view recomputes it as before; the ceiling bounds
+/// retention and never turns a read into a refusal.
+const VISIBLE_PAYLOAD_MEMO_MAX_BYTES: usize = 16 * 1024 * 1024;
+/// Logical clean-retention ceiling for one body block index, the paragraph
+/// index's ceiling.
+const BODY_INDEX_MEMO_MAX_BYTES: usize = PARAGRAPH_INDEX_CACHE_MAX_BYTES;
+
+/// Package-scoped, single-entry memos of values derived from the main
+/// document: the paragraph offsets, the markup-compatibility-visible payload
+/// and the body block index.
+///
+/// The paragraph cache retains only a weak identity key and the bounded
+/// offset memo. It never keeps XML alive by itself. Holding the state lock
+/// while building coalesces concurrent first queries without exposing an
+/// in-progress or failed result to another caller; malformed input and
+/// admission failures remain retryable and are never negatively cached. The
+/// visible-payload and block-index memos follow the same rules
+/// ([`super::memo`]) with their own ceilings, and only the unmanaged routes
+/// use them: a managed view reads its source bytes and builds neither.
 pub(crate) struct ParagraphIndexCache {
     state: Mutex<ParagraphIndexCacheState>,
+    visible: GenerationMemo<VisiblePayload>,
+    body: GenerationMemo<crate::document::BlockIndex>,
 }
 
 impl ParagraphIndexCache {
     pub(crate) fn new() -> Self {
         Self {
             state: Mutex::new(ParagraphIndexCacheState::default()),
+            visible: GenerationMemo::new(VISIBLE_PAYLOAD_MEMO_MAX_BYTES),
+            body: GenerationMemo::new(BODY_INDEX_MEMO_MAX_BYTES),
         }
+    }
+
+    /// The MCE-visible payload of the raw main-part allocation `raw`,
+    /// projected once per allocation.
+    pub(crate) fn visible_payload(&self, raw: &Arc<Vec<u8>>) -> Result<Arc<VisiblePayload>> {
+        let payload = self
+            .visible
+            .get_or_build(raw, ParagraphIndexRoute::Visible, || {
+                VisiblePayload::project(raw.as_slice())
+            })?;
+        #[cfg(debug_assertions)]
+        debug_assert!(
+            VisiblePayload::project(raw.as_slice())
+                .is_ok_and(|fresh| fresh.same_projection(&payload, raw)),
+            "a memoized visible payload differs from a fresh projection"
+        );
+        Ok(payload)
+    }
+
+    /// The MCE-visible payload of the main document of source revision
+    /// `version`; `project` loads and projects it on a miss.
+    pub(crate) fn visible_payload_source<F>(
+        &self,
+        version: SourceVersion,
+        project: F,
+    ) -> Result<Arc<VisiblePayload>>
+    where
+        F: FnOnce() -> Result<VisiblePayload>,
+    {
+        self.visible
+            .get_or_build_source(version, ParagraphIndexRoute::Visible, project)
+    }
+
+    /// The body block index of the raw main-part allocation `raw`, built from
+    /// `visible` once per allocation.
+    pub(crate) fn body_index(
+        &self,
+        raw: &Arc<Vec<u8>>,
+        visible: &[u8],
+        positions: RawPositions,
+    ) -> Result<Arc<crate::document::BlockIndex>> {
+        let index = self
+            .body
+            .get_or_build(raw, ParagraphIndexRoute::Visible, || {
+                body_block_index(visible, positions)
+            })?;
+        debug_assert_reused_body_index(&index, visible, positions);
+        Ok(index)
+    }
+
+    /// The body block index of the main document of source revision
+    /// `version`, built from `visible` once per revision.
+    pub(crate) fn body_index_source(
+        &self,
+        version: SourceVersion,
+        visible: &[u8],
+        positions: RawPositions,
+    ) -> Result<Arc<crate::document::BlockIndex>> {
+        let index = self
+            .body
+            .get_or_build_source(version, ParagraphIndexRoute::Visible, || {
+                body_block_index(visible, positions)
+            })?;
+        debug_assert_reused_body_index(&index, visible, positions);
+        Ok(index)
+    }
+
+    /// Release every clean document memo: the paragraph offsets, the visible
+    /// payload and the body block index that no live view pins.
+    pub(crate) fn trim_clean_all(&self) {
+        self.trim_clean();
+        self.visible.trim_clean();
+        self.body.trim_clean();
+    }
+
+    #[cfg(test)]
+    pub(crate) fn visible_diagnostics(&self) -> crate::parts::memo::MemoDiagnostics {
+        self.visible.diagnostics()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn body_diagnostics(&self) -> crate::parts::memo::MemoDiagnostics {
+        self.body.diagnostics()
     }
 
     fn lock_state(&self) -> std::sync::MutexGuard<'_, ParagraphIndexCacheState> {
@@ -489,6 +604,10 @@ pub struct DocumentPart<'a> {
     /// value empty so the legacy query path keeps reporting the same error at
     /// query time.
     paragraph_memo: OnceLock<Option<Arc<ParagraphIndexMemo>>>,
+    /// Whether the visible XML keeps every element where the raw part has it.
+    positions: RawPositions,
+    /// The body block index, pinned by this view after its first body query.
+    body_memo: OnceLock<Arc<crate::document::BlockIndex>>,
 }
 
 /// The markup-compatibility profile a main document is read with: the OOXML
@@ -506,21 +625,37 @@ pub(crate) fn visible_document_capabilities() -> litchi_ooxml_common::mce::Capab
     capabilities
 }
 
-/// Select markup-compatibility branches for a main-document payload.
-///
-/// Both materialized OPC parts and source-backed pinned documents use this
-/// path so their paragraph semantics remain identical.
-pub(crate) fn visible_document_xml(raw: Arc<Vec<u8>>) -> Result<Arc<Vec<u8>>> {
-    match litchi_ooxml_common::mce::process_markup_compatibility(
-        raw.as_slice(),
-        &visible_document_capabilities(),
-        &litchi_ooxml_common::mce::Limits::default(),
-    )?
-    .xml
-    {
-        std::borrow::Cow::Borrowed(_) => Ok(raw),
-        std::borrow::Cow::Owned(value) => Ok(Arc::new(value)),
-    }
+/// Index the direct block children of the `w:body` of a visible main
+/// document.
+pub(crate) fn body_block_index(
+    visible: &[u8],
+    positions: RawPositions,
+) -> Result<crate::document::BlockIndex> {
+    crate::document::index_blocks(
+        visible,
+        0,
+        &[],
+        crate::document::ContainerRoot::Document,
+        positions,
+    )
+}
+
+/// Re-derive a body index a memo returned and compare it, in test and debug
+/// builds, so the suites prove that a reused index equals a fresh one.
+#[cfg_attr(
+    not(debug_assertions),
+    expect(unused_variables, reason = "debug-only check")
+)]
+fn debug_assert_reused_body_index(
+    index: &crate::document::BlockIndex,
+    visible: &[u8],
+    positions: RawPositions,
+) {
+    #[cfg(debug_assertions)]
+    debug_assert!(
+        body_block_index(visible, positions).is_ok_and(|fresh| fresh.same_blocks(index)),
+        "a memoized body block index differs from a fresh scan"
+    );
 }
 
 /// Admit a main-document part to a transaction that reads and publishes its
@@ -686,6 +821,7 @@ pub(crate) fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32, Name
     const TABLE: usize = 1;
     const ALT: usize = 2;
     const UNKNOWN: usize = 3;
+    const CONTENT_CONTROL: usize = 4;
     const MAX_DEPTH: usize = 256;
     const MAX_NODES: usize = 1_000_000;
 
@@ -754,6 +890,8 @@ pub(crate) fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32, Name
                         TABLE
                     } else if is_word && local.as_ref() == b"altChunk" {
                         ALT
+                    } else if is_word && local.as_ref() == b"sdt" {
+                        CONTENT_CONTROL
                     } else {
                         UNKNOWN
                     };
@@ -789,6 +927,8 @@ pub(crate) fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32, Name
                         && local.as_ref() == b"altChunk"
                     {
                         ALT
+                    } else if is_wordprocessing_namespace(&namespace) && local.as_ref() == b"sdt" {
+                        CONTENT_CONTROL
                     } else {
                         UNKNOWN
                     };
@@ -895,11 +1035,15 @@ pub(crate) fn document_tables(xml: Arc<Vec<u8>>) -> Result<SmallVec<[Table; 8]>>
 /// Extract all visible blocks in direct body order from a normalized payload.
 ///
 /// Every active direct body child is represented. Typed paragraphs, tables,
-/// and `altChunk` anchors retain their existing semantic models while
-/// unmodeled children remain inert [`crate::OpaqueBlock`] values. The helper
-/// is shared by eager and source-backed documents so MCE-visible ordering and
-/// unknown-block retention cannot drift between the two paths.
-pub(crate) fn document_blocks(xml: Arc<Vec<u8>>) -> Result<Vec<crate::Block>> {
+/// block content controls and `altChunk` anchors retain their semantic models
+/// while unmodeled children remain inert [`crate::OpaqueBlock`] values. The
+/// helper is shared by eager and source-backed documents so MCE-visible
+/// ordering and unknown-block retention cannot drift between the two paths.
+/// `positions` is the projection's verdict, carried by content controls.
+pub(crate) fn document_blocks(
+    xml: Arc<Vec<u8>>,
+    positions: RawPositions,
+) -> Result<Vec<crate::Block>> {
     use crate::Block;
 
     let mut alts = scan(xml.as_slice())?;
@@ -928,6 +1072,14 @@ pub(crate) fn document_blocks(xml: Arc<Vec<u8>>) -> Result<Vec<crate::Block>> {
                 )
             })?;
             Block::Alt(Box::new(chunk))
+        } else if target == 4 {
+            Block::Sdt(Box::new(crate::document::BlockContentControl::new(
+                block_source,
+                start,
+                length,
+                namespaces,
+                positions,
+            )))
         } else {
             Block::Unknown(Box::new(crate::OpaqueBlock::from_arc_range(
                 block_source,
@@ -945,13 +1097,18 @@ pub(crate) fn document_blocks(xml: Arc<Vec<u8>>) -> Result<Vec<crate::Block>> {
 pub(crate) fn document_elements(xml: Arc<Vec<u8>>) -> Result<Vec<crate::Element>> {
     use crate::Element;
 
-    let blocks = document_blocks(xml)?;
+    let blocks = document_blocks(xml, RawPositions::Unproven)?;
     let mut elements = Vec::new();
     for block in blocks {
         let element = match block {
             crate::Block::Paragraph(paragraph) => Some(Element::Paragraph(paragraph)),
             crate::Block::Table(table) => Some(Element::Table(table)),
             crate::Block::Alt(_) => None,
+            // The historical element view keeps a content control as the
+            // inert exact XML it always returned.
+            crate::Block::Sdt(control) => {
+                Some(Element::Unknown(Box::new(control.to_opaque_block())))
+            },
             crate::Block::Unknown(value) => Some(Element::Unknown(value)),
         };
         if let Some(element) = element {
@@ -1000,7 +1157,11 @@ impl<'a> DocumentPart<'a> {
         Self::from_part_with_cache(part, Arc::new(ParagraphIndexCache::new()))
     }
 
-    /// Create a document part sharing a package's paragraph memo cache.
+    /// Create a document part sharing a package's document memos.
+    ///
+    /// The markup-compatibility projection of the part's payload is memoized
+    /// per payload allocation, so repeated views of an unchanged part share
+    /// one projection instead of rewriting the part each time.
     pub(crate) fn from_part_with_cache(
         part: &'a dyn Part,
         paragraph_cache: Arc<ParagraphIndexCache>,
@@ -1017,7 +1178,9 @@ impl<'a> DocumentPart<'a> {
             DocumentPartOwner::Owned(part) => part.blob_arc(),
         };
         let paragraph_source = Arc::downgrade(&raw);
-        let xml = visible_document_xml(raw)?;
+        let visible = paragraph_cache.visible_payload(&raw)?;
+        let positions = visible.positions();
+        let xml = visible.xml(raw);
         Ok(Self {
             part,
             xml,
@@ -1025,7 +1188,37 @@ impl<'a> DocumentPart<'a> {
             paragraph_cache,
             paragraph_route: ParagraphIndexRoute::Visible,
             paragraph_memo: OnceLock::new(),
+            positions,
+            body_memo: OnceLock::new(),
         })
+    }
+
+    /// The direct block children of the main document's `w:body`, indexed
+    /// once per payload generation and shared by every view of it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the visible XML is malformed or a bound on the
+    /// index is reached; nothing is retained then.
+    pub fn body_blocks(&self) -> Result<crate::document::Blocks> {
+        if let Some(index) = self.body_memo.get() {
+            return Ok(crate::document::Blocks::new(
+                Arc::clone(&self.xml),
+                Arc::clone(index),
+            ));
+        }
+        let index = match self.paragraph_source.upgrade() {
+            Some(raw) => {
+                self.paragraph_cache
+                    .body_index(&raw, self.xml.as_slice(), self.positions)?
+            },
+            None => Arc::new(body_block_index(self.xml.as_slice(), self.positions)?),
+        };
+        let index = self.body_memo.get_or_init(|| index);
+        Ok(crate::document::Blocks::new(
+            Arc::clone(&self.xml),
+            Arc::clone(index),
+        ))
     }
 
     /// Borrow the bounded paragraph offsets, scanning the visible XML once on
@@ -1238,7 +1431,7 @@ impl<'a> DocumentPart<'a> {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn blocks(&self) -> Result<Vec<crate::Block>> {
-        document_blocks(self.get_xml_arc())
+        document_blocks(self.get_xml_arc(), self.positions)
     }
 
     /// Return all alternative-format anchors in XML order.

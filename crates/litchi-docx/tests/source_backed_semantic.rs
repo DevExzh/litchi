@@ -141,6 +141,7 @@ fn eager_block_signature(
             Block::Paragraph(paragraph) => Ok(format!("p:{}", paragraph.text()?)),
             Block::Table(table) => Ok(format!("t:{}", table_signature(&table)?)),
             Block::Alt(chunk) => Ok(format!("a:{}", chunk.relationship().as_str())),
+            Block::Sdt(control) => Ok(format!("s:{}", control.text()?)),
             Block::Unknown(block) => {
                 Ok(format!("u:{}", String::from_utf8_lossy(block.xml_bytes())))
             },
@@ -156,6 +157,7 @@ fn source_block_signature(document: &source_backed::Document) -> litchi_docx::Re
             Block::Paragraph(paragraph) => Ok(format!("p:{}", paragraph.text()?)),
             Block::Table(table) => Ok(format!("t:{}", table_signature(&table)?)),
             Block::Alt(chunk) => Ok(format!("a:{}", chunk.relationship().as_str())),
+            Block::Sdt(control) => Ok(format!("s:{}", control.text()?)),
             Block::Unknown(block) => {
                 Ok(format!("u:{}", String::from_utf8_lossy(block.xml_bytes())))
             },
@@ -1150,6 +1152,10 @@ fn effective_owner_pinned_document_checks_managed_donor_cancellation() {
         .unwrap();
     let view = owner.document().unwrap();
     assert_eq!(view.paragraph_text(0).unwrap().as_deref(), Some("donor"));
+    assert!(matches!(view.body_blocks(), Err(Error::UnsafeEdit { .. })));
+    assert!(matches!(view.paragraph(0), Err(Error::UnsafeEdit { .. })));
+    assert!(matches!(view.blocks(), Err(Error::UnsafeEdit { .. })));
+    assert!(matches!(view.elements(), Err(Error::UnsafeEdit { .. })));
     assert!(matches!(
         owner.document_snapshot(),
         Err(litchi_docx::document::Error::Document(Error::Opc(

@@ -208,6 +208,27 @@ impl Note {
         self.xml_data.self_contained_xml()
     }
 
+    /// The note's direct block children, indexed with the scanner the
+    /// document body uses (see [`crate::Blocks`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the note's XML is malformed or a bound on the
+    /// index is reached.
+    pub fn blocks(&self) -> Result<crate::Blocks> {
+        let (source, start) = self.xml_data.get_or_create_arc();
+        let length = u32::try_from(self.xml_bytes().len())
+            .map_err(|_source_error| Error::InvalidFormat("Word note exceeds u32".to_string()))?;
+        crate::Blocks::index(
+            source,
+            start,
+            length,
+            self.xml_data.namespace_bindings(),
+            crate::document::ContainerRoot::NOTE,
+            crate::parts::memo::RawPositions::Unproven,
+        )
+    }
+
     /// Extract all text content from this note.
     ///
     /// # Examples

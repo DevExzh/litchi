@@ -144,6 +144,11 @@ fn validate_docx_blocks(blocks: Vec<litchi_docx::Block>) -> Result<()> {
     for block in blocks {
         match block {
             litchi_docx::Block::Paragraph(_) | litchi_docx::Block::Table(_) => {},
+            litchi_docx::Block::Sdt(_) => {
+                return Err(unrepresentable(
+                    "Markdown export cannot preserve DOCX content controls",
+                ));
+            },
             litchi_docx::Block::Alt(_) => {
                 return Err(unrepresentable(
                     "Markdown export cannot preserve active DOCX altChunk body blocks",

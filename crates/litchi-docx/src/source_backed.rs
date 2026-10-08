@@ -15,6 +15,8 @@ mod owner;
 mod svg_lifecycle;
 
 #[cfg(test)]
+mod document_memo_tests;
+#[cfg(test)]
 mod paragraph_index_tests;
 
 pub mod paragraph_copy;
@@ -96,8 +98,9 @@ use crate::parts::document_part::{
     ParagraphIndexMemo, ParagraphIndexRoute, body_block_ranges, document_blocks, document_elements,
     document_paragraph, document_paragraph_count, document_paragraph_from_index,
     document_paragraphs, document_paragraphs_from_index, document_tables, is_xml_outer_whitespace,
-    visible_document_capabilities, visible_document_xml,
+    visible_document_capabilities,
 };
+use crate::parts::memo::{RawPositions, VisiblePayload};
 use crate::redact;
 use crate::sanitize::{self, RelationshipState};
 use crate::section::layout;
@@ -516,6 +519,13 @@ impl Package {
     /// returned document owns its validated visible XML bytes, so repeated text and selective
     /// queries do not revisit the positional source. Managed opens retain the
     /// budgeted [`PartData`] handle instead of detaching an `Arc`.
+    ///
+    /// On an unmanaged package the markup-compatibility projection of the
+    /// main document is memoized for the package's source revision: the
+    /// first call projects it, and later calls share that projection without
+    /// reading the part again. Every call still checks the execution context
+    /// and the source revision first, so a changed source is reported as
+    /// before. [`Package::trim_document_memos`] releases the memo.
     pub fn document(&self) -> Result<Document> {
         if let Some(effective) = &self.effective {
             return self.effective_document(effective);
@@ -524,11 +534,14 @@ impl Package {
             self.physical_package()?.check_execution()?;
             let main = self.physical_package()?.main_document_part()?;
             validate_document_main_content_type(main.content_type())?;
-            let data = self.main_data(main)?;
             let managed = self.physical_package()?.cache_diagnostics().budget_managed;
+            if !managed {
+                return self.visible_document(main);
+            }
+            let data = self.main_data(main)?;
             let source_version = self.physical_package()?.source_version()?;
             let document: Result<Document> = (|| {
-                let (xml, paragraph_memo, index_admission, paragraph_route) = if managed {
+                let (xml, paragraph_memo, index_admission, paragraph_route) = {
                     let context =
                         self.physical_package()?
                             .execution_context()
@@ -537,6 +550,7 @@ impl Package {
                                     "managed document context is unavailable".into(),
                                 )
                             })?;
+
                     let build = self.paragraph_index_cache.get_or_build_source(
                         source_version,
                         ParagraphIndexRoute::Managed,
@@ -576,17 +590,6 @@ impl Package {
                         build.admission,
                         ParagraphIndexRoute::Managed,
                     )
-                } else {
-                    // Unmanaged opens reserve nothing for the index and swallow
-                    // its failure, so the scan is deferred to the first paragraph
-                    // query that can use it.
-                    let xml = visible_document_xml(data.into_arc()?)?;
-                    (
-                        DocumentPayload::Owned(xml),
-                        OnceLock::new(),
-                        None,
-                        ParagraphIndexRoute::Visible,
-                    )
                 };
                 Ok(Document {
                     xml,
@@ -597,6 +600,11 @@ impl Package {
                     execution: self.execution.clone(),
                     paragraph_index_cache: Arc::clone(&self.paragraph_index_cache),
                     paragraph_route,
+                    // A managed view reads its source bytes, which only a
+                    // lexical admission lets through.
+                    positions: RawPositions::Preserved,
+                    body_memo: OnceLock::new(),
+                    allows_detached_views: false,
                     // A pinned view starts from the packaging repairs made
                     // when its package was opened.
                     tolerance: Arc::new(Mutex::new(self.opened_tolerance())),
@@ -628,6 +636,67 @@ impl Package {
             self.paragraph_index_cache.trim_clean();
         }
         result
+    }
+
+    /// [`Self::document`] on an unmanaged package: the visible projection is
+    /// memoized per source revision, and the part is read only to build it
+    /// or when the projection is the part's own allocation.
+    fn visible_document(&self, main: PartView<'_>) -> Result<Document> {
+        let source_version = self.physical_package()?.source_version()?;
+        let document: Result<Document> = (|| {
+            let mut loaded = None;
+            let payload =
+                self.paragraph_index_cache
+                    .visible_payload_source(source_version, || {
+                        let raw = self.main_data(main)?.into_arc()?;
+                        let payload = VisiblePayload::project(raw.as_slice())?;
+                        loaded = Some(raw);
+                        Ok(payload)
+                    })?;
+            // A hit reads no payload: re-deriving it here, even in debug
+            // builds, would change the observable source-cache counters, so
+            // the memo's value identity is proven by the suite instead.
+            let xml = match (payload.projected(), loaded) {
+                (Some(projected), _) => Arc::clone(projected),
+                (None, Some(raw)) => raw,
+                (None, None) => self.main_data(main)?.into_arc()?,
+            };
+            Ok(Document {
+                xml: DocumentPayload::Owned(xml),
+                _retained: None,
+                // Unmanaged opens reserve nothing for the index and swallow
+                // its failure, so the scan is deferred to the first paragraph
+                // query that can use it.
+                paragraph_memo: OnceLock::new(),
+                _index_admission: None,
+                source_version,
+                execution: self.execution.clone(),
+                paragraph_index_cache: Arc::clone(&self.paragraph_index_cache),
+                paragraph_route: ParagraphIndexRoute::Visible,
+                positions: payload.positions(),
+                body_memo: OnceLock::new(),
+                allows_detached_views: true,
+                // A pinned view starts from the packaging repairs made when its
+                // package was opened.
+                tolerance: Arc::new(Mutex::new(self.opened_tolerance())),
+            })
+        })();
+        // The semantic/MCE stage can fail after the payload read has
+        // completed. Check freshness once more before exposing that error so a
+        // source mutation during parsing wins over a stale parse result.
+        self.physical_package()?.source_version()?;
+        self.physical_package()?.check_execution()?;
+        document
+    }
+
+    /// Release the package's clean document memos: the visible main-document
+    /// projection, the paragraph offsets and the body block index that no
+    /// live document view or value still holds.
+    ///
+    /// Views keep what they hold; the next [`Self::document`] rebuilds what
+    /// was released. Results never depend on what the memos hold.
+    pub fn trim_document_memos(&self) {
+        self.paragraph_index_cache.trim_clean_all();
     }
 
     fn ensure_source_document_xml(
@@ -3187,6 +3256,12 @@ pub struct Document {
     execution: Option<ExecutionContext>,
     paragraph_index_cache: Arc<ParagraphIndexCache>,
     paragraph_route: ParagraphIndexRoute,
+    /// Whether the visible XML keeps every element where the raw part has it.
+    positions: RawPositions,
+    /// The body block index, pinned by this view after its first body query.
+    body_memo: OnceLock<Arc<crate::document::BlockIndex>>,
+    /// Only unmanaged base and donor contexts can detach Arc-backed values.
+    allows_detached_views: bool,
     /// Everything repaired while this pinned view was read, shared by its
     /// clones. See `crate::leniency`.
     tolerance: Arc<Mutex<crate::leniency::ToleranceReport>>,
@@ -3269,7 +3344,7 @@ impl Document {
 
     fn check_selective_operation(&self, operation: &'static str) -> Result<()> {
         self.check_execution()?;
-        if self.xml.is_managed() {
+        if self.xml.is_managed() || !self.allows_detached_views {
             return Err(Error::UnsafeEdit {
                 format: "DOCX",
                 operation,
@@ -3365,10 +3440,16 @@ impl Document {
         result
     }
 
-    /// Extract one direct body paragraph's visible text without constructing
-    /// an Arc-backed [`Paragraph`] view. This is available for managed
+    /// Extract one visible paragraph's text without constructing an
+    /// Arc-backed [`Paragraph`] view. This is available for managed
     /// source-backed documents because the returned `String` is caller-owned
     /// semantic output, not a hidden payload alias.
+    ///
+    /// `index` counts every outermost paragraph of the main story in document
+    /// order — body paragraphs, paragraphs in table cells and paragraphs in
+    /// body-level content controls — as [`Self::paragraph`] and
+    /// [`Self::paragraph_count`] do. For the direct body paragraph a path such
+    /// as `/body/p[N]` names, use [`Self::body_paragraph`].
     pub fn paragraph_text(&self, index: usize) -> Result<Option<String>> {
         self.check_execution()?;
         let selected = self.paragraph_ranges().and_then(|paragraph_index| {
@@ -3494,7 +3575,94 @@ impl Document {
         let DocumentPayload::Owned(xml) = &self.xml else {
             unreachable!("managed document payload rejected above")
         };
-        document_blocks(Arc::clone(xml))
+        document_blocks(Arc::clone(xml), self.positions)
+    }
+
+    /// The direct block children of the main document's `w:body`, as
+    /// [`crate::Document::body_blocks`] indexes them.
+    ///
+    /// The index is built once per source revision and shared by every view
+    /// of the package; this view pins it after its first body query.
+    ///
+    /// # Errors
+    ///
+    /// Refuses managed views, whose Arc-backed values could not retain the
+    /// managed reservation, and returns an error when the visible XML is
+    /// malformed or a bound on the index is reached.
+    pub fn body_blocks(&self) -> Result<crate::document::Blocks> {
+        self.check_selective_operation("document body blocks")?;
+        let DocumentPayload::Owned(xml) = &self.xml else {
+            unreachable!("managed document payload rejected above")
+        };
+        if let Some(index) = self.body_memo.get() {
+            return Ok(crate::document::Blocks::new(
+                Arc::clone(xml),
+                Arc::clone(index),
+            ));
+        }
+        let index = self.paragraph_index_cache.body_index_source(
+            self.source_version,
+            xml.as_slice(),
+            self.positions,
+        )?;
+        self.check_execution()?;
+        let index = self.body_memo.get_or_init(|| index);
+        Ok(crate::document::Blocks::new(
+            Arc::clone(xml),
+            Arc::clone(index),
+        ))
+    }
+
+    /// The number of direct body blocks of every kind.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Self::body_blocks`].
+    pub fn body_block_count(&self) -> Result<usize> {
+        Ok(self.body_blocks()?.len())
+    }
+
+    /// The direct body block at zero-based `index`, counting every kind.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Self::body_blocks`].
+    pub fn body_block(
+        &self,
+        index: litchi_core::Position,
+    ) -> Result<Option<crate::document::IndexedBlock>> {
+        Ok(self.body_blocks()?.get(index))
+    }
+
+    /// The direct body paragraph at zero-based `index`: `/body/p[index + 1]`,
+    /// with `w:customXml` wrappers flattened and display equations excluded.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Self::body_blocks`].
+    pub fn body_paragraph(&self, index: litchi_core::Position) -> Result<Option<Paragraph>> {
+        Ok(self.body_blocks()?.paragraph(index))
+    }
+
+    /// The direct body table at zero-based `index`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Self::body_blocks`].
+    pub fn body_table(&self, index: litchi_core::Position) -> Result<Option<crate::Table>> {
+        Ok(self.body_blocks()?.table(index))
+    }
+
+    /// The direct body content control (`w:sdt`) at zero-based `index`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Self::body_blocks`].
+    pub fn body_sdt(
+        &self,
+        index: litchi_core::Position,
+    ) -> Result<Option<crate::document::BlockContentControl>> {
+        Ok(self.body_blocks()?.content_control(index))
     }
 
     /// Return visible paragraph, table, and unknown elements in direct body

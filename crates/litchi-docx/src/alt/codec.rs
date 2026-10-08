@@ -126,7 +126,7 @@ pub fn scan(xml: &[u8]) -> Result<BTreeMap<u32, Chunk>> {
         let decoder = reader.decoder();
         let event = reader
             .read_event()
-            .map_err(|error| Error::Xml(error.to_string()))?
+            .map_err(|_| Error::Xml("malformed alternative-format XML".into()))?
             .into_owned();
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
@@ -256,6 +256,143 @@ pub fn scan(xml: &[u8]) -> Result<BTreeMap<u32, Chunk>> {
     Ok(chunks)
 }
 
+/// Parse the one `w:altChunk` element `fragment`, cut from a story that
+/// markup compatibility has already processed, with the grammar [`scan`]
+/// applies to each anchor. `inherited` are the namespace bindings in scope
+/// where the element appears.
+pub(crate) fn parse_element(
+    fragment: &[u8],
+    inherited: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> Result<Chunk> {
+    validate_xml(fragment)?;
+    let mut reader = NsReader::from_reader(fragment);
+    for (prefix, namespace) in inherited {
+        let prefix = prefix
+            .as_deref()
+            .map_or(quick_xml::name::PrefixDeclaration::Default, |prefix| {
+                quick_xml::name::PrefixDeclaration::Named(prefix)
+            });
+        reader
+            .resolver_mut()
+            .add(prefix, Namespace(namespace))
+            .map_err(|_| Error::Xml("malformed alternative-format XML".into()))?;
+    }
+    let mut depth = 0usize;
+    let mut pending: Option<PendingChunk> = None;
+    loop {
+        let decoder = reader.decoder();
+        let event = reader
+            .read_event()
+            .map_err(|_| Error::Xml("malformed alternative-format XML".into()))?
+            .into_owned();
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+        match event {
+            Event::Start(element) => {
+                let event_depth = next_depth(depth)?;
+                if event_depth == 1 {
+                    if !is_word_namespace(&namespace)
+                        || element.local_name().as_ref() != b"altChunk"
+                    {
+                        return Err(invalid("expected one w:altChunk element"));
+                    }
+                    pending = Some(PendingChunk {
+                        root_depth: event_depth,
+                        start: 0,
+                        relationship: relationship(&element, decoder, &resolver)?,
+                        match_source: None,
+                        saw_properties: false,
+                        properties_depth: None,
+                        opaque_depth: None,
+                    });
+                } else if let Some(chunk) = pending.as_mut() {
+                    parse_child(
+                        chunk,
+                        event_depth,
+                        &namespace,
+                        &element,
+                        decoder,
+                        &resolver,
+                        false,
+                    )?;
+                }
+                depth = event_depth;
+            },
+            Event::Empty(element) => {
+                let event_depth = next_depth(depth)?;
+                if event_depth == 1 {
+                    if !is_word_namespace(&namespace)
+                        || element.local_name().as_ref() != b"altChunk"
+                    {
+                        return Err(invalid("expected one w:altChunk element"));
+                    }
+                    return Ok(Chunk::new(
+                        relationship(&element, decoder, &resolver)?,
+                        None,
+                    ));
+                }
+                if let Some(chunk) = pending.as_mut() {
+                    parse_child(
+                        chunk,
+                        event_depth,
+                        &namespace,
+                        &element,
+                        decoder,
+                        &resolver,
+                        true,
+                    )?;
+                }
+            },
+            Event::End(_) => {
+                if let Some(chunk) = pending.as_mut()
+                    && chunk.opaque_depth == Some(depth)
+                {
+                    chunk.opaque_depth = None;
+                }
+                if let Some(chunk) = pending.as_mut()
+                    && chunk.properties_depth == Some(depth)
+                {
+                    chunk.properties_depth = None;
+                }
+                if depth == 1 {
+                    let chunk = pending
+                        .take()
+                        .ok_or_else(|| Error::Invalid("missing pending altChunk".into()))?;
+                    return Ok(Chunk::new(chunk.relationship, chunk.match_source));
+                }
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| Error::Invalid("unexpected altChunk XML end element".into()))?;
+            },
+            Event::Text(text)
+                if pending
+                    .as_ref()
+                    .is_some_and(|chunk| chunk.opaque_depth.is_none())
+                    && text.as_ref().iter().any(|byte| !byte.is_ascii_whitespace()) =>
+            {
+                return Err(Error::Invalid("altChunk contains unexpected text".into()));
+            },
+            Event::CData(_) | Event::GeneralRef(_)
+                if pending
+                    .as_ref()
+                    .is_some_and(|chunk| chunk.opaque_depth.is_none()) =>
+            {
+                return Err(Error::Invalid(
+                    "altChunk contains unexpected character data".into(),
+                ));
+            },
+            Event::Eof => return Err(Error::Invalid("unterminated altChunk".into())),
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
+}
+
 fn validate_xml(xml: &[u8]) -> Result<()> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid(format!(
@@ -324,7 +461,8 @@ fn relationship(
 ) -> Result<Rel> {
     let mut value = None;
     for attribute in element.checked_attributes() {
-        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let attribute =
+            attribute.map_err(|_| Error::Xml("malformed alternative-format XML".into()))?;
         if attribute.key.local_name().as_ref() != b"id" {
             continue;
         }
@@ -346,7 +484,7 @@ fn relationship(
         value = Some(
             attribute
                 .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
-                .map_err(|error| Error::Xml(error.to_string()))?
+                .map_err(|_| Error::Xml("malformed alternative-format XML".into()))?
                 .into_owned(),
         );
     }
@@ -364,7 +502,8 @@ fn parse_on_off(
 ) -> Result<bool> {
     let mut value = None;
     for attribute in element.checked_attributes() {
-        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let attribute =
+            attribute.map_err(|_| Error::Xml("malformed alternative-format XML".into()))?;
         if attribute.key.local_name().as_ref() != b"val" {
             continue;
         }
@@ -378,7 +517,7 @@ fn parse_on_off(
         value = Some(
             attribute
                 .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
-                .map_err(|error| Error::Xml(error.to_string()))?
+                .map_err(|_| Error::Xml("malformed alternative-format XML".into()))?
                 .into_owned(),
         );
     }

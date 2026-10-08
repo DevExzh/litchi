@@ -817,6 +817,37 @@ impl Cell {
         extract_word_text(self.xml_bytes())
     }
 
+    /// The cell's direct block children — paragraphs, nested tables, content
+    /// controls and other children, `w:customXml` wrappers flattened and the
+    /// cell's `w:tcPr` excluded — indexed with the scanner the document body
+    /// uses (see [`crate::Blocks`]).
+    ///
+    /// Unlike [`Self::paragraphs`], the paragraphs of a nested table are not
+    /// the cell's own: `blocks().paragraph(i)` is the cell's `i`-th direct
+    /// paragraph, `tc[K]/p[i + 1]`. A cell does not carry its document's
+    /// markup-compatibility verdict, so
+    /// [`IndexedBlock::transaction_position`](crate::IndexedBlock::transaction_position)
+    /// refuses on these blocks; check the body index of the same document and
+    /// use [`IndexedBlock::direct_position`](crate::IndexedBlock::direct_position).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the cell's XML is malformed or a bound on the
+    /// index is reached.
+    pub fn blocks(&self) -> Result<crate::Blocks> {
+        let (source, start) = self.xml_data.get_or_create_arc();
+        let length = u32::try_from(self.xml_bytes().len())
+            .map_err(|_source_error| Error::InvalidFormat("Word cell exceeds u32".to_string()))?;
+        crate::Blocks::index(
+            source,
+            start,
+            length,
+            self.xml_data.namespace_bindings(),
+            crate::document::ContainerRoot::CELL,
+            crate::parts::memo::RawPositions::Unproven,
+        )
+    }
+
     /// Get all paragraphs in this cell.
     ///
     /// # Performance

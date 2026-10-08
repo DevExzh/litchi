@@ -179,7 +179,10 @@ pub use variables::{Variables, parse_variables};
 // Concrete document entry points are available through their contextual
 // modules. These root exports keep the standalone facade concise without
 // collapsing the owner modules back into host aliases.
-pub use document::{Block, Document, Element, ImageWatermarkPart, OpaqueBlock};
+pub use document::{
+    Block, BlockContentControl, BlockKind, Blocks, Document, Element, ImageWatermarkPart,
+    IndexedBlock, OpaqueBlock,
+};
 pub use math::{OfficeMath, OfficeMathParagraph};
 pub use open_options::{OpenOptions, OpenPolicy};
 pub use package::Package;

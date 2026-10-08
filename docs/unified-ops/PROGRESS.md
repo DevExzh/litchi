@@ -574,3 +574,11 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 - Record 0048 documents validation, preserved typed causes and allocation/parity
   limitations. Concrete adapters, File navigation, query compilation, registry
   dispatch and the full M1/M2/all-format goal remain open.
+
+### 0049 — DOCX indexed block prerequisite
+
+Record [0049](0049-docx-block-index.md) adds typed direct-block navigation,
+namespace-preserving values and generation memos, adapted to immutable eager and
+effective source owners. Managed detached views refuse, including donor-backed
+projections. The DOCX unified adapter and M1 closure remain pending; the complete
+all-format goal remains active.
