@@ -282,7 +282,7 @@ fn lower_xml_limits_take_the_full_validator_path() {
         managed_package(SOURCE_XML, SourceLimits::default(), "proof-limits");
     let source = capture(&package);
     let lower = SourceLimits::builder()
-        .max_xml_depth(1)
+        .max_depth(1)
         .expect("lower depth limit must be valid")
         .build()
         .expect("lower limits must build");
@@ -294,7 +294,7 @@ fn lower_xml_limits_take_the_full_validator_path() {
     assert!(matches!(
         error,
         OpcError::Limit {
-            kind: SourceLimitKind::XmlDepth,
+            kind: SourceLimitKind::Depth,
             ..
         }
     ));

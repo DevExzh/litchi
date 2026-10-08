@@ -276,7 +276,7 @@ fn directory_entry_fixture() -> Vec<u8> {
 
 fn directory_entry_limits(maximum: usize) -> SourceLimits {
     SourceLimits::builder()
-        .max_archive_members(5)
+        .max_members(5)
         .unwrap()
         .max_parts(5)
         .unwrap()

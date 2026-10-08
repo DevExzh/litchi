@@ -88,8 +88,50 @@ composition (`join`, `three_way`), durable patch formats beyond pptx/xlsx.
 | Build-time invalid limit | `Error::InvalidLimit { kind, value, maximum }` | standalone `*LimitsError` types (doc, iWork) | ✅ OPC `InvalidLimit` with contextual maximum (0036); other owners pending |
 | Ingress limit exceeded | `Error::Limit { kind, observed, maximum }` | `OpcError::ReadLimit`, facade `ResourceLimit` mapping drift | ✅ OPC kind/observed/maximum (0036); broader taxonomy pending |
 | Limit kind enums | `SourceLimitKind` / `SemanticLimitKind` | `ReadResource`, per-crate one-off kinds | ✅ OPC and OOXML `SourceLimitKind` (0036); semantic kinds pending |
-| Dimension naming | nouns (`input_bytes`, `members`, `entry_bytes`, `aggregate_bytes`, `depth`, `events`, …); setters `max_<noun>` | a second name for an existing dimension | shared dimensions share defaults (512 MiB input, XML depth 256) |
+| Dimension naming | nouns (`input_bytes`, `members`, `entry_bytes`, `aggregate_bytes`, `depth`, `events`, …); setters `max_<noun>` | a second name for an existing dimension | ✅ OPC common nouns (0037); shared defaults remain 512 MiB input and XML depth 256; other families pending |
 | Coverage policy | caller-selected limits on **every** public ingress path | — | 🔴 gaps: ppt/xls (W4), ODF (W3) |
+
+### OPC source dimensions
+
+`SourceLimits` and `SourceLimitsBuilder` use `max_<dimension>` for both
+getters and consuming setters. `SourceLimitKind` identifies the same bound.
+The shared dimensions below are canonical in OPC (record 0037). Other names
+are distinct OPC dimensions, not aliases for a shared one.
+
+| Dimension | Kind | Meaning |
+|---|---|---|
+| `input_bytes` | `InputBytes` | Compressed package input bytes |
+| `members` | `Members` | Non-directory ZIP members |
+| `entry_bytes` | `EntryBytes` | Declared uncompressed bytes in one ZIP member |
+| `aggregate_bytes` | `AggregateBytes` | Aggregate declared uncompressed ZIP bytes |
+| `depth` | `Depth` | Nesting depth in checked XML |
+| `events` | `Events` | XML events per checked part or operation |
+| `archive_total_entries` | `ArchiveTotalEntries` | ZIP entries including directory records |
+| `archive_member_name_bytes` | `ArchiveMemberNameBytes` | Bytes in one ZIP member name |
+| `archive_metadata_bytes` | `ArchiveMetadataBytes` | Central-directory metadata bytes |
+| `archive_compressed_bytes` | `ArchiveCompressedBytes` | Declared compressed bytes in one ZIP member |
+| `parts` | `Parts` | Materialized OPC part count |
+| `part_bytes` | `PartBytes` | Bytes in one materialized OPC part |
+| `total_part_bytes` | `TotalPartBytes` | Aggregate materialized OPC part bytes |
+| `content_types_bytes` | `ContentTypesBytes` | Content-types XML bytes |
+| `content_type_mappings` | `ContentTypeMappings` | Content-type defaults and overrides |
+| `relationship_parts` | `RelationshipParts` | Relationship part count |
+| `relationship_xml_bytes` | `RelationshipXmlBytes` | Bytes in one relationship XML part |
+| `total_relationship_xml_bytes` | `TotalRelationshipXmlBytes` | Aggregate relationship XML bytes |
+| `relationships_per_part` | `RelationshipsPerPart` | Relationships in one part |
+| `total_relationships` | `TotalRelationships` | Aggregate package relationships |
+| `relationship_graph_nodes` | `RelationshipGraphNodes` | Discovered relationship graph nodes |
+| `total_relationship_xml_events` | `TotalRelationshipXmlEvents` | Aggregate events across relationship XML parts |
+| `xml_attribute_bytes` | `XmlAttributeBytes` | Bytes in one checked XML attribute |
+| `relationship_target_bytes` | `RelationshipTargetBytes` | Bytes in one relationship target |
+
+`members` and `archive_total_entries` intentionally differ: directory records
+count only toward the latter. Likewise, declared ZIP `aggregate_bytes` and
+decoded `total_part_bytes` protect different stages. The XML bounds are consumed
+by content-types, relationships and supported source-preserving XML operations;
+this ledger does not imply that every format-semantic reader uses this profile.
+Local validation/custom-data XML policies retain their own names pending their
+semantic-limit migrations.
 
 ## 5. Errors
 

@@ -1330,12 +1330,12 @@ fn native_effects_read_honors_caller_event_and_depth_limits() -> FixtureResult<(
     assert!(maximum_depth > 2);
     let limits = [
         SourceLimits::builder()
-            .max_xml_events(events - 1)
+            .max_events(events - 1)
             .unwrap()
             .build()
             .unwrap(),
         SourceLimits::builder()
-            .max_xml_depth(maximum_depth - 1)
+            .max_depth(maximum_depth - 1)
             .unwrap()
             .build()
             .unwrap(),

@@ -2168,7 +2168,7 @@ fn borrowed_workbook_limit_constructor_accepts_valid_source_and_enforces_event_b
     );
 
     let event_limits = SourceLimits::builder()
-        .max_xml_events(8)
+        .max_events(8)
         .unwrap()
         .build()
         .unwrap();
@@ -2672,7 +2672,7 @@ fn low_level_package_ingress_refuses_an_encrypted_pivot_table_entry() {
 fn caller_limits_reject_source_and_candidate_before_publication() {
     let fixture = Fixture::build(FixtureOptions::default());
     let event_limits = SourceLimits::builder()
-        .max_xml_events(8)
+        .max_events(8)
         .unwrap()
         .build()
         .unwrap();

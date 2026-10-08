@@ -38,9 +38,9 @@ fn interoperability_limits() -> SourceLimits {
     // input and compressed-byte policies.  The test never requests the large
     // decoded payload.
     SourceLimits::builder()
-        .max_archive_entry_bytes(LARGE_DECLARED_BYTES)
+        .max_entry_bytes(LARGE_DECLARED_BYTES)
         .unwrap()
-        .max_archive_total_bytes(LARGE_DECLARED_BYTES + MAX_PHYSICAL_SOURCE_BYTES as u64)
+        .max_aggregate_bytes(LARGE_DECLARED_BYTES + MAX_PHYSICAL_SOURCE_BYTES as u64)
         .unwrap()
         .max_part_bytes(LARGE_DECLARED_BYTES)
         .unwrap()

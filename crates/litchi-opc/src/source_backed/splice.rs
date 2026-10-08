@@ -103,7 +103,7 @@ impl SourcePartSpliceLimits {
                 SourceLimitKind::ArchiveCompressedBytes,
                 self.max_compressed_bytes,
             ),
-            (SourceLimitKind::ArchiveTotalBytes, self.max_archive_bytes),
+            (SourceLimitKind::AggregateBytes, self.max_archive_bytes),
         ] {
             if value == 0 || value == u64::MAX {
                 return Err(OpcError::InvalidLimit {
@@ -596,7 +596,7 @@ impl<'package> SourcePartSplicePlan<'package> {
             // branch intentionally bypasses XML and signature checks so a
             // malformed or signed source can still be reproduced exactly.
             limits_check(
-                SourceLimitKind::ArchiveTotalBytes,
+                SourceLimitKind::AggregateBytes,
                 self.package.source.length,
                 self.limits.archive_limit(),
             )?;
@@ -3119,7 +3119,7 @@ fn map_replay_error(error: ReplayPublicationError<OpcError>) -> OpcError {
             kind: match resource {
                 ReplayResource::DecodedBytes => SourceLimitKind::PartBytes,
                 ReplayResource::CompressedBytes => SourceLimitKind::ArchiveCompressedBytes,
-                ReplayResource::ArchiveBytes => SourceLimitKind::ArchiveTotalBytes,
+                ReplayResource::ArchiveBytes => SourceLimitKind::AggregateBytes,
             },
             observed: actual,
             maximum,

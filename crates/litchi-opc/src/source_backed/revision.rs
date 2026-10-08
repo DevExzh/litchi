@@ -231,9 +231,9 @@ impl PreparedTopology {
             .map_or(original.as_bytes().len(), |bytes| bytes.len()) as u64;
         let new_bytes = payload.as_slice().len() as u64;
         self.package.limits.check(
-            SourceLimitKind::ArchiveEntryBytes,
+            SourceLimitKind::EntryBytes,
             new_bytes,
-            self.package.limits.max_archive_entry_bytes(),
+            self.package.limits.max_entry_bytes(),
         )?;
         let previous = self
             .state
@@ -250,8 +250,8 @@ impl PreparedTopology {
             previous.archive,
             old_bytes,
             new_bytes,
-            SourceLimitKind::ArchiveTotalBytes,
-            self.package.limits.max_archive_total_bytes(),
+            SourceLimitKind::AggregateBytes,
+            self.package.limits.max_aggregate_bytes(),
         )?;
         self.package.limits.check(
             SourceLimitKind::TotalPartBytes,
@@ -259,9 +259,9 @@ impl PreparedTopology {
             self.package.limits.max_total_part_bytes(),
         )?;
         self.package.limits.check(
-            SourceLimitKind::ArchiveTotalBytes,
+            SourceLimitKind::AggregateBytes,
             archive_total,
-            self.package.limits.max_archive_total_bytes(),
+            self.package.limits.max_aggregate_bytes(),
         )?;
         let old_output = self
             .state

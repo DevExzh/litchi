@@ -480,11 +480,7 @@ fn relationship_xml_event_count(xml: &[u8], limits: SourceLimits) -> Result<u64>
         events = events
             .checked_add(1)
             .ok_or_else(|| overlay_unavailable("relationship XML event count overflows u64"))?;
-        limits.check(
-            SourceLimitKind::XmlEvents,
-            events,
-            limits.max_xml_events() as u64,
-        )?;
+        limits.check(SourceLimitKind::Events, events, limits.max_events() as u64)?;
         if matches!(reader.read_event()?, Event::Eof) {
             return Ok(events);
         }
@@ -1220,7 +1216,7 @@ where
     // NsReader's resolver increments a u16 nesting counter before returning
     // each start event. Keep one slot below its maximum so a deeper event is
     // refused by our policy check before that counter can wrap.
-    let xml_depth_limit = limits.max_xml_depth().min(QUICK_XML_MAX_SAFE_DEPTH);
+    let xml_depth_limit = limits.max_depth().min(QUICK_XML_MAX_SAFE_DEPTH);
     let mut depth = 0usize;
     let mut root_seen = false;
     let mut root_closed = false;
@@ -1265,11 +1261,7 @@ where
         events = events
             .checked_add(1)
             .ok_or_else(|| overlay_unavailable("relationship XML event count overflows u64"))?;
-        limits.check(
-            SourceLimitKind::XmlEvents,
-            events,
-            limits.max_xml_events() as u64,
-        )?;
+        limits.check(SourceLimitKind::Events, events, limits.max_events() as u64)?;
         let event_start = origin
             .offset(reader.buffer_position())
             .ok_or_else(|| overlay_unavailable("relationship XML event position exceeds usize"))?;
@@ -1297,7 +1289,7 @@ where
                 .checked_add(1)
                 .ok_or_else(|| overlay_unavailable("relationship XML depth overflows"))?;
             limits.check(
-                SourceLimitKind::XmlDepth,
+                SourceLimitKind::Depth,
                 element_depth as u64,
                 xml_depth_limit as u64,
             )?;
@@ -1359,11 +1351,7 @@ where
                     }
                     root_seen = true;
                     depth = 1;
-                    limits.check(
-                        SourceLimitKind::XmlDepth,
-                        depth as u64,
-                        xml_depth_limit as u64,
-                    )?;
+                    limits.check(SourceLimitKind::Depth, depth as u64, xml_depth_limit as u64)?;
                 } else if depth == 1 {
                     let (id, relationship_type, target, target_mode) =
                         inspect_relationship_append_child(
@@ -1386,11 +1374,7 @@ where
                     )?;
                     open_relationship = Some((id, event_start));
                     depth = 2;
-                    limits.check(
-                        SourceLimitKind::XmlDepth,
-                        depth as u64,
-                        xml_depth_limit as u64,
-                    )?;
+                    limits.check(SourceLimitKind::Depth, depth as u64, xml_depth_limit as u64)?;
                 } else {
                     return Err(relationship_manifest_append_error(
                         member_name,
@@ -8031,9 +8015,9 @@ impl SourceBackedPackage {
             self.limits.max_archive_compressed_bytes(),
         )?;
         self.limits.check(
-            SourceLimitKind::ArchiveEntryBytes,
+            SourceLimitKind::EntryBytes,
             metadata.uncompressed_size(),
-            self.limits.max_archive_entry_bytes(),
+            self.limits.max_entry_bytes(),
         )?;
         self.limits.check(
             SourceLimitKind::PartBytes,
@@ -9087,9 +9071,9 @@ impl SourceBackedPackage {
                     self.limits.max_relationship_xml_bytes() as u64,
                 )?;
                 self.limits.check(
-                    SourceLimitKind::ArchiveEntryBytes,
+                    SourceLimitKind::EntryBytes,
                     declared_bytes,
-                    self.limits.max_archive_entry_bytes(),
+                    self.limits.max_entry_bytes(),
                 )?;
                 let source_relationships = source_owner_relationships.ok_or_else(|| {
                     overlay_unavailable(
@@ -9281,9 +9265,9 @@ impl SourceBackedPackage {
                             self.limits.max_relationship_xml_bytes() as u64,
                         )?;
                         self.limits.check(
-                            SourceLimitKind::ArchiveEntryBytes,
+                            SourceLimitKind::EntryBytes,
                             new_len_u64,
-                            self.limits.max_archive_entry_bytes(),
+                            self.limits.max_entry_bytes(),
                         )?;
                         let mut xml = original;
                         remove_relationship_source_ranges(&mut xml, &removed_ranges)?;
@@ -9366,9 +9350,9 @@ impl SourceBackedPackage {
                             self.limits.max_relationship_xml_bytes() as u64,
                         )?;
                         self.limits.check(
-                            SourceLimitKind::ArchiveEntryBytes,
+                            SourceLimitKind::EntryBytes,
                             new_len_u64,
-                            self.limits.max_archive_entry_bytes(),
+                            self.limits.max_entry_bytes(),
                         )?;
                         // Keep the original source allocation reserved while a
                         // growth of the retained Vec may transiently coexist
@@ -9615,7 +9599,7 @@ impl SourceBackedPackage {
             .checked_add(new_relationship_member_count)
             .ok_or_else(|| overlay_unavailable("topology archive member count overflows usize"))?;
         self.limits.check(
-            SourceLimitKind::ArchiveMembers,
+            SourceLimitKind::Members,
             self.archive
                 .len()
                 .checked_sub(removed_archive_member_count)
@@ -9624,7 +9608,7 @@ impl SourceBackedPackage {
                 .ok_or_else(|| {
                     overlay_unavailable("topology archive member count overflows usize")
                 })? as u64,
-            self.limits.max_archive_members() as u64,
+            self.limits.max_members() as u64,
         )?;
         let mut existing_relationship_members = 0usize;
         for (index, name) in self.archive.file_names().enumerate() {
@@ -11174,9 +11158,9 @@ impl SourceBackedPackage {
                 self.limits.max_part_bytes(),
             )?;
             self.limits.check(
-                SourceLimitKind::ArchiveEntryBytes,
+                SourceLimitKind::EntryBytes,
                 replacement_bytes,
-                self.limits.max_archive_entry_bytes(),
+                self.limits.max_entry_bytes(),
             )?;
         }
 
@@ -11198,8 +11182,8 @@ impl SourceBackedPackage {
             archive_total = checked_overlay_total(
                 archive_total,
                 self.archive.metadata(name)?.uncompressed_size(),
-                SourceLimitKind::ArchiveTotalBytes,
-                self.limits.max_archive_total_bytes(),
+                SourceLimitKind::AggregateBytes,
+                self.limits.max_aggregate_bytes(),
             )?;
         }
         let mut adjusted_parts = part_total;
@@ -11221,8 +11205,8 @@ impl SourceBackedPackage {
                 adjusted_archive,
                 target_bytes,
                 replacement_bytes,
-                SourceLimitKind::ArchiveTotalBytes,
-                self.limits.max_archive_total_bytes(),
+                SourceLimitKind::AggregateBytes,
+                self.limits.max_aggregate_bytes(),
             )?;
         }
         self.limits.check(
@@ -11231,9 +11215,9 @@ impl SourceBackedPackage {
             self.limits.max_total_part_bytes(),
         )?;
         self.limits.check(
-            SourceLimitKind::ArchiveTotalBytes,
+            SourceLimitKind::AggregateBytes,
             adjusted_archive,
-            self.limits.max_archive_total_bytes(),
+            self.limits.max_aggregate_bytes(),
         )?;
         Ok(())
     }
@@ -11247,9 +11231,9 @@ impl SourceBackedPackage {
     ) -> Result<()> {
         let relationship_bytes = relationship_len as u64;
         self.limits.check(
-            SourceLimitKind::ArchiveEntryBytes,
+            SourceLimitKind::EntryBytes,
             relationship_bytes,
-            self.limits.max_archive_entry_bytes(),
+            self.limits.max_entry_bytes(),
         )?;
         self.limits.check(
             SourceLimitKind::RelationshipXmlBytes,
@@ -11267,8 +11251,8 @@ impl SourceBackedPackage {
             archive_total = checked_overlay_total(
                 archive_total,
                 bytes,
-                SourceLimitKind::ArchiveTotalBytes,
-                self.limits.max_archive_total_bytes(),
+                SourceLimitKind::AggregateBytes,
+                self.limits.max_aggregate_bytes(),
             )?;
             if is_relationship_member_name(name) {
                 relationship_total = checked_overlay_total(
@@ -11291,20 +11275,20 @@ impl SourceBackedPackage {
             archive_total,
             original_part,
             replacement_len as u64,
-            SourceLimitKind::ArchiveTotalBytes,
-            self.limits.max_archive_total_bytes(),
+            SourceLimitKind::AggregateBytes,
+            self.limits.max_aggregate_bytes(),
         )?;
         let adjusted_archive = adjusted_overlay_total(
             adjusted_archive,
             original_relationship,
             relationship_bytes,
-            SourceLimitKind::ArchiveTotalBytes,
-            self.limits.max_archive_total_bytes(),
+            SourceLimitKind::AggregateBytes,
+            self.limits.max_aggregate_bytes(),
         )?;
         self.limits.check(
-            SourceLimitKind::ArchiveTotalBytes,
+            SourceLimitKind::AggregateBytes,
             adjusted_archive,
-            self.limits.max_archive_total_bytes(),
+            self.limits.max_aggregate_bytes(),
         )?;
         let adjusted_relationships = adjusted_overlay_total(
             relationship_total,
@@ -11333,17 +11317,17 @@ impl SourceBackedPackage {
                 self.limits.max_part_bytes(),
             )?;
             self.limits.check(
-                SourceLimitKind::ArchiveEntryBytes,
+                SourceLimitKind::EntryBytes,
                 replacement_bytes,
-                self.limits.max_archive_entry_bytes(),
+                self.limits.max_entry_bytes(),
             )?;
         }
         for (_, replacement_len) in relationship_overlays {
             let replacement_bytes = *replacement_len as u64;
             self.limits.check(
-                SourceLimitKind::ArchiveEntryBytes,
+                SourceLimitKind::EntryBytes,
                 replacement_bytes,
-                self.limits.max_archive_entry_bytes(),
+                self.limits.max_entry_bytes(),
             )?;
             self.limits.check(
                 SourceLimitKind::RelationshipXmlBytes,
@@ -11362,8 +11346,8 @@ impl SourceBackedPackage {
             archive_total = checked_overlay_total(
                 archive_total,
                 bytes,
-                SourceLimitKind::ArchiveTotalBytes,
-                self.limits.max_archive_total_bytes(),
+                SourceLimitKind::AggregateBytes,
+                self.limits.max_aggregate_bytes(),
             )?;
             if is_relationship_member_name(name) {
                 relationship_total = checked_overlay_total(
@@ -11399,8 +11383,8 @@ impl SourceBackedPackage {
                 adjusted_archive,
                 original,
                 *replacement_len as u64,
-                SourceLimitKind::ArchiveTotalBytes,
-                self.limits.max_archive_total_bytes(),
+                SourceLimitKind::AggregateBytes,
+                self.limits.max_aggregate_bytes(),
             )?;
             adjusted_parts = adjusted_overlay_total(
                 adjusted_parts,
@@ -11416,8 +11400,8 @@ impl SourceBackedPackage {
                 adjusted_archive,
                 original,
                 *replacement_len as u64,
-                SourceLimitKind::ArchiveTotalBytes,
-                self.limits.max_archive_total_bytes(),
+                SourceLimitKind::AggregateBytes,
+                self.limits.max_aggregate_bytes(),
             )?;
             adjusted_relationships = adjusted_overlay_total(
                 adjusted_relationships,
@@ -11428,9 +11412,9 @@ impl SourceBackedPackage {
             )?;
         }
         self.limits.check(
-            SourceLimitKind::ArchiveTotalBytes,
+            SourceLimitKind::AggregateBytes,
             adjusted_archive,
-            self.limits.max_archive_total_bytes(),
+            self.limits.max_aggregate_bytes(),
         )?;
         self.limits.check(
             SourceLimitKind::TotalPartBytes,
@@ -11464,8 +11448,8 @@ impl SourceBackedPackage {
             archive_total = checked_overlay_total(
                 archive_total,
                 bytes,
-                SourceLimitKind::ArchiveTotalBytes,
-                self.limits.max_archive_total_bytes(),
+                SourceLimitKind::AggregateBytes,
+                self.limits.max_aggregate_bytes(),
             )?;
             if is_relationship_member_name(name) {
                 relationship_total = checked_overlay_total(
@@ -11505,8 +11489,8 @@ impl SourceBackedPackage {
                 archive_total,
                 part_bytes,
                 0,
-                SourceLimitKind::ArchiveTotalBytes,
-                self.limits.max_archive_total_bytes(),
+                SourceLimitKind::AggregateBytes,
+                self.limits.max_aggregate_bytes(),
             )?;
             let relationships_uri = part.partname.rels_uri().map_err(OpcError::InvalidPackUri)?;
             let relationship_member = relationships_uri.membername();
@@ -11518,8 +11502,8 @@ impl SourceBackedPackage {
                 archive_total,
                 relationship_bytes,
                 0,
-                SourceLimitKind::ArchiveTotalBytes,
-                self.limits.max_archive_total_bytes(),
+                SourceLimitKind::AggregateBytes,
+                self.limits.max_aggregate_bytes(),
             )?;
             relationship_total = adjusted_overlay_total(
                 relationship_total,
@@ -11587,9 +11571,9 @@ impl SourceBackedPackage {
                 self.limits.max_part_bytes(),
             )?;
             self.limits.check(
-                SourceLimitKind::ArchiveEntryBytes,
+                SourceLimitKind::EntryBytes,
                 replacement_bytes,
-                self.limits.max_archive_entry_bytes(),
+                self.limits.max_entry_bytes(),
             )?;
             let original = self
                 .archive
@@ -11606,8 +11590,8 @@ impl SourceBackedPackage {
                 archive_total,
                 original,
                 replacement_bytes,
-                SourceLimitKind::ArchiveTotalBytes,
-                self.limits.max_archive_total_bytes(),
+                SourceLimitKind::AggregateBytes,
+                self.limits.max_aggregate_bytes(),
             )?;
         }
         for (index, addition) in additions.iter().enumerate() {
@@ -11643,9 +11627,9 @@ impl SourceBackedPackage {
                 self.limits.max_part_bytes(),
             )?;
             self.limits.check(
-                SourceLimitKind::ArchiveEntryBytes,
+                SourceLimitKind::EntryBytes,
                 bytes,
-                self.limits.max_archive_entry_bytes(),
+                self.limits.max_entry_bytes(),
             )?;
             if let Some(compressed_bytes) = compressed_bytes {
                 self.limits.check(
@@ -11663,8 +11647,8 @@ impl SourceBackedPackage {
             archive_total = checked_overlay_total(
                 archive_total,
                 bytes,
-                SourceLimitKind::ArchiveTotalBytes,
-                self.limits.max_archive_total_bytes(),
+                SourceLimitKind::AggregateBytes,
+                self.limits.max_aggregate_bytes(),
             )?;
         }
         if let Some(summary) = content_types_replacement {
@@ -11675,9 +11659,9 @@ impl SourceBackedPackage {
                 self.limits.max_content_types_bytes() as u64,
             )?;
             self.limits.check(
-                SourceLimitKind::ArchiveEntryBytes,
+                SourceLimitKind::EntryBytes,
                 bytes,
-                self.limits.max_archive_entry_bytes(),
+                self.limits.max_entry_bytes(),
             )?;
             let entry = self
                 .archive
@@ -11688,8 +11672,8 @@ impl SourceBackedPackage {
                 archive_total,
                 original,
                 bytes,
-                SourceLimitKind::ArchiveTotalBytes,
-                self.limits.max_archive_total_bytes(),
+                SourceLimitKind::AggregateBytes,
+                self.limits.max_aggregate_bytes(),
             )?;
             self.limits.check(
                 SourceLimitKind::ContentTypeMappings,
@@ -11719,9 +11703,9 @@ impl SourceBackedPackage {
                 self.limits.max_relationship_xml_bytes() as u64,
             )?;
             self.limits.check(
-                SourceLimitKind::ArchiveEntryBytes,
+                SourceLimitKind::EntryBytes,
                 bytes,
-                self.limits.max_archive_entry_bytes(),
+                self.limits.max_entry_bytes(),
             )?;
             if let Some(entry) = publication.existing_entry() {
                 let original = self.archive.metadata_for(entry)?.uncompressed_size();
@@ -11729,8 +11713,8 @@ impl SourceBackedPackage {
                     archive_total,
                     original,
                     bytes,
-                    SourceLimitKind::ArchiveTotalBytes,
-                    self.limits.max_archive_total_bytes(),
+                    SourceLimitKind::AggregateBytes,
+                    self.limits.max_aggregate_bytes(),
                 )?;
                 relationship_total = adjusted_overlay_total(
                     relationship_total,
@@ -11769,8 +11753,8 @@ impl SourceBackedPackage {
                 archive_total = checked_overlay_total(
                     archive_total,
                     bytes,
-                    SourceLimitKind::ArchiveTotalBytes,
-                    self.limits.max_archive_total_bytes(),
+                    SourceLimitKind::AggregateBytes,
+                    self.limits.max_aggregate_bytes(),
                 )?;
                 relationship_total = checked_overlay_total(
                     relationship_total,
@@ -11792,9 +11776,9 @@ impl SourceBackedPackage {
             self.limits.max_total_part_bytes(),
         )?;
         self.limits.check(
-            SourceLimitKind::ArchiveTotalBytes,
+            SourceLimitKind::AggregateBytes,
             archive_total,
-            self.limits.max_archive_total_bytes(),
+            self.limits.max_aggregate_bytes(),
         )?;
         self.limits.check(
             SourceLimitKind::TotalRelationshipXmlBytes,
@@ -16686,7 +16670,7 @@ mod tests {
             );
         }
         let shallow = SourceLimits::builder()
-            .max_xml_depth(1)
+            .max_depth(1)
             .unwrap()
             .build()
             .unwrap();
@@ -16699,7 +16683,7 @@ mod tests {
                 || Ok(()),
             ),
             Err(OpcError::Limit {
-                kind: SourceLimitKind::XmlDepth,
+                kind: SourceLimitKind::Depth,
                 ..
             })
         ));
@@ -17403,7 +17387,7 @@ mod tests {
             .checked_add(relationship_xml_event_count(&relationships, default_limits).unwrap())
             .unwrap();
         let event_limits = SourceLimits::builder()
-            .max_xml_events(5)
+            .max_events(5)
             .unwrap()
             .max_total_relationship_xml_events(source_events as usize)
             .unwrap()
@@ -21520,7 +21504,7 @@ mod tests {
         ));
         assert!(output.is_empty());
         let limits = SourceLimits::builder()
-            .max_archive_total_bytes(source_total + 1)
+            .max_aggregate_bytes(source_total + 1)
             .unwrap()
             .build()
             .unwrap();
@@ -21536,7 +21520,7 @@ mod tests {
                 overlays,
             ),
             Err(OpcError::Limit {
-                kind: SourceLimitKind::ArchiveTotalBytes,
+                kind: SourceLimitKind::AggregateBytes,
                 ..
             })
         ));
@@ -21570,7 +21554,7 @@ mod tests {
         assert!(published_total > source_total);
         drop(published);
         let exact_limits = SourceLimits::builder()
-            .max_archive_total_bytes(published_total)
+            .max_aggregate_bytes(published_total)
             .unwrap()
             .build()
             .unwrap();
@@ -21600,7 +21584,7 @@ mod tests {
         assert!(!exact_output.is_empty());
 
         let under_limits = SourceLimits::builder()
-            .max_archive_total_bytes(published_total - 1)
+            .max_aggregate_bytes(published_total - 1)
             .unwrap()
             .build()
             .unwrap();
@@ -21627,7 +21611,7 @@ mod tests {
                 ],
             ),
             Err(OpcError::Limit {
-                kind: SourceLimitKind::ArchiveTotalBytes,
+                kind: SourceLimitKind::AggregateBytes,
                 ..
             })
         ));

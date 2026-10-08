@@ -252,14 +252,14 @@ fn check_canonical_relationship_plan_limits(
         limits.max_part_bytes(),
     )?;
     limits.check(
-        SourceLimitKind::ArchiveEntryBytes,
+        SourceLimitKind::EntryBytes,
         final_len as u64,
-        limits.max_archive_entry_bytes(),
+        limits.max_entry_bytes(),
     )?;
     limits.check(
-        SourceLimitKind::XmlEvents,
+        SourceLimitKind::Events,
         event_count as u64,
-        limits.max_xml_events() as u64,
+        limits.max_events() as u64,
     )?;
     Ok(())
 }
@@ -348,14 +348,14 @@ impl<'source> RelationshipsEditPlan<'source> {
             limits.max_part_bytes(),
         )?;
         limits.check(
-            SourceLimitKind::ArchiveEntryBytes,
+            SourceLimitKind::EntryBytes,
             self.final_len as u64,
-            limits.max_archive_entry_bytes(),
+            limits.max_entry_bytes(),
         )?;
         limits.check(
-            SourceLimitKind::XmlEvents,
+            SourceLimitKind::Events,
             self.event_count as u64,
-            limits.max_xml_events() as u64,
+            limits.max_events() as u64,
         )?;
         let source = self.source;
         if self.additions.is_empty() && self.scan.removal_ranges.is_empty() {
@@ -471,9 +471,9 @@ impl OwnedRelationships {
             limits.max_part_bytes(),
         )?;
         limits.check(
-            SourceLimitKind::ArchiveEntryBytes,
+            SourceLimitKind::EntryBytes,
             self.bytes().len() as u64,
-            limits.max_archive_entry_bytes(),
+            limits.max_entry_bytes(),
         )?;
         if additions.len() > limits.max_relationships_per_part() {
             return Err(OpcError::Limit {
@@ -640,14 +640,14 @@ impl OwnedRelationships {
             limits.max_part_bytes(),
         )?;
         limits.check(
-            SourceLimitKind::ArchiveEntryBytes,
+            SourceLimitKind::EntryBytes,
             final_len as u64,
-            limits.max_archive_entry_bytes(),
+            limits.max_entry_bytes(),
         )?;
         limits.check(
-            SourceLimitKind::XmlEvents,
+            SourceLimitKind::Events,
             final_events as u64,
-            limits.max_xml_events() as u64,
+            limits.max_events() as u64,
         )?;
         let member_present = self.member_present || !owned_additions.is_empty();
         Ok(RelationshipsEditPlan {
@@ -750,9 +750,9 @@ fn scan_relationship_source(
             .checked_add(1)
             .ok_or_else(|| invalid("relationship XML event count overflows"))?;
         limits.check(
-            SourceLimitKind::XmlEvents,
+            SourceLimitKind::Events,
             event_count as u64,
-            limits.max_xml_events() as u64,
+            limits.max_events() as u64,
         )?;
         let start = relationship_offset(&reader, origin)?;
         let event = reader.read_event()?;
@@ -1298,9 +1298,9 @@ impl OpcPackage {
         // Keep both views: the first protects fresh OwnedXmlPart capture and
         // this one supplies exact retained relationship aggregate accounting.
         limits.check(
-            SourceLimitKind::XmlEvents,
+            SourceLimitKind::Events,
             event_count as u64,
-            limits.max_xml_events() as u64,
+            limits.max_events() as u64,
         )?;
         limits.check(
             SourceLimitKind::TotalRelationshipXmlBytes,
@@ -1544,9 +1544,9 @@ fn relationship_xml_metrics(bytes: &[u8], limits: SourceLimits) -> Result<(usize
             .checked_add(1)
             .ok_or_else(|| invalid("relationship XML event count overflows"))?;
         limits.check(
-            SourceLimitKind::XmlEvents,
+            SourceLimitKind::Events,
             events as u64,
-            limits.max_xml_events() as u64,
+            limits.max_events() as u64,
         )?;
         let decoder = reader.decoder();
         match reader
@@ -1558,9 +1558,9 @@ fn relationship_xml_metrics(bytes: &[u8], limits: SourceLimits) -> Result<(usize
                     .checked_add(1)
                     .ok_or_else(|| invalid("relationship XML depth overflows"))?;
                 limits.check(
-                    SourceLimitKind::XmlDepth,
+                    SourceLimitKind::Depth,
                     next_depth as u64,
-                    limits.max_xml_depth() as u64,
+                    limits.max_depth() as u64,
                 )?;
                 if depth == 1 && element.local_name().as_ref() == b"Relationship" {
                     check_relationship_attributes(&element, decoder, limits)?;
@@ -1683,9 +1683,9 @@ mod tests {
             .unwrap()
             .max_part_bytes(exact as u64)
             .unwrap()
-            .max_archive_entry_bytes(exact as u64)
+            .max_entry_bytes(exact as u64)
             .unwrap()
-            .max_xml_events(5)
+            .max_events(5)
             .unwrap()
             .max_total_relationship_xml_events(5)
             .unwrap()
@@ -1759,7 +1759,7 @@ mod tests {
             // The source-publication validator retains whitespace text events
             // (17 total); relationship ingress trims them (10 aggregate
             // events). Both ceilings must admit this retained member.
-            .max_xml_events(17)
+            .max_events(17)
             .unwrap()
             .max_total_relationship_xml_events(events)
             .unwrap()
@@ -1792,14 +1792,14 @@ mod tests {
             })
         ));
         let raw_events_under = SourceLimits::builder()
-            .max_xml_events(16)
+            .max_events(16)
             .unwrap()
             .build()
             .unwrap();
         assert!(matches!(
             package.plan_source_relationships_with_limits(&owner, raw_events_under),
             Err(OpcError::Limit {
-                kind: SourceLimitKind::XmlEvents,
+                kind: SourceLimitKind::Events,
                 ..
             })
         ));
@@ -1829,21 +1829,21 @@ mod tests {
         ));
 
         let depth_under = SourceLimits::builder()
-            .max_xml_depth(1)
+            .max_depth(1)
             .unwrap()
             .build()
             .unwrap();
         assert!(matches!(
             package.plan_source_relationships_with_limits(&owner, depth_under),
             Err(OpcError::Limit {
-                kind: SourceLimitKind::XmlDepth,
+                kind: SourceLimitKind::Depth,
                 ..
             })
         ));
         assert!(matches!(
             package.source_relationships_with_limits(&owner, depth_under),
             Err(OpcError::Limit {
-                kind: SourceLimitKind::XmlDepth,
+                kind: SourceLimitKind::Depth,
                 ..
             })
         ));
@@ -1916,7 +1916,7 @@ mod tests {
             .unwrap()
             .max_part_bytes(changed_plan.final_len() as u64)
             .unwrap()
-            .max_xml_events(changed_plan.event_count())
+            .max_events(changed_plan.event_count())
             .unwrap()
             .max_total_relationship_xml_events(changed_plan.event_count())
             .unwrap()
@@ -2602,21 +2602,21 @@ mod tests {
         // asking the serializer for its output buffer. The neutral plan and
         // the fresh capture must reject the same under-limit profile.
         let archive_entry_under = SourceLimits::builder()
-            .max_archive_entry_bytes(authored_token.bytes().len() as u64 - 1)
+            .max_entry_bytes(authored_token.bytes().len() as u64 - 1)
             .unwrap()
             .build()
             .unwrap();
         assert!(matches!(
             authored.plan_source_relationships_with_limits(&root, archive_entry_under),
             Err(OpcError::Limit {
-                kind: SourceLimitKind::ArchiveEntryBytes,
+                kind: SourceLimitKind::EntryBytes,
                 ..
             })
         ));
         assert!(matches!(
             authored.source_relationships_with_limits(&root, archive_entry_under),
             Err(OpcError::Limit {
-                kind: SourceLimitKind::ArchiveEntryBytes,
+                kind: SourceLimitKind::EntryBytes,
                 ..
             })
         ));
@@ -2643,27 +2643,27 @@ mod tests {
         ));
 
         let event_under = SourceLimits::builder()
-            .max_xml_events(4)
+            .max_events(4)
             .unwrap()
             .build()
             .unwrap();
         assert!(matches!(
             authored.source_relationships_with_limits(&root, event_under),
             Err(OpcError::Limit {
-                kind: SourceLimitKind::XmlEvents,
+                kind: SourceLimitKind::Events,
                 observed: 5,
                 maximum: 4,
             })
         ));
         let depth_under = SourceLimits::builder()
-            .max_xml_depth(1)
+            .max_depth(1)
             .unwrap()
             .build()
             .unwrap();
         assert!(matches!(
             authored.source_relationships_with_limits(&root, depth_under),
             Err(OpcError::Limit {
-                kind: SourceLimitKind::XmlDepth,
+                kind: SourceLimitKind::Depth,
                 observed: 2,
                 maximum: 1,
             })
@@ -2719,7 +2719,7 @@ mod tests {
             .unwrap()
             .max_part_bytes(output_limit as u64)
             .unwrap()
-            .max_archive_entry_bytes(output_limit as u64)
+            .max_entry_bytes(output_limit as u64)
             .unwrap()
             .max_xml_attribute_bytes(output_limit)
             .unwrap()

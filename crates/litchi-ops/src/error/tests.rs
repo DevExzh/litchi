@@ -367,7 +367,7 @@ fn row_resource_limits_are_limit_exceeded() {
     {
         check(
             litchi_opc::OpcError::Limit {
-                kind: litchi_opc::SourceLimitKind::ArchiveMembers,
+                kind: litchi_opc::SourceLimitKind::Members,
                 observed: 11,
                 maximum: 10,
             }
@@ -684,7 +684,7 @@ fn caller_errors_are_classified_by_kind() {
     {
         assert_code(
             litchi_opc::OpcError::InvalidLimit {
-                kind: litchi_opc::SourceLimitKind::ArchiveMembers,
+                kind: litchi_opc::SourceLimitKind::Members,
                 value: 0,
                 maximum: usize::MAX as u64,
             },

@@ -871,9 +871,9 @@ fn project_aggregate_metrics(
     )?;
     check_limit(
         limits,
-        SourceLimitKind::XmlEvents,
+        SourceLimitKind::Events,
         edit.content_type_events as u64,
-        limits.max_xml_events() as u64,
+        limits.max_events() as u64,
     )?;
     Ok(AggregateMetrics {
         parts,
@@ -2882,8 +2882,8 @@ fn validate_xml(xml: &[u8], expected: Option<Conformance>) -> Result<Conformance
             u64::try_from(MAX_XML_BYTES)
                 .map_err(|_| invalid("stylesWithEffects XML byte bound overflows u64"))?,
         )?
-        .max_xml_events(MAX_XML_EVENTS)?
-        .max_xml_depth(MAX_XML_DEPTH)?
+        .max_events(MAX_XML_EVENTS)?
+        .max_depth(MAX_XML_DEPTH)?
         .build()?;
     validate_xml_with_limits(xml, expected, bounded_limits)
 }
@@ -2927,9 +2927,9 @@ fn validate_xml_with_limits(
         }
         check_limit(
             limits,
-            SourceLimitKind::XmlEvents,
+            SourceLimitKind::Events,
             events as u64,
-            limits.max_xml_events() as u64,
+            limits.max_events() as u64,
         )?;
         match event {
             Event::Start(start) => {
@@ -2963,9 +2963,9 @@ fn validate_xml_with_limits(
                 }
                 check_limit(
                     limits,
-                    SourceLimitKind::XmlDepth,
+                    SourceLimitKind::Depth,
                     depth as u64,
-                    limits.max_xml_depth() as u64,
+                    limits.max_depth() as u64,
                 )?;
             },
             Event::Empty(empty) => {

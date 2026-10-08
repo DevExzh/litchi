@@ -247,9 +247,9 @@ fn check_canonical_relationship_structure(
         OpcError::InvalidRelationship("canonical relationship XML event count overflows".to_owned())
     })?;
     limits.check(
-        crate::SourceLimitKind::XmlEvents,
+        crate::SourceLimitKind::Events,
         events as u64,
-        limits.max_xml_events() as u64,
+        limits.max_events() as u64,
     )?;
     limits.check(
         crate::SourceLimitKind::TotalRelationshipXmlEvents,
@@ -258,9 +258,9 @@ fn check_canonical_relationship_structure(
     )?;
     let depth = if relationships.is_empty() { 1 } else { 2 };
     limits.check(
-        crate::SourceLimitKind::XmlDepth,
+        crate::SourceLimitKind::Depth,
         depth,
-        limits.max_xml_depth() as u64,
+        limits.max_depth() as u64,
     )?;
     limits.check(
         crate::SourceLimitKind::TotalRelationshipXmlBytes,
@@ -3504,7 +3504,7 @@ mod tests {
             .count()
             + 1;
         let authored_structure_exact = SourceLimits::builder()
-            .max_xml_events(authored_events)
+            .max_events(authored_events)
             .unwrap()
             .build()
             .unwrap();
@@ -3514,27 +3514,27 @@ mod tests {
                 .is_ok()
         );
         let authored_events_under = SourceLimits::builder()
-            .max_xml_events(authored_events - 1)
+            .max_events(authored_events - 1)
             .unwrap()
             .build()
             .unwrap();
         assert!(matches!(
             authored.source_content_types_with_limits(authored_events_under),
             Err(OpcError::Limit {
-                kind: crate::SourceLimitKind::XmlEvents,
+                kind: crate::SourceLimitKind::Events,
                 observed: actual,
                 maximum,
             }) if actual == authored_events as u64 && maximum == (authored_events - 1) as u64
         ));
         let authored_depth_under = SourceLimits::builder()
-            .max_xml_depth(1)
+            .max_depth(1)
             .unwrap()
             .build()
             .unwrap();
         assert!(matches!(
             authored.source_content_types_with_limits(authored_depth_under),
             Err(OpcError::Limit {
-                kind: crate::SourceLimitKind::XmlDepth,
+                kind: crate::SourceLimitKind::Depth,
                 observed: 2,
                 maximum: 1,
             })

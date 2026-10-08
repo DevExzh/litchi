@@ -433,9 +433,9 @@ fn verified_capture(
         limits.max_archive_compressed_bytes(),
     )?;
     limits.check(
-        SourceLimitKind::ArchiveEntryBytes,
+        SourceLimitKind::EntryBytes,
         metadata.uncompressed_size(),
-        limits.max_archive_entry_bytes(),
+        limits.max_entry_bytes(),
     )?;
     limits.check(
         SourceLimitKind::PartBytes,

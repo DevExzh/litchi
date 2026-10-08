@@ -1607,16 +1607,12 @@ pub(crate) fn authored_content_types_xml_with_limits(
         )
     })?;
     limits.check(
-        SourceLimitKind::XmlEvents,
+        SourceLimitKind::Events,
         events as u64,
-        limits.max_xml_events() as u64,
+        limits.max_events() as u64,
     )?;
     let depth = if budget.mappings == 0 { 1 } else { 2 };
-    limits.check(
-        SourceLimitKind::XmlDepth,
-        depth,
-        limits.max_xml_depth() as u64,
-    )?;
+    limits.check(SourceLimitKind::Depth, depth, limits.max_depth() as u64)?;
     crate::OwnedXmlPart::check_capture_size(&name, budget.bytes, limits)?;
 
     let mut overrides = Vec::new();

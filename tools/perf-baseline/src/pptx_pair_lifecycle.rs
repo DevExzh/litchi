@@ -857,8 +857,8 @@ fn read_limits(input_limit: u64, expansion_limit: u64) -> Result<SourceLimits, B
         .max_archive_member_name_bytes(4 * 1024)?
         .max_archive_metadata_bytes(metadata_limit)?
         .max_archive_compressed_bytes(input_limit)?
-        .max_archive_entry_bytes(expansion_limit)?
-        .max_archive_total_bytes(expansion_limit)?
+        .max_entry_bytes(expansion_limit)?
+        .max_aggregate_bytes(expansion_limit)?
         .max_part_bytes(expansion_limit)?
         .max_total_part_bytes(expansion_limit)?
         .max_content_types_bytes(xml_limit)?

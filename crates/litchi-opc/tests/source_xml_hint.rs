@@ -640,7 +640,7 @@ fn different_content_type_hint_falls_back_even_with_equal_source_version() {
 #[test]
 fn different_limits_hint_falls_back_to_validation_under_current_limits() {
     let changed_limits = SourceLimits::builder()
-        .max_xml_events(999_999)
+        .max_events(999_999)
         .expect("changed event limit must be valid")
         .build()
         .expect("changed limits must build");

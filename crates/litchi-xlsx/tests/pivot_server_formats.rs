@@ -2576,7 +2576,7 @@ fn retained_xml_event_depth_and_attribute_limits_are_honored_by_owner_scan() {
         ..FixtureOptions::default()
     });
     let event_limits = SourceLimits::builder()
-        .max_xml_events(64)
+        .max_events(64)
         .unwrap()
         .build()
         .unwrap();
@@ -2596,7 +2596,7 @@ fn retained_xml_event_depth_and_attribute_limits_are_honored_by_owner_scan() {
         ..FixtureOptions::default()
     });
     let depth_limits = SourceLimits::builder()
-        .max_xml_depth(4)
+        .max_depth(4)
         .unwrap()
         .build()
         .unwrap();

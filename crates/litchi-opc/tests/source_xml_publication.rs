@@ -434,7 +434,7 @@ fn destination_depth_and_event_limits_refuse_source_xml_additions() {
         .expect("source document must be valid");
 
     let depth_limits = SourceLimits::builder()
-        .max_xml_depth(1)
+        .max_depth(1)
         .expect("depth limit must be valid")
         .build()
         .expect("depth profile must be valid");
@@ -450,14 +450,14 @@ fn destination_depth_and_event_limits_refuse_source_xml_additions() {
     assert!(matches!(
         depth_destination.write_topology_to_stream(&mut depth_output, depth_plan),
         Err(OpcError::Limit {
-            kind: SourceLimitKind::XmlDepth,
+            kind: SourceLimitKind::Depth,
             ..
         })
     ));
     assert!(depth_output.is_empty());
 
     let event_limits = SourceLimits::builder()
-        .max_xml_events(8)
+        .max_events(8)
         .expect("event limit must be valid")
         .build()
         .expect("event profile must be valid");
@@ -470,7 +470,7 @@ fn destination_depth_and_event_limits_refuse_source_xml_additions() {
     assert!(matches!(
         event_destination.write_topology_to_stream(&mut event_output, event_plan),
         Err(OpcError::Limit {
-            kind: SourceLimitKind::XmlEvents,
+            kind: SourceLimitKind::Events,
             ..
         })
     ));
@@ -1291,7 +1291,7 @@ fn retained_xml_revisions_enforce_effective_archive_byte_limits() {
         .map(|name| archive.read_member(name).unwrap().len() as u64)
         .sum();
     let limits = SourceLimits::builder()
-        .max_archive_total_bytes(total + 8)
+        .max_aggregate_bytes(total + 8)
         .unwrap()
         .build()
         .unwrap();
@@ -1307,7 +1307,7 @@ fn retained_xml_revisions_enforce_effective_archive_byte_limits() {
             )
         }),
         Err(OpcError::Limit {
-            kind: SourceLimitKind::ArchiveTotalBytes,
+            kind: SourceLimitKind::AggregateBytes,
             ..
         })
     ));

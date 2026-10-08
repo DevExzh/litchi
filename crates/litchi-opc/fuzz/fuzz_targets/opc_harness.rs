@@ -13,18 +13,18 @@ use litchi_opc::{
 
 /// Maximum fuzzer input retained by one exercise.
 pub const MAX_INPUT_BYTES: usize = 1 << 20;
-const MAX_ARCHIVE_MEMBERS: usize = 64;
+const MAX_MEMBERS: usize = 64;
 const MAX_PARTS: usize = 64;
 const MAX_RELATIONSHIP_PARTS: usize = 32;
 const MAX_MEMBER_BYTES: u64 = 256 << 10;
-const MAX_ARCHIVE_TOTAL_BYTES: u64 = 1 << 20;
+const MAX_AGGREGATE_BYTES: u64 = 1 << 20;
 const MAX_RELATIONSHIP_XML_BYTES: usize = 64 << 10;
 const MAX_TOTAL_RELATIONSHIP_XML_BYTES: usize = 256 << 10;
 const MAX_RELATIONSHIPS_PER_PART: usize = 64;
 const MAX_TOTAL_RELATIONSHIPS: usize = 256;
-const MAX_XML_EVENTS: usize = 512;
+const MAX_EVENTS: usize = 512;
 const MAX_TOTAL_XML_EVENTS: usize = 2048;
-const MAX_XML_DEPTH: usize = 32;
+const MAX_DEPTH: usize = 32;
 const MAX_XML_ATTRIBUTE_BYTES: usize = 16 << 10;
 const MAX_RELATIONSHIP_TARGET_BYTES: usize = 4 << 10;
 
@@ -61,7 +61,7 @@ pub struct BoundaryExpectations {
     /// Compressed package length.
     pub input_bytes: usize,
     /// Number of physical ZIP members.
-    pub archive_members: usize,
+    pub members: usize,
     /// Number of admitted ordinary OPC parts.
     pub parts: usize,
     /// Number of relationship parts.
@@ -85,9 +85,9 @@ pub struct BoundaryExpectations {
     /// Maximum declared compressed member bytes.
     pub archive_compressed_bytes: usize,
     /// Maximum declared uncompressed member bytes.
-    pub archive_entry_bytes: usize,
+    pub entry_bytes: usize,
     /// Aggregate declared uncompressed ZIP bytes.
-    pub archive_total_bytes: usize,
+    pub aggregate_bytes: usize,
     /// Maximum admitted ordinary Part bytes.
     pub part_bytes: usize,
     /// Aggregate admitted ordinary Part bytes.
@@ -95,7 +95,7 @@ pub struct BoundaryExpectations {
     /// Relationship graph nodes visited from package and Part relationships.
     pub relationship_graph_nodes: usize,
     /// Maximum XML event count in one content-types or relationships member.
-    pub xml_events: usize,
+    pub events: usize,
     /// Aggregate XML events across relationships members.
     pub total_relationship_xml_events: usize,
     /// Maximum individual XML attribute value bytes.
@@ -107,7 +107,7 @@ pub struct BoundaryExpectations {
 #[derive(Debug, Clone, Copy)]
 enum BoundaryKind {
     InputBytes,
-    ArchiveMembers,
+    Members,
     Parts,
     RelationshipParts,
     ContentTypesBytes,
@@ -119,12 +119,12 @@ enum BoundaryKind {
     ArchiveMemberNameBytes,
     ArchiveMetadataBytes,
     ArchiveCompressedBytes,
-    ArchiveEntryBytes,
-    ArchiveTotalBytes,
+    EntryBytes,
+    AggregateBytes,
     PartBytes,
     TotalPartBytes,
     RelationshipGraphNodes,
-    XmlEvents,
+    Events,
     TotalRelationshipXmlEvents,
     XmlAttributeBytes,
     RelationshipTargetBytes,
@@ -134,7 +134,7 @@ impl BoundaryKind {
     const fn label(self) -> &'static str {
         match self {
             Self::InputBytes => "input bytes",
-            Self::ArchiveMembers => "archive members",
+            Self::Members => "archive members",
             Self::Parts => "parts",
             Self::RelationshipParts => "relationship parts",
             Self::ContentTypesBytes => "content types bytes",
@@ -146,12 +146,12 @@ impl BoundaryKind {
             Self::ArchiveMemberNameBytes => "archive member-name bytes",
             Self::ArchiveMetadataBytes => "archive metadata bytes",
             Self::ArchiveCompressedBytes => "archive compressed bytes",
-            Self::ArchiveEntryBytes => "archive entry bytes",
-            Self::ArchiveTotalBytes => "archive total bytes",
+            Self::EntryBytes => "archive entry bytes",
+            Self::AggregateBytes => "archive total bytes",
             Self::PartBytes => "Part bytes",
             Self::TotalPartBytes => "total Part bytes",
             Self::RelationshipGraphNodes => "relationship graph nodes",
-            Self::XmlEvents => "XML events",
+            Self::Events => "XML events",
             Self::TotalRelationshipXmlEvents => "total relationship XML events",
             Self::XmlAttributeBytes => "XML attribute bytes",
             Self::RelationshipTargetBytes => "relationship Target bytes",
@@ -169,7 +169,7 @@ fn limits_for_input(max_input_bytes: u64) -> SourceLimits {
     SourceLimits::builder()
         .max_input_bytes(max_input_bytes.max(1))
         .expect("nonzero fuzzer input ceiling")
-        .max_archive_members(MAX_ARCHIVE_MEMBERS)
+        .max_members(MAX_MEMBERS)
         .expect("nonzero archive-member ceiling")
         .max_parts(MAX_PARTS)
         .expect("nonzero part ceiling")
@@ -181,13 +181,13 @@ fn limits_for_input(max_input_bytes: u64) -> SourceLimits {
         .expect("nonzero archive-metadata ceiling")
         .max_archive_compressed_bytes(MAX_MEMBER_BYTES)
         .expect("nonzero compressed-byte ceiling")
-        .max_archive_entry_bytes(MAX_MEMBER_BYTES)
+        .max_entry_bytes(MAX_MEMBER_BYTES)
         .expect("nonzero entry-byte ceiling")
-        .max_archive_total_bytes(MAX_ARCHIVE_TOTAL_BYTES)
+        .max_aggregate_bytes(MAX_AGGREGATE_BYTES)
         .expect("nonzero archive-total ceiling")
         .max_part_bytes(MAX_MEMBER_BYTES)
         .expect("nonzero part-byte ceiling")
-        .max_total_part_bytes(MAX_ARCHIVE_TOTAL_BYTES)
+        .max_total_part_bytes(MAX_AGGREGATE_BYTES)
         .expect("nonzero total-part ceiling")
         .max_content_types_bytes(MAX_RELATIONSHIP_XML_BYTES)
         .expect("nonzero content-types ceiling")
@@ -203,11 +203,11 @@ fn limits_for_input(max_input_bytes: u64) -> SourceLimits {
         .expect("nonzero total relationship ceiling")
         .max_relationship_graph_nodes(MAX_TOTAL_RELATIONSHIPS)
         .expect("nonzero graph-node ceiling")
-        .max_xml_events(MAX_XML_EVENTS)
+        .max_events(MAX_EVENTS)
         .expect("nonzero XML-event ceiling")
         .max_total_relationship_xml_events(MAX_TOTAL_XML_EVENTS)
         .expect("nonzero total XML-event ceiling")
-        .max_xml_depth(MAX_XML_DEPTH)
+        .max_depth(MAX_DEPTH)
         .expect("nonzero XML-depth ceiling")
         .max_xml_attribute_bytes(MAX_XML_ATTRIBUTE_BYTES)
         .expect("nonzero XML-attribute ceiling")
@@ -467,8 +467,8 @@ fn boundary_limits(kind: BoundaryKind, value: usize) -> SourceLimits {
         BoundaryKind::InputBytes => builder
             .max_input_bytes(u64::try_from(value).expect("bounded boundary"))
             .expect("nonzero input boundary"),
-        BoundaryKind::ArchiveMembers => builder
-            .max_archive_members(value)
+        BoundaryKind::Members => builder
+            .max_members(value)
             .expect("nonzero member boundary")
             .max_parts(value)
             .expect("nonzero dependent part boundary")
@@ -505,11 +505,11 @@ fn boundary_limits(kind: BoundaryKind, value: usize) -> SourceLimits {
         BoundaryKind::ArchiveCompressedBytes => builder
             .max_archive_compressed_bytes(value as u64)
             .expect("nonzero compressed-byte boundary"),
-        BoundaryKind::ArchiveEntryBytes => builder
-            .max_archive_entry_bytes(value as u64)
+        BoundaryKind::EntryBytes => builder
+            .max_entry_bytes(value as u64)
             .expect("nonzero entry-byte boundary"),
-        BoundaryKind::ArchiveTotalBytes => builder
-            .max_archive_total_bytes(value as u64)
+        BoundaryKind::AggregateBytes => builder
+            .max_aggregate_bytes(value as u64)
             .expect("nonzero archive-total boundary"),
         BoundaryKind::PartBytes => builder
             .max_part_bytes(value as u64)
@@ -520,8 +520,8 @@ fn boundary_limits(kind: BoundaryKind, value: usize) -> SourceLimits {
         BoundaryKind::RelationshipGraphNodes => builder
             .max_relationship_graph_nodes(value)
             .expect("nonzero graph-node boundary"),
-        BoundaryKind::XmlEvents => builder
-            .max_xml_events(value)
+        BoundaryKind::Events => builder
+            .max_events(value)
             .expect("nonzero XML-event boundary"),
         BoundaryKind::TotalRelationshipXmlEvents => builder
             .max_total_relationship_xml_events(value)
@@ -595,9 +595,9 @@ pub fn exercise_boundaries(data: &[u8], expected: BoundaryExpectations) {
             SourceLimitKind::InputBytes,
         ),
         (
-            BoundaryKind::ArchiveMembers,
-            expected.archive_members,
-            SourceLimitKind::ArchiveMembers,
+            BoundaryKind::Members,
+            expected.members,
+            SourceLimitKind::Members,
         ),
         (BoundaryKind::Parts, expected.parts, SourceLimitKind::Parts),
         (
@@ -651,14 +651,14 @@ pub fn exercise_boundaries(data: &[u8], expected: BoundaryExpectations) {
             SourceLimitKind::ArchiveCompressedBytes,
         ),
         (
-            BoundaryKind::ArchiveEntryBytes,
-            expected.archive_entry_bytes,
-            SourceLimitKind::ArchiveEntryBytes,
+            BoundaryKind::EntryBytes,
+            expected.entry_bytes,
+            SourceLimitKind::EntryBytes,
         ),
         (
-            BoundaryKind::ArchiveTotalBytes,
-            expected.archive_total_bytes,
-            SourceLimitKind::ArchiveTotalBytes,
+            BoundaryKind::AggregateBytes,
+            expected.aggregate_bytes,
+            SourceLimitKind::AggregateBytes,
         ),
         (
             BoundaryKind::PartBytes,
@@ -676,9 +676,9 @@ pub fn exercise_boundaries(data: &[u8], expected: BoundaryExpectations) {
             SourceLimitKind::RelationshipGraphNodes,
         ),
         (
-            BoundaryKind::XmlEvents,
-            expected.xml_events,
-            SourceLimitKind::XmlEvents,
+            BoundaryKind::Events,
+            expected.events,
+            SourceLimitKind::Events,
         ),
         (
             BoundaryKind::TotalRelationshipXmlEvents,

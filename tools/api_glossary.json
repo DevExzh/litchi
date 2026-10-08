@@ -217,6 +217,81 @@
           "name": "resource",
           "scope": "litchi_opc::OpcError::InvalidLimit",
           "replacement": "use kind"
+        },
+        {
+          "name": "max_archive_members",
+          "scope": "litchi_opc::SourceLimits",
+          "replacement": "use max_members"
+        },
+        {
+          "name": "max_archive_members",
+          "scope": "litchi_opc::SourceLimitsBuilder",
+          "replacement": "use max_members"
+        },
+        {
+          "name": "ArchiveMembers",
+          "scope": "litchi_opc::SourceLimitKind",
+          "replacement": "use Members"
+        },
+        {
+          "name": "max_archive_entry_bytes",
+          "scope": "litchi_opc::SourceLimits",
+          "replacement": "use max_entry_bytes"
+        },
+        {
+          "name": "max_archive_entry_bytes",
+          "scope": "litchi_opc::SourceLimitsBuilder",
+          "replacement": "use max_entry_bytes"
+        },
+        {
+          "name": "ArchiveEntryBytes",
+          "scope": "litchi_opc::SourceLimitKind",
+          "replacement": "use EntryBytes"
+        },
+        {
+          "name": "max_archive_total_bytes",
+          "scope": "litchi_opc::SourceLimits",
+          "replacement": "use max_aggregate_bytes"
+        },
+        {
+          "name": "max_archive_total_bytes",
+          "scope": "litchi_opc::SourceLimitsBuilder",
+          "replacement": "use max_aggregate_bytes"
+        },
+        {
+          "name": "ArchiveTotalBytes",
+          "scope": "litchi_opc::SourceLimitKind",
+          "replacement": "use AggregateBytes"
+        },
+        {
+          "name": "max_xml_depth",
+          "scope": "litchi_opc::SourceLimits",
+          "replacement": "use max_depth"
+        },
+        {
+          "name": "max_xml_depth",
+          "scope": "litchi_opc::SourceLimitsBuilder",
+          "replacement": "use max_depth"
+        },
+        {
+          "name": "XmlDepth",
+          "scope": "litchi_opc::SourceLimitKind",
+          "replacement": "use Depth"
+        },
+        {
+          "name": "max_xml_events",
+          "scope": "litchi_opc::SourceLimits",
+          "replacement": "use max_events"
+        },
+        {
+          "name": "max_xml_events",
+          "scope": "litchi_opc::SourceLimitsBuilder",
+          "replacement": "use max_events"
+        },
+        {
+          "name": "XmlEvents",
+          "scope": "litchi_opc::SourceLimitKind",
+          "replacement": "use Events"
         }
       ],
       "families": []
@@ -269,6 +344,81 @@
           "name": "resource",
           "scope": "litchi_opc::OpcError::InvalidLimit",
           "replacement": "use kind"
+        },
+        {
+          "name": "max_archive_members",
+          "scope": "litchi_opc::SourceLimits",
+          "replacement": "use max_members"
+        },
+        {
+          "name": "max_archive_members",
+          "scope": "litchi_opc::SourceLimitsBuilder",
+          "replacement": "use max_members"
+        },
+        {
+          "name": "ArchiveMembers",
+          "scope": "litchi_opc::SourceLimitKind",
+          "replacement": "use Members"
+        },
+        {
+          "name": "max_archive_entry_bytes",
+          "scope": "litchi_opc::SourceLimits",
+          "replacement": "use max_entry_bytes"
+        },
+        {
+          "name": "max_archive_entry_bytes",
+          "scope": "litchi_opc::SourceLimitsBuilder",
+          "replacement": "use max_entry_bytes"
+        },
+        {
+          "name": "ArchiveEntryBytes",
+          "scope": "litchi_opc::SourceLimitKind",
+          "replacement": "use EntryBytes"
+        },
+        {
+          "name": "max_archive_total_bytes",
+          "scope": "litchi_opc::SourceLimits",
+          "replacement": "use max_aggregate_bytes"
+        },
+        {
+          "name": "max_archive_total_bytes",
+          "scope": "litchi_opc::SourceLimitsBuilder",
+          "replacement": "use max_aggregate_bytes"
+        },
+        {
+          "name": "ArchiveTotalBytes",
+          "scope": "litchi_opc::SourceLimitKind",
+          "replacement": "use AggregateBytes"
+        },
+        {
+          "name": "max_xml_depth",
+          "scope": "litchi_opc::SourceLimits",
+          "replacement": "use max_depth"
+        },
+        {
+          "name": "max_xml_depth",
+          "scope": "litchi_opc::SourceLimitsBuilder",
+          "replacement": "use max_depth"
+        },
+        {
+          "name": "XmlDepth",
+          "scope": "litchi_opc::SourceLimitKind",
+          "replacement": "use Depth"
+        },
+        {
+          "name": "max_xml_events",
+          "scope": "litchi_opc::SourceLimits",
+          "replacement": "use max_events"
+        },
+        {
+          "name": "max_xml_events",
+          "scope": "litchi_opc::SourceLimitsBuilder",
+          "replacement": "use max_events"
+        },
+        {
+          "name": "XmlEvents",
+          "scope": "litchi_opc::SourceLimitKind",
+          "replacement": "use Events"
         }
       ],
       "families": []

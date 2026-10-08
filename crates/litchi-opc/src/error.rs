@@ -374,7 +374,7 @@ impl From<soapberry_zip::Error> for OpcError {
                 maximum,
             } => Self::Limit {
                 kind: match resource {
-                    soapberry_zip::LimitResource::FileCount => SourceLimitKind::ArchiveMembers,
+                    soapberry_zip::LimitResource::FileCount => SourceLimitKind::Members,
                     soapberry_zip::LimitResource::MemberNameBytes => {
                         SourceLimitKind::ArchiveMemberNameBytes
                     },
@@ -384,8 +384,8 @@ impl From<soapberry_zip::Error> for OpcError {
                     soapberry_zip::LimitResource::CompressedSize => {
                         SourceLimitKind::ArchiveCompressedBytes
                     },
-                    soapberry_zip::LimitResource::EntrySize => SourceLimitKind::ArchiveEntryBytes,
-                    soapberry_zip::LimitResource::TotalSize => SourceLimitKind::ArchiveTotalBytes,
+                    soapberry_zip::LimitResource::EntrySize => SourceLimitKind::EntryBytes,
+                    soapberry_zip::LimitResource::TotalSize => SourceLimitKind::AggregateBytes,
                 },
                 observed: actual,
                 maximum,

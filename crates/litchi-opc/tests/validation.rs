@@ -244,12 +244,12 @@ fn shared_xml_limits_keep_content_type_and_relationship_phase() {
 
     for limits in [
         SourceLimits::builder()
-            .max_xml_events(1)
+            .max_events(1)
             .unwrap()
             .build()
             .unwrap(),
         SourceLimits::builder()
-            .max_xml_depth(1)
+            .max_depth(1)
             .unwrap()
             .build()
             .unwrap(),
@@ -261,7 +261,7 @@ fn shared_xml_limits_keep_content_type_and_relationship_phase() {
             .build()
             .unwrap(),
     ] {
-        let content_types = if limits.max_xml_depth() == 1 {
+        let content_types = if limits.max_depth() == 1 {
             br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Wrapper><Default Extension="xml" ContentType="application/xml"/></Wrapper></Types>"#.as_slice()
         } else {
             CONTENT_TYPES
@@ -277,7 +277,7 @@ fn shared_xml_limits_keep_content_type_and_relationship_phase() {
         (
             ROOT_RELS,
             SourceLimits::builder()
-                .max_xml_events(2)
+                .max_events(2)
                 .unwrap()
                 .build()
                 .unwrap(),
@@ -285,7 +285,7 @@ fn shared_xml_limits_keep_content_type_and_relationship_phase() {
         (
             br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Wrapper><Relationship Id="rId1" Type="urn:test" Target="word/document.xml"/></Wrapper></Relationships>"#,
             SourceLimits::builder()
-                .max_xml_depth(1)
+                .max_depth(1)
                 .unwrap()
                 .build()
                 .unwrap(),
@@ -446,7 +446,7 @@ fn zip_and_relationship_ceilings_are_blocked_without_issues() {
     );
 
     let archive_limits = SourceLimits::builder()
-        .max_archive_members(1)
+        .max_members(1)
         .unwrap()
         .max_relationship_parts(1)
         .unwrap()
@@ -471,7 +471,7 @@ fn zip_and_relationship_ceilings_are_blocked_without_issues() {
     );
 
     let declared_size_limits = SourceLimits::builder()
-        .max_archive_total_bytes(32)
+        .max_aggregate_bytes(32)
         .unwrap()
         .build()
         .unwrap();

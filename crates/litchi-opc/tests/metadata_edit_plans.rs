@@ -36,7 +36,7 @@ fn content_type_plan_reports_exact_events_for_default_to_override_replacement() 
     let expected_events = plan.event_count();
     let expected_len = plan.final_len();
     let limits = SourceLimits::builder()
-        .max_xml_events(expected_events)
+        .max_events(expected_events)
         .unwrap()
         .build()
         .unwrap();
@@ -53,7 +53,7 @@ fn content_type_plan_reports_exact_events_for_default_to_override_replacement() 
                 &[],
                 &["bin"],
                 SourceLimits::builder()
-                    .max_xml_events(expected_events - 1)
+                    .max_events(expected_events - 1)
                     .unwrap()
                     .build()
                     .unwrap()
@@ -96,7 +96,7 @@ fn relationship_plan_admits_exact_events_before_materialization_for_all_root_for
         assert_eq!(plan.relationship_count(), 1);
         assert!(plan.member_present());
         let limits = SourceLimits::builder()
-            .max_xml_events(planned_events)
+            .max_events(planned_events)
             .unwrap()
             .build()
             .unwrap();
@@ -119,14 +119,14 @@ fn relationship_plan_admits_exact_events_before_materialization_for_all_root_for
             );
         }
         let under = SourceLimits::builder()
-            .max_xml_events(planned_events - 1)
+            .max_events(planned_events - 1)
             .unwrap()
             .build()
             .unwrap();
         assert!(matches!(
             before.plan_edit(&additions, &[], under),
             Err(OpcError::Limit {
-                kind: SourceLimitKind::XmlEvents,
+                kind: SourceLimitKind::Events,
                 ..
             })
         ));
@@ -184,12 +184,12 @@ fn relationship_plan_enforces_archive_entry_cap_for_noop_and_changed_output() {
             .unwrap()
             .final_len();
         let exact = SourceLimits::builder()
-            .max_archive_entry_bytes(size as u64)
+            .max_entry_bytes(size as u64)
             .unwrap()
             .build()
             .unwrap();
         let under = SourceLimits::builder()
-            .max_archive_entry_bytes((size - 1) as u64)
+            .max_entry_bytes((size - 1) as u64)
             .unwrap()
             .build()
             .unwrap();
@@ -200,10 +200,10 @@ fn relationship_plan_enforces_archive_entry_cap_for_noop_and_changed_output() {
             .unwrap();
         assert_eq!(after.bytes().len(), size);
         assert!(
-            matches!(before.plan_edit(additions, &[], under), Err(OpcError::Limit { kind: SourceLimitKind::ArchiveEntryBytes, observed: actual, maximum }) if actual == size as u64 && maximum == (size - 1) as u64)
+            matches!(before.plan_edit(additions, &[], under), Err(OpcError::Limit { kind: SourceLimitKind::EntryBytes, observed: actual, maximum }) if actual == size as u64 && maximum == (size - 1) as u64)
         );
         assert!(
-            matches!(before.plan_edit(additions, &[], SourceLimits::default()).unwrap().materialize(under), Err(OpcError::Limit { kind: SourceLimitKind::ArchiveEntryBytes, observed: actual, maximum }) if actual == size as u64 && maximum == (size - 1) as u64)
+            matches!(before.plan_edit(additions, &[], SourceLimits::default()).unwrap().materialize(under), Err(OpcError::Limit { kind: SourceLimitKind::EntryBytes, observed: actual, maximum }) if actual == size as u64 && maximum == (size - 1) as u64)
         );
         assert_eq!(before.bytes(), xml);
     }
@@ -291,9 +291,9 @@ fn new_owner_canonical_plan_reports_actual_output_before_materialization() {
         let count = plan.event_count();
         assert_eq!(plan.relationship_count(), usize::from(populated));
         let exact = SourceLimits::builder()
-            .max_archive_entry_bytes(size as u64)
+            .max_entry_bytes(size as u64)
             .unwrap()
-            .max_xml_events(count)
+            .max_events(count)
             .unwrap()
             .build()
             .unwrap();
@@ -301,26 +301,26 @@ fn new_owner_canonical_plan_reports_actual_output_before_materialization() {
         assert_eq!(xml.len(), size);
         assert_eq!(events(&xml), count);
         let under = SourceLimits::builder()
-            .max_archive_entry_bytes((size - 1) as u64)
+            .max_entry_bytes((size - 1) as u64)
             .unwrap()
             .build()
             .unwrap();
         assert!(matches!(
             relationships.plan_canonical(under),
             Err(OpcError::Limit {
-                kind: SourceLimitKind::ArchiveEntryBytes,
+                kind: SourceLimitKind::EntryBytes,
                 ..
             })
         ));
         let under = SourceLimits::builder()
-            .max_xml_events(count - 1)
+            .max_events(count - 1)
             .unwrap()
             .build()
             .unwrap();
         assert!(matches!(
             relationships.plan_canonical(under),
             Err(OpcError::Limit {
-                kind: SourceLimitKind::XmlEvents,
+                kind: SourceLimitKind::Events,
                 ..
             })
         ));

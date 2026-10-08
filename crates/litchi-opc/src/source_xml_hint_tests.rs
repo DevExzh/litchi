@@ -105,7 +105,7 @@ fn each_identity_and_policy_field_is_required_for_a_hint_hit() {
 
     let mut limits = original.clone();
     limits.limits = SourceLimits::builder()
-        .max_xml_events(expected_limits.max_xml_events() - 1)
+        .max_events(expected_limits.max_events() - 1)
         .unwrap()
         .build()
         .unwrap();

@@ -240,8 +240,8 @@ fn sha256_hex(bytes: &[u8]) -> String {
 fn inventory_read_limits() -> AnyResult<SourceLimits> {
     Ok(SourceLimits::builder()
         .max_input_bytes(MAX_INPUT_BYTES)?
-        .max_archive_entry_bytes(MAX_ARCHIVE_ENTRY_BYTES)?
-        .max_archive_total_bytes(MAX_ARCHIVE_TOTAL_BYTES)?
+        .max_entry_bytes(MAX_ARCHIVE_ENTRY_BYTES)?
+        .max_aggregate_bytes(MAX_ARCHIVE_TOTAL_BYTES)?
         .max_part_bytes(MAX_ARCHIVE_ENTRY_BYTES)?
         .max_total_part_bytes(MAX_TOTAL_PART_BYTES)?
         .build()?)

@@ -1084,7 +1084,7 @@ fn validate_source_xml(
     // increments it before returning a start event. Clamp one slot below its
     // maximum so the next event can be observed and refused without wrapping
     // the resolver counter before our own depth accounting sees it.
-    let xml_depth_limit = limits.max_xml_depth().min(QUICK_XML_MAX_SAFE_DEPTH);
+    let xml_depth_limit = limits.max_depth().min(QUICK_XML_MAX_SAFE_DEPTH);
     let mut depth = 0usize;
     let mut roots = 0usize;
     let mut events = 0u64;
@@ -1096,11 +1096,7 @@ fn validate_source_xml(
         events = events
             .checked_add(1)
             .ok_or_else(|| invalid_source("source XML event count overflows"))?;
-        limits.check(
-            SourceLimitKind::XmlEvents,
-            events,
-            limits.max_xml_events() as u64,
-        )?;
+        limits.check(SourceLimitKind::Events, events, limits.max_events() as u64)?;
         let (namespace, event) = reader.read_resolved_event().map_err(|error| {
             OpcError::XmlError(format!("source XML '{partname}' is malformed: {error}"))
         })?;
@@ -1120,18 +1116,14 @@ fn validate_source_xml(
                 depth = depth
                     .checked_add(1)
                     .ok_or_else(|| invalid_source("source XML depth overflows"))?;
-                limits.check(
-                    SourceLimitKind::XmlDepth,
-                    depth as u64,
-                    xml_depth_limit as u64,
-                )?;
+                limits.check(SourceLimitKind::Depth, depth as u64, xml_depth_limit as u64)?;
             },
             Event::Empty(element) => {
                 let element_depth = depth
                     .checked_add(1)
                     .ok_or_else(|| invalid_source("source XML depth overflows"))?;
                 limits.check(
-                    SourceLimitKind::XmlDepth,
+                    SourceLimitKind::Depth,
                     element_depth as u64,
                     xml_depth_limit as u64,
                 )?;
@@ -1738,7 +1730,7 @@ mod tests {
     #[test]
     fn empty_elements_obey_depth_and_attributes_are_limited_individually() {
         let shallow = SourceLimits::builder()
-            .max_xml_depth(1)
+            .max_depth(1)
             .unwrap()
             .build()
             .unwrap();

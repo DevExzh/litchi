@@ -724,7 +724,7 @@ fn output_limit_is_checked_before_any_destination_output() {
         u64::try_from(content_types.len() + relationships.len() + b"<destination/>\n".len())
             .unwrap();
     let limits = SourceLimits::builder()
-        .max_archive_total_bytes(destination_total)
+        .max_aggregate_bytes(destination_total)
         .unwrap()
         .build()
         .unwrap();
@@ -739,7 +739,7 @@ fn output_limit_is_checked_before_any_destination_output() {
     assert!(matches!(
         error,
         OpcError::Limit {
-            kind: SourceLimitKind::ArchiveTotalBytes,
+            kind: SourceLimitKind::AggregateBytes,
             ..
         }
     ));

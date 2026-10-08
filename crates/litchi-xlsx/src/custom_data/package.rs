@@ -440,13 +440,13 @@ fn bounded_read_limits(package: &OpcPackage, limits: Limits) -> Result<SourceLim
     let current = package.read_limits();
     let mut builder = SourceLimits::builder();
     builder = builder.max_input_bytes(current.max_input_bytes())?;
-    builder = builder.max_archive_members(current.max_archive_members())?;
+    builder = builder.max_members(current.max_members())?;
     builder = builder.max_archive_total_entries(current.max_archive_total_entries())?;
     builder = builder.max_archive_member_name_bytes(current.max_archive_member_name_bytes())?;
     builder = builder.max_archive_metadata_bytes(current.max_archive_metadata_bytes())?;
     builder = builder.max_archive_compressed_bytes(current.max_archive_compressed_bytes())?;
-    builder = builder.max_archive_entry_bytes(current.max_archive_entry_bytes())?;
-    builder = builder.max_archive_total_bytes(current.max_archive_total_bytes())?;
+    builder = builder.max_entry_bytes(current.max_entry_bytes())?;
+    builder = builder.max_aggregate_bytes(current.max_aggregate_bytes())?;
     builder = builder.max_parts(current.max_parts())?;
     builder = builder.max_part_bytes(current.max_part_bytes())?;
     builder = builder.max_total_part_bytes(current.max_total_part_bytes())?;
@@ -475,10 +475,10 @@ fn bounded_read_limits(package: &OpcPackage, limits: Limits) -> Result<SourceLim
             .max_relationship_graph_nodes()
             .min(limits.max_package_nodes()),
     )?;
-    builder = builder.max_xml_events(current.max_xml_events().min(limits.max_xml_events()))?;
+    builder = builder.max_events(current.max_events().min(limits.max_xml_events()))?;
     builder =
         builder.max_total_relationship_xml_events(current.max_total_relationship_xml_events())?;
-    builder = builder.max_xml_depth(current.max_xml_depth().min(limits.max_xml_depth()))?;
+    builder = builder.max_depth(current.max_depth().min(limits.max_xml_depth()))?;
     builder = builder.max_xml_attribute_bytes(
         current
             .max_xml_attribute_bytes()
@@ -1925,12 +1925,12 @@ fn existing_content_type_removals(
     let mut events = 0usize;
     loop {
         events = events.saturating_add(1);
-        if events > limits.max_xml_events() {
+        if events > limits.max_events() {
             return Err(limit(
                 Resource::Objects,
                 "content-types XML events",
                 events,
-                limits.max_xml_events(),
+                limits.max_events(),
             ));
         }
         let event = reader

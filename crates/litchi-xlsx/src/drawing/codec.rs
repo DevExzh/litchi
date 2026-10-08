@@ -941,8 +941,8 @@ pub(crate) fn parse_with_limits(
     }
 
     let defaults = litchi_ooxml_common::mce::Limits::default();
-    let max_events = MAX_DRAWING_EVENTS.min(caller.max_xml_events());
-    let max_depth = MAX_DRAWING_DEPTH.min(caller.max_xml_depth());
+    let max_events = MAX_DRAWING_EVENTS.min(caller.max_events());
+    let max_depth = MAX_DRAWING_DEPTH.min(caller.max_depth());
     let limits = litchi_ooxml_common::mce::Limits {
         max_input_bytes: defaults.max_input_bytes.min(max_xml_bytes),
         max_output_bytes: defaults.max_output_bytes.min(max_xml_bytes),
@@ -1291,7 +1291,7 @@ mod tests {
 
         let empty_child = format!(r#"<wsDr xmlns="{XDR}"><future/></wsDr>"#);
         let caller_limit = litchi_opc::SourceLimits::builder()
-            .max_xml_depth(1)
+            .max_depth(1)
             .expect("positive depth limit")
             .build()
             .expect("consistent read limits");

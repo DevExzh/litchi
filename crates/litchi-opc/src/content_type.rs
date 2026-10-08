@@ -130,17 +130,13 @@ impl ContentTypeMap {
         let mut open_mapping: Option<String> = None;
 
         loop {
-            events =
-                checked_increment(events, limits.max_xml_events(), SourceLimitKind::XmlEvents)?;
+            events = checked_increment(events, limits.max_events(), SourceLimitKind::Events)?;
             let decoder = reader.decoder();
             let (resolved_namespace, event) = reader.read_resolved_event()?;
             match event {
                 Event::Start(element) => {
-                    let next_depth = checked_increment(
-                        depth,
-                        limits.max_xml_depth(),
-                        SourceLimitKind::XmlDepth,
-                    )?;
+                    let next_depth =
+                        checked_increment(depth, limits.max_depth(), SourceLimitKind::Depth)?;
                     if skip_from.is_none() {
                         match inspect_element(
                             &mut map,
@@ -788,13 +784,13 @@ mod tests {
             ContentTypeMap::from_xml(
                 deep.as_bytes(),
                 SourceLimits::builder()
-                    .max_xml_depth(3)
+                    .max_depth(3)
                     .unwrap()
                     .build()
                     .unwrap()
             ),
             Err(OpcError::Limit {
-                kind: SourceLimitKind::XmlDepth,
+                kind: SourceLimitKind::Depth,
                 ..
             })
         ));
@@ -944,9 +940,9 @@ mod tests {
             .unwrap()
             .max_content_type_mappings(1)
             .unwrap()
-            .max_xml_events(4)
+            .max_events(4)
             .unwrap()
-            .max_xml_depth(1)
+            .max_depth(1)
             .unwrap()
             .max_xml_attribute_bytes("application/xml".len())
             .unwrap()
@@ -989,13 +985,13 @@ mod tests {
             ContentTypeMap::from_xml(
                 events.as_bytes(),
                 SourceLimits::builder()
-                    .max_xml_events(4)
+                    .max_events(4)
                     .unwrap()
                     .build()
                     .unwrap()
             ),
             Err(OpcError::Limit {
-                kind: SourceLimitKind::XmlEvents,
+                kind: SourceLimitKind::Events,
                 ..
             })
         ));
@@ -1005,13 +1001,13 @@ mod tests {
             ContentTypeMap::from_xml(
                 nested.as_bytes(),
                 SourceLimits::builder()
-                    .max_xml_depth(1)
+                    .max_depth(1)
                     .unwrap()
                     .build()
                     .unwrap()
             ),
             Err(OpcError::Limit {
-                kind: SourceLimitKind::XmlDepth,
+                kind: SourceLimitKind::Depth,
                 observed: 2,
                 maximum: 1,
             })

@@ -1695,7 +1695,7 @@ fn source_backed_cross_copy_refuses_limits_and_cancellation_before_output() -> T
     let source_bytes = source_fixture()?;
     let destination_bytes = destination_fixture()?;
     let too_small = SourceLimits::builder()
-        .max_archive_entry_bytes(1)
+        .max_entry_bytes(1)
         .map_err(|error| Error::Invalid(error.to_string()))?
         .build()?;
     assert!(

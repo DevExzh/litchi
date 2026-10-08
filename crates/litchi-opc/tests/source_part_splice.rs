@@ -780,7 +780,7 @@ fn exact_noop_authenticates_source_and_candidate_hashes_and_archive_limit() {
     assert!(matches!(
         error,
         OpcError::Limit {
-            kind: litchi_opc::SourceLimitKind::ArchiveTotalBytes,
+            kind: litchi_opc::SourceLimitKind::AggregateBytes,
             ..
         }
     ));

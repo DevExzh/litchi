@@ -906,7 +906,7 @@ fn combined_content_types_and_relationship_growth_obeys_exact_archive_total_cap(
         plan
     };
     let exact_limits = litchi_opc::SourceLimits::builder()
-        .max_archive_total_bytes(exact_total)
+        .max_aggregate_bytes(exact_total)
         .unwrap()
         .build()
         .unwrap();
@@ -914,7 +914,7 @@ fn combined_content_types_and_relationship_growth_obeys_exact_archive_total_cap(
     assert_eq!(archive_uncompressed_total(&exact_output), exact_total);
 
     let under_limits = litchi_opc::SourceLimits::builder()
-        .max_archive_total_bytes(exact_total - 1)
+        .max_aggregate_bytes(exact_total - 1)
         .unwrap()
         .build()
         .unwrap();
@@ -927,7 +927,7 @@ fn combined_content_types_and_relationship_growth_obeys_exact_archive_total_cap(
     assert!(matches!(
         error,
         OpcError::Limit {
-            kind: litchi_opc::SourceLimitKind::ArchiveTotalBytes,
+            kind: litchi_opc::SourceLimitKind::AggregateBytes,
             ..
         }
     ));

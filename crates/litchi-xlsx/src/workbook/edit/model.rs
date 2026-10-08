@@ -2448,7 +2448,7 @@ pub(super) fn validate_svg_final_removals(
             relationship_xml_events = relationship_xml_events
                 .checked_add(relationship_xml_event_count(
                     source.bytes(),
-                    limits.max_xml_events(),
+                    limits.max_events(),
                 )?)
                 .ok_or_else(|| invalid("SVG lifecycle relationship XML events overflow"))?;
         }

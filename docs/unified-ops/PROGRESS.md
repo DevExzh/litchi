@@ -426,3 +426,14 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
   retain typed numeric evidence. Glossary profiles ban the retired vocabulary.
 - Remaining configuration/dimension and semantic-limit work is documented in
   record 0036; the wider goal remains active.
+
+
+## 0037 — canonical physical source dimensions
+
+- Shared OPC/OOXML limits use members, entry_bytes, aggregate_bytes, depth and
+  events with matching max_* methods and SourceLimitKind variants; no aliases.
+- Registered all 24 OPC dimensions and their distinct meanings in the glossary.
+  Defaults, admission rules and owner-local semantic profiles are unchanged.
+- Migrated consumers, tests, active fuzz/performance tools and added exact-scope
+  glossary bans. Record 0037 documents verification and remaining work.
+- OpenOptions, semantic profiles and the wider unified goal remain active.

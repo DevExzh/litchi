@@ -968,7 +968,7 @@ impl<'data> PhysPkgReader<'data> {
 /// Admit the EOCD-declared total central-directory entry count before the
 /// lazy/indexed ZIP reader reserves ownership. The ZIP reader's bounded
 /// layout walk then validates the actual count against this declaration while
-/// it performs the one retained central-directory parse. `max_archive_members`
+/// it performs the one retained central-directory parse. `max_members`
 /// is intentionally the non-directory file limit and cannot provide this
 /// guard.
 fn admit_total_archive_entries(data: &[u8], limits: SourceLimits) -> Result<()> {
@@ -1932,12 +1932,12 @@ fn map_archive_error(error: &soapberry_zip::Error) -> OpcError {
     } = error.kind()
     {
         let opc_resource = match resource {
-            LimitResource::FileCount => SourceLimitKind::ArchiveMembers,
+            LimitResource::FileCount => SourceLimitKind::Members,
             LimitResource::MemberNameBytes => SourceLimitKind::ArchiveMemberNameBytes,
             LimitResource::MetadataBytes => SourceLimitKind::ArchiveMetadataBytes,
             LimitResource::CompressedSize => SourceLimitKind::ArchiveCompressedBytes,
-            LimitResource::EntrySize => SourceLimitKind::ArchiveEntryBytes,
-            LimitResource::TotalSize => SourceLimitKind::ArchiveTotalBytes,
+            LimitResource::EntrySize => SourceLimitKind::EntryBytes,
+            LimitResource::TotalSize => SourceLimitKind::AggregateBytes,
         };
         return OpcError::Limit {
             kind: opc_resource,
@@ -2170,7 +2170,7 @@ mod tests {
         }
         let bytes = writer.finish_to_bytes().unwrap();
         let limits = SourceLimits::builder()
-            .max_archive_members(4_096)
+            .max_members(4_096)
             .unwrap()
             .max_archive_total_entries(4_096)
             .unwrap()
@@ -3012,7 +3012,7 @@ mod tests {
             .unwrap();
         let archive = writer.finish().unwrap();
         let limits = SourceLimits::builder()
-            .max_archive_members(1)
+            .max_members(1)
             .unwrap()
             .max_parts(1)
             .unwrap()
@@ -3023,7 +3023,7 @@ mod tests {
         assert!(matches!(
             PhysPkgReader::new_with_limits(&archive, limits),
             Err(OpcError::Limit {
-                kind: SourceLimitKind::ArchiveMembers,
+                kind: SourceLimitKind::Members,
                 observed: 2,
                 maximum: 1,
             })

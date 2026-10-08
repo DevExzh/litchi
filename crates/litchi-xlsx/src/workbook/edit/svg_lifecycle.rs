@@ -126,8 +126,8 @@ fn scan_limits(workbook: &Workbook) -> source::ScanLimits {
     let part_bytes = usize::try_from(caller.max_part_bytes()).unwrap_or(usize::MAX);
     source::ScanLimits {
         max_xml_bytes: defaults.max_xml_bytes.min(part_bytes),
-        max_nodes: defaults.max_nodes.min(caller.max_xml_events()),
-        max_depth: defaults.max_depth.min(caller.max_xml_depth()),
+        max_nodes: defaults.max_nodes.min(caller.max_events()),
+        max_depth: defaults.max_depth.min(caller.max_depth()),
         max_pictures: defaults
             .max_pictures
             .min(caller.max_relationships_per_part()),
@@ -1156,7 +1156,7 @@ fn plan_final_relationship_topology(
                         0
                     },
                     if source.member_present() {
-                        relationship_xml_event_count(source.bytes(), limits.max_xml_events())?
+                        relationship_xml_event_count(source.bytes(), limits.max_events())?
                     } else {
                         0
                     },

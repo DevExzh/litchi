@@ -865,9 +865,9 @@ impl PackageReader {
             .validate_unencrypted_entries()
             .map_err(OpcError::from)?;
         limits.check(
-            SourceLimitKind::ArchiveMembers,
+            SourceLimitKind::Members,
             archive.len() as u64,
-            limits.max_archive_members() as u64,
+            limits.max_members() as u64,
         )?;
 
         let relationship_part_count = archive
@@ -959,9 +959,9 @@ impl PackageReader {
             .validate_unencrypted_entries()
             .map_err(OpcError::from)?;
         limits.check(
-            SourceLimitKind::ArchiveMembers,
+            SourceLimitKind::Members,
             archive.len() as u64,
-            limits.max_archive_members() as u64,
+            limits.max_members() as u64,
         )?;
 
         let relationship_part_count = archive
@@ -1038,9 +1038,9 @@ impl PackageReader {
             .validate_unencrypted_entries()
             .map_err(OpcError::from)?;
         limits.check(
-            SourceLimitKind::ArchiveMembers,
+            SourceLimitKind::Members,
             archive.len() as u64,
-            limits.max_archive_members() as u64,
+            limits.max_members() as u64,
         )?;
 
         let relationship_part_count = archive
@@ -1181,18 +1181,14 @@ impl PackageReader {
         let mut open_relationship: Option<String> = None;
 
         loop {
-            events =
-                checked_increment(events, limits.max_xml_events(), SourceLimitKind::XmlEvents)?;
+            events = checked_increment(events, limits.max_events(), SourceLimitKind::Events)?;
             ledger.add_event(limits)?;
             let decoder = reader.decoder();
             let (resolved_namespace, event) = reader.read_resolved_event()?;
             match event {
                 Event::Start(element) => {
-                    let next_depth = checked_increment(
-                        depth,
-                        limits.max_xml_depth(),
-                        SourceLimitKind::XmlDepth,
-                    )?;
+                    let next_depth =
+                        checked_increment(depth, limits.max_depth(), SourceLimitKind::Depth)?;
                     if skip_from.is_none() {
                         match inspect_relationship_element(
                             &mut srels,
@@ -1805,9 +1801,9 @@ impl PackageReader {
             .validate_unencrypted_entries()
             .map_err(OpcError::from)?;
         limits.check(
-            SourceLimitKind::ArchiveMembers,
+            SourceLimitKind::Members,
             archive.len() as u64,
-            limits.max_archive_members() as u64,
+            limits.max_members() as u64,
         )?;
         let relationship_part_count = archive
             .file_names()
@@ -1873,9 +1869,9 @@ impl PackageReader {
             .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
         limits
             .check(
-                SourceLimitKind::ArchiveMembers,
+                SourceLimitKind::Members,
                 archive.len() as u64,
-                limits.max_archive_members() as u64,
+                limits.max_members() as u64,
             )
             .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
         let relationship_part_count = archive
@@ -3425,7 +3421,7 @@ mod tests {
             read_with_limits(
                 &exact,
                 SourceLimits::builder()
-                    .max_archive_members(3)
+                    .max_members(3)
                     .unwrap()
                     .max_relationship_parts(1)
                     .unwrap()
@@ -3444,7 +3440,7 @@ mod tests {
         assert_limit(
             &exact,
             SourceLimits::builder()
-                .max_archive_members(2)
+                .max_members(2)
                 .unwrap()
                 .max_relationship_parts(1)
                 .unwrap()
@@ -3452,7 +3448,7 @@ mod tests {
                 .unwrap()
                 .build()
                 .unwrap(),
-            SourceLimitKind::ArchiveMembers,
+            SourceLimitKind::Members,
         );
         assert_limit(
             &package_with_extra_parts(
@@ -3511,11 +3507,11 @@ mod tests {
             .unwrap()
             .max_relationship_graph_nodes(1)
             .unwrap()
-            .max_xml_events(5)
+            .max_events(5)
             .unwrap()
             .max_total_relationship_xml_events(4)
             .unwrap()
-            .max_xml_depth(1)
+            .max_depth(1)
             .unwrap()
             .max_xml_attribute_bytes(RELATIONSHIPS_CONTENT_TYPE.len())
             .unwrap()
@@ -3603,11 +3599,11 @@ mod tests {
         assert_limit(
             &package_with_extra_parts(event_bomb.as_bytes(), &[("word/document.xml", b"x")], None),
             SourceLimits::builder()
-                .max_xml_events(5)
+                .max_events(5)
                 .unwrap()
                 .build()
                 .unwrap(),
-            SourceLimitKind::XmlEvents,
+            SourceLimitKind::Events,
         );
         assert_limit(
             &two_relationship_parts,
@@ -3623,11 +3619,11 @@ mod tests {
         assert_limit(
             &package_with_extra_parts(nested.as_bytes(), &[("word/document.xml", b"x")], None),
             SourceLimits::builder()
-                .max_xml_depth(1)
+                .max_depth(1)
                 .unwrap()
                 .build()
                 .unwrap(),
-            SourceLimitKind::XmlDepth,
+            SourceLimitKind::Depth,
         );
         let encoded_type = format!("urn:{}", "&#x78;".repeat(10));
         let long_attribute = relationships_xml(&relationship("rId1", &encoded_type, "a"));

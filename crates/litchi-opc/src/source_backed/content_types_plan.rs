@@ -182,9 +182,9 @@ impl<'source> ContentTypesPlan<'source> {
             limits.max_content_types_bytes() as u64,
         )?;
         limits.check(
-            SourceLimitKind::ArchiveEntryBytes,
+            SourceLimitKind::EntryBytes,
             source.len() as u64,
-            limits.max_archive_entry_bytes(),
+            limits.max_entry_bytes(),
         )?;
         check_context(context)?;
 
@@ -304,14 +304,14 @@ impl<'source> ContentTypesPlan<'source> {
         loop {
             check_context(context)?;
             event_count = event_count.checked_add(1).ok_or(OpcError::Limit {
-                kind: SourceLimitKind::XmlEvents,
+                kind: SourceLimitKind::Events,
                 observed: u64::MAX,
-                maximum: limits.max_xml_events() as u64,
+                maximum: limits.max_events() as u64,
             })?;
             limits.check(
-                SourceLimitKind::XmlEvents,
+                SourceLimitKind::Events,
                 event_count as u64,
-                limits.max_xml_events() as u64,
+                limits.max_events() as u64,
             )?;
             let event_start = origin
                 .offset(reader.buffer_position())
@@ -548,9 +548,9 @@ impl<'source> ContentTypesPlan<'source> {
             limits.max_part_bytes(),
         )?;
         limits.check(
-            SourceLimitKind::ArchiveEntryBytes,
+            SourceLimitKind::EntryBytes,
             final_len as u64,
-            limits.max_archive_entry_bytes(),
+            limits.max_entry_bytes(),
         )?;
         let mapping_count = mapping_count
             .checked_sub(removal_selector_count)
@@ -569,9 +569,9 @@ impl<'source> ContentTypesPlan<'source> {
             })
             .ok_or_else(|| overlay_unavailable("content-type XML event count underflows"))?;
         limits.check(
-            SourceLimitKind::XmlEvents,
+            SourceLimitKind::Events,
             event_count as u64,
-            limits.max_xml_events() as u64,
+            limits.max_events() as u64,
         )?;
 
         let insertion_offset = if additions.is_empty() || root_is_empty {
@@ -653,14 +653,14 @@ impl<'source> ContentTypesPlan<'source> {
             limits.max_content_types_bytes() as u64,
         )?;
         limits.check(
-            SourceLimitKind::ArchiveEntryBytes,
+            SourceLimitKind::EntryBytes,
             final_len as u64,
-            limits.max_archive_entry_bytes(),
+            limits.max_entry_bytes(),
         )?;
         limits.check(
-            SourceLimitKind::XmlEvents,
+            SourceLimitKind::Events,
             event_count as u64,
-            limits.max_xml_events() as u64,
+            limits.max_events() as u64,
         )?;
         let reservation = reserve_memory(
             context,
@@ -915,14 +915,14 @@ fn checked_mapping_count(current: usize, limits: SourceLimits) -> Result<usize> 
 
 fn next_depth(depth: usize, limits: SourceLimits) -> Result<usize> {
     let next = depth.checked_add(1).ok_or(OpcError::Limit {
-        kind: SourceLimitKind::XmlDepth,
+        kind: SourceLimitKind::Depth,
         observed: u64::MAX,
-        maximum: limits.max_xml_depth() as u64,
+        maximum: limits.max_depth() as u64,
     })?;
     limits.check(
-        SourceLimitKind::XmlDepth,
+        SourceLimitKind::Depth,
         next as u64,
-        limits.max_xml_depth() as u64,
+        limits.max_depth() as u64,
     )?;
     Ok(next)
 }
@@ -1148,7 +1148,7 @@ mod tests {
         let exact = SourceLimits::builder()
             .max_content_types_bytes(final_len)
             .unwrap()
-            .max_archive_entry_bytes(final_len as u64)
+            .max_entry_bytes(final_len as u64)
             .unwrap()
             .build()
             .unwrap();
@@ -1160,7 +1160,7 @@ mod tests {
         let below = SourceLimits::builder()
             .max_content_types_bytes(final_len - 1)
             .unwrap()
-            .max_archive_entry_bytes((final_len - 1) as u64)
+            .max_entry_bytes((final_len - 1) as u64)
             .unwrap()
             .build()
             .unwrap();

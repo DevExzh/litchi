@@ -962,7 +962,7 @@ mod zip_candidates {
         ));
         assert_eq!(opc_probe_count(), 0);
         let limits = crate::opc::SourceLimits::builder()
-            .max_archive_members(1)
+            .max_members(1)
             .expect("test member limit")
             .max_parts(1)
             .expect("test part limit")

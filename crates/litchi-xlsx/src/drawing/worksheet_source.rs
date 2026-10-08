@@ -118,8 +118,8 @@ impl WorksheetSourceLimits {
         let part_bytes = usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX);
         Self {
             max_xml_bytes: defaults.max_xml_bytes.min(part_bytes),
-            max_nodes: defaults.max_nodes.min(limits.max_xml_events()),
-            max_depth: defaults.max_depth.min(limits.max_xml_depth()),
+            max_nodes: defaults.max_nodes.min(limits.max_events()),
+            max_depth: defaults.max_depth.min(limits.max_depth()),
             max_drawing_references: defaults
                 .max_drawing_references
                 .min(limits.max_relationships_per_part()),

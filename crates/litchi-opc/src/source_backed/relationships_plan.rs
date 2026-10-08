@@ -260,9 +260,9 @@ pub(crate) fn plan_relationship_publications(
             package.limits.max_relationship_xml_bytes() as u64,
         )?;
         package.limits.check(
-            crate::limits::SourceLimitKind::ArchiveEntryBytes,
+            crate::limits::SourceLimitKind::EntryBytes,
             declared_bytes,
-            package.limits.max_archive_entry_bytes(),
+            package.limits.max_entry_bytes(),
         )?;
         // Preflight reads and parses the source member to classify its
         // lexical profile. Charge that temporary source/parser state before

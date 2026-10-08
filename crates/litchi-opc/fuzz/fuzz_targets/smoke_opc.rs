@@ -130,12 +130,12 @@ fn valid_fixture() -> ValidFixture {
         })
         .max()
         .expect("deterministic members");
-    let archive_entry_bytes = metadata
+    let entry_bytes = metadata
         .iter()
         .map(|metadata| usize::try_from(metadata.uncompressed_size()).expect("bounded entry size"))
         .max()
         .expect("deterministic members");
-    let archive_total_bytes = metadata
+    let aggregate_bytes = metadata
         .iter()
         .map(|metadata| usize::try_from(metadata.uncompressed_size()).expect("bounded total size"))
         .sum();
@@ -163,7 +163,7 @@ fn valid_fixture() -> ValidFixture {
         bytes,
         boundaries: opc_harness::BoundaryExpectations {
             input_bytes,
-            archive_members: 5,
+            members: 5,
             parts: 2,
             relationship_parts: 2,
             content_types_bytes: content_types.len(),
@@ -175,12 +175,12 @@ fn valid_fixture() -> ValidFixture {
             archive_member_name_bytes,
             archive_metadata_bytes: metadata_bytes,
             archive_compressed_bytes,
-            archive_entry_bytes,
-            archive_total_bytes,
+            entry_bytes,
+            aggregate_bytes,
             part_bytes: DOCUMENT_PAYLOAD.len().max(DATA_PAYLOAD.len()),
             total_part_bytes: DOCUMENT_PAYLOAD.len() + DATA_PAYLOAD.len(),
             relationship_graph_nodes: 2,
-            xml_events: 7,
+            events: 7,
             total_relationship_xml_events: 9,
             xml_attribute_bytes,
             relationship_target_bytes: EXTERNAL_TARGET.len(),
@@ -305,7 +305,7 @@ fn archive_total_entries_fixture() -> Vec<u8> {
 
 fn limits_for_xml_depth(maximum: usize) -> SourceLimits {
     SourceLimits::builder()
-        .max_xml_depth(maximum)
+        .max_depth(maximum)
         .expect("positive XML-depth boundary")
         .build()
         .expect("XML-depth profile must remain consistent")
@@ -313,7 +313,7 @@ fn limits_for_xml_depth(maximum: usize) -> SourceLimits {
 
 fn limits_for_archive_total_entries(maximum: usize) -> SourceLimits {
     SourceLimits::builder()
-        .max_archive_members(5)
+        .max_members(5)
         .expect("five non-directory members is a valid ceiling")
         .max_parts(5)
         .expect("five admitted parts is a valid ceiling")
@@ -327,9 +327,9 @@ fn limits_for_archive_total_entries(maximum: usize) -> SourceLimits {
 
 fn assert_builder_constraints() {
     assert!(matches!(
-        SourceLimits::builder().max_xml_depth(0),
+        SourceLimits::builder().max_depth(0),
         Err(OpcError::InvalidLimit {
-            kind: SourceLimitKind::XmlDepth,
+            kind: SourceLimitKind::Depth,
             value: 0,
             ..
         })
@@ -344,7 +344,7 @@ fn assert_builder_constraints() {
     ));
     assert!(matches!(
         SourceLimits::builder()
-            .max_archive_members(6)
+            .max_members(6)
             .expect("positive archive-member ceiling")
             .max_parts(6)
             .expect("positive parts ceiling")
@@ -354,7 +354,7 @@ fn assert_builder_constraints() {
             .expect("positive total-entry ceiling")
             .build(),
         Err(OpcError::InvalidLimit {
-            kind: SourceLimitKind::ArchiveMembers,
+            kind: SourceLimitKind::Members,
             value: 6,
             maximum: 5,
             ..
@@ -373,7 +373,7 @@ fn exercise_v4_limit_boundaries() {
     assert_ingress_rejects(
         &depth,
         limits_for_xml_depth(1),
-        SourceLimitKind::XmlDepth,
+        SourceLimitKind::Depth,
         "XML depth one-under ceiling",
     );
 

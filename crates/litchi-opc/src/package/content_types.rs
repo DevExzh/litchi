@@ -78,14 +78,14 @@ impl<'source> ContentTypesEditPlan<'source> {
             limits.max_part_bytes(),
         )?;
         limits.check(
-            SourceLimitKind::ArchiveEntryBytes,
+            SourceLimitKind::EntryBytes,
             self.inner.final_len() as u64,
-            limits.max_archive_entry_bytes(),
+            limits.max_entry_bytes(),
         )?;
         limits.check(
-            SourceLimitKind::XmlEvents,
+            SourceLimitKind::Events,
             self.inner.event_count() as u64,
-            limits.max_xml_events() as u64,
+            limits.max_events() as u64,
         )?;
         limits.check(
             SourceLimitKind::ContentTypeMappings,
@@ -154,9 +154,9 @@ impl super::OwnedContentTypes {
             limits.max_part_bytes(),
         )?;
         limits.check(
-            SourceLimitKind::ArchiveEntryBytes,
+            SourceLimitKind::EntryBytes,
             self.xml.bytes().len() as u64,
-            limits.max_archive_entry_bytes(),
+            limits.max_entry_bytes(),
         )?;
         preflight_content_type_edit_inputs(additions, removals, default_removals, limits)?;
         for addition in additions {

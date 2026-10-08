@@ -5104,9 +5104,9 @@ fn validate_slide_graph(
 fn source_slide_output_limit(limits: SourceLimits) -> usize {
     let bounded = limits
         .max_part_bytes()
-        .min(limits.max_archive_entry_bytes())
+        .min(limits.max_entry_bytes())
         .min(limits.max_total_part_bytes())
-        .min(limits.max_archive_total_bytes());
+        .min(limits.max_aggregate_bytes());
     usize::try_from(bounded)
         .unwrap_or(usize::MAX)
         .min(crate::shape::Limits::DEFAULT.output_bytes())

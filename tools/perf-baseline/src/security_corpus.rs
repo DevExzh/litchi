@@ -487,13 +487,13 @@ fn open_doc_package(bytes: &[u8]) -> Result<DocPackage<Cursor<Vec<u8>>>, Box<dyn
 fn security_read_limits() -> Result<SourceLimits, Box<dyn Error>> {
     Ok(SourceLimits::builder()
         .max_input_bytes(SECURITY_MAX_INPUT_BYTES)?
-        .max_archive_members(SECURITY_MAX_MEMBERS)?
+        .max_members(SECURITY_MAX_MEMBERS)?
         .max_archive_total_entries(SECURITY_MAX_MEMBERS)?
         .max_archive_member_name_bytes(SECURITY_MAX_MEMBER_NAME_BYTES)?
         .max_archive_metadata_bytes(SECURITY_MAX_INPUT_BYTES)?
         .max_archive_compressed_bytes(SECURITY_MAX_INPUT_BYTES)?
-        .max_archive_entry_bytes(SECURITY_MAX_INPUT_BYTES)?
-        .max_archive_total_bytes(SECURITY_MAX_INPUT_BYTES)?
+        .max_entry_bytes(SECURITY_MAX_INPUT_BYTES)?
+        .max_aggregate_bytes(SECURITY_MAX_INPUT_BYTES)?
         .max_parts(SECURITY_MAX_MEMBERS)?
         .max_part_bytes(SECURITY_MAX_INPUT_BYTES)?
         .max_total_part_bytes(SECURITY_MAX_INPUT_BYTES)?
@@ -505,9 +505,9 @@ fn security_read_limits() -> Result<SourceLimits, Box<dyn Error>> {
         .max_relationships_per_part(SECURITY_MAX_RELATIONSHIPS)?
         .max_total_relationships(SECURITY_MAX_RELATIONSHIPS)?
         .max_relationship_graph_nodes(SECURITY_MAX_MEMBERS)?
-        .max_xml_events(SECURITY_MAX_RELATIONSHIPS)?
+        .max_events(SECURITY_MAX_RELATIONSHIPS)?
         .max_total_relationship_xml_events(SECURITY_MAX_RELATIONSHIPS)?
-        .max_xml_depth(256)?
+        .max_depth(256)?
         .max_xml_attribute_bytes(SECURITY_MAX_INPUT_BYTES as usize)?
         .max_relationship_target_bytes(SECURITY_MAX_INPUT_BYTES as usize)?
         .build()?)

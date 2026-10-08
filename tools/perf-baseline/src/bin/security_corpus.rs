@@ -1268,13 +1268,13 @@ fn admit_zip_archive_entries<R: ReaderAt>(
 fn opc_limits() -> Result<SourceLimits> {
     Ok(SourceLimits::builder()
         .max_input_bytes(MAX_INPUT_BYTES)?
-        .max_archive_members(MAX_MEMBERS)?
+        .max_members(MAX_MEMBERS)?
         .max_archive_total_entries(MAX_MEMBERS)?
         .max_archive_member_name_bytes(MAX_MEMBER_NAME_BYTES)?
         .max_archive_metadata_bytes(MAX_INPUT_BYTES)?
         .max_archive_compressed_bytes(MAX_INPUT_BYTES)?
-        .max_archive_entry_bytes(MAX_INPUT_BYTES)?
-        .max_archive_total_bytes(MAX_INPUT_BYTES)?
+        .max_entry_bytes(MAX_INPUT_BYTES)?
+        .max_aggregate_bytes(MAX_INPUT_BYTES)?
         .max_parts(MAX_MEMBERS)?
         .max_part_bytes(MAX_INPUT_BYTES)?
         .max_total_part_bytes(MAX_INPUT_BYTES)?
@@ -1286,9 +1286,9 @@ fn opc_limits() -> Result<SourceLimits> {
         .max_relationships_per_part(MAX_RELATIONSHIPS)?
         .max_total_relationships(MAX_RELATIONSHIPS)?
         .max_relationship_graph_nodes(MAX_MEMBERS)?
-        .max_xml_events(MAX_RELATIONSHIPS)?
+        .max_events(MAX_RELATIONSHIPS)?
         .max_total_relationship_xml_events(MAX_RELATIONSHIPS)?
-        .max_xml_depth(256)?
+        .max_depth(256)?
         .max_xml_attribute_bytes(MAX_INPUT_BYTES as usize)?
         .max_relationship_target_bytes(MAX_INPUT_BYTES as usize)?
         .build()?)

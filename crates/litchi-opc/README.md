@@ -39,7 +39,7 @@ use litchi_opc::{OpcPackage, SourceLimits};
 
 let limits = SourceLimits::builder()
     .max_input_bytes(32 * 1024 * 1024)?
-    .max_archive_members(10_000)?
+    .max_members(10_000)?
     .build()?;
 let package = OpcPackage::open_with_limits("untrusted.docx", limits)?;
 # let _ = package;

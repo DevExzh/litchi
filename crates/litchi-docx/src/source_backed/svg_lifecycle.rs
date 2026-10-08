@@ -1587,7 +1587,7 @@ impl SourceBackedSvgAttachmentBatchEdit<'_> {
         if budget
             .physical_member_count
             .checked_add(member_additions)
-            .is_none_or(|count| count > limits.max_archive_members())
+            .is_none_or(|count| count > limits.max_members())
         {
             return Err(Error::Invalid(
                 "DOCX SVG attachment members exceed the archive limit".into(),

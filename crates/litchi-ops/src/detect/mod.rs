@@ -108,12 +108,12 @@ pub(crate) fn catalog_probe_limits(
 ) -> litchi_odf_common::detect::CatalogProbeLimits {
     litchi_odf_common::detect::CatalogProbeLimits::new(
         limits.max_input_bytes(),
-        limits.max_archive_members(),
+        limits.max_members(),
         limits.max_archive_member_name_bytes(),
         limits.max_archive_metadata_bytes(),
         limits.max_archive_compressed_bytes(),
-        limits.max_archive_entry_bytes(),
-        limits.max_archive_total_bytes(),
+        limits.max_entry_bytes(),
+        limits.max_aggregate_bytes(),
     )
 }
 

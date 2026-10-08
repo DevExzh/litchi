@@ -800,8 +800,8 @@ fn drawing_source_limits(owner: &Inner) -> source::ScanLimits {
     let part_bytes = usize::try_from(caller.max_part_bytes()).unwrap_or(usize::MAX);
     source::ScanLimits {
         max_xml_bytes: defaults.max_xml_bytes.min(part_bytes),
-        max_nodes: defaults.max_nodes.min(caller.max_xml_events()),
-        max_depth: defaults.max_depth.min(caller.max_xml_depth()),
+        max_nodes: defaults.max_nodes.min(caller.max_events()),
+        max_depth: defaults.max_depth.min(caller.max_depth()),
         max_pictures: defaults
             .max_pictures
             .min(caller.max_relationships_per_part()),

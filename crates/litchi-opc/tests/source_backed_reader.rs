@@ -261,7 +261,7 @@ fn assert_index_limit_is_typed_for_both_sources(
 fn indexed_archive_limits_remain_typed_for_vec_and_read_at_ingress() {
     let source = archive_bytes();
     let member_limits = SourceLimits::builder()
-        .max_archive_members(1)
+        .max_members(1)
         .unwrap()
         .max_parts(1)
         .unwrap()
@@ -270,7 +270,7 @@ fn indexed_archive_limits_remain_typed_for_vec_and_read_at_ingress() {
         .build()
         .unwrap();
     let profiles = [
-        (member_limits, SourceLimitKind::ArchiveMembers, 2, 1),
+        (member_limits, SourceLimitKind::Members, 2, 1),
         (
             SourceLimits::builder()
                 .max_archive_metadata_bytes(1)
@@ -303,21 +303,21 @@ fn indexed_archive_limits_remain_typed_for_vec_and_read_at_ingress() {
         ),
         (
             SourceLimits::builder()
-                .max_archive_entry_bytes(1)
+                .max_entry_bytes(1)
                 .unwrap()
                 .build()
                 .unwrap(),
-            SourceLimitKind::ArchiveEntryBytes,
+            SourceLimitKind::EntryBytes,
             383,
             1,
         ),
         (
             SourceLimits::builder()
-                .max_archive_total_bytes(1)
+                .max_aggregate_bytes(1)
                 .unwrap()
                 .build()
                 .unwrap(),
-            SourceLimitKind::ArchiveTotalBytes,
+            SourceLimitKind::AggregateBytes,
             383,
             1,
         ),

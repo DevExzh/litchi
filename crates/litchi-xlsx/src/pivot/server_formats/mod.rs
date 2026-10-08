@@ -106,8 +106,8 @@ impl XmlScanLimits {
         let part_bytes = usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX);
         Self {
             part_bytes: MAX_PART_BYTES.min(part_bytes),
-            events: MAX_NODES.min(limits.max_xml_events()),
-            depth: MAX_DEPTH.min(limits.max_xml_depth()),
+            events: MAX_NODES.min(limits.max_events()),
+            depth: MAX_DEPTH.min(limits.max_depth()),
             attribute_bytes: MAX_ATTRIBUTE_TEXT_BYTES.min(limits.max_xml_attribute_bytes()),
             namespace_bytes: MAX_NAMESPACE_BYTES.min(limits.max_xml_attribute_bytes()),
             name_bytes: MAX_NAME_BYTES.min(limits.max_xml_attribute_bytes()),
@@ -124,9 +124,7 @@ fn catalog_mce_limits(limits: SourceLimits) -> litchi_ooxml_common::mce::Limits 
     let part_bytes = usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX);
     let input = MAX_PART_BYTES.min(part_bytes);
     let aggregate_bytes = usize::try_from(limits.max_total_part_bytes()).unwrap_or(usize::MAX);
-    let caller_tokens = limits
-        .max_xml_events()
-        .min(limits.max_xml_attribute_bytes());
+    let caller_tokens = limits.max_events().min(limits.max_xml_attribute_bytes());
     let directive_tokens = MAX_NODES.min(caller_tokens);
     litchi_ooxml_common::mce::Limits {
         max_input_bytes: input,
@@ -134,7 +132,7 @@ fn catalog_mce_limits(limits: SourceLimits) -> litchi_ooxml_common::mce::Limits 
         // branch. Keep both the intermediate output and directive state
         // within the caller's XML/Part policy before the raw catalog sees it.
         max_output_bytes: MAX_PART_BYTES.min(aggregate_bytes),
-        max_depth: MAX_DEPTH.min(limits.max_xml_depth()),
+        max_depth: MAX_DEPTH.min(limits.max_depth()),
         max_namespace_bindings: MAX_NAMESPACE_DECLARATIONS.min(caller_tokens),
         max_directive_tokens: directive_tokens,
         max_choices_per_alternate: MAX_REFERENCE_COUNT.min(1024).min(directive_tokens),

@@ -886,7 +886,7 @@ fn worksheet_content_part_payload_xml_contract_is_bounded_and_preserving() {
     let root_limit = SourceLimits::builder()
         // The worksheet/drawing source itself reaches depth four; the empty
         // payload root must still count as an XML element at that boundary.
-        .max_xml_depth(4)
+        .max_depth(4)
         .unwrap()
         .build()
         .unwrap();
@@ -901,7 +901,7 @@ fn worksheet_content_part_payload_xml_contract_is_bounded_and_preserving() {
     let nested_empty = content_part_package(false, PackageFault::NestedEmptyTarget, 1);
     let one_under = SourceLimits::builder()
         // The payload's fifth empty-element depth is one over the shared cap.
-        .max_xml_depth(4)
+        .max_depth(4)
         .unwrap()
         .build()
         .unwrap();
@@ -912,7 +912,7 @@ fn worksheet_content_part_payload_xml_contract_is_bounded_and_preserving() {
 
     let nested = content_part_package(false, PackageFault::NestedDepthTarget, 1);
     let limits = SourceLimits::builder()
-        .max_xml_depth(4)
+        .max_depth(4)
         .unwrap()
         .build()
         .unwrap();

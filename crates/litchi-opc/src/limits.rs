@@ -19,7 +19,7 @@ pub enum SourceLimitKind {
     /// Compressed package input bytes.
     InputBytes,
     /// ZIP non-directory members.
-    ArchiveMembers,
+    Members,
     /// Total ZIP central-directory entries, including directory records.
     ArchiveTotalEntries,
     /// ZIP member name bytes.
@@ -29,9 +29,9 @@ pub enum SourceLimitKind {
     /// ZIP member compressed bytes.
     ArchiveCompressedBytes,
     /// ZIP member declared uncompressed bytes.
-    ArchiveEntryBytes,
+    EntryBytes,
     /// ZIP aggregate declared uncompressed bytes.
-    ArchiveTotalBytes,
+    AggregateBytes,
     /// OPC parts materialized from the archive.
     Parts,
     /// One materialized OPC part's bytes.
@@ -54,12 +54,12 @@ pub enum SourceLimitKind {
     TotalRelationships,
     /// Nodes discovered while traversing relationship targets.
     RelationshipGraphNodes,
-    /// XML events in one relationships part.
-    XmlEvents,
+    /// XML events in one checked XML part or operation.
+    Events,
     /// Aggregate XML events across relationship parts.
     TotalRelationshipXmlEvents,
     /// XML nesting depth.
-    XmlDepth,
+    Depth,
     /// One XML attribute's bytes.
     XmlAttributeBytes,
     /// One relationship target's bytes.
@@ -70,13 +70,13 @@ impl fmt::Display for SourceLimitKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Self::InputBytes => "package input bytes",
-            Self::ArchiveMembers => "ZIP members",
+            Self::Members => "ZIP members",
             Self::ArchiveTotalEntries => "ZIP total entries",
             Self::ArchiveMemberNameBytes => "ZIP member name bytes",
             Self::ArchiveMetadataBytes => "ZIP metadata bytes",
             Self::ArchiveCompressedBytes => "ZIP member compressed bytes",
-            Self::ArchiveEntryBytes => "ZIP member uncompressed bytes",
-            Self::ArchiveTotalBytes => "ZIP aggregate uncompressed bytes",
+            Self::EntryBytes => "ZIP member uncompressed bytes",
+            Self::AggregateBytes => "ZIP aggregate uncompressed bytes",
             Self::Parts => "OPC parts",
             Self::PartBytes => "OPC part bytes",
             Self::TotalPartBytes => "aggregate OPC part bytes",
@@ -88,9 +88,9 @@ impl fmt::Display for SourceLimitKind {
             Self::RelationshipsPerPart => "relationships per part",
             Self::TotalRelationships => "aggregate relationships",
             Self::RelationshipGraphNodes => "relationship graph nodes",
-            Self::XmlEvents => "relationship XML events",
+            Self::Events => "XML events",
             Self::TotalRelationshipXmlEvents => "aggregate relationship XML events",
-            Self::XmlDepth => "XML nesting depth",
+            Self::Depth => "XML nesting depth",
             Self::XmlAttributeBytes => "XML attribute bytes",
             Self::RelationshipTargetBytes => "relationship target bytes",
         })
@@ -115,13 +115,13 @@ impl fmt::Display for SourceLimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SourceLimits {
     input_bytes: u64,
-    archive_members: usize,
+    members: usize,
     archive_total_entries: usize,
     archive_member_name_bytes: u64,
     archive_metadata_bytes: u64,
     archive_compressed_bytes: u64,
-    archive_entry_bytes: u64,
-    archive_total_bytes: u64,
+    entry_bytes: u64,
+    aggregate_bytes: u64,
     parts: usize,
     part_bytes: u64,
     total_part_bytes: u64,
@@ -133,9 +133,9 @@ pub struct SourceLimits {
     relationships_per_part: usize,
     total_relationships: usize,
     relationship_graph_nodes: usize,
-    xml_events: usize,
+    events: usize,
     total_relationship_xml_events: usize,
-    xml_depth: usize,
+    depth: usize,
     xml_attribute_bytes: usize,
     relationship_target_bytes: usize,
 }
@@ -156,8 +156,8 @@ impl SourceLimits {
     }
     /// Maximum non-directory ZIP members.
     #[must_use]
-    pub const fn max_archive_members(self) -> usize {
-        self.archive_members
+    pub const fn max_members(self) -> usize {
+        self.members
     }
     /// Maximum total ZIP central-directory entries, including directories.
     #[must_use]
@@ -181,13 +181,13 @@ impl SourceLimits {
     }
     /// Maximum declared uncompressed bytes for one ZIP member.
     #[must_use]
-    pub const fn max_archive_entry_bytes(self) -> u64 {
-        self.archive_entry_bytes
+    pub const fn max_entry_bytes(self) -> u64 {
+        self.entry_bytes
     }
     /// Maximum aggregate declared uncompressed ZIP bytes.
     #[must_use]
-    pub const fn max_archive_total_bytes(self) -> u64 {
-        self.archive_total_bytes
+    pub const fn max_aggregate_bytes(self) -> u64 {
+        self.aggregate_bytes
     }
     /// Maximum materialized OPC parts.
     #[must_use]
@@ -244,20 +244,20 @@ impl SourceLimits {
     pub const fn max_relationship_graph_nodes(self) -> usize {
         self.relationship_graph_nodes
     }
-    /// Maximum XML events in one relationship part.
+    /// Maximum XML events in one checked XML part or operation.
     #[must_use]
-    pub const fn max_xml_events(self) -> usize {
-        self.xml_events
+    pub const fn max_events(self) -> usize {
+        self.events
     }
     /// Maximum XML events across relationship parts.
     #[must_use]
     pub const fn max_total_relationship_xml_events(self) -> usize {
         self.total_relationship_xml_events
     }
-    /// Maximum relationship XML nesting depth.
+    /// Maximum nesting depth in checked XML.
     #[must_use]
-    pub const fn max_xml_depth(self) -> usize {
-        self.xml_depth
+    pub const fn max_depth(self) -> usize {
+        self.depth
     }
     /// Maximum bytes in any XML attribute.
     #[must_use]
@@ -274,12 +274,12 @@ impl SourceLimits {
     #[must_use]
     pub(crate) const fn zip_limits(self) -> ArchiveLimits {
         ArchiveLimits {
-            max_files: self.archive_members,
+            max_files: self.members,
             max_member_name_bytes: self.archive_member_name_bytes,
             max_metadata_bytes: self.archive_metadata_bytes,
             max_compressed_size: self.archive_compressed_bytes,
-            max_entry_size: self.archive_entry_bytes,
-            max_total_size: self.archive_total_bytes,
+            max_entry_size: self.entry_bytes,
+            max_total_size: self.aggregate_bytes,
         }
     }
 
@@ -307,13 +307,13 @@ impl Default for SourceLimits {
     fn default() -> Self {
         Self {
             input_bytes: 512 * MIB as u64,
-            archive_members: 100_000,
+            members: 100_000,
             archive_total_entries: 100_000,
             archive_member_name_bytes: 4 * KIB as u64,
             archive_metadata_bytes: 64 * MIB as u64,
             archive_compressed_bytes: 512 * MIB as u64,
-            archive_entry_bytes: 512 * MIB as u64,
-            archive_total_bytes: 2 * GIB,
+            entry_bytes: 512 * MIB as u64,
+            aggregate_bytes: 2 * GIB,
             parts: 100_000,
             part_bytes: 512 * MIB as u64,
             total_part_bytes: 512 * MIB as u64,
@@ -325,9 +325,9 @@ impl Default for SourceLimits {
             relationships_per_part: 100_000,
             total_relationships: 1_000_000,
             relationship_graph_nodes: 100_000,
-            xml_events: 1_000_000,
+            events: 1_000_000,
             total_relationship_xml_events: 8_000_000,
-            xml_depth: 256,
+            depth: 256,
             xml_attribute_bytes: 64 * KIB,
             relationship_target_bytes: 4 * KIB,
         }
@@ -349,25 +349,25 @@ impl SourceLimitsBuilder {
     /// exceed archive members, parts exceed archive members, or relationship
     /// target bytes exceed XML attribute bytes.
     pub fn build(self) -> Result<SourceLimits> {
-        if self.limits.relationship_parts > self.limits.archive_members {
+        if self.limits.relationship_parts > self.limits.members {
             return Err(invalid(
                 SourceLimitKind::RelationshipParts,
                 self.limits.relationship_parts as u64,
-                self.limits.archive_members as u64,
+                self.limits.members as u64,
             ));
         }
-        if self.limits.archive_members > self.limits.archive_total_entries {
+        if self.limits.members > self.limits.archive_total_entries {
             return Err(invalid(
-                SourceLimitKind::ArchiveMembers,
-                self.limits.archive_members as u64,
+                SourceLimitKind::Members,
+                self.limits.members as u64,
                 self.limits.archive_total_entries as u64,
             ));
         }
-        if self.limits.parts > self.limits.archive_members {
+        if self.limits.parts > self.limits.members {
             return Err(invalid(
                 SourceLimitKind::Parts,
                 self.limits.parts as u64,
-                self.limits.archive_members as u64,
+                self.limits.members as u64,
             ));
         }
         if self.limits.relationship_target_bytes > self.limits.xml_attribute_bytes {
@@ -395,9 +395,9 @@ impl SourceLimitsBuilder {
     /// # Errors
     ///
     /// Returns `Err` if `value` is zero.
-    pub fn max_archive_members(mut self, value: usize) -> Result<Self> {
-        validate_count(SourceLimitKind::ArchiveMembers, value)?;
-        self.limits.archive_members = value;
+    pub fn max_members(mut self, value: usize) -> Result<Self> {
+        validate_count(SourceLimitKind::Members, value)?;
+        self.limits.members = value;
         Ok(self)
     }
     /// Set the total ZIP central-directory entry ceiling, including directories.
@@ -441,9 +441,9 @@ impl SourceLimitsBuilder {
     /// # Errors
     ///
     /// Returns `Err` if `value` is zero.
-    pub fn max_archive_entry_bytes(mut self, value: u64) -> Result<Self> {
-        validate_bytes(SourceLimitKind::ArchiveEntryBytes, value)?;
-        self.limits.archive_entry_bytes = value;
+    pub fn max_entry_bytes(mut self, value: u64) -> Result<Self> {
+        validate_bytes(SourceLimitKind::EntryBytes, value)?;
+        self.limits.entry_bytes = value;
         Ok(self)
     }
     /// Set the aggregate ZIP uncompressed-byte ceiling.
@@ -451,9 +451,9 @@ impl SourceLimitsBuilder {
     /// # Errors
     ///
     /// Returns `Err` if `value` is zero.
-    pub fn max_archive_total_bytes(mut self, value: u64) -> Result<Self> {
-        validate_bytes(SourceLimitKind::ArchiveTotalBytes, value)?;
-        self.limits.archive_total_bytes = value;
+    pub fn max_aggregate_bytes(mut self, value: u64) -> Result<Self> {
+        validate_bytes(SourceLimitKind::AggregateBytes, value)?;
+        self.limits.aggregate_bytes = value;
         Ok(self)
     }
     /// Set the materialized OPC part count ceiling.
@@ -566,14 +566,14 @@ impl SourceLimitsBuilder {
         self.limits.relationship_graph_nodes = value;
         Ok(self)
     }
-    /// Set the per-part relationship XML event ceiling.
+    /// Set the per-part XML parser event ceiling.
     ///
     /// # Errors
     ///
     /// Returns `Err` if `value` is zero.
-    pub fn max_xml_events(mut self, value: usize) -> Result<Self> {
-        validate_count(SourceLimitKind::XmlEvents, value)?;
-        self.limits.xml_events = value;
+    pub fn max_events(mut self, value: usize) -> Result<Self> {
+        validate_count(SourceLimitKind::Events, value)?;
+        self.limits.events = value;
         Ok(self)
     }
     /// Set the aggregate relationship XML event ceiling.
@@ -586,14 +586,14 @@ impl SourceLimitsBuilder {
         self.limits.total_relationship_xml_events = value;
         Ok(self)
     }
-    /// Set the relationship XML nesting ceiling.
+    /// Set the XML nesting ceiling.
     ///
     /// # Errors
     ///
     /// Returns `Err` if `value` is zero.
-    pub fn max_xml_depth(mut self, value: usize) -> Result<Self> {
-        validate_count(SourceLimitKind::XmlDepth, value)?;
-        self.limits.xml_depth = value;
+    pub fn max_depth(mut self, value: usize) -> Result<Self> {
+        validate_count(SourceLimitKind::Depth, value)?;
+        self.limits.depth = value;
         Ok(self)
     }
     /// Set the universal XML attribute byte ceiling.
@@ -700,24 +700,16 @@ mod tests {
             );
         }
         assert_eq!(
-            invalid_fields(
-                SourceLimits::builder()
-                    .max_archive_entry_bytes(0)
-                    .unwrap_err()
-            ),
-            (SourceLimitKind::ArchiveEntryBytes, 0, u64::MAX)
+            invalid_fields(SourceLimits::builder().max_entry_bytes(0).unwrap_err()),
+            (SourceLimitKind::EntryBytes, 0, u64::MAX)
         );
         assert_eq!(
-            invalid_fields(SourceLimits::builder().max_xml_depth(0).unwrap_err()),
-            (SourceLimitKind::XmlDepth, 0, usize::MAX as u64)
+            invalid_fields(SourceLimits::builder().max_depth(0).unwrap_err()),
+            (SourceLimitKind::Depth, 0, usize::MAX as u64)
         );
         assert!(SourceLimits::builder().max_input_bytes(input_max).is_ok());
-        assert!(
-            SourceLimits::builder()
-                .max_archive_entry_bytes(u64::MAX)
-                .is_ok()
-        );
-        assert!(SourceLimits::builder().max_xml_depth(usize::MAX).is_ok());
+        assert!(SourceLimits::builder().max_entry_bytes(u64::MAX).is_ok());
+        assert!(SourceLimits::builder().max_depth(usize::MAX).is_ok());
         assert_eq!(
             invalid_fields(
                 crate::SourcePartSpliceLimits::new(u64::MAX, 1, 1, 1, 1, 1).unwrap_err()
@@ -731,7 +723,7 @@ mod tests {
         let cases = [
             (
                 SourceLimits::builder()
-                    .max_archive_members(1)
+                    .max_members(1)
                     .unwrap()
                     .max_relationship_parts(2)
                     .unwrap()
@@ -741,7 +733,7 @@ mod tests {
             ),
             (
                 SourceLimits::builder()
-                    .max_archive_members(3)
+                    .max_members(3)
                     .unwrap()
                     .max_relationship_parts(1)
                     .unwrap()
@@ -751,11 +743,11 @@ mod tests {
                     .unwrap()
                     .build()
                     .unwrap_err(),
-                (SourceLimitKind::ArchiveMembers, 3, 2),
+                (SourceLimitKind::Members, 3, 2),
             ),
             (
                 SourceLimits::builder()
-                    .max_archive_members(1)
+                    .max_members(1)
                     .unwrap()
                     .max_relationship_parts(1)
                     .unwrap()
