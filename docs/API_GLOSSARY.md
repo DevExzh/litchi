@@ -311,3 +311,13 @@ This supplies retained topology ownership for the source-backed DOCX wave.
 It does not make source-backed `Package::edit()` canonical: chained edits still
 need logical overlay revisions and XML authorization against the effective
 candidate, distinct from the physical archive lineage/version.
+
+## 17. OPC XML logical revision foundation (record 0024)
+
+`SourceXmlPart::begin_revision()` creates a distinct logical range-proof scope
+for the current validated XML. Clones share that scope; independent calls do
+not. Changed splices require a fresh revision before another edit. Physical
+archive identity and original bytes remain separate publication authority.
+This enables per-part chaining without archive materialization. It does not
+supply package-wide effective catalog revisions or migrate source DOCX commits;
+no complete transaction family is registered by this step.

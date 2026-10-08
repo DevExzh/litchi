@@ -458,3 +458,45 @@ fn destination_identity_is_checked_for_replacements() {
         OpcError::SourceBackedOverlayUnavailable { .. }
     ));
 }
+
+#[test]
+fn logical_revisions_keep_physical_source_change_fences() {
+    let source = Arc::new(MutableSource::new(archive_bytes(SOURCE_XML)));
+    let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+    let original = capture(&package);
+    let revision = original.begin_revision().unwrap();
+    let publication = revision.clone().into_publication().unwrap();
+    source.replace_bytes(archive_bytes(SOURCE_XML));
+    assert!(matches!(
+        original.begin_revision(),
+        Err(OpcError::SourceChanged { .. })
+    ));
+    assert!(matches!(
+        revision.checked_range(0..0, b""),
+        Err(OpcError::SourceChanged { .. })
+    ));
+    assert!(matches!(
+        revision.into_publication(),
+        Err(OpcError::SourceChanged { .. })
+    ));
+    assert!(matches!(
+        publication.finish(),
+        Err(OpcError::SourceChanged { .. })
+    ));
+}
+
+#[test]
+fn range_proofs_check_content_type_as_well_as_revision() {
+    let package = SourceBackedPackage::from_vec(archive_bytes(SOURCE_XML)).unwrap();
+    let original = capture(&package).begin_revision().unwrap();
+    let mut different_type = original.clone();
+    different_type.source_content_type =
+        Arc::new(ContentType::new("application/other+xml").unwrap());
+    let proof = different_type.checked_range(0..0, b"").unwrap();
+    let mut publication = original.into_publication().unwrap();
+    assert!(
+        publication
+            .replace(proof, AuthoredXmlFragment::empty())
+            .is_err()
+    );
+}

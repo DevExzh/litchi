@@ -67,8 +67,28 @@ pub struct SourceXmlPart {
     pub(crate) original: PartData,
     pub(crate) payload: Arc<Vec<u8>>,
     pub(crate) payload_reservation: Option<Arc<Reservation>>,
+    revision: Option<Arc<XmlRevision>>,
     _metadata_reservation: Option<Arc<Reservation>>,
     pub(crate) limits: ReadLimits,
+}
+
+// A logical edit base, distinct from the immutable physical archive source.
+// No parent revision is retained. Range proofs pin this base and its admission
+// until the proof is consumed or dropped; the original PartData also covers
+// the case where edit_base shares the original managed payload allocation.
+struct XmlRevision {
+    edit_base: Arc<Vec<u8>>,
+    _original: PartData,
+    _payload_reservation: Option<Arc<Reservation>>,
+    _holder_reservation: Option<Arc<Reservation>>,
+}
+
+fn same_revision(left: &Option<Arc<XmlRevision>>, right: &Option<Arc<XmlRevision>>) -> bool {
+    match (left, right) {
+        (None, None) => true,
+        (Some(left), Some(right)) => Arc::ptr_eq(left, right),
+        _ => false,
+    }
 }
 
 impl fmt::Debug for SourceXmlPart {
@@ -82,6 +102,7 @@ impl fmt::Debug for SourceXmlPart {
             .field("source_bytes", &self.original.as_bytes().len())
             .field("payload_bytes", &self.payload.len())
             .field("derived_payload", &self.payload_reservation.is_some())
+            .field("logical_revision", &self.revision.is_some())
             .finish()
     }
 }
@@ -130,6 +151,7 @@ impl SourceXmlPart {
             original,
             payload,
             payload_reservation: None,
+            revision: None,
             _metadata_reservation: metadata_reservation,
             limits,
         })
@@ -153,6 +175,76 @@ impl SourceXmlPart {
         self.source_content_type.as_str()
     }
 
+    /// Start a fresh logical revision over the current validated XML payload.
+    ///
+    /// This shares the payload and its reservations without reopening the ZIP
+    /// or rescanning XML. The original archive bytes remain the authority for
+    /// physical publication. Each call creates a distinct revision: proofs
+    /// issued by another revision are refused even when its bytes are equal.
+    /// A changed splice must explicitly begin another revision before editing
+    /// again. Clones of this returned token share its revision.
+    ///
+    /// ```
+    /// use litchi_opc::{AuthoredXmlFragment, BlobPart, OpcPackage, PackURI,
+    ///     PackageWriter, SourceBackedPackage};
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let name = PackURI::new("/example.xml")?;
+    /// let mut package = OpcPackage::new();
+    /// package.try_add_part(Box::new(BlobPart::new(
+    ///     name.clone(), "application/xml".to_owned(), b"<first/>".to_vec(),
+    /// )))?;
+    /// let source = SourceBackedPackage::from_vec(PackageWriter::to_bytes(&package)?)?;
+    /// let mut current = source.part(&name)?.source_xml()?;
+    /// for next in [b"<second/>".as_slice(), b"<third/>".as_slice()] {
+    ///     let revision = current.begin_revision()?;
+    ///     let proof = revision.checked_range(0..revision.bytes().len(), revision.bytes())?;
+    ///     let mut edit = revision.into_publication()?;
+    ///     edit.replace(proof, AuthoredXmlFragment::markup(next.to_vec())?)?;
+    ///     current = edit.finish()?;
+    /// }
+    /// assert_eq!(current.bytes(), b"<third/>");
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    /// Returns source-change, cancellation or metadata-admission failures.
+    pub fn begin_revision(&self) -> Result<Self> {
+        self.check_source_state()?;
+        let holder = reserve_output_memory(
+            &self.source,
+            size_of::<XmlRevision>() + size_of::<[usize; 2]>(),
+        )?;
+        let revision = Arc::new(XmlRevision {
+            edit_base: Arc::clone(&self.payload),
+            _original: self.original.clone(),
+            _payload_reservation: self.payload_reservation.clone(),
+            _holder_reservation: holder,
+        });
+        self.check_source_state()?;
+        let mut next = self.clone();
+        next.revision = Some(revision);
+        Ok(next)
+    }
+
+    fn edit_base(&self) -> &[u8] {
+        self.revision.as_ref().map_or_else(
+            || self.original.as_bytes(),
+            |revision| revision.edit_base.as_slice(),
+        )
+    }
+
+    fn is_edit_base_payload(&self) -> bool {
+        self.revision.as_ref().map_or_else(
+            || Arc::ptr_eq(&self.payload, &self.original.shared_bytes()),
+            |revision| Arc::ptr_eq(&self.payload, &revision.edit_base),
+        )
+    }
+
+    pub(crate) fn is_physical_source(&self) -> bool {
+        self.revision.is_none() && Arc::ptr_eq(&self.payload, &self.original.shared_bytes())
+    }
+
     /// Issue a proof for an exact source byte range.
     ///
     /// The expected bytes are compared before the proof is issued.  Empty
@@ -164,7 +256,7 @@ impl SourceXmlPart {
         expected_source: &[u8],
     ) -> Result<XmlSourceRange> {
         self.check_source_state()?;
-        if !self.is_original_payload() {
+        if !self.is_edit_base_payload() {
             return Err(invalid_source(
                 "derived source XML cannot issue a second range proof",
             ));
@@ -187,8 +279,7 @@ impl SourceXmlPart {
             ));
         }
         let actual = self
-            .original
-            .as_bytes()
+            .edit_base()
             .get(range.clone())
             .ok_or_else(|| invalid_source("XML source range is outside the source Part"))?;
         if actual != expected_source {
@@ -213,6 +304,9 @@ impl SourceXmlPart {
             source_lineage: self.source_lineage.clone(),
             source_version: self.source_version,
             source_partname: self.source_partname.as_ref().clone(),
+            source_content_type: Arc::clone(&self.source_content_type),
+            revision: self.revision.clone(),
+            _source_metadata_reservation: self._metadata_reservation.clone(),
             range,
             expected,
             _reservation: expected_reservation,
@@ -222,7 +316,7 @@ impl SourceXmlPart {
     /// Begin a source-preserving edit transaction.
     pub fn into_publication(self) -> Result<XmlSplicePublication> {
         self.check_source_state()?;
-        if !self.is_original_payload() {
+        if !self.is_edit_base_payload() {
             return Err(invalid_source(
                 "derived source XML cannot be edited a second time",
             ));
@@ -239,10 +333,6 @@ impl SourceXmlPart {
 
     pub(crate) fn source_snapshot(&self) -> SourceSnapshot {
         self.source.clone()
-    }
-
-    fn is_original_payload(&self) -> bool {
-        Arc::ptr_eq(&self.payload, &self.original.shared_bytes())
     }
 
     pub(crate) fn check_for_publication(
@@ -334,6 +424,9 @@ pub struct XmlSourceRange {
     source_lineage: SourceLineage,
     source_version: SourceVersion,
     source_partname: PackURI,
+    source_content_type: Arc<ContentType>,
+    revision: Option<Arc<XmlRevision>>,
+    _source_metadata_reservation: Option<Arc<Reservation>>,
     range: Range<usize>,
     expected: Vec<u8>,
     _reservation: Option<Arc<Reservation>>,
@@ -348,6 +441,7 @@ impl fmt::Debug for XmlSourceRange {
             .field("source_partname", &self.source_partname)
             .field("range", &self.range)
             .field("expected_bytes", &self.expected.len())
+            .field("logical_revision", &self.revision.is_some())
             .finish()
     }
 }
@@ -461,13 +555,15 @@ impl XmlSplicePublication {
     /// Stage one checked replacement or insertion.
     pub fn replace(&mut self, proof: XmlSourceRange, fragment: AuthoredXmlFragment) -> Result<()> {
         self.source.check_source_state()?;
-        if !self.source.is_original_payload() {
+        if !self.source.is_edit_base_payload() {
             return Err(invalid_source(
                 "derived source XML cannot receive another source splice",
             ));
         }
         if proof.source_lineage != self.source.source_lineage
             || proof.source_version != self.source.source_version
+            || proof.source_content_type != self.source.source_content_type
+            || !same_revision(&proof.revision, &self.source.revision)
             || !proof
                 .source_partname
                 .is_equivalent_to(&self.source.source_partname)
@@ -476,8 +572,7 @@ impl XmlSplicePublication {
         }
         let actual = self
             .source
-            .original
-            .as_bytes()
+            .edit_base()
             .get(proof.range.clone())
             .ok_or_else(|| invalid_source("invalid XML source range"))?;
         if actual != proof.expected.as_slice() {
@@ -541,7 +636,7 @@ impl XmlSplicePublication {
             return Ok(self.source);
         }
         self.edits.sort_unstable_by_key(|edit| edit.range.start);
-        let original = self.source.original.as_bytes();
+        let original = self.source.edit_base();
         let mut removed = 0usize;
         let mut added = 0usize;
         for (index, edit) in self.edits.iter().enumerate() {
@@ -607,6 +702,7 @@ impl XmlSplicePublication {
         self.source.check_source_state()?;
         self.source.payload = Arc::new(output);
         self.source.payload_reservation = output_reservation;
+        self.source.revision = None;
         Ok(self.source)
     }
 }

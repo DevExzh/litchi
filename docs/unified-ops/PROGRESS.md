@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0024 | Revision-bound source XML edits over retained payloads | per-part chaining foundation; package overlay revisions pending |
 | 0023 | Retained OPC prepared topology and shared ZIP appended members | source-overlay ownership foundation; chained source package commits pending |
 | 0022 | Eager DOCX package-bound Edit/Commit and removal of mutating publication doors | eager primary commit migrated; source overlays, history and full W2 pending |
 | 0021 | Shared source-backed DOCX owners and borrowing stream publication | sharing prerequisite complete; package-bound Edit/Commit pending |
@@ -251,3 +252,15 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 - This is the retained topology foundation, not chained source-package commit.
   Logical overlay revisions and revision-bound XML proofs remain required;
   the original physical source proof is deliberately unchanged. See 0023.
+
+## 0024 — revision-bound source XML edits
+
+- `SourceXmlPart::begin_revision()` establishes a fresh logical edit base over
+  the current validated payload, without reopening the ZIP or rescanning XML.
+- Range proofs bind to that revision, physical source, part and content type;
+  sibling and stale proofs are refused even when their bytes match.
+- Physical replacement authority remains the original archive. Managed proofs
+  retain payload admissions; sequential revisions do not retain an ancestor chain.
+- Chained edits, inverse exact-artifact publication, source fences and managed
+  limits are covered. Package-wide effective revisions and canonical source
+  commits remain required. See record 0024.

@@ -767,3 +767,255 @@ fn marked_xml_members_in_real_packages_pass_the_source_audit_unchanged() {
     }
     assert_eq!(marked, 16);
 }
+
+fn append_revision(
+    source: &litchi_opc::SourceXmlPart,
+    fragment: &[u8],
+) -> litchi_opc::SourceXmlPart {
+    let revision = source.begin_revision().unwrap();
+    let insertion = insertion_range(revision.bytes());
+    let proof = revision.checked_range(insertion..insertion, &[]).unwrap();
+    let mut edit = revision.into_publication().unwrap();
+    edit.replace(
+        proof,
+        AuthoredXmlFragment::markup(fragment.to_vec()).unwrap(),
+    )
+    .unwrap();
+    edit.finish().unwrap()
+}
+
+#[test]
+fn logical_xml_revisions_chain_without_reopening_the_physical_source() {
+    let package = open(FORMATTED_DOCUMENT);
+    let original = package.part(&document_uri()).unwrap().source_xml().unwrap();
+    let first = append_revision(&original, b"<first/>");
+    let second = append_revision(&first, b"<second/>");
+    let third = append_revision(&second, b"<third/>");
+    assert_eq!(original.bytes(), FORMATTED_DOCUMENT);
+    assert!(
+        !first
+            .bytes()
+            .windows(b"<second/>".len())
+            .any(|bytes| bytes == b"<second/>")
+    );
+    let insertion = insertion_range(FORMATTED_DOCUMENT);
+    let expected = [
+        &FORMATTED_DOCUMENT[..insertion],
+        b"<first/><second/><third/>",
+        &FORMATTED_DOCUMENT[insertion..],
+    ]
+    .concat();
+    assert_eq!(third.bytes(), expected);
+    assert!(third.checked_range(0..0, &[]).is_err());
+    assert!(third.clone().into_publication().is_err());
+    let mut plan = SourceTopologyPlan::new();
+    plan.try_replace_source_xml_part(document_uri(), third.clone())
+        .unwrap();
+    let prepared = package.clone().prepare_topology(plan).unwrap();
+    prepared
+        .with_candidate(|candidate| {
+            assert_eq!(
+                candidate.part(&document_uri())?.data()?.as_bytes(),
+                expected
+            );
+            Ok(())
+        })
+        .unwrap();
+    let mut output = Vec::new();
+    prepared.publish_to_stream(&mut output).unwrap();
+    let reopened = SourceBackedPackage::from_vec(output).unwrap();
+    assert_eq!(
+        reopened
+            .part(&document_uri())
+            .unwrap()
+            .data()
+            .unwrap()
+            .as_bytes(),
+        expected
+    );
+    // Reversing the logical additions restores the physical no-op path.
+    let revision = third.begin_revision().unwrap();
+    let additions = b"<first/><second/><third/>";
+    let proof = revision
+        .checked_range(insertion..insertion + additions.len(), additions)
+        .unwrap();
+    let mut inverse = revision.into_publication().unwrap();
+    inverse
+        .replace(proof, AuthoredXmlFragment::empty())
+        .unwrap();
+    let restored = inverse.finish().unwrap();
+    assert_eq!(restored.bytes(), original.bytes());
+    let mut inverse_plan = SourceTopologyPlan::new();
+    inverse_plan
+        .try_replace_source_xml_part(document_uri(), restored)
+        .unwrap();
+    let mut restored_archive = Vec::new();
+    package
+        .write_topology_to_stream(&mut restored_archive, inverse_plan)
+        .unwrap();
+    assert_eq!(restored_archive, archive_bytes(FORMATTED_DOCUMENT));
+    // Equal physical bytes from another open do not supply the same authority.
+    let mut foreign_plan = SourceTopologyPlan::new();
+    foreign_plan
+        .try_replace_source_xml_part(document_uri(), third)
+        .unwrap();
+    let mut rejected = Vec::new();
+    assert!(
+        open(FORMATTED_DOCUMENT)
+            .write_topology_to_stream(&mut rejected, foreign_plan)
+            .is_err()
+    );
+    assert!(rejected.is_empty());
+}
+
+#[test]
+fn range_proofs_reject_sibling_and_stale_logical_revisions_with_equal_bytes() {
+    let package = open(FORMATTED_DOCUMENT);
+    let original = package.part(&document_uri()).unwrap().source_xml().unwrap();
+    let left = original.begin_revision().unwrap();
+    let right = original.begin_revision().unwrap();
+    assert_eq!(left.bytes(), right.bytes());
+    let insertion = insertion_range(left.bytes());
+    let proof = left.checked_range(insertion..insertion, &[]).unwrap();
+    let mut sibling = right.into_publication().unwrap();
+    assert!(
+        sibling
+            .replace(
+                proof,
+                AuthoredXmlFragment::markup(b"<wrong/>".to_vec()).unwrap()
+            )
+            .is_err()
+    );
+    assert_eq!(sibling.finish().unwrap().bytes(), FORMATTED_DOCUMENT);
+    let stale = left.checked_range(0..0, &[]).unwrap();
+    let changed = append_revision(&left, b"<changed/>");
+    let next = changed.begin_revision().unwrap();
+    let mut next_edit = next.into_publication().unwrap();
+    assert!(
+        next_edit
+            .replace(
+                stale,
+                AuthoredXmlFragment::markup(b"<wrong/>".to_vec()).unwrap()
+            )
+            .is_err()
+    );
+    assert_eq!(next_edit.finish().unwrap().bytes(), changed.bytes());
+    // A clone is the same revision and accepts its exact proof.
+    let cloned = left.clone();
+    let proof = left.checked_range(insertion..insertion, &[]).unwrap();
+    let mut accepted = cloned.into_publication().unwrap();
+    accepted
+        .replace(
+            proof,
+            AuthoredXmlFragment::markup(b"<accepted/>".to_vec()).unwrap(),
+        )
+        .unwrap();
+    assert!(
+        accepted
+            .finish()
+            .unwrap()
+            .bytes()
+            .windows(11)
+            .any(|bytes| bytes == b"<accepted/>")
+    );
+    // Physical-source proofs are not logical-revision proofs either.
+    let proof = original.checked_range(insertion..insertion, &[]).unwrap();
+    let mut edit = left.into_publication().unwrap();
+    assert!(edit.replace(proof, AuthoredXmlFragment::empty()).is_err());
+}
+
+#[test]
+fn revision_hint_cannot_replace_a_physical_source_capture() {
+    let package = open(FORMATTED_DOCUMENT);
+    let part = package.part(&document_uri()).unwrap();
+    let original = part.source_xml().unwrap();
+    let logical = original.begin_revision().unwrap();
+    let captured = part.source_xml_with_hint(&logical).unwrap();
+    let insertion = insertion_range(original.bytes());
+    let physical_proof = original.checked_range(insertion..insertion, &[]).unwrap();
+    let mut edit = captured.into_publication().unwrap();
+    edit.replace(
+        physical_proof,
+        AuthoredXmlFragment::markup(b"<physical/>".to_vec()).unwrap(),
+    )
+    .unwrap();
+    assert!(edit.finish().is_ok());
+}
+
+#[test]
+fn managed_revisions_pin_payload_admissions_without_retaining_the_revision_chain() {
+    let (budget, _cancel, context) = managed_context(1024 * 1024);
+    let package = SourceBackedPackage::from_read_at_with_execution_context(
+        Arc::new(OwnedSource::new(archive_bytes(FORMATTED_DOCUMENT))),
+        ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    let mut current = package.part(&document_uri()).unwrap().source_xml().unwrap();
+    let offset = before_range(current.bytes());
+    let mut stable_memory = None;
+    for index in 0..32 {
+        let work = budget.used(Resource::Work);
+        let revision = current.begin_revision().unwrap();
+        assert_eq!(
+            budget.used(Resource::Work),
+            work,
+            "starting a revision must not rescan XML"
+        );
+        let proof = revision
+            .checked_range(offset.clone(), &revision.bytes()[offset.clone()])
+            .unwrap();
+        let mut edit = revision.into_publication().unwrap();
+        let tag = if index % 2 == 0 {
+            b"<before attr=\"two\"/>"
+        } else {
+            b"<before attr=\"one\"/>"
+        };
+        edit.replace(proof, AuthoredXmlFragment::markup(tag.to_vec()).unwrap())
+            .unwrap();
+        current = edit.finish().unwrap();
+        let used = budget.used(Resource::Memory);
+        assert_eq!(
+            *stable_memory.get_or_insert(used),
+            used,
+            "old revision payloads must release"
+        );
+    }
+    let revision = current.begin_revision().unwrap();
+    let proof = revision.checked_range(0..0, &[]).unwrap();
+    drop(revision);
+    drop(current);
+    drop(package);
+    assert!(
+        budget.used(Resource::Memory) > 0,
+        "proof pins its admitted base"
+    );
+    drop(proof);
+    assert_eq!(budget.used(Resource::Memory), 0);
+    assert_eq!(budget.used(Resource::Objects), 0);
+}
+
+#[test]
+fn revision_holder_refuses_exhausted_memory_and_cancelled_contexts() {
+    let memory = 1024 * 1024;
+    let (budget, cancel, context) = managed_context(memory);
+    let package = SourceBackedPackage::from_read_at_with_execution_context(
+        Arc::new(OwnedSource::new(archive_bytes(FORMATTED_DOCUMENT))),
+        ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    let source = package.part(&document_uri()).unwrap().source_xml().unwrap();
+    let remaining = memory - budget.used(Resource::Memory);
+    let held = budget.reserve(Resource::Memory, remaining).unwrap();
+    assert!(
+        matches!(source.begin_revision(), Err(OpcError::Execution(litchi_core::ExecutionError::ResourceLimit(limit))) if limit.resource == Resource::Memory)
+    );
+    drop(held);
+    assert!(source.begin_revision().is_ok());
+    cancel.cancel();
+    assert!(source.begin_revision().is_err());
+    drop(source);
+    drop(package);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}

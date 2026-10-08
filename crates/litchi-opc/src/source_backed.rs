@@ -7648,7 +7648,7 @@ impl SourceBackedPackage {
                 && hint.source_partname.is_equivalent_to(&part.partname)
                 && hint.content_type() == part.content_type.as_str()
                 && hint.limits == self.limits
-                && Arc::ptr_eq(&hint.payload, &hint.original.shared_bytes())
+                && hint.is_physical_source()
         }) {
             // Retain the constructor's fresh-state fences. Only the immutable
             // original proof is eligible; a candidate payload is never the

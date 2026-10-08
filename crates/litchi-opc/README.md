@@ -159,3 +159,13 @@ sources. Retained reservations are released when the last owner drops.
 This is a prepared candidate, not a chained editable package: XML range proofs
 remain tied to their admitted revision, and an exact no-op still uses the
 original-artifact path without an effective candidate callback.
+
+`SourceXmlPart::begin_revision()` permits another positional edit over its
+current validated payload without reopening the archive or rescanning XML.
+Each call creates a distinct logical revision; range proofs from sibling or
+older revisions are refused, including proofs over equal bytes. Clones share
+one revision. A changed splice requires another explicit revision. Proofs keep
+their payload reservations alive, while successive revisions do not retain an
+ancestor chain. Physical replacement checks still use the original archive
+bytes and source identity. This per-part primitive does not yet supply chained
+package-wide effective catalogs.
