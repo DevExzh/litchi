@@ -1207,7 +1207,11 @@ fn lifecycle_read_and_attach_honor_input_and_story_output_limits() {
         .build()
         .unwrap();
     assert!(
-        source_backed::Package::from_reader_with_limits(Cursor::new(native), input_limits).is_err()
+        source_backed::Package::from_reader_with_options(
+            Cursor::new(native),
+            litchi_docx::OpenOptions::default().source_limits(input_limits)
+        )
+        .is_err()
     );
 
     let source = raster_only_fixture("inline", "limits");
@@ -1217,9 +1221,11 @@ fn lifecycle_read_and_attach_honor_input_and_story_output_limits() {
         .unwrap()
         .build()
         .unwrap();
-    let package =
-        source_backed::Package::from_reader_with_limits(Cursor::new(source), output_limits)
-            .unwrap();
+    let package = source_backed::Package::from_reader_with_options(
+        Cursor::new(source),
+        litchi_docx::OpenOptions::default().source_limits(output_limits),
+    )
+    .unwrap();
     let mut edit = package.edit_svg_attachment(0).unwrap();
     assert!(edit.attach_svg(b"payload".as_slice()).is_err());
 }
@@ -1622,8 +1628,11 @@ fn batch_failed_aggregate_admission_leaves_projection_unchanged() {
         .unwrap()
         .build()
         .unwrap();
-    let package = source_backed::Package::from_reader_with_limits(Cursor::new(source), limits)
-        .expect("open source within aggregate relationship limit");
+    let package = source_backed::Package::from_reader_with_options(
+        Cursor::new(source),
+        litchi_docx::OpenOptions::default().source_limits(limits),
+    )
+    .expect("open source within aggregate relationship limit");
     let mut edit = package.edit_svg_attachments([1usize, 0usize]).unwrap();
     let first_payload = br#"<svg xmlns="http://www.w3.org/2000/svg"><path id="admitted"/></svg>"#;
     let rejected_payload =

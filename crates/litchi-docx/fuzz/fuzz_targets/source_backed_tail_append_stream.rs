@@ -296,7 +296,10 @@ fn recipe_events(recipe: &[u8]) -> (Vec<Event>, Option<Vec<Event>>, bool) {
 }
 
 fn exercise(archive: &[u8], recipe: &[u8]) -> bool {
-    let Ok(package) = Package::from_reader_with_limits(Cursor::new(archive), read_limits()) else {
+    let Ok(package) = Package::from_reader_with_options(
+        Cursor::new(archive),
+        litchi_docx::OpenOptions::default().source_limits(read_limits()),
+    ) else {
         return false;
     };
     let (events, alternate, expected_success) = recipe_events(recipe);
@@ -330,8 +333,11 @@ fn exercise(archive: &[u8], recipe: &[u8]) -> bool {
         !output.is_empty(),
         "successful publication produced no archive"
     );
-    let current = Package::from_reader_with_limits(Cursor::new(&output), read_limits())
-        .expect("successful publication must reopen");
+    let current = Package::from_reader_with_options(
+        Cursor::new(&output),
+        litchi_docx::OpenOptions::default().source_limits(read_limits()),
+    )
+    .expect("successful publication must reopen");
     let after_count = current
         .document_snapshot()
         .expect("published candidate must have a semantic document snapshot")
@@ -347,8 +353,11 @@ fn exercise(archive: &[u8], recipe: &[u8]) -> bool {
         "immediate inverse must restore exact bytes"
     );
 
-    let partial_package = Package::from_reader_with_limits(Cursor::new(archive), read_limits())
-        .expect("the source package was accepted");
+    let partial_package = Package::from_reader_with_options(
+        Cursor::new(archive),
+        litchi_docx::OpenOptions::default().source_limits(read_limits()),
+    )
+    .expect("the source package was accepted");
     let Ok(partial_plan) = partial_package
         .tail_append_plain_paragraphs(EventSource::stable(valid_events(recipe)), limits)
         .prepare()

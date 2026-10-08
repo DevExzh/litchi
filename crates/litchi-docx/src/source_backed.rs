@@ -9,6 +9,7 @@
 //! while raw-copying every unselected ZIP member.
 
 pub(crate) mod document_policy;
+mod ingress;
 mod ink;
 mod owner;
 mod svg_lifecycle;
@@ -386,26 +387,47 @@ impl Package {
         Self::with_execution(package, options.execution_context)
     }
 
-    /// Open a DOCX source from a sequential reader using the standard bounded
-    /// OPC read policy.
-    ///
-    /// The reader is consumed once into the source-backed positional owner;
-    /// ordinary package payloads remain deferred until a query asks for them.
+    /// Open a sequential reader with the standard finite source policies.
     pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
-        Self::from_source_backed(SourceBackedPackage::from_reader(reader)?)
+        Self::from_reader_with_options(reader, crate::OpenOptions::default())
     }
 
-    /// Open a DOCX source from a sequential reader with explicit OPC limits.
+    /// Consume a reader once into a bounded immutable source.
     ///
-    /// Reader ingestion is bounded by `limits.max_input_bytes()`, and
-    /// ordinary package payloads remain deferred after the source is indexed.
-    pub fn from_reader_with_limits<R: Read>(
+    /// Managed ingress charges accepted input bytes and copy/retry work. The
+    /// source retains its buffer-capacity and owner memory reservations; growth
+    /// also admits the peak of old and replacement buffers plus an 8 KiB scratch
+    /// buffer. Subsequent OPC reads charge input independently. An EOF probe
+    /// needs one byte of available input budget, but commits zero at EOF.
+    /// Cache, read-ahead and execution policies continue through deferred reads.
+    pub fn from_reader_with_options<R: Read>(
         reader: R,
-        limits: litchi_opc::SourceLimits,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
-        Self::from_source_backed(SourceBackedPackage::from_reader_with_limits(
-            reader, limits,
-        )?)
+        if options.execution_context.is_none()
+            && options.cache_limits.is_none()
+            && options.source_read_policy.is_none()
+        {
+            // Preserve the existing move-owned OPC fast path and its memoized
+            // immutable-source proofs when no lazy policy is selected.
+            return Self::from_source_backed(SourceBackedPackage::from_reader_with_limits(
+                reader,
+                options.source_limits,
+            )?);
+        }
+        let source = ingress::from_reader(reader, &options)?;
+        Self::from_read_at_with_options(source, options)
+    }
+
+    /// Open a byte slice with standard finite policies. The input is copied.
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        Self::from_bytes_with_options(bytes, crate::OpenOptions::default())
+    }
+
+    /// Open a byte slice with caller-selected policies, copying it into an
+    /// immutable source under the same accounting as sequential ingress.
+    pub fn from_bytes_with_options(bytes: &[u8], options: crate::OpenOptions) -> Result<Self> {
+        Self::from_reader_with_options(bytes, options)
     }
 
     fn from_source_backed(package: SourceBackedPackage) -> Result<Self> {

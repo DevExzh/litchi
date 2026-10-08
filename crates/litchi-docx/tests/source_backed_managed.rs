@@ -618,3 +618,106 @@ fn cancelled_path_options_fail_before_opening_the_file() {
     .unwrap();
     assert!(matches!(error, Error::Opc(OpcError::Cancelled)));
 }
+
+#[test]
+fn sequential_ingress_retains_input_charges_with_source_artifacts_and_clones() {
+    let bytes = fixture();
+    let (budget, _, context) = context(4 << 20);
+    let options = litchi_docx::OpenOptions::default()
+        .source_limits(
+            SourceLimits::builder()
+                .max_input_bytes(bytes.len() as u64)
+                .unwrap()
+                .build()
+                .unwrap(),
+        )
+        .cache_limits(SourceCacheLimits::new(1 << 20, 8).unwrap())
+        .execution_context(context);
+    let package = source_backed::Package::from_reader_with_options(&bytes[..], options).unwrap();
+    let input_memory = budget.used(Resource::Memory);
+    assert!(input_memory >= bytes.len() as u64);
+    // Resource::InputBytes counts external ingestion and later OPC positional
+    // reads; SourceLimits::InputBytes above still bounds the archive length.
+    assert!(budget.used(Resource::InputBytes) > bytes.len() as u64);
+    assert_eq!(package.cache_diagnostics().cold_loads, 0);
+    let clone = package.clone();
+    let artifact = package.source_backed_package().unwrap().source_artifact();
+    assert_eq!(
+        package.document().unwrap().extract_text().unwrap(),
+        "managedread"
+    );
+    drop((package, clone));
+    assert_eq!(budget.used(Resource::Memory), input_memory);
+    let mut output = Vec::new();
+    artifact.write_to_stream(&mut output).unwrap();
+    assert_eq!(output, bytes);
+    drop(artifact);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn sequential_options_preserve_read_ahead_and_publication_release() {
+    let bytes = fixture();
+    let (budget, _, context) = context(4 << 20);
+    let package = source_backed::Package::from_bytes_with_options(
+        &bytes,
+        litchi_docx::OpenOptions::default()
+            .source_read_policy(litchi_opc::SourceReadPolicy::forward_start(4096).unwrap())
+            .execution_context(context),
+    )
+    .unwrap();
+    assert!(package.source_read_diagnostics().unwrap().unwrap().enabled);
+    let mut output = Vec::new();
+    package.to_stream(&mut output).unwrap();
+    assert_eq!(output, bytes);
+    assert!(!package.source_read_diagnostics().unwrap().unwrap().enabled);
+    assert!(budget.used(Resource::Memory) >= bytes.len() as u64);
+    drop(package);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn sequential_ingress_failure_releases_retained_input() {
+    let (budget, _, context) = context(4 << 20);
+    assert!(
+        source_backed::Package::from_bytes_with_options(
+            b"not a zip",
+            litchi_docx::OpenOptions::default().execution_context(context),
+        )
+        .is_err()
+    );
+    assert_eq!(budget.used(Resource::Memory), 0);
+    assert!(budget.used(Resource::InputBytes) >= 9);
+}
+
+#[test]
+fn sequential_default_and_cache_options_preserve_archive_limits_and_bytes() {
+    let bytes = fixture();
+    source_backed::Package::from_bytes(&bytes).unwrap();
+    for options in [
+        litchi_docx::OpenOptions::default(),
+        litchi_docx::OpenOptions::default().cache_limits(SourceCacheLimits::new(1024, 1).unwrap()),
+    ] {
+        let limits = |maximum| {
+            SourceLimits::builder()
+                .max_input_bytes(maximum)
+                .unwrap()
+                .build()
+                .unwrap()
+        };
+        let package = source_backed::Package::from_bytes_with_options(
+            &bytes,
+            options.clone().source_limits(limits(bytes.len() as u64)),
+        )
+        .unwrap();
+        let mut output = Vec::new();
+        package.to_stream(&mut output).unwrap();
+        assert_eq!(output, bytes);
+        assert!(
+            matches!(source_backed::Package::from_reader_with_options(&bytes[..],
+            options.source_limits(limits(bytes.len() as u64 - 1))),
+            Err(Error::Opc(OpcError::Limit { kind: litchi_opc::SourceLimitKind::InputBytes, observed, maximum }))
+                if observed == bytes.len() as u64 && maximum == bytes.len() as u64 - 1)
+        );
+    }
+}

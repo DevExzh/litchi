@@ -463,3 +463,16 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
   classification. Sequential reader accounting and owner consolidation remain
   required; this does not declare the ingress family complete.
 - Record 0039 documents migrated consumers, verification and remaining work.
+
+
+## 0040 — managed sequential DOCX ingress
+
+- Lazy reader and byte-slice ingress use OpenOptions; the old limits-only
+  reader constructor is deleted and active consumers are migrated.
+- Retained source buffers own their memory reservations through package clones
+  and artifacts. Growth admits old/new peaks; reads, retries, copies and input
+  counts obey caller execution policies, including the bounded EOF probe.
+- Added focused failure/lifetime tests, a managed sequential fuzz target and a
+  deterministic 1,024-mode smoke driver. Record 0040 documents results.
+- Owner consolidation, semantic/crypto policy migration and the wider unified
+  goal remain active; no complete milestone or performance gain is claimed.

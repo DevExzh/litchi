@@ -199,6 +199,11 @@
           "name": "from_read_at_with_limits_and_execution_context",
           "scope": "litchi_docx::source_backed::Package",
           "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_reader_with_limits",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use from_reader_with_options"
         }
       ],
       "families": []
@@ -398,6 +403,11 @@
           "name": "from_read_at_with_limits_and_execution_context",
           "scope": "litchi_docx::source_backed::Package",
           "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_reader_with_limits",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use from_reader_with_options"
         }
       ],
       "families": []

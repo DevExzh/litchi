@@ -44,7 +44,10 @@ fuzz_target!(|data: &[u8]| {
     if data.len() > 64 * 1024 {
         return;
     }
-    let Ok(package) = Package::from_reader_with_limits(Cursor::new(data), read_limits()) else {
+    let Ok(package) = Package::from_reader_with_options(
+        Cursor::new(data),
+        litchi_docx::OpenOptions::default().source_limits(read_limits()),
+    ) else {
         return;
     };
     let limits = Limits {
@@ -83,8 +86,11 @@ fuzz_target!(|data: &[u8]| {
     let mut output = Vec::new();
     if let Ok(publication) = plan.write_to_stream(&mut output) {
         assert!(!publication.is_noop());
-        let current = Package::from_reader_with_limits(Cursor::new(&output), read_limits())
-            .expect("a successfully published bounded candidate must reopen");
+        let current = Package::from_reader_with_options(
+            Cursor::new(&output),
+            litchi_docx::OpenOptions::default().source_limits(read_limits()),
+        )
+        .expect("a successfully published bounded candidate must reopen");
         let mut restored = Vec::new();
         publication
             .write_inverse_to_stream(&current, &mut restored)

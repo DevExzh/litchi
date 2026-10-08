@@ -63,7 +63,7 @@ composition (`join`, `three_way`), durable patch formats beyond pptx/xlsx.
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
 | Open from path | `open(path)` | — | ✅ everywhere |
-| Open from bytes (copy allowed) | `from_bytes(&[u8])` | `from_bytes(Vec<u8>)` signatures (xlsx/odt/odp), `from_slice` (xlsx) | ✅ DOCX owning Package (0038); 🔴 W2/W3 |
+| Open from bytes (copy allowed) | `from_bytes(&[u8])` | `from_bytes(Vec<u8>)` signatures (xlsx/odt/odp), `from_slice` (xlsx) | ✅ DOCX owning/lazy Package (0038/0040); 🔴 W2/W3 |
 | Open from shared bytes (zero-copy) | `from_shared_bytes(Arc<[u8]>)` | — | ✅ numbers; offered only where zero-copy is real |
 | Open from reader | `from_reader(R)` | — | ✅ docx/xlsx; extended per wave |
 | Configured open | `open_with_options(path, OpenOptions)`, `from_bytes_with_options(bytes, OpenOptions)` | `open_with_limits`, `open_with` (doc), `open_with_options` under other type names | envelope decided in §5 |
@@ -83,7 +83,7 @@ composition (`join`, `three_way`), durable patch formats beyond pptx/xlsx.
 |---|---|---|---|
 | Physical ingress limits | `SourceLimits` | `ReadLimits` (OPC re-exports in docx/pptx/xlsx/xlsb), `SourcePackageLimits` (odt), `package::Limits` (doc), `DocumentSourceLimits` (iWork) | ✅ OPC `SourceLimits`/`SourceLimitsBuilder` and OOXML `SourceLimits` re-exports, record 0035 · 🔴 ODF/legacy/iWork |
 | Semantic limits | `SemanticLimits` | `DocumentLimits` (numbers), `DocumentSemanticLimits` (keynote) | ✅ pages · 🔴 W1 |
-| Open configuration envelope | `OpenOptions` (per format, extensible fields) | `PackageOpenOptions` (doc — merges), `ReadOptions` (numbers), `iwork::Options` (facade) | ✅ DOCX owning and positional/path ingress (0038–0039); lazy sequential ingress and W1–W4 pending |
+| Open configuration envelope | `OpenOptions` (per format, extensible fields) | `PackageOpenOptions` (doc — merges), `ReadOptions` (numbers), `iwork::Options` (facade) | ✅ DOCX ingress envelope (0038–0040); owning lazy-policy support and W1–W4 pending |
 | Construction idiom | consuming builder, fallible `max_<dimension>` setters, fallible `build()` | positional `new(...)` constructors (iWork) | ✅ OPC · 🔴 W1 |
 | Build-time invalid limit | `Error::InvalidLimit { kind, value, maximum }` | standalone `*LimitsError` types (doc, iWork) | ✅ OPC `InvalidLimit` with contextual maximum (0036); other owners pending |
 | Ingress limit exceeded | `Error::Limit { kind, observed, maximum }` | `OpcError::ReadLimit`, facade `ResourceLimit` mapping drift | ✅ OPC kind/observed/maximum (0036); broader taxonomy pending |

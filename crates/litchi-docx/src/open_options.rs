@@ -7,8 +7,8 @@ use litchi_opc::{SourceCacheLimits, SourceReadPolicy};
 /// Policies for owning and positional-source DOCX ingress.
 ///
 /// Cache, read-ahead and execution settings apply to
-/// [`crate::source_backed::Package::from_read_at_with_options`] and its path
-/// counterpart. Owning constructors reject these settings before input reads;
+/// [`crate::source_backed::Package::from_read_at_with_options`] and the path,
+/// reader and byte-slice counterparts. Owning constructors reject these settings before input reads;
 /// their payloads cannot yet retain the requested lazy resource policies.
 ///
 /// Source limits bound the clear OPC archive. With the `encryption` feature,
@@ -46,14 +46,14 @@ impl OpenOptions {
         self
     }
 
-    /// Select a validated finite payload-cache policy for positional ingress.
+    /// Select a validated finite payload-cache policy for lazy ingress.
     #[must_use]
     pub const fn cache_limits(mut self, limits: SourceCacheLimits) -> Self {
         self.cache_limits = Some(limits);
         self
     }
 
-    /// Select exact reads or validated bounded read-ahead for positional ingress.
+    /// Select exact reads or validated bounded read-ahead for lazy ingress.
     /// Publication disables read-ahead and releases its retained reservation.
     #[must_use]
     pub const fn source_read_policy(mut self, policy: SourceReadPolicy) -> Self {
