@@ -16,7 +16,7 @@ fn document_bytes() -> Vec<u8> {
     let mut package = Package::new().expect("new DOCX package");
     let mut output = Cursor::new(Vec::new());
     package
-        .to_stream(&mut output)
+        .write_to(&mut output)
         .expect("serialize DOCX package");
     output.into_inner()
 }
@@ -191,7 +191,7 @@ fn encrypted_options_preserve_independent_bounds_and_source_profile_on_every_rou
         let mut package = open(options.clone()).expect("both exact bounds admit source");
         assert_eq!(package.encryption(), Some(Mode::Standard));
         assert!(
-            package.to_stream(&mut Cursor::new(Vec::new())).is_err(),
+            package.write_to(&mut Cursor::new(Vec::new())).is_err(),
             "plain output must remain explicit"
         );
         assert_input_limit(

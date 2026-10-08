@@ -37,7 +37,7 @@ fn removing_notes_strips_references_and_keeps_ids_unique() {
     }
 
     let mut bytes = Cursor::new(Vec::new());
-    package.to_stream(&mut bytes).unwrap();
+    package.write_to(&mut bytes).unwrap();
     bytes.set_position(0);
     let reopened = Package::from_reader(bytes).unwrap();
     let document = reopened.document().unwrap();
@@ -67,7 +67,7 @@ fn removing_comments_updates_the_comments_part() {
     }
 
     let mut bytes = Cursor::new(Vec::new());
-    package.to_stream(&mut bytes).unwrap();
+    package.write_to(&mut bytes).unwrap();
     bytes.set_position(0);
     let reopened = Package::from_reader(bytes).unwrap();
     let document = reopened.document().unwrap();

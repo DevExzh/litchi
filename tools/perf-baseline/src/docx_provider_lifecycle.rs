@@ -1447,7 +1447,7 @@ mod tests {
             .expect("document")
             .add_paragraph_with_text("source-change");
         let mut bytes = Cursor::new(Vec::new());
-        package.to_stream(&mut bytes).expect("serialize DOCX");
+        package.write_to(&mut bytes).expect("serialize DOCX");
         let source: Arc<dyn ReadAt> = Arc::new(ChangingSource {
             inner: OwnedSource::new(bytes.into_inner()),
             reads: AtomicUsize::new(0),

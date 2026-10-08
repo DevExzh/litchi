@@ -45,7 +45,7 @@ fn opens_real_poi_div_metadata_and_round_trips_a_package() {
     settings.set_encoding("utf-8").unwrap();
     assert!(synthetic.put_web(settings, conformance).unwrap());
     let mut output = Cursor::new(Vec::new());
-    synthetic.to_stream(&mut output).unwrap();
+    synthetic.write_to(&mut output).unwrap();
     let reopened = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
     let (settings, conformance) = reopened.document().unwrap().web().unwrap().unwrap();
     let serialized = settings.xml(conformance).unwrap();

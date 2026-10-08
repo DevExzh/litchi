@@ -36,7 +36,7 @@ fn inserts_and_removes_paragraphs_and_tables_then_reparses() {
     }
 
     let mut bytes = Cursor::new(Vec::new());
-    package.to_stream(&mut bytes).unwrap();
+    package.write_to(&mut bytes).unwrap();
     bytes.set_position(0);
     let reopened = Package::from_reader(bytes).unwrap();
     let text = reopened.document().unwrap().text().unwrap();
@@ -118,7 +118,7 @@ fn structural_edits_keep_the_pending_toc_anchored_after_existing_content() {
     }
 
     let mut bytes = Cursor::new(Vec::new());
-    package.to_stream(&mut bytes).unwrap();
+    package.write_to(&mut bytes).unwrap();
     bytes.set_position(0);
     let reopened = Package::from_reader(bytes).unwrap();
     let part = reopened

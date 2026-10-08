@@ -209,6 +209,11 @@
           "name": "to_stream",
           "scope": "litchi_docx::source_backed::Package",
           "replacement": "use write_to"
+        },
+        {
+          "name": "to_stream",
+          "scope": "litchi_docx::Package",
+          "replacement": "use write_to"
         }
       ],
       "families": []
@@ -417,6 +422,11 @@
         {
           "name": "to_stream",
           "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use write_to"
+        },
+        {
+          "name": "to_stream",
+          "scope": "litchi_docx::Package",
           "replacement": "use write_to"
         }
       ],

@@ -813,7 +813,7 @@ impl Owner {
     /// The documented sequential serialization entry point.
     fn write_to(&mut self, sink: &mut BoundedSink) -> Result<(), Box<dyn Error>> {
         match self {
-            Self::Docx(package) => package.to_stream(&mut *sink)?,
+            Self::Docx(package) => package.write_to(&mut *sink)?,
             Self::Xlsx(workbook) => workbook.write_to(&mut *sink)?,
             Self::Pptx(package) => {
                 let bytes = package.to_bytes()?;

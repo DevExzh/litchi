@@ -10296,7 +10296,7 @@ mod tests {
             }
         }
         let mut output = std::io::Cursor::new(Vec::new());
-        package.to_stream(&mut output).unwrap();
+        package.write_to(&mut output).unwrap();
         crate::Package::from_reader(std::io::Cursor::new(output.into_inner()))
             .unwrap()
             .document_snapshot()

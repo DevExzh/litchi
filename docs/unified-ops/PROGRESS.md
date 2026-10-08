@@ -489,3 +489,16 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 - Record 0041 documents durability, preservation, refusal and cleanup tests.
 - Owning/specialized output names, budgeted to_bytes, owner consolidation and
   the wider unified goal remain active. No complete family is claimed.
+
+
+## 0042 — owning DOCX canonical stream output
+
+- Owning Package now exposes write_to; to_stream is removed without an alias.
+  Both DOCX owner implementations use the glossary's canonical stream verb.
+- Migrated unit/integration tests, operations consumers, active benchmark code
+  and the sequential-ingress fuzz smoke fixture producer. Historical evidence
+  and low-level OPC names remain unchanged.
+- The same serialization path retains encryption refusal, signature policy,
+  property staging and retry behavior. Record 0042 lists verification.
+- Owner consolidation, immutable owning publication, specialized APIs and the
+  broader all-format unified goal remain active.

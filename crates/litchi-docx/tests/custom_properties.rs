@@ -168,7 +168,7 @@ fn clean_real_fixture_preserves_custom_properties_for_stream_and_path_save() {
         .expect("open alt-chunk-header fixture for stream save");
     let mut stream_output = Vec::new();
     streamed
-        .to_stream(&mut stream_output)
+        .write_to(&mut stream_output)
         .expect("stream clean alt-chunk-header fixture");
     assert_eq!(custom_properties_xml(&stream_output), expected);
 
@@ -192,7 +192,7 @@ fn refused_document_edit_preserves_custom_properties_for_stream_and_path_save() 
     refused_document_edit(&mut streamed);
     let mut stream_output = Vec::new();
     streamed
-        .to_stream(&mut stream_output)
+        .write_to(&mut stream_output)
         .expect("stream after refused document edit");
     assert_eq!(custom_properties_xml(&stream_output), expected);
 
@@ -218,7 +218,7 @@ fn dirty_custom_properties_survive_a_failed_stream_and_retry() {
     let custom_uri = PackURI::new("/docProps/custom.xml").expect("static custom-properties URI");
     assert!(package.opc_package().get_part(&custom_uri).is_err());
 
-    assert!(package.to_stream(FailingSink { remaining: 1 }).is_err());
+    assert!(package.write_to(FailingSink { remaining: 1 }).is_err());
     assert!(
         package.opc_package().get_part(&custom_uri).is_err(),
         "failed publication must roll back the staged custom-properties part"
@@ -226,7 +226,7 @@ fn dirty_custom_properties_survive_a_failed_stream_and_retry() {
 
     let mut output = Vec::new();
     package
-        .to_stream(&mut output)
+        .write_to(&mut output)
         .expect("retry custom-property stream after sink failure");
     let reopened = Package::from_reader(Cursor::new(output)).expect("reopen retried package");
     assert_eq!(
@@ -262,7 +262,7 @@ fn raw_opc_custom_property_replacement_remains_byte_exact_after_save() {
 
     let mut output = Vec::new();
     package
-        .to_stream(&mut output)
+        .write_to(&mut output)
         .expect("save raw OPC custom-properties replacement");
     assert_eq!(custom_properties_xml(&output), replacement);
 }
@@ -288,7 +288,7 @@ fn raw_opc_empty_custom_properties_part_is_preserved_until_explicit_clear() {
 
     let mut output = Vec::new();
     package
-        .to_stream(&mut output)
+        .write_to(&mut output)
         .expect("save empty raw OPC custom-properties replacement");
     assert_eq!(custom_properties_xml(&output), replacement);
 
@@ -296,7 +296,7 @@ fn raw_opc_empty_custom_properties_part_is_preserved_until_explicit_clear() {
     cleared.custom_props_mut().clear();
     let mut cleared_output = Vec::new();
     cleared
-        .to_stream(&mut cleared_output)
+        .write_to(&mut cleared_output)
         .expect("save explicitly cleared custom properties");
     let cleared_graph = OpcPackage::from_bytes(&cleared_output).expect("open cleared OPC graph");
     assert!(cleared_graph.get_part(&custom_uri).is_err());

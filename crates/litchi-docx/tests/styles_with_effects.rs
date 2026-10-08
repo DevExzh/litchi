@@ -184,7 +184,7 @@ fn replace_all(source: &[u8], marker: &[u8], replacement: &[u8]) -> Vec<u8> {
 fn package_bytes(package: &mut Package) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
     package
-        .to_stream(&mut output)
+        .write_to(&mut output)
         .expect("serialize DOCX package in test");
     output.into_inner()
 }
@@ -819,9 +819,7 @@ fn source_resource_replace_inverse_stale_and_save_reopen_are_owner_bound() {
     );
 
     let mut output = Cursor::new(Vec::new());
-    package
-        .to_stream(&mut output)
-        .expect("save effects package");
+    package.write_to(&mut output).expect("save effects package");
     let reopened =
         Package::from_reader(Cursor::new(output.into_inner())).expect("reopen effects package");
     assert_eq!(

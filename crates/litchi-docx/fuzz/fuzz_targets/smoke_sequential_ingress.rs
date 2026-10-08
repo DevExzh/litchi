@@ -4,7 +4,7 @@ fn main() {
     let mut bytes = Vec::new();
     litchi_docx::Package::new()
         .unwrap()
-        .to_stream(&mut bytes)
+        .write_to(&mut bytes)
         .unwrap();
     let mut opened = 0;
     for flags in 0..=255 {

@@ -11,7 +11,7 @@ fn reopened_document_statistics_use_the_concrete_metrics_owner() {
     }
 
     let mut bytes = Cursor::new(Vec::new());
-    package.to_stream(&mut bytes).unwrap();
+    package.write_to(&mut bytes).unwrap();
 
     let reopened = Package::from_reader(Cursor::new(bytes.into_inner())).unwrap();
     let statistics = reopened.document().unwrap().statistics().unwrap();

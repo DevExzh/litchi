@@ -273,7 +273,7 @@ fn source_backed_edits_publish_what_the_eager_owner_publishes() {
             .unwrap_or_else(|error| panic!("{name}: {error}"))
             .into_package();
         let mut saved = Vec::new();
-        owner.to_stream(&mut saved).unwrap();
+        owner.write_to(&mut saved).unwrap();
 
         // The two owners publish the same main part, byte for byte.
         let source_main = main_part(&published);
@@ -608,7 +608,7 @@ fn witness_matrix_on_both_owners_and_the_managed_route() {
                 commit.package().write_to(&mut published).unwrap();
                 owner = eager_edit.commit().unwrap().into_package();
                 let mut saved = Vec::new();
-                owner.to_stream(&mut saved).unwrap();
+                owner.write_to(&mut saved).unwrap();
                 assert_eq!(main_part(&published), main_part(&saved), "{label}");
                 assert_eq!(
                     root_tag(&main_part(&published)),

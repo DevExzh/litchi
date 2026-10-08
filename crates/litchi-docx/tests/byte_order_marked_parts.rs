@@ -126,7 +126,7 @@ fn assert_equal_but_marks(
 
 fn save(package: &mut Package) -> Vec<u8> {
     let mut output = Vec::new();
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output
 }
 

@@ -111,7 +111,7 @@ fn cloned_encrypted_package_retains_policy_and_refuses_plain_apply() {
     assert_eq!(shared.encryption(), Some(Mode::Standard));
     assert!(shared.apply(noop.patch()).is_err());
     let mut output = Vec::new();
-    assert!(shared.to_stream(&mut output).is_err());
+    assert!(shared.write_to(&mut output).is_err());
     assert!(output.is_empty());
     shared.to_plain_stream(&mut output).unwrap();
     assert!(output.starts_with(b"PK"));

@@ -167,7 +167,7 @@ fn captured_edit_is_independent_of_later_source_writer_mutation() {
             .contains("later writer change")
     );
     let mut output = Vec::new();
-    source.to_stream(&mut output).unwrap();
+    source.write_to(&mut output).unwrap();
     let reopened = Package::from_reader(output.as_slice()).unwrap();
     assert!(
         reopened

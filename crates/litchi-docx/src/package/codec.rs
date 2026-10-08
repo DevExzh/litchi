@@ -601,15 +601,15 @@ impl Package {
     /// let mut pkg = Package::new()?;
     /// // Modify document...
     /// let mut cursor = Cursor::new(Vec::new());
-    /// pkg.to_stream(&mut cursor)?;
+    /// pkg.write_to(&mut cursor)?;
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn to_stream<W: Write>(&mut self, writer: W) -> Result<()> {
-        self.ensure_plain_output("to_stream")?;
+    pub fn write_to<W: Write>(&mut self, writer: W) -> Result<()> {
+        self.ensure_plain_output("write_to")?;
         self.write_plain(writer)
     }
 

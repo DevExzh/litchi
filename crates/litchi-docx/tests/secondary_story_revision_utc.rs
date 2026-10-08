@@ -34,7 +34,7 @@ fn header_and_footer_revision_utc_survive_package_save_and_reopen() {
     }
 
     let mut bytes = Cursor::new(Vec::new());
-    package.to_stream(&mut bytes).unwrap();
+    package.write_to(&mut bytes).unwrap();
     let original_bytes = bytes.into_inner();
     let mut reopened = Package::from_reader(Cursor::new(original_bytes.as_slice())).unwrap();
     let document = reopened.document().unwrap();
@@ -63,6 +63,6 @@ fn header_and_footer_revision_utc_survive_package_save_and_reopen() {
             .any(|window| window == b"du:dateUtc=\"2026-07-18T00:00:00Z\"")
     );
     let mut unchanged = Cursor::new(Vec::new());
-    reopened.to_stream(&mut unchanged).unwrap();
+    reopened.write_to(&mut unchanged).unwrap();
     assert_eq!(unchanged.into_inner(), original_bytes);
 }

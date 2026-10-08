@@ -10,7 +10,7 @@ fn body_edits_preserve_settings_part_byte_for_byte() {
         .document_mut()
         .unwrap()
         .add_paragraph_with_text("body-only edit");
-    package.to_stream(Cursor::new(Vec::new())).unwrap();
+    package.write_to(Cursor::new(Vec::new())).unwrap();
 
     assert_eq!(package.opc.get_part(&settings_uri).unwrap().blob(), before);
 }
@@ -41,7 +41,7 @@ fn body_edits_preserve_web_settings_part_byte_for_byte() {
         .document_mut()
         .unwrap()
         .add_paragraph_with_text("body-only edit");
-    package.to_stream(Cursor::new(Vec::new())).unwrap();
+    package.write_to(Cursor::new(Vec::new())).unwrap();
 
     assert_eq!(
         package.opc.get_part(&web_settings_uri).unwrap().blob(),
@@ -98,7 +98,7 @@ fn web_settings_updates_preserve_frame_relationship_ids() {
     let (mut settings, conformance) = package.web().unwrap().unwrap();
     settings.set_frameset(frameset);
     assert!(package.put_web(settings, conformance).unwrap());
-    package.to_stream(Cursor::new(Vec::new())).unwrap();
+    package.write_to(Cursor::new(Vec::new())).unwrap();
 
     let part = package.opc.get_part(&web_settings_uri).unwrap();
     let relationship = part.rels().get(&relationship_id).unwrap();
@@ -122,7 +122,7 @@ fn creates_a_web_settings_relationship_when_missing() {
             .put_web(settings, Conformance::Transitional)
             .unwrap()
     );
-    package.to_stream(Cursor::new(Vec::new())).unwrap();
+    package.write_to(Cursor::new(Vec::new())).unwrap();
 
     let relationship = package
         .opc
@@ -174,7 +174,7 @@ fn reads_and_updates_strict_web_settings_relationships() {
     let mut settings = Settings::default();
     settings.set_save_smart_tags_as_xml(true);
     assert!(package.put_web(settings, Conformance::Strict).unwrap());
-    package.to_stream(Cursor::new(Vec::new())).unwrap();
+    package.write_to(Cursor::new(Vec::new())).unwrap();
 
     let (_, conformance) = package.document().unwrap().web().unwrap().unwrap();
     assert_eq!(conformance, Conformance::Strict);
@@ -413,7 +413,7 @@ fn protection_rewrite_preserves_attached_template_relationship() {
         .document_mut()
         .unwrap()
         .set_protection(ProtectionType::ReadOnly);
-    package.to_stream(Cursor::new(Vec::new())).unwrap();
+    package.write_to(Cursor::new(Vec::new())).unwrap();
 
     let attached = package.attached_template().unwrap().unwrap();
     assert_eq!(attached.relationship_id(), relationship_id);
@@ -519,7 +519,7 @@ fn document_variable_mutation_preserves_xml_relationships_and_protection() {
         .document_mut()
         .unwrap()
         .set_protection(ProtectionType::ReadOnly);
-    package.to_stream(Cursor::new(Vec::new())).unwrap();
+    package.write_to(Cursor::new(Vec::new())).unwrap();
     assert_eq!(
         package
             .document_variables()

@@ -582,7 +582,7 @@ fn owning_ingress_refuses_lazy_options_before_io() {
         #[cfg(feature = "encryption")]
         {
             let mut clear = Vec::new();
-            Package::new().unwrap().to_stream(&mut clear).unwrap();
+            Package::new().unwrap().write_to(&mut clear).unwrap();
             let decrypted = litchi_docx::encryption::open(clear, "pw").unwrap();
             assert_policy(Package::from_decrypted(decrypted, options.clone()));
             assert_policy(Package::from_reader_with_password_and_options(

@@ -81,7 +81,7 @@ fn package_roundtrip_keeps_distinct_section_header_footer_parts() {
     }
 
     let mut bytes = Cursor::new(Vec::new());
-    package.to_stream(&mut bytes).unwrap();
+    package.write_to(&mut bytes).unwrap();
     bytes.set_position(0);
     let reopened = Package::from_reader(bytes).unwrap();
     assert_eq!(reopened.document().unwrap().sections().unwrap().len(), 2);

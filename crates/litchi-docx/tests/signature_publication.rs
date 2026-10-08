@@ -28,7 +28,7 @@ fn signed_document(document: &[u8]) -> Vec<u8> {
 
 fn bytes(package: &mut Package) -> Vec<u8> {
     let mut sink = Cursor::new(Vec::new());
-    package.to_stream(&mut sink).unwrap();
+    package.write_to(&mut sink).unwrap();
     sink.into_inner()
 }
 

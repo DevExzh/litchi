@@ -1360,10 +1360,10 @@ fn the_compaction_policy_reaches_publication_through_the_package_route() {
     // Both publish: the preserved bytes satisfy the writer's authored-XML
     // contract, so neither route is refused at save.
     let mut published = Vec::new();
-    preserving.to_stream(&mut published).unwrap();
+    preserving.write_to(&mut published).unwrap();
     assert!(!published.is_empty());
     let mut published = Vec::new();
-    compacting.to_stream(&mut published).unwrap();
+    compacting.write_to(&mut published).unwrap();
     assert!(!published.is_empty());
 }
 

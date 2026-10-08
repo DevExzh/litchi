@@ -200,13 +200,13 @@ fn generated_package(paragraphs: usize) -> crate::Package {
         }
     }
     let mut output = std::io::Cursor::new(Vec::new());
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     crate::Package::from_reader(std::io::Cursor::new(output.into_inner())).unwrap()
 }
 
 fn saved(package: &mut crate::Package) -> Vec<u8> {
     let mut output = std::io::Cursor::new(Vec::new());
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output.into_inner()
 }
 
@@ -262,7 +262,7 @@ fn a_source_with_identity_keeps_the_historical_gate_and_builds_no_proof() {
     let plain = package.document_snapshot().unwrap();
     let mut archive = std::io::Cursor::new(Vec::new());
     let mut writable = generated_package(16);
-    writable.to_stream(&mut archive).unwrap();
+    writable.write_to(&mut archive).unwrap();
     let source_backed = crate::source_backed::Package::from_read_at(Arc::new(
         litchi_core::OwnedSource::new(archive.into_inner()),
     ))

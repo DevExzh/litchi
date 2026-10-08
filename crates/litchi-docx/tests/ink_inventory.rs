@@ -145,7 +145,7 @@ fn open(opc: &OpcPackage) -> Package {
 
 fn save(package: &mut Package) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output.into_inner()
 }
 

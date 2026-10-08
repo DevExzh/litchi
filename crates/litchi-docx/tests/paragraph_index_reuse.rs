@@ -321,7 +321,7 @@ fn eager_failed_save_keeps_warmed_generation_retryable() {
         .document_mut()
         .unwrap()
         .add_paragraph_with_text("after");
-    assert!(package.to_stream(FailingWriter).is_err());
+    assert!(package.write_to(FailingWriter).is_err());
 
     // The failed sink must leave the published OPC generation unchanged. The
     // staged mutable document remains retryable, while the warmed index still
@@ -576,11 +576,11 @@ fn owned_eager_projection_survives_failed_edit_and_failed_save() {
         .document_mut()
         .unwrap()
         .add_paragraph_with_text("after");
-    assert!(package.to_stream(FailingWriter).is_err());
+    assert!(package.write_to(FailingWriter).is_err());
     assert_eager_view(&document, &["before"]);
     assert!(std::ptr::eq(document.opc_package(), package.opc_package()));
     let mut output = Cursor::new(Vec::new());
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     assert_eager_view(&package.document().unwrap(), &["before", "after"]);
     drop(package);
     assert_eager_view(&document, &["before"]);
@@ -592,7 +592,7 @@ fn unchanged_eager_save_keeps_projection_graph_shared_and_bytes_exact() {
     let mut package = Package::from_reader(Cursor::new(bytes.clone())).unwrap();
     let document = package.document().unwrap();
     let mut output = Vec::new();
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     assert_eq!(output, bytes);
     assert!(std::ptr::eq(document.opc_package(), package.opc_package()));
     assert_eager_view(&document, &["unchanged"]);

@@ -635,7 +635,7 @@ mod tests {
             .unwrap()
             .add_paragraph_with_text("materialize");
         let mut bytes = Cursor::new(Vec::new());
-        package.to_stream(&mut bytes).unwrap();
+        package.write_to(&mut bytes).unwrap();
 
         bytes.set_position(0);
         let mut reopened = Package::from_reader(bytes).unwrap();

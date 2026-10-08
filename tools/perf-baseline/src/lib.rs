@@ -16818,7 +16818,7 @@ fn semantic_docx_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> 
         document.add_paragraph_with_text(&semantic_docx_text(index, false));
     }
     let mut output = Cursor::new(Vec::new());
-    package.to_stream(&mut output)?;
+    package.write_to(&mut output)?;
     Ok(output.into_inner())
 }
 
@@ -16884,7 +16884,7 @@ fn docx_source_edit_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
         }
     }
     let mut output = Cursor::new(Vec::new());
-    package.to_stream(&mut output)?;
+    package.write_to(&mut output)?;
     restore_docx_source_edit_v1(output.into_inner())
 }
 
@@ -34482,7 +34482,7 @@ fn run_semantic_docx(
                 let mut sink = CountingSeekSink::default();
                 let commit = edit.commit()?;
                 package = commit.package().clone();
-                package.to_stream(&mut sink)?;
+                package.write_to(&mut sink)?;
                 let duration = started.elapsed();
                 if commit.patch().is_noop() != selected.is_empty()
                     || commit.diagnostics().operations() != selected.len()

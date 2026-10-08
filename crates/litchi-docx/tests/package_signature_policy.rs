@@ -47,7 +47,7 @@ fn open(bytes: &[u8]) -> Package {
 
 fn bytes(package: &mut Package) -> Vec<u8> {
     let mut sink = Cursor::new(Vec::new());
-    package.to_stream(&mut sink).unwrap();
+    package.write_to(&mut sink).unwrap();
     sink.into_inner()
 }
 
@@ -478,7 +478,7 @@ mod shared_properties {
     #[track_caller]
     fn assert_save_refused(package: &mut Package) {
         let mut sink = Cursor::new(Vec::new());
-        assert_signed(package.to_stream(&mut sink));
+        assert_signed(package.write_to(&mut sink));
         assert!(package.is_signed());
     }
 

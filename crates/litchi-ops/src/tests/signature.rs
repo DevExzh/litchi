@@ -350,7 +350,7 @@ fn changed_commit(file: &File) -> (Vec<u8>, String) {
             let commit = edit.commit().unwrap();
             let mut package = package.apply(commit.patch()).unwrap();
             let mut output = Vec::new();
-            package.to_stream(&mut output).unwrap();
+            package.write_to(&mut output).unwrap();
             (output, MARKER.to_owned())
         },
         #[cfg(feature = "pptx")]
@@ -543,7 +543,7 @@ fn assert_exact_noop(input: &Input) {
             let commit = package.edit().unwrap().commit().unwrap();
             let mut package = package.apply(commit.patch()).unwrap();
             let mut output = Vec::new();
-            package.to_stream(&mut output).unwrap();
+            package.write_to(&mut output).unwrap();
             assert_eq!(&output, bytes, "{label}: eager no-op");
         },
         #[cfg(feature = "pptx")]
