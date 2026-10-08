@@ -116,7 +116,7 @@ pub mod node;
 ))]
 mod open;
 mod options;
-mod path;
+pub mod path;
 mod registry;
 mod signed;
 mod tolerance;
@@ -206,3 +206,5 @@ pub mod detect;
 use litchi_opc as opc;
 #[cfg(feature = "pptx")]
 use litchi_pptx as pptx;
+
+pub use path::{IntoPath, PathArg};

@@ -86,6 +86,8 @@ impl<'a> NodePath<'a> {
     /// assert_eq!(path.to_string(), "/slide[1]/shape[@id=5]");
     /// ```
     #[must_use]
+    /// Native identity steps require `path::raw::path` before resolution;
+    /// ordinary format adapters must produce semantic names or positions.
     pub fn to_path(self) -> Path<'a> {
         Path::from_steps(self.steps.iter().map(|step| step.to_step()))
     }

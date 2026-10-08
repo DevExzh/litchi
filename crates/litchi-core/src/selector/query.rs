@@ -355,7 +355,7 @@ impl fmt::Display for Compound<'_> {
 }
 
 /// The element-type part of a compound.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Element<'a> {
     /// No type written (`:has(formula)`, `[style=Title]`): any element.
@@ -395,7 +395,7 @@ impl Element<'_> {
 }
 
 /// A pseudo-class.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Pseudo<'a> {
     /// `:contains(text)` (and OfficeCLI's shorthand `cell:text`, which parses
@@ -760,4 +760,16 @@ fn contains_argument<'a>(cursor: &mut Cursor<'a>) -> Result<Cow<'a, str>> {
     cursor.skip_ws();
     cursor.expect(b')', Expected::CloseParen)?;
     Ok(text)
+}
+
+impl fmt::Debug for Element<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("Element { .. }")
+    }
+}
+
+impl fmt::Debug for Pseudo<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("Pseudo { .. }")
+    }
 }

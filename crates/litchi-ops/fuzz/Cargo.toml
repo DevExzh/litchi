@@ -26,3 +26,17 @@ doc = false
 bench = false
 
 [workspace]
+
+[[bin]]
+name = "paths"
+path = "fuzz_targets/paths.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "smoke_paths"
+path = "fuzz_targets/smoke_paths.rs"
+test = false
+doc = false
+bench = false

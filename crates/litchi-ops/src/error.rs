@@ -32,6 +32,7 @@
 //! | An index outside its collection, among them a caller's cell indices outside the worksheet grid | [`Code::OutOfRange`] |
 //! | A named slide, sheet, tag or font that does not exist | [`Code::NotFound`] |
 //! | A sheet that is not a worksheet | [`Code::UnsupportedType`] |
+//! | Path or selector syntax | [`Code::InvalidPath`] or [`Code::InvalidSelector`]; [`Code::MaxDepthExceeded`] for the step and nesting limits |
 //!
 //! Leaf enums that are `#[non_exhaustive]` end in a wildcard arm that reports
 //! [`Code::CorruptFile`]: a variant the classifier does not name is treated as
@@ -300,6 +301,8 @@ pub enum Source {
     Core(litchi_core::Error),
     /// An execution-context refusal: cancellation or a budget charge.
     Execution(ExecutionError),
+    /// A path or selector syntax error, with its typed kind and byte offset.
+    Selector(litchi_core::selector::ParseError),
     /// An Open Packaging Conventions error.
     #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
     Opc(litchi_opc::OpcError),
@@ -371,6 +374,7 @@ impl Source {
             Self::Io(error) => Some(error),
             Self::Core(error) => Some(error),
             Self::Execution(error) => Some(error),
+            Self::Selector(error) => Some(error),
             #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
             Self::Opc(error) => Some(error),
             #[cfg(any(
@@ -737,6 +741,30 @@ impl Classify for ExecutionError {
             Self::ResourceLimit(_) => Class::of(Code::LimitExceeded),
             // The remaining variants reject an inconsistent caller policy.
             _ => Class::of(Code::InvalidArgument),
+        }
+    }
+}
+
+/// The grammar's own code decides: `invalid_path` or `invalid_selector` for
+/// syntax, `max_depth_exceeded` for the step and nesting limits. The grammar's
+/// corrective hint, when it has one, becomes the suggestion.
+impl Classify for litchi_core::selector::ParseError {
+    fn classify(&self) -> Class {
+        use litchi_core::selector::{ErrorCode, Grammar};
+
+        let code = match self.code() {
+            ErrorCode::InvalidPath => Code::InvalidPath,
+            ErrorCode::InvalidSelector => Code::InvalidSelector,
+            ErrorCode::MaxDepthExceeded => Code::MaxDepthExceeded,
+            ErrorCode::PathNotFound => Code::PathNotFound,
+            _ => match self.grammar() {
+                Grammar::Query => Code::InvalidSelector,
+                _ => Code::InvalidPath,
+            },
+        };
+        match self.suggestion() {
+            Some(suggestion) => Class::suggest(code, suggestion),
+            None => Class::of(code),
         }
     }
 }
@@ -1217,6 +1245,7 @@ macro_rules! from_leaf {
 from_leaf!(io::Error => Io, None);
 from_leaf!(litchi_core::Error => Core, None);
 from_leaf!(ExecutionError => Execution, None);
+from_leaf!(litchi_core::selector::ParseError => Selector, None);
 from_leaf!(
     #[cfg(any(
         feature = "docx",

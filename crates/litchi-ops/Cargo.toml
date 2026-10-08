@@ -73,6 +73,8 @@ yaml = ["dep:serde-saphyr"]
 test-support = []
 
 [dependencies]
+caseless = { workspace = true }
+unicode-normalization = { workspace = true }
 serde = { workspace = true }
 base64              = { workspace = true, optional = true } # Markdown image data URIs
 chrono              = { workspace = true, optional = true } # RTF metadata timestamps
@@ -104,6 +106,10 @@ serde-saphyr        = { workspace = true, optional = true } # Markdown YAML fron
 serde_json = { workspace = true }
 tempfile = { workspace = true }
 zip      = { version = "8", default-features = false, features = ["deflate"] }
+
+[[test]]
+name = "path_allocations"
+required-features = ["test-support"]
 
 [lints]
 workspace = true

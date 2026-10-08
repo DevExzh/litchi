@@ -215,7 +215,7 @@ impl fmt::Display for Path<'_> {
 /// document element names, aliases (`paragraph` for `p`), sheet names, and
 /// style IDs is resolution's job. A segment that needs `/`, `[`, `]`, or a
 /// leading quote is written quoted: `/"a/b"/A1`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Step<'a> {
     name: Cow<'a, str>,
     predicates: Predicates<'a>,
@@ -380,4 +380,10 @@ fn step<'a>(cursor: &mut Cursor<'a>) -> Result<Step<'a>> {
     let mut predicates = Predicates::new();
     cursor.predicates(&mut predicates, 0)?;
     Ok(Step { name, predicates })
+}
+
+impl fmt::Debug for Step<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("Step { .. }")
+    }
 }

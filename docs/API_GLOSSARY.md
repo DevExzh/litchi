@@ -521,3 +521,22 @@ These are format-independent prerequisites, exercised through test-only fake
 nodes. Concrete format node payloads remain uninhabited; File query, registry
 and write dispatch are not implemented by this record. Grouped Word spacing
 input and long grouped-number allocation remain documented follow-up work.
+
+
+## 29. Unified path input and resolution (record 0048)
+
+`path::{IntoPath, PathArg}` accepts text and reusable core `Path` values.
+`path::raw::path` explicitly opts into native identity resolution. Ordinary
+resolution accepts positions and registered semantic keys; unknown keys still
+produce an invalid-path error before any raw-identity gate. Grammar types carry
+syntax without authorizing native resolution. Native `NodePath` conversions
+must also pass through `path::raw::path`; ordinary adapters must emit positions
+or semantic names.
+
+`Source::Selector` retains typed grammar failures and byte offsets. Selector
+Debug and diagnostic rendering omit authored names, values and encountered
+characters; explicit Display and data accessors retain content rendering.
+`ParseError::offset_by` adjusts a suffix error to the original input offset.
+
+This is shared resolution infrastructure with test-only adapters. Concrete
+format navigation, File get/find/query and capability generation remain pending.

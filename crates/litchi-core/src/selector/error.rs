@@ -103,7 +103,7 @@ impl Limit {
 }
 
 /// What the parser found at the error offset.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Found {
     /// A character.
     Char(char),
@@ -114,7 +114,7 @@ pub enum Found {
 impl fmt::Display for Found {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Char(c) => write!(f, "{c:?}"),
+            Self::Char(_) => f.write_str("a character"),
             Self::End => f.write_str("end of input"),
         }
     }
@@ -305,6 +305,27 @@ impl ParseError {
         self.offset
     }
 
+    /// Returns the error with its offset moved `base` bytes later.
+    ///
+    /// A caller that parses a suffix of a larger text, such as the part after
+    /// `!` in the spreadsheet form `Sheet1!A1`, uses this to report the offset
+    /// in the text the user wrote. The offset saturates at `usize::MAX`.
+    ///
+    /// ```
+    /// use litchi_core::selector::{ErrorKind, Path};
+    ///
+    /// let text = "Sheet1!A1[0]";
+    /// let error = Path::parse_relative(&text[7..]).unwrap_err().offset_by(7);
+    /// assert_eq!((error.kind(), error.offset()), (ErrorKind::IndexZero, 10));
+    /// ```
+    #[must_use]
+    pub const fn offset_by(self, base: usize) -> Self {
+        Self {
+            offset: self.offset.saturating_add(base),
+            ..self
+        }
+    }
+
     /// Returns the specific failure.
     #[must_use]
     pub const fn kind(&self) -> ErrorKind {
@@ -345,5 +366,11 @@ impl ParseError {
             },
             _ => None,
         }
+    }
+}
+
+impl fmt::Debug for Found {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(self, f)
     }
 }

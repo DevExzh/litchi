@@ -240,7 +240,7 @@ impl fmt::Display for Condition<'_> {
 
 /// A predicate key: `name`, `@name` (an attribute locator), or a quoted
 /// header name such as `"Full Name"`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Key<'a> {
     name: Cow<'a, str>,
     attribute: bool,
@@ -342,7 +342,7 @@ impl fmt::Display for CompareOp {
 ///
 /// Bare and quoted spellings of the same text produce the same `Text` value;
 /// quoting only changes which characters can be written.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Value<'a> {
     /// Literal text, already unescaped.
@@ -417,5 +417,17 @@ impl fmt::Display for Value<'_> {
                 write!(f, "r{quote}{pattern}{quote}")
             },
         }
+    }
+}
+
+impl fmt::Debug for Key<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("Key { .. }")
+    }
+}
+
+impl fmt::Debug for Value<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("Value { .. }")
     }
 }

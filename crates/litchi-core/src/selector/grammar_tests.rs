@@ -303,10 +303,25 @@ fn path_syntax_errors_carry_offsets_and_codes() {
     let error = path_error("/body/p[x]]");
     assert_eq!(
         error.to_string(),
-        "invalid path at byte 10: expected '/', '[', or end of path, found ']'"
+        "invalid path at byte 10: expected '/', '[', or end of path, found a character"
     );
     assert_eq!(path_error("/x[a*]").suggestion(), None);
     assert!(path_error("/x[a=b*]").suggestion().is_some());
+}
+
+#[test]
+fn offsets_move_to_the_enclosing_text() {
+    let error = path_error("/body/p[0]");
+    let moved = error.offset_by(7);
+    assert_eq!(
+        (moved.kind(), moved.offset(), moved.code(), moved.grammar()),
+        (error.kind(), 15, error.code(), error.grammar())
+    );
+    assert_eq!(
+        moved.to_string(),
+        "invalid path at byte 15: index 0 is invalid; indices are 1-based"
+    );
+    assert_eq!(error.offset_by(usize::MAX).offset(), usize::MAX);
 }
 
 #[test]
@@ -800,4 +815,22 @@ fn ast_values_are_thread_safe_and_sized_for_the_stack() {
     assert!(size_of::<Path<'static>>() <= 1024);
     assert!(size_of::<Query<'static>>() <= 512);
     assert!(size_of::<ParseError>() <= 32);
+}
+
+#[test]
+fn diagnostic_rendering_omits_authored_selector_content() {
+    let path = Path::parse("/PRIVATE[@name=PRIVATE]").unwrap();
+    let query = Query::parse("PRIVATE:contains(PRIVATE)").unwrap();
+    for debug in [
+        format!("{path:?}"),
+        format!("{query:?}"),
+        format!("{:?}", path.steps()[0]),
+        format!("{:?}", path.steps()[0].predicates()[0]),
+    ] {
+        assert!(!debug.contains("PRIVATE"));
+    }
+    let error = Path::parse("PRIVATE").unwrap_err();
+    assert!(!error.to_string().contains("'P'"));
+    assert!(!format!("{error:?}").contains("'P'"));
+    assert_eq!(path.to_string(), "/PRIVATE[@name=PRIVATE]");
 }

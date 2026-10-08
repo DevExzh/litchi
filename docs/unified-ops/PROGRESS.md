@@ -562,3 +562,15 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
   record 0047 lists validation and explicit parity/allocation limitations.
 - Format adapters remain placeholders. Registry dispatch, File query/write APIs,
   M1/M2 integration and the complete all-format goal remain active.
+
+
+## 0048 — bounded path resolution core
+
+- Added IntoPath/PathArg, Excel notation, typed grammar errors and a static
+  family-vocabulary resolver with relative navigation and get/find semantics.
+- Adapted source-only candidate 85300f74e2 to raw-only native identities,
+  content-free diagnostics/Debug, typed-input bounds and canonical Unicode
+  name matching. Lowercase whole-column notation stays borrowed.
+- Record 0048 documents validation, preserved typed causes and allocation/parity
+  limitations. Concrete adapters, File navigation, query compilation, registry
+  dispatch and the full M1/M2/all-format goal remain open.
