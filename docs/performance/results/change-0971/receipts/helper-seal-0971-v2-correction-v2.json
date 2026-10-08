@@ -1,0 +1,68 @@
+{
+  "correction_receipt": {
+    "bytes": 1942,
+    "path": "/home/zhuhe/litchi-performance-0971/receipts/correction-receipt-0971-v3.json",
+    "sha256": "a1cdeb4ae2aeb36424355a2b254ce2ec51a3aa82678d1f81eb9210e16b7e2daa"
+  },
+  "created_utc": "2026-10-08T03:15:56.269893+00:00",
+  "helpers": {
+    "plan_generator": {
+      "bytes": 9010,
+      "path": "/home/zhuhe/litchi-performance-0971/tools/prepare_plan_0971_v2.py",
+      "sha256": "3ae82979f7c50f47a13ca88fcc0ad34dfe7a84d8876177f99659fff7be5fe377"
+    },
+    "protocol": {
+      "bytes": 29320,
+      "path": "/home/zhuhe/litchi-performance-0971/tools/protocol_common_0971_v2.py",
+      "sha256": "4ff9af4c64b50896f39a6a30286d445ebe0c9364435888593ade45a11c5cab43"
+    },
+    "reducer": {
+      "bytes": 11924,
+      "path": "/home/zhuhe/litchi-performance-0971/tools/reduce_0971_v2.py",
+      "sha256": "4151be54fc8138e157ec85e1b75e7f9db16d70afd8099e7ac00c6bdb8c6345bc"
+    },
+    "runner": {
+      "bytes": 18113,
+      "path": "/home/zhuhe/litchi-performance-0971/tools/run_0971_v2.py",
+      "sha256": "d6a40e0726f7a0f66a470cb2509d535a7f5ec7eeb0f7e788786aa626f4f9a7e8"
+    }
+  },
+  "invariants": [
+    "serial 12 children",
+    "exact fixed report identity and 5+80 scope",
+    "exact marker DSO path/build ID",
+    "all ten raw artifact hashes revalidated",
+    "process-group timeout kill/reap",
+    "first-child pilot stop without retry",
+    "per-owner associations over all 12",
+    "exact GO output roots and source/tool bindings",
+    "external fixture/source custody path preserved",
+    "diagnostic-only interpretation"
+  ],
+  "retained_dependencies": {
+    "launcher": {
+      "bytes": 3597,
+      "path": "/home/zhuhe/litchi-performance-0970/tools/launch_baseline_v2.py",
+      "sha256": "3b5b79351883a9b4efb680f47498d8e10bdf77d131a60d11c1ecb54ad95430f5"
+    },
+    "validator": {
+      "bytes": 39444,
+      "path": "/home/zhuhe/litchi-performance-0969/tools/protocol_common_v4.py",
+      "sha256": "5ce0f2ac08fc7909df054a4cc2d5137b3279af4cd726acf5bfb4558d97b05c5c"
+    }
+  },
+  "schema": "litchi.performance.0971.helper_seal.v2",
+  "scope": "external diagnostic helper only; no Office workload/build/capture",
+  "self_test_receipt": {
+    "bytes": 3590,
+    "path": "/home/zhuhe/litchi-performance-0971/receipts/tool-self-tests-0971-v7.json",
+    "sha256": "3cf68abf1a85aac5eb1a92c5ba85d6d313d1090bd91a127c0aac501fdc772c52"
+  },
+  "source_content_proof": {
+    "bytes": 268981,
+    "path": "/home/zhuhe/litchi-performance-0971/receipts/source-content-proof-0971-v2.json",
+    "sha256": "20e0f9fad68da357e2278157a8d1514c8b9b226993e16a91656fddc7ff38edd6"
+  },
+  "status": "sealed",
+  "version": "v2-correction-v2"
+}

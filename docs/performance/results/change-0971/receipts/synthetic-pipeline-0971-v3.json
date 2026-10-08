@@ -1,0 +1,32 @@
+{
+  "created_utc": "2026-10-08T03:16:26.016366+00:00",
+  "mutation_checks": {
+    "duplicate_owner_deduplicated": true,
+    "raw_owner_hash_rejected": true,
+    "sample_index_rejected": true,
+    "wrong_case_rejected": true,
+    "wrong_cpu_rejected": true,
+    "wrong_dso_rejected": true,
+    "wrong_event_rejected": true,
+    "wrong_pid_rejected": true,
+    "zero_period_rejected": true
+  },
+  "observed_base_result": {
+    "base_result_sha256": "300da4a43f79fa248696ae9f7133d2ca1f22d66b9d52f1fee9de567bf8819f22",
+    "children": 12,
+    "duplicate_owner_inclusive_period_deduplicated": true,
+    "owner_association_count": 1,
+    "p99_is_percentile_not_max": true
+  },
+  "owner_contract": "exclusive per-owner period/share associations emitted over all 12 children; inclusive owner coverage deduplicated per sample",
+  "plan": {
+    "bytes": 11792,
+    "path": "/home/zhuhe/litchi-performance-0971/plans/plan-0971-pre-capture-v2-correction-v2.json",
+    "sha256": "600756f3a36317208a887bb5b3d38bbf079b732437454221e68c80f128a04f81"
+  },
+  "raw_contract": "ten artifact path/bytes/SHA bindings; report, launcher, terminal, command, no-inline parser and exact build-ID exporter revalidated",
+  "reproducibility": "fixed synthetic values; no measurement claim",
+  "schema": "litchi.performance.0971.synthetic_pipeline.v2",
+  "scope": "offline synthetic 12-child packet/reducer pipeline against final v2 plan; no Office workload/build/capture; temporary raw tree discarded after mutation checks",
+  "status": "pass"
+}

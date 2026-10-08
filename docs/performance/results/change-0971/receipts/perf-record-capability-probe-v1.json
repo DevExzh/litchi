@@ -1,0 +1,89 @@
+{
+  "schema": "litchi.performance.0971.perf_record_capability_probe.v1",
+  "observed_utc": "2026-10-08T02:56:05.139093648Z",
+  "host": "ip-172-31-39-190",
+  "scope": "harmless /usr/bin/true capability probes only; no benchmark, native harness, Cargo invocation, or production workload",
+  "perf": {
+    "path": "/usr/bin/perf",
+    "sha256": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b",
+    "version": "perf version 7.0.14",
+    "perf_event_paranoid": 1,
+    "perf_event_max_sample_rate": 25000,
+    "perf_event_max_stack": 127
+  },
+  "target": {
+    "path": "/usr/bin/true",
+    "sha256": "deadd5bb984a1153139afd09ee4e01100fbe2196d4f98ec7978674e2c83a4b97"
+  },
+  "probes": [
+    {
+      "name": "cycles_dwarf_65528",
+      "argv": [
+        "/usr/bin/perf", "record", "-q", "-o", "/tmp/litchi-0971-perf-record-probe-v1.data",
+        "-e", "cycles:u", "-F", "99", "--call-graph", "dwarf,65528", "--", "/usr/bin/true"
+      ],
+      "returncode": 0,
+      "stdout_path": "/tmp/litchi-0971-perf-record-probe-v1.stdout",
+      "stderr_path": "/tmp/litchi-0971-perf-record-probe-v1.stderr",
+      "perf_data": {
+        "path": "/tmp/litchi-0971-perf-record-probe-v1.data",
+        "bytes": 373256,
+        "sha256": "50ddd47bdd315475e42d81e181dccd6aaca77369f40ea359e7b28a5b23c3e4a6",
+        "mtime_utc": "2026-10-08T02:54:11.547014448Z"
+      },
+      "report_observation": "5 samples, 0 lost samples, report decoded successfully"
+    },
+    {
+      "name": "instructions_dwarf_65528",
+      "argv": [
+        "/usr/bin/perf", "record", "-q", "-o", "/tmp/litchi-0971-perf-record-instructions-probe-v1.data",
+        "-e", "instructions:u", "-F", "99", "--call-graph", "dwarf,65528", "--", "/usr/bin/true"
+      ],
+      "returncode": 0,
+      "stdout_path": "/tmp/litchi-0971-perf-record-instructions-probe-v1.stdout",
+      "stderr_path": "/tmp/litchi-0971-perf-record-instructions-probe-v1.stderr",
+      "perf_data": {
+        "path": "/tmp/litchi-0971-perf-record-instructions-probe-v1.data",
+        "bytes": 373264,
+        "sha256": "414ab76cb141fd06615f2d1ff07058c9d5be9fdcae121aafda3a615c4bc756ce",
+        "mtime_utc": "2026-10-08T02:54:15.419031952Z"
+      },
+      "report_observation": "5 samples, 0 lost samples, report decoded successfully"
+    },
+    {
+      "name": "instructions_dwarf_8192_smoke",
+      "argv": [
+        "/usr/bin/perf", "record", "-q", "-o", "/tmp/litchi-0971-callgraph-smoke-freq-8192.data",
+        "-e", "instructions:u", "-F", "99", "--call-graph", "dwarf,8192", "--", "/usr/bin/true"
+      ],
+      "returncode": 0,
+      "perf_data": {
+        "path": "/tmp/litchi-0971-callgraph-smoke-freq-8192.data",
+        "bytes": 87776,
+        "sha256": "3449dcba19f6f47e356222445957b1a11f81db6be5c1ab5c3c272361f64470cc",
+        "mtime_utc": "2026-10-08T02:55:24.818345191Z"
+      },
+      "report_observation": "5 samples, 0 lost samples, report decoded successfully"
+    },
+    {
+      "name": "instructions_dwarf_16384_smoke",
+      "argv": [
+        "/usr/bin/perf", "record", "-q", "-o", "/tmp/litchi-0971-callgraph-smoke-freq-16384.data",
+        "-e", "instructions:u", "-F", "99", "--call-graph", "dwarf,16384", "--", "/usr/bin/true"
+      ],
+      "returncode": 0,
+      "perf_data": {
+        "path": "/tmp/litchi-0971-callgraph-smoke-freq-16384.data",
+        "bytes": 128760,
+        "sha256": "68f850d68e2754b96a92c73be1a41bccdaf798a4d5f0bca4f93fe5812bd2467d",
+        "mtime_utc": "2026-10-08T02:55:24.893345528Z"
+      },
+      "report_observation": "5 samples, 0 lost samples, report decoded successfully"
+    }
+  ],
+  "interpretation": "The fixed instructions:u event and DWARF callgraph setup are available. These probes do not validate marker recovery on the retained native binary; the first exact-binary pilot must count marker, unresolved, truncated, and lost samples before any attribution is accepted.",
+  "benchmark_started": false,
+  "workload_started": false,
+  "build_started": false,
+  "global_settings_changed": false
+}

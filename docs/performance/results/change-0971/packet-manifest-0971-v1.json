@@ -1,0 +1,244 @@
+{
+  "schema": "litchi.performance.0971.packet_manifest.v2",
+  "status": "sealed",
+  "packet_root": "docs/performance/results/change-0971",
+  "self_excluded": true,
+  "file_count": 36,
+  "total_bytes": 909217,
+  "maximum_file_bytes": 279748,
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 4562,
+      "sha256": "1ad28d1c93b48c926de7f46e315785d322fa3fbb9d061c613114d4f6cdc663fb"
+    },
+    {
+      "path": "analysis/capture-summary-instruction-profile-v2-v1.json",
+      "bytes": 5635,
+      "sha256": "a7c8e18cd628e753cb64f6d482acaf36f897fe673b8e88fbb1258416fc11b252"
+    },
+    {
+      "path": "analysis/float-e1-work-v1.json",
+      "bytes": 83835,
+      "sha256": "1e27a1e84b12d696133bf97fab17e59180e8ba99db64d70fb0ea85f9f61c19fc"
+    },
+    {
+      "path": "analysis/float-e1-work-v1.md",
+      "bytes": 2332,
+      "sha256": "efdece9809a097cae69c0b6d87a8ea982bd2f93b4c14725b72c758f8eda8cbd7"
+    },
+    {
+      "path": "analysis/instruction-profile-v2-failure-v1/commands-v1.txt",
+      "bytes": 3405,
+      "sha256": "4b60e00b056f19e36e300dac304dfacdb5fc471eeadadf546fdd9d8640bfe84c"
+    },
+    {
+      "path": "analysis/instruction-profile-v2-failure-v1/failure-analysis-v1.md",
+      "bytes": 4014,
+      "sha256": "6aecc34e84edd357401549f8591bd921cf01249b67a22163d0888c2f95658c52"
+    },
+    {
+      "path": "analysis/instruction-profile-v2-failure-v1/raw-stack-scan-v1.json",
+      "bytes": 279748,
+      "sha256": "29f284fe9e1b2b98d50aa7f8556af0e03155f4248c7d44f5db9244412471316e"
+    },
+    {
+      "path": "analysis/instruction-profile-v2-failure-v1/raw-stack-scan-v1.py",
+      "bytes": 5183,
+      "sha256": "2f162ffe7fd0095dd0216c00ee1daca573dc8b9bd01eb5574059fa731e413cfa"
+    },
+    {
+      "path": "analysis/instruction-profile-v2-failure-v1/receipt-v1.json",
+      "bytes": 11581,
+      "sha256": "5eb4a186159247e2369b595c53a8ce8d11dab9cd5ed56ff899950b65c7bfdae7"
+    },
+    {
+      "path": "capture/capture-manifest-v2.json",
+      "bytes": 672,
+      "sha256": "bb51f571c33cb6426d3adf75ac91f7ef3f1720a2cec17738832e90205c08673f"
+    },
+    {
+      "path": "design/attribution-proposal-v1.md",
+      "bytes": 9365,
+      "sha256": "c099fb6dc0572bbb09e1d911445e6012988f64a3bb3110be69377861ef2ef437"
+    },
+    {
+      "path": "design/source-work-variation-v1.md",
+      "bytes": 14232,
+      "sha256": "86487399a1ffa2dbd51ba7a2aa7b02adf11d45e4b556ee3b48a618e2c65d5217"
+    },
+    {
+      "path": "plan/plan-0971-pre-capture-v2-correction-v2.json",
+      "bytes": 11792,
+      "sha256": "600756f3a36317208a887bb5b3d38bbf079b732437454221e68c80f128a04f81"
+    },
+    {
+      "path": "provenance/capture-inventory-descriptor-instruction-profile-v2-v1.json",
+      "bytes": 1363,
+      "sha256": "fb804f46b083337ee9130e9996f6d724cd05d653204475da78cf78b31e371bc8"
+    },
+    {
+      "path": "provenance/instruction-profile-failure-forensic-descriptor-v1.json",
+      "bytes": 1925,
+      "sha256": "a216267467bf26c6e5280ee688bc2546fba779c73eb1275cf9395bf2003796f1"
+    },
+    {
+      "path": "receipts/adr-revalidation-0971-v1.json",
+      "bytes": 8195,
+      "sha256": "08b1a8d25be0ee9777221d6ce409c7da93a892981a6dadc7dd84779b4c7b471b"
+    },
+    {
+      "path": "receipts/correction-receipt-0971-v3.json",
+      "bytes": 1942,
+      "sha256": "a1cdeb4ae2aeb36424355a2b254ce2ec51a3aa82678d1f81eb9210e16b7e2daa"
+    },
+    {
+      "path": "receipts/float-e1-work-receipt-v1.json",
+      "bytes": 3636,
+      "sha256": "cc9da6e1ef8357691df9b91ed361a9a81f672a92138bedddf85e5e23501ed4da"
+    },
+    {
+      "path": "receipts/helper-seal-0971-v2-correction-v2.json",
+      "bytes": 2686,
+      "sha256": "1c97f055e19a2621812fb688f7f3377faef4cc3ca74ef5421587c716298a6599"
+    },
+    {
+      "path": "receipts/perf-record-capability-probe-v1.json",
+      "bytes": 4007,
+      "sha256": "50bc1b5c3253ed44cc3b1516e258a6028db40a3f049336814264365b539141f2"
+    },
+    {
+      "path": "receipts/protocol-seal-0971-v4.json",
+      "bytes": 4627,
+      "sha256": "37e416009599c204501cd7cba6ea1037ffc7fde6faf8ae8ad0190f99cd9dde51"
+    },
+    {
+      "path": "receipts/root-go-0971-v2.json",
+      "bytes": 7495,
+      "sha256": "ac84a543596842798d09a4727e7e32096bda580270b3e56e37dd55871768f13e"
+    },
+    {
+      "path": "receipts/root-quiescence-0971-v2.json",
+      "bytes": 95,
+      "sha256": "e9011dc369dcea20f44e49f6eef641186bc01e363c87f324e00d96b11a90226a"
+    },
+    {
+      "path": "receipts/root-terminal-0971-v1.json",
+      "bytes": 854,
+      "sha256": "0664f420f5d56654e3e61dda83b8d4e2ca06498b3e2a985343a8947d5c18e35a"
+    },
+    {
+      "path": "receipts/source-content-proof-0971-v2.json",
+      "bytes": 268981,
+      "sha256": "20e0f9fad68da357e2278157a8d1514c8b9b226993e16a91656fddc7ff38edd6"
+    },
+    {
+      "path": "receipts/synthetic-pipeline-0971-v3.json",
+      "bytes": 1515,
+      "sha256": "94ed06d2f35f54296fa2a44d3a60fe73342a1c1d94dc9aa63ea07dd7ab213b56"
+    },
+    {
+      "path": "receipts/temporary-cleanup-0971-v1.json",
+      "bytes": 24973,
+      "sha256": "e25b7eb218960e440b187b4aa73f74acecd507acbe66f1f2b2ccfdad81801832"
+    },
+    {
+      "path": "receipts/tool-self-tests-0971-v7.json",
+      "bytes": 3590,
+      "sha256": "3cf68abf1a85aac5eb1a92c5ba85d6d313d1090bd91a127c0aac501fdc772c52"
+    },
+    {
+      "path": "review/failed-pilot-independent-audit-0971-v1.json",
+      "bytes": 8815,
+      "sha256": "99eefd86a035d8f6ac87dfa3bd768f1d1d85fee7e152526d2e26e0c40112a2a7"
+    },
+    {
+      "path": "review/historical/independent-final-review-0971-v1.json",
+      "bytes": 11726,
+      "sha256": "eaef77c781fb2d610ec4b04c82c85827772535583b6e47c1c311dd03619b6ea0"
+    },
+    {
+      "path": "review/independent-final-review-0971-v2.json",
+      "bytes": 10583,
+      "sha256": "ab2d1c292e008ea2f398b3dbb9b3e923ab4581207eaa99c2efd659a3703ca92d"
+    },
+    {
+      "path": "tools/analyze_float_e1_work_v1.py",
+      "bytes": 37486,
+      "sha256": "692cb70adcf6a21759e9465b81fdedc76681c2d042d57261ae4946e3fa9c6de1"
+    },
+    {
+      "path": "tools/prepare_plan_0971_v2.py",
+      "bytes": 9010,
+      "sha256": "3ae82979f7c50f47a13ca88fcc0ad34dfe7a84d8876177f99659fff7be5fe377"
+    },
+    {
+      "path": "tools/protocol_common_0971_v2.py",
+      "bytes": 29320,
+      "sha256": "4ff9af4c64b50896f39a6a30286d445ebe0c9364435888593ade45a11c5cab43"
+    },
+    {
+      "path": "tools/reduce_0971_v2.py",
+      "bytes": 11924,
+      "sha256": "4151be54fc8138e157ec85e1b75e7f9db16d70afd8099e7ac00c6bdb8c6345bc"
+    },
+    {
+      "path": "tools/run_0971_v2.py",
+      "bytes": 18113,
+      "sha256": "d6a40e0726f7a0f66a470cb2509d535a7f5ec7eeb0f7e788786aa626f4f9a7e8"
+    }
+  ],
+  "capture_inventory_descriptor": "provenance/capture-inventory-descriptor-instruction-profile-v2-v1.json",
+  "capture_summary": "analysis/capture-summary-instruction-profile-v2-v1.json",
+  "forensic_descriptor": "provenance/instruction-profile-failure-forensic-descriptor-v1.json",
+  "capture_external_set": {
+    "file_count": 12,
+    "total_bytes": 25210628,
+    "max_file_bytes": 23129880,
+    "set_sha256": "ad33a9070eeb8355a216c6ca3506f7b6e5778064ce14ff568226c3a4fcfd16a1"
+  },
+  "pilot_failure": {
+    "children_requested": 12,
+    "children_completed": 1,
+    "marker_sample_count": 0,
+    "marker_period_share": 0.0,
+    "lost_events": 0,
+    "no_retry": true,
+    "exit_code": 2
+  },
+  "forensic_result": {
+    "status": "unsupported_attribution",
+    "sample_count": 1387,
+    "marker_sample_count": 0,
+    "lost_events": 0,
+    "stack_truncated_records": 906,
+    "unresolved_frames": 618,
+    "target_leaf_ip_sample_count": 891,
+    "target_leaf_samples_with_marker_range_word": 0,
+    "target_leaf_samples_with_marker_return_word": 0,
+    "cause_established": false
+  },
+  "cleanup": {
+    "receipt": "receipts/temporary-cleanup-0971-v1.json",
+    "bytes": 24973,
+    "sha256": "e25b7eb218960e440b187b4aa73f74acecd507acbe66f1f2b2ccfdad81801832",
+    "status": "completed",
+    "deleted_path_count": 9,
+    "deleted_regular_file_count": 17,
+    "main_checkout_touched": false,
+    "capture_preserved": true
+  },
+  "rules": {
+    "all_copied_files_below_1MiB": true,
+    "compiled_executables_copied": false,
+    "raw_perf_data_copied": false,
+    "raw_perf_scripts_copied": false,
+    "raw_packets_copied": false,
+    "raw_reports_copied": false,
+    "capture_manifest_copied": true,
+    "full_raw_inventory_copied": false,
+    "obsolete_draft_or_skeleton_manifests_present": false,
+    "final_seal": true
+  },
+  "sealed_interpretation": "Failed pilot custody is valid, but native marker attribution is unsupported. No phase, performance, source-owner, qualification, adoption, optimization, or causal claim is made."
+}

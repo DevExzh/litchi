@@ -1,0 +1,42 @@
+{
+  "created_utc": "2026-10-08T03:15:52.806328+00:00",
+  "fixes": [
+    "fixed report cell/warmup/sample/index/elapsed identities",
+    "timeout process-group termination and descendant reap test",
+    "all ten raw artifact path/bytes/SHA bindings with full authoritative parser reparse",
+    "positive period and exact sample PID/CPU checks",
+    "exact marker DSO path plus buildid-list retained ELF check",
+    "deduplicated inclusive owners per sample",
+    "declared p99 percentile plus max_ns",
+    "per-owner period/share correlations over all 12",
+    "correct perf-launched child-tree scope wording",
+    "strict helper/tool/review/correction/protocol/GO/output custody and empty roots",
+    "924 baseline source entries rehashed via baseline_sha256 proof"
+  ],
+  "independent_review_required": true,
+  "no_retry": true,
+  "prior_review": {
+    "bytes": 11726,
+    "path": "/home/zhuhe/litchi-performance-0971/review/independent-final-review-0971-v1.json",
+    "sha256": "eaef77c781fb2d610ec4b04c82c85827772535583b6e47c1c311dd03619b6ea0"
+  },
+  "root_go_required": true,
+  "schema": "litchi.performance.0971.correction_receipt.v2",
+  "scope": "fresh v2 correction including exact GO output/custody bindings; no Office workload/build/capture",
+  "source_content_proof": {
+    "bytes": 268981,
+    "path": "/home/zhuhe/litchi-performance-0971/receipts/source-content-proof-0971-v2.json",
+    "sha256": "20e0f9fad68da357e2278157a8d1514c8b9b226993e16a91656fddc7ff38edd6"
+  },
+  "status": "pass",
+  "synthetic_pipeline": {
+    "bytes": 1523,
+    "path": "/home/zhuhe/litchi-performance-0971/receipts/synthetic-pipeline-0971-v2.json",
+    "sha256": "bdfc82860b39ea8b1e9d47265d3e5e920991626aaa5639cfcb6d7fd0ff050382"
+  },
+  "tool_self_tests": {
+    "bytes": 3590,
+    "path": "/home/zhuhe/litchi-performance-0971/receipts/tool-self-tests-0971-v7.json",
+    "sha256": "3cf68abf1a85aac5eb1a92c5ba85d6d313d1090bd91a127c0aac501fdc772c52"
+  }
+}

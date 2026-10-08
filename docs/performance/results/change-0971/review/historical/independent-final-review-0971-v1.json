@@ -1,0 +1,218 @@
+{
+  "created_utc": "2026-10-08T03:09:20.946738+00:00",
+  "custody_check": {
+    "all_21_match": true,
+    "binary_build_id": "e5c457384eeebd057932c444efda77618f137399",
+    "binary_sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb",
+    "mismatches": [],
+    "plan_recursive_path_sha_bytes_references": 19
+  },
+  "exact_cli_after_fixes": {
+    "command": "env LC_ALL=C LANG=C TZ=UTC PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.14 /home/zhuhe/litchi-performance-0971/tools/run_0971_v1.py --run --plan /home/zhuhe/litchi-performance-0971/plans/plan-0971-pre-capture-v4.json --go /home/zhuhe/litchi-performance-0971/receipts/root-go-0971-v1.json",
+    "currently_authorized": false,
+    "reason": "Do not launch until blocker corrections are sealed and a fresh independent pass receipt binds the corrected plan/helpers."
+  },
+  "interpretation": "Blocked before launch. The experiment scope is conceptually bounded, but the listed custody, identity, parser, timeout, and attribution-output gaps must be corrected in one fresh sealed helper/plan version before root GO.",
+  "reproduced_blockers": [
+    {
+      "evidence": "protocol_common_0971_v1.validate_report constructs validator cell from report.case/edits/retention; mutating a retained valid report case to docnohf was accepted.",
+      "id": "report-identity-derived-from-untrusted-fields",
+      "required_fix": "Validate against fixed plan cell docfloat/e1/default_8mib and fixture/input identity before or alongside the retained validator.",
+      "severity": "blocker"
+    },
+    {
+      "evidence": "run_0971_v1.run_child uses subprocess.run timeout around taskset/perf without a process group/session kill; a timeout can leave the launcher/historical binary alive after terminal failure.",
+      "id": "timeout-does-not-kill-descendant-group",
+      "required_fix": "Run each child in a new process group/session and kill/reap the entire group on timeout, preserving stop-without-retry.",
+      "severity": "blocker"
+    },
+    {
+      "evidence": "Reducer validates packet.inline report and cached perf summary, reparses no-inline text but compares only five summary fields, trusts cached owner/unresolved/truncation maps, and does not bind/hash raw report, perf.data, decoded texts, header, launch, stderr, command, or terminal files.",
+      "id": "raw-child-custody-and-authority-incomplete",
+      "required_fix": "Record and verify bytes/SHA for every raw child artifact; make full parser reparse authoritative or compare every derived field, and revalidate exact launch/report/script identity before reduction.",
+      "severity": "blocker"
+    },
+    {
+      "evidence": "parse_perf_script accepted period=0, mixed sample PIDs/CPUs, and no CPU/PID consistency check exists after launch metadata.",
+      "id": "period-and-sample-identity-gates-missing",
+      "required_fix": "Require finite positive periods; require every sample PID to equal launch exec_pid and CPU 31 (with sample-cpu enabled), or fail closed.",
+      "severity": "blocker"
+    },
+    {
+      "evidence": "marker DSO validation compares Path(frame.dso).name only; a wrong path with the retained basename was accepted in synthetic parser replay.",
+      "id": "marker-dso-only-basename",
+      "required_fix": "Bind the marker DSO to the exact retained binary path/build ID, not basename alone.",
+      "severity": "blocker"
+    },
+    {
+      "evidence": "inclusive_marker_ancestor_period adds a period for each repeated resolved frame; a synthetic recursive marker counted the same period twice for one owner.",
+      "id": "inclusive-owner-period-double-count",
+      "required_fix": "Deduplicate each owner per sample for inclusive coverage and document cross-owner overlap explicitly.",
+      "severity": "blocker"
+    },
+    {
+      "evidence": "reduce_0971_v1 child_rows writes p99_ns=max(elapsed), which is not the declared p99 percentile.",
+      "id": "p99-labelled-as-maximum",
+      "required_fix": "Compute the declared percentile or rename the field to max_ns and avoid p99 semantics.",
+      "severity": "blocker"
+    },
+    {
+      "evidence": "Reducer emits aggregate p50-vs-total marker-period/share correlations only; proposal requires p50 associations for each exclusive owner marker-period/share across all 12 children.",
+      "id": "per-owner-associations-absent",
+      "required_fix": "Retain per-child owner periods/shares and compute descriptive Pearson/Spearman per owner over all 12 children.",
+      "severity": "blocker"
+    },
+    {
+      "evidence": "plan.perf.whole_process_scope says \u201cperf launched GNU/perf child tree\u201d; this command has no GNU time and perf bookkeeping is outside its launched child.",
+      "id": "whole-process-scope-wording",
+      "required_fix": "Correct wording to perf-launched child process tree (Python launcher and execed baseline), excluding perf bookkeeping.",
+      "severity": "material"
+    },
+    {
+      "evidence": "check_plan_bindings omits helper/helper-seal and perf/python/taskset file hash checks; check_go does not require a passing independent-review binding or helper-file bindings.",
+      "id": "sealed-binding-validation-gaps",
+      "required_fix": "Validate all helper/tool hashes at plan/GO admission and require the fresh independent review receipt/status, exact plan/protocol/helper seals, quiescence, environment, CPU31, and exclusive empty output roots.",
+      "severity": "blocker"
+    },
+    {
+      "evidence": "Relevant harness source/Cargo files independently match plan hashes, but the helper does not rehash all 924 source-manifest entries when admitting source-owner claims.",
+      "id": "source-custody-scope",
+      "required_fix": "Bind the relevant source files/build ID in GO and retain a source-manifest content proof if full source-owner attribution is published; do not claim current-HEAD equivalence.",
+      "severity": "material"
+    }
+  ],
+  "root_go_required_fields_after_fixes": {
+    "authorized": true,
+    "binary": "path/bytes/sha256/build_id exact retained 0967 ELF",
+    "capability": "perf receipt hash",
+    "correction_receipt": "all blocker-fix correction hashes",
+    "fixture": "path/bytes/sha256 exact FloatingPictures.doc",
+    "helper_seal": "path/bytes/sha256 plus every helper actual path/bytes/sha256",
+    "host": "allowed audited mask including CPU31",
+    "independent_review": "fresh receipt path/bytes/sha256 with status pass",
+    "matrix": "12 serial children, child1 pilot, 5 warmups/80 measured, instructions:u period 5000000 dwarf,16384",
+    "no_retry": true,
+    "outputs": "exclusive empty capture/analysis roots",
+    "plan": "path/bytes/sha256 exact plan-v4 (or corrected fresh plan)",
+    "protocol_seal": "path/bytes/sha256 exact protocol-seal-v2 or correction-bound successor",
+    "quiescence": "passing fresh receipt",
+    "schema": "litchi.performance.0971.root_go.v1",
+    "scope": "diagnostic only; no timing/qualification/adoption claim; warmup mix explicit",
+    "source": "manifest/file-manifest plus relevant harness source/Cargo hashes",
+    "status": "authorized",
+    "tools": "perf/python/taskset hashes and environment LC_ALL=C LANG=C TZ=UTC"
+  },
+  "schema": "litchi.performance.0971.independent_final_review.v1",
+  "scope": "Read-only independent review of sealed 0971 pre-capture plan/helpers; no Office workload, build, capture, or sealed-artifact mutation.",
+  "scope_checks": {
+    "all12_required": true,
+    "combined_marker_calls": "5 warmups + 80 measured calls",
+    "cpu31_plan": true,
+    "historical_binary_only": true,
+    "missing_membership_unknown": true,
+    "owner_percentages_not_exact_timed_region": true,
+    "p50_scope": "80 measured samples only",
+    "pilot_failure_stop_without_retry": true,
+    "pilot_is_child1": true,
+    "pilot_lost_events": 0,
+    "pilot_min_marker_samples": 100,
+    "pilot_positive_share": true,
+    "serial_children": 12,
+    "warmup_mix_explicit": true
+  },
+  "sealed_bindings": {
+    "capability_receipt": {
+      "bytes": 4007,
+      "path": "/home/zhuhe/litchi-performance-0971/receipts/perf-record-capability-probe-v1.json",
+      "sha256": "50bc1b5c3253ed44cc3b1516e258a6028db40a3f049336814264365b539141f2"
+    },
+    "helper_seal": {
+      "bytes": 2077,
+      "path": "/home/zhuhe/litchi-performance-0971/receipts/helper-seal-0971-v5.json",
+      "sha256": "e495a0073b48c63c999310a565d47351acd8b9a78e93e07316daca05e044decd"
+    },
+    "helpers": {
+      "plan_generator": {
+        "bytes": 7821,
+        "path": "/home/zhuhe/litchi-performance-0971/tools/prepare_plan_0971_v1.py",
+        "sha256": "cec38b39d6b8029cb9aa4682b34b055d371777c282d0e8a3ee020128f73e408a"
+      },
+      "protocol": {
+        "bytes": 17877,
+        "path": "/home/zhuhe/litchi-performance-0971/tools/protocol_common_0971_v1.py",
+        "sha256": "aaab46e97a9aca9681e285bcf8eab9acb159e080036c2572592bfb1e0e048953"
+      },
+      "reducer": {
+        "bytes": 9785,
+        "path": "/home/zhuhe/litchi-performance-0971/tools/reduce_0971_v1.py",
+        "sha256": "f5fc643da945414ead77b158821ee81a43558bb74b8cdd36c44e3f5330f05731"
+      },
+      "runner": {
+        "bytes": 14162,
+        "path": "/home/zhuhe/litchi-performance-0971/tools/run_0971_v1.py",
+        "sha256": "3b05627373086c4ced4c81ce26f6a76d52c73a130daa2d69a9fa924d99a95672"
+      }
+    },
+    "plan": {
+      "bytes": 9131,
+      "path": "/home/zhuhe/litchi-performance-0971/plans/plan-0971-pre-capture-v4.json",
+      "sha256": "2c84512ea426c6f8e90d60fba0931f965667a23cfe56ab66e445f7520361d266"
+    },
+    "proposal": {
+      "bytes": 9365,
+      "path": "/home/zhuhe/litchi-performance-0971/attribution-proposal-v1.md",
+      "sha256": "c099fb6dc0572bbb09e1d911445e6012988f64a3bb3110be69377861ef2ef437"
+    },
+    "protocol_seal": {
+      "bytes": 3235,
+      "path": "/home/zhuhe/litchi-performance-0971/receipts/protocol-seal-0971-v2.json",
+      "sha256": "8924785202bf376eedb6def0ba0ba76f4a2b0f1916c5c7735f76ab9ddc053c87"
+    },
+    "relevant_source": {
+      "harness_cargo": {
+        "bytes": 560,
+        "path": "/home/zhuhe/litchi-performance-0969/source-baseline/tools/perf-cfb-profile/Cargo.toml",
+        "sha256": "41dee12e4eb7d1e3853a33a7743afdf6b5d6519d5e7456e61ce4978aa9177945"
+      },
+      "harness_source": {
+        "bytes": 35543,
+        "path": "/home/zhuhe/litchi-performance-0969/source-baseline/tools/perf-cfb-profile/src/lib.rs",
+        "sha256": "b4893321ac9a9321a9055823a7f05ecb35e59319531913affc49342b8ccd73dc"
+      }
+    },
+    "source_variation": {
+      "bytes": 14232,
+      "path": "/home/zhuhe/litchi-performance-0971/source-work-variation-v1.md",
+      "sha256": "86487399a1ffa2dbd51ba7a2aa7b02adf11d45e4b556ee3b48a618e2c65d5217"
+    },
+    "tool_self_tests": {
+      "bytes": 3400,
+      "path": "/home/zhuhe/litchi-performance-0971/receipts/tool-self-tests-0971-v4.json",
+      "sha256": "383ba319f87297cc5656992369059d206fe06391d5f05ad4a136219fac1241ba"
+    }
+  },
+  "smoke_and_synthetic": {
+    "synthetic_reducer_e2e": {
+      "children": 12,
+      "marker_period_total": 1200.0,
+      "output": {
+        "bytes": 12090,
+        "path": "/tmp/litchi-0971-reducer-e2e-k7z6fhk0/reducer-output.json",
+        "sha256": "141cca3c8d610501350829f5198c91d23f9017c2c7b963574e7624612e5779bc"
+      },
+      "root": "/tmp/litchi-0971-reducer-e2e-k7z6fhk0",
+      "status": "complete",
+      "workload_started": false
+    },
+    "tool_self_tests_receipt_status": "pass",
+    "wrapper_decoded_sample_count": 30,
+    "wrapper_decoded_total_period": 150000000,
+    "wrapper_inline_returncode": 0,
+    "wrapper_launch_affinity": [
+      31
+    ],
+    "wrapper_lost_events": 0,
+    "wrapper_record_returncode": 0
+  },
+  "status": "blocked_prelaunch"
+}

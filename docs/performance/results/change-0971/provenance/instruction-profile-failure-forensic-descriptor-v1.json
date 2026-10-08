@@ -1,0 +1,34 @@
+{
+  "artifacts": {
+    "commands-v1.txt": {
+      "bytes": 3405,
+      "path": "/home/zhuhe/litchi-performance-0971/analysis/instruction-profile-v2-failure-v1/commands-v1.txt",
+      "sha256": "4b60e00b056f19e36e300dac304dfacdb5fc471eeadadf546fdd9d8640bfe84c"
+    },
+    "failure-analysis-v1.md": {
+      "bytes": 4014,
+      "path": "/home/zhuhe/litchi-performance-0971/analysis/instruction-profile-v2-failure-v1/failure-analysis-v1.md",
+      "sha256": "6aecc34e84edd357401549f8591bd921cf01249b67a22163d0888c2f95658c52"
+    },
+    "raw-stack-scan-v1.json": {
+      "bytes": 279748,
+      "path": "/home/zhuhe/litchi-performance-0971/analysis/instruction-profile-v2-failure-v1/raw-stack-scan-v1.json",
+      "sha256": "29f284fe9e1b2b98d50aa7f8556af0e03155f4248c7d44f5db9244412471316e"
+    },
+    "raw-stack-scan-v1.py": {
+      "bytes": 5183,
+      "path": "/home/zhuhe/litchi-performance-0971/analysis/instruction-profile-v2-failure-v1/raw-stack-scan-v1.py",
+      "sha256": "2f162ffe7fd0095dd0216c00ee1daca573dc8b9bd01eb5574059fa731e413cfa"
+    },
+    "receipt-v1.json": {
+      "bytes": 11581,
+      "path": "/home/zhuhe/litchi-performance-0971/analysis/instruction-profile-v2-failure-v1/receipt-v1.json",
+      "sha256": "5eb4a186159247e2369b595c53a8ce8d11dab9cd5ed56ff899950b65c7bfdae7"
+    }
+  },
+  "external_root": "/home/zhuhe/litchi-performance-0971/analysis/instruction-profile-v2-failure-v1",
+  "finding": "Target DSO leaf samples were present, but marker ancestry and caller return pointers were absent from decoded and inspected raw 16KiB callchains; attribution remains unsupported and the mechanism is unproven.",
+  "schema": "litchi.performance.0971.forensic_descriptor.v1",
+  "scope": "Bounded offline forensic analysis of the already-terminal child-01 capture. It does not include raw perf.data or decoded perf-script dumps in the repository.",
+  "status": "sealed_forensic_note_unsupported_attribution"
+}

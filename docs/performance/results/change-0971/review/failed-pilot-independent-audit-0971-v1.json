@@ -1,0 +1,184 @@
+{
+  "actionable_next_step": {
+    "admission_requirement": "Before any new formal capture, isolate callchain coverage with a pilot that demonstrates non-empty native callchains and positive marker ancestry under the chosen period; a substantially lower period and/or a diagnostic frame-pointer/full-debuginfo binary may be evaluated as tooling diagnostics, with no latency comparison to this retained binary.",
+    "disposition": "Do not reduce or aggregate this failed cohort and do not retry it.",
+    "scope": "Any future native attribution must retain exact binary/DSO/build ID and report all empty/unresolved/truncated samples; zero marker remains a gate failure."
+  },
+  "capture_inventory": {
+    "descriptor_sha256": "1733ffe1b2f1fb20183aa3c61081b17ab5181ab5bfdd66c6b5fa1bcc063ce0a0",
+    "file_count": 12,
+    "set_sha256": "ad33a9070eeb8355a216c6ca3506f7b6e5778064ce14ff568226c3a4fcfd16a1",
+    "total_bytes": 25210628
+  },
+  "created_utc": "2026-10-08T03:28:01.124357+00:00",
+  "custody_and_terminal": {
+    "child_terminal_returncode": 0,
+    "child_timed_out": false,
+    "children_completed": 1,
+    "children_requested": 12,
+    "launch_actual_affinity": [
+      31
+    ],
+    "launch_exec_pid": 3683783,
+    "no_retry": true,
+    "packet_artifacts_hash_match": true,
+    "packet_launch_matches_raw": true,
+    "packet_perf_matches_authoritative_reparse": true,
+    "packet_report_matches_raw": true,
+    "root_exit_code": 2,
+    "root_terminal_status": "pilot_gate_failed"
+  },
+  "decision": "PILOT FAILED; raw custody and native execution are retained, but attribution is unusable because marker ancestry was not observed and callchain coverage is incomplete.",
+  "diagnosis": {
+    "classification": "marker_gate_failure_with_unusable_callchain_coverage",
+    "confirmed": "The native binary, exact marker symbol/DSO/build ID, report lifecycle, perf event, PID/CPU, and raw custody all pass. No marker frame appears in either decode.",
+    "evidence": "906 of 1387 samples have no physical frames at all; 618 frame records are unresolved; only 11 samples carry 23 frames from the retained native binary, all other symbols. Lost events are zero.",
+    "interpretation": "The zero marker result cannot establish that the marker did not execute. At 5,000,000 instructions per sample the 125-byte wrapper is unlikely to be sampled by self IP, while expected caller ancestry is unavailable in the empty/unwound samples. This cohort cannot support marker ownership or native attribution.",
+    "not_confirmed": "No claim is made about the underlying workload mechanism, exact timed-region ownership, or candidate/adoption effect."
+  },
+  "marker_identity_and_static_evidence": {
+    "binary_path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+    "build_id": "e5c457384eeebd057932c444efda77618f137399",
+    "buildid_export_exactly_bound": true,
+    "direct_call_site": "measure_one 0xe6d8e -> 0xec4f0",
+    "dso_path_exactly_bound": true,
+    "eh_frame_fde": "present for 0xec4f0..0xec56d",
+    "elf_address_range": "0xec4f0..0xec56d",
+    "elf_symbol": "doc_retention_probe_0942_cfb_profile::profiled_measured_case",
+    "elf_symbol_size_bytes": 125,
+    "objdump_call_target": "0xec506 -> run_case 0xf15f0",
+    "source": "tools/perf-cfb-profile/src/lib.rs:338"
+  },
+  "native_report": {
+    "binary_sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb",
+    "case": "docfloat",
+    "edits": 1,
+    "elapsed_ns_max": 1252626,
+    "elapsed_ns_min": 1034864,
+    "fixture_sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d",
+    "measured_samples": 80,
+    "status": "valid",
+    "warmups": 5
+  },
+  "perf_raw_summary": {
+    "cpu_counts": {
+      "31": 1387
+    },
+    "event_counts": {
+      "instructions:u": 1387
+    },
+    "header_checks": {
+      "event_instructions_u": true,
+      "exclude_hv_1": true,
+      "exclude_kernel_1": true,
+      "inherit_1": true,
+      "sample_period_5000000": true,
+      "sample_stack_user_16384": true
+    },
+    "lost_events": 0,
+    "marker_period": 0,
+    "marker_period_share": 0.0,
+    "marker_sample_count": 0,
+    "marker_string_in_inline": 0,
+    "marker_string_in_no_inline": 0,
+    "native_binary_frames": 23,
+    "native_binary_samples": 11,
+    "parser_stack_truncated": 906,
+    "period_per_sample": 5000000,
+    "pid_counts": {
+      "3683783": 1387
+    },
+    "sample_count": 1387,
+    "total_period": 6935000000,
+    "unresolved_frames": 618,
+    "zero_frame_samples": 906
+  },
+  "raw_artifact_bindings": {
+    "buildid": {
+      "bytes": 571,
+      "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf-buildid.txt",
+      "sha256": "6c7729316b6a54fc6ac338ceedfb960f4bb4fc669effac870d8ae58a34902925"
+    },
+    "command": {
+      "bytes": 1157,
+      "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.command.json",
+      "sha256": "d06cd4b943b32ef25c9dec93587791c6cdff84a6deb628edad85f0e4b511e38e"
+    },
+    "header": {
+      "bytes": 1917,
+      "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf-header.txt",
+      "sha256": "623b8a2cd44a09d3013afb3371e48d415c4e6a9c8af9ad495798ddd4e7419049"
+    },
+    "inline": {
+      "bytes": 238317,
+      "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf-script-inline.txt",
+      "sha256": "72a94c8bcff0036f274c63d24667cd19d9c3260d66b9bf625b04c230ae18e6ce"
+    },
+    "launch": {
+      "bytes": 1126,
+      "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.launch.json",
+      "sha256": "f20a5ec92b7a3afc07fd73d4b350fce9bc74e08729aae393aa1cf6652607b539"
+    },
+    "no_inline": {
+      "bytes": 225250,
+      "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf-script-no-inline.txt",
+      "sha256": "b679f21fa8da30890d7397b3130eef99dd00f605fec25cfa625e8bfd124bfe67"
+    },
+    "perf_data": {
+      "bytes": 23129880,
+      "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf.data",
+      "sha256": "499e3008e6496b01fe09c9cf7f6f2aedbf46c1b24f7697e98289c09460143746"
+    },
+    "report": {
+      "bytes": 292316,
+      "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.report.json",
+      "sha256": "8475f7174df580c2a2496275fe539d84ca709e42fd8a533915a64d19ee977a33"
+    },
+    "stderr": {
+      "bytes": 190,
+      "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf.stderr",
+      "sha256": "e222ba534726fec2cc3de82c7d0a76c5a8cfe77a13011983eb8dc13e65d62312"
+    },
+    "terminal": {
+      "bytes": 1334,
+      "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.terminal.json",
+      "sha256": "501a0e822b7fbe88947f27273b4f47989bb3b5c1343ab47917a39d2f644dce8d"
+    }
+  },
+  "reviewer": "cpu_review",
+  "schema": "litchi.performance.0971.failed_pilot_independent_audit.v1",
+  "scope": "Independent read-only audit of the single child-01 pilot retained after the 0971 pilot gate failure; no replacement workload, build, reducer, or helper mutation.",
+  "sealed_control_inputs": {
+    "capture_inventory": {
+      "bytes": 5138,
+      "path": "/home/zhuhe/litchi-performance-0971/analysis/capture-inventory-instruction-profile-v2-v1.json",
+      "sha256": "1733ffe1b2f1fb20183aa3c61081b17ab5181ab5bfdd66c6b5fa1bcc063ce0a0"
+    },
+    "capture_manifest": {
+      "bytes": 672,
+      "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/capture-manifest-v2.json",
+      "sha256": "bb51f571c33cb6426d3adf75ac91f7ef3f1720a2cec17738832e90205c08673f"
+    },
+    "packet": {
+      "bytes": 1317898,
+      "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.packet.json",
+      "sha256": "606b4e82b9aa71921936d95c8ba910827bf8a51f81b32c254bb6790c891d0194"
+    },
+    "plan": {
+      "bytes": 11792,
+      "path": "/home/zhuhe/litchi-performance-0971/plans/plan-0971-pre-capture-v2-correction-v2.json",
+      "sha256": "600756f3a36317208a887bb5b3d38bbf079b732437454221e68c80f128a04f81"
+    },
+    "root_go": {
+      "bytes": 7495,
+      "path": "/home/zhuhe/litchi-performance-0971/receipts/root-go-0971-v2.json",
+      "sha256": "ac84a543596842798d09a4727e7e32096bda580270b3e56e37dd55871768f13e"
+    },
+    "root_terminal": {
+      "bytes": 854,
+      "path": "/home/zhuhe/litchi-performance-0971/receipts/root-terminal-0971-v1.json",
+      "sha256": "0664f420f5d56654e3e61dda83b8d4e2ca06498b3e2a985343a8947d5c18e35a"
+    }
+  },
+  "status": "pilot_failed_unusable_attribution"
+}

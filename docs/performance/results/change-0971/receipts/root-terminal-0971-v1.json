@@ -1,0 +1,28 @@
+{
+  "children_completed": 1,
+  "children_requested": 12,
+  "created_utc": "2026-10-08T03:24:41.293546+00:00",
+  "exit_code": 2,
+  "failure": {
+    "pilot": {
+      "lost_events": 0,
+      "marker_period_share": 0.0,
+      "marker_sample_count": 0
+    },
+    "reason": "pilot_gate_failed"
+  },
+  "manifest": {
+    "bytes": 672,
+    "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/capture-manifest-v2.json",
+    "sha256": "bb51f571c33cb6426d3adf75ac91f7ef3f1720a2cec17738832e90205c08673f"
+  },
+  "no_retry": true,
+  "root_go": {
+    "bytes": 7495,
+    "path": "/home/zhuhe/litchi-performance-0971/receipts/root-go-0971-v2.json",
+    "sha256": "ac84a543596842798d09a4727e7e32096bda580270b3e56e37dd55871768f13e"
+  },
+  "schema": "litchi.performance.0971.root_terminal.v1",
+  "session_id": 81267,
+  "status": "pilot_gate_failed"
+}

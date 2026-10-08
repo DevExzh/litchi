@@ -1,0 +1,33 @@
+{
+  "capture_root": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2",
+  "external_inventory": {
+    "bytes": 5138,
+    "path": "/home/zhuhe/litchi-performance-0971/analysis/capture-inventory-instruction-profile-v2-v1.json",
+    "sha256": "1733ffe1b2f1fb20183aa3c61081b17ab5181ab5bfdd66c6b5fa1bcc063ce0a0"
+  },
+  "failure": "Child 01 pilot gate failed with marker_sample_count=0, lost_events=0, marker_period_share=0.0; no retry occurred.",
+  "file_count": 12,
+  "max_file_bytes": 23129880,
+  "raw_files_remain_external": true,
+  "regeneration": "The external inventory lists every regular file under capture/instruction-profile-v2 with absolute/relative path, bytes, role, and SHA-256. Recompute only after capture owners seal a stable tree.",
+  "role_bytes": {
+    "capture_manifest": 672,
+    "capture_metadata": 6295,
+    "raw_packet": 1317898,
+    "raw_perf_data": 23129880,
+    "raw_perf_script": 463567,
+    "raw_report": 292316
+  },
+  "role_counts": {
+    "capture_manifest": 1,
+    "capture_metadata": 6,
+    "raw_packet": 1,
+    "raw_perf_data": 1,
+    "raw_perf_script": 2,
+    "raw_report": 1
+  },
+  "schema": "litchi.performance.0971.external_capture_inventory_descriptor.v1",
+  "set_sha256": "ad33a9070eeb8355a216c6ca3506f7b6e5778064ce14ff568226c3a4fcfd16a1",
+  "status": "pilot_gate_failed_no_retry",
+  "total_bytes": 25210628
+}

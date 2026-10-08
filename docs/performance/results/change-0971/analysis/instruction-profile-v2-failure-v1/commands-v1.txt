@@ -1,0 +1,31 @@
+0971 instruction-profile-v2 forensic offline commands v1
+created_utc: 2026-10-08T03:31:31.706540+00:00
+
+Scope: offline inspection of the already-terminal sealed child-01 capture. No benchmark,
+workload, build, source edit, or perf capture was run by this analysis. The raw stack
+scan consumed the sealed perf.data through perf script -D only.
+
+Sealed input paths:
+  /home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf.data
+  /home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile
+
+Commands (executed with cwd /home/zhuhe/code/litchi; output redirected to this directory):
+  /usr/bin/perf --version > perf-version.txt
+  /usr/bin/perf script --show-lost-events --no-inline -F cpu,pid,tid,time,event,period,ip,sym,symoff,dso -i /home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf.data > redecode-no-inline.txt
+  /usr/bin/perf script --show-lost-events --inline -i /home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf.data > redecode-inline.txt
+  /usr/bin/perf buildid-list -i /home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf.data > buildid-list.txt
+  /usr/bin/perf report --stdio --no-children --sort dso,symbol --percent-limit 0 -i /home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf.data > perf-report.txt 2> perf-report.stderr
+  /usr/bin/nm -n -C /home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile | /home/zhuhe/.codex/packages/standalone/releases/0.161.0-x86_64-unknown-linux-musl/codex-path/rg 'profiled_measured_case|run_case|measure_one' > marker-symbols.txt
+  /usr/bin/objdump -d -C --disassemble='doc_retention_probe_0942_cfb_profile::profiled_measured_case' /home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile > marker-disassembly.txt
+  /usr/bin/sha256sum /usr/bin/perf /home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile /home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf.data /home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf-script-no-inline.txt /home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf-script-inline.txt /home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf-header.txt /home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf-buildid.txt /home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.packet.json > input-sha256.txt
+  /usr/bin/python3.14 raw-stack-scan-v1.py
+
+The scan generator originally wrote a literal two-byte backslash-n suffix after the JSON
+object. After the scan completed, that suffix alone was removed from raw-stack-scan-v1.json
+and one newline was written; no perf command was rerun and no decoded content was changed.
+The retained raw-stack-scan-v1.py is the exact generator used for the scan.
+
+Analysis outputs:
+  redecode-no-inline.txt, redecode-inline.txt, buildid-list.txt, perf-report.txt,
+  marker-symbols.txt, marker-disassembly.txt, raw-stack-scan-v1.json,
+  input-sha256.txt, perf-version.txt, and failure-analysis-v1.md.

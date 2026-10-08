@@ -1,0 +1,105 @@
+{
+  "admission": {
+    "fresh_independent_review_status_pass_required": true,
+    "no_build_or_workload_before_go": true,
+    "outputs_must_be_empty_and_exclusive": true,
+    "pilot_failure": "stop_without_retry",
+    "pilot_first_child_min_marker_samples": 100,
+    "pilot_lost_events": 0,
+    "retry": false,
+    "root_go_required": true,
+    "serial": true
+  },
+  "adr_revalidation": {
+    "bytes": 8195,
+    "path": "/home/zhuhe/litchi-performance-0971/receipts/adr-revalidation-0971-v1.json",
+    "sha256": "08b1a8d25be0ee9777221d6ce409c7da93a892981a6dadc7dd84779b4c7b471b"
+  },
+  "capability": {
+    "bytes": 4007,
+    "path": "/home/zhuhe/litchi-performance-0971/receipts/perf-record-capability-probe-v1.json",
+    "sha256": "50bc1b5c3253ed44cc3b1516e258a6028db40a3f049336814264365b539141f2"
+  },
+  "correction_receipt": {
+    "bytes": 1942,
+    "path": "/home/zhuhe/litchi-performance-0971/receipts/correction-receipt-0971-v3.json",
+    "sha256": "a1cdeb4ae2aeb36424355a2b254ce2ec51a3aa82678d1f81eb9210e16b7e2daa"
+  },
+  "created_utc": "2026-10-08T03:16:32.401804+00:00",
+  "custody": {
+    "binary_build_id": "e5c457384eeebd057932c444efda77618f137399",
+    "binary_bytes": 47909224,
+    "binary_path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+    "binary_sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb",
+    "children": 12,
+    "cpu": 31,
+    "dwarf_stack_bytes": 16384,
+    "fixture_bytes": 335360,
+    "fixture_path": "/home/zhuhe/litchi-performance-0969/qa-core/test-data/ole/doc/FloatingPictures.doc",
+    "fixture_sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d",
+    "marker": "doc_retention_probe_0942_cfb_profile::profiled_measured_case",
+    "measured_samples": 80,
+    "perf_event": "instructions:u",
+    "period": 5000000,
+    "source_entries_rehashed": 924,
+    "warmups": 5
+  },
+  "design": {
+    "bytes": 9365,
+    "path": "/home/zhuhe/litchi-performance-0971/attribution-proposal-v1.md",
+    "sha256": "c099fb6dc0572bbb09e1d911445e6012988f64a3bb3110be69377861ef2ef437"
+  },
+  "helper_seal": {
+    "bytes": 2686,
+    "path": "/home/zhuhe/litchi-performance-0971/receipts/helper-seal-0971-v2-correction-v2.json",
+    "sha256": "1c97f055e19a2621812fb688f7f3377faef4cc3ca74ef5421587c716298a6599"
+  },
+  "interpretation": {
+    "correlations": "descriptive over all 12 children; no fast/slow subset",
+    "diagnostic_only": true,
+    "marker_owner_percentage": "not exact timed-region attribution",
+    "marker_scope": "5 warmups + 80 measured combined (85-call lifecycle subset)",
+    "missing_marker_membership": "unknown",
+    "p50_scope": "80 measured samples only",
+    "unresolved_ancestry": "reported descriptively"
+  },
+  "outputs": {
+    "analysis_root": "/home/zhuhe/litchi-performance-0971/analysis/instruction-profile-v2",
+    "capture_root": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2",
+    "exclusive": true
+  },
+  "plan": {
+    "bytes": 11792,
+    "path": "/home/zhuhe/litchi-performance-0971/plans/plan-0971-pre-capture-v2-correction-v2.json",
+    "sha256": "600756f3a36317208a887bb5b3d38bbf079b732437454221e68c80f128a04f81"
+  },
+  "prior_blocking_review": {
+    "bytes": 11726,
+    "path": "/home/zhuhe/litchi-performance-0971/review/independent-final-review-0971-v1.json",
+    "sha256": "eaef77c781fb2d610ec4b04c82c85827772535583b6e47c1c311dd03619b6ea0"
+  },
+  "schema": "litchi.performance.0971.protocol_seal.v2",
+  "scope": "prospective diagnostic instruction attribution; fresh v2 helper/plan correction; no Office workload/build/capture; fresh independent pass and root GO still required",
+  "source_content_proof": {
+    "bytes": 268981,
+    "path": "/home/zhuhe/litchi-performance-0971/receipts/source-content-proof-0971-v2.json",
+    "sha256": "20e0f9fad68da357e2278157a8d1514c8b9b226993e16a91656fddc7ff38edd6"
+  },
+  "source_variation": {
+    "bytes": 14232,
+    "path": "/home/zhuhe/litchi-performance-0971/source-work-variation-v1.md",
+    "sha256": "86487399a1ffa2dbd51ba7a2aa7b02adf11d45e4b556ee3b48a618e2c65d5217"
+  },
+  "status": "sealed_pre_capture",
+  "synthetic_pipeline": {
+    "bytes": 1515,
+    "path": "/home/zhuhe/litchi-performance-0971/receipts/synthetic-pipeline-0971-v3.json",
+    "sha256": "94ed06d2f35f54296fa2a44d3a60fe73342a1c1d94dc9aa63ea07dd7ab213b56"
+  },
+  "tool_self_tests": {
+    "bytes": 3590,
+    "path": "/home/zhuhe/litchi-performance-0971/receipts/tool-self-tests-0971-v7.json",
+    "sha256": "3cf68abf1a85aac5eb1a92c5ba85d6d313d1090bd91a127c0aac501fdc772c52"
+  },
+  "version": "v2-correction-v2"
+}

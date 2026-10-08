@@ -1,5 +1,21 @@
 # Performance hotspot inventory
 
+## 0971 — instruction-profile pilot stops before attribution
+
+[0971](0971-instruction-profile-pilot.md) stopped at the required first-child
+pilot: the exact `profiled_measured_case` marker was recovered zero times,
+with zero marker-period share and zero lost events. The runner made no retry,
+so no 12-child profiler cohort or owner association exists. The independent
+audit confirms valid native execution and raw custody but no marker in either
+decode, 906 empty callchains, 618 unresolved frames, and only 11 samples with
+23 native-binary frames. The pilot is unusable for attribution; the unwind
+failure cause is not established. The completed retained 0970 Float/e1
+analysis shows stable output bytes, route shape, stage-slot counts, and
+semantic-change counts, while whole-process instruction/p50 associations
+remain wrapper-tree telemetry rather than stage attribution. Seeded
+`HashMap`/`HashSet` iteration is an unproven work-variation hypothesis; no
+source or runtime change follows.
+
 ## 0970 — FloatingPictures/e1 variance persists under pinning
 
 [0970](0970-baseline-affinity-diagnostic.md) is a same-binary historical

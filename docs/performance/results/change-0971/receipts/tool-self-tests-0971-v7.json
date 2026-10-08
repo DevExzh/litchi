@@ -1,0 +1,42 @@
+{
+  "created_utc": "2026-10-08T03:15:48.615770+00:00",
+  "schema": "litchi.performance.0971.tool_self_tests.v2",
+  "scope": "synthetic parser/statistics/identity tests, process-group timeout descendant test, and harmless /usr/bin/true full perf wrapper smoke; no Office workload/build/capture",
+  "status": "pass",
+  "tests": {
+    "reducer_self_test": {
+      "argv": [
+        "/usr/bin/python3.14",
+        "/home/zhuhe/litchi-performance-0971/tools/reduce_0971_v2.py",
+        "--self-test"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "{\n  \"schema\": \"litchi.performance.0971.reducer_self_test.v2\",\n  \"status\": \"pass\"\n}\n"
+    },
+    "runner_self_test": {
+      "argv": [
+        "/usr/bin/python3.14",
+        "/home/zhuhe/litchi-performance-0971/tools/run_0971_v2.py",
+        "--self-test"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "{\n  \"schema\": \"litchi.performance.0971.self_test.v2\",\n  \"status\": \"pass\",\n  \"synthetic\": \"pass\",\n  \"timeout_group\": {\n    \"descendant\": \"sleep 30\",\n    \"group_terminated\": true,\n    \"returncode\": -15\n  },\n  \"wrapper\": {\n    \"buildid_lines\": 5,\n    \"buildid_returncode\": 0,\n    \"decoded\": {\n      \"lost_events\": 0,\n      \"sample_count\": 30,\n      \"total_period\": 150000000\n    },\n    \"inline_returncode\": 0,\n    \"launch\": {\n      \"actual_affinity\": [\n        31\n      ],\n      \"cgroup\": [\n        \"0::/user.slice/user-1001.slice/user@1001.service/tmux-spawn-3a22b971-8fd0-4c28-9367-732dd8523549.scope\"\n      ],\n      \"created_utc\": \"2026-10-08T03:15:48.371363+00:00\",\n      \"exec_argv\": [\n        \"/usr/bin/gnutrue\"\n      ],\n      \"exec_path\": \"/usr/bin/gnutrue\",\n      \"exec_pid\": 3680799,\n      \"exec_ready_utc\": \"2026-10-08T03:15:48.371372+00:00\",\n      \"execve\": true,\n      \"helper_path\": \"/home/zhuhe/litchi-performance-0970/tools/launch_baseline_v2.py\",\n      \"helper_sha256\": \"3b5b79351883a9b4efb680f47498d8e10bdf77d131a60d11c1ecb54ad95430f5\",\n      \"packet_id\": \"true\",\n      \"pid\": 3680799,\n      \"requested_affinity\": [\n        31\n      ],\n      \"schema\": \"litchi.performance.0970.launch.v2\"\n    },\n    \"record_argv\": [\n      \"/usr/bin/taskset\",\n      \"--cpu-list\",\n      \"31\",\n      \"/usr/bin/perf\",\n      \"record\",\n      \"-q\",\n      \"-e\",\n      \"instructions:u\",\n      \"-c\",\n      \"5000000\",\n      \"--call-graph\",\n      \"dwarf,16384\",\n      \"--period\",\n      \"--timestamp\",\n      \"--sample-cpu\",\n      \"--buildid-all\",\n      \"--no-buildid-cache\",\n      \"--user-callchains\",\n      \"-o\",\n      \"/tmp/litchi-0971-wrapper-smoke-z5eswqq1/true.perf.data\",\n      \"--\",\n      \"/usr/bin/python3.14\",\n      \"/home/zhuhe/litchi-performance-0970/tools/launch_baseline_v2.py\",\n      \"--metadata\",\n      \"/tmp/litchi-0971-wrapper-smoke-z5eswqq1/true.launch.json\",\n      \"--requested-affinity\",\n      \"[31]\",\n      \"--\",\n      \"/usr/bin/true\"\n    ],\n    \"record_returncode\": 0\n  }\n}\n"
+    },
+    "syntax": {
+      "argv": [
+        "/usr/bin/python3.14",
+        "-m",
+        "py_compile",
+        "/home/zhuhe/litchi-performance-0971/tools/protocol_common_0971_v2.py",
+        "/home/zhuhe/litchi-performance-0971/tools/run_0971_v2.py",
+        "/home/zhuhe/litchi-performance-0971/tools/reduce_0971_v2.py",
+        "/home/zhuhe/litchi-performance-0971/tools/prepare_plan_0971_v2.py"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": ""
+    }
+  }
+}

@@ -1,0 +1,248 @@
+{
+  "artifacts": {
+    "derived": [
+      {
+        "bytes": 3405,
+        "path": "/home/zhuhe/litchi-performance-0971/analysis/instruction-profile-v2-failure-v1/commands-v1.txt",
+        "sha256": "4b60e00b056f19e36e300dac304dfacdb5fc471eeadadf546fdd9d8640bfe84c"
+      },
+      {
+        "bytes": 4014,
+        "path": "/home/zhuhe/litchi-performance-0971/analysis/instruction-profile-v2-failure-v1/failure-analysis-v1.md",
+        "sha256": "6aecc34e84edd357401549f8591bd921cf01249b67a22163d0888c2f95658c52"
+      },
+      {
+        "bytes": 1264,
+        "path": "/home/zhuhe/litchi-performance-0971/analysis/instruction-profile-v2-failure-v1/input-sha256.txt",
+        "sha256": "1a2146355d27f4ab8b4d1e933be878b0c03d765afe119c207ee010ac9a0db6d9"
+      },
+      {
+        "bytes": 20,
+        "path": "/home/zhuhe/litchi-performance-0971/analysis/instruction-profile-v2-failure-v1/perf-version.txt",
+        "sha256": "496b3d503a88d37a5f9137643742e6101b6a7f183075dd04d279982e92dcc662"
+      },
+      {
+        "bytes": 571,
+        "path": "/home/zhuhe/litchi-performance-0971/analysis/instruction-profile-v2-failure-v1/buildid-list.txt",
+        "sha256": "6c7729316b6a54fc6ac338ceedfb960f4bb4fc669effac870d8ae58a34902925"
+      },
+      {
+        "bytes": 93072,
+        "path": "/home/zhuhe/litchi-performance-0971/analysis/instruction-profile-v2-failure-v1/perf-report.txt",
+        "sha256": "c8227dfc6c5a939db0b9cdee44abc6303feaba7960c57f907938fe21b8983125"
+      },
+      {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0971/analysis/instruction-profile-v2-failure-v1/perf-report.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "bytes": 215,
+        "path": "/home/zhuhe/litchi-performance-0971/analysis/instruction-profile-v2-failure-v1/marker-symbols.txt",
+        "sha256": "99476f91a683889b5977db356aa18c8b8d3ea278975754288f04e8c96a13bfa6"
+      },
+      {
+        "bytes": 2004,
+        "path": "/home/zhuhe/litchi-performance-0971/analysis/instruction-profile-v2-failure-v1/marker-disassembly.txt",
+        "sha256": "19e1acea2ddba84a597d006bca64df3a25d01c6981209ee38e8c7a0cc2fc66c3"
+      },
+      {
+        "bytes": 5183,
+        "path": "/home/zhuhe/litchi-performance-0971/analysis/instruction-profile-v2-failure-v1/raw-stack-scan-v1.py",
+        "sha256": "2f162ffe7fd0095dd0216c00ee1daca573dc8b9bd01eb5574059fa731e413cfa"
+      },
+      {
+        "bytes": 279748,
+        "path": "/home/zhuhe/litchi-performance-0971/analysis/instruction-profile-v2-failure-v1/raw-stack-scan-v1.json",
+        "sha256": "29f284fe9e1b2b98d50aa7f8556af0e03155f4248c7d44f5db9244412471316e"
+      },
+      {
+        "bytes": 225250,
+        "path": "/home/zhuhe/litchi-performance-0971/analysis/instruction-profile-v2-failure-v1/redecode-no-inline.txt",
+        "sha256": "b679f21fa8da30890d7397b3130eef99dd00f605fec25cfa625e8bfd124bfe67"
+      },
+      {
+        "bytes": 238317,
+        "path": "/home/zhuhe/litchi-performance-0971/analysis/instruction-profile-v2-failure-v1/redecode-inline.txt",
+        "sha256": "72a94c8bcff0036f274c63d24667cd19d9c3260d66b9bf625b04c230ae18e6ce"
+      }
+    ],
+    "sealed": [
+      {
+        "bytes": 672,
+        "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/capture-manifest-v2.json",
+        "sha256": "bb51f571c33cb6426d3adf75ac91f7ef3f1720a2cec17738832e90205c08673f"
+      },
+      {
+        "bytes": 1157,
+        "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.command.json",
+        "sha256": "d06cd4b943b32ef25c9dec93587791c6cdff84a6deb628edad85f0e4b511e38e"
+      },
+      {
+        "bytes": 1126,
+        "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.launch.json",
+        "sha256": "f20a5ec92b7a3afc07fd73d4b350fce9bc74e08729aae393aa1cf6652607b539"
+      },
+      {
+        "bytes": 1317898,
+        "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.packet.json",
+        "sha256": "606b4e82b9aa71921936d95c8ba910827bf8a51f81b32c254bb6790c891d0194"
+      },
+      {
+        "bytes": 1334,
+        "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.terminal.json",
+        "sha256": "501a0e822b7fbe88947f27273b4f47989bb3b5c1343ab47917a39d2f644dce8d"
+      },
+      {
+        "bytes": 190,
+        "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf.stderr",
+        "sha256": "e222ba534726fec2cc3de82c7d0a76c5a8cfe77a13011983eb8dc13e65d62312"
+      },
+      {
+        "bytes": 292316,
+        "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.report.json",
+        "sha256": "8475f7174df580c2a2496275fe539d84ca709e42fd8a533915a64d19ee977a33"
+      },
+      {
+        "bytes": 23129880,
+        "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf.data",
+        "sha256": "499e3008e6496b01fe09c9cf7f6f2aedbf46c1b24f7697e98289c09460143746"
+      },
+      {
+        "bytes": 1917,
+        "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf-header.txt",
+        "sha256": "623b8a2cd44a09d3013afb3371e48d415c4e6a9c8af9ad495798ddd4e7419049"
+      },
+      {
+        "bytes": 571,
+        "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf-buildid.txt",
+        "sha256": "6c7729316b6a54fc6ac338ceedfb960f4bb4fc669effac870d8ae58a34902925"
+      },
+      {
+        "bytes": 225250,
+        "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf-script-no-inline.txt",
+        "sha256": "b679f21fa8da30890d7397b3130eef99dd00f605fec25cfa625e8bfd124bfe67"
+      },
+      {
+        "bytes": 238317,
+        "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf-script-inline.txt",
+        "sha256": "72a94c8bcff0036f274c63d24667cd19d9c3260d66b9bf625b04c230ae18e6ce"
+      }
+    ]
+  },
+  "capture_binding": {
+    "binary": {
+      "bytes": 47909224,
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+    },
+    "command": {
+      "bytes": 1157,
+      "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.command.json",
+      "sha256": "d06cd4b943b32ef25c9dec93587791c6cdff84a6deb628edad85f0e4b511e38e"
+    },
+    "launch": {
+      "bytes": 1126,
+      "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.launch.json",
+      "sha256": "f20a5ec92b7a3afc07fd73d4b350fce9bc74e08729aae393aa1cf6652607b539"
+    },
+    "manifest": {
+      "bytes": 672,
+      "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/capture-manifest-v2.json",
+      "sha256": "bb51f571c33cb6426d3adf75ac91f7ef3f1720a2cec17738832e90205c08673f"
+    },
+    "packet": {
+      "bytes": 1317898,
+      "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.packet.json",
+      "sha256": "606b4e82b9aa71921936d95c8ba910827bf8a51f81b32c254bb6790c891d0194"
+    },
+    "perf_data": {
+      "bytes": 23129880,
+      "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf.data",
+      "sha256": "499e3008e6496b01fe09c9cf7f6f2aedbf46c1b24f7697e98289c09460143746"
+    },
+    "perf_tool": {
+      "bytes": 25221960,
+      "path": "/usr/bin/perf",
+      "sha256": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b"
+    },
+    "terminal": {
+      "bytes": 1334,
+      "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.terminal.json",
+      "sha256": "501a0e822b7fbe88947f27273b4f47989bb3b5c1343ab47917a39d2f644dce8d"
+    }
+  },
+  "created_utc": "2026-10-08T03:32:02.265362+00:00",
+  "execution": {
+    "actual_affinity": [
+      31
+    ],
+    "callgraph": "dwarf,16384",
+    "case": "docfloat",
+    "cgroup": "/user.slice/user-1001.slice/user@1001.service/tmux-spawn-3a22b971-8fd0-4c28-9367-732dd8523549.scope",
+    "edits": 1,
+    "event": "instructions:u",
+    "helper_path": "/home/zhuhe/litchi-performance-0970/tools/launch_baseline_v2.py",
+    "helper_sha256": "3b5b79351883a9b4efb680f47498d8e10bdf77d131a60d11c1ecb54ad95430f5",
+    "marker_calls": 85,
+    "measured_samples": 80,
+    "requested_affinity": [
+      31
+    ],
+    "retention": "default",
+    "sample_period": 5000000,
+    "target_binary_build_id": "e5c457384eeebd057932c444efda77618f137399",
+    "target_binary_sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb",
+    "target_pid": 3683783,
+    "warmups": 5
+  },
+  "limitation": "Offline evidence confirms absence of marker ancestry in decoded and inspected raw callchains, but cannot distinguish stack-depth exhaustion from a DWARF unwind boundary or wrapper-specific unwind shape.",
+  "packet_observations": {
+    "interpretation": "Exact native marker ancestry was not recovered; no native phase attribution is supported.",
+    "lost_events": 0,
+    "marker": "doc_retention_probe_0942_cfb_profile::profiled_measured_case",
+    "marker_period": 0,
+    "marker_period_share": 0.0,
+    "marker_sample_count": 0,
+    "sample_count": 1387,
+    "stack_truncated_records": 906,
+    "total_period": 6935000000,
+    "unresolved_frames": 618
+  },
+  "provenance_note": "The raw JSON was normalized after the completed scan by removing only an accidental literal two-byte backslash-n suffix emitted by the generator; no perf command was rerun and decoded records were unchanged.",
+  "raw_record_diagnostic": {
+    "diagnostic_path": "/home/zhuhe/litchi-performance-0971/analysis/instruction-profile-v2-failure-v1/raw-stack-scan-v1.json",
+    "meaning": "Descriptive raw-record evidence only; it does not identify a workload phase, native owner, or causal mechanism. The raw-filter denominator is not substituted for packet sample_count.",
+    "sample_records_seen_by_perf_dump_filter": 1377,
+    "stack_bytes_per_record": 16384,
+    "target_leaf_ip_period": 4455000000,
+    "target_leaf_ip_sample_count": 891,
+    "target_leaf_samples_with_marker_range_word": 0,
+    "target_leaf_samples_with_marker_return_word": 0,
+    "target_leaf_samples_with_measure_one_return_word": 0,
+    "target_leaf_samples_with_run_case_range_word": 0
+  },
+  "schema": "litchi.performance.0971.instruction_profile_failure_receipt.v1",
+  "scope": {
+    "analysis": "instruction-profile-v2-failure-v1",
+    "analysis_checkout_head": "29f8c61d51b1c81f4f2afe6b9f61984e6347a6a6",
+    "batch": "0971",
+    "capture": "instruction-profile-v2",
+    "new_workload_or_build": false,
+    "offline_only_after_terminal_capture": true,
+    "qualification_or_speedup_claim": false,
+    "retry_launched": false
+  },
+  "status": "unsupported",
+  "symbolization_checks": {
+    "build_id_present_in_perf_buildid_list": true,
+    "conclusion": "Missing ancestry is not explained by an absent target DSO, BuildID, or wholly broken symbolization.",
+    "inline_text_marker_occurrences": 0,
+    "marker_nm_offset": "0xec4f0",
+    "marker_run_case_direct_call_return_offset": "0xec50b",
+    "measure_one_nm_offset": "0xe6ca0",
+    "no_inline_text_marker_occurrences": 0,
+    "perf_report_resolved_target_symbols": true,
+    "run_case_nm_offset": "0xf15f0"
+  }
+}

@@ -1,0 +1,254 @@
+{
+  "correction_coverage": {
+    "all_924_baseline_source_entries_rehashed": true,
+    "all_prior_blockers_resolved": true,
+    "exact_marker_dso_path_and_build_id": true,
+    "fixed_report_identity_and_exact_5_plus_80_sequence": true,
+    "helper_tool_review_correction_protocol_go_output_bindings": true,
+    "inclusive_owner_per_sample_deduplication": true,
+    "per_owner_associations_all_12": true,
+    "perf_launched_child_tree_scope": true,
+    "positive_period_and_exact_pid_cpu": true,
+    "process_group_timeout_kill_and_reap": true,
+    "ten_raw_artifact_bindings_and_full_no_inline_reparse": true,
+    "true_p99_and_max_separate": true
+  },
+  "created_utc": "2026-10-08T03:18:56.014275+00:00",
+  "decision": "PASS for corrected pre-capture tooling. Capture remains gated on a fresh root GO satisfying the exact schema/bindings above.",
+  "findings": [],
+  "harmless_wrapper_and_timeout": {
+    "independent_self_test": "pass",
+    "self_test_receipt_status": "pass",
+    "timeout_group_kill_reap": "pass",
+    "wrapper": "taskset CPU31 -> perf record instructions:u period 5000000 dwarf,16384 -> python3.14 launcher -> /usr/bin/true; record/script/inline/buildid all passed",
+    "wrapper_lost_events": 0,
+    "wrapper_sample_count": 30,
+    "wrapper_total_period": 150000000
+  },
+  "hash_verification": {
+    "all_actual_hashes_match": true,
+    "expected_sha256": {
+      "correction_receipt": "a1cdeb4ae2aeb36424355a2b254ce2ec51a3aa82678d1f81eb9210e16b7e2daa",
+      "helper_seal": "1c97f055e19a2621812fb688f7f3377faef4cc3ca74ef5421587c716298a6599",
+      "plan": "600756f3a36317208a887bb5b3d38bbf079b732437454221e68c80f128a04f81",
+      "prior_blocking_review": "eaef77c781fb2d610ec4b04c82c85827772535583b6e47c1c311dd03619b6ea0",
+      "protocol_seal": "37e416009599c204501cd7cba6ea1037ffc7fde6faf8ae8ad0190f99cd9dde51",
+      "source_content_proof": "20e0f9fad68da357e2278157a8d1514c8b9b226993e16a91656fddc7ff38edd6",
+      "synthetic_pipeline": "94ed06d2f35f54296fa2a44d3a60fe73342a1c1d94dc9aa63ea07dd7ab213b56",
+      "tool_self_tests": "3cf68abf1a85aac5eb1a92c5ba85d6d313d1090bd91a127c0aac501fdc772c52"
+    },
+    "plan_checker": "pass",
+    "source_proof": {
+      "entries_checked": 924,
+      "mismatches": [],
+      "status": "pass"
+    }
+  },
+  "independent_replay": {
+    "full_synthetic_reducer_12_child_e2e": "pass",
+    "inclusive_repeated_owner_dedup": "pass",
+    "output_sha256": "bffdecd444a70eabf69283079361fa5706a4a68a0c4099b1d1e412d38690ef15",
+    "parser_mutations": "pass",
+    "report_identity_mutation": "pass"
+  },
+  "interpretation_constraints": {
+    "diagnostic_only": true,
+    "marker_scope": "5 warmups + 80 measured calls combined",
+    "missing_marker_membership": "unknown",
+    "no_speed_or_adoption_claim": true,
+    "owner_percentage": "not exact timed-region attribution",
+    "p50_scope": "80 measured samples only",
+    "unresolved_ancestry": "reported descriptively"
+  },
+  "reviewer": "cpu_review",
+  "root_go": {
+    "authorized": true,
+    "exact_cli": "env LC_ALL=C LANG=C TZ=UTC PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.14 /home/zhuhe/litchi-performance-0971/tools/run_0971_v2.py --run --plan /home/zhuhe/litchi-performance-0971/plans/plan-0971-pre-capture-v2-correction-v2.json --go /home/zhuhe/litchi-performance-0971/receipts/root-go-0971-v2.json",
+    "host_requirement": "actual audited affinity list must include CPU31 and selected_cpu must equal 31; quiescence status pass; output roots absent or empty; no build/no Cargo/no other workload and no retry",
+    "required_bindings": {
+      "binary": {
+        "build_id": "e5c457384eeebd057932c444efda77618f137399",
+        "bytes": 47909224,
+        "executable": true,
+        "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+        "role": "retained_0967_historical_baseline",
+        "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+      },
+      "correction_receipt": {
+        "bytes": 1942,
+        "path": "/home/zhuhe/litchi-performance-0971/receipts/correction-receipt-0971-v3.json",
+        "sha256": "a1cdeb4ae2aeb36424355a2b254ce2ec51a3aa82678d1f81eb9210e16b7e2daa"
+      },
+      "environment": {
+        "LANG": "C",
+        "LC_ALL": "C",
+        "TZ": "UTC"
+      },
+      "fixture": {
+        "bytes": 335360,
+        "case": "docfloat",
+        "edits": 1,
+        "harness_retention": "default_8mib",
+        "path": "/home/zhuhe/litchi-performance-0969/qa-core/test-data/ole/doc/FloatingPictures.doc",
+        "retention": "default",
+        "sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d"
+      },
+      "helper_seal": {
+        "bytes": 2686,
+        "path": "/home/zhuhe/litchi-performance-0971/receipts/helper-seal-0971-v2-correction-v2.json",
+        "sha256": "1c97f055e19a2621812fb688f7f3377faef4cc3ca74ef5421587c716298a6599"
+      },
+      "independent_review": "this receipt, status pass",
+      "outputs": {
+        "analysis_root": "/home/zhuhe/litchi-performance-0971/analysis/instruction-profile-v2",
+        "capture_root": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2",
+        "exclusive_artifacts": true,
+        "raw_retained": true
+      },
+      "plan": {
+        "bytes": 11792,
+        "path": "/home/zhuhe/litchi-performance-0971/plans/plan-0971-pre-capture-v2-correction-v2.json",
+        "sha256": "600756f3a36317208a887bb5b3d38bbf079b732437454221e68c80f128a04f81"
+      },
+      "protocol_seal": {
+        "bytes": 4627,
+        "path": "/home/zhuhe/litchi-performance-0971/receipts/protocol-seal-0971-v4.json",
+        "sha256": "37e416009599c204501cd7cba6ea1037ffc7fde6faf8ae8ad0190f99cd9dde51"
+      },
+      "tools": {
+        "perf": {
+          "buildid_export": [
+            "buildid-list",
+            "-i",
+            "<child>.perf.data"
+          ],
+          "callgraph": "dwarf,16384",
+          "decode_inline": [
+            "--show-lost-events",
+            "--inline"
+          ],
+          "decode_no_inline": [
+            "--show-lost-events",
+            "--no-inline",
+            "-F",
+            "cpu,pid,tid,time,event,period,ip,sym,symoff,dso"
+          ],
+          "event": "instructions:u",
+          "path": "/usr/bin/perf",
+          "period": 5000000,
+          "sample_flags": [
+            "--period",
+            "--timestamp",
+            "--sample-cpu",
+            "--buildid-all",
+            "--no-buildid-cache",
+            "--user-callchains"
+          ],
+          "sha256": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b",
+          "timed_scope": "harness elapsed_ns only; never conflated with perf whole-process counts",
+          "whole_process_scope": "perf-launched child process tree (Python launcher and execed baseline); excludes perf bookkeeping"
+        },
+        "python": {
+          "bytes": 7468968,
+          "path": "/usr/bin/python3.14",
+          "sha256": "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd"
+        },
+        "taskset": {
+          "bytes": 31184,
+          "path": "/usr/bin/taskset",
+          "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2"
+        }
+      }
+    },
+    "required_fields": [
+      "plan",
+      "quiescence",
+      "helper_seal",
+      "helper_bindings",
+      "binary",
+      "fixture",
+      "tools.perf",
+      "tools.python",
+      "tools.taskset",
+      "environment",
+      "host.allowed_affinity",
+      "host.selected_cpu",
+      "capability",
+      "correction_receipt",
+      "protocol_seal",
+      "independent_review",
+      "source.manifest",
+      "source.file_manifest",
+      "source.content_proof",
+      "source.harness_source",
+      "source.harness_cargo",
+      "outputs.capture_root",
+      "outputs.analysis_root"
+    ],
+    "schema": "litchi.performance.0971.root_go.v1",
+    "status": "authorized"
+  },
+  "schema": "litchi.performance.0971.independent_final_review.v2",
+  "scope": "final static and harmless synthetic review of corrected 0971 pre-capture tooling; no Office workload, build, or native capture",
+  "sealed_inputs": {
+    "correction_receipt": {
+      "bytes": 1942,
+      "path": "/home/zhuhe/litchi-performance-0971/receipts/correction-receipt-0971-v3.json",
+      "sha256": "a1cdeb4ae2aeb36424355a2b254ce2ec51a3aa82678d1f81eb9210e16b7e2daa"
+    },
+    "helper_seal": {
+      "bytes": 2686,
+      "path": "/home/zhuhe/litchi-performance-0971/receipts/helper-seal-0971-v2-correction-v2.json",
+      "sha256": "1c97f055e19a2621812fb688f7f3377faef4cc3ca74ef5421587c716298a6599"
+    },
+    "plan": {
+      "bytes": 11792,
+      "path": "/home/zhuhe/litchi-performance-0971/plans/plan-0971-pre-capture-v2-correction-v2.json",
+      "sha256": "600756f3a36317208a887bb5b3d38bbf079b732437454221e68c80f128a04f81"
+    },
+    "prior_blocking_review": {
+      "bytes": 11726,
+      "path": "/home/zhuhe/litchi-performance-0971/review/independent-final-review-0971-v1.json",
+      "sha256": "eaef77c781fb2d610ec4b04c82c85827772535583b6e47c1c311dd03619b6ea0"
+    },
+    "protocol_seal": {
+      "bytes": 4627,
+      "path": "/home/zhuhe/litchi-performance-0971/receipts/protocol-seal-0971-v4.json",
+      "sha256": "37e416009599c204501cd7cba6ea1037ffc7fde6faf8ae8ad0190f99cd9dde51"
+    },
+    "source_content_proof": {
+      "bytes": 268981,
+      "path": "/home/zhuhe/litchi-performance-0971/receipts/source-content-proof-0971-v2.json",
+      "sha256": "20e0f9fad68da357e2278157a8d1514c8b9b226993e16a91656fddc7ff38edd6"
+    },
+    "synthetic_pipeline": {
+      "bytes": 1515,
+      "path": "/home/zhuhe/litchi-performance-0971/receipts/synthetic-pipeline-0971-v3.json",
+      "sha256": "94ed06d2f35f54296fa2a44d3a60fe73342a1c1d94dc9aa63ea07dd7ab213b56"
+    },
+    "tool_self_tests": {
+      "bytes": 3590,
+      "path": "/home/zhuhe/litchi-performance-0971/receipts/tool-self-tests-0971-v7.json",
+      "sha256": "3cf68abf1a85aac5eb1a92c5ba85d6d313d1090bd91a127c0aac501fdc772c52"
+    }
+  },
+  "status": "pass",
+  "synthetic_pipeline": {
+    "all_declared_mutations_rejected": true,
+    "children": 12,
+    "mutation_checks": {
+      "duplicate_owner_deduplicated": true,
+      "raw_owner_hash_rejected": true,
+      "sample_index_rejected": true,
+      "wrong_case_rejected": true,
+      "wrong_cpu_rejected": true,
+      "wrong_dso_rejected": true,
+      "wrong_event_rejected": true,
+      "wrong_pid_rejected": true,
+      "zero_period_rejected": true
+    },
+    "owner_association_count": 1,
+    "p99_is_percentile_not_max": true,
+    "receipt_status": "pass"
+  }
+}

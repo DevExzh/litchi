@@ -1,5 +1,25 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0971 — instruction-profile pilot fails marker admission
+
+[0971](0971-instruction-profile-pilot.md) attempted a bounded diagnostic on
+the same retained 0967 `FloatingPictures/e1/default` binary, pinned to CPU 31,
+with `instructions:u` period 5,000,000 and DWARF 16,384-byte callgraphs. The
+required child-01 pilot recovered zero exact marker samples, zero marker-period
+share, and zero lost events, so the runner exited with `pilot_gate_failed`
+after one child and enforced no retry. The independent audit confirms rc0,
+valid report/PID/CPU, 1,387 samples, zero lost events, and exact marker ELF
+identity, but no marker in either decode: 906 samples have empty callchains,
+618 frames are unresolved, and only 11 samples contain 23 frames from the
+native binary. Attribution is unusable; the underlying unwind failure remains
+unestablished and the 16 KiB setting is not assigned as its cause. The
+12-child cohort and reducer associations are absent. The separate retained
+0970 Float/e1 analysis covers 24 children and finds stable 342,528-byte
+output/capacity, three routes, 32 stage slots, one active stage, and no
+stage-duration or subphase counters. Its whole-process instruction
+associations remain descriptive and do not identify a source owner. Seeded
+CFB-container work is a hypothesis only; production remains unchanged.
+
 ## 0970 — historical baseline affinity diagnostic remains descriptive
 
 [0970](0970-baseline-affinity-diagnostic.md) completes 96 serial historical
