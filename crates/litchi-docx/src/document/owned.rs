@@ -8,23 +8,26 @@ use super::{
 use crate::Package;
 use litchi_core::Position;
 
-/// An isolated main-document edit retaining its complete eager source package.
+/// An isolated main-document edit retaining its complete source package.
+///
+/// `P` defaults to the eager [`crate::Package`]; source-backed owners use
+/// [`crate::source_backed::Package`].
 ///
 /// Dropping an edit rolls it back. Committing validates and returns a new
 /// package; the source is unchanged on success and failure.
-pub struct Edit {
-    package: Package,
+pub struct Edit<P = Package> {
+    package: P,
     inner: transaction::Edit,
 }
 
-impl std::fmt::Debug for Edit {
+impl<P> std::fmt::Debug for Edit<P> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Edit").finish_non_exhaustive()
     }
 }
 
-impl Edit {
-    pub(crate) fn new(package: Package, inner: transaction::Edit) -> Self {
+impl<P: Clone> Edit<P> {
+    pub(crate) fn new(package: P, inner: transaction::Edit) -> Self {
         Self { package, inner }
     }
 
@@ -562,7 +565,9 @@ impl Edit {
         self.inner.insert_paragraph_transfer(position, plan)?;
         Ok(self)
     }
+}
 
+impl Edit<Package> {
     /// Validate the staged document and publish a complete immutable package.
     ///
     /// ```
@@ -596,6 +601,44 @@ impl Edit {
     }
 }
 
+impl Edit<crate::source_backed::Package> {
+    /// Validate the staged document and retain a new immutable source owner.
+    ///
+    /// No ZIP is serialized or reopened. The source owner remains unchanged.
+    ///
+    /// ```
+    /// use litchi_docx::{document, source_backed};
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let bytes = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"),
+    ///     "/../../test-data/ooxml/docx/documentProperties.docx"));
+    /// let source = source_backed::Package::from_reader(bytes.as_slice())?;
+    /// let edit = source.edit()?;
+    /// drop(source);
+    /// let commit: document::Commit<source_backed::Package> = edit.commit()?;
+    /// let (package, patch) = commit.into_parts();
+    /// assert!(patch.is_noop());
+    /// let mut output = Vec::new();
+    /// package.to_stream(&mut output)?;
+    /// assert_eq!(output, bytes);
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    /// Returns validation, source, signature, protection or admission failures.
+    pub fn commit(self) -> Result<Commit<crate::source_backed::Package>> {
+        let committed = self.inner.commit()?;
+        let diagnostics = committed.diagnostics();
+        let (_, patch) = committed.into_parts();
+        let package = self.package.apply(&patch)?;
+        Ok(Commit {
+            package,
+            patch,
+            diagnostics,
+        })
+    }
+}
+
 /// A validated main-document edit with its complete published package.
 ///
 /// A standalone XML commit cannot be substituted for a package commit:
@@ -606,13 +649,13 @@ impl Edit {
 /// let commit: document::Commit = source.edit().commit().unwrap();
 /// ```
 #[derive(Clone)]
-pub struct Commit {
-    package: Package,
+pub struct Commit<P = Package> {
+    package: P,
     patch: Patch,
     diagnostics: Diagnostics,
 }
 
-impl std::fmt::Debug for Commit {
+impl<P> std::fmt::Debug for Commit<P> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Commit")
             .field("diagnostics", &self.diagnostics)
@@ -620,10 +663,10 @@ impl std::fmt::Debug for Commit {
     }
 }
 
-impl Commit {
+impl<P> Commit<P> {
     /// Borrow the immutable published package.
     #[must_use]
-    pub const fn package(&self) -> &Package {
+    pub const fn package(&self) -> &P {
         &self.package
     }
 
@@ -641,13 +684,13 @@ impl Commit {
 
     /// Take the published package.
     #[must_use]
-    pub fn into_package(self) -> Package {
+    pub fn into_package(self) -> P {
         self.package
     }
 
     /// Take the published package and reversible patch.
     #[must_use]
-    pub fn into_parts(self) -> (Package, Patch) {
+    pub fn into_parts(self) -> (P, Patch) {
         (self.package, self.patch)
     }
 }

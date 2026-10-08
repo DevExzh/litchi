@@ -6,12 +6,17 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
-| 0026 | Owned reads and physical identity access for retained OPC candidates | effective read adapter foundation; DOCX owner migration pending |
-| 0025 | Immutable XML edits of retained effective OPC candidates | flat chained source-Part candidates; canonical DOCX owner migration pending |
+| 0031 | Canonical source DOCX package-owning Edit/Commit | primary owner migrated; specialized families, limits and performance pending |
+| 0030 | Immutable retained DOCX semantic apply | main-document apply integrated; independent managed donor snapshots refused |
+| 0029 | Source DOCX effective owner and physical-operation boundary | effective reads/publication integrated; specialized routes pending |
+| 0028 | Effective OPC owning conversion | explicit materialization integrated |
+| 0027 | DOCX patch predicate and content-free Debug | primary patch migrated; broader diagnostics pending |
+| 0026 | Owned reads and physical identity access for retained OPC candidates | effective read adapter foundation; integrated in 0029–0031 |
+| 0025 | Immutable XML edits of retained effective OPC candidates | flat chained source-Part candidates; primary owner integrated in 0031 |
 | 0024 | Revision-bound source XML edits over retained payloads | per-part chaining foundation; package overlay revisions pending |
-| 0023 | Retained OPC prepared topology and shared ZIP appended members | source-overlay ownership foundation; chained source package commits pending |
-| 0022 | Eager DOCX package-bound Edit/Commit and removal of mutating publication doors | eager primary commit migrated; source overlays, history and full W2 pending |
-| 0021 | Shared source-backed DOCX owners and borrowing stream publication | sharing prerequisite complete; package-bound Edit/Commit pending |
+| 0023 | Retained OPC prepared topology and shared ZIP appended members | source-overlay ownership foundation; chained commits integrated in 0031 |
+| 0022 | Eager DOCX package-bound Edit/Commit and removal of mutating publication doors | eager primary commit migrated; source joined in 0031; history and full W2 pending |
+| 0021 | Shared source-backed DOCX owners and borrowing stream publication | sharing prerequisite complete; primary package-bound triad integrated in 0031 |
 | 0020 | Cheap eager DOCX package shares and immutable primary patch application | eager apply migrated; package-owning commit W2 work pending |
 | 0019 | Owned eager DOCX read projection and shared physical graph | projection migrated; immutable package and commit W2 work pending |
 | 0018 | DOCX primary edit entry and focused error/result names; minimal/full glossary bans | names migrated; package-owned commit/projection W2 work pending |
@@ -339,3 +344,18 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 - Canonical package-owning source Edit/Commit, specialized effective routes and
   allocation/performance work remain open. Record 0030 documents verification
   and the exact-byte (rather than strict logical-version) precondition boundary.
+
+
+## 0031 — canonical source package-owning commit
+
+- Source `Package::edit()` returns `document::Edit<source_backed::Package>`;
+  commit returns the new effective owner through the canonical package accessors.
+- Generic Edit/Commit share eager/source staging and diagnostics with private
+  construction and specialized commit policy. Unified editor consumers migrate.
+- Legacy stream/history harnesses explicitly request raw XML transactions.
+- Canonical MCE coverage exposed and fixed escaped-namespace compatibility:
+  unmanaged full-document apply uses the existing publication audit, while
+  managed edits keep typed splice authority and admissions.
+- Earlier pending primary-source-triad notes are superseded by this record.
+  Specialized families, history, limits, performance and full acceptance remain
+  open. See 0031 for scope and verification.

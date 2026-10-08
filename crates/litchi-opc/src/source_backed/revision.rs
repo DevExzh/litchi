@@ -127,6 +127,75 @@ impl PreparedTopology {
         result
     }
 
+    /// Replace an unmanaged physical XML Part under an exact effective-byte precondition.
+    ///
+    /// Uses the ordinary full-document publication audit, including producer
+    /// namespace spellings that cannot authorize positional XML splices.
+    /// Format-specific semantics and source identity are the caller's responsibility.
+    /// XML is audited even when the requested bytes are unchanged; callers that
+    /// need an arbitrary exact-artifact no-op should retain the current candidate.
+    ///
+    /// # Errors
+    /// Refuses managed base/donors, added Parts, non-XML Parts, mismatched bytes,
+    /// invalid XML, signatures, source changes or resource limits.
+    pub fn apply_xml_bytes(
+        &self,
+        partname: &PackURI,
+        expected: &[u8],
+        replacement: Arc<Vec<u8>>,
+    ) -> Result<Self> {
+        self.check_source()?;
+        let result = (|| {
+            if self.is_managed() {
+                return Err(OpcError::ManagedPackageMaterialization);
+            }
+            let part = self.part(partname)?;
+            let current = part.data()?;
+            if current.as_bytes() != expected {
+                return Err(overlay_unavailable(
+                    "XML precondition differs from effective Part",
+                ));
+            }
+            if !xml_minifier::audit::package::is_xml_part(partname.as_str(), part.content_type()) {
+                return Err(overlay_unavailable(
+                    "full XML replacement requires an XML Part",
+                ));
+            }
+            if !self.state.no_op
+                && self.state.effective_data().parts[part.index]
+                    .source_index
+                    .is_none()
+            {
+                return Err(overlay_unavailable(
+                    "full XML replacement requires a physical Part",
+                ));
+            }
+            self.package.limits.check(
+                ReadResource::PartBytes,
+                replacement.len() as u64,
+                self.package.limits.max_part_bytes(),
+            )?;
+            let original = self.package.part(partname)?.data()?;
+            validate_source_part_replacement_xml(
+                partname.as_str(),
+                original.as_bytes(),
+                &replacement,
+            )?;
+            if replacement.as_slice() == current.as_bytes() {
+                return Ok(self.clone());
+            }
+            if self.state.no_op {
+                let mut plan = SourceTopologyPlan::new();
+                plan.try_replace_part_shared(partname.clone(), replacement)?;
+                self.package.clone().prepare_topology(plan)
+            } else {
+                self.replace_effective_payload(part.index, replacement, None)
+            }
+        })();
+        self.check_source()?;
+        result
+    }
+
     fn replace_effective_xml(&self, index: usize, result: SourceXmlPart) -> Result<Self> {
         let data = self.state.effective_data();
         let old_part = &data.parts[index];
@@ -141,11 +210,26 @@ impl PreparedTopology {
             original.as_bytes(),
             self.package.limits,
         )?;
+        self.replace_effective_payload(index, result.payload_arc(), Some(result))
+    }
+
+    fn replace_effective_payload(
+        &self,
+        index: usize,
+        payload: Arc<Vec<u8>>,
+        proof: Option<SourceXmlPart>,
+    ) -> Result<Self> {
+        let data = self.state.effective_data();
+        let old_part = &data.parts[index];
+        let target = old_part
+            .source_index
+            .expect("edit resolved a physical Part");
+        let original = self.package.read_part(target)?;
         let old_bytes = old_part
             .replacement
             .as_ref()
             .map_or(original.as_bytes().len(), |bytes| bytes.len()) as u64;
-        let new_bytes = result.bytes().len() as u64;
+        let new_bytes = payload.as_slice().len() as u64;
         self.package.limits.check(
             ReadResource::ArchiveEntryBytes,
             new_bytes,
@@ -188,7 +272,7 @@ impl PreparedTopology {
                     .then_some(overlay.replacement.len() as u64)
             })
             .unwrap_or(0);
-        let new_output = if result.bytes() == original.as_bytes() {
+        let new_output = if payload.as_slice() == original.as_bytes() {
             0
         } else {
             new_bytes
@@ -272,10 +356,10 @@ impl PreparedTopology {
         changed.extend(self.state.changed.iter().filter(|overlay| {
             !matches!(overlay.target, ChangedOverlayTarget::Part(part) if part == target)
         }).cloned());
-        if result.bytes() != original.as_bytes() {
+        if payload.as_slice() != original.as_bytes() {
             changed.push(ChangedOverlay {
                 target: ChangedOverlayTarget::Part(target),
-                replacement: ChangedOverlayPayload::Shared(result.payload_arc()),
+                replacement: ChangedOverlayPayload::Shared(Arc::clone(&payload)),
             });
         }
         let mut parts = Vec::new();
@@ -287,8 +371,8 @@ impl PreparedTopology {
             })?;
         parts.extend(data.parts.iter().cloned());
         let mut part = old_part.as_ref().clone();
-        part.replacement = Some(result.payload_arc());
-        part.source_xml = Some(result);
+        part.replacement = Some(Arc::clone(&payload));
+        part.source_xml = proof;
         part._metadata_reservation = part_reservation;
         parts[index] = Arc::new(part);
         let retained = self.state.retained();

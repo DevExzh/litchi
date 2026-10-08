@@ -110,13 +110,8 @@ impl Package {
                     .map_err(Error::from)?
             } else {
                 let bytes = target.shared_xml()?;
-                let source = topology
-                    .part(&name)
-                    .and_then(|part| part.source_xml())
-                    .map_err(Error::from)?;
-                let target = source.with_replacement_xml(bytes).map_err(Error::from)?;
                 topology
-                    .apply_source_xml(&source, target)
+                    .apply_xml_bytes(&name, current.xml_bytes(), bytes)
                     .map_err(Error::from)?
             };
             self.with_prepared_topology(changed)

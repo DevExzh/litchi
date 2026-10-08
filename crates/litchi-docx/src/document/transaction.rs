@@ -11489,7 +11489,7 @@ mod tests {
             ExecutionContext::new(budget.clone(), cancellation, limits),
         )
         .unwrap();
-        let mut managed = package.edit().unwrap();
+        let mut managed = package.document_snapshot().unwrap().edit();
         assert!(managed.projected.is_managed());
         let projected = managed.projected().xml_bytes().to_vec();
         let reserved = budget.used(Resource::Memory);

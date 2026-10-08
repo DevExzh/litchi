@@ -509,7 +509,7 @@ fn build_fixture(paragraph_count: usize, replacement_count: usize) -> AnyResult<
 fn build_preflight(fixture: &Fixture, mode: EditMode) -> AnyResult<Preflight> {
     let package =
         source_backed::Package::from_read_at(Arc::new(OwnedSource::new(fixture.archive.clone())))?;
-    let mut edit = package.edit()?;
+    let mut edit = package.document_snapshot()?.edit();
     stage_edit(&mut edit, fixture, mode)?;
     let commit = edit.commit()?;
     let patch = commit.patch().clone();
@@ -550,7 +550,7 @@ fn build_managed_preflight(
             SourceCacheLimits::new(CACHE_BYTES, CACHE_ENTRIES)?,
             context,
         )?;
-    let mut edit = package.edit()?;
+    let mut edit = package.document_snapshot()?.edit();
     stage_edit(&mut edit, fixture, mode)?;
     let commit = edit.commit()?;
     let patch = commit.patch().clone();
@@ -660,7 +660,7 @@ fn run_sample(
     let cache_before = package.cache_diagnostics();
 
     let phase_started = Instant::now();
-    let mut edit = package.edit()?;
+    let mut edit = package.document_snapshot()?.edit();
     stage_edit(&mut edit, fixture, config.mode)?;
     let edit_ns = elapsed_ns(phase_started)?;
 

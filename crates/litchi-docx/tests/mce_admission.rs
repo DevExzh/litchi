@@ -233,7 +233,8 @@ fn source_backed_edits_publish_what_the_eager_owner_publishes() {
 
         let package = source(&original);
         let mut edit = package
-            .edit()
+            .document_snapshot()
+            .map(|snapshot| snapshot.edit())
             .unwrap_or_else(|error| panic!("{name}: {error}"));
         first_edit(&mut edit);
         let commit = edit.commit().unwrap();
@@ -306,7 +307,12 @@ fn exact_no_ops_republish_every_fixture_byte_for_byte() {
     for name in all_fixtures() {
         let original = fixture(name);
         let package = source(&original);
-        let commit = package.edit().unwrap().commit().unwrap();
+        let commit = package
+            .document_snapshot()
+            .unwrap()
+            .edit()
+            .commit()
+            .unwrap();
         assert!(commit.patch().is_noop());
         let mut published = Vec::new();
         package
@@ -594,11 +600,11 @@ fn witness_matrix_on_both_owners_and_the_managed_route() {
                 eager_edit
                     .replace_paragraph_text(Position::new(1), "edited")
                     .unwrap();
-                let commit = source_edit.commit().unwrap();
+                let commit = source_edit
+                    .commit()
+                    .unwrap_or_else(|error| panic!("{label}: {error}"));
                 let mut published = Vec::new();
-                source_owner
-                    .publish_document_commit_to_stream(&mut published, &commit)
-                    .unwrap();
+                commit.package().to_stream(&mut published).unwrap();
                 owner = eager_edit.commit().unwrap().into_package();
                 let mut saved = Vec::new();
                 owner.to_stream(&mut saved).unwrap();

@@ -84,7 +84,7 @@ pub use tail_append_stream::patch::{
 };
 
 use crate::alt::Data;
-use crate::document::snapshot::{Commit, Edit};
+use crate::document::snapshot::Commit;
 use crate::document::{Result as TransactionResult, Snapshot};
 use crate::error::{Error, Result};
 use crate::namespace::scan_word_element_ranges;
@@ -1217,14 +1217,18 @@ impl Package {
         Ok(snapshot)
     }
 
-    /// Start an isolated semantic edit over the exact raw main document.
+    /// Start an isolated semantic edit retaining this complete source owner.
+    ///
+    /// Commit returns a new immutable package without serializing a ZIP.
+    /// For the transitional raw stream publishers, explicitly start with
+    /// `document_snapshot()?.edit()` instead.
     ///
     /// # Errors
     ///
     /// Returns the same failures as [`Self::document_snapshot`].
-    pub fn edit(&self) -> TransactionResult<Edit> {
+    pub fn edit(&self) -> TransactionResult<crate::document::Edit<Self>> {
         let (_, snapshot) = self.main_document_snapshot("edit", true)?;
-        Ok(snapshot.edit())
+        Ok(crate::document::Edit::new(self.clone(), snapshot.edit()))
     }
 
     /// Capture document variables from the existing internal settings Part.

@@ -42,14 +42,14 @@ transaction is the bare `Package::edit()`.
 
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
-| Edit entry, primary transaction | `Package::edit()` | `edit_document()` (docx), `opened_presentation_transaction()` (pptx), `Workbook::edit()` (xlsx — moves to `Package`) | ✅ docx eager/source entry name (0018; eager package-bound commit 0022, source pending) · ✅ iWork/xlsx-name · 🔴 pptx/xlsx (W2), odt already `edit` but moves onto `Package` (W3) |
+| Edit entry, primary transaction | `Package::edit()` | `edit_document()` (docx), `opened_presentation_transaction()` (pptx), `Workbook::edit()` (xlsx — moves to `Package`) | ✅ docx eager/source entry name (0018; eager package-bound commit 0022, source 0031) · ✅ iWork/xlsx-name · 🔴 pptx/xlsx (W2), odt already `edit` but moves onto `Package` (W3) |
 | Edit entry, scoped family | `Package::edit_x()` | — | ✅ numbers/keynote/pages families |
 | Transaction type | `Edit` | `Transaction` (pptx), `WorkbookEdit` (xlsb) | 🔴 W2 |
 | Commit | `Edit::commit() -> Result<Commit>` | — | ✅ everywhere; shape fixed by the rows below |
-| New snapshot accessor | `Commit::package()` / `Commit::into_package()` | `Commit::snapshot()` (docx/pptx), `Commit::{workbook, into_workbook}` (xlsx) | ✅ iWork/docx eager (0022) · 🔴 source-backed DOCX and other W2 |
+| New snapshot accessor | `Commit::package()` / `Commit::into_package()` | `Commit::snapshot()` (docx/pptx), `Commit::{workbook, into_workbook}` (xlsx) | ✅ iWork/docx eager (0022) and source (0031) · 🔴 other W2 |
 | Diagnostics on every commit | `Commit::diagnostics()` | commits without diagnostics (xlsx, pptx) | ✅ docx/iWork · 🔴 xlsx/pptx (W2) |
-| Split commit | `Commit::into_parts() -> (Package, Patch)` | — | ✅ docx eager (0022); 🔴 source-backed DOCX and remaining owner shapes |
-| Patch application | `Package::apply(&patch)`; scoped `Package::apply_x(&patch)` | `publish_document_commit()`, `apply_document_patch()` (docx), `apply_opened_presentation_commit/patch()` (pptx), `Workbook::apply` (xlsx — moves) | ✅ iWork · ✅ docx eager immutable `apply` (0020); 🔴 source-backed package publication and other W2 owners |
+| Split commit | `Commit::into_parts() -> (Package, Patch)` | — | ✅ docx eager (0022) and source (0031); 🔴 remaining owner shapes |
+| Patch application | `Package::apply(&patch)`; scoped `Package::apply_x(&patch)` | `publish_document_commit()`, `apply_document_patch()` (docx), `apply_opened_presentation_commit/patch()` (pptx), `Workbook::apply` (xlsx — moves) | ✅ iWork · ✅ docx eager immutable `apply` (0020) and source (0030); 🔴 legacy publishers and other W2 owners |
 | No-op introspection | `commit.diagnostics().changed()`; `patch.is_noop()` | `Transaction::is_changed()`, `Commit::is_changed()` (pptx), `Patch::is_empty()` (xlsx) | ✅ iWork/docx · 🔴 W2 |
 | Inverse patch | `Patch::inverse()` | — | ✅ everywhere |
 | Rollback | *dropping the `Edit`* | `Transaction::rollback()` (pptx) | 🔴 W2 |
@@ -257,10 +257,10 @@ eager `apply_document_patch` removal (0020). The full
 profile enables `automatic-fonts`, `encryption`, `sign` and `vba-inspection`,
 which include every optional DOCX feature. Neither profile registers the
 complete document family yet: eager `Commit` carries the immutable package
-(0022), while source-backed and legacy history retain transitional XML commits. The eager read-only
+(0022) and the source owner (0031); legacy history retains transitional XML commits. The eager read-only
 projection is now owned (0019), and eager `apply(&patch) -> Result<Package>`
 is immutable (0020), and eager package-bound commit is implemented (0022).
-Full immutable package ownership, source-backed publication replacement, `LimitKind`,
+Specialized immutable ownership, legacy source publication replacement, `LimitKind`,
 and mutable-writer removal remain pending. Scoped transactions and other
 formats are not marked migrated by this step.
 
@@ -280,8 +280,8 @@ Source-backed `Package` is cheaply cloneable, sharing source identity, index,
 read caches, admission and repair-report state. Existing stream publishers now
 borrow the package, allowing repeated publication and retry while retaining the
 original source. Execution reservations follow the lifetime of retained shares.
-These stream entries remain transitional: the package-bound `Edit`/`Commit` triad
-and immutable source-overlay publication are still pending. No additional full
+These stream entries remain transitional; records 0030–0031 implement the
+ordinary package-bound triad and immutable source-overlay application. No additional full
 transaction family is marked conformant by this step.
 
 ## 15. W2 DOCX eager package-bound commit (record 0022)
@@ -308,9 +308,9 @@ pending beyond the new canonical Edit/Commit implementations.
 proofs and reservations. Its stream publisher borrows the retained candidate;
 clones can read or publish it again while physical source checks remain active.
 This supplies retained topology ownership for the source-backed DOCX wave.
-It does not make source-backed `Package::edit()` canonical: chained edits still
-need logical overlay revisions and XML authorization against the effective
-candidate, distinct from the physical archive lineage/version.
+This foundation alone did not make source-backed `Package::edit()` canonical;
+records 0024–0031 supply effective XML authorization and package-bound commits.
+Physical archive lineage/version remains distinct from logical candidate state.
 
 ## 17. OPC XML logical revision foundation (record 0024)
 
@@ -340,8 +340,8 @@ its candidate and payload admissions. Source XML proof capture reads the
 current effective payload and shares the edit path's provenance checks.
 `physical_source_*` accessors explicitly expose original archive identity;
 that identity is not a logical revision/cache key. These are low-level OPC
-owner facilities. Canonical source DOCX projections/commits and complete
-transaction-family registration remain pending.
+owner facilities. Records 0029–0031 integrate source DOCX projections/commits;
+complete transaction-family registration remains pending.
 
 ## 20. Main-document patch and Debug policy (record 0027)
 
@@ -357,7 +357,7 @@ core diagnostics remain pending; this does not register a complete family.
 
 `PreparedTopology::to_opc_package()` explicitly materializes the current effective
 catalog, preserving retained graph changes. It refuses managed base and donor
-sources and rechecks all source guards. Source DOCX integration remains pending;
+sources and rechecks all source guards. Record 0029 integrates source DOCX;
 this is a conversion seam, not a complete transaction-family registration.
 
 ## 22. Source DOCX effective ownership (record 0029)
@@ -366,5 +366,27 @@ Source DOCX can retain an effective OPC graph for main-document reads, owning
 conversion and publication. Legacy physical operations and the now-fallible
 `source_backed_package()` accessor refuse effective owners. Semantic caches are
 isolated per adopted owner; pinned views retain donor execution checks.
-Canonical source Edit/Commit/Patch integration and complete family registration
-remain pending.
+Records 0030–0031 integrate canonical source Edit/Commit/Patch. Complete family
+registration remains pending.
+
+
+## 23. Source DOCX package-bound commit (records 0030–0031)
+
+Both owner entry points return `document::Edit<P>` and commit to
+`document::Commit<P>`, with `P` defaulting to the eager Package. Source-backed
+edits retain their complete owner and return a new effective Package without ZIP
+serialization/reopening. Common staging methods share one implementation;
+private construction and specialized commit implementations constrain ownership
+to the supported eager/source types without a public owner trait.
+
+`package`, `into_package`, `patch`, `diagnostics` and `into_parts` have the same
+shape for both owners. Source commit checks exact XML identity, protection,
+signatures and source/execution fences through immutable `apply`. Generic Debug
+never formats the owner or authored content.
+
+Legacy stream/history publishers explicitly consume raw
+`document::snapshot::Commit`; their callers start with
+`document_snapshot()?.edit()`. This is not a compatibility alias for the ordinary
+owner entry point. Full family registration still needs `LimitKind`, remaining
+policy vocabulary and specialized ownership migration. Managed donor snapshot
+refusal and unmanaged copy/rescan costs recorded in 0030 remain open.

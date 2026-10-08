@@ -492,7 +492,7 @@ fn managed_main_document_edits_retain_source_and_candidate_reservations() {
     let snapshot_clone = snapshot.clone();
     assert_eq!(budget.used(Resource::Memory), source_reserved);
 
-    let mut edit = package.edit().unwrap();
+    let mut edit = package.document_snapshot().unwrap().edit();
     edit.replace_paragraph_text(Position::new(0), "managed replacement")
         .unwrap();
     let candidate_reserved = budget.used(Resource::Memory);

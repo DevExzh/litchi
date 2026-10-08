@@ -391,7 +391,7 @@ fn document_commit_edits_only_the_main_part_and_reopens() {
     ));
     let read_at: Arc<dyn ReadAt> = source.clone();
     let package = source_backed::Package::from_read_at(read_at).unwrap();
-    let mut edit = package.edit().unwrap();
+    let mut edit = package.document_snapshot().unwrap().edit();
     edit.replace_paragraph_text(Position::new(1), "edited")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -441,7 +441,12 @@ fn exact_noop_reproduces_every_source_byte() {
     let source = Arc::new(ObservedSource::new(source_bytes.clone(), main, unused));
     let read_at: Arc<dyn ReadAt> = source;
     let package = source_backed::Package::from_read_at(read_at).unwrap();
-    let commit = package.edit().unwrap().commit().unwrap();
+    let commit = package
+        .document_snapshot()
+        .unwrap()
+        .edit()
+        .commit()
+        .unwrap();
     let mut output = Vec::new();
 
     package
@@ -460,7 +465,7 @@ fn rolled_back_document_operations_use_the_exact_signed_source_path() {
     let source = Arc::new(ObservedSource::new(source_bytes.clone(), main, unused));
     let read_at: Arc<dyn ReadAt> = source;
     let package = source_backed::Package::from_read_at(read_at).unwrap();
-    let mut edit = package.edit().unwrap();
+    let mut edit = package.document_snapshot().unwrap().edit();
     edit.replace_paragraph_text(Position::new(0), "temporary")
         .unwrap();
     edit.replace_paragraph_text(Position::new(0), "alpha")
@@ -473,11 +478,16 @@ fn rolled_back_document_operations_use_the_exact_signed_source_path() {
     let mut retained_output = Vec::new();
     retained.to_stream(&mut retained_output).unwrap();
     assert_eq!(retained_output, source_bytes);
-    let mut changed = package.edit().unwrap();
+    let mut changed = package.document_snapshot().unwrap().edit();
     changed
         .replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
     assert!(package.apply(changed.commit().unwrap().patch()).is_err());
+    let mut canonical = package.edit().unwrap();
+    canonical
+        .replace_paragraph_text(Position::new(0), "changed")
+        .unwrap();
+    assert!(canonical.commit().is_err());
     let mut output = Vec::new();
     package
         .publish_document_commit_to_stream(&mut output, &commit)
@@ -491,7 +501,7 @@ fn stale_commit_and_changed_source_fail_before_output() {
     let source = Arc::new(ObservedSource::new(source_bytes, main, unused));
     let read_at: Arc<dyn ReadAt> = source.clone();
     let package = source_backed::Package::from_read_at(read_at).unwrap();
-    let mut edit = package.edit().unwrap();
+    let mut edit = package.document_snapshot().unwrap().edit();
     edit.replace_paragraph_text(Position::new(1), "edited")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -559,7 +569,12 @@ fn signed_changes_are_refused_but_signed_noops_are_exact() {
     ));
     let read_at: Arc<dyn ReadAt> = source;
     let package = source_backed::Package::from_read_at(read_at).unwrap();
-    let noop = package.edit().unwrap().commit().unwrap();
+    let noop = package
+        .document_snapshot()
+        .unwrap()
+        .edit()
+        .commit()
+        .unwrap();
     let mut output = Vec::new();
     package
         .publish_document_commit_to_stream(&mut output, &noop)
@@ -569,7 +584,7 @@ fn signed_changes_are_refused_but_signed_noops_are_exact() {
     let source = Arc::new(ObservedSource::new(signed_bytes, main, unused));
     let read_at: Arc<dyn ReadAt> = source;
     let package = source_backed::Package::from_read_at(read_at).unwrap();
-    let mut edit = package.edit().unwrap();
+    let mut edit = package.document_snapshot().unwrap().edit();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -589,7 +604,7 @@ fn sequential_sink_failure_is_typed_as_incomplete_output() {
     let source = Arc::new(ObservedSource::new(bytes, main, unused));
     let read_at: Arc<dyn ReadAt> = source;
     let package = source_backed::Package::from_read_at(read_at).unwrap();
-    let mut edit = package.edit().unwrap();
+    let mut edit = package.document_snapshot().unwrap().edit();
     edit.replace_paragraph_text(Position::new(1), "edited")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -618,7 +633,7 @@ fn strict_main_document_relationship_uses_the_same_overlay_contract() {
     let source = Arc::new(ObservedSource::new(bytes, main, unused));
     let read_at: Arc<dyn ReadAt> = source;
     let package = source_backed::Package::from_read_at(read_at).unwrap();
-    let mut edit = package.edit().unwrap();
+    let mut edit = package.document_snapshot().unwrap().edit();
     edit.replace_paragraph_text(Position::new(0), "strict edited")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -801,7 +816,7 @@ fn shared_source_publishes_repeatedly_without_reopen_or_consumption() {
     let shared = package.clone();
     assert_eq!(source.main_reads.load(Ordering::SeqCst), before_main);
     assert_eq!(source.unused_reads.load(Ordering::SeqCst), before_unused);
-    let mut edit = package.edit().unwrap();
+    let mut edit = package.document_snapshot().unwrap().edit();
     edit.replace_paragraph_text(Position::new(1), "changed")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -830,7 +845,7 @@ fn shared_source_publishes_repeatedly_without_reopen_or_consumption() {
     let reopened = Package::from_reader(io::Cursor::new(first)).unwrap();
     assert_eq!(reopened.document().unwrap().text().unwrap(), "alphachanged");
     drop(package);
-    let noop = shared.edit().unwrap().commit().unwrap();
+    let noop = shared.document_snapshot().unwrap().edit().commit().unwrap();
     let mut original = Vec::new();
     shared
         .publish_document_commit_to_stream(&mut original, &noop)
@@ -855,7 +870,12 @@ fn concurrent_source_shares_keep_the_same_noop_artifact() {
     let second = package.clone();
     let outputs = std::thread::scope(|scope| {
         let publish = |package: source_backed::Package| {
-            let commit = package.edit().unwrap().commit().unwrap();
+            let commit = package
+                .document_snapshot()
+                .unwrap()
+                .edit()
+                .commit()
+                .unwrap();
             let mut output = Vec::new();
             package
                 .publish_document_commit_to_stream(&mut output, &commit)

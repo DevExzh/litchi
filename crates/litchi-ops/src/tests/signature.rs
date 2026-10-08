@@ -536,9 +536,7 @@ fn assert_exact_noop(input: &Input) {
             let package = litchi_docx::source_backed::Package::from_read_at(source()).unwrap();
             let commit = package.edit().unwrap().commit().unwrap();
             let mut output = Vec::new();
-            package
-                .publish_document_commit_to_stream(&mut output, &commit)
-                .unwrap();
+            commit.package().to_stream(&mut output).unwrap();
             assert_eq!(&output, bytes, "{label}: source-backed no-op");
 
             let package = litchi_docx::Package::from_reader(Cursor::new(bytes)).unwrap();

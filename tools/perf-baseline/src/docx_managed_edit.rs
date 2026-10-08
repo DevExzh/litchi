@@ -1258,7 +1258,7 @@ fn execute_api(
     let open_ns = phase_elapsed(open_started)?;
 
     let edit_staging_started = phase_start(config.phase_diagnostics);
-    let mut edit = package.edit()?;
+    let mut edit = package.document_snapshot()?.edit();
     edit.replace_paragraph_text(
         Position::new(prepared.target_position),
         &prepared.replacement_text,

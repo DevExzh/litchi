@@ -977,7 +977,7 @@ fn effective_owner_refuses_unmigrated_operations_and_foreign_candidates() {
     let physical =
         SourceBackedPackage::from_vec(package_bytes(effective_xml("before"), None, false)).unwrap();
     let owner = source_backed::Package::from_source_backed_package(physical.clone()).unwrap();
-    let commit = owner.edit().unwrap().commit().unwrap();
+    let commit = owner.document_snapshot().unwrap().edit().commit().unwrap();
     for changed in [false, true] {
         let mut plan = litchi_opc::SourceTopologyPlan::new();
         if changed {
@@ -1178,13 +1178,13 @@ fn retained_semantic_patches_chain_and_inverse_without_reopening() {
         edit.replace_paragraph_text(litchi_core::Position::new(0), "first")
             .unwrap();
         let first = edit.commit().unwrap();
-        let current = source.apply(first.patch()).unwrap();
+        let current = first.package().clone();
         assert_eq!(current.document().unwrap().extract_text().unwrap(), "first");
         let mut edit = current.edit().unwrap();
         edit.replace_paragraph_text(litchi_core::Position::new(0), "second")
             .unwrap();
         let second = edit.commit().unwrap();
-        let next = current.apply(second.patch()).unwrap();
+        let next = second.clone().into_package();
         assert_eq!(next.document().unwrap().extract_text().unwrap(), "second");
         assert!(next.apply(first.patch()).is_err());
         let restored = next
@@ -1233,14 +1233,18 @@ fn retained_semantic_apply_preserves_graph_edits_and_effective_protection() {
         let owner = owner
             .with_prepared_topology(physical.prepare_topology(plan).unwrap())
             .unwrap();
-        let noop = owner.edit().unwrap().commit().unwrap();
+        let noop = owner.document_snapshot().unwrap().edit().commit().unwrap();
         owner.apply(noop.patch()).unwrap();
-        let mut edit = owner.edit().unwrap();
+        let mut edit = owner.document_snapshot().unwrap().edit();
         edit.replace_paragraph_text(litchi_core::Position::new(0), "after")
             .unwrap();
         let committed = edit.commit().unwrap();
         if policy.is_empty() {
-            let next = owner.apply(committed.patch()).unwrap();
+            let mut canonical = owner.edit().unwrap();
+            canonical
+                .replace_paragraph_text(litchi_core::Position::new(0), "after")
+                .unwrap();
+            let next = canonical.commit().unwrap().into_package();
             let mut bytes = Vec::new();
             next.to_stream(&mut bytes).unwrap();
             let package = SourceBackedPackage::from_vec(bytes).unwrap();
@@ -1260,6 +1264,16 @@ fn retained_semantic_apply_preserves_graph_edits_and_effective_protection() {
             );
             assert_eq!(next.document().unwrap().extract_text().unwrap(), "after");
         } else {
+            let mut canonical = owner.edit().unwrap();
+            canonical
+                .replace_paragraph_text(litchi_core::Position::new(0), "after")
+                .unwrap();
+            assert!(matches!(
+                canonical.commit(),
+                Err(litchi_docx::document::Error::Document(
+                    Error::UnsafeEdit { .. }
+                ))
+            ));
             assert!(matches!(
                 owner.apply(committed.patch()),
                 Err(litchi_docx::document::Error::Document(
@@ -1294,10 +1308,88 @@ fn retained_semantic_apply_preserves_declaration_bom_and_revision_spelling() {
     let next = owner.apply(committed.patch()).unwrap();
     let snapshot = next.document_snapshot().unwrap();
     assert!(snapshot.xml_bytes().starts_with(b"\xef\xbb\xbf<?xml"));
-    assert_eq!(snapshot.xml_bytes(), committed.snapshot().xml_bytes());
+    assert_eq!(snapshot.xml_bytes(), committed.patch().target().xml_bytes());
     let restored = next.apply(&committed.patch().inverse()).unwrap();
     assert_eq!(
         restored.document_snapshot().unwrap().xml_bytes(),
         xml.as_bytes()
     );
+}
+
+#[test]
+fn canonical_source_edit_owns_package_and_isolates_staged_clones() {
+    for managed in [false, true] {
+        let xml = effective_xml("before");
+        let source = if managed {
+            managed_raw_document(&xml)
+        } else {
+            source_backed::Package::from_read_at(Arc::new(OwnedSource::new(package_bytes(
+                xml, None, false,
+            ))))
+            .unwrap()
+        };
+        let mut edit: litchi_docx::document::Edit<source_backed::Package> = source.edit().unwrap();
+        let view = source.document().unwrap();
+        edit.replace_paragraph_text(litchi_core::Position::new(0), "first")
+            .unwrap();
+        let mut sibling = edit.try_clone().unwrap();
+        sibling
+            .replace_paragraph_text(litchi_core::Position::new(0), "second")
+            .unwrap();
+        drop(source);
+        let commit: litchi_docx::document::Commit<source_backed::Package> = edit.commit().unwrap();
+        assert_eq!(
+            commit.package().document().unwrap().extract_text().unwrap(),
+            "first"
+        );
+        assert_eq!(view.extract_text().unwrap(), "before");
+        let (owner, patch) = commit.into_parts();
+        assert!(!patch.is_noop());
+        assert_eq!(
+            owner
+                .apply(&patch.inverse())
+                .unwrap()
+                .document()
+                .unwrap()
+                .extract_text()
+                .unwrap(),
+            "before"
+        );
+        assert_eq!(
+            sibling
+                .commit()
+                .unwrap()
+                .into_package()
+                .document()
+                .unwrap()
+                .extract_text()
+                .unwrap(),
+            "second"
+        );
+        let mut abandoned = owner.edit().unwrap();
+        abandoned
+            .replace_paragraph_text(litchi_core::Position::new(0), "abandoned")
+            .unwrap();
+        drop(abandoned);
+        assert_eq!(owner.document().unwrap().extract_text().unwrap(), "first");
+    }
+}
+
+#[test]
+fn canonical_source_commit_refuses_a_changed_physical_source() {
+    let physical = Arc::new(ProbeSource::new(
+        package_bytes(effective_xml("before"), None, false),
+        None,
+    ));
+    let owner = source_backed::Package::from_read_at(physical.clone()).unwrap();
+    let mut edit = owner.edit().unwrap();
+    edit.replace_paragraph_text(litchi_core::Position::new(0), "after")
+        .unwrap();
+    physical.changed();
+    assert!(matches!(
+        edit.commit(),
+        Err(litchi_docx::document::Error::Document(Error::Opc(
+            OpcError::SourceChanged { .. }
+        )))
+    ));
 }

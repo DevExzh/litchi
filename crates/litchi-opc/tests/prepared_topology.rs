@@ -2325,3 +2325,69 @@ fn full_xml_replacement_rejects_invalid_documents_and_releases_managed_output() 
         Err(OpcError::Cancelled)
     ));
 }
+
+#[test]
+fn full_document_byte_replacements_preserve_producer_namespaces_and_chain() {
+    let physical = open(Arc::new(VersionedSource::new(source_bytes())));
+    let base = physical
+        .prepare_topology(SourceTopologyPlan::new())
+        .unwrap();
+    let original = base.main_document_part().unwrap().data().unwrap();
+    let first_xml = Arc::new(br#"<first xmlns:x="urn:&#120;"><x:child/></first>"#.to_vec());
+    let first = base
+        .apply_xml_bytes(&pack(DOCUMENT), original.as_bytes(), first_xml.clone())
+        .unwrap();
+    let current = first.main_document_part().unwrap().data().unwrap();
+    assert_eq!(current.as_bytes(), first_xml.as_slice());
+    let second_xml = Arc::new(b"<second/>".to_vec());
+    assert!(
+        first
+            .apply_xml_bytes(&pack(DOCUMENT), original.as_bytes(), second_xml.clone())
+            .is_err()
+    );
+    let second = first
+        .apply_xml_bytes(&pack(DOCUMENT), current.as_bytes(), second_xml.clone())
+        .unwrap();
+    let restored = second
+        .apply_xml_bytes(
+            &pack(DOCUMENT),
+            &second_xml,
+            Arc::new(original.as_bytes().to_vec()),
+        )
+        .unwrap();
+    let mut bytes = Vec::new();
+    restored.publish_to_stream(&mut bytes).unwrap();
+    assert_eq!(bytes, source_bytes());
+    for invalid in [b"<a>".as_slice(), b"<a/><b/>", b"<!DOCTYPE a><a/>"] {
+        assert!(
+            base.apply_xml_bytes(
+                &pack(DOCUMENT),
+                original.as_bytes(),
+                Arc::new(invalid.to_vec())
+            )
+            .is_err()
+        );
+    }
+    assert_eq!(
+        first
+            .main_document_part()
+            .unwrap()
+            .data()
+            .unwrap()
+            .as_bytes(),
+        first_xml.as_slice()
+    );
+    let (_budget, _cancel, context) = managed_context();
+    let managed = SourceBackedPackage::from_read_at_with_execution_context(
+        Arc::new(VersionedSource::new(source_bytes())),
+        litchi_opc::ReadLimits::default(),
+        context,
+    )
+    .unwrap()
+    .prepare_topology(SourceTopologyPlan::new())
+    .unwrap();
+    assert!(matches!(
+        managed.apply_xml_bytes(&pack(DOCUMENT), original.as_bytes(), second_xml),
+        Err(OpcError::ManagedPackageMaterialization)
+    ));
+}

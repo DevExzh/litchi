@@ -4,10 +4,10 @@
 //! package-bound orchestration in separate layers while retaining the
 //! historical `crate::document` entry point.
 //!
-//! Eager `Package::edit()` retains the complete source package. Committing
+//! Both eager and source-backed `Package::edit()` retain the complete source package. Committing
 //! validates and returns the immutable package through [`Commit::package`].
-//! Source-backed `edit()` still uses the transitional [`snapshot`] family
-//! until retained source-overlay publication is available.
+//! The owner type is the generic parameter of [`Edit`] and [`Commit`];
+//! it defaults to the eager [`crate::Package`].
 //!
 //! ```
 //! use litchi_docx::{Package, document, source_backed};
@@ -38,7 +38,8 @@ mod transaction;
 /// Transitional standalone XML transactions used by source-backed publication.
 ///
 /// These values retain main-document XML, not an editable package. Ordinary
-/// eager callers use [`crate::Package::edit`] and [`crate::document::Edit`] instead.
+/// callers use [`crate::Package::edit`] or [`crate::source_backed::Package::edit`]
+/// and [`crate::document::Edit`] instead.
 pub mod snapshot {
     pub use super::transaction::{Commit, Edit};
 }
