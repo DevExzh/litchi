@@ -7,7 +7,7 @@ use std::hint::black_box;
 use std::io::Cursor;
 
 use litchi_opc::{
-    AuthoredXmlFragment, OpcError, OpcPackage, PackURI, ReadResource, SourceBackedPackage,
+    AuthoredXmlFragment, OpcError, OpcPackage, PackURI, SourceBackedPackage, SourceLimitKind,
     SourceLimits, SourceTopologyPlan, probe_package_catalog_from_reader_with_limits,
 };
 
@@ -552,14 +552,14 @@ fn assert_boundary_rejected(
     data: &[u8],
     kind: BoundaryKind,
     value: usize,
-    expected_resource: ReadResource,
+    expected_resource: SourceLimitKind,
 ) {
     let limits = boundary_limits(kind, value);
     let source = SourceBackedPackage::from_vec_with_limits(data.to_vec(), limits);
     assert!(
         matches!(
             source,
-            Err(OpcError::ReadLimit { resource, .. }) if resource == expected_resource
+            Err(OpcError::Limit { kind: resource, .. }) if resource == expected_resource
         ),
         "source-backed path must reject the {} boundary at {value}",
         kind.label()
@@ -568,7 +568,7 @@ fn assert_boundary_rejected(
     assert!(
         matches!(
             eager,
-            Err(OpcError::ReadLimit { resource, .. }) if resource == expected_resource
+            Err(OpcError::Limit { kind: resource, .. }) if resource == expected_resource
         ),
         "eager path must reject the {} boundary at {value}",
         kind.label()
@@ -578,7 +578,7 @@ fn assert_boundary_rejected(
     assert!(
         matches!(
             probe,
-            Err(OpcError::ReadLimit { resource, .. }) if resource == expected_resource
+            Err(OpcError::Limit { kind: resource, .. }) if resource == expected_resource
         ),
         "probe path must reject the {} boundary at {value}",
         kind.label()
@@ -592,108 +592,108 @@ pub fn exercise_boundaries(data: &[u8], expected: BoundaryExpectations) {
         (
             BoundaryKind::InputBytes,
             expected.input_bytes,
-            ReadResource::InputBytes,
+            SourceLimitKind::InputBytes,
         ),
         (
             BoundaryKind::ArchiveMembers,
             expected.archive_members,
-            ReadResource::ArchiveMembers,
+            SourceLimitKind::ArchiveMembers,
         ),
-        (BoundaryKind::Parts, expected.parts, ReadResource::Parts),
+        (BoundaryKind::Parts, expected.parts, SourceLimitKind::Parts),
         (
             BoundaryKind::RelationshipParts,
             expected.relationship_parts,
-            ReadResource::RelationshipParts,
+            SourceLimitKind::RelationshipParts,
         ),
         (
             BoundaryKind::ContentTypesBytes,
             expected.content_types_bytes,
-            ReadResource::ContentTypesBytes,
+            SourceLimitKind::ContentTypesBytes,
         ),
         (
             BoundaryKind::ContentTypeMappings,
             expected.content_type_mappings,
-            ReadResource::ContentTypeMappings,
+            SourceLimitKind::ContentTypeMappings,
         ),
         (
             BoundaryKind::RelationshipXmlBytes,
             expected.relationship_xml_bytes,
-            ReadResource::RelationshipXmlBytes,
+            SourceLimitKind::RelationshipXmlBytes,
         ),
         (
             BoundaryKind::TotalRelationshipXmlBytes,
             expected.total_relationship_xml_bytes,
-            ReadResource::TotalRelationshipXmlBytes,
+            SourceLimitKind::TotalRelationshipXmlBytes,
         ),
         (
             BoundaryKind::RelationshipsPerPart,
             expected.relationships_per_part,
-            ReadResource::RelationshipsPerPart,
+            SourceLimitKind::RelationshipsPerPart,
         ),
         (
             BoundaryKind::TotalRelationships,
             expected.total_relationships,
-            ReadResource::TotalRelationships,
+            SourceLimitKind::TotalRelationships,
         ),
         (
             BoundaryKind::ArchiveMemberNameBytes,
             expected.archive_member_name_bytes,
-            ReadResource::ArchiveMemberNameBytes,
+            SourceLimitKind::ArchiveMemberNameBytes,
         ),
         (
             BoundaryKind::ArchiveMetadataBytes,
             expected.archive_metadata_bytes,
-            ReadResource::ArchiveMetadataBytes,
+            SourceLimitKind::ArchiveMetadataBytes,
         ),
         (
             BoundaryKind::ArchiveCompressedBytes,
             expected.archive_compressed_bytes,
-            ReadResource::ArchiveCompressedBytes,
+            SourceLimitKind::ArchiveCompressedBytes,
         ),
         (
             BoundaryKind::ArchiveEntryBytes,
             expected.archive_entry_bytes,
-            ReadResource::ArchiveEntryBytes,
+            SourceLimitKind::ArchiveEntryBytes,
         ),
         (
             BoundaryKind::ArchiveTotalBytes,
             expected.archive_total_bytes,
-            ReadResource::ArchiveTotalBytes,
+            SourceLimitKind::ArchiveTotalBytes,
         ),
         (
             BoundaryKind::PartBytes,
             expected.part_bytes,
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
         ),
         (
             BoundaryKind::TotalPartBytes,
             expected.total_part_bytes,
-            ReadResource::TotalPartBytes,
+            SourceLimitKind::TotalPartBytes,
         ),
         (
             BoundaryKind::RelationshipGraphNodes,
             expected.relationship_graph_nodes,
-            ReadResource::RelationshipGraphNodes,
+            SourceLimitKind::RelationshipGraphNodes,
         ),
         (
             BoundaryKind::XmlEvents,
             expected.xml_events,
-            ReadResource::XmlEvents,
+            SourceLimitKind::XmlEvents,
         ),
         (
             BoundaryKind::TotalRelationshipXmlEvents,
             expected.total_relationship_xml_events,
-            ReadResource::TotalRelationshipXmlEvents,
+            SourceLimitKind::TotalRelationshipXmlEvents,
         ),
         (
             BoundaryKind::XmlAttributeBytes,
             expected.xml_attribute_bytes,
-            ReadResource::XmlAttributeBytes,
+            SourceLimitKind::XmlAttributeBytes,
         ),
         (
             BoundaryKind::RelationshipTargetBytes,
             expected.relationship_target_bytes,
-            ReadResource::RelationshipTargetBytes,
+            SourceLimitKind::RelationshipTargetBytes,
         ),
     ];
     for (kind, exact, resource) in cases {

@@ -22,7 +22,7 @@
 use std::io::{Cursor, Write};
 
 use litchi::error::Source;
-use litchi::opc::{OpcError, OpcPackage, PackURI, ReadResource};
+use litchi::opc::{OpcError, OpcPackage, PackURI, SourceLimitKind};
 use litchi::sheet::WorkbookTrait;
 use litchi::xlsb;
 use litchi::{Code, File, FileFormat, OpenOptions, SourceMode};
@@ -297,7 +297,7 @@ fn assert_boxed_unsupported_feature<T>(result: litchi_core::sheet::Result<T>, ex
 #[track_caller]
 fn assert_read_limit(
     error: &litchi::Error,
-    resource: ReadResource,
+    resource: SourceLimitKind,
     observed: Option<u64>,
     maximum: u64,
 ) {
@@ -305,7 +305,7 @@ fn assert_read_limit(
     assert!(
         matches!(
             error.leaf(),
-            Source::Opc(OpcError::ReadLimit { resource: actual_resource, actual, maximum: limit })
+            Source::Opc(OpcError::Limit { kind: actual_resource, observed: actual, maximum: limit })
                 if *actual_resource == resource
                     && observed.is_none_or(|observed| *actual == observed)
                     && *limit == maximum
@@ -467,7 +467,7 @@ fn dynamic_owned_bytes_facade_enforces_exact_input_limit() {
         .expect_err("an input over the configured limit must be rejected before copying");
     assert_read_limit(
         &error,
-        ReadResource::InputBytes,
+        SourceLimitKind::InputBytes,
         Some(input_bytes),
         input_bytes - 1,
     );
@@ -503,7 +503,7 @@ fn dynamic_owned_bytes_facade_enforces_exact_part_limit() {
         .expect_err("a part over the configured limit must be rejected");
     assert_read_limit(
         &error,
-        ReadResource::PartBytes,
+        SourceLimitKind::PartBytes,
         None,
         largest_part_bytes - 1,
     );

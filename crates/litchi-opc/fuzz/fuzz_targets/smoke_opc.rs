@@ -11,7 +11,7 @@ use std::panic::{self, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 
 use litchi_opc::{
-    AuthoredXmlFragment, OpcError, OpcPackage, PackURI, ReadResource, SourceBackedPackage,
+    AuthoredXmlFragment, OpcError, OpcPackage, PackURI, SourceBackedPackage, SourceLimitKind,
     SourceLimits, SourceTopologyPlan, probe_package_catalog_from_reader_with_limits,
 };
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
@@ -224,7 +224,12 @@ fn assert_ingress_admits(data: &[u8], limits: SourceLimits, label: &str) {
     );
 }
 
-fn assert_ingress_rejects(data: &[u8], limits: SourceLimits, resource: ReadResource, label: &str) {
+fn assert_ingress_rejects(
+    data: &[u8],
+    limits: SourceLimits,
+    resource: SourceLimitKind,
+    label: &str,
+) {
     let source_error = match SourceBackedPackage::from_vec_with_limits(data.to_vec(), limits) {
         Ok(_) => panic!("source-backed ingress unexpectedly admitted boundary input for {label}"),
         Err(error) => error,
@@ -245,9 +250,9 @@ fn assert_ingress_rejects(data: &[u8], limits: SourceLimits, resource: ReadResou
     assert_read_limit(probe_error, resource, label, "metadata probe");
 }
 
-fn assert_read_limit(error: OpcError, resource: ReadResource, label: &str, ingress: &str) {
+fn assert_read_limit(error: OpcError, resource: SourceLimitKind, label: &str, ingress: &str) {
     assert!(
-        matches!(error, OpcError::ReadLimit { resource: actual, .. } if actual == resource),
+        matches!(error, OpcError::Limit { kind: actual, .. } if actual == resource),
         "{ingress} ingress returned {error:?}, expected {resource:?} for {label}"
     );
 }
@@ -323,16 +328,18 @@ fn limits_for_archive_total_entries(maximum: usize) -> SourceLimits {
 fn assert_builder_constraints() {
     assert!(matches!(
         SourceLimits::builder().max_xml_depth(0),
-        Err(OpcError::InvalidReadLimit {
-            resource: ReadResource::XmlDepth,
+        Err(OpcError::InvalidLimit {
+            kind: SourceLimitKind::XmlDepth,
             value: 0,
+            ..
         })
     ));
     assert!(matches!(
         SourceLimits::builder().max_archive_total_entries(0),
-        Err(OpcError::InvalidReadLimit {
-            resource: ReadResource::ArchiveTotalEntries,
+        Err(OpcError::InvalidLimit {
+            kind: SourceLimitKind::ArchiveTotalEntries,
             value: 0,
+            ..
         })
     ));
     assert!(matches!(
@@ -346,9 +353,11 @@ fn assert_builder_constraints() {
             .max_archive_total_entries(5)
             .expect("positive total-entry ceiling")
             .build(),
-        Err(OpcError::InvalidReadLimit {
-            resource: ReadResource::ArchiveTotalEntries,
-            value: 5,
+        Err(OpcError::InvalidLimit {
+            kind: SourceLimitKind::ArchiveMembers,
+            value: 6,
+            maximum: 5,
+            ..
         })
     ));
 }
@@ -364,7 +373,7 @@ fn exercise_v4_limit_boundaries() {
     assert_ingress_rejects(
         &depth,
         limits_for_xml_depth(1),
-        ReadResource::XmlDepth,
+        SourceLimitKind::XmlDepth,
         "XML depth one-under ceiling",
     );
 
@@ -382,7 +391,7 @@ fn exercise_v4_limit_boundaries() {
     assert_ingress_rejects(
         &entries,
         limits_for_archive_total_entries(5),
-        ReadResource::ArchiveTotalEntries,
+        SourceLimitKind::ArchiveTotalEntries,
         "archive total entries one-under ceiling",
     );
     assert_builder_constraints();

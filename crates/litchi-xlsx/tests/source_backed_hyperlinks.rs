@@ -690,7 +690,7 @@ fn managed_limits_cancellation_and_partial_sink_are_typed() {
             Arc::new(CountingSource::new(source_bytes.clone())),
             limits,
         ),
-        Err(Error::Package(OpcError::ReadLimit { .. }))
+        Err(Error::Package(OpcError::Limit { .. }))
     ));
 
     let (budget, cancellation_source, context) = managed_context(exact);

@@ -207,8 +207,8 @@ pub fn detect_format_smart_with_tail<T: ZipTail>(
 pub(crate) fn hard_ooxml_probe_error(error: &crate::opc::OpcError) -> bool {
     matches!(
         error,
-        crate::opc::OpcError::InvalidReadLimit { .. }
-            | crate::opc::OpcError::ReadLimit { .. }
+        crate::opc::OpcError::InvalidLimit { .. }
+            | crate::opc::OpcError::Limit { .. }
             | crate::opc::OpcError::Cancelled
             | crate::opc::OpcError::Execution(_)
             | crate::opc::OpcError::ParallelRead(_)

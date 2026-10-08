@@ -500,9 +500,9 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
         .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)?
         .build()?;
     match litchi_pptx::Package::from_vec_with_limits(source.clone(), under_limit) {
-        Err(litchi_pptx::Error::Opc(litchi_opc::OpcError::ReadLimit {
-            resource: litchi_opc::ReadResource::InputBytes,
-            actual,
+        Err(litchi_pptx::Error::Opc(litchi_opc::OpcError::Limit {
+            kind: litchi_opc::SourceLimitKind::InputBytes,
+            observed: actual,
             maximum,
         })) if actual == source.len() as u64 && maximum == source.len() as u64 - 1 => {},
         _ => {

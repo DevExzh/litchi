@@ -545,7 +545,7 @@ fn mce_selected_collections_and_partial_sinks_are_refused() {
             Arc::new(VersionedSource::new(ordinary_fixture(false))),
             limits,
         ),
-        Err(Error::Package(OpcError::ReadLimit { .. }))
+        Err(Error::Package(OpcError::Limit { .. }))
     ));
 
     let source_bytes = ordinary_fixture(false);

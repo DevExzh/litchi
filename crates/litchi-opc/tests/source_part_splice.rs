@@ -779,8 +779,8 @@ fn exact_noop_authenticates_source_and_candidate_hashes_and_archive_limit() {
         .expect_err("physical archive limit must apply to an exact no-op");
     assert!(matches!(
         error,
-        OpcError::ReadLimit {
-            resource: litchi_opc::ReadResource::ArchiveTotalBytes,
+        OpcError::Limit {
+            kind: litchi_opc::SourceLimitKind::ArchiveTotalBytes,
             ..
         }
     ));
@@ -1042,8 +1042,8 @@ fn candidate_limit_is_refused_without_output() {
         .expect_err("candidate limit must reject the plan");
     assert!(matches!(
         error,
-        OpcError::ReadLimit {
-            actual,
+        OpcError::Limit {
+            observed: actual,
             maximum,
             ..
         } if actual == candidate_len && maximum == candidate_len - 1

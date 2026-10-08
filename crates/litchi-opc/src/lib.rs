@@ -69,7 +69,7 @@ pub use accounting::OpcOperationAccounting;
 pub use content_type::ContentType;
 pub use error::{OpcError, Result, SpliceResource};
 pub use execution::OpenSession;
-pub use limits::{ReadResource, SourceLimits, SourceLimitsBuilder};
+pub use limits::{SourceLimitKind, SourceLimits, SourceLimitsBuilder};
 pub use members::{NonPartMember, NonPartReason};
 pub use package::{
     CanonicalRelationshipsPlan, CompressedPartTransfer, ContentTypeEdit, ContentTypesEditPlan,

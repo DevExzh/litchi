@@ -3,7 +3,7 @@
 use crate::constants::namespace;
 use crate::error::{OpcError, Result};
 use crate::leniency::{CDATA_NODE, ContentTypeDefect, TEXT_NODE, ToleranceReport, bounded_name};
-use crate::limits::{ReadResource, SourceLimits};
+use crate::limits::{SourceLimitKind, SourceLimits};
 use crate::packuri::{CONTENT_TYPES_URI, PackURI};
 use crate::xml_attributes::BytesStartExt as _;
 use quick_xml::events::{BytesStart, Event};
@@ -108,7 +108,7 @@ impl ContentTypeMap {
         report: &mut ToleranceReport,
     ) -> Result<Self> {
         limits.check(
-            ReadResource::ContentTypesBytes,
+            SourceLimitKind::ContentTypesBytes,
             xml.len() as u64,
             limits.max_content_types_bytes() as u64,
         )?;
@@ -130,13 +130,17 @@ impl ContentTypeMap {
         let mut open_mapping: Option<String> = None;
 
         loop {
-            events = checked_increment(events, limits.max_xml_events(), ReadResource::XmlEvents)?;
+            events =
+                checked_increment(events, limits.max_xml_events(), SourceLimitKind::XmlEvents)?;
             let decoder = reader.decoder();
             let (resolved_namespace, event) = reader.read_resolved_event()?;
             match event {
                 Event::Start(element) => {
-                    let next_depth =
-                        checked_increment(depth, limits.max_xml_depth(), ReadResource::XmlDepth)?;
+                    let next_depth = checked_increment(
+                        depth,
+                        limits.max_xml_depth(),
+                        SourceLimitKind::XmlDepth,
+                    )?;
                     if skip_from.is_none() {
                         match inspect_element(
                             &mut map,
@@ -455,7 +459,7 @@ fn inspect_element(
     *entry_count = checked_increment(
         *entry_count,
         limits.max_content_type_mappings(),
-        ReadResource::ContentTypeMappings,
+        SourceLimitKind::ContentTypeMappings,
     )?;
 
     if local_name.as_ref() == b"Default" {
@@ -555,7 +559,7 @@ fn required_attributes(
     for attribute_result in element.checked_attributes() {
         let attribute = attribute_result?;
         limits.check(
-            ReadResource::XmlAttributeBytes,
+            SourceLimitKind::XmlAttributeBytes,
             attribute.value.as_ref().len() as u64,
             limits.max_xml_attribute_bytes() as u64,
         )?;
@@ -565,7 +569,7 @@ fn required_attributes(
                 .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)?
                 .to_string();
             limits.check(
-                ReadResource::XmlAttributeBytes,
+                SourceLimitKind::XmlAttributeBytes,
                 value.len() as u64,
                 limits.max_xml_attribute_bytes() as u64,
             )?;
@@ -575,7 +579,7 @@ fn required_attributes(
                 .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)?
                 .to_string();
             limits.check(
-                ReadResource::XmlAttributeBytes,
+                SourceLimitKind::XmlAttributeBytes,
                 value.len() as u64,
                 limits.max_xml_attribute_bytes() as u64,
             )?;
@@ -616,16 +620,16 @@ fn allocation(resource: &'static str, source: TryReserveError) -> OpcError {
     OpcError::Allocation { resource, source }
 }
 
-fn checked_increment(current: usize, maximum: usize, resource: ReadResource) -> Result<usize> {
-    let actual = current.checked_add(1).ok_or(OpcError::ReadLimit {
-        resource,
-        actual: u64::MAX,
+fn checked_increment(current: usize, maximum: usize, resource: SourceLimitKind) -> Result<usize> {
+    let actual = current.checked_add(1).ok_or(OpcError::Limit {
+        kind: resource,
+        observed: u64::MAX,
         maximum: maximum as u64,
     })?;
     if actual > maximum {
-        return Err(OpcError::ReadLimit {
-            resource,
-            actual: actual as u64,
+        return Err(OpcError::Limit {
+            kind: resource,
+            observed: actual as u64,
             maximum: maximum as u64,
         });
     }
@@ -789,8 +793,8 @@ mod tests {
                     .build()
                     .unwrap()
             ),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::XmlDepth,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::XmlDepth,
                 ..
             })
         ));
@@ -955,8 +959,8 @@ mod tests {
         let oversized = vec![b' '; valid.len() + 1];
         assert!(matches!(
             ContentTypeMap::from_xml(&oversized, exact),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::ContentTypesBytes,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::ContentTypesBytes,
                 ..
             })
         ));
@@ -973,9 +977,9 @@ mod tests {
                     .build()
                     .unwrap()
             ),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::ContentTypeMappings,
-                actual: 2,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::ContentTypeMappings,
+                observed: 2,
                 maximum: 1,
             })
         ));
@@ -990,8 +994,8 @@ mod tests {
                     .build()
                     .unwrap()
             ),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::XmlEvents,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::XmlEvents,
                 ..
             })
         ));
@@ -1006,9 +1010,9 @@ mod tests {
                     .build()
                     .unwrap()
             ),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::XmlDepth,
-                actual: 2,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::XmlDepth,
+                observed: 2,
                 maximum: 1,
             })
         ));
@@ -1026,8 +1030,8 @@ mod tests {
                     .build()
                     .unwrap(),
             ),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::XmlAttributeBytes,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::XmlAttributeBytes,
                 ..
             })
         ));

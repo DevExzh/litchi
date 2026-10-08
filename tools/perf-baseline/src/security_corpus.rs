@@ -41,7 +41,7 @@ use litchi_doc::{Error as DocError, Limits as DocLimits, OpenOptions, Package as
 use litchi_docx::source_backed::Package as DocxSourcePackage;
 use litchi_ole_common::object::Limits as ObjectLimits;
 use litchi_opc::{
-    OpcError, OpcPackage, ReadResource, SourceBackedPackage, SourceLimits, TargetMode,
+    OpcError, OpcPackage, SourceBackedPackage, SourceLimitKind, SourceLimits, TargetMode,
 };
 use litchi_sign::{Policy, Status};
 use litchi_xls::{Workbook as XlsWorkbook, cell_values::Snapshot as XlsSnapshot};
@@ -354,8 +354,8 @@ fn bounded_ingress_and_publication() -> Result<(), Box<dyn Error>> {
     };
     assert!(matches!(
         error,
-        OpcError::ReadLimit {
-            resource: ReadResource::InputBytes,
+        OpcError::Limit {
+            kind: SourceLimitKind::InputBytes,
             ..
         }
     ));

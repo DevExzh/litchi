@@ -13,8 +13,8 @@ use litchi_opc::constants::content_type as ct;
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::part::{BlobPart, Part};
 use litchi_opc::{
-    ContentTypeEdit, OpcPackage, OwnedContentTypes, OwnedRelationships, PackURI, ReadResource,
-    RelationshipEdit, SourceLimits, TargetMode, validate_source_xml_bytes,
+    ContentTypeEdit, OpcPackage, OwnedContentTypes, OwnedRelationships, PackURI, RelationshipEdit,
+    SourceLimitKind, SourceLimits, TargetMode, validate_source_xml_bytes,
 };
 use quick_xml::events::Event;
 use quick_xml::{Reader, XmlVersion};
@@ -809,7 +809,7 @@ fn project_aggregate_metrics(
     if let Some(length) = edit.added_part_len {
         check_limit(
             limits,
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             u64::try_from(length)
                 .map_err(|_| invalid("stylesWithEffects part byte count overflows u64"))?,
             limits.max_part_bytes(),
@@ -817,61 +817,61 @@ fn project_aggregate_metrics(
     }
     check_limit(
         limits,
-        ReadResource::Parts,
+        SourceLimitKind::Parts,
         parts as u64,
         limits.max_parts() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::TotalPartBytes,
+        SourceLimitKind::TotalPartBytes,
         total_part_bytes,
         limits.max_total_part_bytes(),
     )?;
     check_limit(
         limits,
-        ReadResource::RelationshipParts,
+        SourceLimitKind::RelationshipParts,
         relationship_parts as u64,
         limits.max_relationship_parts() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::TotalRelationships,
+        SourceLimitKind::TotalRelationships,
         total_relationships as u64,
         limits.max_total_relationships() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::RelationshipGraphNodes,
+        SourceLimitKind::RelationshipGraphNodes,
         relationship_graph_nodes as u64,
         limits.max_relationship_graph_nodes() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::TotalRelationshipXmlBytes,
+        SourceLimitKind::TotalRelationshipXmlBytes,
         relationship_xml_bytes,
         limits.max_total_relationship_xml_bytes() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::TotalRelationshipXmlEvents,
+        SourceLimitKind::TotalRelationshipXmlEvents,
         relationship_xml_events as u64,
         limits.max_total_relationship_xml_events() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::ContentTypesBytes,
+        SourceLimitKind::ContentTypesBytes,
         edit.content_type_len as u64,
         limits.max_content_types_bytes() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::ContentTypeMappings,
+        SourceLimitKind::ContentTypeMappings,
         edit.content_type_mappings as u64,
         limits.max_content_type_mappings() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::XmlEvents,
+        SourceLimitKind::XmlEvents,
         edit.content_type_events as u64,
         limits.max_xml_events() as u64,
     )?;
@@ -1341,37 +1341,37 @@ fn capture_aggregate_metrics(package: &OpcPackage) -> Result<AggregateMetrics> {
     };
     check_limit(
         limits,
-        ReadResource::Parts,
+        SourceLimitKind::Parts,
         metrics.parts as u64,
         limits.max_parts() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::TotalPartBytes,
+        SourceLimitKind::TotalPartBytes,
         metrics.total_part_bytes,
         limits.max_total_part_bytes(),
     )?;
     check_limit(
         limits,
-        ReadResource::TotalRelationships,
+        SourceLimitKind::TotalRelationships,
         metrics.total_relationships as u64,
         limits.max_total_relationships() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::RelationshipParts,
+        SourceLimitKind::RelationshipParts,
         metrics.relationship_parts as u64,
         limits.max_relationship_parts() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::TotalRelationshipXmlBytes,
+        SourceLimitKind::TotalRelationshipXmlBytes,
         metrics.relationship_xml_bytes,
         limits.max_total_relationship_xml_bytes() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::TotalRelationshipXmlEvents,
+        SourceLimitKind::TotalRelationshipXmlEvents,
         metrics.relationship_xml_events as u64,
         limits.max_total_relationship_xml_events() as u64,
     )?;
@@ -1850,7 +1850,7 @@ fn publish_resource(
                 )?;
                 check_limit(
                     limits,
-                    ReadResource::ContentTypesBytes,
+                    SourceLimitKind::ContentTypesBytes,
                     content_type_len as u64,
                     limits.max_content_types_bytes() as u64,
                 )?;
@@ -1875,7 +1875,7 @@ fn publish_resource(
             )?;
             check_limit(
                 limits,
-                ReadResource::ContentTypesBytes,
+                SourceLimitKind::ContentTypesBytes,
                 replacement_content_types.bytes().len() as u64,
                 limits.max_content_types_bytes() as u64,
             )?;
@@ -1964,7 +1964,7 @@ fn publish_resource(
                 )?;
                 check_limit(
                     limits,
-                    ReadResource::ContentTypesBytes,
+                    SourceLimitKind::ContentTypesBytes,
                     content_type_len as u64,
                     limits.max_content_types_bytes() as u64,
                 )?;
@@ -1993,7 +1993,7 @@ fn publish_resource(
             )?;
             check_limit(
                 limits,
-                ReadResource::ContentTypesBytes,
+                SourceLimitKind::ContentTypesBytes,
                 replacement_content_types.bytes().len() as u64,
                 limits.max_content_types_bytes() as u64,
             )?;
@@ -2109,7 +2109,7 @@ fn preflight_package_limits(
     }
     check_limit(
         limits,
-        ReadResource::Parts,
+        SourceLimitKind::Parts,
         final_parts as u64,
         limits.max_parts() as u64,
     )?;
@@ -2125,7 +2125,7 @@ fn preflight_package_limits(
     }
     check_limit(
         limits,
-        ReadResource::RelationshipGraphNodes,
+        SourceLimitKind::RelationshipGraphNodes,
         final_graph_nodes as u64,
         limits.max_relationship_graph_nodes() as u64,
     )?;
@@ -2150,14 +2150,14 @@ fn preflight_package_limits(
             .ok_or_else(|| invalid("stylesWithEffects replacement part bytes overflow"))?;
         check_limit(
             limits,
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             new_part_len as u64,
             limits.max_part_bytes(),
         )?;
     }
     check_limit(
         limits,
-        ReadResource::TotalPartBytes,
+        SourceLimitKind::TotalPartBytes,
         total_part_bytes,
         limits.max_total_part_bytes(),
     )?;
@@ -2250,25 +2250,25 @@ fn preflight_package_limits(
     }
     check_limit(
         limits,
-        ReadResource::RelationshipParts,
+        SourceLimitKind::RelationshipParts,
         final_relationship_parts as u64,
         limits.max_relationship_parts() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::TotalRelationships,
+        SourceLimitKind::TotalRelationships,
         relationship_count as u64,
         limits.max_total_relationships() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::TotalRelationshipXmlEvents,
+        SourceLimitKind::TotalRelationshipXmlEvents,
         relationship_events as u64,
         limits.max_total_relationship_xml_events() as u64,
     )?;
     check_limit(
         limits,
-        ReadResource::TotalRelationshipXmlBytes,
+        SourceLimitKind::TotalRelationshipXmlBytes,
         relationship_bytes,
         limits.max_total_relationship_xml_bytes() as u64,
     )?;
@@ -2313,7 +2313,7 @@ fn enqueue_relationship_graph_target(
         .ok_or_else(|| invalid("stylesWithEffects relationship graph node count overflows"))?;
     check_limit(
         limits,
-        ReadResource::RelationshipGraphNodes,
+        SourceLimitKind::RelationshipGraphNodes,
         next as u64,
         limits.max_relationship_graph_nodes() as u64,
     )?;
@@ -2862,14 +2862,14 @@ fn invalid(message: impl Into<String>) -> Error {
 
 fn check_limit(
     _limits: SourceLimits,
-    resource: ReadResource,
+    resource: SourceLimitKind,
     actual: u64,
     maximum: u64,
 ) -> Result<()> {
     if actual > maximum {
-        return Err(Error::Opc(litchi_opc::OpcError::ReadLimit {
-            resource,
-            actual,
+        return Err(Error::Opc(litchi_opc::OpcError::Limit {
+            kind: resource,
+            observed: actual,
             maximum,
         }));
     }
@@ -2900,7 +2900,7 @@ fn validate_xml_with_limits(
     }
     check_limit(
         limits,
-        ReadResource::PartBytes,
+        SourceLimitKind::PartBytes,
         xml.len() as u64,
         limits.max_part_bytes(),
     )?;
@@ -2927,7 +2927,7 @@ fn validate_xml_with_limits(
         }
         check_limit(
             limits,
-            ReadResource::XmlEvents,
+            SourceLimitKind::XmlEvents,
             events as u64,
             limits.max_xml_events() as u64,
         )?;
@@ -2963,7 +2963,7 @@ fn validate_xml_with_limits(
                 }
                 check_limit(
                     limits,
-                    ReadResource::XmlDepth,
+                    SourceLimitKind::XmlDepth,
                     depth as u64,
                     limits.max_xml_depth() as u64,
                 )?;

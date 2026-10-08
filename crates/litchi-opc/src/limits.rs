@@ -15,7 +15,7 @@ const GIB: u64 = 1024 * 1024 * 1024;
 /// A bounded OPC resource.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum ReadResource {
+pub enum SourceLimitKind {
     /// Compressed package input bytes.
     InputBytes,
     /// ZIP non-directory members.
@@ -66,7 +66,7 @@ pub enum ReadResource {
     RelationshipTargetBytes,
 }
 
-impl fmt::Display for ReadResource {
+impl fmt::Display for SourceLimitKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Self::InputBytes => "package input bytes",
@@ -287,11 +287,11 @@ impl SourceLimits {
         clippy::unused_self,
         reason = "kept as a method so crate-internal callers write limits.check(...)"
     )]
-    pub(crate) fn check(self, resource: ReadResource, actual: u64, maximum: u64) -> Result<()> {
+    pub(crate) fn check(self, resource: SourceLimitKind, actual: u64, maximum: u64) -> Result<()> {
         if actual > maximum {
-            return Err(OpcError::ReadLimit {
-                resource,
-                actual,
+            return Err(OpcError::Limit {
+                kind: resource,
+                observed: actual,
                 maximum,
             });
         }
@@ -299,7 +299,7 @@ impl SourceLimits {
     }
 
     pub(crate) fn check_input_bytes(self, actual: u64) -> Result<()> {
-        self.check(ReadResource::InputBytes, actual, self.input_bytes)
+        self.check(SourceLimitKind::InputBytes, actual, self.input_bytes)
     }
 }
 
@@ -351,23 +351,30 @@ impl SourceLimitsBuilder {
     pub fn build(self) -> Result<SourceLimits> {
         if self.limits.relationship_parts > self.limits.archive_members {
             return Err(invalid(
-                ReadResource::RelationshipParts,
+                SourceLimitKind::RelationshipParts,
                 self.limits.relationship_parts as u64,
+                self.limits.archive_members as u64,
             ));
         }
         if self.limits.archive_members > self.limits.archive_total_entries {
             return Err(invalid(
-                ReadResource::ArchiveTotalEntries,
+                SourceLimitKind::ArchiveMembers,
+                self.limits.archive_members as u64,
                 self.limits.archive_total_entries as u64,
             ));
         }
         if self.limits.parts > self.limits.archive_members {
-            return Err(invalid(ReadResource::Parts, self.limits.parts as u64));
+            return Err(invalid(
+                SourceLimitKind::Parts,
+                self.limits.parts as u64,
+                self.limits.archive_members as u64,
+            ));
         }
         if self.limits.relationship_target_bytes > self.limits.xml_attribute_bytes {
             return Err(invalid(
-                ReadResource::RelationshipTargetBytes,
+                SourceLimitKind::RelationshipTargetBytes,
                 self.limits.relationship_target_bytes as u64,
+                self.limits.xml_attribute_bytes as u64,
             ));
         }
         Ok(self.limits)
@@ -389,13 +396,13 @@ impl SourceLimitsBuilder {
     ///
     /// Returns `Err` if `value` is zero.
     pub fn max_archive_members(mut self, value: usize) -> Result<Self> {
-        validate_count(ReadResource::ArchiveMembers, value)?;
+        validate_count(SourceLimitKind::ArchiveMembers, value)?;
         self.limits.archive_members = value;
         Ok(self)
     }
     /// Set the total ZIP central-directory entry ceiling, including directories.
     pub fn max_archive_total_entries(mut self, value: usize) -> Result<Self> {
-        validate_count(ReadResource::ArchiveTotalEntries, value)?;
+        validate_count(SourceLimitKind::ArchiveTotalEntries, value)?;
         self.limits.archive_total_entries = value;
         Ok(self)
     }
@@ -405,7 +412,7 @@ impl SourceLimitsBuilder {
     ///
     /// Returns `Err` if `value` is zero.
     pub fn max_archive_member_name_bytes(mut self, value: u64) -> Result<Self> {
-        validate_bytes(ReadResource::ArchiveMemberNameBytes, value)?;
+        validate_bytes(SourceLimitKind::ArchiveMemberNameBytes, value)?;
         self.limits.archive_member_name_bytes = value;
         Ok(self)
     }
@@ -415,7 +422,7 @@ impl SourceLimitsBuilder {
     ///
     /// Returns `Err` if `value` is zero.
     pub fn max_archive_metadata_bytes(mut self, value: u64) -> Result<Self> {
-        validate_bytes(ReadResource::ArchiveMetadataBytes, value)?;
+        validate_bytes(SourceLimitKind::ArchiveMetadataBytes, value)?;
         self.limits.archive_metadata_bytes = value;
         Ok(self)
     }
@@ -425,7 +432,7 @@ impl SourceLimitsBuilder {
     ///
     /// Returns `Err` if `value` is zero.
     pub fn max_archive_compressed_bytes(mut self, value: u64) -> Result<Self> {
-        validate_bytes(ReadResource::ArchiveCompressedBytes, value)?;
+        validate_bytes(SourceLimitKind::ArchiveCompressedBytes, value)?;
         self.limits.archive_compressed_bytes = value;
         Ok(self)
     }
@@ -435,7 +442,7 @@ impl SourceLimitsBuilder {
     ///
     /// Returns `Err` if `value` is zero.
     pub fn max_archive_entry_bytes(mut self, value: u64) -> Result<Self> {
-        validate_bytes(ReadResource::ArchiveEntryBytes, value)?;
+        validate_bytes(SourceLimitKind::ArchiveEntryBytes, value)?;
         self.limits.archive_entry_bytes = value;
         Ok(self)
     }
@@ -445,7 +452,7 @@ impl SourceLimitsBuilder {
     ///
     /// Returns `Err` if `value` is zero.
     pub fn max_archive_total_bytes(mut self, value: u64) -> Result<Self> {
-        validate_bytes(ReadResource::ArchiveTotalBytes, value)?;
+        validate_bytes(SourceLimitKind::ArchiveTotalBytes, value)?;
         self.limits.archive_total_bytes = value;
         Ok(self)
     }
@@ -455,7 +462,7 @@ impl SourceLimitsBuilder {
     ///
     /// Returns `Err` if `value` is zero.
     pub fn max_parts(mut self, value: usize) -> Result<Self> {
-        validate_count(ReadResource::Parts, value)?;
+        validate_count(SourceLimitKind::Parts, value)?;
         self.limits.parts = value;
         Ok(self)
     }
@@ -465,7 +472,7 @@ impl SourceLimitsBuilder {
     ///
     /// Returns `Err` if `value` is zero.
     pub fn max_part_bytes(mut self, value: u64) -> Result<Self> {
-        validate_bytes(ReadResource::PartBytes, value)?;
+        validate_bytes(SourceLimitKind::PartBytes, value)?;
         self.limits.part_bytes = value;
         Ok(self)
     }
@@ -475,7 +482,7 @@ impl SourceLimitsBuilder {
     ///
     /// Returns `Err` if `value` is zero.
     pub fn max_total_part_bytes(mut self, value: u64) -> Result<Self> {
-        validate_bytes(ReadResource::TotalPartBytes, value)?;
+        validate_bytes(SourceLimitKind::TotalPartBytes, value)?;
         self.limits.total_part_bytes = value;
         Ok(self)
     }
@@ -485,7 +492,7 @@ impl SourceLimitsBuilder {
     ///
     /// Returns `Err` if `value` is zero.
     pub fn max_content_types_bytes(mut self, value: usize) -> Result<Self> {
-        validate_count(ReadResource::ContentTypesBytes, value)?;
+        validate_count(SourceLimitKind::ContentTypesBytes, value)?;
         self.limits.content_types_bytes = value;
         Ok(self)
     }
@@ -495,7 +502,7 @@ impl SourceLimitsBuilder {
     ///
     /// Returns `Err` if `value` is zero.
     pub fn max_content_type_mappings(mut self, value: usize) -> Result<Self> {
-        validate_count(ReadResource::ContentTypeMappings, value)?;
+        validate_count(SourceLimitKind::ContentTypeMappings, value)?;
         self.limits.content_type_mappings = value;
         Ok(self)
     }
@@ -505,7 +512,7 @@ impl SourceLimitsBuilder {
     ///
     /// Returns `Err` if `value` is zero.
     pub fn max_relationship_parts(mut self, value: usize) -> Result<Self> {
-        validate_count(ReadResource::RelationshipParts, value)?;
+        validate_count(SourceLimitKind::RelationshipParts, value)?;
         self.limits.relationship_parts = value;
         Ok(self)
     }
@@ -515,7 +522,7 @@ impl SourceLimitsBuilder {
     ///
     /// Returns `Err` if `value` is zero.
     pub fn max_relationship_xml_bytes(mut self, value: usize) -> Result<Self> {
-        validate_count(ReadResource::RelationshipXmlBytes, value)?;
+        validate_count(SourceLimitKind::RelationshipXmlBytes, value)?;
         self.limits.relationship_xml_bytes = value;
         Ok(self)
     }
@@ -525,7 +532,7 @@ impl SourceLimitsBuilder {
     ///
     /// Returns `Err` if `value` is zero.
     pub fn max_total_relationship_xml_bytes(mut self, value: usize) -> Result<Self> {
-        validate_count(ReadResource::TotalRelationshipXmlBytes, value)?;
+        validate_count(SourceLimitKind::TotalRelationshipXmlBytes, value)?;
         self.limits.total_relationship_xml_bytes = value;
         Ok(self)
     }
@@ -535,7 +542,7 @@ impl SourceLimitsBuilder {
     ///
     /// Returns `Err` if `value` is zero.
     pub fn max_relationships_per_part(mut self, value: usize) -> Result<Self> {
-        validate_count(ReadResource::RelationshipsPerPart, value)?;
+        validate_count(SourceLimitKind::RelationshipsPerPart, value)?;
         self.limits.relationships_per_part = value;
         Ok(self)
     }
@@ -545,7 +552,7 @@ impl SourceLimitsBuilder {
     ///
     /// Returns `Err` if `value` is zero.
     pub fn max_total_relationships(mut self, value: usize) -> Result<Self> {
-        validate_count(ReadResource::TotalRelationships, value)?;
+        validate_count(SourceLimitKind::TotalRelationships, value)?;
         self.limits.total_relationships = value;
         Ok(self)
     }
@@ -555,7 +562,7 @@ impl SourceLimitsBuilder {
     ///
     /// Returns `Err` if `value` is zero.
     pub fn max_relationship_graph_nodes(mut self, value: usize) -> Result<Self> {
-        validate_count(ReadResource::RelationshipGraphNodes, value)?;
+        validate_count(SourceLimitKind::RelationshipGraphNodes, value)?;
         self.limits.relationship_graph_nodes = value;
         Ok(self)
     }
@@ -565,7 +572,7 @@ impl SourceLimitsBuilder {
     ///
     /// Returns `Err` if `value` is zero.
     pub fn max_xml_events(mut self, value: usize) -> Result<Self> {
-        validate_count(ReadResource::XmlEvents, value)?;
+        validate_count(SourceLimitKind::XmlEvents, value)?;
         self.limits.xml_events = value;
         Ok(self)
     }
@@ -575,7 +582,7 @@ impl SourceLimitsBuilder {
     ///
     /// Returns `Err` if `value` is zero.
     pub fn max_total_relationship_xml_events(mut self, value: usize) -> Result<Self> {
-        validate_count(ReadResource::TotalRelationshipXmlEvents, value)?;
+        validate_count(SourceLimitKind::TotalRelationshipXmlEvents, value)?;
         self.limits.total_relationship_xml_events = value;
         Ok(self)
     }
@@ -585,7 +592,7 @@ impl SourceLimitsBuilder {
     ///
     /// Returns `Err` if `value` is zero.
     pub fn max_xml_depth(mut self, value: usize) -> Result<Self> {
-        validate_count(ReadResource::XmlDepth, value)?;
+        validate_count(SourceLimitKind::XmlDepth, value)?;
         self.limits.xml_depth = value;
         Ok(self)
     }
@@ -595,7 +602,7 @@ impl SourceLimitsBuilder {
     ///
     /// Returns `Err` if `value` is zero.
     pub fn max_xml_attribute_bytes(mut self, value: usize) -> Result<Self> {
-        validate_count(ReadResource::XmlAttributeBytes, value)?;
+        validate_count(SourceLimitKind::XmlAttributeBytes, value)?;
         self.limits.xml_attribute_bytes = value;
         Ok(self)
     }
@@ -605,33 +612,41 @@ impl SourceLimitsBuilder {
     ///
     /// Returns `Err` if `value` is zero.
     pub fn max_relationship_target_bytes(mut self, value: usize) -> Result<Self> {
-        validate_count(ReadResource::RelationshipTargetBytes, value)?;
+        validate_count(SourceLimitKind::RelationshipTargetBytes, value)?;
         self.limits.relationship_target_bytes = value;
         Ok(self)
     }
 }
 
-fn invalid(resource: ReadResource, value: u64) -> OpcError {
-    OpcError::InvalidReadLimit { resource, value }
+fn invalid(kind: SourceLimitKind, value: u64, maximum: u64) -> OpcError {
+    OpcError::InvalidLimit {
+        kind,
+        value,
+        maximum,
+    }
 }
 
 fn validate_input(value: u64) -> Result<()> {
     if value == 0 || value > usize::MAX.saturating_sub(1) as u64 {
-        return Err(invalid(ReadResource::InputBytes, value));
+        return Err(invalid(
+            SourceLimitKind::InputBytes,
+            value,
+            usize::MAX.saturating_sub(1) as u64,
+        ));
     }
     Ok(())
 }
 
-fn validate_bytes(resource: ReadResource, value: u64) -> Result<()> {
+fn validate_bytes(resource: SourceLimitKind, value: u64) -> Result<()> {
     if value == 0 {
-        return Err(invalid(resource, value));
+        return Err(invalid(resource, value, u64::MAX));
     }
     Ok(())
 }
 
-fn validate_count(resource: ReadResource, value: usize) -> Result<()> {
+fn validate_count(resource: SourceLimitKind, value: usize) -> Result<()> {
     if value == 0 {
-        return Err(invalid(resource, 0));
+        return Err(invalid(resource, 0, usize::MAX as u64));
     }
     Ok(())
 }
@@ -649,9 +664,10 @@ mod tests {
     fn builder_rejects_zero_and_keeps_defaults_checked() {
         assert!(matches!(
             SourceLimits::builder().max_input_bytes(0),
-            Err(OpcError::InvalidReadLimit {
-                resource: ReadResource::InputBytes,
+            Err(OpcError::InvalidLimit {
+                kind: SourceLimitKind::InputBytes,
                 value: 0,
+                ..
             })
         ));
         assert_eq!(
@@ -660,6 +676,133 @@ mod tests {
                 .unwrap()
                 .max_total_part_bytes(),
             512 * MIB as u64
+        );
+    }
+
+    fn invalid_fields(error: OpcError) -> (SourceLimitKind, u64, u64) {
+        match error {
+            OpcError::InvalidLimit {
+                kind,
+                value,
+                maximum,
+            } => (kind, value, maximum),
+            error => panic!("expected invalid limit, got {error:?}"),
+        }
+    }
+
+    #[test]
+    fn invalid_scalar_limits_report_their_actual_upper_bounds() {
+        let input_max = usize::MAX.saturating_sub(1) as u64;
+        for value in [0, u64::MAX] {
+            assert_eq!(
+                invalid_fields(SourceLimits::builder().max_input_bytes(value).unwrap_err()),
+                (SourceLimitKind::InputBytes, value, input_max)
+            );
+        }
+        assert_eq!(
+            invalid_fields(
+                SourceLimits::builder()
+                    .max_archive_entry_bytes(0)
+                    .unwrap_err()
+            ),
+            (SourceLimitKind::ArchiveEntryBytes, 0, u64::MAX)
+        );
+        assert_eq!(
+            invalid_fields(SourceLimits::builder().max_xml_depth(0).unwrap_err()),
+            (SourceLimitKind::XmlDepth, 0, usize::MAX as u64)
+        );
+        assert!(SourceLimits::builder().max_input_bytes(input_max).is_ok());
+        assert!(
+            SourceLimits::builder()
+                .max_archive_entry_bytes(u64::MAX)
+                .is_ok()
+        );
+        assert!(SourceLimits::builder().max_xml_depth(usize::MAX).is_ok());
+        assert_eq!(
+            invalid_fields(
+                crate::SourcePartSpliceLimits::new(u64::MAX, 1, 1, 1, 1, 1).unwrap_err()
+            ),
+            (SourceLimitKind::PartBytes, u64::MAX, u64::MAX - 1)
+        );
+    }
+
+    #[test]
+    fn inconsistent_profiles_report_the_offending_dimension_and_bound() {
+        let cases = [
+            (
+                SourceLimits::builder()
+                    .max_archive_members(1)
+                    .unwrap()
+                    .max_relationship_parts(2)
+                    .unwrap()
+                    .build()
+                    .unwrap_err(),
+                (SourceLimitKind::RelationshipParts, 2, 1),
+            ),
+            (
+                SourceLimits::builder()
+                    .max_archive_members(3)
+                    .unwrap()
+                    .max_relationship_parts(1)
+                    .unwrap()
+                    .max_parts(1)
+                    .unwrap()
+                    .max_archive_total_entries(2)
+                    .unwrap()
+                    .build()
+                    .unwrap_err(),
+                (SourceLimitKind::ArchiveMembers, 3, 2),
+            ),
+            (
+                SourceLimits::builder()
+                    .max_archive_members(1)
+                    .unwrap()
+                    .max_relationship_parts(1)
+                    .unwrap()
+                    .max_parts(2)
+                    .unwrap()
+                    .build()
+                    .unwrap_err(),
+                (SourceLimitKind::Parts, 2, 1),
+            ),
+            (
+                SourceLimits::builder()
+                    .max_xml_attribute_bytes(2)
+                    .unwrap()
+                    .max_relationship_target_bytes(3)
+                    .unwrap()
+                    .build()
+                    .unwrap_err(),
+                (SourceLimitKind::RelationshipTargetBytes, 3, 2),
+            ),
+        ];
+        for (error, expected) in cases {
+            assert_eq!(invalid_fields(error), expected);
+        }
+    }
+
+    #[test]
+    fn source_limit_diagnostics_keep_canonical_content_free_fields() {
+        let error = OpcError::Limit {
+            kind: SourceLimitKind::InputBytes,
+            observed: 2,
+            maximum: 1,
+        };
+        assert_eq!(
+            format!("{error:?}"),
+            "Limit { kind: InputBytes, observed: 2, maximum: 1 }"
+        );
+        assert_eq!(
+            format!("{:?}", crate::error::replicate_deferred_error(&error)),
+            format!("{error:?}")
+        );
+        let invalid = SourceLimits::builder().max_input_bytes(0).unwrap_err();
+        assert_eq!(
+            format!("{invalid:?}"),
+            format!(
+                "InvalidLimit {{ kind: InputBytes, value: 0, maximum: {} }}",
+                usize::MAX.saturating_sub(1)
+            )
         );
     }
 }

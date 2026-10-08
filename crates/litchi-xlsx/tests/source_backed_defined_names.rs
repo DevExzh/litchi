@@ -417,7 +417,7 @@ fn protection_mce_limits_invalid_scopes_and_partial_sink_are_checked() {
             Arc::new(VersionedSource::new(bytes.clone())),
             limits,
         ),
-        Err(Error::Package(OpcError::ReadLimit { .. }))
+        Err(Error::Package(OpcError::Limit { .. }))
     ));
 
     let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();

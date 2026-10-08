@@ -25,7 +25,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits, ReadAt,
     Resource, SourceVersion,
 };
-use litchi_opc::{OpcError, PackURI, ReadResource, SourceBackedPackage, SourceLimits};
+use litchi_opc::{OpcError, PackURI, SourceBackedPackage, SourceLimitKind, SourceLimits};
 
 const TARGET_URI: &str = "/word/document.xml";
 const SOURCE_FIXTURE: &[u8] = include_bytes!(
@@ -291,9 +291,9 @@ fn forced_zip64_metadata_limit_rejects_source_before_catalog_publication() {
     };
     assert!(matches!(
         error,
-        OpcError::ReadLimit {
-            resource: ReadResource::ArchiveMetadataBytes,
-            actual,
+        OpcError::Limit {
+            kind: SourceLimitKind::ArchiveMetadataBytes,
+            observed: actual,
             maximum,
         } if actual == metadata_bytes && maximum == metadata_bytes - 1
     ));
@@ -317,9 +317,9 @@ fn forced_zip64_overlay_part_limit_rejects_before_sink_output() {
 
     assert!(matches!(
         error,
-        OpcError::ReadLimit {
-            resource: ReadResource::PartBytes,
-            actual,
+        OpcError::Limit {
+            kind: SourceLimitKind::PartBytes,
+            observed: actual,
             maximum: 61,
         } if actual == REPLACEMENT.len() as u64
     ));

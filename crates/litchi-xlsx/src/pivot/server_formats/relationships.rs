@@ -90,7 +90,7 @@ impl<'package> RelationshipIndex<'package> {
         let limits = package.read_limits();
         let part_count = package.part_count();
         check_limit(
-            litchi_opc::ReadResource::Parts,
+            litchi_opc::SourceLimitKind::Parts,
             part_count,
             limits.max_parts(),
         )?;
@@ -272,7 +272,7 @@ impl<'package> RelationshipIndex<'package> {
         let references = self.incoming(target)?;
         if references.len() > self.limits.max_total_relationships() {
             return Err(read_limit(
-                litchi_opc::ReadResource::TotalRelationships,
+                litchi_opc::SourceLimitKind::TotalRelationships,
                 references.len(),
                 self.limits.max_total_relationships(),
             ));
@@ -336,26 +336,26 @@ impl RelationshipBudget {
             self.relationship_parts = checked_add_limit(
                 self.relationship_parts,
                 1,
-                litchi_opc::ReadResource::RelationshipParts,
+                litchi_opc::SourceLimitKind::RelationshipParts,
                 limits.max_relationship_parts(),
             )?;
             self.xml_bytes = checked_add_limit(
                 self.xml_bytes,
                 plan.final_len(),
-                litchi_opc::ReadResource::TotalRelationshipXmlBytes,
+                litchi_opc::SourceLimitKind::TotalRelationshipXmlBytes,
                 limits.max_total_relationship_xml_bytes(),
             )?;
             self.xml_events = checked_add_limit(
                 self.xml_events,
                 plan.event_count(),
-                litchi_opc::ReadResource::TotalRelationshipXmlEvents,
+                litchi_opc::SourceLimitKind::TotalRelationshipXmlEvents,
                 limits.max_total_relationship_xml_events(),
             )?;
         }
         self.relationships = checked_add_limit(
             self.relationships,
             plan.relationship_count(),
-            litchi_opc::ReadResource::TotalRelationships,
+            litchi_opc::SourceLimitKind::TotalRelationships,
             limits.max_total_relationships(),
         )?;
         Ok(())
@@ -383,7 +383,7 @@ where
         // addition to the authored Target attribute charged by source capture.
         // Keep that retained limit for changed in-memory relationships too.
         check_limit(
-            litchi_opc::ReadResource::RelationshipTargetBytes,
+            litchi_opc::SourceLimitKind::RelationshipTargetBytes,
             target.as_str().len(),
             limits.max_relationship_target_bytes(),
         )?;
@@ -403,7 +403,7 @@ where
                 budget.graph_nodes = checked_add_limit(
                     budget.graph_nodes,
                     1,
-                    litchi_opc::ReadResource::RelationshipGraphNodes,
+                    litchi_opc::SourceLimitKind::RelationshipGraphNodes,
                     limits.max_relationship_graph_nodes(),
                 )?;
                 graph_seen[target_index] = true;
@@ -423,7 +423,7 @@ where
                 budget.graph_nodes = checked_add_limit(
                     budget.graph_nodes,
                     1,
-                    litchi_opc::ReadResource::RelationshipGraphNodes,
+                    litchi_opc::SourceLimitKind::RelationshipGraphNodes,
                     limits.max_relationship_graph_nodes(),
                 )?;
                 budget.missing_nodes.try_reserve(1).map_err(|source| {
@@ -503,7 +503,7 @@ fn relationship_xml_metrics(bytes: &[u8]) -> Result<(usize, usize)> {
 fn check_part_name_limit(name: &PackURI, limits: SourceLimits) -> Result<()> {
     let maximum = usize::try_from(limits.max_archive_member_name_bytes()).unwrap_or(usize::MAX);
     check_limit(
-        litchi_opc::ReadResource::ArchiveMemberNameBytes,
+        litchi_opc::SourceLimitKind::ArchiveMemberNameBytes,
         name.membername().len(),
         maximum,
     )
@@ -517,7 +517,7 @@ fn canonical_part_key(name: &PackURI, limits: SourceLimits) -> Result<String> {
 fn canonical_key(value: &str, maximum: u64) -> Result<String> {
     let maximum = usize::try_from(maximum).unwrap_or(usize::MAX);
     check_limit(
-        litchi_opc::ReadResource::RelationshipTargetBytes,
+        litchi_opc::SourceLimitKind::RelationshipTargetBytes,
         value.len(),
         maximum,
     )?;
@@ -554,7 +554,7 @@ fn ascii_case_insensitive_cmp(left: &str, right: &str) -> Ordering {
 fn checked_add_limit(
     current: usize,
     additional: usize,
-    resource: litchi_opc::ReadResource,
+    resource: litchi_opc::SourceLimitKind,
     maximum: usize,
 ) -> Result<usize> {
     let next = current
@@ -566,17 +566,17 @@ fn checked_add_limit(
     Ok(next)
 }
 
-fn check_limit(resource: litchi_opc::ReadResource, actual: usize, maximum: usize) -> Result<()> {
+fn check_limit(resource: litchi_opc::SourceLimitKind, actual: usize, maximum: usize) -> Result<()> {
     if actual > maximum {
         return Err(read_limit(resource, actual, maximum));
     }
     Ok(())
 }
 
-fn read_limit(resource: litchi_opc::ReadResource, actual: usize, maximum: usize) -> Error {
-    Error::Package(OpcError::ReadLimit {
-        resource,
-        actual: actual as u64,
+fn read_limit(resource: litchi_opc::SourceLimitKind, actual: usize, maximum: usize) -> Error {
+    Error::Package(OpcError::Limit {
+        kind: resource,
+        observed: actual as u64,
         maximum: maximum as u64,
     })
 }

@@ -920,7 +920,7 @@ fn topology_publish_rejects_invalid_xml_and_part_byte_limits_before_output() {
     let error = package
         .write_topology_to_stream(&mut output, oversized)
         .unwrap_err();
-    assert!(matches!(error, OpcError::ReadLimit { .. }));
+    assert!(matches!(error, OpcError::Limit { .. }));
     assert!(output.is_empty());
 }
 

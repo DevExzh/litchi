@@ -293,8 +293,8 @@ fn lower_xml_limits_take_the_full_validator_path() {
         .expect_err("a nested source must fail the lower destination depth limit");
     assert!(matches!(
         error,
-        OpcError::ReadLimit {
-            resource: ReadResource::XmlDepth,
+        OpcError::Limit {
+            kind: SourceLimitKind::XmlDepth,
             ..
         }
     ));

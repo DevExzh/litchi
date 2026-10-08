@@ -267,7 +267,7 @@ pub fn validate_read_at_with_limits(
                 return Err(DocxValidationError::Ingress(OpcError::IoError(io_error)));
             }
             match error {
-                OpcError::ReadLimit { .. } => blocked_ingress_report(report_limits)?,
+                OpcError::Limit { .. } => blocked_ingress_report(report_limits)?,
                 error if is_structural_rejection(&error) => {
                     rejected_ingress_report(&error, report_limits)?
                 },
@@ -848,7 +848,7 @@ fn inspect_main_document(
     }
     let data = match data_result {
         Ok(data) => data,
-        Err(OpcError::ReadLimit { .. }) => {
+        Err(OpcError::Limit { .. }) => {
             return Err(InspectionFailure::Blocked(
                 "main-document payload exceeded the configured OPC read ceiling",
             ));

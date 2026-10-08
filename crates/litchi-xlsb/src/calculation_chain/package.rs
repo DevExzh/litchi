@@ -160,7 +160,7 @@ pub(crate) fn preflight_metadata(package: &OpcPackage, limits: ReadLimits) -> Re
         )?;
         if content_type_metadata_bytes > opc_limits.max_content_types_bytes() {
             return Err(opc_limit(
-                litchi_opc::ReadResource::ContentTypesBytes,
+                litchi_opc::SourceLimitKind::ContentTypesBytes,
                 content_type_metadata_bytes,
                 opc_limits.max_content_types_bytes(),
             ));
@@ -198,7 +198,7 @@ fn preflight_relationship_collection(
     )?;
     if *relationship_metadata_bytes > opc_limits.max_total_relationship_xml_bytes() {
         return Err(opc_limit(
-            litchi_opc::ReadResource::TotalRelationshipXmlBytes,
+            litchi_opc::SourceLimitKind::TotalRelationshipXmlBytes,
             *relationship_metadata_bytes,
             opc_limits.max_total_relationship_xml_bytes(),
         ));
@@ -251,7 +251,7 @@ fn preflight_relationship(
         opc_limits.max_xml_attribute_bytes(),
     )?;
     preflight_metadata_text(
-        litchi_opc::ReadResource::RelationshipTargetBytes,
+        litchi_opc::SourceLimitKind::RelationshipTargetBytes,
         relationship.target_ref().len(),
         opc_limits.max_relationship_target_bytes(),
     )?;
@@ -268,7 +268,7 @@ fn preflight_relationship(
                 resource: "Calculation Chain relationship target metadata",
             })?;
         preflight_metadata_text(
-            litchi_opc::ReadResource::XmlAttributeBytes,
+            litchi_opc::SourceLimitKind::XmlAttributeBytes,
             resolved_upper_bound,
             opc_limits.max_xml_attribute_bytes(),
         )?;
@@ -291,7 +291,7 @@ fn preflight_relationship(
     )?;
     if *relationship_metadata_bytes > opc_limits.max_total_relationship_xml_bytes() {
         return Err(opc_limit(
-            litchi_opc::ReadResource::TotalRelationshipXmlBytes,
+            litchi_opc::SourceLimitKind::TotalRelationshipXmlBytes,
             *relationship_metadata_bytes,
             opc_limits.max_total_relationship_xml_bytes(),
         ));
@@ -319,7 +319,7 @@ fn checked_metadata_add(current: usize, addition: usize, resource: &'static str)
 }
 
 fn preflight_metadata_text(
-    resource: litchi_opc::ReadResource,
+    resource: litchi_opc::SourceLimitKind,
     actual: usize,
     maximum: usize,
 ) -> Result<()> {
@@ -347,13 +347,17 @@ fn preflight_xml_attribute(key: &str, value: &str, maximum: usize) -> Result<()>
         .ok_or(Error::CapacityOverflow {
             resource: "Calculation Chain XML attribute metadata",
         })?;
-    preflight_metadata_text(litchi_opc::ReadResource::XmlAttributeBytes, actual, maximum)
+    preflight_metadata_text(
+        litchi_opc::SourceLimitKind::XmlAttributeBytes,
+        actual,
+        maximum,
+    )
 }
 
-fn opc_limit(resource: litchi_opc::ReadResource, actual: usize, maximum: usize) -> Error {
-    Error::Opc(litchi_opc::OpcError::ReadLimit {
-        resource,
-        actual: actual as u64,
+fn opc_limit(resource: litchi_opc::SourceLimitKind, actual: usize, maximum: usize) -> Error {
+    Error::Opc(litchi_opc::OpcError::Limit {
+        kind: resource,
+        observed: actual as u64,
         maximum: maximum as u64,
     })
 }

@@ -340,7 +340,7 @@ fn mce_limits_and_partial_sink_are_checked() {
             limits,
             litchi_xlsx::calculation_properties::Limits::default(),
         ),
-        Err(Error::Package(OpcError::ReadLimit { .. }))
+        Err(Error::Package(OpcError::Limit { .. }))
     ));
 
     let editor =

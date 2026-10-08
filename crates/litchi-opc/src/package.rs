@@ -149,33 +149,33 @@ fn check_relationship_capture_limits(
     limits: SourceLimits,
 ) -> Result<()> {
     limits.check(
-        crate::ReadResource::RelationshipsPerPart,
+        crate::SourceLimitKind::RelationshipsPerPart,
         relationships.len() as u64,
         limits.max_relationships_per_part() as u64,
     )?;
     limits.check(
-        crate::ReadResource::TotalRelationships,
+        crate::SourceLimitKind::TotalRelationships,
         relationships.len() as u64,
         limits.max_total_relationships() as u64,
     )?;
     for relationship in relationships.iter() {
         limits.check(
-            crate::ReadResource::XmlAttributeBytes,
+            crate::SourceLimitKind::XmlAttributeBytes,
             relationship.r_id().len() as u64,
             limits.max_xml_attribute_bytes() as u64,
         )?;
         limits.check(
-            crate::ReadResource::XmlAttributeBytes,
+            crate::SourceLimitKind::XmlAttributeBytes,
             relationship.reltype().len() as u64,
             limits.max_xml_attribute_bytes() as u64,
         )?;
         limits.check(
-            crate::ReadResource::XmlAttributeBytes,
+            crate::SourceLimitKind::XmlAttributeBytes,
             relationship.target_ref().len() as u64,
             limits.max_xml_attribute_bytes() as u64,
         )?;
         limits.check(
-            crate::ReadResource::RelationshipTargetBytes,
+            crate::SourceLimitKind::RelationshipTargetBytes,
             relationship.target_ref().len() as u64,
             limits.max_relationship_target_bytes() as u64,
         )?;
@@ -204,7 +204,7 @@ fn check_canonical_relationship_attribute_limits(
     limits: SourceLimits,
 ) -> Result<()> {
     limits.check(
-        crate::ReadResource::XmlAttributeBytes,
+        crate::SourceLimitKind::XmlAttributeBytes,
         "xmlns".len() as u64 + crate::constants::namespace::OPC_RELATIONSHIPS.len() as u64,
         limits.max_xml_attribute_bytes() as u64,
     )?;
@@ -221,7 +221,7 @@ fn check_canonical_relationship_attribute_limits(
                 )
             })?;
             limits.check(
-                crate::ReadResource::XmlAttributeBytes,
+                crate::SourceLimitKind::XmlAttributeBytes,
                 actual as u64,
                 limits.max_xml_attribute_bytes() as u64,
             )?;
@@ -229,7 +229,7 @@ fn check_canonical_relationship_attribute_limits(
         if relationship.target_mode() == RelationshipTargetMode::External {
             let actual = "TargetMode".len() + b"External".len();
             limits.check(
-                crate::ReadResource::XmlAttributeBytes,
+                crate::SourceLimitKind::XmlAttributeBytes,
                 actual as u64,
                 limits.max_xml_attribute_bytes() as u64,
             )?;
@@ -247,23 +247,23 @@ fn check_canonical_relationship_structure(
         OpcError::InvalidRelationship("canonical relationship XML event count overflows".to_owned())
     })?;
     limits.check(
-        crate::ReadResource::XmlEvents,
+        crate::SourceLimitKind::XmlEvents,
         events as u64,
         limits.max_xml_events() as u64,
     )?;
     limits.check(
-        crate::ReadResource::TotalRelationshipXmlEvents,
+        crate::SourceLimitKind::TotalRelationshipXmlEvents,
         events as u64,
         limits.max_total_relationship_xml_events() as u64,
     )?;
     let depth = if relationships.is_empty() { 1 } else { 2 };
     limits.check(
-        crate::ReadResource::XmlDepth,
+        crate::SourceLimitKind::XmlDepth,
         depth,
         limits.max_xml_depth() as u64,
     )?;
     limits.check(
-        crate::ReadResource::TotalRelationshipXmlBytes,
+        crate::SourceLimitKind::TotalRelationshipXmlBytes,
         bytes as u64,
         limits.max_total_relationship_xml_bytes() as u64,
     )
@@ -586,22 +586,22 @@ impl OpcPackage {
         limits: SourceLimits,
     ) -> Result<()> {
         limits.check(
-            crate::ReadResource::ContentTypesBytes,
+            crate::SourceLimitKind::ContentTypesBytes,
             bytes.len() as u64,
             limits.max_content_types_bytes() as u64,
         )?;
         limits.check(
-            crate::ReadResource::PartBytes,
+            crate::SourceLimitKind::PartBytes,
             bytes.len() as u64,
             limits.max_part_bytes(),
         )?;
         limits.check(
-            crate::ReadResource::Parts,
+            crate::SourceLimitKind::Parts,
             self.parts.len() as u64,
             limits.max_parts() as u64,
         )?;
         limits.check(
-            crate::ReadResource::ContentTypeMappings,
+            crate::SourceLimitKind::ContentTypeMappings,
             source.mapping_count() as u64,
             limits.max_content_type_mappings() as u64,
         )?;
@@ -779,12 +779,12 @@ impl OpcPackage {
                     self, limits,
                 )?);
                 limits.check(
-                    crate::ReadResource::ContentTypesBytes,
+                    crate::SourceLimitKind::ContentTypesBytes,
                     bytes.len() as u64,
                     limits.max_content_types_bytes() as u64,
                 )?;
                 limits.check(
-                    crate::ReadResource::PartBytes,
+                    crate::SourceLimitKind::PartBytes,
                     bytes.len() as u64,
                     limits.max_part_bytes(),
                 )?;
@@ -849,12 +849,12 @@ impl OpcPackage {
         }
 
         limits.check(
-            crate::ReadResource::ContentTypesBytes,
+            crate::SourceLimitKind::ContentTypesBytes,
             replacement.bytes().len() as u64,
             limits.max_content_types_bytes() as u64,
         )?;
         limits.check(
-            crate::ReadResource::ContentTypeMappings,
+            crate::SourceLimitKind::ContentTypeMappings,
             replacement.binding.mapping_count() as u64,
             limits.max_content_type_mappings() as u64,
         )?;
@@ -3327,9 +3327,9 @@ mod tests {
             .unwrap_err();
         assert!(matches!(
             error,
-            OpcError::ReadLimit {
-                resource: crate::ReadResource::ContentTypesBytes,
-                actual,
+            OpcError::Limit {
+                kind: crate::SourceLimitKind::ContentTypesBytes,
+                observed: actual,
                 maximum,
             } if actual == replacement.bytes().len() as u64
                 && maximum == current_bytes.len() as u64
@@ -3446,8 +3446,8 @@ mod tests {
             .unwrap();
         assert!(matches!(
             package.source_content_types_with_limits(under),
-            Err(OpcError::ReadLimit {
-                resource: crate::ReadResource::ContentTypesBytes,
+            Err(OpcError::Limit {
+                kind: crate::SourceLimitKind::ContentTypesBytes,
                 ..
             })
         ));
@@ -3460,8 +3460,8 @@ mod tests {
             .unwrap();
         assert!(matches!(
             package.source_content_types_with_limits(part_under),
-            Err(OpcError::ReadLimit {
-                resource: crate::ReadResource::PartBytes,
+            Err(OpcError::Limit {
+                kind: crate::SourceLimitKind::PartBytes,
                 ..
             })
         ));
@@ -3520,9 +3520,9 @@ mod tests {
             .unwrap();
         assert!(matches!(
             authored.source_content_types_with_limits(authored_events_under),
-            Err(OpcError::ReadLimit {
-                resource: crate::ReadResource::XmlEvents,
-                actual,
+            Err(OpcError::Limit {
+                kind: crate::SourceLimitKind::XmlEvents,
+                observed: actual,
                 maximum,
             }) if actual == authored_events as u64 && maximum == (authored_events - 1) as u64
         ));
@@ -3533,9 +3533,9 @@ mod tests {
             .unwrap();
         assert!(matches!(
             authored.source_content_types_with_limits(authored_depth_under),
-            Err(OpcError::ReadLimit {
-                resource: crate::ReadResource::XmlDepth,
-                actual: 2,
+            Err(OpcError::Limit {
+                kind: crate::SourceLimitKind::XmlDepth,
+                observed: 2,
                 maximum: 1,
             })
         ));
@@ -3546,9 +3546,9 @@ mod tests {
             .unwrap();
         assert!(matches!(
             authored.source_content_types_with_limits(mapping_under),
-            Err(OpcError::ReadLimit {
-                resource: crate::ReadResource::ContentTypeMappings,
-                actual: 3,
+            Err(OpcError::Limit {
+                kind: crate::SourceLimitKind::ContentTypeMappings,
+                observed: 3,
                 maximum: 2,
             })
         ));
@@ -3566,8 +3566,8 @@ mod tests {
 
         assert!(matches!(
             package.source_content_types(),
-            Err(OpcError::ReadLimit {
-                resource: crate::ReadResource::ContentTypesBytes,
+            Err(OpcError::Limit {
+                kind: crate::SourceLimitKind::ContentTypesBytes,
                 ..
             })
         ));
@@ -3615,9 +3615,9 @@ mod tests {
         );
         assert!(matches!(
             package.source_content_types_with_limits(fallback_limit),
-            Err(OpcError::ReadLimit {
-                resource: crate::ReadResource::ContentTypesBytes,
-                actual,
+            Err(OpcError::Limit {
+                kind: crate::SourceLimitKind::ContentTypesBytes,
+                observed: actual,
                 maximum,
             }) if actual == content_types.len() as u64 && maximum == (content_types.len() - 1) as u64
         ));
@@ -3669,7 +3669,7 @@ mod tests {
                     .unwrap()
                     .build()
                     .unwrap(),
-                crate::ReadResource::ContentTypesBytes,
+                crate::SourceLimitKind::ContentTypesBytes,
             ),
             (
                 SourceLimits::builder()
@@ -3677,7 +3677,7 @@ mod tests {
                     .unwrap()
                     .build()
                     .unwrap(),
-                crate::ReadResource::RelationshipXmlBytes,
+                crate::SourceLimitKind::RelationshipXmlBytes,
             ),
         ] {
             package.read_limits = limits;
@@ -3689,7 +3689,7 @@ mod tests {
                     &replacement_relationships,
                     Vec::new(),
                 ),
-                Err(OpcError::ReadLimit { resource: actual, .. }) if actual == resource
+                Err(OpcError::Limit { kind: actual, .. }) if actual == resource
             ));
             package.read_limits = original_limits;
             assert_eq!(
@@ -3799,9 +3799,9 @@ mod tests {
         ] {
             assert!(matches!(
                 result,
-                Err(OpcError::ReadLimit {
-                    resource: crate::ReadResource::InputBytes,
-                    actual: 4,
+                Err(OpcError::Limit {
+                    kind: crate::SourceLimitKind::InputBytes,
+                    observed: 4,
                     maximum: 3,
                 })
             ));
@@ -4243,9 +4243,9 @@ mod tests {
             .unwrap();
         assert!(matches!(
             OpcPackage::from_bytes_with_limits(b"four", limits),
-            Err(OpcError::ReadLimit {
-                resource: crate::ReadResource::InputBytes,
-                actual: 4,
+            Err(OpcError::Limit {
+                kind: crate::SourceLimitKind::InputBytes,
+                observed: 4,
                 maximum: 3,
             })
         ));

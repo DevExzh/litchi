@@ -188,9 +188,9 @@ fn preflight_relationships(
                     resource: "Data Model relationship target metadata",
                 })?;
             if resolved > opc_limits.max_xml_attribute_bytes() {
-                return Err(Error::Opc(litchi_opc::OpcError::ReadLimit {
-                    resource: litchi_opc::ReadResource::XmlAttributeBytes,
-                    actual: resolved as u64,
+                return Err(Error::Opc(litchi_opc::OpcError::Limit {
+                    kind: litchi_opc::SourceLimitKind::XmlAttributeBytes,
+                    observed: resolved as u64,
                     maximum: opc_limits.max_xml_attribute_bytes() as u64,
                 }));
             }
@@ -257,9 +257,9 @@ fn preflight_xml_attribute(key: &str, value: &str, maximum: usize) -> Result<()>
             resource: "Data Model XML attribute metadata",
         })?;
     if actual > maximum {
-        return Err(Error::Opc(litchi_opc::OpcError::ReadLimit {
-            resource: litchi_opc::ReadResource::XmlAttributeBytes,
-            actual: actual as u64,
+        return Err(Error::Opc(litchi_opc::OpcError::Limit {
+            kind: litchi_opc::SourceLimitKind::XmlAttributeBytes,
+            observed: actual as u64,
             maximum: maximum as u64,
         }));
     }

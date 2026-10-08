@@ -24,7 +24,7 @@
 use std::path::{Path, PathBuf};
 
 use litchi::error::Source;
-use litchi::opc::{OpcError, ReadResource, SourceLimits};
+use litchi::opc::{OpcError, SourceLimitKind, SourceLimits};
 use litchi::{Code, File, OpenOptions};
 
 fn fixture(relative: &str) -> PathBuf {
@@ -59,9 +59,9 @@ fn assert_input_limit(error: &litchi::Error, observed: u64, maximum: u64) {
     assert!(
         matches!(
             error.leaf(),
-            Source::Opc(OpcError::ReadLimit {
-                resource: ReadResource::InputBytes,
-                actual,
+            Source::Opc(OpcError::Limit {
+                kind: SourceLimitKind::InputBytes,
+                observed: actual,
                 maximum: limit,
             }) if *actual == observed && *limit == maximum
         ),

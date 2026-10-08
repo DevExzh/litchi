@@ -9,7 +9,9 @@ use super::{
     raw_zip_members, record_elapsed, relationship_signatures, sha256_hex, statistics,
 };
 use litchi_core::{OwnedSource, ReadAt, SourceVersion};
-use litchi_opc::{OpcError, ReadResource, SourceBackedPackage, SourceLimits, SourceTopologyPlan};
+use litchi_opc::{
+    OpcError, SourceBackedPackage, SourceLimitKind, SourceLimits, SourceTopologyPlan,
+};
 use serde::Serialize;
 use std::{
     error::Error,
@@ -319,8 +321,8 @@ fn verify_gates(
         let mut bounded = Vec::new();
         let result = package.write_topology_to_stream(&mut bounded, plan(added.clone())?);
         if maximum == parts {
-            if !matches!(result, Err(OpcError::ReadLimit {
-                resource: ReadResource::Parts, actual, maximum
+            if !matches!(result, Err(OpcError::Limit {
+                kind: SourceLimitKind::Parts, observed: actual, maximum
             }) if actual == (parts + 1) as u64 && maximum == parts as u64)
                 || !bounded.is_empty()
             {

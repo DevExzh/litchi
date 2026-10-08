@@ -57,7 +57,7 @@ pub fn validate_read_at_with_limits(
     }
     let report = match ingress {
         Ok(package) => successful_report(&package, report_limits),
-        Err(failure) if matches!(failure.error, OpcError::ReadLimit { .. }) => {
+        Err(failure) if matches!(failure.error, OpcError::Limit { .. }) => {
             blocked_report(failure.phase, report_limits)
         },
         Err(failure) if is_structural_rejection(&failure.error) => {

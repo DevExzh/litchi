@@ -1445,7 +1445,7 @@ fn source_commit_rechecks_exact_custom_vml_limit_after_snapshot() {
             error,
             Error::ResourceLimit(_)
                 | Error::FormControl(litchi_xlsx::form_control::FormControlError::Limit { .. })
-                | Error::Package(OpcError::ReadLimit { .. })
+                | Error::Package(OpcError::Limit { .. })
         ),
         "custom VML limit returned the wrong error: {error:?}"
     );

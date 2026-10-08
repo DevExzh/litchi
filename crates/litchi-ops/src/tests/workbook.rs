@@ -347,8 +347,8 @@ mod xlsx {
         assert_eq!(error.code(), Code::LimitExceeded);
         assert!(matches!(
             error.leaf(),
-            crate::error::Source::Opc(litchi_opc::OpcError::ReadLimit {
-                resource: litchi_opc::ReadResource::InputBytes,
+            crate::error::Source::Opc(litchi_opc::OpcError::Limit {
+                kind: litchi_opc::SourceLimitKind::InputBytes,
                 ..
             })
         ));
@@ -368,9 +368,9 @@ mod xlsx {
             .unwrap_err();
         assert!(matches!(
             error.leaf(),
-            crate::error::Source::Opc(litchi_opc::OpcError::ReadLimit {
-                resource: litchi_opc::ReadResource::InputBytes,
-                actual: 1_048_577,
+            crate::error::Source::Opc(litchi_opc::OpcError::Limit {
+                kind: litchi_opc::SourceLimitKind::InputBytes,
+                observed: 1_048_577,
                 maximum: 1024,
             })
         ));
@@ -842,9 +842,9 @@ mod polyglot {
             assert!(
                 matches!(
                     error.leaf(),
-                    crate::error::Source::Opc(litchi_opc::OpcError::ReadLimit {
-                        resource: litchi_opc::ReadResource::InputBytes,
-                        actual,
+                    crate::error::Source::Opc(litchi_opc::OpcError::Limit {
+                        kind: litchi_opc::SourceLimitKind::InputBytes,
+                        observed: actual,
                         maximum: 1,
                     }) if *actual == bytes.len() as u64
                 ),

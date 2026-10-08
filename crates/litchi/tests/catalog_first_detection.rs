@@ -356,8 +356,8 @@ fn typed_catalog_and_owner_restore_reader_position_on_error_and_limit() {
     .expect_err("input limit must be reported by the typed catalog probe");
     assert!(matches!(
         limited_error,
-        litchi::opc::OpcError::ReadLimit {
-            resource: litchi::opc::ReadResource::InputBytes,
+        litchi::opc::OpcError::Limit {
+            kind: litchi::opc::SourceLimitKind::InputBytes,
             ..
         }
     ));
@@ -379,8 +379,8 @@ fn typed_catalog_and_owner_restore_reader_position_on_error_and_limit() {
     };
     assert!(matches!(
         owner_error,
-        litchi::docx::Error::Opc(litchi::opc::OpcError::ReadLimit {
-            resource: litchi::opc::ReadResource::InputBytes,
+        litchi::docx::Error::Opc(litchi::opc::OpcError::Limit {
+            kind: litchi::opc::SourceLimitKind::InputBytes,
             ..
         })
     ));

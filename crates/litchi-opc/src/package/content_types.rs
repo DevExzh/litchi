@@ -4,7 +4,7 @@ use super::super::{OwnedElementEdit, OwnedElementUpdate, OwnedXmlPart, PackURI, 
 use crate::Result;
 use crate::content_type::validate_content_type;
 use crate::error::OpcError;
-use crate::limits::ReadResource;
+use crate::limits::SourceLimitKind;
 use crate::source_backed::content_types_plan::collapse_xml_token;
 use crate::source_backed::escaped_xml_attribute_len;
 use crate::xml_attributes::BytesStartExt as _;
@@ -68,27 +68,27 @@ impl<'source> ContentTypesEditPlan<'source> {
     pub fn materialize(self, limits: SourceLimits) -> Result<super::OwnedContentTypes> {
         let source = self.source;
         limits.check(
-            ReadResource::ContentTypesBytes,
+            SourceLimitKind::ContentTypesBytes,
             self.inner.final_len() as u64,
             limits.max_content_types_bytes() as u64,
         )?;
         limits.check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             self.inner.final_len() as u64,
             limits.max_part_bytes(),
         )?;
         limits.check(
-            ReadResource::ArchiveEntryBytes,
+            SourceLimitKind::ArchiveEntryBytes,
             self.inner.final_len() as u64,
             limits.max_archive_entry_bytes(),
         )?;
         limits.check(
-            ReadResource::XmlEvents,
+            SourceLimitKind::XmlEvents,
             self.inner.event_count() as u64,
             limits.max_xml_events() as u64,
         )?;
         limits.check(
-            ReadResource::ContentTypeMappings,
+            SourceLimitKind::ContentTypeMappings,
             self.inner.mapping_count() as u64,
             limits.max_content_type_mappings() as u64,
         )?;
@@ -144,17 +144,17 @@ impl super::OwnedContentTypes {
         limits: SourceLimits,
     ) -> Result<ContentTypesEditPlan<'source>> {
         limits.check(
-            ReadResource::ContentTypesBytes,
+            SourceLimitKind::ContentTypesBytes,
             self.xml.bytes().len() as u64,
             limits.max_content_types_bytes() as u64,
         )?;
         limits.check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             self.xml.bytes().len() as u64,
             limits.max_part_bytes(),
         )?;
         limits.check(
-            ReadResource::ArchiveEntryBytes,
+            SourceLimitKind::ArchiveEntryBytes,
             self.xml.bytes().len() as u64,
             limits.max_archive_entry_bytes(),
         )?;
@@ -232,9 +232,9 @@ fn preflight_content_type_edit_inputs(
     limits: SourceLimits,
 ) -> Result<()> {
     if additions.len() > limits.max_content_type_mappings() {
-        return Err(OpcError::ReadLimit {
-            resource: ReadResource::ContentTypeMappings,
-            actual: additions.len() as u64,
+        return Err(OpcError::Limit {
+            kind: SourceLimitKind::ContentTypeMappings,
+            observed: additions.len() as u64,
             maximum: limits.max_content_type_mappings() as u64,
         });
     }
@@ -243,9 +243,9 @@ fn preflight_content_type_edit_inputs(
         .checked_add(default_removals.len())
         .ok_or_else(|| OpcError::InvalidContentTypesManifest("selector count overflows".into()))?;
     if removal_count > limits.max_content_type_mappings() {
-        return Err(OpcError::ReadLimit {
-            resource: ReadResource::ContentTypeMappings,
-            actual: removal_count as u64,
+        return Err(OpcError::Limit {
+            kind: SourceLimitKind::ContentTypeMappings,
+            observed: removal_count as u64,
             maximum: limits.max_content_type_mappings() as u64,
         });
     }
@@ -255,12 +255,12 @@ fn preflight_content_type_edit_inputs(
         let escaped_part_len = escaped_xml_attribute_len(addition.part_name.as_str())?;
         let escaped_content_type_len = escaped_xml_attribute_len(addition.content_type)?;
         limits.check(
-            ReadResource::XmlAttributeBytes,
+            SourceLimitKind::XmlAttributeBytes,
             escaped_part_len as u64,
             limits.max_xml_attribute_bytes() as u64,
         )?;
         limits.check(
-            ReadResource::XmlAttributeBytes,
+            SourceLimitKind::XmlAttributeBytes,
             escaped_content_type_len as u64,
             limits.max_xml_attribute_bytes() as u64,
         )?;
@@ -280,7 +280,7 @@ fn preflight_content_type_edit_inputs(
     for part in removals {
         let length = part.as_str().len();
         limits.check(
-            ReadResource::XmlAttributeBytes,
+            SourceLimitKind::XmlAttributeBytes,
             length as u64,
             limits.max_xml_attribute_bytes() as u64,
         )?;
@@ -290,7 +290,7 @@ fn preflight_content_type_edit_inputs(
     }
     for extension in default_removals {
         limits.check(
-            ReadResource::XmlAttributeBytes,
+            SourceLimitKind::XmlAttributeBytes,
             extension.len() as u64,
             limits.max_xml_attribute_bytes() as u64,
         )?;
@@ -299,7 +299,7 @@ fn preflight_content_type_edit_inputs(
         })?;
     }
     limits.check(
-        ReadResource::ContentTypesBytes,
+        SourceLimitKind::ContentTypesBytes,
         raw_bytes as u64,
         limits.max_content_types_bytes() as u64,
     )?;

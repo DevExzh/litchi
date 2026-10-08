@@ -185,7 +185,7 @@ fn path_with_limits_matches_from_vec_and_rejects_exact_too_small_input_and_part_
         .unwrap();
     assert!(matches!(
         SourceBackedPackage::from_path_with_limits(file.path(), too_small_input),
-        Err(OpcError::ReadLimit { .. })
+        Err(OpcError::Limit { .. })
     ));
     assert!(matches!(
         SourceBackedPackage::from_vec_with_limits(
@@ -196,7 +196,7 @@ fn path_with_limits_matches_from_vec_and_rejects_exact_too_small_input_and_part_
                 .build()
                 .unwrap(),
         ),
-        Err(OpcError::ReadLimit { .. })
+        Err(OpcError::Limit { .. })
     ));
 
     let too_small_part = SourceLimits::builder()
@@ -206,7 +206,7 @@ fn path_with_limits_matches_from_vec_and_rejects_exact_too_small_input_and_part_
         .unwrap();
     assert!(matches!(
         SourceBackedPackage::from_path_with_limits(file.path(), too_small_part),
-        Err(OpcError::ReadLimit { .. })
+        Err(OpcError::Limit { .. })
     ));
     assert!(matches!(
         SourceBackedPackage::from_vec_with_limits(
@@ -217,7 +217,7 @@ fn path_with_limits_matches_from_vec_and_rejects_exact_too_small_input_and_part_
                 .build()
                 .unwrap(),
         ),
-        Err(OpcError::ReadLimit { .. })
+        Err(OpcError::Limit { .. })
     ));
 }
 

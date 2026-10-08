@@ -6,7 +6,7 @@
 
 use super::*;
 use crate::part::{BlobPart, Part};
-use crate::{PackageWriter, ReadResource, TargetMode};
+use crate::{PackageWriter, SourceLimitKind, TargetMode};
 use soapberry_zip::office::StreamingArchiveWriter;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -355,8 +355,8 @@ fn input_limit_is_refused_before_donor_payload_callbacks() {
         .expect_err("input limit must reject the target archive");
     assert!(matches!(
         error,
-        OpcError::ReadLimit {
-            resource: ReadResource::InputBytes,
+        OpcError::Limit {
+            kind: SourceLimitKind::InputBytes,
             ..
         }
     ));

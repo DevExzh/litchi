@@ -31,7 +31,7 @@ use litchi_core::{
     Resource, SourceVersion,
 };
 use litchi_opc::{
-    OpcError, PackURI, ReadResource, SourceBackedPackage, SourceCacheLimits, SourceLimits,
+    OpcError, PackURI, SourceBackedPackage, SourceCacheLimits, SourceLimitKind, SourceLimits,
 };
 use soapberry_zip::office::StreamingArchiveWriter;
 
@@ -1186,9 +1186,9 @@ fn batch_request_count_limit_remains_a_typed_read_limit() {
     ]);
     assert!(matches!(
         result,
-        Err(OpcError::ReadLimit {
-            resource: ReadResource::Parts,
-            actual,
+        Err(OpcError::Limit {
+            kind: SourceLimitKind::Parts,
+            observed: actual,
             maximum,
         }) if actual == 5 && maximum == 4
     ));

@@ -344,8 +344,8 @@ fn huge_unrelated_authored_relationship_metadata_is_rejected_before_capture() {
     let package = package_with_unrelated_root_relationship(id);
     assert!(matches!(
         package.calculation_chain(),
-        Err(Error::Opc(litchi_opc::OpcError::ReadLimit {
-            resource: litchi_opc::ReadResource::XmlAttributeBytes,
+        Err(Error::Opc(litchi_opc::OpcError::Limit {
+            kind: litchi_opc::SourceLimitKind::XmlAttributeBytes,
             ..
         }))
     ));
@@ -363,8 +363,8 @@ fn public_package_facade_preflights_oversized_stale_metadata_before_clone() {
     let stale = package_with_unrelated_root_relationship("x".repeat(maximum - "Id".len() + 1));
     assert!(matches!(
         stale.apply_calculation_chain(&commit),
-        Err(Error::Opc(litchi_opc::OpcError::ReadLimit {
-            resource: litchi_opc::ReadResource::XmlAttributeBytes,
+        Err(Error::Opc(litchi_opc::OpcError::Limit {
+            kind: litchi_opc::SourceLimitKind::XmlAttributeBytes,
             ..
         }))
     ));
@@ -455,8 +455,8 @@ fn long_relationship_owner_and_many_short_edges_are_bounded_before_clone() {
     let package = Package::from_opc(package).expect("authored package");
     assert!(matches!(
         package.calculation_chain(),
-        Err(Error::Opc(litchi_opc::OpcError::ReadLimit {
-            resource: litchi_opc::ReadResource::TotalRelationshipXmlBytes,
+        Err(Error::Opc(litchi_opc::OpcError::Limit {
+            kind: litchi_opc::SourceLimitKind::TotalRelationshipXmlBytes,
             ..
         }))
     ));

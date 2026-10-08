@@ -250,7 +250,7 @@ pub fn validate_source_with_limits(
         input_limits.read_limits,
     ) {
         Ok(package) => validate_source_backed_with_limits(&package, input_limits, report_limits),
-        Err(OpcError::ReadLimit { .. }) => blocked_report(
+        Err(OpcError::Limit { .. }) => blocked_report(
             "PPTX OPC ingress reached a configured resource ceiling",
             report_limits,
         ),
@@ -338,7 +338,7 @@ pub fn validate_source_backed_with_limits(
 
     let data = match root.data() {
         Ok(data) => data,
-        Err(OpcError::ReadLimit { .. }) => {
+        Err(OpcError::Limit { .. }) => {
             facts.root = RootOutcome::Blocked;
             facts.slides = SlideOutcome::StoppedByRoot;
             facts.mce = MceOutcome::StoppedByRoot;
@@ -526,7 +526,7 @@ pub fn validate_source_backed_with_limits(
         }
         let slide_data = match slide.data() {
             Ok(data) => data,
-            Err(OpcError::ReadLimit { .. }) => {
+            Err(OpcError::Limit { .. }) => {
                 block_mce(&mut facts);
                 slide_blocked = true;
                 break;

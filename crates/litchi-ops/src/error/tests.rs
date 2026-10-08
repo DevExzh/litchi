@@ -352,7 +352,7 @@ fn row_malformed_input_is_corrupt_file() {
     );
 }
 
-// Row: `ResourceLimit`, OPC `ReadLimit`, leaf limit errors -> `limit_exceeded`
+// Row: `ResourceLimit`, OPC `Limit`, leaf limit errors -> `limit_exceeded`
 // (record 0007, Q1), with the limit detail kept in the typed source.
 #[test]
 fn row_resource_limits_are_limit_exceeded() {
@@ -366,9 +366,9 @@ fn row_resource_limits_are_limit_exceeded() {
     #[cfg(feature = "docx")]
     {
         check(
-            litchi_opc::OpcError::ReadLimit {
-                resource: litchi_opc::ReadResource::ArchiveMembers,
-                actual: 11,
+            litchi_opc::OpcError::Limit {
+                kind: litchi_opc::SourceLimitKind::ArchiveMembers,
+                observed: 11,
                 maximum: 10,
             }
             .into(),
@@ -683,9 +683,10 @@ fn caller_errors_are_classified_by_kind() {
     #[cfg(feature = "docx")]
     {
         assert_code(
-            litchi_opc::OpcError::InvalidReadLimit {
-                resource: litchi_opc::ReadResource::ArchiveMembers,
+            litchi_opc::OpcError::InvalidLimit {
+                kind: litchi_opc::SourceLimitKind::ArchiveMembers,
                 value: 0,
+                maximum: usize::MAX as u64,
             },
             Code::InvalidArgument,
         );

@@ -17,8 +17,8 @@ use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    EffectiveTopology, OpcPackage, OwnedRelationships, PackURI, PartData, ReadResource,
-    Relationships, SourceBackedPackage, SourceLimits, TargetMode,
+    EffectiveTopology, OpcPackage, OwnedRelationships, PackURI, PartData, Relationships,
+    SourceBackedPackage, SourceLimitKind, SourceLimits, TargetMode,
 };
 use quick_xml::events::{BytesEnd, BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -2962,9 +2962,9 @@ fn source_content_types_data_with_limit(
     let caller_maximum = u64::try_from(maximum).unwrap_or(u64::MAX);
     match package.content_types_data_with_limit(maximum) {
         Ok(data) => Ok(data),
-        Err(litchi_opc::OpcError::ReadLimit {
-            resource: ReadResource::ContentTypesBytes,
-            actual,
+        Err(litchi_opc::OpcError::Limit {
+            kind: SourceLimitKind::ContentTypesBytes,
+            observed: actual,
             maximum: observed_maximum,
         }) if observed_maximum == caller_maximum => Err(owner_limit(
             "MCE input bytes",

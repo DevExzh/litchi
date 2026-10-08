@@ -138,7 +138,7 @@ pub use leniency::{
     ToleranceReport, ToleratedDefect,
 };
 /// Resource policy for package ingestion through [`Package`].
-pub use litchi_opc::SourceLimits;
+pub use litchi_opc::{SourceLimitKind, SourceLimits};
 pub use mail_merge::{
     DataSourceObject, DataType, Destination, FieldMap, FieldMappingType, MainDocumentType,
     RECIPIENT_CONTENT_TYPE, Recipient, Recipients, RelationshipId, Source, Target,

@@ -403,7 +403,7 @@ fn assert_relationship_limit_boundaries(source: &[u8], plan: fn() -> SourceTopol
                 .unwrap()
                 .build()
                 .unwrap(),
-            litchi_opc::ReadResource::RelationshipXmlBytes,
+            litchi_opc::SourceLimitKind::RelationshipXmlBytes,
         ),
         (
             "aggregate relationship bytes",
@@ -416,7 +416,7 @@ fn assert_relationship_limit_boundaries(source: &[u8], plan: fn() -> SourceTopol
                 .unwrap()
                 .build()
                 .unwrap(),
-            litchi_opc::ReadResource::TotalRelationshipXmlBytes,
+            litchi_opc::SourceLimitKind::TotalRelationshipXmlBytes,
         ),
         (
             "aggregate relationship events",
@@ -429,7 +429,7 @@ fn assert_relationship_limit_boundaries(source: &[u8], plan: fn() -> SourceTopol
                 .unwrap()
                 .build()
                 .unwrap(),
-            litchi_opc::ReadResource::TotalRelationshipXmlEvents,
+            litchi_opc::SourceLimitKind::TotalRelationshipXmlEvents,
         ),
     ];
     for (label, limits, resource) in cases {
@@ -440,7 +440,7 @@ fn assert_relationship_limit_boundaries(source: &[u8], plan: fn() -> SourceTopol
             Ok(_) => panic!("{label} must refuse one under the exact final boundary"),
         };
         assert!(
-            matches!(error, OpcError::ReadLimit { resource: actual, .. } if actual == resource),
+            matches!(error, OpcError::Limit { kind: actual, .. } if actual == resource),
             "{label} returned unexpected error: {error:?}"
         );
     }
@@ -492,8 +492,8 @@ fn assert_relationship_removal_subtracts_source_usage(
     };
     assert!(matches!(
         member_error,
-        OpcError::ReadLimit {
-            resource: litchi_opc::ReadResource::RelationshipXmlBytes,
+        OpcError::Limit {
+            kind: litchi_opc::SourceLimitKind::RelationshipXmlBytes,
             ..
         }
     ));
@@ -510,8 +510,8 @@ fn assert_relationship_removal_subtracts_source_usage(
         };
     assert!(matches!(
         total_error,
-        OpcError::ReadLimit {
-            resource: litchi_opc::ReadResource::TotalRelationshipXmlBytes,
+        OpcError::Limit {
+            kind: litchi_opc::SourceLimitKind::TotalRelationshipXmlBytes,
             ..
         }
     ));
@@ -742,8 +742,8 @@ fn effective_relationship_graph_cap_rejects_one_new_internal_target_before_candi
     };
     assert!(matches!(
         error,
-        OpcError::ReadLimit {
-            resource: litchi_opc::ReadResource::RelationshipGraphNodes,
+        OpcError::Limit {
+            kind: litchi_opc::SourceLimitKind::RelationshipGraphNodes,
             ..
         }
     ));
@@ -832,8 +832,8 @@ fn content_types_byte_cap_refuses_new_mapping_before_candidate() {
     };
     assert!(matches!(
         error,
-        OpcError::ReadLimit {
-            resource: litchi_opc::ReadResource::ContentTypesBytes,
+        OpcError::Limit {
+            kind: litchi_opc::SourceLimitKind::ContentTypesBytes,
             ..
         }
     ));
@@ -926,8 +926,8 @@ fn combined_content_types_and_relationship_growth_obeys_exact_archive_total_cap(
     };
     assert!(matches!(
         error,
-        OpcError::ReadLimit {
-            resource: litchi_opc::ReadResource::ArchiveTotalBytes,
+        OpcError::Limit {
+            kind: litchi_opc::SourceLimitKind::ArchiveTotalBytes,
             ..
         }
     ));

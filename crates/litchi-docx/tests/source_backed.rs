@@ -376,7 +376,7 @@ fn read_limits_are_returned_as_the_original_opc_error() {
 
     assert!(matches!(
         source_backed::Package::from_read_at_with_limits(read_at, limits),
-        Err(Error::Opc(OpcError::ReadLimit { .. }))
+        Err(Error::Opc(OpcError::Limit { .. }))
     ));
 }
 

@@ -12,7 +12,7 @@ use super::{
     map_execution_error, map_io_error, map_preservation_error, overlay_unavailable,
 };
 use crate::error::SpliceResource;
-use crate::limits::ReadResource;
+use crate::limits::SourceLimitKind;
 use crate::packuri::PackURI;
 use litchi_core::{ExecutionContext, Reservation, Resource, SourceVersion};
 use sha2::{Digest as _, Sha256};
@@ -96,17 +96,21 @@ impl SourcePartSpliceLimits {
 
     fn validate(self) -> Result<()> {
         for (resource, value) in [
-            (ReadResource::PartBytes, self.max_source_bytes),
-            (ReadResource::PartBytes, self.max_fragment_bytes),
-            (ReadResource::PartBytes, self.max_candidate_bytes),
+            (SourceLimitKind::PartBytes, self.max_source_bytes),
+            (SourceLimitKind::PartBytes, self.max_fragment_bytes),
+            (SourceLimitKind::PartBytes, self.max_candidate_bytes),
             (
-                ReadResource::ArchiveCompressedBytes,
+                SourceLimitKind::ArchiveCompressedBytes,
                 self.max_compressed_bytes,
             ),
-            (ReadResource::ArchiveTotalBytes, self.max_archive_bytes),
+            (SourceLimitKind::ArchiveTotalBytes, self.max_archive_bytes),
         ] {
             if value == 0 || value == u64::MAX {
-                return Err(OpcError::InvalidReadLimit { resource, value });
+                return Err(OpcError::InvalidLimit {
+                    kind: resource,
+                    value,
+                    maximum: u64::MAX - 1,
+                });
             }
         }
         validate_splice_limit(SpliceResource::OutputBytes, self.max_output_bytes)?;
@@ -592,7 +596,7 @@ impl<'package> SourcePartSplicePlan<'package> {
             // branch intentionally bypasses XML and signature checks so a
             // malformed or signed source can still be reproduced exactly.
             limits_check(
-                ReadResource::ArchiveTotalBytes,
+                SourceLimitKind::ArchiveTotalBytes,
                 self.package.source.length,
                 self.limits.archive_limit(),
             )?;
@@ -1005,16 +1009,17 @@ impl SourceBackedPackage {
         maximum: u64,
     ) -> Result<SourcePartSpliceFragment<'_>> {
         if maximum == 0 || maximum == u64::MAX {
-            return Err(OpcError::InvalidReadLimit {
-                resource: ReadResource::PartBytes,
+            return Err(OpcError::InvalidLimit {
+                kind: SourceLimitKind::PartBytes,
                 value: maximum,
+                maximum: u64::MAX - 1,
             });
         }
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
-        limits_check(ReadResource::PartBytes, length, maximum)?;
+        limits_check(SourceLimitKind::PartBytes, length, maximum)?;
         limits_check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             length,
             self.limits.max_part_bytes(),
         )?;
@@ -1176,12 +1181,12 @@ impl SourceBackedPackage {
             ));
         }
         self.limits.check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             proof.source_len,
             self.limits.max_part_bytes(),
         )?;
         self.limits.check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             proof.source_len,
             limits.max_source_bytes,
         )?;
@@ -1208,7 +1213,7 @@ impl SourceBackedPackage {
             }
         }
         limits_check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             replay_proof.encoded_len,
             limits.max_fragment_bytes,
         )?;
@@ -1222,7 +1227,7 @@ impl SourceBackedPackage {
             ));
         }
         limits_check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             candidate_len,
             limits.max_candidate_bytes,
         )?;
@@ -1324,12 +1329,12 @@ impl SourceBackedPackage {
             ));
         }
         self.limits.check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             proof.source_len,
             self.limits.max_part_bytes(),
         )?;
         self.limits.check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             proof.source_len,
             limits.max_source_bytes,
         )?;
@@ -1342,14 +1347,14 @@ impl SourceBackedPackage {
         }
         limits.validate()?;
         limits_check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             fragment_len,
             limits.max_fragment_bytes,
         )?;
         let fragment_capacity = u64::try_from(fragment.capacity())
             .map_err(|_| overlay_unavailable("decoded splice fragment capacity exceeds u64"))?;
         limits_check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             fragment_capacity,
             limits.max_fragment_bytes,
         )?;
@@ -1368,7 +1373,7 @@ impl SourceBackedPackage {
             ));
         }
         limits_check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             candidate_len,
             limits.max_candidate_bytes,
         )?;
@@ -1620,11 +1625,11 @@ impl SourcePartSplicePublication {
     }
 }
 
-fn limits_check(resource: ReadResource, actual: u64, maximum: u64) -> Result<()> {
+fn limits_check(resource: SourceLimitKind, actual: u64, maximum: u64) -> Result<()> {
     if actual > maximum {
-        return Err(OpcError::ReadLimit {
-            resource,
-            actual,
+        return Err(OpcError::Limit {
+            kind: resource,
+            observed: actual,
             maximum,
         });
     }
@@ -3110,13 +3115,13 @@ fn map_replay_error(error: ReplayPublicationError<OpcError>) -> OpcError {
             actual,
             maximum,
             ..
-        } => OpcError::ReadLimit {
-            resource: match resource {
-                ReplayResource::DecodedBytes => ReadResource::PartBytes,
-                ReplayResource::CompressedBytes => ReadResource::ArchiveCompressedBytes,
-                ReplayResource::ArchiveBytes => ReadResource::ArchiveTotalBytes,
+        } => OpcError::Limit {
+            kind: match resource {
+                ReplayResource::DecodedBytes => SourceLimitKind::PartBytes,
+                ReplayResource::CompressedBytes => SourceLimitKind::ArchiveCompressedBytes,
+                ReplayResource::ArchiveBytes => SourceLimitKind::ArchiveTotalBytes,
             },
-            actual,
+            observed: actual,
             maximum,
         },
         ReplayPublicationError::Sink { source, .. } => map_io_error(source),

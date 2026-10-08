@@ -6,7 +6,7 @@ use std::sync::Arc;
 use litchi_drawingml::ink::actions::{self, Profile};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    OpcError, OpcPackage, OwnedContentTypes, OwnedRelationships, PackURI, Part, ReadResource,
+    OpcError, OpcPackage, OwnedContentTypes, OwnedRelationships, PackURI, Part, SourceLimitKind,
     TargetMode,
 };
 use quick_xml::events::Event;
@@ -659,7 +659,7 @@ fn validate_relationship_source(
         .checked_add(1)
         .ok_or_else(|| invalid("relationship part count overflows"))?;
     check_relationship_limit(
-        ReadResource::RelationshipParts,
+        SourceLimitKind::RelationshipParts,
         *relationship_parts,
         limits.max_relationship_parts(),
     )?;
@@ -668,7 +668,7 @@ fn validate_relationship_source(
         .checked_add(source.bytes().len())
         .ok_or_else(|| invalid("relationship XML byte count overflows"))?;
     check_relationship_limit(
-        ReadResource::TotalRelationshipXmlBytes,
+        SourceLimitKind::TotalRelationshipXmlBytes,
         *total_xml_bytes,
         limits.max_total_relationship_xml_bytes(),
     )?;
@@ -678,7 +678,7 @@ fn validate_relationship_source(
         .checked_add(events)
         .ok_or_else(|| invalid("relationship XML event count overflows"))?;
     check_relationship_limit(
-        ReadResource::TotalRelationshipXmlEvents,
+        SourceLimitKind::TotalRelationshipXmlEvents,
         *total_xml_events,
         limits.max_total_relationship_xml_events(),
     )?;
@@ -686,7 +686,7 @@ fn validate_relationship_source(
         .checked_add(relationships)
         .ok_or_else(|| invalid("relationship count overflows"))?;
     check_relationship_limit(
-        ReadResource::TotalRelationships,
+        SourceLimitKind::TotalRelationships,
         *total_relationships,
         limits.max_total_relationships(),
     )?;
@@ -718,11 +718,15 @@ fn relationship_xml_metrics(xml: &[u8]) -> Result<(usize, usize)> {
     Ok((events, relationships))
 }
 
-fn check_relationship_limit(resource: ReadResource, actual: usize, maximum: usize) -> Result<()> {
+fn check_relationship_limit(
+    resource: SourceLimitKind,
+    actual: usize,
+    maximum: usize,
+) -> Result<()> {
     if actual > maximum {
-        return Err(Error::Opc(OpcError::ReadLimit {
-            resource,
-            actual: actual as u64,
+        return Err(Error::Opc(OpcError::Limit {
+            kind: resource,
+            observed: actual as u64,
             maximum: maximum as u64,
         }));
     }
@@ -858,9 +862,9 @@ fn preflight_patch_limits(package: &OpcPackage, patch: &Patch) -> Result<()> {
     let read_limits = package.read_limits();
     let part_count = package.part_count();
     if part_count > read_limits.max_parts() {
-        return Err(Error::Opc(OpcError::ReadLimit {
-            resource: ReadResource::Parts,
-            actual: part_count as u64,
+        return Err(Error::Opc(OpcError::Limit {
+            kind: SourceLimitKind::Parts,
+            observed: part_count as u64,
             maximum: read_limits.max_parts() as u64,
         }));
     }
@@ -892,9 +896,9 @@ fn preflight_patch_limits(package: &OpcPackage, patch: &Patch) -> Result<()> {
         let actual =
             u64::try_from(size).map_err(|_| invalid("ink-action staged part bytes exceed u64"))?;
         if actual > read_limits.max_part_bytes() {
-            return Err(Error::Opc(OpcError::ReadLimit {
-                resource: ReadResource::PartBytes,
-                actual,
+            return Err(Error::Opc(OpcError::Limit {
+                kind: SourceLimitKind::PartBytes,
+                observed: actual,
                 maximum: read_limits.max_part_bytes(),
             }));
         }
@@ -902,9 +906,9 @@ fn preflight_patch_limits(package: &OpcPackage, patch: &Patch) -> Result<()> {
             .checked_add(actual)
             .ok_or_else(|| invalid("ink-action staged package bytes overflow"))?;
         if total > read_limits.max_total_part_bytes() {
-            return Err(Error::Opc(OpcError::ReadLimit {
-                resource: ReadResource::TotalPartBytes,
-                actual: total,
+            return Err(Error::Opc(OpcError::Limit {
+                kind: SourceLimitKind::TotalPartBytes,
+                observed: total,
                 maximum: read_limits.max_total_part_bytes(),
             }));
         }

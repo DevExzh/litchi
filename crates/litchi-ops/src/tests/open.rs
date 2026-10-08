@@ -466,9 +466,9 @@ mod limits {
                 assert!(
                     matches!(
                         error.leaf(),
-                        crate::error::Source::Opc(litchi_opc::OpcError::ReadLimit {
-                            resource: litchi_opc::ReadResource::InputBytes,
-                            actual,
+                        crate::error::Source::Opc(litchi_opc::OpcError::Limit {
+                            kind: litchi_opc::SourceLimitKind::InputBytes,
+                            observed: actual,
                             ..
                         }) if *actual == bytes.len() as u64
                     ),
@@ -526,9 +526,9 @@ mod limits {
         assert_eq!(error.code(), crate::Code::LimitExceeded);
         assert!(matches!(
             error.leaf(),
-            crate::error::Source::Opc(litchi_opc::OpcError::ReadLimit {
-                resource: litchi_opc::ReadResource::Parts,
-                actual: 2,
+            crate::error::Source::Opc(litchi_opc::OpcError::Limit {
+                kind: litchi_opc::SourceLimitKind::Parts,
+                observed: 2,
                 maximum: 1,
             })
         ));
@@ -1126,7 +1126,7 @@ mod zip_candidates {
     #[test]
     fn ooxml_limits_refuse_a_zip_candidate_with_the_exact_bound() {
         use crate::error::Source;
-        use crate::opc::{OpcError, ReadResource, SourceLimits};
+        use crate::opc::{OpcError, SourceLimitKind, SourceLimits};
 
         let input = SourceLimits::builder()
             .max_input_bytes(1)
@@ -1142,9 +1142,9 @@ mod zip_candidates {
         assert!(
             matches!(
                 error.leaf(),
-                Source::Opc(OpcError::ReadLimit {
-                    resource: ReadResource::InputBytes,
-                    actual: 4,
+                Source::Opc(OpcError::Limit {
+                    kind: SourceLimitKind::InputBytes,
+                    observed: 4,
                     maximum: 1,
                 })
             ),
@@ -1170,9 +1170,9 @@ mod zip_candidates {
         assert!(
             matches!(
                 error.leaf(),
-                Source::Opc(OpcError::ReadLimit {
-                    resource: ReadResource::Parts,
-                    actual: 2,
+                Source::Opc(OpcError::Limit {
+                    kind: SourceLimitKind::Parts,
+                    observed: 2,
                     maximum: 1,
                 })
             ),

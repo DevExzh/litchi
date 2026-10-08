@@ -652,7 +652,7 @@ fn signed_change_source_version_limit_and_partial_sink_fail_before_or_during_out
         .unwrap();
     assert!(matches!(
         source_backed::Package::from_read_at_with_limits(source, limits),
-        Err(Error::Opc(OpcError::ReadLimit { .. }))
+        Err(Error::Opc(OpcError::Limit { .. }))
     ));
 
     let package = open_source(fixture(Fixture::transitional(&xml)));

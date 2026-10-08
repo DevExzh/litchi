@@ -119,7 +119,7 @@ pub trait Part: PartClone + Send + Sync {
     ///
     /// # Errors
     ///
-    /// Returns the refusal the decode produced: [`OpcError::ReadLimit`] for
+    /// Returns the refusal the decode produced: [`OpcError::Limit`] for
     /// `PartBytes` or `TotalPartBytes` when the central directory
     /// under-declared the member, an allocation failure, a cancellation, an
     /// I/O error, or a ZIP error for a corrupt Deflate stream or a CRC

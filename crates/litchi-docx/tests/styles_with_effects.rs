@@ -452,13 +452,15 @@ fn assert_effects_add_rejected_under_cap(
     cap: MutationCap,
 ) -> FixtureResult<()> {
     let expected_resource = match cap {
-        MutationCap::Parts => litchi_opc::ReadResource::Parts,
-        MutationCap::TotalPartBytes => litchi_opc::ReadResource::TotalPartBytes,
-        MutationCap::TotalRelationships => litchi_opc::ReadResource::TotalRelationships,
-        MutationCap::RelationshipParts => litchi_opc::ReadResource::RelationshipParts,
-        MutationCap::RelationshipGraphNodes => litchi_opc::ReadResource::RelationshipGraphNodes,
-        MutationCap::RelationshipXmlEvents => litchi_opc::ReadResource::TotalRelationshipXmlEvents,
-        MutationCap::RelationshipXmlBytes => litchi_opc::ReadResource::TotalRelationshipXmlBytes,
+        MutationCap::Parts => litchi_opc::SourceLimitKind::Parts,
+        MutationCap::TotalPartBytes => litchi_opc::SourceLimitKind::TotalPartBytes,
+        MutationCap::TotalRelationships => litchi_opc::SourceLimitKind::TotalRelationships,
+        MutationCap::RelationshipParts => litchi_opc::SourceLimitKind::RelationshipParts,
+        MutationCap::RelationshipGraphNodes => litchi_opc::SourceLimitKind::RelationshipGraphNodes,
+        MutationCap::RelationshipXmlEvents => {
+            litchi_opc::SourceLimitKind::TotalRelationshipXmlEvents
+        },
+        MutationCap::RelationshipXmlBytes => litchi_opc::SourceLimitKind::TotalRelationshipXmlBytes,
     };
     let mut package = Package::from_reader_with_limits(Cursor::new(source.to_vec()), limits)
         .map_err(|error| FixtureError(format!("open baseline under {label}: {error}")))?;
@@ -493,8 +495,8 @@ fn assert_effects_add_rejected_under_cap(
     assert!(
         matches!(
             edit.commit(),
-            Err(litchi_docx::Error::Opc(litchi_opc::OpcError::ReadLimit {
-                resource, actual, maximum,
+            Err(litchi_docx::Error::Opc(litchi_opc::OpcError::Limit {
+                kind: resource, observed: actual, maximum,
             })) if resource == expected_resource && actual > maximum
         ),
         "commit must reject {label} before serializing projected metadata"
@@ -1819,9 +1821,9 @@ fn assert_replacement_honors_total_part_bytes_cap(
     assert!(
         matches!(
             commit_error,
-            litchi_docx::Error::Opc(litchi_opc::OpcError::ReadLimit {
-                resource: litchi_opc::ReadResource::TotalPartBytes,
-                actual,
+            litchi_docx::Error::Opc(litchi_opc::OpcError::Limit {
+                kind: litchi_opc::SourceLimitKind::TotalPartBytes,
+                observed: actual,
                 maximum,
             }) if actual == exact_total && maximum == one_under
         ),

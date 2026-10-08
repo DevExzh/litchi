@@ -255,12 +255,12 @@ pub(crate) fn plan_relationship_publications(
         let metadata = package.archive.metadata_for(entry_id)?;
         let declared_bytes = metadata.uncompressed_size();
         package.limits.check(
-            crate::limits::ReadResource::RelationshipXmlBytes,
+            crate::limits::SourceLimitKind::RelationshipXmlBytes,
             declared_bytes,
             package.limits.max_relationship_xml_bytes() as u64,
         )?;
         package.limits.check(
-            crate::limits::ReadResource::ArchiveEntryBytes,
+            crate::limits::SourceLimitKind::ArchiveEntryBytes,
             declared_bytes,
             package.limits.max_archive_entry_bytes(),
         )?;
@@ -283,7 +283,7 @@ pub(crate) fn plan_relationship_publications(
             )));
         }
         package.limits.check(
-            crate::limits::ReadResource::RelationshipXmlBytes,
+            crate::limits::SourceLimitKind::RelationshipXmlBytes,
             canonical_len as u64,
             package.limits.max_relationship_xml_bytes() as u64,
         )?;

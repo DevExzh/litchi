@@ -1450,7 +1450,7 @@ impl AuthoredContentTypesBudget {
                 )
             })?;
         self.limits.check(
-            crate::ReadResource::XmlAttributeBytes,
+            crate::SourceLimitKind::XmlAttributeBytes,
             actual as u64,
             self.limits.max_xml_attribute_bytes() as u64,
         )
@@ -1463,18 +1463,18 @@ impl AuthoredContentTypesBudget {
         name: &str,
         content_type: &str,
     ) -> Result<()> {
-        use crate::ReadResource;
+        use crate::SourceLimitKind;
         let maximum = self.limits.max_content_types_bytes();
         self.mappings = self
             .mappings
             .checked_add(1)
-            .ok_or_else(|| crate::OpcError::ReadLimit {
-                resource: ReadResource::ContentTypeMappings,
-                actual: u64::MAX,
+            .ok_or_else(|| crate::OpcError::Limit {
+                kind: SourceLimitKind::ContentTypeMappings,
+                observed: u64::MAX,
                 maximum: self.limits.max_content_type_mappings() as u64,
             })?;
         self.limits.check(
-            ReadResource::ContentTypeMappings,
+            SourceLimitKind::ContentTypeMappings,
             self.mappings as u64,
             self.limits.max_content_type_mappings() as u64,
         )?;
@@ -1489,7 +1489,7 @@ impl AuthoredContentTypesBudget {
                 )
             })?;
         self.limits.check(
-            ReadResource::ContentTypesBytes,
+            SourceLimitKind::ContentTypesBytes,
             self.bytes as u64,
             maximum as u64,
         )?;
@@ -1501,7 +1501,7 @@ impl AuthoredContentTypesBudget {
                 )
             })?;
             self.limits.check(
-                ReadResource::ContentTypesBytes,
+                SourceLimitKind::ContentTypesBytes,
                 lower_bound as u64,
                 maximum as u64,
             )?;
@@ -1521,7 +1521,7 @@ impl AuthoredContentTypesBudget {
                     )
                 })?;
             self.limits.check(
-                ReadResource::ContentTypesBytes,
+                SourceLimitKind::ContentTypesBytes,
                 self.bytes as u64,
                 maximum as u64,
             )?;
@@ -1534,7 +1534,7 @@ pub(crate) fn authored_content_types_xml_with_limits(
     package: &OpcPackage,
     limits: crate::SourceLimits,
 ) -> Result<Vec<u8>> {
-    use crate::ReadResource;
+    use crate::SourceLimitKind;
 
     const HEADER: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">"#;
     const FOOTER: &[u8] = b"</Types>";
@@ -1545,7 +1545,7 @@ pub(crate) fn authored_content_types_xml_with_limits(
     crate::OwnedXmlPart::check_capture_member_name(&name, limits)?;
 
     limits.check(
-        ReadResource::Parts,
+        SourceLimitKind::Parts,
         package.part_count() as u64,
         limits.max_parts() as u64,
     )?;
@@ -1607,12 +1607,16 @@ pub(crate) fn authored_content_types_xml_with_limits(
         )
     })?;
     limits.check(
-        ReadResource::XmlEvents,
+        SourceLimitKind::XmlEvents,
         events as u64,
         limits.max_xml_events() as u64,
     )?;
     let depth = if budget.mappings == 0 { 1 } else { 2 };
-    limits.check(ReadResource::XmlDepth, depth, limits.max_xml_depth() as u64)?;
+    limits.check(
+        SourceLimitKind::XmlDepth,
+        depth,
+        limits.max_xml_depth() as u64,
+    )?;
     crate::OwnedXmlPart::check_capture_size(&name, budget.bytes, limits)?;
 
     let mut overrides = Vec::new();
@@ -1649,7 +1653,7 @@ pub(crate) fn authored_content_types_xml_with_limits(
     overrides.sort_unstable_by_key(|(name, _)| *name);
     let mut output = Vec::new();
     limits.check(
-        ReadResource::PartBytes,
+        SourceLimitKind::PartBytes,
         budget.bytes as u64,
         limits.max_part_bytes(),
     )?;
@@ -1846,8 +1850,8 @@ mod tests {
             .unwrap();
         assert!(matches!(
             authored_content_types_xml_with_limits(&package, too_small),
-            Err(crate::OpcError::ReadLimit {
-                resource: crate::ReadResource::ContentTypesBytes,
+            Err(crate::OpcError::Limit {
+                kind: crate::SourceLimitKind::ContentTypesBytes,
                 ..
             })
         ));
@@ -1858,8 +1862,8 @@ mod tests {
             .unwrap();
         assert!(matches!(
             authored_content_types_xml_with_limits(&package, too_few),
-            Err(crate::OpcError::ReadLimit {
-                resource: crate::ReadResource::ContentTypeMappings,
+            Err(crate::OpcError::Limit {
+                kind: crate::SourceLimitKind::ContentTypeMappings,
                 ..
             })
         ));
@@ -1882,8 +1886,8 @@ mod tests {
             .unwrap();
         assert!(matches!(
             authored_content_types_xml_with_limits(&package, limits),
-            Err(crate::OpcError::ReadLimit {
-                resource: crate::ReadResource::ContentTypesBytes,
+            Err(crate::OpcError::Limit {
+                kind: crate::SourceLimitKind::ContentTypesBytes,
                 ..
             })
         ));

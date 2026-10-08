@@ -18,7 +18,7 @@ use soapberry_zip::office::StreamingArchiveWriter;
 use soapberry_zip::time::UtcDateTime;
 use soapberry_zip::{CompressionMethod, Header, ZipArchive, ZipArchiveWriter};
 
-use crate::limits::{ReadResource, SourceLimits};
+use crate::limits::{SourceLimitKind, SourceLimits};
 use crate::packuri::PackURI;
 use crate::part::{BlobPart, Part};
 use crate::pkgwriter::PackageWriter;
@@ -568,7 +568,7 @@ fn assert_refused(archive: Vec<u8>) {
     assert!(
         matches!(
             error,
-            OpcError::ZipError(_) | OpcError::IoError(_) | OpcError::ReadLimit { .. }
+            OpcError::ZipError(_) | OpcError::IoError(_) | OpcError::Limit { .. }
         ),
         "the refusal is typed: {error:?}"
     );
@@ -810,7 +810,7 @@ fn the_transfer_rechecks_the_read_limits_the_archive_was_admitted_under() {
                 .max_part_bytes(1024)
                 .and_then(crate::SourceLimitsBuilder::build)
                 .expect("limit"),
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
         ),
         (
             SourceLimits::builder()
@@ -819,7 +819,7 @@ fn the_transfer_rechecks_the_read_limits_the_archive_was_admitted_under() {
                 )
                 .and_then(crate::SourceLimitsBuilder::build)
                 .expect("limit"),
-            ReadResource::ArchiveCompressedBytes,
+            SourceLimitKind::ArchiveCompressedBytes,
         ),
     ] {
         // Admit the archive under the default policy, then bind the policy
@@ -835,7 +835,7 @@ fn the_transfer_rechecks_the_read_limits_the_archive_was_admitted_under() {
             .authorize_compressed_transfer(&part_uri(PHOTO))
             .expect_err("a member above the limit is refused");
         assert!(
-            matches!(error, OpcError::ReadLimit { resource: found, .. } if found == resource),
+            matches!(error, OpcError::Limit { kind: found, .. } if found == resource),
             "{error:?}"
         );
     }

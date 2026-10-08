@@ -40,7 +40,9 @@ metadata, materialized OPC parts, `[Content_Types].xml`, and relationship XML
 and graph traversal. It implements the defensive-consumer concerns in
 ECMA-376 Part 2 sections 7.3.6 and 10, together with MS-OI29500 sections
 2.1.1749-1752; its ceilings are Litchi safety policy, not maxima prescribed by
-those specifications.
+those specifications. Errors report
+`OpcError::Limit { kind: SourceLimitKind, observed, maximum }`; invalid profiles
+report `InvalidLimit { kind, value, maximum }`.
 
 PPTX and XLSX custom document properties use the shared typed
 `litchi_ooxml_common::custom::Props` and `Value` model for parsing and writing,

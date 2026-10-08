@@ -533,7 +533,7 @@ fn mce_limits_and_partial_sink_are_checked() {
             Arc::new(VersionedSource::new(ordinary_fixture("", false))),
             limits,
         ),
-        Err(Error::Package(OpcError::ReadLimit { .. }))
+        Err(Error::Package(OpcError::Limit { .. }))
     ));
 
     let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(

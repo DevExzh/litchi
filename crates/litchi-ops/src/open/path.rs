@@ -44,9 +44,9 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
     if !zip && super::ooxml_format_for_extension(path).is_some() {
         let limits = options.ooxml_limits.unwrap_or_default();
         if length > limits.max_input_bytes() {
-            return Err(litchi_opc::OpcError::ReadLimit {
-                resource: litchi_opc::ReadResource::InputBytes,
-                actual: length,
+            return Err(litchi_opc::OpcError::Limit {
+                kind: litchi_opc::SourceLimitKind::InputBytes,
+                observed: length,
                 maximum: limits.max_input_bytes(),
             }
             .into());
@@ -205,9 +205,9 @@ mod zip {
         {
             let limits = options.ooxml_limits.unwrap_or_default();
             if length > limits.max_input_bytes() {
-                return Err(litchi_opc::OpcError::ReadLimit {
-                    resource: litchi_opc::ReadResource::InputBytes,
-                    actual: length,
+                return Err(litchi_opc::OpcError::Limit {
+                    kind: litchi_opc::SourceLimitKind::InputBytes,
+                    observed: length,
                     maximum: limits.max_input_bytes(),
                 }
                 .into());
@@ -295,9 +295,9 @@ mod zip {
                 if super::super::ooxml_format_for_extension(path).is_some() {
                     let limits = options.ooxml_limits.unwrap_or_default();
                     if length > limits.max_input_bytes() {
-                        return Err(litchi_opc::OpcError::ReadLimit {
-                            resource: litchi_opc::ReadResource::InputBytes,
-                            actual: length,
+                        return Err(litchi_opc::OpcError::Limit {
+                            kind: litchi_opc::SourceLimitKind::InputBytes,
+                            observed: length,
                             maximum: limits.max_input_bytes(),
                         }
                         .into());

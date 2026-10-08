@@ -25,7 +25,7 @@ use litchi_core::{
     Resource, SourceVersion,
 };
 use litchi_opc::{
-    AuthorizedPrecompressedPart, OpcError, PackURI, ReadResource, SourceBackedPackage,
+    AuthorizedPrecompressedPart, OpcError, PackURI, SourceBackedPackage, SourceLimitKind,
     SourceLimits, SourceTopologyPlan,
 };
 
@@ -738,8 +738,8 @@ fn output_limit_is_checked_before_any_destination_output() {
 
     assert!(matches!(
         error,
-        OpcError::ReadLimit {
-            resource: ReadResource::ArchiveTotalBytes,
+        OpcError::Limit {
+            kind: SourceLimitKind::ArchiveTotalBytes,
             ..
         }
     ));

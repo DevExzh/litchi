@@ -6,7 +6,7 @@
 
 use super::{PartData, SourceBackedPackage};
 use crate::error::{OpcError, Result};
-use crate::limits::ReadResource;
+use crate::limits::SourceLimitKind;
 use crate::packuri::PackURI;
 use litchi_core::{ExecutionContext, ExecutionError, Reservation, Resource};
 use soapberry_zip::office::EntryId;
@@ -391,7 +391,7 @@ impl PreparedBatch {
             let declared_bytes = if context.is_some() {
                 let declared = declared_size(package, entry_id)?;
                 package.limits.check(
-                    ReadResource::PartBytes,
+                    SourceLimitKind::PartBytes,
                     declared,
                     package.limits.max_part_bytes(),
                 )?;
@@ -1162,9 +1162,9 @@ fn check_request_count(package: &SourceBackedPackage, actual: usize) -> Result<(
     let maximum = u64::try_from(package.limits.max_parts())
         .map_err(|_| batch_refusal("source-backed batch Part limit exceeds u64"))?;
     if actual > maximum {
-        return Err(OpcError::ReadLimit {
-            resource: ReadResource::Parts,
-            actual,
+        return Err(OpcError::Limit {
+            kind: SourceLimitKind::Parts,
+            observed: actual,
             maximum,
         });
     }

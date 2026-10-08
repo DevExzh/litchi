@@ -7,7 +7,7 @@
 
 use crate::content_type::ContentType;
 use crate::error::{OpcError, Result};
-use crate::limits::{ReadResource, SourceLimits};
+use crate::limits::{SourceLimitKind, SourceLimits};
 use crate::packuri::PackURI;
 use crate::pkgreader::is_xml_id;
 use crate::source_backed::{PartData, SourceLineage, SourceSnapshot};
@@ -132,7 +132,7 @@ impl SourceXmlPart {
         let source_content_type = ContentType::from_admitted_source(source_content_type);
         let bytes = original.as_bytes();
         limits.check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             bytes.len() as u64,
             limits.max_part_bytes(),
         )?;
@@ -269,7 +269,7 @@ impl SourceXmlPart {
             .checked_sub(range.start)
             .ok_or_else(|| invalid_source("XML source range length overflows"))?;
         self.limits.check(
-            ReadResource::XmlAttributeBytes,
+            SourceLimitKind::XmlAttributeBytes,
             range_len as u64,
             limits_range_max(self.limits),
         )?;
@@ -329,7 +329,7 @@ impl SourceXmlPart {
         let result = (|| {
             let bytes = bytes.into();
             self.limits.check(
-                ReadResource::PartBytes,
+                SourceLimitKind::PartBytes,
                 bytes.len() as u64,
                 self.limits.max_part_bytes(),
             )?;
@@ -389,7 +389,7 @@ impl SourceXmlPart {
         }
         self.check_source_state()?;
         destination_limits.check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             self.payload.len() as u64,
             destination_limits.max_part_bytes(),
         )?;
@@ -718,7 +718,7 @@ impl XmlSplicePublication {
             .and_then(|length| length.checked_add(added))
             .ok_or_else(|| invalid_source("XML source splice size overflows"))?;
         self.source.limits.check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             output_len as u64,
             self.source.limits.max_part_bytes(),
         )?;
@@ -1063,7 +1063,7 @@ fn validate_source_xml(
     context: Option<&ExecutionContext>,
 ) -> Result<()> {
     limits.check(
-        ReadResource::PartBytes,
+        SourceLimitKind::PartBytes,
         bytes.len() as u64,
         limits.max_part_bytes(),
     )?;
@@ -1097,7 +1097,7 @@ fn validate_source_xml(
             .checked_add(1)
             .ok_or_else(|| invalid_source("source XML event count overflows"))?;
         limits.check(
-            ReadResource::XmlEvents,
+            SourceLimitKind::XmlEvents,
             events,
             limits.max_xml_events() as u64,
         )?;
@@ -1120,14 +1120,18 @@ fn validate_source_xml(
                 depth = depth
                     .checked_add(1)
                     .ok_or_else(|| invalid_source("source XML depth overflows"))?;
-                limits.check(ReadResource::XmlDepth, depth as u64, xml_depth_limit as u64)?;
+                limits.check(
+                    SourceLimitKind::XmlDepth,
+                    depth as u64,
+                    xml_depth_limit as u64,
+                )?;
             },
             Event::Empty(element) => {
                 let element_depth = depth
                     .checked_add(1)
                     .ok_or_else(|| invalid_source("source XML depth overflows"))?;
                 limits.check(
-                    ReadResource::XmlDepth,
+                    SourceLimitKind::XmlDepth,
                     element_depth as u64,
                     xml_depth_limit as u64,
                 )?;
@@ -1357,7 +1361,7 @@ fn validate_source_element(
             .checked_add(attribute.value.as_ref().len())
             .ok_or_else(|| invalid_source("source XML attribute size overflows"))?;
         limits.check(
-            ReadResource::XmlAttributeBytes,
+            SourceLimitKind::XmlAttributeBytes,
             raw_attribute_bytes as u64,
             limits.max_xml_attribute_bytes() as u64,
         )?;
@@ -1376,7 +1380,7 @@ fn validate_source_element(
                 invalid_source(format!("source XML attribute value is invalid: {error}"))
             })?;
         limits.check(
-            ReadResource::XmlAttributeBytes,
+            SourceLimitKind::XmlAttributeBytes,
             value.len() as u64,
             limits.max_xml_attribute_bytes() as u64,
         )?;

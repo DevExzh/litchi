@@ -17,7 +17,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, Resource,
 };
 use litchi_opc::{
-    AuthoredXmlFragment, OpcError, PackURI, ReadResource, SourceBackedPackage, SourceLimits,
+    AuthoredXmlFragment, OpcError, PackURI, SourceBackedPackage, SourceLimitKind, SourceLimits,
     SourceTopologyPlan, authored_xml_requires_source_proof,
 };
 use soapberry_zip::office::StreamingArchiveWriter;
@@ -449,8 +449,8 @@ fn destination_depth_and_event_limits_refuse_source_xml_additions() {
     let mut depth_output = Vec::new();
     assert!(matches!(
         depth_destination.write_topology_to_stream(&mut depth_output, depth_plan),
-        Err(OpcError::ReadLimit {
-            resource: ReadResource::XmlDepth,
+        Err(OpcError::Limit {
+            kind: SourceLimitKind::XmlDepth,
             ..
         })
     ));
@@ -469,8 +469,8 @@ fn destination_depth_and_event_limits_refuse_source_xml_additions() {
     let mut event_output = Vec::new();
     assert!(matches!(
         event_destination.write_topology_to_stream(&mut event_output, event_plan),
-        Err(OpcError::ReadLimit {
-            resource: ReadResource::XmlEvents,
+        Err(OpcError::Limit {
+            kind: SourceLimitKind::XmlEvents,
             ..
         })
     ));
@@ -1243,8 +1243,8 @@ fn retained_xml_revisions_enforce_aggregate_limits_and_memory_admission() {
                 AuthoredXmlFragment::markup(b"<second/>".to_vec())?,
             )
         }),
-        Err(OpcError::ReadLimit {
-            resource: ReadResource::TotalPartBytes,
+        Err(OpcError::Limit {
+            kind: SourceLimitKind::TotalPartBytes,
             ..
         })
     ));
@@ -1306,8 +1306,8 @@ fn retained_xml_revisions_enforce_effective_archive_byte_limits() {
                 AuthoredXmlFragment::markup(b"<second/>".to_vec())?,
             )
         }),
-        Err(OpcError::ReadLimit {
-            resource: ReadResource::ArchiveTotalBytes,
+        Err(OpcError::Limit {
+            kind: SourceLimitKind::ArchiveTotalBytes,
             ..
         })
     ));

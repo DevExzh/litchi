@@ -783,10 +783,10 @@ impl Classify for litchi_opc::OpcError {
             Self::SourceChanged { .. }
             | Self::CentralDirectorySpool { .. }
             | Self::IncompleteOutput { .. } => Class::of(Code::IoError),
-            Self::ReadLimit { .. }
+            Self::Limit { .. }
             | Self::SourcePartSpliceLimit { .. }
             | Self::CentralDirectorySpoolLimitExceeded { .. } => Class::of(Code::LimitExceeded),
-            Self::InvalidReadLimit { .. }
+            Self::InvalidLimit { .. }
             | Self::InvalidSourcePartSpliceLimit { .. }
             | Self::UnsupportedExecutionAffinity => Class::of(Code::InvalidArgument),
             Self::Cancelled => Class::of(Code::Cancelled),

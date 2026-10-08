@@ -1327,14 +1327,14 @@ fn inherited_namespace_context_respects_source_part_limit_and_is_reusable() {
             Arc::new(VersionedSource::new(source.clone())),
             tight_limit,
         ),
-        Err(Error::Opc(OpcError::ReadLimit { .. }))
+        Err(Error::Opc(OpcError::Limit { .. }))
     ));
     assert!(matches!(
         SourceBackedPresentationEditor::from_read_at_with_limits(
             Arc::new(VersionedSource::new(source.clone())),
             tight_limit,
         ),
-        Err(Error::Opc(OpcError::ReadLimit { .. }))
+        Err(Error::Opc(OpcError::Limit { .. }))
     ));
     assert_eq!(slide_member(&source), source_slide);
 }

@@ -2,8 +2,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, reason = "test assertions")]
 
 use litchi_opc::{
-    ContentTypeEdit, OpcError, OpcPackage, PackURI, ReadResource, RelationshipEdit, Relationships,
-    SourceLimits, TargetMode,
+    ContentTypeEdit, OpcError, OpcPackage, PackURI, RelationshipEdit, Relationships,
+    SourceLimitKind, SourceLimits, TargetMode,
 };
 use quick_xml::{Reader, events::Event};
 
@@ -125,8 +125,8 @@ fn relationship_plan_admits_exact_events_before_materialization_for_all_root_for
             .unwrap();
         assert!(matches!(
             before.plan_edit(&additions, &[], under),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::XmlEvents,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::XmlEvents,
                 ..
             })
         ));
@@ -200,10 +200,10 @@ fn relationship_plan_enforces_archive_entry_cap_for_noop_and_changed_output() {
             .unwrap();
         assert_eq!(after.bytes().len(), size);
         assert!(
-            matches!(before.plan_edit(additions, &[], under), Err(OpcError::ReadLimit { resource: ReadResource::ArchiveEntryBytes, actual, maximum }) if actual == size as u64 && maximum == (size - 1) as u64)
+            matches!(before.plan_edit(additions, &[], under), Err(OpcError::Limit { kind: SourceLimitKind::ArchiveEntryBytes, observed: actual, maximum }) if actual == size as u64 && maximum == (size - 1) as u64)
         );
         assert!(
-            matches!(before.plan_edit(additions, &[], SourceLimits::default()).unwrap().materialize(under), Err(OpcError::ReadLimit { resource: ReadResource::ArchiveEntryBytes, actual, maximum }) if actual == size as u64 && maximum == (size - 1) as u64)
+            matches!(before.plan_edit(additions, &[], SourceLimits::default()).unwrap().materialize(under), Err(OpcError::Limit { kind: SourceLimitKind::ArchiveEntryBytes, observed: actual, maximum }) if actual == size as u64 && maximum == (size - 1) as u64)
         );
         assert_eq!(before.bytes(), xml);
     }
@@ -307,8 +307,8 @@ fn new_owner_canonical_plan_reports_actual_output_before_materialization() {
             .unwrap();
         assert!(matches!(
             relationships.plan_canonical(under),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::ArchiveEntryBytes,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::ArchiveEntryBytes,
                 ..
             })
         ));
@@ -319,8 +319,8 @@ fn new_owner_canonical_plan_reports_actual_output_before_materialization() {
             .unwrap();
         assert!(matches!(
             relationships.plan_canonical(under),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::XmlEvents,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::XmlEvents,
                 ..
             })
         ));

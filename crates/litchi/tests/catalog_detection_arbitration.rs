@@ -91,7 +91,7 @@ fn odf_package(mimetype: &str, content: &[u8]) -> Vec<u8> {
 mod document_limit_arbitration {
     use super::odf_package;
     use litchi::error::Source;
-    use litchi::opc::{OpcError, ReadResource};
+    use litchi::opc::{OpcError, SourceLimitKind};
     use litchi::{Code, Error, File, OpenOptions};
 
     const ODT_MIME: &str = "application/vnd.oasis.opendocument.text";
@@ -121,15 +121,15 @@ mod document_limit_arbitration {
     #[track_caller]
     fn assert_input_limit(error: &Error, observed: u64, maximum: u64) {
         assert_eq!(error.code(), Code::LimitExceeded, "{error:?}");
-        let Source::Opc(OpcError::ReadLimit {
-            resource,
-            actual,
+        let Source::Opc(OpcError::Limit {
+            kind: resource,
+            observed: actual,
             maximum: limit,
         }) = error.leaf()
         else {
             panic!("expected an input resource limit, got {error:?}");
         };
-        assert_eq!(*resource, ReadResource::InputBytes);
+        assert_eq!(*resource, SourceLimitKind::InputBytes);
         assert_eq!(*actual, observed);
         assert_eq!(*limit, maximum);
     }
@@ -322,7 +322,7 @@ mod ooxml_odf_arbitration {
         detect_format_smart_with_limits,
     };
     use litchi::error::Source;
-    use litchi::opc::{OpcError, ReadResource};
+    use litchi::opc::{OpcError, SourceLimitKind};
     use litchi::{Code, OpenOptions};
 
     const ODP_MIME: &str = "application/vnd.oasis.opendocument.presentation";
@@ -423,8 +423,8 @@ mod ooxml_odf_arbitration {
         assert!(
             matches!(
                 error.leaf(),
-                Source::Opc(OpcError::ReadLimit {
-                    resource: ReadResource::ContentTypesBytes,
+                Source::Opc(OpcError::Limit {
+                    kind: SourceLimitKind::ContentTypesBytes,
                     maximum: 1,
                     ..
                 })

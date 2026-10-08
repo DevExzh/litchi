@@ -11,7 +11,7 @@
 //! adapter's public contract and its mapping of those outcomes.
 
 use litchi_opc::phys_pkg::PhysPkgReader;
-use litchi_opc::{OpcError, PackURI, ReadResource, SourceLimits};
+use litchi_opc::{OpcError, PackURI, SourceLimitKind, SourceLimits};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const STORED_MEMBER: &str = "word/media/image.bin";
@@ -284,9 +284,9 @@ fn phys_pkg_borrowed_enforces_part_limit_without_materialization_charge() {
         .expect_err("declared Store bytes above max_part_bytes must be rejected");
     assert!(matches!(
         error,
-        OpcError::ReadLimit {
-            resource: ReadResource::PartBytes,
-            actual,
+        OpcError::Limit {
+            kind: SourceLimitKind::PartBytes,
+            observed: actual,
             maximum,
         } if actual == STORED_PAYLOAD.len() as u64 && maximum == oversized_maximum
     ));
@@ -321,9 +321,9 @@ fn phys_pkg_borrowed_enforces_part_limit_without_materialization_charge() {
         .expect_err("second owned read must be the first exhausted materialization");
     assert!(matches!(
         error,
-        OpcError::ReadLimit {
-            resource: ReadResource::Parts,
-            actual: 2,
+        OpcError::Limit {
+            kind: SourceLimitKind::Parts,
+            observed: 2,
             maximum: 1,
         }
     ));

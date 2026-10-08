@@ -14,7 +14,7 @@ use super::{
 use crate::constants::namespace;
 use crate::content_type::{ContentType, ContentTypeMap, validate_content_type};
 use crate::error::{OpcError, Result};
-use crate::limits::{ReadResource, SourceLimits};
+use crate::limits::{SourceLimitKind, SourceLimits};
 use crate::packuri::PackURI;
 use crate::xml_attributes::BytesStartExt as _;
 use litchi_core::xml::ReaderOrigin;
@@ -177,21 +177,21 @@ impl<'source> ContentTypesPlan<'source> {
         reservation_failures: Option<&DiagnosticCounter>,
     ) -> Result<Self> {
         limits.check(
-            ReadResource::ContentTypesBytes,
+            SourceLimitKind::ContentTypesBytes,
             source.len() as u64,
             limits.max_content_types_bytes() as u64,
         )?;
         limits.check(
-            ReadResource::ArchiveEntryBytes,
+            SourceLimitKind::ArchiveEntryBytes,
             source.len() as u64,
             limits.max_archive_entry_bytes(),
         )?;
         check_context(context)?;
 
         if additions.len() > limits.max_content_type_mappings() {
-            return Err(OpcError::ReadLimit {
-                resource: ReadResource::ContentTypeMappings,
-                actual: additions.len() as u64,
+            return Err(OpcError::Limit {
+                kind: SourceLimitKind::ContentTypeMappings,
+                observed: additions.len() as u64,
                 maximum: limits.max_content_type_mappings() as u64,
             });
         }
@@ -199,15 +199,15 @@ impl<'source> ContentTypesPlan<'source> {
             removals
                 .len()
                 .checked_add(default_removals.len())
-                .ok_or(OpcError::ReadLimit {
-                    resource: ReadResource::ContentTypeMappings,
-                    actual: u64::MAX,
+                .ok_or(OpcError::Limit {
+                    kind: SourceLimitKind::ContentTypeMappings,
+                    observed: u64::MAX,
                     maximum: limits.max_content_type_mappings() as u64,
                 })?;
         if removal_selector_count > limits.max_content_type_mappings() {
-            return Err(OpcError::ReadLimit {
-                resource: ReadResource::ContentTypeMappings,
-                actual: removal_selector_count as u64,
+            return Err(OpcError::Limit {
+                kind: SourceLimitKind::ContentTypeMappings,
+                observed: removal_selector_count as u64,
                 maximum: limits.max_content_type_mappings() as u64,
             });
         }
@@ -303,13 +303,13 @@ impl<'source> ContentTypesPlan<'source> {
 
         loop {
             check_context(context)?;
-            event_count = event_count.checked_add(1).ok_or(OpcError::ReadLimit {
-                resource: ReadResource::XmlEvents,
-                actual: u64::MAX,
+            event_count = event_count.checked_add(1).ok_or(OpcError::Limit {
+                kind: SourceLimitKind::XmlEvents,
+                observed: u64::MAX,
                 maximum: limits.max_xml_events() as u64,
             })?;
             limits.check(
-                ReadResource::XmlEvents,
+                SourceLimitKind::XmlEvents,
                 event_count as u64,
                 limits.max_xml_events() as u64,
             )?;
@@ -538,17 +538,17 @@ impl<'source> ContentTypesPlan<'source> {
             })
             .ok_or_else(|| overlay_unavailable("content-type output length overflows"))?;
         limits.check(
-            ReadResource::ContentTypesBytes,
+            SourceLimitKind::ContentTypesBytes,
             final_len as u64,
             limits.max_content_types_bytes() as u64,
         )?;
         limits.check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             final_len as u64,
             limits.max_part_bytes(),
         )?;
         limits.check(
-            ReadResource::ArchiveEntryBytes,
+            SourceLimitKind::ArchiveEntryBytes,
             final_len as u64,
             limits.max_archive_entry_bytes(),
         )?;
@@ -557,7 +557,7 @@ impl<'source> ContentTypesPlan<'source> {
             .and_then(|value| value.checked_add(additions.len()))
             .ok_or_else(|| overlay_unavailable("content-type mapping count underflows"))?;
         limits.check(
-            ReadResource::ContentTypeMappings,
+            SourceLimitKind::ContentTypeMappings,
             mapping_count as u64,
             limits.max_content_type_mappings() as u64,
         )?;
@@ -569,7 +569,7 @@ impl<'source> ContentTypesPlan<'source> {
             })
             .ok_or_else(|| overlay_unavailable("content-type XML event count underflows"))?;
         limits.check(
-            ReadResource::XmlEvents,
+            SourceLimitKind::XmlEvents,
             event_count as u64,
             limits.max_xml_events() as u64,
         )?;
@@ -648,17 +648,17 @@ impl<'source> ContentTypesPlan<'source> {
 
         check_context(context)?;
         limits.check(
-            ReadResource::ContentTypesBytes,
+            SourceLimitKind::ContentTypesBytes,
             final_len as u64,
             limits.max_content_types_bytes() as u64,
         )?;
         limits.check(
-            ReadResource::ArchiveEntryBytes,
+            SourceLimitKind::ArchiveEntryBytes,
             final_len as u64,
             limits.max_archive_entry_bytes(),
         )?;
         limits.check(
-            ReadResource::XmlEvents,
+            SourceLimitKind::XmlEvents,
             event_count as u64,
             limits.max_xml_events() as u64,
         )?;
@@ -900,13 +900,13 @@ fn is_xml_name_delimiter(byte: u8) -> bool {
 }
 
 fn checked_mapping_count(current: usize, limits: SourceLimits) -> Result<usize> {
-    let next = current.checked_add(1).ok_or(OpcError::ReadLimit {
-        resource: ReadResource::ContentTypeMappings,
-        actual: u64::MAX,
+    let next = current.checked_add(1).ok_or(OpcError::Limit {
+        kind: SourceLimitKind::ContentTypeMappings,
+        observed: u64::MAX,
         maximum: limits.max_content_type_mappings() as u64,
     })?;
     limits.check(
-        ReadResource::ContentTypeMappings,
+        SourceLimitKind::ContentTypeMappings,
         next as u64,
         limits.max_content_type_mappings() as u64,
     )?;
@@ -914,13 +914,13 @@ fn checked_mapping_count(current: usize, limits: SourceLimits) -> Result<usize> 
 }
 
 fn next_depth(depth: usize, limits: SourceLimits) -> Result<usize> {
-    let next = depth.checked_add(1).ok_or(OpcError::ReadLimit {
-        resource: ReadResource::XmlDepth,
-        actual: u64::MAX,
+    let next = depth.checked_add(1).ok_or(OpcError::Limit {
+        kind: SourceLimitKind::XmlDepth,
+        observed: u64::MAX,
         maximum: limits.max_xml_depth() as u64,
     })?;
     limits.check(
-        ReadResource::XmlDepth,
+        SourceLimitKind::XmlDepth,
         next as u64,
         limits.max_xml_depth() as u64,
     )?;
@@ -1166,8 +1166,8 @@ mod tests {
             .unwrap();
         assert!(matches!(
             ContentTypesPlan::plan(SOURCE, &additions, &[], below, None, None),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::ContentTypesBytes,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::ContentTypesBytes,
                 ..
             })
         ));

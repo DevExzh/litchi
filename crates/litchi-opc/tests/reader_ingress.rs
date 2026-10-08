@@ -10,7 +10,9 @@
 use std::io::{self, Read};
 
 use litchi_opc::phys_pkg::OwnedPhysPkgReader;
-use litchi_opc::{OpcError, OpcPackage, PackURI, ReadResource, SourceBackedPackage, SourceLimits};
+use litchi_opc::{
+    OpcError, OpcPackage, PackURI, SourceBackedPackage, SourceLimitKind, SourceLimits,
+};
 use soapberry_zip::office::StreamingArchiveWriter;
 use tempfile::NamedTempFile;
 
@@ -127,9 +129,9 @@ impl Read for ErrorAfterLimit {
 fn input_limit_error(error: OpcError, maximum: usize, actual: usize) {
     assert!(matches!(
         error,
-        OpcError::ReadLimit {
-            resource: ReadResource::InputBytes,
-            actual: observed,
+        OpcError::Limit {
+            kind: SourceLimitKind::InputBytes,
+            observed,
             maximum: configured,
         } if observed == actual as u64 && configured == maximum as u64
     ));
@@ -336,16 +338,18 @@ fn physical_path_ingress_uses_file_size_for_input_limit_precheck() {
 fn input_limit_builder_rejects_zero_and_unaddressable_values() {
     assert!(matches!(
         SourceLimits::builder().max_input_bytes(0),
-        Err(OpcError::InvalidReadLimit {
-            resource: ReadResource::InputBytes,
+        Err(OpcError::InvalidLimit {
+            kind: SourceLimitKind::InputBytes,
             value: 0,
+            ..
         })
     ));
     assert!(matches!(
         SourceLimits::builder().max_input_bytes(u64::MAX),
-        Err(OpcError::InvalidReadLimit {
-            resource: ReadResource::InputBytes,
+        Err(OpcError::InvalidLimit {
+            kind: SourceLimitKind::InputBytes,
             value: u64::MAX,
+            ..
         })
     ));
 }

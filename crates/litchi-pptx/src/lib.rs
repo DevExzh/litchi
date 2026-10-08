@@ -164,7 +164,7 @@ pub use litchi_ooxml_common::package_encryption::{
     PackageEncryption, PolicyError as EncryptionPolicyError,
 };
 /// Resource policy for package ingestion through [`Package`].
-pub use litchi_opc::SourceLimits;
+pub use litchi_opc::{SourceLimitKind, SourceLimits};
 pub use master_layout::{
     AuthoredSlideLayout, AuthoredSlideMaster, MIN_MASTER_OR_LAYOUT_ID,
     PLACEHOLDER_TYPE_EXTENSION_URI, PlaceholderKind, PlaceholderSignaturePolicy, PlaceholderSpec,

@@ -1,7 +1,7 @@
 use std::io::Cursor;
 
 use litchi_docx::{Error, Package, SourceLimits};
-use litchi_opc::{OpcError, ReadResource};
+use litchi_opc::{OpcError, SourceLimitKind};
 use tempfile::NamedTempFile;
 
 fn input_limit(bytes: usize) -> SourceLimits {
@@ -24,9 +24,9 @@ fn document_bytes() -> Vec<u8> {
 fn assert_input_limit(error: Error, actual: usize, maximum: usize) {
     assert!(matches!(
         error,
-        Error::Opc(OpcError::ReadLimit {
-            resource: ReadResource::InputBytes,
-            actual: observed,
+        Error::Opc(OpcError::Limit {
+            kind: SourceLimitKind::InputBytes,
+            observed,
             maximum: bound,
         }) if observed == actual as u64 && bound == maximum as u64
     ));

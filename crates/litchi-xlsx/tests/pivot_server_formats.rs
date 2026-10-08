@@ -26,7 +26,7 @@ use std::sync::Arc;
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, ReadResource, TargetMode,
+    BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, SourceLimitKind, TargetMode,
 };
 use litchi_xlsx::pivot::server_formats::table_data::load as load_pivot_table_data;
 use litchi_xlsx::pivot::server_formats::{
@@ -1100,11 +1100,11 @@ fn add_unknown_relationships(package: &mut OpcPackage) {
         .unwrap();
 }
 
-fn assert_read_limit<T>(result: Result<T, Error>, resource: ReadResource) {
+fn assert_read_limit<T>(result: Result<T, Error>, resource: SourceLimitKind) {
     assert!(matches!(
         result,
-        Err(Error::Package(OpcError::ReadLimit {
-            resource: actual, ..
+        Err(Error::Package(OpcError::Limit {
+            kind: actual, ..
         })) if actual == resource
     ));
 }
@@ -2783,7 +2783,7 @@ fn retained_relationship_limits_account_for_mutated_root_and_unknown_edges() {
 
     let cases = [
         (
-            ReadResource::RelationshipParts,
+            SourceLimitKind::RelationshipParts,
             SourceLimits::builder()
                 .max_relationship_parts(final_inventory.parts)
                 .unwrap(),
@@ -2792,7 +2792,7 @@ fn retained_relationship_limits_account_for_mutated_root_and_unknown_edges() {
                 .unwrap(),
         ),
         (
-            ReadResource::TotalRelationshipXmlBytes,
+            SourceLimitKind::TotalRelationshipXmlBytes,
             SourceLimits::builder()
                 .max_total_relationship_xml_bytes(final_inventory.total_xml_bytes)
                 .unwrap(),
@@ -2801,7 +2801,7 @@ fn retained_relationship_limits_account_for_mutated_root_and_unknown_edges() {
                 .unwrap(),
         ),
         (
-            ReadResource::TotalRelationshipXmlEvents,
+            SourceLimitKind::TotalRelationshipXmlEvents,
             SourceLimits::builder()
                 .max_total_relationship_xml_events(final_inventory.total_xml_events)
                 .unwrap(),
@@ -2810,7 +2810,7 @@ fn retained_relationship_limits_account_for_mutated_root_and_unknown_edges() {
                 .unwrap(),
         ),
         (
-            ReadResource::TotalRelationships,
+            SourceLimitKind::TotalRelationships,
             SourceLimits::builder()
                 .max_total_relationships(final_inventory.total_edges)
                 .unwrap(),
@@ -2819,7 +2819,7 @@ fn retained_relationship_limits_account_for_mutated_root_and_unknown_edges() {
                 .unwrap(),
         ),
         (
-            ReadResource::RelationshipGraphNodes,
+            SourceLimitKind::RelationshipGraphNodes,
             SourceLimits::builder()
                 .max_relationship_graph_nodes(final_inventory.graph_nodes)
                 .unwrap(),
@@ -2866,7 +2866,10 @@ fn retained_relationship_limits_account_for_mutated_root_and_unknown_edges() {
         OpcPackage::from_bytes_with_limits(&fixture.bytes, target_under_builder.build().unwrap())
             .unwrap();
     add_unknown_relationships(&mut under);
-    assert_read_limit(load(&under, "Pivot"), ReadResource::RelationshipTargetBytes);
+    assert_read_limit(
+        load(&under, "Pivot"),
+        SourceLimitKind::RelationshipTargetBytes,
+    );
 }
 
 #[test]
@@ -2895,7 +2898,7 @@ fn retained_relationship_xml_part_limit_has_exact_and_one_under_mutation_bounds(
     add_unknown_relationships(&mut under_package);
     assert_read_limit(
         load(&under_package, "Pivot"),
-        ReadResource::RelationshipXmlBytes,
+        SourceLimitKind::RelationshipXmlBytes,
     );
 }
 
@@ -2930,9 +2933,9 @@ fn retained_relationship_archive_member_bound_uses_public_source_capture() {
         .unwrap();
     assert!(matches!(
         package.source_relationships_with_limits(&owner, under),
-        Err(OpcError::ReadLimit {
-            resource: ReadResource::ArchiveMemberNameBytes,
-            actual,
+        Err(OpcError::Limit {
+            kind: SourceLimitKind::ArchiveMemberNameBytes,
+            observed: actual,
             maximum,
         }) if actual == member_len as u64 && maximum == (member_len - 1) as u64
     ));

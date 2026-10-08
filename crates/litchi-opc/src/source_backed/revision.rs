@@ -171,7 +171,7 @@ impl PreparedTopology {
                 ));
             }
             self.package.limits.check(
-                ReadResource::PartBytes,
+                SourceLimitKind::PartBytes,
                 replacement.len() as u64,
                 self.package.limits.max_part_bytes(),
             )?;
@@ -231,7 +231,7 @@ impl PreparedTopology {
             .map_or(original.as_bytes().len(), |bytes| bytes.len()) as u64;
         let new_bytes = payload.as_slice().len() as u64;
         self.package.limits.check(
-            ReadResource::ArchiveEntryBytes,
+            SourceLimitKind::ArchiveEntryBytes,
             new_bytes,
             self.package.limits.max_archive_entry_bytes(),
         )?;
@@ -243,23 +243,23 @@ impl PreparedTopology {
             previous.parts,
             old_bytes,
             new_bytes,
-            ReadResource::TotalPartBytes,
+            SourceLimitKind::TotalPartBytes,
             self.package.limits.max_total_part_bytes(),
         )?;
         let archive_total = adjusted_overlay_total(
             previous.archive,
             old_bytes,
             new_bytes,
-            ReadResource::ArchiveTotalBytes,
+            SourceLimitKind::ArchiveTotalBytes,
             self.package.limits.max_archive_total_bytes(),
         )?;
         self.package.limits.check(
-            ReadResource::TotalPartBytes,
+            SourceLimitKind::TotalPartBytes,
             parts_total,
             self.package.limits.max_total_part_bytes(),
         )?;
         self.package.limits.check(
-            ReadResource::ArchiveTotalBytes,
+            SourceLimitKind::ArchiveTotalBytes,
             archive_total,
             self.package.limits.max_archive_total_bytes(),
         )?;

@@ -188,9 +188,9 @@ mod docx {
         assert_eq!(error.code(), Code::LimitExceeded);
         assert!(matches!(
             error.leaf(),
-            crate::error::Source::Opc(litchi_opc::OpcError::ReadLimit {
-                resource: litchi_opc::ReadResource::InputBytes,
-                actual,
+            crate::error::Source::Opc(litchi_opc::OpcError::Limit {
+                kind: litchi_opc::SourceLimitKind::InputBytes,
+                observed: actual,
                 maximum: 1,
             }) if *actual == bytes.len() as u64
         ));
@@ -547,9 +547,9 @@ mod docx {
         assert_eq!(error.code(), Code::LimitExceeded);
         assert!(matches!(
             error.leaf(),
-            crate::error::Source::Opc(litchi_opc::OpcError::ReadLimit {
-                resource: litchi_opc::ReadResource::InputBytes,
-                actual: 4096,
+            crate::error::Source::Opc(litchi_opc::OpcError::Limit {
+                kind: litchi_opc::SourceLimitKind::InputBytes,
+                observed: 4096,
                 maximum: 1,
             })
         ));
@@ -598,9 +598,9 @@ mod docx {
         assert_eq!(error.code(), Code::LimitExceeded);
         assert!(matches!(
             error.leaf(),
-            crate::error::Source::Opc(litchi_opc::OpcError::ReadLimit {
-                resource: litchi_opc::ReadResource::Parts,
-                actual: 2,
+            crate::error::Source::Opc(litchi_opc::OpcError::Limit {
+                kind: litchi_opc::SourceLimitKind::Parts,
+                observed: 2,
                 maximum: 1,
             })
         ));

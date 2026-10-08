@@ -1,7 +1,7 @@
 //! Error types for OPC package operations
 use std::collections::TryReserveError;
 
-use crate::ReadResource;
+use crate::SourceLimitKind;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -11,20 +11,22 @@ use thiserror::Error;
     reason = "the error type is named for the OPC domain it covers; renaming the public `OpcError` type would break the crate's public API"
 )]
 pub enum OpcError {
-    #[error("invalid OPC read limit for {resource}: {value}")]
-    InvalidReadLimit {
+    #[error("invalid OPC source limit for {kind}: {value} (expected 1..={maximum})")]
+    InvalidLimit {
         /// Limit that was invalid.
-        resource: ReadResource,
+        kind: SourceLimitKind,
         /// Invalid configured value.
         value: u64,
+        /// Largest permitted value, including bounds imposed by other limits.
+        maximum: u64,
     },
 
-    #[error("OPC read limit exceeded for {resource}: {actual} > {maximum}")]
-    ReadLimit {
+    #[error("OPC source limit exceeded for {kind}: {observed} > {maximum}")]
+    Limit {
         /// Resource whose configured maximum was exceeded.
-        resource: ReadResource,
+        kind: SourceLimitKind,
         /// Observed resource use.
-        actual: u64,
+        observed: u64,
         /// Configured maximum.
         maximum: u64,
     },
@@ -370,22 +372,22 @@ impl From<soapberry_zip::Error> for OpcError {
                 resource,
                 actual,
                 maximum,
-            } => Self::ReadLimit {
-                resource: match resource {
-                    soapberry_zip::LimitResource::FileCount => ReadResource::ArchiveMembers,
+            } => Self::Limit {
+                kind: match resource {
+                    soapberry_zip::LimitResource::FileCount => SourceLimitKind::ArchiveMembers,
                     soapberry_zip::LimitResource::MemberNameBytes => {
-                        ReadResource::ArchiveMemberNameBytes
+                        SourceLimitKind::ArchiveMemberNameBytes
                     },
                     soapberry_zip::LimitResource::MetadataBytes => {
-                        ReadResource::ArchiveMetadataBytes
+                        SourceLimitKind::ArchiveMetadataBytes
                     },
                     soapberry_zip::LimitResource::CompressedSize => {
-                        ReadResource::ArchiveCompressedBytes
+                        SourceLimitKind::ArchiveCompressedBytes
                     },
-                    soapberry_zip::LimitResource::EntrySize => ReadResource::ArchiveEntryBytes,
-                    soapberry_zip::LimitResource::TotalSize => ReadResource::ArchiveTotalBytes,
+                    soapberry_zip::LimitResource::EntrySize => SourceLimitKind::ArchiveEntryBytes,
+                    soapberry_zip::LimitResource::TotalSize => SourceLimitKind::ArchiveTotalBytes,
                 },
-                actual,
+                observed: actual,
                 maximum,
             },
             soapberry_zip::ErrorKind::Allocation { resource, source } => {
@@ -440,13 +442,13 @@ pub(crate) fn execution_io_error(error: litchi_core::ExecutionError) -> std::io:
 /// `ZipError` carrying the original rendering so no refusal can be lost.
 pub(crate) fn replicate_deferred_error(error: &OpcError) -> OpcError {
     match error {
-        OpcError::ReadLimit {
-            resource,
-            actual,
+        OpcError::Limit {
+            kind: resource,
+            observed: actual,
             maximum,
-        } => OpcError::ReadLimit {
-            resource: *resource,
-            actual: *actual,
+        } => OpcError::Limit {
+            kind: *resource,
+            observed: *actual,
             maximum: *maximum,
         },
         OpcError::Allocation { resource, source } => OpcError::Allocation {
@@ -537,8 +539,8 @@ impl From<OpcError> for litchi_core::Error {
             | OpcError::SourceBackedBatchInvariant { .. }) => {
                 litchi_core::Error::Unsupported(error.to_string())
             },
-            OpcError::InvalidReadLimit { .. }
-            | OpcError::ReadLimit { .. }
+            OpcError::InvalidLimit { .. }
+            | OpcError::Limit { .. }
             | OpcError::Cancelled
             | OpcError::Execution(_)
             | OpcError::ParallelRead(_)

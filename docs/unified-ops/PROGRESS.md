@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0036 | OPC source-limit kinds and canonical errors | physical kind/error fields migrated; broader limits policy pending |
 | 0035 | OPC/OOXML source-limit vocabulary | shared physical profile and builder renamed; broader limits policy pending |
 | 0034 | Effective source DOCX text streaming | retained main/donor output integrated; specialized routes pending |
 | 0033 | Effective source DOCX metadata reads | shared property graph/decoder integrated; remaining specialized routes pending |
@@ -413,3 +414,15 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 - Kind/error names, options envelopes and other limit migrations remain open.
   Record 0035 documents checks and the unrelated existing iWork example error
   encountered by the exploratory workspace all-targets build.
+
+
+## 0036 — typed physical source-limit errors
+
+- OPC and OOXML expose SourceLimitKind; primary OPC failures use Limit with
+  kind/observed/maximum and InvalidLimit with kind/value/maximum.
+- Builder failures carry scalar or cross-field bounds. The members/entries
+  inconsistency now identifies the excessive member dimension correctly.
+- ZIP mapping, cached failures, unified classification and consumer assertions
+  retain typed numeric evidence. Glossary profiles ban the retired vocabulary.
+- Remaining configuration/dimension and semantic-limit work is documented in
+  record 0036; the wider goal remains active.

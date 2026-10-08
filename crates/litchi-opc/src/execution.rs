@@ -145,9 +145,9 @@ impl OpenSession {
                 .and_then(|metadata| {
                     total
                         .checked_add(metadata.uncompressed_size())
-                        .ok_or(OpcError::ReadLimit {
-                            resource: crate::ReadResource::TotalPartBytes,
-                            actual: u64::MAX,
+                        .ok_or(OpcError::Limit {
+                            kind: crate::SourceLimitKind::TotalPartBytes,
+                            observed: u64::MAX,
                             maximum: u64::MAX,
                         })
                 })
@@ -750,8 +750,8 @@ mod tests {
 
         assert!(matches!(
             session.from_bytes(&bytes, limits),
-            Err(OpcError::ReadLimit {
-                resource: crate::ReadResource::InputBytes,
+            Err(OpcError::Limit {
+                kind: crate::SourceLimitKind::InputBytes,
                 ..
             })
         ));
@@ -782,9 +782,9 @@ mod tests {
 
         assert!(matches!(
             session.from_vec(b"four".to_vec(), limits),
-            Err(OpcError::ReadLimit {
-                resource: crate::ReadResource::InputBytes,
-                actual: 4,
+            Err(OpcError::Limit {
+                kind: crate::SourceLimitKind::InputBytes,
+                observed: 4,
                 maximum: 3,
             })
         ));

@@ -13,7 +13,7 @@ use std::sync::{
 };
 
 use litchi_core::{OwnedSource, ReadAt};
-use litchi_opc::{OpcError, PackURI, ReadResource, SourceBackedPackage, SourceLimits};
+use litchi_opc::{OpcError, PackURI, SourceBackedPackage, SourceLimitKind, SourceLimits};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const CONTENT_TYPES_NS: &str = "http://schemas.openxmlformats.org/package/2006/content-types";
@@ -172,9 +172,9 @@ fn reader_ingress_rejects_input_above_max_input_bytes() {
 
     assert!(matches!(
         error,
-        OpcError::ReadLimit {
-            resource: ReadResource::InputBytes,
-            actual,
+        OpcError::Limit {
+            kind: SourceLimitKind::InputBytes,
+            observed: actual,
             maximum,
         }
         if actual == configured_max as u64 + 1 && maximum == configured_max as u64
@@ -223,7 +223,7 @@ fn reader_ingress_rejects_invalid_read_count_without_panicking() {
 fn assert_index_limit_is_typed_for_both_sources(
     source: &[u8],
     limits: SourceLimits,
-    expected: ReadResource,
+    expected: SourceLimitKind,
     expected_actual: u64,
     expected_maximum: u64,
 ) {
@@ -233,9 +233,9 @@ fn assert_index_limit_is_typed_for_both_sources(
     };
     assert!(matches!(
         from_vec,
-        OpcError::ReadLimit {
-            resource,
-            actual,
+        OpcError::Limit {
+            kind: resource,
+            observed: actual,
             maximum,
         } if resource == expected && actual == expected_actual && maximum == expected_maximum
     ));
@@ -249,9 +249,9 @@ fn assert_index_limit_is_typed_for_both_sources(
     };
     assert!(matches!(
         from_read_at,
-        OpcError::ReadLimit {
-            resource,
-            actual,
+        OpcError::Limit {
+            kind: resource,
+            observed: actual,
             maximum,
         } if resource == expected && actual == expected_actual && maximum == expected_maximum
     ));
@@ -270,14 +270,14 @@ fn indexed_archive_limits_remain_typed_for_vec_and_read_at_ingress() {
         .build()
         .unwrap();
     let profiles = [
-        (member_limits, ReadResource::ArchiveMembers, 2, 1),
+        (member_limits, SourceLimitKind::ArchiveMembers, 2, 1),
         (
             SourceLimits::builder()
                 .max_archive_metadata_bytes(1)
                 .unwrap()
                 .build()
                 .unwrap(),
-            ReadResource::ArchiveMetadataBytes,
+            SourceLimitKind::ArchiveMetadataBytes,
             46,
             1,
         ),
@@ -287,7 +287,7 @@ fn indexed_archive_limits_remain_typed_for_vec_and_read_at_ingress() {
                 .unwrap()
                 .build()
                 .unwrap(),
-            ReadResource::ArchiveMemberNameBytes,
+            SourceLimitKind::ArchiveMemberNameBytes,
             19,
             1,
         ),
@@ -297,7 +297,7 @@ fn indexed_archive_limits_remain_typed_for_vec_and_read_at_ingress() {
                 .unwrap()
                 .build()
                 .unwrap(),
-            ReadResource::ArchiveCompressedBytes,
+            SourceLimitKind::ArchiveCompressedBytes,
             383,
             1,
         ),
@@ -307,7 +307,7 @@ fn indexed_archive_limits_remain_typed_for_vec_and_read_at_ingress() {
                 .unwrap()
                 .build()
                 .unwrap(),
-            ReadResource::ArchiveEntryBytes,
+            SourceLimitKind::ArchiveEntryBytes,
             383,
             1,
         ),
@@ -317,7 +317,7 @@ fn indexed_archive_limits_remain_typed_for_vec_and_read_at_ingress() {
                 .unwrap()
                 .build()
                 .unwrap(),
-            ReadResource::ArchiveTotalBytes,
+            SourceLimitKind::ArchiveTotalBytes,
             383,
             1,
         ),

@@ -1061,7 +1061,7 @@ fn mce_limits_strict_and_partial_sink_are_checked() {
             ))),
             limits,
         ),
-        Err(Error::Opc(OpcError::ReadLimit { .. }))
+        Err(Error::Opc(OpcError::Limit { .. }))
     ));
 
     let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
@@ -2088,7 +2088,7 @@ fn source_slide_order_rejects_limits_malformed_mce_and_invalid_owners() {
             Arc::new(VersionedSource::new(multi_fixture(3, false))),
             limits,
         ),
-        Err(Error::Opc(OpcError::ReadLimit { .. }))
+        Err(Error::Opc(OpcError::Limit { .. }))
     ));
 
     let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(

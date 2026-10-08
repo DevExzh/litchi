@@ -78,7 +78,7 @@ impl fmt::Debug for OwnedXmlPart {
 impl OwnedXmlPart {
     pub(crate) fn check_capture_member_name(name: &PackURI, limits: SourceLimits) -> Result<()> {
         limits.check(
-            crate::ReadResource::ArchiveMemberNameBytes,
+            crate::SourceLimitKind::ArchiveMemberNameBytes,
             name.membername().len() as u64,
             limits.max_archive_member_name_bytes(),
         )
@@ -114,7 +114,7 @@ impl OwnedXmlPart {
                 )
             })?;
         limits.check(
-            crate::ReadResource::ArchiveMemberNameBytes,
+            crate::SourceLimitKind::ArchiveMemberNameBytes,
             member_name_len as u64,
             limits.max_archive_member_name_bytes(),
         )
@@ -137,7 +137,7 @@ impl OwnedXmlPart {
     /// capture before any owned XML buffer is allocated.
     pub(crate) fn check_capture_bytes(bytes_len: usize, limits: SourceLimits) -> Result<()> {
         limits.check(
-            crate::ReadResource::PartBytes,
+            crate::SourceLimitKind::PartBytes,
             bytes_len as u64,
             limits.max_part_bytes(),
         )?;
@@ -1448,9 +1448,9 @@ mod tests {
                 Arc::clone(&malformed),
                 under,
             ),
-            Err(OpcError::ReadLimit {
-                resource: crate::ReadResource::PartBytes,
-                actual,
+            Err(OpcError::Limit {
+                kind: crate::SourceLimitKind::PartBytes,
+                observed: actual,
                 maximum,
             }) if actual == malformed.len() as u64 && maximum == (malformed.len() - 1) as u64
         ));
@@ -1497,9 +1497,9 @@ mod tests {
                 Arc::new(b"<broken".to_vec()),
                 under,
             ),
-            Err(OpcError::ReadLimit {
-                resource: crate::ReadResource::ArchiveMemberNameBytes,
-                actual,
+            Err(OpcError::Limit {
+                kind: crate::SourceLimitKind::ArchiveMemberNameBytes,
+                observed: actual,
                 maximum,
             }) if actual == member_name_bytes as u64 && maximum == (member_name_bytes - 1) as u64
         ));

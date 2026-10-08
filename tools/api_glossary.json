@@ -79,6 +79,11 @@
           "name": "ReadLimitsBuilder",
           "scope": "litchi_docx",
           "replacement": "use SourceLimitsBuilder"
+        },
+        {
+          "name": "ReadResource",
+          "scope": "litchi_docx",
+          "replacement": "use SourceLimitKind"
         }
       ],
       "families": []
@@ -158,6 +163,11 @@
           "name": "ReadLimitsBuilder",
           "scope": "litchi_docx",
           "replacement": "use SourceLimitsBuilder"
+        },
+        {
+          "name": "ReadResource",
+          "scope": "litchi_docx",
+          "replacement": "use SourceLimitKind"
         }
       ],
       "families": []
@@ -177,6 +187,36 @@
           "name": "ReadLimitsBuilder",
           "scope": "litchi_opc",
           "replacement": "use SourceLimitsBuilder"
+        },
+        {
+          "name": "ReadResource",
+          "scope": "litchi_opc",
+          "replacement": "use SourceLimitKind"
+        },
+        {
+          "name": "ReadLimit",
+          "scope": "litchi_opc::OpcError",
+          "replacement": "use OpcError::Limit"
+        },
+        {
+          "name": "InvalidReadLimit",
+          "scope": "litchi_opc::OpcError",
+          "replacement": "use OpcError::InvalidLimit"
+        },
+        {
+          "name": "resource",
+          "scope": "litchi_opc::OpcError::Limit",
+          "replacement": "use kind"
+        },
+        {
+          "name": "actual",
+          "scope": "litchi_opc::OpcError::Limit",
+          "replacement": "use observed"
+        },
+        {
+          "name": "resource",
+          "scope": "litchi_opc::OpcError::InvalidLimit",
+          "replacement": "use kind"
         }
       ],
       "families": []
@@ -199,6 +239,36 @@
           "name": "ReadLimitsBuilder",
           "scope": "litchi_opc",
           "replacement": "use SourceLimitsBuilder"
+        },
+        {
+          "name": "ReadResource",
+          "scope": "litchi_opc",
+          "replacement": "use SourceLimitKind"
+        },
+        {
+          "name": "ReadLimit",
+          "scope": "litchi_opc::OpcError",
+          "replacement": "use OpcError::Limit"
+        },
+        {
+          "name": "InvalidReadLimit",
+          "scope": "litchi_opc::OpcError",
+          "replacement": "use OpcError::InvalidLimit"
+        },
+        {
+          "name": "resource",
+          "scope": "litchi_opc::OpcError::Limit",
+          "replacement": "use kind"
+        },
+        {
+          "name": "actual",
+          "scope": "litchi_opc::OpcError::Limit",
+          "replacement": "use observed"
+        },
+        {
+          "name": "resource",
+          "scope": "litchi_opc::OpcError::InvalidLimit",
+          "replacement": "use kind"
         }
       ],
       "families": []
@@ -218,6 +288,11 @@
           "name": "ReadLimitsBuilder",
           "scope": "litchi_pptx",
           "replacement": "use SourceLimitsBuilder"
+        },
+        {
+          "name": "ReadResource",
+          "scope": "litchi_pptx",
+          "replacement": "use SourceLimitKind"
         }
       ],
       "families": []
@@ -241,6 +316,11 @@
           "name": "ReadLimitsBuilder",
           "scope": "litchi_pptx",
           "replacement": "use SourceLimitsBuilder"
+        },
+        {
+          "name": "ReadResource",
+          "scope": "litchi_pptx",
+          "replacement": "use SourceLimitKind"
         }
       ],
       "families": []
@@ -260,6 +340,11 @@
           "name": "ReadLimitsBuilder",
           "scope": "litchi_xlsx",
           "replacement": "use SourceLimitsBuilder"
+        },
+        {
+          "name": "ReadResource",
+          "scope": "litchi_xlsx",
+          "replacement": "use SourceLimitKind"
         }
       ],
       "families": []
@@ -282,6 +367,11 @@
           "name": "ReadLimitsBuilder",
           "scope": "litchi_xlsx",
           "replacement": "use SourceLimitsBuilder"
+        },
+        {
+          "name": "ReadResource",
+          "scope": "litchi_xlsx",
+          "replacement": "use SourceLimitKind"
         }
       ],
       "families": []
@@ -302,6 +392,12 @@
           "name": "ReadLimitsBuilder",
           "scope": "litchi_xlsb",
           "replacement": "use SourceLimitsBuilder",
+          "recursive": false
+        },
+        {
+          "name": "ReadResource",
+          "scope": "litchi_xlsb",
+          "replacement": "use SourceLimitKind",
           "recursive": false
         }
       ],
@@ -326,6 +422,12 @@
           "name": "ReadLimitsBuilder",
           "scope": "litchi_xlsb",
           "replacement": "use SourceLimitsBuilder",
+          "recursive": false
+        },
+        {
+          "name": "ReadResource",
+          "scope": "litchi_xlsb",
+          "replacement": "use SourceLimitKind",
           "recursive": false
         }
       ],

@@ -52,7 +52,7 @@ and aggregate declared ZIP bytes at 2 GiB. It also bounds ZIP names, central
 directory metadata, compressed bytes, aggregate materialized parts,
 `[Content_Types].xml` and its mappings, relationship parts and XML, individual
 and aggregate relationships, graph nodes, XML events and depth, and
-relationship attribute and target lengths. `ReadResource` identifies the
+relationship attribute and target lengths. `SourceLimitKind` identifies the
 specific rejected resource.
 
 These ceilings are Litchi safety policy rather than ECMA-376 size maxima. They

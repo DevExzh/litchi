@@ -1740,7 +1740,7 @@ fn holds_only_built_in_parts(package: &OpcPackage) -> bool {
 
 /// Whether `error` is a read-limit refusal of a package's re-read.
 const fn is_read_limit(error: &Error) -> bool {
-    matches!(error, Error::Opc(litchi_opc::OpcError::ReadLimit { .. }))
+    matches!(error, Error::Opc(litchi_opc::OpcError::Limit { .. }))
 }
 
 /// The package that holds, as its owned source archive, exactly the bytes

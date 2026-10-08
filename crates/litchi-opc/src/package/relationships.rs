@@ -9,7 +9,7 @@ use crate::rel::Relationships;
 use crate::source_backed::escaped_xml_attribute_len;
 use crate::xml_attributes::BytesStartExt as _;
 use crate::{
-    OpcError, OwnedElementEdit, OwnedElementUpdate, OwnedXmlPart, PackURI, ReadResource, Result,
+    OpcError, OwnedElementEdit, OwnedElementUpdate, OwnedXmlPart, PackURI, Result, SourceLimitKind,
     SourceLimits, TargetMode,
 };
 use litchi_core::xml::ReaderOrigin;
@@ -224,7 +224,7 @@ fn validate_canonical_relationship_values(
             ));
         }
         limits.check(
-            ReadResource::RelationshipTargetBytes,
+            SourceLimitKind::RelationshipTargetBytes,
             relationship.target_ref().len() as u64,
             limits.max_relationship_target_bytes() as u64,
         )?;
@@ -242,22 +242,22 @@ fn check_canonical_relationship_plan_limits(
     check_canonical_relationship_attribute_limits(relationships, limits)?;
     check_canonical_relationship_structure(relationships, final_len, limits)?;
     limits.check(
-        ReadResource::RelationshipXmlBytes,
+        SourceLimitKind::RelationshipXmlBytes,
         final_len as u64,
         limits.max_relationship_xml_bytes() as u64,
     )?;
     limits.check(
-        ReadResource::PartBytes,
+        SourceLimitKind::PartBytes,
         final_len as u64,
         limits.max_part_bytes(),
     )?;
     limits.check(
-        ReadResource::ArchiveEntryBytes,
+        SourceLimitKind::ArchiveEntryBytes,
         final_len as u64,
         limits.max_archive_entry_bytes(),
     )?;
     limits.check(
-        ReadResource::XmlEvents,
+        SourceLimitKind::XmlEvents,
         event_count as u64,
         limits.max_xml_events() as u64,
     )?;
@@ -338,22 +338,22 @@ impl<'source> RelationshipsEditPlan<'source> {
     /// limits have admitted the exact metrics.
     pub fn materialize(self, limits: SourceLimits) -> Result<OwnedRelationships> {
         limits.check(
-            ReadResource::RelationshipXmlBytes,
+            SourceLimitKind::RelationshipXmlBytes,
             self.final_len as u64,
             limits.max_relationship_xml_bytes() as u64,
         )?;
         limits.check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             self.final_len as u64,
             limits.max_part_bytes(),
         )?;
         limits.check(
-            ReadResource::ArchiveEntryBytes,
+            SourceLimitKind::ArchiveEntryBytes,
             self.final_len as u64,
             limits.max_archive_entry_bytes(),
         )?;
         limits.check(
-            ReadResource::XmlEvents,
+            SourceLimitKind::XmlEvents,
             self.event_count as u64,
             limits.max_xml_events() as u64,
         )?;
@@ -461,24 +461,24 @@ impl OwnedRelationships {
         limits: SourceLimits,
     ) -> Result<RelationshipsEditPlan<'source>> {
         limits.check(
-            ReadResource::RelationshipXmlBytes,
+            SourceLimitKind::RelationshipXmlBytes,
             self.bytes().len() as u64,
             limits.max_relationship_xml_bytes() as u64,
         )?;
         limits.check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             self.bytes().len() as u64,
             limits.max_part_bytes(),
         )?;
         limits.check(
-            ReadResource::ArchiveEntryBytes,
+            SourceLimitKind::ArchiveEntryBytes,
             self.bytes().len() as u64,
             limits.max_archive_entry_bytes(),
         )?;
         if additions.len() > limits.max_relationships_per_part() {
-            return Err(OpcError::ReadLimit {
-                resource: ReadResource::RelationshipsPerPart,
-                actual: additions.len() as u64,
+            return Err(OpcError::Limit {
+                kind: SourceLimitKind::RelationshipsPerPart,
+                observed: additions.len() as u64,
                 maximum: limits.max_relationships_per_part() as u64,
             });
         }
@@ -509,22 +509,22 @@ impl OwnedRelationships {
             let escaped_reltype_len = escaped_xml_attribute_len(addition.reltype)?;
             let escaped_target_len = escaped_xml_attribute_len(addition.target)?;
             limits.check(
-                ReadResource::XmlAttributeBytes,
+                SourceLimitKind::XmlAttributeBytes,
                 escaped_id_len as u64,
                 limits.max_xml_attribute_bytes() as u64,
             )?;
             limits.check(
-                ReadResource::XmlAttributeBytes,
+                SourceLimitKind::XmlAttributeBytes,
                 escaped_reltype_len as u64,
                 limits.max_xml_attribute_bytes() as u64,
             )?;
             limits.check(
-                ReadResource::XmlAttributeBytes,
+                SourceLimitKind::XmlAttributeBytes,
                 escaped_target_len as u64,
                 limits.max_xml_attribute_bytes() as u64,
             )?;
             limits.check(
-                ReadResource::RelationshipTargetBytes,
+                SourceLimitKind::RelationshipTargetBytes,
                 addition.target.len() as u64,
                 limits.max_relationship_target_bytes() as u64,
             )?;
@@ -539,7 +539,7 @@ impl OwnedRelationships {
         }
         for id in removals {
             limits.check(
-                ReadResource::XmlAttributeBytes,
+                SourceLimitKind::XmlAttributeBytes,
                 id.len() as u64,
                 limits.max_xml_attribute_bytes() as u64,
             )?;
@@ -548,7 +548,7 @@ impl OwnedRelationships {
                 .ok_or_else(|| invalid("relationship edit selector bytes overflow"))?;
         }
         limits.check(
-            ReadResource::RelationshipXmlBytes,
+            SourceLimitKind::RelationshipXmlBytes,
             raw_addition_bytes as u64,
             limits.max_relationship_xml_bytes() as u64,
         )?;
@@ -630,22 +630,22 @@ impl OwnedRelationships {
             })
             .ok_or_else(|| invalid("relationship XML event count overflows"))?;
         limits.check(
-            ReadResource::RelationshipXmlBytes,
+            SourceLimitKind::RelationshipXmlBytes,
             final_len as u64,
             limits.max_relationship_xml_bytes() as u64,
         )?;
         limits.check(
-            ReadResource::PartBytes,
+            SourceLimitKind::PartBytes,
             final_len as u64,
             limits.max_part_bytes(),
         )?;
         limits.check(
-            ReadResource::ArchiveEntryBytes,
+            SourceLimitKind::ArchiveEntryBytes,
             final_len as u64,
             limits.max_archive_entry_bytes(),
         )?;
         limits.check(
-            ReadResource::XmlEvents,
+            SourceLimitKind::XmlEvents,
             final_events as u64,
             limits.max_xml_events() as u64,
         )?;
@@ -750,7 +750,7 @@ fn scan_relationship_source(
             .checked_add(1)
             .ok_or_else(|| invalid("relationship XML event count overflows"))?;
         limits.check(
-            ReadResource::XmlEvents,
+            SourceLimitKind::XmlEvents,
             event_count as u64,
             limits.max_xml_events() as u64,
         )?;
@@ -1247,17 +1247,17 @@ impl OpcPackage {
         let (final_len, event_count, relationship_count, member_present) =
             if let Some(source) = source {
                 limits.check(
-                    ReadResource::RelationshipXmlBytes,
+                    SourceLimitKind::RelationshipXmlBytes,
                     source.bytes.len() as u64,
                     limits.max_relationship_xml_bytes() as u64,
                 )?;
                 limits.check(
-                    ReadResource::TotalRelationshipXmlBytes,
+                    SourceLimitKind::TotalRelationshipXmlBytes,
                     source.bytes.len() as u64,
                     limits.max_total_relationship_xml_bytes() as u64,
                 )?;
                 limits.check(
-                    ReadResource::PartBytes,
+                    SourceLimitKind::PartBytes,
                     source.bytes.len() as u64,
                     limits.max_part_bytes(),
                 )?;
@@ -1298,17 +1298,17 @@ impl OpcPackage {
         // Keep both views: the first protects fresh OwnedXmlPart capture and
         // this one supplies exact retained relationship aggregate accounting.
         limits.check(
-            ReadResource::XmlEvents,
+            SourceLimitKind::XmlEvents,
             event_count as u64,
             limits.max_xml_events() as u64,
         )?;
         limits.check(
-            ReadResource::TotalRelationshipXmlBytes,
+            SourceLimitKind::TotalRelationshipXmlBytes,
             final_len as u64,
             limits.max_total_relationship_xml_bytes() as u64,
         )?;
         limits.check(
-            ReadResource::TotalRelationshipXmlEvents,
+            SourceLimitKind::TotalRelationshipXmlEvents,
             event_count as u64,
             limits.max_total_relationship_xml_events() as u64,
         )?;
@@ -1350,17 +1350,17 @@ impl OpcPackage {
             .filter(|source| source.binding.matches(relationships));
         let bytes = if let Some(source) = source {
             limits.check(
-                ReadResource::RelationshipXmlBytes,
+                SourceLimitKind::RelationshipXmlBytes,
                 source.bytes.len() as u64,
                 limits.max_relationship_xml_bytes() as u64,
             )?;
             limits.check(
-                ReadResource::TotalRelationshipXmlBytes,
+                SourceLimitKind::TotalRelationshipXmlBytes,
                 source.bytes.len() as u64,
                 limits.max_total_relationship_xml_bytes() as u64,
             )?;
             limits.check(
-                ReadResource::PartBytes,
+                SourceLimitKind::PartBytes,
                 source.bytes.len() as u64,
                 limits.max_part_bytes(),
             )?;
@@ -1370,7 +1370,7 @@ impl OpcPackage {
             let canonical = relationships.plan_canonical(limits)?;
             let length = canonical.final_len();
             limits.check(
-                ReadResource::TotalRelationshipXmlBytes,
+                SourceLimitKind::TotalRelationshipXmlBytes,
                 length as u64,
                 limits.max_total_relationship_xml_bytes() as u64,
             )?;
@@ -1544,7 +1544,7 @@ fn relationship_xml_metrics(bytes: &[u8], limits: SourceLimits) -> Result<(usize
             .checked_add(1)
             .ok_or_else(|| invalid("relationship XML event count overflows"))?;
         limits.check(
-            ReadResource::XmlEvents,
+            SourceLimitKind::XmlEvents,
             events as u64,
             limits.max_xml_events() as u64,
         )?;
@@ -1558,7 +1558,7 @@ fn relationship_xml_metrics(bytes: &[u8], limits: SourceLimits) -> Result<(usize
                     .checked_add(1)
                     .ok_or_else(|| invalid("relationship XML depth overflows"))?;
                 limits.check(
-                    ReadResource::XmlDepth,
+                    SourceLimitKind::XmlDepth,
                     next_depth as u64,
                     limits.max_xml_depth() as u64,
                 )?;
@@ -1601,7 +1601,7 @@ fn check_relationship_attributes(
     for attribute_result in element.checked_attributes() {
         let attribute = attribute_result.map_err(|error| invalid(error.to_string()))?;
         limits.check(
-            ReadResource::XmlAttributeBytes,
+            SourceLimitKind::XmlAttributeBytes,
             attribute.value.as_ref().len() as u64,
             limits.max_xml_attribute_bytes() as u64,
         )?;
@@ -1609,7 +1609,7 @@ fn check_relationship_attributes(
             .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
             .map_err(|error| invalid(error.to_string()))?;
         limits.check(
-            ReadResource::XmlAttributeBytes,
+            SourceLimitKind::XmlAttributeBytes,
             value.len() as u64,
             limits.max_xml_attribute_bytes() as u64,
         )?;
@@ -1711,8 +1711,8 @@ mod tests {
                 .plan_canonical(SourceLimits::default())
                 .unwrap()
                 .materialize(under),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::RelationshipXmlBytes,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::RelationshipXmlBytes,
                 ..
             })
         ));
@@ -1786,8 +1786,8 @@ mod tests {
             .unwrap();
         assert!(matches!(
             package.plan_source_relationships_with_limits(&owner, bytes_under),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::RelationshipXmlBytes,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::RelationshipXmlBytes,
                 ..
             })
         ));
@@ -1798,8 +1798,8 @@ mod tests {
             .unwrap();
         assert!(matches!(
             package.plan_source_relationships_with_limits(&owner, raw_events_under),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::XmlEvents,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::XmlEvents,
                 ..
             })
         ));
@@ -1810,8 +1810,8 @@ mod tests {
             .unwrap();
         assert!(matches!(
             package.plan_source_relationships_with_limits(&owner, aggregate_bytes_under),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::TotalRelationshipXmlBytes,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::TotalRelationshipXmlBytes,
                 ..
             })
         ));
@@ -1822,8 +1822,8 @@ mod tests {
             .unwrap();
         assert!(matches!(
             package.plan_source_relationships_with_limits(&owner, aggregate_events_under),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::TotalRelationshipXmlEvents,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::TotalRelationshipXmlEvents,
                 ..
             })
         ));
@@ -1835,15 +1835,15 @@ mod tests {
             .unwrap();
         assert!(matches!(
             package.plan_source_relationships_with_limits(&owner, depth_under),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::XmlDepth,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::XmlDepth,
                 ..
             })
         ));
         assert!(matches!(
             package.source_relationships_with_limits(&owner, depth_under),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::XmlDepth,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::XmlDepth,
                 ..
             })
         ));
@@ -1864,15 +1864,15 @@ mod tests {
         assert!(matches!(
             escaped_attribute_package
                 .plan_source_relationships_with_limits(&owner, raw_attribute_under),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::XmlAttributeBytes,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::XmlAttributeBytes,
                 ..
             })
         ));
         assert!(matches!(
             escaped_attribute_package.source_relationships_with_limits(&owner, raw_attribute_under),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::XmlAttributeBytes,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::XmlAttributeBytes,
                 ..
             })
         ));
@@ -1935,8 +1935,8 @@ mod tests {
             .unwrap();
         assert!(matches!(
             changed.plan_source_relationships_with_limits(&root, changed_under),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::RelationshipXmlBytes,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::RelationshipXmlBytes,
                 ..
             })
         ));
@@ -2445,9 +2445,9 @@ mod tests {
             .unwrap();
         assert!(matches!(
             package.try_replace_relationships_with_limits(&current, &before, under),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::RelationshipXmlBytes,
-                actual,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::RelationshipXmlBytes,
+                observed: actual,
                 maximum,
             }) if actual == XML.len() as u64 && maximum == (XML.len() - 1) as u64
         ));
@@ -2513,9 +2513,9 @@ mod tests {
             .unwrap();
         assert!(matches!(
             package.source_relationships_with_limits(&root, root_name_under),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::ArchiveMemberNameBytes,
-                actual,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::ArchiveMemberNameBytes,
+                observed: actual,
                 maximum,
             }) if actual == root_member as u64 && maximum == (root_member - 1) as u64
         ));
@@ -2539,9 +2539,9 @@ mod tests {
             .unwrap();
         assert!(matches!(
             package.source_relationships_with_limits(&custom_owner, custom_name_under),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::ArchiveMemberNameBytes,
-                actual,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::ArchiveMemberNameBytes,
+                observed: actual,
                 maximum,
             }) if actual == custom_member as u64 && maximum == (custom_member - 1) as u64
         ));
@@ -2553,8 +2553,8 @@ mod tests {
             .unwrap();
         assert!(matches!(
             package.source_relationships_with_limits(&root, under),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::RelationshipXmlBytes,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::RelationshipXmlBytes,
                 ..
             })
         ));
@@ -2608,15 +2608,15 @@ mod tests {
             .unwrap();
         assert!(matches!(
             authored.plan_source_relationships_with_limits(&root, archive_entry_under),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::ArchiveEntryBytes,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::ArchiveEntryBytes,
                 ..
             })
         ));
         assert!(matches!(
             authored.source_relationships_with_limits(&root, archive_entry_under),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::ArchiveEntryBytes,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::ArchiveEntryBytes,
                 ..
             })
         ));
@@ -2649,9 +2649,9 @@ mod tests {
             .unwrap();
         assert!(matches!(
             authored.source_relationships_with_limits(&root, event_under),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::XmlEvents,
-                actual: 5,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::XmlEvents,
+                observed: 5,
                 maximum: 4,
             })
         ));
@@ -2662,9 +2662,9 @@ mod tests {
             .unwrap();
         assert!(matches!(
             authored.source_relationships_with_limits(&root, depth_under),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::XmlDepth,
-                actual: 2,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::XmlDepth,
+                observed: 2,
                 maximum: 1,
             })
         ));
@@ -2675,8 +2675,8 @@ mod tests {
             .unwrap();
         assert!(matches!(
             authored.source_relationships_with_limits(&root, aggregate_bytes_under),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::TotalRelationshipXmlBytes,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::TotalRelationshipXmlBytes,
                 ..
             })
         ));
@@ -2700,9 +2700,9 @@ mod tests {
             .unwrap();
         assert!(matches!(
             too_many.source_relationships_with_limits(&root, count_limit),
-            Err(OpcError::ReadLimit {
-                resource: ReadResource::RelationshipsPerPart,
-                actual: 2,
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::RelationshipsPerPart,
+                observed: 2,
                 maximum: 1,
             })
         ));

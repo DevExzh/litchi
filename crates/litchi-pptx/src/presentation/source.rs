@@ -5211,7 +5211,7 @@ mod tests {
         Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, ReadAt, Resource,
         SourceVersion,
     };
-    use litchi_opc::{PackURI, ReadResource, SourceBackedPackage, SourceLimits};
+    use litchi_opc::{PackURI, SourceBackedPackage, SourceLimitKind, SourceLimits};
     use soapberry_zip::office::StreamingArchiveWriter;
     #[cfg(any(unix, windows))]
     use tempfile::NamedTempFile;
@@ -6966,7 +6966,7 @@ mod tests {
             .unwrap();
         assert!(matches!(
             SourceBackedPresentation::from_read_at_with_limits(source.clone(), limits),
-            Err(Error::Opc(litchi_opc::OpcError::ReadLimit { .. }))
+            Err(Error::Opc(litchi_opc::OpcError::Limit { .. }))
         ));
         assert_eq!(source.media_payload_reads.load(Ordering::SeqCst), 0);
     }
@@ -7070,8 +7070,8 @@ mod tests {
 
         assert!(matches!(
             SourceBackedPresentation::from_read_at_with_limits(source.clone(), limits),
-            Err(Error::Opc(litchi_opc::OpcError::ReadLimit {
-                resource: ReadResource::PartBytes,
+            Err(Error::Opc(litchi_opc::OpcError::Limit {
+                kind: SourceLimitKind::PartBytes,
                 maximum: 1024,
                 ..
             }))
@@ -7342,7 +7342,7 @@ mod tests {
             .unwrap();
         assert!(matches!(
             SourceBackedPresentation::from_path_with_limits(file.path(), limits),
-            Err(Error::Opc(litchi_opc::OpcError::ReadLimit { .. }))
+            Err(Error::Opc(litchi_opc::OpcError::Limit { .. }))
         ));
 
         let editor = SourceBackedPresentationEditor::from_path(file.path()).unwrap();

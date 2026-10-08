@@ -32,7 +32,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use soapberry_zip::office::{IndexedArchive, VerifiedPrecompressedEntry};
 
 use crate::error::{OpcError, Result, replicate_deferred_error};
-use crate::limits::{ReadResource, SourceLimits};
+use crate::limits::{SourceLimitKind, SourceLimits};
 
 /// The retained owned source archive that deferred payloads inflate from.
 ///
@@ -116,22 +116,22 @@ impl DeferredPartSource {
     /// Charge one decoded payload against the aggregate actual-byte limit.
     ///
     /// This mirrors `pkgreader`'s `checked_add` for
-    /// [`ReadResource::TotalPartBytes`], including the overflow observation
+    /// [`SourceLimitKind::TotalPartBytes`], including the overflow observation
     /// value, so a lazy package's refusal is the value the eager path
     /// produces.
     fn charge_inflated(&self, bytes: u64) -> Result<()> {
         let maximum = self.limits.max_total_part_bytes();
         let mut current = self.inflated_bytes.load(Ordering::Relaxed);
         loop {
-            let actual = current.checked_add(bytes).ok_or(OpcError::ReadLimit {
-                resource: ReadResource::TotalPartBytes,
-                actual: u64::MAX,
+            let actual = current.checked_add(bytes).ok_or(OpcError::Limit {
+                kind: SourceLimitKind::TotalPartBytes,
+                observed: u64::MAX,
                 maximum,
             })?;
             if actual > maximum {
-                return Err(OpcError::ReadLimit {
-                    resource: ReadResource::TotalPartBytes,
-                    actual,
+                return Err(OpcError::Limit {
+                    kind: SourceLimitKind::TotalPartBytes,
+                    observed: actual,
                     maximum,
                 });
             }
@@ -180,7 +180,11 @@ impl DeferredPayload {
         let blob = archive.read(&self.member).map_err(OpcError::from)?;
         let limits = self.source.limits;
         let inflated = blob.len() as u64;
-        limits.check(ReadResource::PartBytes, inflated, limits.max_part_bytes())?;
+        limits.check(
+            SourceLimitKind::PartBytes,
+            inflated,
+            limits.max_part_bytes(),
+        )?;
         self.source.charge_inflated(inflated)?;
         Ok(Arc::new(blob))
     }
@@ -289,7 +293,7 @@ impl PartPayload {
     /// # Errors
     ///
     /// Returns the refusal the first decode produced: a
-    /// [`OpcError::ReadLimit`] for `PartBytes` or `TotalPartBytes`, an
+    /// [`OpcError::Limit`] for `PartBytes` or `TotalPartBytes`, an
     /// allocation failure, a cancellation, an I/O error, or a ZIP error for a
     /// corrupt Deflate stream or a CRC mismatch.
     pub(crate) fn force(&self) -> Result<&Arc<Vec<u8>>> {

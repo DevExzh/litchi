@@ -511,9 +511,9 @@ mod source_pptx_path {
         assert_eq!(error.code(), Code::LimitExceeded);
         assert!(matches!(
             error.leaf(),
-            crate::error::Source::Opc(litchi_opc::OpcError::ReadLimit {
-                resource: litchi_opc::ReadResource::InputBytes,
-                actual,
+            crate::error::Source::Opc(litchi_opc::OpcError::Limit {
+                kind: litchi_opc::SourceLimitKind::InputBytes,
+                observed: actual,
                 maximum,
             }) if *actual == bytes.len() as u64 && *maximum == bytes.len() as u64 - 1
         ));
@@ -616,8 +616,8 @@ mod source_pptx_path {
         assert_eq!(error.code(), Code::LimitExceeded);
         assert!(matches!(
             error.leaf(),
-            crate::error::Source::Opc(litchi_opc::OpcError::ReadLimit {
-                resource: litchi_opc::ReadResource::InputBytes,
+            crate::error::Source::Opc(litchi_opc::OpcError::Limit {
+                kind: litchi_opc::SourceLimitKind::InputBytes,
                 ..
             })
         ));
@@ -681,9 +681,9 @@ mod source_pptx_path {
             crate::open_with(unknown.path(), &OpenOptions::new().ooxml_limits(limits)).unwrap_err();
         assert!(matches!(
             error.leaf(),
-            crate::error::Source::Opc(litchi_opc::OpcError::ReadLimit {
-                resource: litchi_opc::ReadResource::InputBytes,
-                actual,
+            crate::error::Source::Opc(litchi_opc::OpcError::Limit {
+                kind: litchi_opc::SourceLimitKind::InputBytes,
+                observed: actual,
                 maximum: 1,
             }) if *actual == unknown_bytes.len() as u64
         ));

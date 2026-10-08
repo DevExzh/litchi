@@ -146,7 +146,7 @@ pub(crate) mod worksheet_index;
 pub mod xml_maps;
 
 /// OPC resource limits and diagnostics used by XLSB package and workbook ingress.
-pub use litchi_opc::{SourceCacheDiagnostics, SourceCacheLimits, SourceLimits};
+pub use litchi_opc::{SourceCacheDiagnostics, SourceCacheLimits, SourceLimitKind, SourceLimits};
 pub mod writer;
 
 pub use raw::Error;

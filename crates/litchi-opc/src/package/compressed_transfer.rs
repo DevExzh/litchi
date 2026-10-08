@@ -39,7 +39,7 @@ use soapberry_zip::office::{
 
 use super::{OpcPackage, SourcePart};
 use crate::error::{OpcError, Result, map_io_error};
-use crate::limits::{ReadResource, SourceLimits};
+use crate::limits::{SourceLimitKind, SourceLimits};
 use crate::packuri::PackURI;
 use crate::part::Part;
 use crate::payload::{PartPayload, TransferredPayload};
@@ -210,7 +210,7 @@ impl OpcPackage {
     ///   eligible (see [`Self::compressed_transfer_size`]);
     /// - the part's own decode refusal when its deferred payload cannot be
     ///   decoded;
-    /// - [`OpcError::ReadLimit`] when the member's declared sizes exceed the
+    /// - [`OpcError::Limit`] when the member's declared sizes exceed the
     ///   archive's read limits;
     /// - [`OpcError::Allocation`] when the capture cannot be reserved, and an
     ///   I/O error from the retained source.
@@ -428,17 +428,17 @@ fn verified_capture(
         return Ok(None);
     }
     limits.check(
-        ReadResource::ArchiveCompressedBytes,
+        SourceLimitKind::ArchiveCompressedBytes,
         metadata.compressed_size(),
         limits.max_archive_compressed_bytes(),
     )?;
     limits.check(
-        ReadResource::ArchiveEntryBytes,
+        SourceLimitKind::ArchiveEntryBytes,
         metadata.uncompressed_size(),
         limits.max_archive_entry_bytes(),
     )?;
     limits.check(
-        ReadResource::PartBytes,
+        SourceLimitKind::PartBytes,
         logical_size,
         limits.max_part_bytes(),
     )?;

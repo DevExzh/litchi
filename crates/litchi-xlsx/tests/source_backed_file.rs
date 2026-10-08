@@ -241,7 +241,7 @@ fn path_replacement_and_limits_are_typed_errors() {
         .unwrap();
     assert!(matches!(
         SourceBackedWorkbook::from_path_with_limits(file.path(), limits),
-        Err(Error::Package(OpcError::ReadLimit { .. }))
+        Err(Error::Package(OpcError::Limit { .. }))
     ));
 
     let missing = file.path().with_extension("missing.xlsx");

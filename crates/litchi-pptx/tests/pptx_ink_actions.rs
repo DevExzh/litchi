@@ -14,7 +14,7 @@
 
 use litchi_drawingml::ink::actions::{ActionSelector, ActionType, ChildSelector};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, Part, ReadResource, SourceLimits};
+use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, Part, SourceLimitKind, SourceLimits};
 use litchi_pptx::Package;
 use litchi_pptx::presentation::embedded::ink_actions;
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
@@ -1681,8 +1681,8 @@ fn retained_opc_read_limits_cover_unrelated_candidate_parts_atomically() {
         let error = ink_actions::apply_patch(&mut package, commit.patch()).unwrap_err();
         assert!(matches!(
             error,
-            litchi_pptx::Error::Opc(OpcError::ReadLimit {
-                resource: ReadResource::Parts,
+            litchi_pptx::Error::Opc(OpcError::Limit {
+                kind: SourceLimitKind::Parts,
                 ..
             })
         ));
@@ -1720,8 +1720,8 @@ fn retained_opc_read_limits_cover_unrelated_candidate_parts_atomically() {
         assert!(
             matches!(
                 error,
-                litchi_pptx::Error::Opc(OpcError::ReadLimit {
-                    resource: ReadResource::PartBytes,
+                litchi_pptx::Error::Opc(OpcError::Limit {
+                    kind: SourceLimitKind::PartBytes,
                     ..
                 })
             ),
@@ -1752,8 +1752,8 @@ fn retained_opc_read_limits_cover_unrelated_candidate_parts_atomically() {
         let error = ink_actions::apply_patch(&mut package, commit.patch()).unwrap_err();
         assert!(matches!(
             error,
-            litchi_pptx::Error::Opc(OpcError::ReadLimit {
-                resource: ReadResource::TotalPartBytes,
+            litchi_pptx::Error::Opc(OpcError::Limit {
+                kind: SourceLimitKind::TotalPartBytes,
                 ..
             })
         ));
@@ -1797,8 +1797,8 @@ fn retained_lower_opc_limits_are_checked_during_action_inventory() {
         assert!(
             matches!(
                 error,
-                litchi_pptx::Error::Opc(OpcError::ReadLimit {
-                    resource: ReadResource::Parts,
+                litchi_pptx::Error::Opc(OpcError::Limit {
+                    kind: SourceLimitKind::Parts,
                     ..
                 })
             ),
@@ -1829,8 +1829,8 @@ fn retained_lower_opc_limits_are_checked_during_action_inventory() {
         assert!(
             matches!(
                 error,
-                litchi_pptx::Error::Opc(OpcError::ReadLimit {
-                    resource: ReadResource::PartBytes,
+                litchi_pptx::Error::Opc(OpcError::Limit {
+                    kind: SourceLimitKind::PartBytes,
                     ..
                 })
             ),
@@ -1859,8 +1859,8 @@ fn retained_lower_opc_limits_are_checked_during_action_inventory() {
         assert!(
             matches!(
                 error,
-                litchi_pptx::Error::Opc(OpcError::ReadLimit {
-                    resource: ReadResource::TotalPartBytes,
+                litchi_pptx::Error::Opc(OpcError::Limit {
+                    kind: SourceLimitKind::TotalPartBytes,
                     ..
                 })
             ),

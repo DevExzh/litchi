@@ -174,7 +174,7 @@ fn from_path_variants_forward_limits_and_managed_cache_policy() {
         .unwrap();
     assert!(matches!(
         source_backed::Package::from_path_with_limits(&path, limits),
-        Err(Error::Opc(OpcError::ReadLimit { .. }))
+        Err(Error::Opc(OpcError::Limit { .. }))
     ));
 
     let cache_limits = SourceCacheLimits::new(1 << 20, 8).unwrap();

@@ -10,7 +10,7 @@ use std::io::{self, Cursor, Read, Seek, SeekFrom};
 use std::ops::Range;
 
 use litchi_opc::{
-    OpcError, OpcPackage, ReadResource, SourceBackedPackage, SourceLimits,
+    OpcError, OpcPackage, SourceBackedPackage, SourceLimitKind, SourceLimits,
     probe_package_catalog_from_reader, probe_package_catalog_from_reader_with_limits,
 };
 use soapberry_zip::office::StreamingArchiveWriter;
@@ -304,18 +304,18 @@ fn archive_total_entry_limit_is_consistent_across_ingress_paths() {
     let source = SourceBackedPackage::from_vec_with_limits(bytes.clone(), under);
     assert!(matches!(
         source,
-        Err(OpcError::ReadLimit {
-            resource: ReadResource::ArchiveTotalEntries,
-            actual: 6,
+        Err(OpcError::Limit {
+            kind: SourceLimitKind::ArchiveTotalEntries,
+            observed: 6,
             maximum: 5,
         })
     ));
     let eager = OpcPackage::from_bytes_with_limits(&bytes, under);
     assert!(matches!(
         eager,
-        Err(OpcError::ReadLimit {
-            resource: ReadResource::ArchiveTotalEntries,
-            actual: 6,
+        Err(OpcError::Limit {
+            kind: SourceLimitKind::ArchiveTotalEntries,
+            observed: 6,
             maximum: 5,
         })
     ));
@@ -323,9 +323,9 @@ fn archive_total_entry_limit_is_consistent_across_ingress_paths() {
     let probe = probe_package_catalog_from_reader_with_limits(&mut reader, under);
     assert!(matches!(
         probe,
-        Err(OpcError::ReadLimit {
-            resource: ReadResource::ArchiveTotalEntries,
-            actual: 6,
+        Err(OpcError::Limit {
+            kind: SourceLimitKind::ArchiveTotalEntries,
+            observed: 6,
             maximum: 5,
         })
     ));
@@ -406,7 +406,7 @@ fn probe_limit_errors_are_typed_and_restore_the_cursor() {
                 .unwrap()
                 .build()
                 .unwrap(),
-            ReadResource::InputBytes,
+            SourceLimitKind::InputBytes,
         ),
         (
             SourceLimits::builder()
@@ -414,7 +414,7 @@ fn probe_limit_errors_are_typed_and_restore_the_cursor() {
                 .unwrap()
                 .build()
                 .unwrap(),
-            ReadResource::ContentTypesBytes,
+            SourceLimitKind::ContentTypesBytes,
         ),
         (
             SourceLimits::builder()
@@ -422,7 +422,7 @@ fn probe_limit_errors_are_typed_and_restore_the_cursor() {
                 .unwrap()
                 .build()
                 .unwrap(),
-            ReadResource::RelationshipParts,
+            SourceLimitKind::RelationshipParts,
         ),
         (
             SourceLimits::builder()
@@ -430,7 +430,7 @@ fn probe_limit_errors_are_typed_and_restore_the_cursor() {
                 .unwrap()
                 .build()
                 .unwrap(),
-            ReadResource::RelationshipXmlBytes,
+            SourceLimitKind::RelationshipXmlBytes,
         ),
     ];
 
@@ -443,7 +443,7 @@ fn probe_limit_errors_are_typed_and_restore_the_cursor() {
 
         assert!(matches!(
             error,
-            OpcError::ReadLimit { resource, .. } if resource == expected_resource
+            OpcError::Limit { kind: resource, .. } if resource == expected_resource
         ));
         assert_eq!(reader.position(), original_position);
     }
