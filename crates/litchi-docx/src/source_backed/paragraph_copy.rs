@@ -1002,7 +1002,7 @@ impl Package {
 
     /// Publish an exact-source-checked copy while raw-copying every other ZIP member.
     pub fn publish_plain_paragraph_copy_to_stream<W: Write>(
-        self,
+        &self,
         writer: W,
         commit: &Commit,
     ) -> Result<Publication> {
@@ -1015,7 +1015,7 @@ impl Package {
     /// A rehydrated patch instead authorizes an identical reopened package by
     /// the complete source-artifact SHA-256 retained in its canonical wire.
     pub fn publish_plain_paragraph_copy_patch_to_stream<W: Write>(
-        self,
+        &self,
         writer: W,
         patch: &Patch,
     ) -> Result<Publication> {
@@ -1037,6 +1037,7 @@ impl Package {
         } else {
             let replacement = Arc::clone(&target.xml);
             self.package
+                .clone()
                 .write_part_overlay_shared_to_stream(&mut output, &main, replacement)
                 .map_err(crate::Error::from)?;
         }
@@ -1055,7 +1056,7 @@ impl Package {
 
     /// Restore the exact original package from a byte-exact published artifact.
     pub fn publish_plain_paragraph_copy_inverse_to_stream<W: Write>(
-        self,
+        &self,
         writer: W,
         publication: &Publication,
     ) -> Result<Snapshot> {
@@ -1074,7 +1075,7 @@ impl Package {
     /// Publish one exact-source-checked removal while raw-copying every other
     /// physical ZIP member.
     pub fn publish_plain_paragraph_removal_to_stream<W: Write>(
-        self,
+        &self,
         writer: W,
         commit: &RemovalCommit,
     ) -> Result<RemovalPublication> {
@@ -1084,7 +1085,7 @@ impl Package {
     /// Publish a live or rehydrated durable removal patch against its exact
     /// complete source artifact.
     pub fn publish_plain_paragraph_removal_patch_to_stream<W: Write>(
-        self,
+        &self,
         writer: W,
         patch: &RemovalPatch,
     ) -> Result<RemovalPublication> {
@@ -1106,6 +1107,7 @@ impl Package {
         } else {
             let replacement = checked_clone(target.xml_bytes(), "removal publication replacement")?;
             self.package
+                .clone()
                 .write_part_overlay_to_stream(&mut output, &main, replacement)
                 .map_err(crate::Error::from)?;
         }
@@ -1124,7 +1126,7 @@ impl Package {
 
     /// Restore the exact original package from a byte-exact removal output.
     pub fn publish_plain_paragraph_removal_inverse_to_stream<W: Write>(
-        self,
+        &self,
         writer: W,
         publication: &RemovalPublication,
     ) -> Result<Snapshot> {

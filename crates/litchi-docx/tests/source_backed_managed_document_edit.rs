@@ -323,6 +323,7 @@ fn publish_managed_edit_with_inverse(
     let publication = package
         .publish_document_commit_with_inverse_to_stream(&mut output, &commit)
         .unwrap();
+    drop(package);
     (output, publication, budget, commit)
 }
 
@@ -928,6 +929,7 @@ fn managed_signed_noop_and_equal_setter_preserve_exact_source() {
     package
         .publish_document_commit_to_stream(&mut output, &noop)
         .unwrap();
+    drop(package);
     assert_eq!(output, source);
     drop(noop);
     assert_eq!(budget.used(Resource::Memory), 0);
@@ -942,6 +944,7 @@ fn managed_signed_noop_and_equal_setter_preserve_exact_source() {
     package
         .publish_document_commit_to_stream(&mut output, &commit)
         .unwrap();
+    drop(package);
     assert_eq!(output, source);
     drop(commit);
     assert_eq!(budget.used(Resource::Memory), 0);
@@ -969,6 +972,7 @@ fn managed_signed_noop_and_equal_setter_preserve_exact_source() {
             OpcError::SignedSourceRequiresExplicitPolicy
         )))
     ));
+    drop(package);
     assert!(output.is_empty());
 }
 
@@ -1091,6 +1095,7 @@ fn managed_revision_dispositions_are_refused_like_revision_text_replacement() {
         package
             .publish_document_commit_to_stream(&mut output, &commit)
             .unwrap();
+        drop(package);
         assert_eq!(output, source);
         drop(commit);
         assert_eq!(budget.used(Resource::Memory), 0);
@@ -1149,6 +1154,7 @@ fn managed_disjoint_updates_publish_in_arbitrary_order_and_inverse_exact() {
     let publication = package
         .publish_document_commit_with_inverse_to_stream(&mut output, &commit)
         .unwrap();
+    drop(package);
     assert_eq!(part_bytes(&output, MEDIA), part_bytes(&source, MEDIA));
     assert_eq!(part_bytes(&output, OPAQUE), part_bytes(&source, OPAQUE));
     let (inverse_budget, _cancellation_source, reopened) = managed(output, 1 << 20);
@@ -1173,6 +1179,7 @@ fn managed_disjoint_updates_publish_in_arbitrary_order_and_inverse_exact() {
     reopened
         .publish_document_inverse_to_stream(&mut restored, &publication)
         .unwrap();
+    drop(reopened);
     assert_eq!(restored, source);
     drop(snapshot);
     assert_eq!(inverse_budget.used(Resource::Memory), 0);
@@ -1202,6 +1209,7 @@ fn unmanaged_foreign_package_with_equal_main_xml_refuses_stale_commit_before_out
         source_backed::Package::from_read_at(Arc::new(OwnedSource::new(second))).unwrap();
     let mut output = Vec::new();
     let result = second_package.publish_document_commit_to_stream(&mut output, &commit);
+    drop(second_package);
     assert!(matches!(result, Err(TransactionError::StaleSource)));
     assert!(output.is_empty());
 }
@@ -1248,11 +1256,13 @@ fn managed_four_disjoint_updates_release_scan_depth_and_restore_exact_artifact()
     let publication = package
         .publish_document_commit_with_inverse_to_stream(&mut changed, &commit)
         .unwrap();
+    drop(package);
     let (inverse_budget, _cancellation_source, reopened) = managed(changed, 1 << 20);
     let mut restored = Vec::new();
     reopened
         .publish_document_inverse_to_stream(&mut restored, &publication)
         .unwrap();
+    drop(reopened);
     assert_eq!(restored, source);
     assert_eq!(inverse_budget.used(Resource::Memory), 0);
     drop(publication);
@@ -1339,12 +1349,14 @@ fn managed_reverting_one_operation_preserves_the_other_and_inverse_artifact() {
     let publication = package
         .publish_document_commit_with_inverse_to_stream(&mut changed, &commit)
         .unwrap();
+    drop(package);
     assert_ne!(changed, source);
     let (inverse_budget, _cancellation_source, reopened) = managed(changed, 1 << 20);
     let mut restored = Vec::new();
     reopened
         .publish_document_inverse_to_stream(&mut restored, &publication)
         .unwrap();
+    drop(reopened);
     assert_eq!(restored, source);
     assert_eq!(inverse_budget.used(Resource::Memory), 0);
     drop(publication);
@@ -1368,6 +1380,7 @@ fn managed_revert_to_original_publishes_exact_noop_bytes() {
     package
         .publish_document_commit_to_stream(&mut output, &commit)
         .unwrap();
+    drop(package);
     assert_eq!(output, source);
     drop(commit);
     assert_eq!(budget.used(Resource::Memory), 0);
@@ -1440,6 +1453,7 @@ fn managed_noop_inverse_and_changed_publication_preserve_untouched_media() {
     package
         .publish_document_commit_to_stream(&mut noop_output, &noop)
         .unwrap();
+    drop(package);
     assert_eq!(noop_output, source);
     drop(noop);
     assert_eq!(budget.used(Resource::Memory), 0);
@@ -1461,6 +1475,7 @@ fn managed_noop_inverse_and_changed_publication_preserve_untouched_media() {
     package
         .publish_document_commit_to_stream(&mut output, &commit)
         .unwrap();
+    drop(package);
     assert_ne!(output, source);
     assert_eq!(part_bytes(&output, MEDIA), part_bytes(&source, MEDIA));
     assert_eq!(part_bytes(&output, OPAQUE), part_bytes(&source, OPAQUE));
@@ -1496,6 +1511,7 @@ fn managed_protected_settings_noop_preserves_relationship_and_payload_exactly() 
     package
         .publish_document_commit_to_stream(&mut output, &commit)
         .unwrap();
+    drop(package);
     assert_eq!(output, source);
     assert_eq!(part_bytes(&output, SETTINGS), settings);
     drop(commit);
@@ -1549,6 +1565,7 @@ fn managed_changed_publication_enforces_settings_protection_flags() {
         let commit = edit.commit().unwrap();
         let mut output = Vec::new();
         let result = package.publish_document_commit_to_stream(&mut output, &commit);
+        drop(package);
         if refused {
             assert!(
                 result.as_ref().is_err_and(is_protection_refusal),
@@ -1579,6 +1596,7 @@ fn changed_publication_preserves_standard_ignorable_settings_for_managed_and_unm
     package
         .publish_document_commit_to_stream(&mut managed_output, &commit)
         .unwrap();
+    drop(package);
     assert_eq!(part_bytes(&managed_output, SETTINGS), settings);
     drop(commit);
     assert_eq!(budget.used(Resource::Memory), 0);
@@ -1593,6 +1611,7 @@ fn changed_publication_preserves_standard_ignorable_settings_for_managed_and_unm
     unmanaged_package
         .publish_document_commit_to_stream(&mut unmanaged_output, &commit)
         .unwrap();
+    drop(unmanaged_package);
     assert_eq!(part_bytes(&unmanaged_output, SETTINGS), settings);
 }
 
@@ -1611,6 +1630,7 @@ fn protected_track_revisions_with_ignorable_extension_remains_refused() {
     let commit = edit.commit().unwrap();
     let mut managed_output = Vec::new();
     let result = package.publish_document_commit_to_stream(&mut managed_output, &commit);
+    drop(package);
     assert!(result.as_ref().is_err_and(is_protection_refusal));
     assert!(managed_output.is_empty());
     drop(commit);
@@ -1625,6 +1645,7 @@ fn protected_track_revisions_with_ignorable_extension_remains_refused() {
     let mut unmanaged_output = Vec::new();
     let result =
         unmanaged_package.publish_document_commit_to_stream(&mut unmanaged_output, &commit);
+    drop(unmanaged_package);
     assert!(result.as_ref().is_err_and(is_protection_refusal));
     assert!(unmanaged_output.is_empty());
 }
@@ -1682,6 +1703,7 @@ fn changed_publication_rejects_unresolved_ignorable_and_active_mce_controls() {
         let commit = edit.commit().unwrap();
         let mut output = Vec::new();
         let result = package.publish_document_commit_to_stream(&mut output, &commit);
+        drop(package);
         assert!(
             result.as_ref().is_err_and(refusal),
             "{label} must refuse changed publication: {:?}",
@@ -1704,6 +1726,7 @@ fn managed_changed_publication_rejects_mixed_settings_dialect_before_output() {
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
     let result = package.publish_document_commit_to_stream(&mut output, &commit);
+    drop(package);
     assert!(result.as_ref().is_err_and(is_mixed_dialect_refusal));
     assert!(output.is_empty());
     drop(commit);
@@ -1739,6 +1762,7 @@ fn managed_changed_publication_rejects_settings_mce_and_dtd_before_output() {
         let commit = edit.commit().unwrap();
         let mut output = Vec::new();
         let result = package.publish_document_commit_to_stream(&mut output, &commit);
+        drop(package);
         assert!(
             result.as_ref().is_err_and(refusal),
             "{label} must refuse changed publication: {:?}",
@@ -1775,6 +1799,7 @@ fn managed_changed_publication_rejects_settings_mce_and_dtd_before_output() {
         let commit = edit.commit().unwrap();
         let mut output = Vec::new();
         let result = package.publish_document_commit_to_stream(&mut output, &commit);
+        drop(package);
         assert!(
             result.as_ref().is_err_and(is_literal_namespace_refusal),
             "{label} must refuse changed publication: {:?}",
@@ -1807,6 +1832,7 @@ fn managed_source_document_admits_word_markup_compatibility() {
     unmanaged
         .publish_document_commit_to_stream(&mut expected, &commit)
         .unwrap();
+    drop(unmanaged);
 
     let (budget, _cancellation_source, package) = managed(source, 1 << 20);
     let snapshot = package.document_snapshot().unwrap();
@@ -1819,6 +1845,7 @@ fn managed_source_document_admits_word_markup_compatibility() {
     package
         .publish_document_commit_to_stream(&mut output, &commit)
         .unwrap();
+    drop(package);
     assert_eq!(part_bytes(&output, MAIN), part_bytes(&expected, MAIN));
     let published = String::from_utf8(part_bytes(&output, MAIN)).unwrap();
     assert!(published.contains(r#"mc:Ignorable="w14""#));
@@ -1884,6 +1911,7 @@ fn managed_reopened_inverse_restores_exact_artifact_and_rejects_foreign_member()
     let mut foreign_output = Vec::new();
     let result =
         foreign_package.publish_document_inverse_to_stream(&mut foreign_output, &publication);
+    drop(foreign_package);
     assert!(result.as_ref().is_err_and(is_artifact_mismatch));
     assert!(foreign_output.is_empty());
     assert_eq!(foreign_budget.used(Resource::Memory), 0);
@@ -1893,6 +1921,7 @@ fn managed_reopened_inverse_restores_exact_artifact_and_rejects_foreign_member()
     reopened
         .publish_document_inverse_to_stream(&mut restored, &publication)
         .unwrap();
+    drop(reopened);
     assert_eq!(restored, source);
     assert_eq!(inverse_budget.used(Resource::Memory), 0);
 
@@ -1917,6 +1946,7 @@ fn managed_reopened_inverse_rejects_source_mutation_before_output() {
 
     let mut output = Vec::new();
     let result = package.publish_document_inverse_to_stream(&mut output, &publication);
+    drop(package);
     assert!(result.as_ref().is_err_and(is_source_changed));
     assert!(output.is_empty());
     assert_eq!(inverse_budget.used(Resource::Memory), 0);
@@ -1933,6 +1963,7 @@ fn managed_reopened_inverse_cancellation_and_output_budget_are_before_output() {
     cancellation_source.cancel();
     let mut cancelled_output = Vec::new();
     let result = package.publish_document_inverse_to_stream(&mut cancelled_output, &publication);
+    drop(package);
     assert!(result.as_ref().is_err_and(is_cancelled));
     assert!(cancelled_output.is_empty());
     assert_eq!(inverse_budget.used(Resource::Memory), 0);
@@ -1947,6 +1978,7 @@ fn managed_reopened_inverse_cancellation_and_output_budget_are_before_output() {
     let mut limited_output = Vec::new();
     let result =
         limited_package.publish_document_inverse_to_stream(&mut limited_output, &publication);
+    drop(limited_package);
     assert!(result.as_ref().is_err_and(is_output_budget_refusal));
     assert!(limited_output.is_empty());
     assert_eq!(limited_budget.used(Resource::Memory), 0);
@@ -1966,6 +1998,7 @@ fn managed_reopened_inverse_reports_partial_sink_failure() {
         limit: 1,
     };
     let result = package.publish_document_inverse_to_stream(&mut sink, &publication);
+    drop(package);
     assert!(matches!(
         result,
         Err(TransactionError::Document(Error::Opc(
@@ -2035,6 +2068,7 @@ fn managed_source_change_refuses_publication_before_sink_output() {
 
     let mut output = Vec::new();
     let result = package.publish_document_commit_to_stream(&mut output, &commit);
+    drop(package);
     assert!(result.as_ref().is_err_and(is_source_changed));
     assert!(output.is_empty());
     drop(commit);
@@ -2058,6 +2092,7 @@ fn managed_cancellation_refuses_edit_and_publication_without_output() {
     cancellation_source.cancel();
     let mut output = Vec::new();
     let result = package.publish_document_commit_to_stream(&mut output, &commit);
+    drop(package);
     assert!(result.as_ref().is_err_and(is_cancelled));
     assert!(output.is_empty());
     drop(commit);
@@ -2135,6 +2170,7 @@ fn managed_publication_reports_a_partial_sink_failure() {
         limit: 1,
     };
     let result = package.publish_document_commit_to_stream(&mut sink, &commit);
+    drop(package);
     assert!(matches!(
         result,
         Err(TransactionError::Document(Error::Opc(
@@ -2177,6 +2213,7 @@ fn managed_changed_publication_preserves_readback_and_releases_snapshot_budget()
     let published = package
         .publish_document_commit_to_stream(&mut output, &commit)
         .unwrap();
+    drop(package);
     assert_eq!(
         published
             .paragraph(Position::new(0))
@@ -2215,6 +2252,7 @@ fn managed_foreign_equal_main_xml_refuses_commit_before_output() {
     let (second_budget, _second_cancellation, second_package) = managed(second, 1 << 20);
     let mut output = Vec::new();
     let result = second_package.publish_document_commit_to_stream(&mut output, &commit);
+    drop(second_package);
     assert!(matches!(result, Err(TransactionError::StaleSource)));
     assert!(output.is_empty());
 
@@ -2245,6 +2283,7 @@ fn managed_source_change_during_current_part_read_refuses_before_output() {
 
     let mut output = Vec::new();
     let result = package.publish_document_commit_to_stream(&mut output, &commit);
+    drop(package);
     assert!(result.as_ref().is_err_and(is_source_changed));
     assert!(output.is_empty());
 
@@ -2274,9 +2313,42 @@ fn managed_cancellation_during_current_part_read_refuses_before_output() {
 
     let mut output = Vec::new();
     let result = package.publish_document_commit_to_stream(&mut output, &commit);
+    drop(package);
     assert!(result.as_ref().is_err_and(is_cancelled));
     assert!(output.is_empty());
 
     drop(commit);
     assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn shared_package_reservations_live_until_the_last_source_owner_drops() {
+    let (budget, _cancellation, package) = managed(fixture("before", "second"), 1 << 20);
+    // Open is cold; admit the main payload before measuring shared cache retention.
+    drop(package.document_snapshot().unwrap());
+    let opened_memory = budget.used(Resource::Memory);
+    let opened_objects = budget.used(Resource::Objects);
+    assert!(opened_memory > 0);
+    let shared = package.clone();
+    let last_owner = shared.clone();
+    assert_eq!(budget.used(Resource::Memory), opened_memory);
+    assert_eq!(budget.used(Resource::Objects), opened_objects);
+    let mut edit = package.edit().unwrap();
+    edit.replace_paragraph_text(Position::new(0), "changed")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    drop(package);
+    let mut output = Vec::new();
+    let published = shared
+        .publish_document_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert!(!output.is_empty());
+    assert!(last_owner.document_snapshot().is_ok());
+    drop(published);
+    drop(commit);
+    drop(shared);
+    assert!(budget.used(Resource::Memory) > 0);
+    drop(last_owner);
+    assert_eq!(budget.used(Resource::Memory), 0);
+    assert_eq!(budget.used(Resource::Objects), 0);
 }

@@ -1209,7 +1209,7 @@ impl Package {
     /// overlay path. Unchanged members are copied in their original physical
     /// form, and an exact no-op copies the complete source artifact.
     pub fn publish_story_text_commit_to_stream<W: Write>(
-        self,
+        &self,
         writer: W,
         commit: &Commit,
     ) -> Result<Publication> {
@@ -1218,14 +1218,14 @@ impl Package {
 
     /// Publish one source-bound selected-story patch.
     pub fn publish_story_text_patch_to_stream<W: Write>(
-        self,
+        &self,
         writer: W,
         patch: &Patch,
     ) -> Result<Publication> {
         self.trim_clean_paragraph_index_for_operation();
         self.package.check_execution()?;
         let execution = self.package.execution_context();
-        let current = capture(&self, patch.before.selector.clone(), patch.before.limits)?;
+        let current = capture(self, patch.before.selector.clone(), patch.before.limits)?;
         let target = patch.apply(&current)?;
         let original_artifact = self.package.source_artifact();
         let mut output = FingerprintingWriter::new(writer);
@@ -1249,7 +1249,7 @@ impl Package {
                 target.raw_bytes(),
                 "story publication replacement",
             )?);
-            self.package.write_part_overlay_shared_to_stream(
+            self.package.clone().write_part_overlay_shared_to_stream(
                 &mut output,
                 &current.partname,
                 replacement,
@@ -1272,7 +1272,7 @@ impl Package {
 
     /// Restore the exact source artifact from a selected-story publication.
     pub fn publish_story_text_inverse_to_stream<W: Write>(
-        self,
+        &self,
         writer: W,
         publication: &Publication,
     ) -> Result<Snapshot> {
@@ -5088,7 +5088,7 @@ impl Package {
 
     /// Publish one glossary batch commit through a one-Part shared overlay.
     pub fn publish_glossary_text_batch_commit_to_stream<W: Write>(
-        self,
+        &self,
         writer: W,
         commit: &GlossaryBatchCommit,
     ) -> Result<GlossaryBatchPublication> {
@@ -5097,7 +5097,7 @@ impl Package {
 
     /// Publish one source-bound glossary batch patch.
     pub fn publish_glossary_text_batch_patch_to_stream<W: Write>(
-        self,
+        &self,
         writer: W,
         patch: &GlossaryBatchPatch,
     ) -> Result<GlossaryBatchPublication> {
@@ -5105,7 +5105,7 @@ impl Package {
         self.package.check_execution()?;
         let execution = self.package.execution_context();
         let current =
-            capture_glossary_batch(&self, patch.before.selector.clone(), patch.before.limits)?;
+            capture_glossary_batch(self, patch.before.selector.clone(), patch.before.limits)?;
         let target = patch.apply(&current)?;
         let original_artifact = self.package.source_artifact();
         let mut output = FingerprintingWriter::new(writer);
@@ -5129,7 +5129,7 @@ impl Package {
                 target.raw_bytes(),
                 "glossary batch publication replacement",
             )?);
-            self.package.write_part_overlay_shared_to_stream(
+            self.package.clone().write_part_overlay_shared_to_stream(
                 &mut output,
                 &current.partname,
                 replacement,
@@ -5152,7 +5152,7 @@ impl Package {
 
     /// Restore the exact source artifact from a glossary batch publication.
     pub fn publish_glossary_text_batch_inverse_to_stream<W: Write>(
-        self,
+        &self,
         writer: W,
         publication: &GlossaryBatchPublication,
     ) -> Result<GlossaryBatchSnapshot> {

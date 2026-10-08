@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0021 | Shared source-backed DOCX owners and borrowing stream publication | sharing prerequisite complete; package-bound Edit/Commit pending |
 | 0020 | Cheap eager DOCX package shares and immutable primary patch application | eager apply migrated; package-owning commit W2 work pending |
 | 0019 | Owned eager DOCX read projection and shared physical graph | projection migrated; immutable package and commit W2 work pending |
 | 0018 | DOCX primary edit entry and focused error/result names; minimal/full glossary bans | names migrated; package-owned commit/projection W2 work pending |
@@ -210,3 +211,15 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 - This is the publication prerequisite for package-bound `Edit`/`Commit`.
   Those shapes, source-backed package publication and writer removal remain
   required; evidence and limits are recorded in 0020.
+
+## 0021 — shared source-backed DOCX publication
+
+- Source-backed `Package` clones share source identity, lazy caches, admission,
+  tolerance reports and execution reservations without reopening the archive.
+- All 32 package stream publishers borrow their owner. Retained owners support
+  repeated publication and retry after sink failure; source-version checks stay
+  active. Cache reservations persist until the final retaining owner drops.
+- Concurrent clone/no-op and metadata-report tests cover shared state; existing
+  managed tests explicitly release the retained source before zero-budget checks.
+- This enables retained source publication; package-bound `Edit`/`Commit`, source
+  overlays and canonical immutable publication remain required. See record 0021.

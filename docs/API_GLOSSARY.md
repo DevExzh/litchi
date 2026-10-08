@@ -273,3 +273,13 @@ package without changing its source; a no-op shares state and keeps signatures.
 publisher, legacy commit/history publication methods and mutable authoring
 entries still require migration. The complete transaction-family contract is
 not yet registered as conformant.
+
+## 14. W2 DOCX shared source owners (record 0021)
+
+Source-backed `Package` is cheaply cloneable, sharing source identity, index,
+read caches, admission and repair-report state. Existing stream publishers now
+borrow the package, allowing repeated publication and retry while retaining the
+original source. Execution reservations follow the lifetime of retained shares.
+These stream entries remain transitional: the package-bound `Edit`/`Commit` triad
+and immutable source-overlay publication are still pending. No additional full
+transaction family is marked conformant by this step.

@@ -189,6 +189,14 @@ fn core_property_repairs_join_the_report_when_metadata_is_read() {
     // The source-backed package reads metadata on demand.
     let source = open_source_backed(&bytes);
     assert!(source.tolerance_report().is_clean());
+    let shared = source.clone();
+    std::thread::scope(|scope| {
+        let first = scope.spawn(|| source.metadata().expect("source metadata"));
+        let second = scope.spawn(|| shared.metadata().expect("shared metadata"));
+        assert_eq!(first.join().unwrap().title, second.join().unwrap().title);
+    });
+    assert_eq!(located(&source.tolerance_report()), expected);
+    assert_eq!(located(&shared.tolerance_report()), expected);
     let metadata = source.metadata().expect("metadata");
     assert_eq!(metadata.title.as_deref(), Some("Title"));
     assert!(metadata.created.is_some());

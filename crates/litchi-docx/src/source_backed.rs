@@ -121,6 +121,11 @@ use std::path::Path;
 use std::sync::{Arc, Mutex, OnceLock};
 
 /// A DOCX package that leaves ordinary part bodies cold at open.
+///
+/// Clones share the source lineage, index, caches and execution reservations.
+/// Publishing borrows this snapshot: callers can publish again or keep reading
+/// the original package while any share remains alive.
+#[derive(Clone)]
 pub struct Package {
     package: SourceBackedPackage,
     execution: Option<ExecutionContext>,
@@ -128,16 +133,16 @@ pub struct Package {
     /// Everything repaired while the package was read, aggregated from the
     /// codecs that record. See `crate::leniency`. Interior mutability keeps
     /// the lazy read facades on `&self`.
-    tolerance: Mutex<crate::leniency::ToleranceReport>,
+    tolerance: Arc<Mutex<crate::leniency::ToleranceReport>>,
     /// Whether [`Package::metadata`] has folded the core-properties repairs
     /// into `tolerance`. The source is pinned to one revision, so every read
     /// repairs the same defects; they are recorded once, not per call.
-    properties_recorded: std::sync::atomic::AtomicBool,
+    properties_recorded: Arc<std::sync::atomic::AtomicBool>,
     /// The source revision whose main document the markup-compatibility
     /// admission last proved for an unmanaged transaction. One revision has
     /// one main-document payload, so publishing an edit started from it does
     /// not prove the same bytes again.
-    main_admission: Mutex<Option<SourceVersion>>,
+    main_admission: Arc<Mutex<Option<SourceVersion>>>,
 }
 
 /// A checked selector for one active `w:altChunk` anchor in the main story.
@@ -628,9 +633,9 @@ impl Package {
             package,
             execution,
             paragraph_index_cache: Arc::new(ParagraphIndexCache::new()),
-            tolerance: Mutex::new(tolerance),
-            properties_recorded: std::sync::atomic::AtomicBool::new(false),
-            main_admission: Mutex::new(None),
+            tolerance: Arc::new(Mutex::new(tolerance)),
+            properties_recorded: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            main_admission: Arc::new(Mutex::new(None)),
         })
     }
 
@@ -1223,7 +1228,7 @@ impl Package {
     /// preservation, signature, limit, XML-publication, or incomplete-output
     /// error.
     pub fn publish_document_variables_commit_to_stream<W: Write>(
-        self,
+        &self,
         writer: W,
         commit: &variables::Commit,
     ) -> Result<DocumentVariablesPublication> {
@@ -1256,9 +1261,10 @@ impl Package {
         };
         if commit.patch().is_empty() {
             self.package
+                .clone()
                 .write_part_overlays_shared_to_stream(&mut output, Vec::new())?;
         } else {
-            self.package.write_part_overlay_shared_to_stream(
+            self.package.clone().write_part_overlay_shared_to_stream(
                 &mut output,
                 &current.partname,
                 target.shared_xml(),
@@ -1286,7 +1292,7 @@ impl Package {
     /// Returns a typed conflict, source-change, allocation, or incomplete-
     /// output error.
     pub fn publish_document_variables_inverse_to_stream<W: Write>(
-        self,
+        &self,
         writer: W,
         publication: &DocumentVariablesPublication,
     ) -> Result<variables::Snapshot> {
@@ -1307,7 +1313,7 @@ impl Package {
     /// all other ZIP members are copied through the source-backed preservation
     /// plan.
     pub fn publish_section_layout_commit_to_stream<W: Write>(
-        self,
+        &self,
         writer: W,
         commit: &layout::Commit,
     ) -> Result<layout::Publication> {
@@ -1328,7 +1334,7 @@ impl Package {
     /// stream. The returned publication retains an inverse authorization for
     /// the exact emitted artifact.
     pub fn publish_section_layout_patch_to_stream<W: Write>(
-        self,
+        &self,
         writer: W,
         patch: &layout::Patch,
     ) -> Result<layout::Publication> {
@@ -1343,7 +1349,7 @@ impl Package {
     }
 
     fn publish_section_layout_target_to_stream<W: Write>(
-        self,
+        &self,
         writer: W,
         main: &PackURI,
         patch: &layout::Patch,
@@ -1358,7 +1364,7 @@ impl Package {
         if patch.is_noop() {
             original_artifact.write_to_stream(&mut output)?;
         } else {
-            self.package.write_part_overlay_shared_to_stream(
+            self.package.clone().write_part_overlay_shared_to_stream(
                 &mut output,
                 main,
                 target.shared_xml(),
@@ -1383,7 +1389,7 @@ impl Package {
     /// bytes are checked before the sink receives any output; a foreign or
     /// stale package is rejected without partial output.
     pub fn publish_section_layout_inverse_to_stream<W: Write>(
-        self,
+        &self,
         writer: W,
         publication: &layout::Publication,
     ) -> Result<layout::Snapshot> {
@@ -1562,7 +1568,7 @@ impl Package {
     /// Returns a typed transaction, package, unsafe-edit, signature, source,
     /// XML-publication, or sink error.
     pub fn publish_document_commit_to_stream<W: Write>(
-        self,
+        &self,
         writer: W,
         commit: &Commit,
     ) -> TransactionResult<Snapshot> {
@@ -1593,10 +1599,11 @@ impl Package {
         // this also avoids asking a rewritten target to stand in for an
         // unsupported source payload.
         if commit.patch().changed() {
-            document_policy::validate_changed_document(&self)?;
+            document_policy::validate_changed_document(self)?;
         }
         if !commit.patch().changed() {
             self.package
+                .clone()
                 .write_part_overlays_shared_to_stream(writer, Vec::new())
                 .map_err(Error::from)?;
         } else if let Some(source_xml) = target.source_xml() {
@@ -1604,10 +1611,12 @@ impl Package {
             plan.try_replace_source_xml_part(main, source_xml)
                 .map_err(Error::from)?;
             self.package
+                .clone()
                 .write_topology_to_stream(writer, plan)
                 .map_err(Error::from)?;
         } else {
             self.package
+                .clone()
                 .write_part_overlay_shared_to_stream(
                     writer,
                     &main,
@@ -1632,7 +1641,7 @@ impl Package {
     /// Returns the ordinary publication errors, or a typed source, budget, or
     /// cancellation error while authenticating the original artifact.
     pub fn publish_document_commit_with_inverse_to_stream<W: Write>(
-        self,
+        &self,
         writer: W,
         commit: &Commit,
     ) -> TransactionResult<DocumentPublication> {
@@ -1677,7 +1686,7 @@ impl Package {
     /// Returns a typed artifact mismatch, source-change, cancellation, resource,
     /// allocation, or incomplete-output error.
     pub fn publish_document_inverse_to_stream<W: Write>(
-        self,
+        &self,
         writer: W,
         publication: &DocumentPublication,
     ) -> TransactionResult<Snapshot> {
@@ -1719,7 +1728,7 @@ impl Package {
     /// signature, XML-publication, or sink error. A sink failure after output
     /// begins is reported by the underlying incomplete-output error.
     pub fn publish_alt_chunk_to_stream<W: Write>(
-        self,
+        &self,
         writer: W,
         selector: impl Into<AltChunkSelector>,
         replacement: Data,
@@ -1732,6 +1741,7 @@ impl Package {
             replacement.extension(),
         )?;
         self.package
+            .clone()
             .write_part_overlay_to_stream(writer, &target, replacement.into_bytes())
             .map_err(Error::from)
     }
@@ -1755,7 +1765,7 @@ impl Package {
     /// Returns a typed package, source-conflict, protection, signature, XML,
     /// resource-limit, or sink error.
     pub fn publish_external_hyperlink_sanitization_to_stream<W: Write>(
-        self,
+        &self,
         writer: W,
         commit: &sanitize::Commit,
     ) -> Result<sanitize::Snapshot> {
@@ -1766,10 +1776,14 @@ impl Package {
         let target = commit.patch().apply(&current)?;
         if commit.patch().is_noop() {
             self.package
+                .clone()
                 .write_part_overlays_shared_to_stream(writer, Vec::new())?;
         } else {
-            self.package
-                .write_part_overlay_shared_to_stream(writer, &main, target.shared_xml())?;
+            self.package.clone().write_part_overlay_shared_to_stream(
+                writer,
+                &main,
+                target.shared_xml(),
+            )?;
         }
         Ok(target)
     }
@@ -1778,10 +1792,10 @@ impl Package {
     ///
     /// Selected wrappers are unwrapped, selected external relationship records
     /// are removed, visible children are retained, and every other ZIP member
-    /// is raw-copied. This operation consumes the package and exposes no inverse
+    /// is raw-copied. This operation retains the source and exposes no inverse
     /// API. It is never called by ordinary save or detachment operations.
     pub fn publish_external_hyperlink_redaction_to_stream<W: Write>(
-        self,
+        &self,
         writer: W,
         commit: &redact::Commit,
     ) -> Result<redact::EffectReport> {
@@ -1797,6 +1811,7 @@ impl Package {
         }
         let (replacement, removed_ids) = redact::publication_parts(commit);
         self.package
+            .clone()
             .write_part_overlay_with_external_relationship_removals_to_stream(
                 writer,
                 &main,
@@ -1860,7 +1875,7 @@ impl Package {
     /// no-ops copy the source byte-for-byte; changed signed/protected or stale
     /// sources are refused before output begins.
     pub fn publish_story_hyperlink_redaction_to_stream<W: Write>(
-        self,
+        &self,
         writer: W,
         commit: &crate::story_hyperlinks::Commit,
     ) -> Result<crate::story_hyperlinks::Report> {
@@ -1874,6 +1889,7 @@ impl Package {
         }
         let parts = crate::story_hyperlinks::publication_parts(commit)?;
         self.package
+            .clone()
             .write_part_overlays_with_external_relationship_removals_to_stream(writer, parts)?;
         Ok(report)
     }
@@ -2155,13 +2171,13 @@ impl Package {
         version: SourceVersion,
         operation: &'static str,
     ) -> Result<()> {
-        let admitted = || {
-            *self
-                .main_admission
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-        };
-        if admitted() == Some(version) {
+        // Admission only examines these already-retained bytes; no source
+        // callback or publication runs while this shared memo is locked.
+        let mut admitted = self
+            .main_admission
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if *admitted == Some(version) {
             return Ok(());
         }
         crate::parts::document_part::admit_document_source(
@@ -2169,10 +2185,7 @@ impl Package {
             operation,
             "source-backed document transactions do not support markup-compatibility branch selection",
         )?;
-        *self
-            .main_admission
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(version);
+        *admitted = Some(version);
         Ok(())
     }
 

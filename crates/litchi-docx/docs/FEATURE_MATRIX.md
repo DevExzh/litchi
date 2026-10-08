@@ -43,6 +43,13 @@ without changing the source. Other eager mutation APIs are still being migrated
 to the immutable package/commit contract; an owned projection does not imply that
 migration is complete.
 
+Source-backed `Package` clones retain the same source lineage, lazy caches and
+repair report. Stream publication borrows the source, which stays readable and
+can publish again after success or a sink failure. Retained caches keep their
+execution reservations until the last retaining owner drops; cloning does not
+reserve the same payload again. The package-bound source commit contract remains
+under migration.
+
 ## Core WordprocessingML document model
 
 ## Shared specification map

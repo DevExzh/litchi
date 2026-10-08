@@ -260,6 +260,7 @@ fn managed_batch_matches_repeated_scalar_xml_and_preserves_unknown_members() {
     batch_package
         .publish_document_commit_to_stream(&mut batch_output, &batch_commit)
         .unwrap();
+    drop(batch_package);
     drop(batch_commit);
     drop(batch_snapshot);
     assert_eq!(batch_budget.used(Resource::Memory), 0);
@@ -279,6 +280,7 @@ fn managed_batch_matches_repeated_scalar_xml_and_preserves_unknown_members() {
     scalar_package
         .publish_document_commit_to_stream(&mut scalar_output, &scalar_commit)
         .unwrap();
+    drop(scalar_package);
     assert_eq!(batch_output, scalar_output);
     assert_eq!(part_bytes(&batch_output, MEDIA), part_bytes(&source, MEDIA));
     assert_eq!(
@@ -309,6 +311,7 @@ fn managed_batch_forward_and_inverse_are_source_checked() {
     let publication = package
         .publish_document_commit_with_inverse_to_stream(&mut output, &commit)
         .unwrap();
+    drop(package);
     drop(commit);
     drop(snapshot);
     assert!(budget.used(Resource::Memory) > 0);
@@ -318,6 +321,7 @@ fn managed_batch_forward_and_inverse_are_source_checked() {
     let restored_snapshot = reopened
         .publish_document_inverse_to_stream(&mut restored, &publication)
         .unwrap();
+    drop(reopened);
     assert_eq!(restored, source);
     assert_eq!(restored_snapshot.xml_bytes(), part_bytes(&source, MAIN));
     drop(restored_snapshot);
@@ -340,6 +344,7 @@ fn managed_batch_forward_and_inverse_are_source_checked() {
     mutable.bump_revision();
     let mut refused_output = Vec::new();
     let result = package.publish_document_commit_to_stream(&mut refused_output, &commit);
+    drop(package);
     assert!(matches!(
         result,
         Err(TransactionError::Document(Error::Opc(
@@ -370,6 +375,7 @@ fn managed_batch_noop_and_revert_restore_the_exact_source_owner() {
     package
         .publish_document_commit_to_stream(&mut output, &commit)
         .unwrap();
+    drop(package);
     assert_eq!(output, source);
     drop(commit);
     drop(snapshot);
@@ -390,6 +396,7 @@ fn managed_batch_noop_and_revert_restore_the_exact_source_owner() {
     package
         .publish_document_commit_to_stream(&mut output, &commit)
         .unwrap();
+    drop(package);
     assert_eq!(output, source);
     drop(commit);
     drop(snapshot);
@@ -414,6 +421,7 @@ fn managed_batch_composes_with_scalar_edits_in_either_order() {
     first_package
         .publish_document_commit_to_stream(&mut first_output, &first_commit)
         .unwrap();
+    drop(first_package);
 
     let (second_budget, _cancel, second_package) = managed(source);
     let second_snapshot = second_package.document_snapshot().unwrap();
@@ -427,6 +435,7 @@ fn managed_batch_composes_with_scalar_edits_in_either_order() {
     second_package
         .publish_document_commit_to_stream(&mut second_output, &second_commit)
         .unwrap();
+    drop(second_package);
 
     assert_eq!(first_xml, second_commit.snapshot().xml_bytes());
     assert_eq!(first_output, second_output);
@@ -622,6 +631,7 @@ fn managed_signed_batch_noop_is_exact_and_change_is_refused() {
     package
         .publish_document_commit_to_stream(&mut output, &commit)
         .unwrap();
+    drop(package);
     assert_eq!(output, source);
     drop(commit);
     drop(snapshot);

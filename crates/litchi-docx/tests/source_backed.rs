@@ -779,3 +779,88 @@ fn alt_chunk_overlay_rejects_oversized_payload_before_reading_source() {
     ));
     assert!(output.is_empty());
 }
+
+#[test]
+fn shared_source_publishes_repeatedly_without_reopen_or_consumption() {
+    fn assert_shared<T: Clone + Send + Sync + 'static>() {}
+    assert_shared::<source_backed::Package>();
+    let (bytes, main, unused) = fixture();
+    let source = Arc::new(ObservedSource::new(bytes.clone(), main, unused));
+    let package = source_backed::Package::from_read_at(source.clone()).unwrap();
+    let before_main = source.main_reads.load(Ordering::SeqCst);
+    let before_unused = source.unused_reads.load(Ordering::SeqCst);
+    let shared = package.clone();
+    assert_eq!(source.main_reads.load(Ordering::SeqCst), before_main);
+    assert_eq!(source.unused_reads.load(Ordering::SeqCst), before_unused);
+    let mut edit = package.edit().unwrap();
+    edit.replace_paragraph_text(Position::new(1), "changed")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let mut failure = FailingSink {
+        accepted: 0,
+        limit: 64,
+    };
+    assert!(
+        shared
+            .publish_document_commit_to_stream(&mut failure, &commit)
+            .is_err()
+    );
+    let mut first = Vec::new();
+    shared
+        .publish_document_commit_to_stream(&mut first, &commit)
+        .unwrap();
+    let mut second = Vec::new();
+    package
+        .publish_document_commit_to_stream(&mut second, &commit)
+        .unwrap();
+    assert_eq!(first, second);
+    assert_eq!(
+        package.document().unwrap().extract_text().unwrap(),
+        "alphabeta"
+    );
+    let reopened = Package::from_reader(io::Cursor::new(first)).unwrap();
+    assert_eq!(reopened.document().unwrap().text().unwrap(), "alphachanged");
+    drop(package);
+    let noop = shared.edit().unwrap().commit().unwrap();
+    let mut original = Vec::new();
+    shared
+        .publish_document_commit_to_stream(&mut original, &noop)
+        .unwrap();
+    assert_eq!(original, bytes);
+    source.changed();
+    let mut rejected = Vec::new();
+    assert!(matches!(
+        shared.publish_document_commit_to_stream(&mut rejected, &commit),
+        Err(TransactionError::Document(Error::Opc(
+            OpcError::SourceChanged { .. }
+        )))
+    ));
+    assert!(rejected.is_empty());
+}
+
+#[test]
+fn concurrent_source_shares_keep_the_same_noop_artifact() {
+    let (bytes, _, _) = fixture();
+    let package = source_backed::Package::from_reader(bytes.as_slice()).unwrap();
+    let first = package.clone();
+    let second = package.clone();
+    let outputs = std::thread::scope(|scope| {
+        let publish = |package: source_backed::Package| {
+            let commit = package.edit().unwrap().commit().unwrap();
+            let mut output = Vec::new();
+            package
+                .publish_document_commit_to_stream(&mut output, &commit)
+                .unwrap();
+            output
+        };
+        let left = scope.spawn(move || publish(first));
+        let right = scope.spawn(move || publish(second));
+        (left.join().unwrap(), right.join().unwrap())
+    });
+    assert_eq!(outputs.0, bytes);
+    assert_eq!(outputs.1, bytes);
+    assert_eq!(
+        package.document().unwrap().extract_text().unwrap(),
+        "alphabeta"
+    );
+}

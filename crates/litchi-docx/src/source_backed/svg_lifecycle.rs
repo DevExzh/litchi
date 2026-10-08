@@ -1967,7 +1967,7 @@ impl super::Package {
 
     /// Publish one checked SVG attach/detach commit atomically.
     pub fn publish_svg_attachment_commit_to_stream<W: std::io::Write>(
-        self,
+        &self,
         writer: W,
         commit: &SourceBackedSvgAttachmentCommit,
     ) -> Result<SourceBackedSvgAttachmentSnapshot> {
@@ -1980,12 +1980,12 @@ impl super::Package {
     /// Publish one checked SVG commit and retain exact physical inverse
     /// authorization for the emitted artifact.
     pub fn publish_svg_attachment_commit_with_publication_to_stream<W: std::io::Write>(
-        self,
+        &self,
         writer: W,
         commit: &SourceBackedSvgAttachmentCommit,
     ) -> Result<SourceBackedSvgAttachmentPublication> {
         self.package.check_execution()?;
-        let current = capture_picture(&self, commit.patch.before.state.selector)?;
+        let current = capture_picture(self, commit.patch.before.state.selector)?;
         if !same_source(&current, &commit.patch.before.state) {
             return Err(Error::Invalid(
                 "SVG lifecycle commit source is stale or foreign".into(),
@@ -2006,9 +2006,9 @@ impl super::Package {
         };
         let published_fingerprint = if target_state_changed(&current, &target.state) {
             let plan = build_batch_topology_plan(&self.package, &before, &expected)?;
-            publish_checked_topology(self.package, writer, plan, &before, &expected)?
+            publish_checked_topology(self.package.clone(), writer, plan, &before, &expected)?
         } else {
-            publish_exact_source_with_fingerprint(self.package, writer)?
+            publish_exact_source_with_fingerprint(self.package.clone(), writer)?
         };
         Ok(SourceBackedSvgAttachmentPublication {
             snapshot: target,
@@ -2020,7 +2020,7 @@ impl super::Package {
 
     /// Publish one checked multi-picture SVG batch atomically.
     pub fn publish_svg_attachment_batch_commit_to_stream<W: std::io::Write>(
-        self,
+        &self,
         writer: W,
         commit: &SourceBackedSvgAttachmentBatchCommit,
     ) -> Result<SourceBackedSvgAttachmentBatchSnapshot> {
@@ -2033,7 +2033,7 @@ impl super::Package {
     /// Publish one checked SVG batch and retain exact physical inverse
     /// authorization for the emitted artifact.
     pub fn publish_svg_attachment_batch_commit_with_publication_to_stream<W: std::io::Write>(
-        self,
+        &self,
         writer: W,
         commit: &SourceBackedSvgAttachmentBatchCommit,
     ) -> Result<SourceBackedSvgAttachmentBatchPublication> {
@@ -2045,7 +2045,7 @@ impl super::Package {
             .iter()
             .map(|state| state.selector)
             .collect::<Vec<_>>();
-        let current = capture_batch(&self, selectors)?;
+        let current = capture_batch(self, selectors)?;
         if !same_batch_source(&current, &commit.patch.before) {
             return Err(Error::Invalid(
                 "SVG lifecycle batch commit source is stale or foreign".into(),
@@ -2056,9 +2056,9 @@ impl super::Package {
         let original_artifact = self.package.source_artifact();
         let published_fingerprint = if !same_batch_state(&current, &target) {
             let plan = build_batch_topology_plan(&self.package, &current, &target)?;
-            publish_checked_topology(self.package, writer, plan, &current, &target)?
+            publish_checked_topology(self.package.clone(), writer, plan, &current, &target)?
         } else {
-            publish_exact_source_with_fingerprint(self.package, writer)?
+            publish_exact_source_with_fingerprint(self.package.clone(), writer)?
         };
         Ok(SourceBackedSvgAttachmentBatchPublication {
             snapshot: target,
@@ -2072,12 +2072,12 @@ impl super::Package {
     /// The reopened package must match both its physical fingerprint and the
     /// published semantic target before any output is accepted.
     pub fn publish_svg_attachment_inverse_to_stream<W: std::io::Write>(
-        self,
+        &self,
         writer: W,
         publication: &SourceBackedSvgAttachmentPublication,
     ) -> Result<SourceBackedSvgAttachmentSnapshot> {
         self.package.check_execution()?;
-        let current = capture_picture(&self, publication.snapshot.selector())?;
+        let current = capture_picture(self, publication.snapshot.selector())?;
         if !same_state(&current, &publication.snapshot.state)
             || self.package.source_artifact().fingerprint()? != publication.published_fingerprint()
         {
@@ -2093,7 +2093,7 @@ impl super::Package {
     /// The reopened package must match both its physical fingerprint and the
     /// published semantic target before any output is accepted.
     pub fn publish_svg_attachment_batch_inverse_to_stream<W: std::io::Write>(
-        self,
+        &self,
         writer: W,
         publication: &SourceBackedSvgAttachmentBatchPublication,
     ) -> Result<SourceBackedSvgAttachmentBatchSnapshot> {
@@ -2104,7 +2104,7 @@ impl super::Package {
             .iter()
             .map(|state| state.selector)
             .collect::<Vec<_>>();
-        let current = capture_batch(&self, selectors)?;
+        let current = capture_batch(self, selectors)?;
         if !same_batch_state(&current, &publication.snapshot)
             || self.package.source_artifact().fingerprint()? != publication.published_fingerprint()
         {
@@ -2118,7 +2118,7 @@ impl super::Package {
 
     /// Alias using the explicit batch noun for downstream callers.
     pub fn publish_svg_lifecycle_batch_commit_to_stream<W: std::io::Write>(
-        self,
+        &self,
         writer: W,
         commit: &SourceBackedSvgAttachmentBatchCommit,
     ) -> Result<SourceBackedSvgAttachmentBatchSnapshot> {
@@ -2127,7 +2127,7 @@ impl super::Package {
 
     /// Compatibility alias for publication callers using lifecycle wording.
     pub fn publish_svg_lifecycle_commit_to_stream<W: std::io::Write>(
-        self,
+        &self,
         writer: W,
         commit: &SourceBackedSvgAttachmentCommit,
     ) -> Result<SourceBackedSvgAttachmentSnapshot> {

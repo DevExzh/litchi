@@ -508,5 +508,6 @@ fn managed_main_document_edits_retain_source_and_candidate_reservations() {
     drop(commit);
     drop(snapshot_clone);
     drop(snapshot);
+    drop(package);
     assert_eq!(budget.used(Resource::Memory), 0);
 }
