@@ -108,10 +108,15 @@ fn managed_raw_document(document: &[u8]) -> source_backed::Package {
         0,
     )
     .unwrap();
-    source_backed::Package::from_read_at_with_execution_context(
+    source_backed::Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes)),
-        litchi_docx::SourceLimits::default(),
-        litchi_core::ExecutionContext::new(budget, cancellation, execution_limits),
+        litchi_docx::OpenOptions::default()
+            .source_limits(litchi_docx::SourceLimits::default())
+            .execution_context(litchi_core::ExecutionContext::new(
+                budget,
+                cancellation,
+                execution_limits,
+            )),
     )
     .unwrap()
 }
@@ -595,10 +600,11 @@ fn source_document_is_send_sync_and_managed_arc_views_refuse_consistently() {
     )
     .unwrap();
     let context = litchi_core::ExecutionContext::new(budget, cancellation, limits);
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes)),
-        litchi_docx::SourceLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(litchi_docx::SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let document = package.document().unwrap();

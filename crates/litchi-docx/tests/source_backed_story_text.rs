@@ -104,10 +104,15 @@ fn managed_open(bytes: Vec<u8>) -> (Budget, CancellationSource, source_backed::P
         0,
     )
     .unwrap();
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes)),
-        SourceLimits::default(),
-        ExecutionContext::new(budget.clone(), cancellation, execution_limits),
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(ExecutionContext::new(
+                budget.clone(),
+                cancellation,
+                execution_limits,
+            )),
     )
     .unwrap();
     (budget, cancellation_source, package)

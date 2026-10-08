@@ -1,8 +1,15 @@
-//! Configuration for opening an owning DOCX package.
+//! Configuration for DOCX ingress.
 
 use crate::SourceLimits;
+use litchi_core::ExecutionContext;
+use litchi_opc::{SourceCacheLimits, SourceReadPolicy};
 
-/// Policies applied while opening an owning [`crate::Package`].
+/// Policies for owning and positional-source DOCX ingress.
+///
+/// Cache, read-ahead and execution settings apply to
+/// [`crate::source_backed::Package::from_read_at_with_options`] and its path
+/// counterpart. Owning constructors reject these settings before input reads;
+/// their payloads cannot yet retain the requested lazy resource policies.
 ///
 /// Source limits bound the clear OPC archive. With the `encryption` feature,
 /// encryption limits independently bound the outer encrypted container and
@@ -21,9 +28,12 @@ use crate::SourceLimits;
 ///
 /// Defaults retain the standard finite source and encryption policies.
 /// Setters consume already constructed policy values and do not perform I/O.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct OpenOptions {
     pub(crate) source_limits: SourceLimits,
+    pub(crate) cache_limits: Option<SourceCacheLimits>,
+    pub(crate) source_read_policy: Option<SourceReadPolicy>,
+    pub(crate) execution_context: Option<ExecutionContext>,
     #[cfg(feature = "encryption")]
     pub(crate) encryption_limits: crate::encryption::Limits,
 }
@@ -34,6 +44,45 @@ impl OpenOptions {
     pub const fn source_limits(mut self, limits: SourceLimits) -> Self {
         self.source_limits = limits;
         self
+    }
+
+    /// Select a validated finite payload-cache policy for positional ingress.
+    #[must_use]
+    pub const fn cache_limits(mut self, limits: SourceCacheLimits) -> Self {
+        self.cache_limits = Some(limits);
+        self
+    }
+
+    /// Select exact reads or validated bounded read-ahead for positional ingress.
+    /// Publication disables read-ahead and releases its retained reservation.
+    #[must_use]
+    pub const fn source_read_policy(mut self, policy: SourceReadPolicy) -> Self {
+        self.source_read_policy = Some(policy);
+        self
+    }
+
+    /// Use the caller's execution context for opening and deferred reads.
+    /// Cloned options share its budget and cancellation token.
+    #[must_use]
+    pub fn execution_context(mut self, context: ExecutionContext) -> Self {
+        self.execution_context = Some(context);
+        self
+    }
+
+    pub(crate) fn check_owning(&self) -> crate::Result<()> {
+        let policy = if self.execution_context.is_some() {
+            Some(OpenPolicy::ExecutionContext)
+        } else if self.cache_limits.is_some() {
+            Some(OpenPolicy::CacheLimits)
+        } else if self.source_read_policy.is_some() {
+            Some(OpenPolicy::SourceReadPolicy)
+        } else {
+            None
+        };
+        if let Some(policy) = policy {
+            return Err(crate::Error::UnsupportedOpenPolicy { policy });
+        }
+        Ok(())
     }
 
     /// Select the outer encryption policy for password-bearing ingress.
@@ -47,4 +96,16 @@ impl OpenOptions {
         self.encryption_limits = limits;
         self
     }
+}
+
+/// A resource policy that requires positional-source DOCX ownership.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum OpenPolicy {
+    /// Retention in the finite deferred payload cache.
+    CacheLimits,
+    /// Exact or bounded read-ahead source access.
+    SourceReadPolicy,
+    /// Hierarchical budgets and cooperative cancellation.
+    ExecutionContext,
 }

@@ -370,9 +370,9 @@ fn typed_catalog_and_owner_restore_reader_position_on_error_and_limit() {
     limited_reader.guard().assert_no_forbidden_reads();
 
     let source = GuardedSource::new(fixture.bytes.clone(), fixture.ordinary_payload.clone());
-    let owner_error = match litchi::docx::source_backed::Package::from_read_at_with_limits(
+    let owner_error = match litchi::docx::source_backed::Package::from_read_at_with_options(
         Arc::new(source.clone()),
-        input_limit_below(&fixture),
+        litchi::docx::OpenOptions::default().source_limits(input_limit_below(&fixture)),
     ) {
         Ok(_) => panic!("typed DOCX owner unexpectedly accepted the input limit"),
         Err(error) => error,

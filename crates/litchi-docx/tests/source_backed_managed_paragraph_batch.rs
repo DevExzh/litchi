@@ -143,10 +143,11 @@ fn managed_with_work(
     work: u64,
 ) -> (Budget, CancellationSource, source_backed::Package) {
     let (budget, cancellation_source, context) = managed_context(memory, work);
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes)),
-        SourceLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     (budget, cancellation_source, package)
@@ -331,10 +332,11 @@ fn managed_batch_forward_and_inverse_are_source_checked() {
 
     let mutable = Arc::new(MutableSource::new(source.clone()));
     let (mutable_budget, _mutable_cancel, context) = managed_context(FINITE_MEMORY, FINITE_WORK);
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         mutable.clone(),
-        SourceLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let snapshot = package.document_snapshot().unwrap();

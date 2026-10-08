@@ -335,10 +335,11 @@ fn managed_context_with_objects(
 
 fn managed_package(archive: Vec<u8>, memory: u64, output: u64) -> (Budget, source_backed::Package) {
     let (budget, context) = managed_context(memory, output);
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         Arc::new(VersionedArchiveSource::new(archive)),
-        litchi_opc::SourceLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(litchi_opc::SourceLimits::default())
+            .execution_context(context),
     )
     .expect("managed source-backed DOCX fixture must open");
     (budget, package)
@@ -351,10 +352,11 @@ fn managed_package_with_cancellation(
 ) -> (Budget, CancellationSource, source_backed::Package) {
     let (budget, cancellation_source, context) =
         managed_context_with_objects(memory, output, u64::MAX);
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         Arc::new(VersionedArchiveSource::new(archive)),
-        litchi_opc::SourceLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(litchi_opc::SourceLimits::default())
+            .execution_context(context),
     )
     .expect("managed source-backed DOCX fixture must open");
     (budget, cancellation_source, package)
@@ -383,7 +385,7 @@ fn semantic_texts(archive: &[u8]) -> Vec<String> {
 }
 
 fn path_semantic_texts(path: &Path) -> Vec<String> {
-    let package = source_backed::Package::from_path(path).expect("published path must reopen");
+    let package = source_backed::Package::open(path).expect("published path must reopen");
     package
         .document_snapshot()
         .expect("published path document must decode")
@@ -2054,7 +2056,7 @@ fn path_publication_retains_durable_forward_and_inverse_authorizations() {
     assert_eq!(applied, candidate);
     assert_eq!(semantic_texts(&applied), vec!["seed", "path durable"]);
 
-    let reopened_candidate = source_backed::Package::from_path(&destination)
+    let reopened_candidate = source_backed::Package::open(&destination)
         .expect("durable path candidate must reopen from its destination");
     let mut restored = Vec::new();
     publication
@@ -2125,7 +2127,7 @@ fn path_publication_can_replace_the_open_source_path_and_inverse_from_the_new_in
     let source_path = directory.path().join("source.docx");
     fs::write(&source_path, &source_archive).expect("source path fixture");
     let package =
-        source_backed::Package::from_path(&source_path).expect("filesystem source path must open");
+        source_backed::Package::open(&source_path).expect("filesystem source path must open");
     let plan = package
         .tail_append_plain_paragraphs(
             EventSource::new(events_for(&["same path"])),
@@ -2143,7 +2145,7 @@ fn path_publication_can_replace_the_open_source_path_and_inverse_from_the_new_in
         publication.candidate_artifact_length(),
         replaced.len() as u64
     );
-    let reopened_candidate = source_backed::Package::from_path(&source_path)
+    let reopened_candidate = source_backed::Package::open(&source_path)
         .expect("replacement inode must reopen independently");
     let mut restored = Vec::new();
     publication
@@ -2164,8 +2166,8 @@ fn path_publication_hardlink_destination_preserves_the_original_source_inode() {
     fs::write(&source_path, &source_archive).expect("hardlink source fixture");
     fs::hard_link(&source_path, &destination).expect("hardlink destination fixture");
 
-    let package = source_backed::Package::from_path(&source_path)
-        .expect("hardlink filesystem source must open");
+    let package =
+        source_backed::Package::open(&source_path).expect("hardlink filesystem source must open");
     let plan = package
         .tail_append_plain_paragraphs(
             EventSource::new(events_for(&["hardlink path"])),
@@ -2190,7 +2192,7 @@ fn path_publication_hardlink_destination_preserves_the_original_source_inode() {
         path_semantic_texts(&destination),
         vec!["seed", "hardlink path"]
     );
-    let reopened_candidate = source_backed::Package::from_path(&destination)
+    let reopened_candidate = source_backed::Package::open(&destination)
         .expect("hardlink candidate replacement must reopen");
     let mut restored = Vec::new();
     publication
@@ -2244,10 +2246,11 @@ fn path_publication_cancellation_leaves_destination_and_managed_memory_untouched
     let source_archive = archive(&source_xml, false, Compression::Store);
     let (budget, cancellation_source, context) =
         managed_context_with_objects(64 * 1024 * 1024, u64::MAX, u64::MAX);
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         Arc::new(VersionedArchiveSource::new(source_archive.clone())),
-        litchi_opc::SourceLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(litchi_opc::SourceLimits::default())
+            .execution_context(context),
     )
     .expect("cancelled managed path source must open");
     let directory = tempdir().expect("cancelled path temporary directory");

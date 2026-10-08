@@ -493,13 +493,13 @@ fn managed_source(
         )
         .unwrap(),
     );
-    let package =
-        litchi_docx::source_backed::Package::from_read_at_with_cache_limits_and_execution_context(
-            std::sync::Arc::new(litchi_core::OwnedSource::new(bytes)),
-            litchi_opc::SourceCacheLimits::new(1, 1).unwrap(),
-            execution,
-        )
-        .unwrap();
+    let package = litchi_docx::source_backed::Package::from_read_at_with_options(
+        std::sync::Arc::new(litchi_core::OwnedSource::new(bytes)),
+        litchi_docx::OpenOptions::default()
+            .cache_limits(litchi_opc::SourceCacheLimits::new(1, 1).unwrap())
+            .execution_context(execution),
+    )
+    .unwrap();
     (budget, cancellation, package)
 }
 

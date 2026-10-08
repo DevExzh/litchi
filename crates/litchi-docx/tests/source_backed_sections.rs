@@ -134,10 +134,15 @@ fn managed_document_fixture_with_memory(
         0,
     )
     .unwrap();
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes)),
-        litchi_opc::SourceLimits::default(),
-        ExecutionContext::new(budget.clone(), cancellation, execution_limits),
+        litchi_docx::OpenOptions::default()
+            .source_limits(litchi_opc::SourceLimits::default())
+            .execution_context(ExecutionContext::new(
+                budget.clone(),
+                cancellation,
+                execution_limits,
+            )),
     )
     .unwrap();
     (budget, package)

@@ -704,13 +704,14 @@ impl Write for CancelOnWrite {
 #[test]
 fn source_cancellation_before_and_after_output_is_document_progress() {
     let (cancellation, context) = execution_context();
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at_with_options(
         Arc::new(OwnedSource::new(package_bytes(
             &document_xml(r#"<w:p><w:r><w:t>cancel</w:t></w:r></w:p>"#),
             false,
         ))),
-        SourceLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .expect("managed source package");
     cancellation.cancel();
@@ -721,13 +722,14 @@ fn source_cancellation_before_and_after_output_is_document_progress() {
     ));
 
     let (cancellation, context) = execution_context();
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at_with_options(
         Arc::new(OwnedSource::new(package_bytes(
             &document_xml(r#"<w:p><w:r><w:t>cancel</w:t></w:r></w:p>"#),
             false,
         ))),
-        SourceLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .expect("managed source package");
     let mut sink = CancelOnWrite {
@@ -1114,10 +1116,11 @@ fn committed_owner_streams_current_text_and_preserves_old_owner() {
         )));
         let owner = if managed {
             let (_, context) = execution_context();
-            SourceBackedPackage::from_read_at_with_execution_context(
+            SourceBackedPackage::from_read_at_with_options(
                 source,
-                SourceLimits::default(),
-                context,
+                litchi_docx::OpenOptions::default()
+                    .source_limits(SourceLimits::default())
+                    .execution_context(context),
             )
             .unwrap()
         } else {

@@ -114,6 +114,91 @@
           "name": "from_reader_with_password_and_limits",
           "scope": "litchi_docx::Package",
           "replacement": "use the corresponding *_with_options constructor"
+        },
+        {
+          "name": "from_path",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_path_with_cache_limits",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_path_with_cache_limits_and_execution_context",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_path_with_execution_context",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_path_with_limits",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_path_with_limits_and_cache_limits",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_path_with_limits_and_cache_limits_and_execution_context",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_path_with_limits_and_execution_context",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_read_at_with_cache_limits",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_read_at_with_cache_limits_and_execution_context",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_read_at_with_execution_context",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_read_at_with_limits",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_read_at_with_limits_and_cache_limits",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_read_at_with_limits_and_cache_limits_and_execution_context",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_read_at_with_limits_and_cache_limits_and_source_read_policy",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_read_at_with_limits_and_cache_limits_and_source_read_policy_and_execution_context",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_read_at_with_limits_and_execution_context",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
         }
       ],
       "families": []
@@ -228,6 +313,91 @@
           "name": "from_reader_with_password_and_limits",
           "scope": "litchi_docx::Package",
           "replacement": "use the corresponding *_with_options constructor"
+        },
+        {
+          "name": "from_path",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_path_with_cache_limits",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_path_with_cache_limits_and_execution_context",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_path_with_execution_context",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_path_with_limits",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_path_with_limits_and_cache_limits",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_path_with_limits_and_cache_limits_and_execution_context",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_path_with_limits_and_execution_context",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_read_at_with_cache_limits",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_read_at_with_cache_limits_and_execution_context",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_read_at_with_execution_context",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_read_at_with_limits",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_read_at_with_limits_and_cache_limits",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_read_at_with_limits_and_cache_limits_and_execution_context",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_read_at_with_limits_and_cache_limits_and_source_read_policy",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_read_at_with_limits_and_cache_limits_and_source_read_policy_and_execution_context",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
+        },
+        {
+          "name": "from_read_at_with_limits_and_execution_context",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use open/open_with_options or from_read_at_with_options"
         }
       ],
       "families": []

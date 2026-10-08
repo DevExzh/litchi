@@ -8,6 +8,13 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum Error {
+    /// The owning ingress route cannot retain a positional-source policy.
+    #[error("DOCX owning ingress cannot retain {policy:?}; use positional-source ingress")]
+    UnsupportedOpenPolicy {
+        /// The resource policy that must not be silently discarded.
+        policy: crate::OpenPolicy,
+    },
+
     /// The underlying OPC graph is malformed or could not be mutated safely.
     #[error("OPC error: {0}")]
     Opc(#[from] litchi_opc::error::OpcError),

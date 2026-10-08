@@ -26,7 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let text = text
         .into_string()
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "paragraph text must be UTF-8"))?;
-    let package = litchi_docx::source_backed::Package::from_path(input)?;
+    let package = litchi_docx::source_backed::Package::open(input)?;
     let commit = package.tail_append_plain_paragraph(text).commit()?;
     // Preparation and semantic readback finish before even creating the file.
     let mut sink = OpenOptions::new()

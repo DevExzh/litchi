@@ -139,10 +139,11 @@ fn managed(bytes: &[u8]) -> (Budget, CancellationSource, source_backed::Package)
         0,
     )
     .unwrap();
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes.to_vec())),
-        SourceLimits::default(),
-        ExecutionContext::new(budget.clone(), cancellation, limits),
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(ExecutionContext::new(budget.clone(), cancellation, limits)),
     )
     .unwrap();
     (budget, cancellation_source, package)

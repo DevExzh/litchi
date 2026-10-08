@@ -1563,10 +1563,11 @@ fn run_source(corpus: &Corpus, managed: bool) -> AnyResult<SourceRun> {
         let (managed_budget, managed_cancellation, context) =
             managed_context(corpus.archive.len())?;
         memory_before_open = managed_budget.used(Resource::Memory);
-        let package = source_backed::Package::from_read_at_with_execution_context(
+        let package = source_backed::Package::from_read_at_with_options(
             source_for_package,
-            litchi_docx::SourceLimits::default(),
-            context,
+            litchi_docx::OpenOptions::default()
+                .source_limits(litchi_docx::SourceLimits::default())
+                .execution_context(context),
         )?;
         budget = Some(managed_budget);
         cancellation_source = Some(managed_cancellation);

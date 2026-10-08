@@ -382,10 +382,11 @@ mod docx {
         .unwrap();
         let context =
             litchi_core::ExecutionContext::new(budget.clone(), cancellation, execution_limits);
-        let package = litchi_docx::source_backed::Package::from_read_at_with_execution_context(
+        let package = litchi_docx::source_backed::Package::from_read_at_with_options(
             std::sync::Arc::new(litchi_core::OwnedSource::new(bytes)),
-            litchi_docx::SourceLimits::default(),
-            context,
+            litchi_docx::OpenOptions::default()
+                .source_limits(litchi_docx::SourceLimits::default())
+                .execution_context(context),
         )
         .expect("open managed DOCX source");
         let file = File::Docx(Docx::from_source(package, &OpenOptions::new()).unwrap());

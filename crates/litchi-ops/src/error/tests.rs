@@ -965,3 +965,15 @@ fn compound_file_signature_errors_are_classified() {
         Code::UnsupportedFormat,
     );
 }
+
+#[cfg(feature = "docx")]
+#[test]
+fn docx_owning_policy_refusal_is_an_unsupported_capability() {
+    let error = assert_code(
+        litchi_docx::Error::UnsupportedOpenPolicy {
+            policy: litchi_docx::OpenPolicy::ExecutionContext,
+        },
+        Code::UnsupportedCapability,
+    );
+    assert!(matches!(error.leaf(), Source::Docx(_)));
+}

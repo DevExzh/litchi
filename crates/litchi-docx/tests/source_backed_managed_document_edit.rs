@@ -301,10 +301,11 @@ fn managed_context_with_output(
 
 fn managed(bytes: Vec<u8>, memory: u64) -> (Budget, CancellationSource, source_backed::Package) {
     let (budget, cancellation_source, context) = managed_context(memory);
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes)),
-        SourceLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     (budget, cancellation_source, package)
@@ -1968,10 +1969,11 @@ fn managed_reopened_inverse_rejects_source_mutation_before_output() {
     let (changed, publication, budget, commit) = publish_managed_edit_with_inverse(source, "after");
     let mutable = Arc::new(MutableSource::new(changed));
     let (inverse_budget, _cancellation_source, context) = managed_context(1 << 20);
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         mutable.clone(),
-        SourceLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     mutable.bump_revision();
@@ -2001,10 +2003,11 @@ fn managed_reopened_inverse_cancellation_and_output_budget_are_before_output() {
     assert_eq!(inverse_budget.used(Resource::Memory), 0);
 
     let (limited_budget, _cancellation_source, context) = managed_context_with_output(1 << 20, 1);
-    let limited_package = source_backed::Package::from_read_at_with_execution_context(
+    let limited_package = source_backed::Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(changed)),
-        SourceLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let mut limited_output = Vec::new();
@@ -2055,10 +2058,11 @@ fn managed_file_source_pins_the_open_source_across_path_replacement() {
     std::fs::write(&replacement_path, &replacement).unwrap();
 
     let (budget, _cancellation_source, context) = managed_context(1 << 20);
-    let package = source_backed::Package::from_path_with_execution_context(
+    let package = source_backed::Package::open_with_options(
         &path,
-        SourceLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let version = package.source_version().unwrap();
@@ -2086,10 +2090,11 @@ fn managed_source_change_refuses_publication_before_sink_output() {
     let source_bytes = fixture("before", "second");
     let source = Arc::new(MutableSource::new(source_bytes));
     let (budget, _cancellation_source, context) = managed_context(1 << 20);
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         source.clone(),
-        SourceLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let mut edit = package.document_snapshot().unwrap().edit();
@@ -2304,14 +2309,14 @@ fn managed_source_change_during_current_part_read_refuses_before_output() {
     let source = Arc::new(MutableSource::new(source_bytes));
     let (budget, _cancellation_source, context) = managed_context(1 << 20);
     let cache_limits = SourceCacheLimits::new(1, 1).unwrap();
-    let package =
-        source_backed::Package::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            source.clone(),
-            SourceLimits::default(),
-            cache_limits,
-            context,
-        )
-        .unwrap();
+    let package = source_backed::Package::from_read_at_with_options(
+        source.clone(),
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .cache_limits(cache_limits)
+            .execution_context(context),
+    )
+    .unwrap();
     let mut edit = package.document_snapshot().unwrap().edit();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
@@ -2334,14 +2339,14 @@ fn managed_cancellation_during_current_part_read_refuses_before_output() {
     let source = Arc::new(MutableSource::new(source_bytes));
     let (budget, cancellation_source, context) = managed_context(1 << 20);
     let cache_limits = SourceCacheLimits::new(1, 1).unwrap();
-    let package =
-        source_backed::Package::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            source.clone(),
-            SourceLimits::default(),
-            cache_limits,
-            context,
-        )
-        .unwrap();
+    let package = source_backed::Package::from_read_at_with_options(
+        source.clone(),
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .cache_limits(cache_limits)
+            .execution_context(context),
+    )
+    .unwrap();
     let mut edit = package.document_snapshot().unwrap().edit();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();

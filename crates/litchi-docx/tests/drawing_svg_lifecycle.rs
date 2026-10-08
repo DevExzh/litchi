@@ -542,10 +542,15 @@ fn managed_package(
         0,
     )
     .expect("valid managed execution limits");
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         Arc::new(source),
-        SourceLimits::default(),
-        ExecutionContext::new(budget.clone(), cancellation, execution_limits),
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(ExecutionContext::new(
+                budget.clone(),
+                cancellation,
+                execution_limits,
+            )),
     )
     .expect("open managed source-backed package");
     (budget, package)
@@ -1282,7 +1287,11 @@ fn lifecycle_low_total_part_limit_refuses_before_raster_retention() {
         .build()
         .unwrap();
     assert!(
-        source_backed::Package::from_read_at_with_limits(Arc::new(source), limits).is_err(),
+        source_backed::Package::from_read_at_with_options(
+            Arc::new(source),
+            litchi_docx::OpenOptions::default().source_limits(limits)
+        )
+        .is_err(),
         "a low total-part profile must refuse before retaining media"
     );
     assert_eq!(

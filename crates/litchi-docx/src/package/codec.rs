@@ -286,6 +286,7 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn open_with_options<P: AsRef<Path>>(path: P, options: OpenOptions) -> Result<Self> {
+        options.check_owning()?;
         Self::from_opc_package(OpcPackage::open_with_limits(path, options.source_limits)?)
     }
 
@@ -311,6 +312,7 @@ impl Package {
         password: &str,
         options: OpenOptions,
     ) -> Result<Self> {
+        options.check_owning()?;
         let file = std::fs::File::open(path.as_ref()).map_err(Error::Io)?;
         Self::from_reader_with_password_and_options(file, password, options)
     }
@@ -398,6 +400,7 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn from_reader_with_options<R: Read>(reader: R, options: OpenOptions) -> Result<Self> {
+        options.check_owning()?;
         Self::from_opc_package(OpcPackage::from_reader_with_limits(
             reader,
             options.source_limits,
@@ -426,6 +429,7 @@ impl Package {
         password: &str,
         options: OpenOptions,
     ) -> Result<Self> {
+        options.check_owning()?;
         let opened = crate::encryption::load_with(reader, password, &options.encryption_limits)?;
         Self::from_decrypted(opened, options)
     }
@@ -488,6 +492,7 @@ impl Package {
     /// valid DOCX package.
     #[cfg(feature = "encryption")]
     pub fn from_decrypted(opened: crate::encryption::Opened, options: OpenOptions) -> Result<Self> {
+        options.check_owning()?;
         let source_encryption = opened.mode();
         let opc = OpcPackage::from_vec_with_limits(opened.into_bytes(), options.source_limits)?;
         let mut package = Self::from_opc_package(opc)?;

@@ -450,3 +450,16 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
   checks; glossary rules ban the retired owning-Package methods.
 - Record 0038 records evidence and remaining lazy-owner, semantic and crypto
   policy work. The broader unified goal remains active.
+
+
+## 0039 — DOCX positional options and resource retention
+
+- Replaced 17 path/positional constructor variants with canonical open and
+  from_read_at options routes, using the existing root OpenOptions envelope.
+- Cache, read-ahead and execution settings reach OPC admission and deferred
+  reads; cloned options share budgets and cancellation. Path cancellation is
+  checked before file opening.
+- Owning routes explicitly refuse lazy policies before I/O, with typed unified
+  classification. Sequential reader accounting and owner consolidation remain
+  required; this does not declare the ingress family complete.
+- Record 0039 documents migrated consumers, verification and remaining work.

@@ -139,7 +139,7 @@ pub use leniency::{
     ToleranceReport, ToleratedDefect,
 };
 /// Resource policy for package ingestion through [`Package`].
-pub use litchi_opc::{SourceLimitKind, SourceLimits};
+pub use litchi_opc::{SourceCacheLimits, SourceLimitKind, SourceLimits, SourceReadPolicy};
 pub use mail_merge::{
     DataSourceObject, DataType, Destination, FieldMap, FieldMappingType, MainDocumentType,
     RECIPIENT_CONTENT_TYPE, Recipient, Recipients, RelationshipId, Source, Target,
@@ -180,7 +180,7 @@ pub use variables::{Variables, parse_variables};
 // collapsing the owner modules back into host aliases.
 pub use document::{Block, Document, Element, ImageWatermarkPart, OpaqueBlock};
 pub use math::{OfficeMath, OfficeMathParagraph};
-pub use open_options::OpenOptions;
+pub use open_options::{OpenOptions, OpenPolicy};
 pub use package::Package;
 pub use paragraph::{
     Collapsed, Inline, InlineHyperlink, OpaqueInline, OpaqueRunContent, Paragraph, Run, RunBreak,

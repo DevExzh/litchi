@@ -1056,10 +1056,11 @@ fn glossary_managed_entry_edit_and_cancellation_are_refused() {
         )
         .unwrap(),
     );
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(source)),
-        litchi_docx::SourceLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(litchi_docx::SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let snapshot = package.story_text_snapshot(alpha_by_name()).unwrap();
@@ -1442,30 +1443,31 @@ fn glossary_batch_rejects_stale_foreign_managed_cancelled_signed_and_sink_paths(
         .unwrap();
     assert!(commit.patch().apply(&foreign).is_err());
 
-    let managed = source_backed::Package::from_read_at_with_execution_context(
+    let managed = source_backed::Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(source.clone())),
-        litchi_docx::SourceLimits::default(),
-        litchi_core::ExecutionContext::new(
-            litchi_core::Budget::root(
-                "source-backed-glossary-batch-test",
-                litchi_core::Limits::new(
-                    2 * source.len() as u64,
-                    u64::MAX,
-                    u64::MAX,
-                    u64::MAX,
-                    u64::MAX,
-                    u64::MAX,
+        litchi_docx::OpenOptions::default()
+            .source_limits(litchi_docx::SourceLimits::default())
+            .execution_context(litchi_core::ExecutionContext::new(
+                litchi_core::Budget::root(
+                    "source-backed-glossary-batch-test",
+                    litchi_core::Limits::new(
+                        2 * source.len() as u64,
+                        u64::MAX,
+                        u64::MAX,
+                        u64::MAX,
+                        u64::MAX,
+                        u64::MAX,
+                    ),
                 ),
-            ),
-            litchi_core::CancellationSource::pair().1,
-            litchi_core::ExecutionLimits::new(
-                std::num::NonZeroUsize::MIN,
-                std::num::NonZeroUsize::MIN,
-                std::num::NonZeroU64::new(2 * source.len() as u64).unwrap(),
-                0,
-            )
-            .unwrap(),
-        ),
+                litchi_core::CancellationSource::pair().1,
+                litchi_core::ExecutionLimits::new(
+                    std::num::NonZeroUsize::MIN,
+                    std::num::NonZeroUsize::MIN,
+                    std::num::NonZeroU64::new(2 * source.len() as u64).unwrap(),
+                    0,
+                )
+                .unwrap(),
+            )),
     )
     .unwrap();
     assert!(
@@ -1477,30 +1479,31 @@ fn glossary_batch_rejects_stale_foreign_managed_cancelled_signed_and_sink_paths(
     );
 
     let (cancel_source, token) = litchi_core::CancellationSource::pair();
-    let cancelled = source_backed::Package::from_read_at_with_execution_context(
+    let cancelled = source_backed::Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(source.clone())),
-        litchi_docx::SourceLimits::default(),
-        litchi_core::ExecutionContext::new(
-            litchi_core::Budget::root(
-                "source-backed-glossary-batch-cancel-test",
-                litchi_core::Limits::new(
-                    2 * source.len() as u64,
-                    u64::MAX,
-                    u64::MAX,
-                    u64::MAX,
-                    u64::MAX,
-                    u64::MAX,
+        litchi_docx::OpenOptions::default()
+            .source_limits(litchi_docx::SourceLimits::default())
+            .execution_context(litchi_core::ExecutionContext::new(
+                litchi_core::Budget::root(
+                    "source-backed-glossary-batch-cancel-test",
+                    litchi_core::Limits::new(
+                        2 * source.len() as u64,
+                        u64::MAX,
+                        u64::MAX,
+                        u64::MAX,
+                        u64::MAX,
+                        u64::MAX,
+                    ),
                 ),
-            ),
-            token,
-            litchi_core::ExecutionLimits::new(
-                std::num::NonZeroUsize::MIN,
-                std::num::NonZeroUsize::MIN,
-                std::num::NonZeroU64::new(2 * source.len() as u64).unwrap(),
-                0,
-            )
-            .unwrap(),
-        ),
+                token,
+                litchi_core::ExecutionLimits::new(
+                    std::num::NonZeroUsize::MIN,
+                    std::num::NonZeroUsize::MIN,
+                    std::num::NonZeroU64::new(2 * source.len() as u64).unwrap(),
+                    0,
+                )
+                .unwrap(),
+            )),
     )
     .unwrap();
     let captured = cancelled

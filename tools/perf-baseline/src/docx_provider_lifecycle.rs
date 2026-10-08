@@ -46,7 +46,7 @@ use crate::pptx_range_source::{
 
 const SCHEMA: &str = "docx_provider_lifecycle_v1";
 const TRACE_SCHEMA: &str = "docx_provider_lifecycle_v2";
-const TRACE_TIMING_SCOPE: &str = "Package::from_read_at_with_limits_and_cache_limits + document + extract_text + two cache diagnostic snapshots + package/document drop; returned text remains live after the clock; text destruction, hashing, oracle comparison, range counters and traces are outside";
+const TRACE_TIMING_SCOPE: &str = "Package::from_read_at_with_options + document + extract_text + two cache diagnostic snapshots + package/document drop; returned text remains live after the clock; text destruction, hashing, oracle comparison, range counters and traces are outside";
 const TRACE_SETUP_SCOPE: &str = "all v1 setup plus fresh bounded read-ahead buffer and wrapper construction outside the clock; fixed window capacity is reported separately; unmanaged benchmark pilot only";
 const CORPUS_GENERATOR: &str = "litchi-docx-source-edit-media-v1";
 const CORPUS_VERSION: &str = "0188-media-v1";
@@ -67,7 +67,7 @@ const CACHE_MAX_ENTRIES: usize = 128;
 const MAX_TRACKED_RANGES: usize = 4_096;
 
 const PROVIDER_SCOPE: &str = "typed-owner source-backed DOCX provider baseline; direct comparison with the high-level filesystem facade is out of scope";
-const TIMING_SCOPE: &str = "Package::from_read_at_with_limits_and_cache_limits + document + extract_text + package/document drop; returned text remains live after the clock; text destruction, hashing, oracle comparison, counters, and diagnostics are outside";
+const TIMING_SCOPE: &str = "Package::from_read_at_with_options + document + extract_text + package/document drop; returned text remains live after the clock; text destruction, hashing, oracle comparison, counters, and diagnostics are outside";
 const SETUP_SCOPE: &str = "corpus construction, source hashing, file staging, FileSource::open, instrumented wrapper construction, range-adapter construction, and limits construction are outside the clock";
 const FILE_SCOPE: &str = "FileSource is opened before each iteration and the staged file is recently written; this is a warm-cache/recent-file provider observation, not a filesystem-cold result";
 const READ_SCOPE: &str = "logical ReadAt calls observed by the named wrapper; counters are not physical filesystem or network I/O observations";
@@ -787,10 +787,11 @@ fn run_sample(
     let allocation_region = crate::allocation_metrics::begin();
     let started = Instant::now();
     let (actual_text, cache_record) = {
-        let package = SourcePackage::from_read_at_with_limits_and_cache_limits(
+        let package = SourcePackage::from_read_at_with_options(
             Arc::clone(&provider.source),
-            limits,
-            cache,
+            litchi_docx::OpenOptions::default()
+                .source_limits(limits)
+                .cache_limits(cache),
         )?;
         let open_cache = config.trace_ranges.then(|| package.cache_diagnostics());
         let document = package.document()?;

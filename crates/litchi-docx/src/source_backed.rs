@@ -109,7 +109,7 @@ use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
     BlobPart, PackURI, Part, PartData, PartView, SourceArtifact, SourceArtifactFingerprint,
-    SourceBackedPackage, SourceCacheDiagnostics, SourceCacheLimits, SourceTopologyPlan,
+    SourceBackedPackage, SourceCacheDiagnostics, SourceTopologyPlan,
 };
 use quick_xml::events::{BytesRef, BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
@@ -335,119 +335,55 @@ impl Package {
         Ok(&self.physical)
     }
 
-    /// Open a DOCX package from a regular filesystem file without slurping it
-    /// into memory.
-    ///
-    /// The path is opened once as an immutable positional [`FileSource`].
-    /// Ordinary package payloads remain cold until a query asks for them.
-    ///
-    /// This constructor is available on platforms where [`FileSource`] is
-    /// implemented.
+    /// Open an immutable filesystem source using the standard finite policies.
     #[cfg(any(unix, windows))]
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_path(path)
+        Self::open_with_options(path, crate::OpenOptions::default())
     }
 
-    /// Open a DOCX package from a regular filesystem file without slurping it
-    /// into memory.
-    ///
-    /// This constructor is available on platforms where [`FileSource`] is
-    /// implemented.
+    /// Open a filesystem source with selected source, cache, read-ahead and
+    /// execution policies. Ordinary payloads stay cold until requested.
+    /// Cancellation is checked before opening the file and during OPC admission.
     #[cfg(any(unix, windows))]
-    pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_read_at(file_source(path)?)
+    pub fn open_with_options(path: impl AsRef<Path>, options: crate::OpenOptions) -> Result<Self> {
+        if let Some(context) = &options.execution_context {
+            context.check().map_err(|error| match error {
+                ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
+                error => litchi_opc::OpcError::Execution(error),
+            })?;
+        }
+        Self::from_read_at_with_options(file_source(path)?, options)
     }
 
-    /// Open a filesystem-backed DOCX package with explicit OPC read limits.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits(
-        path: impl AsRef<Path>,
-        limits: litchi_opc::SourceLimits,
-    ) -> Result<Self> {
-        Self::from_read_at_with_limits(file_source(path)?, limits)
-    }
-
-    /// Open a filesystem-backed DOCX package with an explicit finite payload
-    /// cache policy.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_cache_limits(
-        path: impl AsRef<Path>,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_read_at_with_cache_limits(file_source(path)?, cache_limits)
-    }
-
-    /// Open a filesystem-backed DOCX package with explicit OPC read and
-    /// payload-cache policies.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits_and_cache_limits(
-        path: impl AsRef<Path>,
-        limits: litchi_opc::SourceLimits,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_cache_limits(file_source(path)?, limits, cache_limits)
-    }
-
-    /// Open a filesystem-backed DOCX package with the standard read limits
-    /// and a caller-owned execution context.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_cache_limits_and_execution_context(
-        path: impl AsRef<Path>,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_cache_limits_and_execution_context(
-            file_source(path)?,
-            cache_limits,
-            context,
-        )
-    }
-
-    /// Open a filesystem-backed DOCX package with explicit OPC read limits
-    /// and a caller-owned execution context.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_execution_context(
-        path: impl AsRef<Path>,
-        limits: litchi_opc::SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_execution_context(file_source(path)?, limits, context)
-    }
-
-    /// Open a filesystem-backed DOCX package with explicit OPC read and
-    /// execution policies while retaining the default finite payload cache.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits_and_execution_context(
-        path: impl AsRef<Path>,
-        limits: litchi_opc::SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_execution_context(file_source(path)?, limits, context)
-    }
-
-    /// Open a filesystem-backed DOCX package with explicit OPC read,
-    /// payload-cache, and caller-owned execution policies.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits_and_cache_limits_and_execution_context(
-        path: impl AsRef<Path>,
-        limits: litchi_opc::SourceLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            file_source(path)?,
-            limits,
-            cache_limits,
-            context,
-        )
-    }
-
-    /// Open a DOCX source using the standard bounded OPC read policy.
-    ///
-    /// This validates the main-document relationship and content type but
-    /// does not decompress or materialize the main-document payload.
+    /// Open an immutable positional source using standard finite policies.
+    /// The main relationship and content type are checked without loading its payload.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_source_backed(SourceBackedPackage::from_read_at(source)?)
+        Self::from_read_at_with_options(source, crate::OpenOptions::default())
+    }
+
+    /// Open a positional source with caller-selected source, cache, read-ahead
+    /// and execution policies. The context remains attached to deferred reads;
+    /// managed payload handles retain their reservations through publication.
+    /// No runtime or implicit scheduler is installed.
+    pub fn from_read_at_with_options(
+        source: Arc<dyn ReadAt>,
+        options: crate::OpenOptions,
+    ) -> Result<Self> {
+        let cache_limits = options.cache_limits.unwrap_or_default();
+        let read_policy = options.source_read_policy.unwrap_or_default();
+        let package = if let Some(context) = options.execution_context.clone() {
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_source_read_policy_and_execution_context(
+                source, options.source_limits, cache_limits, read_policy, context,
+            )?
+        } else {
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_source_read_policy(
+                source,
+                options.source_limits,
+                cache_limits,
+                read_policy,
+            )?
+        };
+        Self::with_execution(package, options.execution_context)
     }
 
     /// Open a DOCX source from a sequential reader using the standard bounded
@@ -470,158 +406,6 @@ impl Package {
         Self::from_source_backed(SourceBackedPackage::from_reader_with_limits(
             reader, limits,
         )?)
-    }
-
-    /// Open a DOCX source with an explicit bounded OPC read policy.
-    ///
-    /// This validates the main-document relationship and content type but
-    /// does not decompress or materialize the main-document payload.
-    pub fn from_read_at_with_limits(
-        source: Arc<dyn ReadAt>,
-        limits: litchi_opc::SourceLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed(SourceBackedPackage::from_read_at_with_limits(
-            source, limits,
-        )?)
-    }
-
-    /// Open a DOCX source with an explicit finite deferred-part cache policy.
-    ///
-    /// This compatibility constructor remains unmanaged: cache retention is
-    /// bounded, but it is not charged to a hierarchical execution budget.
-    /// Use one of the `*_with_execution_context` constructors when the caller
-    /// owns the budget for lazy payloads.
-    pub fn from_read_at_with_cache_limits(
-        source: Arc<dyn ReadAt>,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed(SourceBackedPackage::from_read_at_with_cache_limits(
-            source,
-            cache_limits,
-        )?)
-    }
-
-    /// Open a DOCX source with explicit read and finite cache policies.
-    pub fn from_read_at_with_limits_and_cache_limits(
-        source: Arc<dyn ReadAt>,
-        limits: litchi_opc::SourceLimits,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed(
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
-                source,
-                limits,
-                cache_limits,
-            )?,
-        )
-    }
-
-    /// Open a DOCX source with an explicit cache policy and caller execution
-    /// context while retaining the standard OPC read limits.
-    pub fn from_read_at_with_cache_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            source,
-            litchi_opc::SourceLimits::default(),
-            cache_limits,
-            context,
-        )
-    }
-
-    /// Open a DOCX source with an explicit caller-owned execution context.
-    ///
-    /// The context is checked before mandatory open work and before each
-    /// deferred semantic read. Lazy part payloads retain their managed
-    /// [`PartData`] handles for the lifetime of the returned read facade; no
-    /// executor or global scheduler is installed.
-    pub fn from_read_at_with_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: litchi_opc::SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            source,
-            limits,
-            SourceCacheLimits::default(),
-            context,
-        )
-    }
-
-    /// Open a DOCX source with explicit read and execution policies while
-    /// retaining the default finite deferred-part cache.
-    pub fn from_read_at_with_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: litchi_opc::SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_execution_context(source, limits, context)
-    }
-
-    /// Open a DOCX source with explicit read, cache, and execution policies.
-    ///
-    /// This is the fully explicit managed constructor. The selective
-    /// read-only document facade retains the bounded OPC [`PartData`] handle
-    /// instead of detaching it into an unbudgeted `Arc` allocation. Existing
-    /// edit operations whose snapshots require an owned `Arc` remain typed
-    /// refusals on this path.
-    pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: litchi_opc::SourceLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        let package_context = context.clone();
-        let package =
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source,
-                limits,
-                cache_limits,
-                context,
-            )?;
-        Self::with_execution(package, Some(package_context))
-    }
-
-    /// Open with an explicit bounded source-read policy and payload cache.
-    ///
-    /// Read-ahead can fetch adjacent compressed bytes. Publication or mutable
-    /// materialization permanently returns the underlying package to exact
-    /// reads. Existing constructors remain exact.
-    pub fn from_read_at_with_limits_and_cache_limits_and_source_read_policy(
-        source: Arc<dyn ReadAt>,
-        limits: litchi_opc::SourceLimits,
-        cache_limits: SourceCacheLimits,
-        source_read_policy: SourceReadPolicy,
-    ) -> Result<Self> {
-        Self::from_source_backed(
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_source_read_policy(
-                source,
-                limits,
-                cache_limits,
-                source_read_policy,
-            )?,
-        )
-    }
-
-    /// Open with explicit read-ahead, payload-cache, and execution policies.
-    ///
-    /// Physical reads, including overfetch, consume input bytes; the retained
-    /// window holds a memory reservation until publication disables it or the
-    /// package is dropped. The same context bounds deferred semantic reads.
-    pub fn from_read_at_with_limits_and_cache_limits_and_source_read_policy_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: litchi_opc::SourceLimits,
-        cache_limits: SourceCacheLimits,
-        source_read_policy: SourceReadPolicy,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        let package_context = context.clone();
-        let package = SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_source_read_policy_and_execution_context(
-            source, limits, cache_limits, source_read_policy, context,
-        )?;
-        Self::with_execution(package, Some(package_context))
     }
 
     fn from_source_backed(package: SourceBackedPackage) -> Result<Self> {

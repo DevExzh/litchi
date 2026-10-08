@@ -651,7 +651,10 @@ fn signed_change_source_version_limit_and_partial_sink_fail_before_or_during_out
         .build()
         .unwrap();
     assert!(matches!(
-        source_backed::Package::from_read_at_with_limits(source, limits),
+        source_backed::Package::from_read_at_with_options(
+            source,
+            litchi_docx::OpenOptions::default().source_limits(limits)
+        ),
         Err(Error::Opc(OpcError::Limit { .. }))
     ));
 

@@ -87,7 +87,7 @@ those predecessors.
 | Family | Unified leg | Leaf leg |
 |---|---|---|
 | DOCX eager | `fs::read` + `open_bytes_with(Eager)`; queries `document()?.paragraph_count()`, `.paragraphs()`, `File::text` | `fs::read` + `OpcPackage::from_bytes_with_limits` + `litchi_docx::Package::from_opc_package` + `document()?.text()`; queries on `Package::document()` |
-| DOCX source | `litchi::open(path)`; the same queries | `source_backed::Package::from_path`; `document()?.{paragraph_count, paragraphs, extract_text}` |
+| DOCX source | `litchi::open(path)`; the same queries | `source_backed::Package::open`; `document()?.{paragraph_count, paragraphs, extract_text}` |
 | PPTX eager (bytes) | `fs::read` + `litchi::open_bytes`; `presentation()?.{slides, slide_count, slide(100)}` | `fs::read` + `SourceBackedPresentation::from_read_at(OwnedSource)`; `slides()`, `text_and_name`, `slide_count`, `slide(100)` |
 | PPTX source | `litchi::open(path)`; the same queries | `SourceBackedPresentation::from_path`; the same leaf queries |
 | XLSX file | `litchi::open(path)`; `workbook()?.{worksheet_names, worksheet_count}` + `File::text`; `Xlsx::sheet(mixed case)` + `SelectedWorksheet::cell` | `SourceBackedPackage::from_read_at_with_limits(FileSource)` + core-properties read + `SourceBackedWorkbook::from_source_backed_package`; names, `len`, a row-by-row cell-text projection; `sheet(mixed case)` + `cell` |

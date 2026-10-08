@@ -1244,14 +1244,13 @@ fn execute_api(
 ) -> Result<TimedOperation, Box<dyn Error>> {
     let open_started = phase_start(config.phase_diagnostics);
     let package = match budget {
-        Some((_budget, context, _before)) => {
-            source_backed::Package::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source,
-                SourceLimits::default(),
-                SourceCacheLimits::new(CACHE_MAX_BYTES, CACHE_MAX_ENTRIES)?,
-                context.clone(),
-            )?
-        },
+        Some((_budget, context, _before)) => source_backed::Package::from_read_at_with_options(
+            source,
+            litchi_docx::OpenOptions::default()
+                .source_limits(SourceLimits::default())
+                .cache_limits(SourceCacheLimits::new(CACHE_MAX_BYTES, CACHE_MAX_ENTRIES)?)
+                .execution_context(context.clone()),
+        )?,
         None => source_backed::Package::from_read_at(source)?,
     };
     let cache_before = package.cache_diagnostics();

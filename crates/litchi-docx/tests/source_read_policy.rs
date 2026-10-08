@@ -144,14 +144,14 @@ fn managed_read_ahead_supports_semantic_read_then_releases_before_docx_publicati
     // each package has completed its mandatory source indexing.
     let (exact_budget, _exact_cancellation, exact_context) = managed_context("docx-exact-control");
     let exact_source = Arc::new(CountingSource::new(archive.clone()));
-    let exact_package =
-        source_backed::Package::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            exact_source.clone(),
-            SourceLimits::default(),
-            SourceCacheLimits::default(),
-            exact_context,
-        )
-        .expect("exact managed DOCX fixture must open");
+    let exact_package = source_backed::Package::from_read_at_with_options(
+        exact_source.clone(),
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .cache_limits(SourceCacheLimits::default())
+            .execution_context(exact_context),
+    )
+    .expect("exact managed DOCX fixture must open");
     let exact_before = exact_source.calls();
     assert_eq!(
         exact_package
@@ -173,12 +173,13 @@ fn managed_read_ahead_supports_semantic_read_then_releases_before_docx_publicati
     let candidate_source = Arc::new(CountingSource::new(archive));
     let source_read_policy = source_backed::SourceReadPolicy::forward_start(4096)
         .expect("focused read-ahead policy must be valid");
-    let package = source_backed::Package::from_read_at_with_limits_and_cache_limits_and_source_read_policy_and_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         candidate_source.clone(),
-        SourceLimits::default(),
-        SourceCacheLimits::default(),
-        source_read_policy,
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .cache_limits(SourceCacheLimits::default())
+            .source_read_policy(source_read_policy)
+            .execution_context(context),
     )
     .expect("managed read-ahead DOCX fixture must open");
 

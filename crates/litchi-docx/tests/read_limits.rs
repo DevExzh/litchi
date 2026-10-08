@@ -175,36 +175,40 @@ fn encrypted_options_preserve_independent_bounds_and_source_profile_on_every_rou
             ..Limits::default()
         });
     for route in 0..3 {
-        let open = |options| match route {
-            0 => Package::open_with_password_and_options(file.path(), "options", options),
+        let open = |options: OpenOptions| match route {
+            0 => Package::open_with_password_and_options(file.path(), "options", options.clone()),
             1 => Package::from_reader_with_password_and_options(
                 Cursor::new(&encrypted),
                 "options",
                 options,
             ),
-            _ => Package::from_bytes_with_password_and_options(&encrypted, "options", options),
+            _ => Package::from_bytes_with_password_and_options(
+                &encrypted,
+                "options",
+                options.clone(),
+            ),
         };
-        let mut package = open(options).expect("both exact bounds admit source");
+        let mut package = open(options.clone()).expect("both exact bounds admit source");
         assert_eq!(package.encryption(), Some(Mode::Standard));
         assert!(
             package.to_stream(&mut Cursor::new(Vec::new())).is_err(),
             "plain output must remain explicit"
         );
         assert_input_limit(
-            open(options.source_limits(input_limit(clear.len() - 1)))
+            open(options.clone().source_limits(input_limit(clear.len() - 1)))
                 .err()
                 .unwrap(),
             clear.len(),
             clear.len() - 1,
         );
         assert!(matches!(
-            open(options.encryption_limits(Limits { max_input_bytes: encrypted.len() - 1, ..Limits::default() })),
+            open(options.clone().encryption_limits(Limits { max_input_bytes: encrypted.len() - 1, ..Limits::default() })),
             Err(Error::Encryption(CryptoError::Limit { resource: "input", actual, maximum }))
                 if actual == encrypted.len() as u64 && maximum == (encrypted.len() - 1) as u64
         ));
     }
     let opened = encryption::open(encrypted.clone(), "options").unwrap();
-    let package = Package::from_decrypted(opened, options).unwrap();
+    let package = Package::from_decrypted(opened, options.clone()).unwrap();
     assert_eq!(package.encryption(), Some(Mode::Standard));
     let opened = encryption::open(encrypted.clone(), "options").unwrap();
     assert_input_limit(
@@ -231,7 +235,7 @@ fn encryption_policy_validation_remains_at_password_ingress() {
         ..encryption::Limits::default()
     });
     assert!(matches!(
-        Package::from_bytes_with_password_and_options(&[], "options", options),
+        Package::from_bytes_with_password_and_options(&[], "options", options.clone()),
         Err(Error::Encryption(encryption::Error::InvalidLimit(_)))
     ));
     // A plaintext open does not perform an encryption operation.

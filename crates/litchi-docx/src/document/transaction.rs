@@ -11484,10 +11484,11 @@ mod tests {
             0,
         )
         .unwrap();
-        let package = crate::source_backed::Package::from_read_at_with_execution_context(
+        let package = crate::source_backed::Package::from_read_at_with_options(
             Arc::new(OwnedSource::new(PackageWriter::to_bytes(&opc).unwrap())),
-            crate::SourceLimits::default(),
-            ExecutionContext::new(budget.clone(), cancellation, limits),
+            crate::OpenOptions::default()
+                .source_limits(crate::SourceLimits::default())
+                .execution_context(ExecutionContext::new(budget.clone(), cancellation, limits)),
         )
         .unwrap();
         let mut managed = package.document_snapshot().unwrap().edit();

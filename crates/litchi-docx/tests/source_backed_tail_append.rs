@@ -544,10 +544,11 @@ fn managed_package(
     work: u64,
 ) -> (Budget, CancellationSource, source_backed::Package) {
     let (budget, cancellation_source, context) = managed_context(memory, work);
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(archive)),
-        SourceLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .expect("managed source-backed DOCX fixture must open");
     (budget, cancellation_source, package)
@@ -2329,10 +2330,11 @@ fn managed_prepare_charges_semantic_memory_and_releases_plan_workspace() {
     let (budget, _cancellation_source, context) = managed_context(8 * 1024 * 1024, u64::MAX);
     let source = Arc::new(MemoryObservingSource::new(source_archive, budget.clone()));
     let source_reader: Arc<dyn ReadAt> = source.clone();
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         source_reader,
-        SourceLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .expect("managed source-backed DOCX fixture must open");
     let baseline = budget.used(Resource::Memory);

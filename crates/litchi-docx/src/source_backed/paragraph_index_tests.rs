@@ -57,10 +57,15 @@ fn managed_package_with_memory(memory: u64) -> (Budget, CancellationSource, Pack
         0,
     )
     .unwrap();
-    let package = Package::from_read_at_with_execution_context(
+    let package = Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(fixture_bytes())),
-        SourceLimits::default(),
-        ExecutionContext::new(budget.clone(), cancellation, execution_limits),
+        crate::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(ExecutionContext::new(
+                budget.clone(),
+                cancellation,
+                execution_limits,
+            )),
     )
     .unwrap();
     (budget, cancellation_source, package)

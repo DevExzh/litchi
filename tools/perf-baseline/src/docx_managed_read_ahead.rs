@@ -581,12 +581,13 @@ fn run_sample(
     let allocation_region = allocation_metrics::begin();
     let started = Instant::now();
     let (actual_text, source_read, cache, memory_live, objects_live) = {
-        let package = source_backed::Package::from_read_at_with_limits_and_cache_limits_and_source_read_policy_and_execution_context(
+        let package = source_backed::Package::from_read_at_with_options(
             Arc::clone(&provider.source),
-            limits,
-            cache_limits,
-            source_policy(config.policy)?,
-            context,
+            litchi_docx::OpenOptions::default()
+                .source_limits(limits)
+                .cache_limits(cache_limits)
+                .source_read_policy(source_policy(config.policy)?)
+                .execution_context(context),
         )?;
         let open_cache = package.cache_diagnostics();
         let document = package.document()?;
@@ -1205,12 +1206,13 @@ mod tests {
         .unwrap();
         let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
         let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(bytes));
-        let package = source_backed::Package::from_read_at_with_limits_and_cache_limits_and_source_read_policy_and_execution_context(
+        let package = source_backed::Package::from_read_at_with_options(
             source,
-            SourceLimits::default(),
-            SourceCacheLimits::new(CACHE_MAX_BYTES, CACHE_MAX_ENTRIES).unwrap(),
-            source_policy(policy).unwrap(),
-            context,
+            litchi_docx::OpenOptions::default()
+                .source_limits(SourceLimits::default())
+                .cache_limits(SourceCacheLimits::new(CACHE_MAX_BYTES, CACHE_MAX_ENTRIES).unwrap())
+                .source_read_policy(source_policy(policy).unwrap())
+                .execution_context(context),
         )
         .unwrap();
         (budget, package)

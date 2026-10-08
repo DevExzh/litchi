@@ -795,7 +795,7 @@ impl Route {
                 ingress: Ingress::Source,
                 query,
             } => match query {
-                DocxQuery::Open => "litchi_docx::source_backed::Package::from_path",
+                DocxQuery::Open => "litchi_docx::source_backed::Package::open",
                 DocxQuery::ParagraphCount => {
                     "source_backed::Package::document()?.paragraph_count() on a package prepared outside the timer"
                 },
@@ -806,10 +806,10 @@ impl Route {
                     "source_backed::Package::document()?.extract_text_with_paragraph_separator(\"\\n\") on a package prepared outside the timer"
                 },
                 DocxQuery::OpenParagraphCountLifecycle => {
-                    "source_backed::Package::from_path + document()?.paragraph_count()"
+                    "source_backed::Package::open + document()?.paragraph_count()"
                 },
                 DocxQuery::OpenFullTextLifecycle => {
-                    "source_backed::Package::from_path + document()?.extract_text_with_paragraph_separator(\"\\n\")"
+                    "source_backed::Package::open + document()?.extract_text_with_paragraph_separator(\"\\n\")"
                 },
             },
             Self::Pptx {
@@ -978,7 +978,7 @@ pub(super) fn prepare(route: Route, source: &Path) -> Result<Prepared, Box<dyn E
             leg: Leg::Leaf,
             ingress: Ingress::Source,
             ..
-        } => Prepared::DocxSource(litchi_docx::source_backed::Package::from_path(source)?),
+        } => Prepared::DocxSource(litchi_docx::source_backed::Package::open(source)?),
         Route::Pptx {
             leg: Leg::Unified,
             ingress,
@@ -1124,9 +1124,9 @@ pub(super) fn run_timed(
                                 std::hint::black_box(leaf_docx_eager(fs::read(source)?)?);
                             },
                             Ingress::Source => {
-                                std::hint::black_box(
-                                    litchi_docx::source_backed::Package::from_path(source)?,
-                                );
+                                std::hint::black_box(litchi_docx::source_backed::Package::open(
+                                    source,
+                                )?);
                             },
                         },
                     }

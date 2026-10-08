@@ -375,7 +375,10 @@ fn read_limits_are_returned_as_the_original_opc_error() {
     let read_at: Arc<dyn ReadAt> = source;
 
     assert!(matches!(
-        source_backed::Package::from_read_at_with_limits(read_at, limits),
+        source_backed::Package::from_read_at_with_options(
+            read_at,
+            litchi_docx::OpenOptions::default().source_limits(limits)
+        ),
         Err(Error::Opc(OpcError::Limit { .. }))
     ));
 }

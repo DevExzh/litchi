@@ -402,10 +402,11 @@ fn source_change_after_a_warm_index_refuses_new_view_but_old_view_stays_pinned()
 fn cancellation_after_a_warm_index_is_checked_before_cache_reuse() {
     let bytes = docx_bytes(document_xml(&["managed", "read"]));
     let (budget, cancellation_source, context) = managed_context(1 << 20);
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes)),
-        SourceLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let document = package.document().unwrap();
@@ -438,10 +439,11 @@ fn managed_clean_index_pressure_does_not_refuse_a_following_text_sink() {
         .saturating_add(index_admission)
         .saturating_add(parser_workspace);
     let (budget, _cancellation_source, context) = managed_context(memory_limit);
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes)),
-        SourceLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
 
@@ -484,10 +486,11 @@ fn managed_clean_index_pressure_does_not_block_core_metadata_read() {
         .saturating_add(index_admission)
         .saturating_add(parser_workspace);
     let (budget, _cancellation_source, context) = managed_context(memory_limit);
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes)),
-        SourceLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
 

@@ -543,13 +543,13 @@ fn build_managed_preflight(
 ) -> AnyResult<(bool, bool, bool)> {
     let (budget, _cancellation_source, context) = managed_context()?;
     let budget_before = BudgetSnapshot::from_budget(&budget);
-    let package =
-        source_backed::Package::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            Arc::new(OwnedSource::new(fixture.archive.clone())),
-            SourceLimits::default(),
-            SourceCacheLimits::new(CACHE_BYTES, CACHE_ENTRIES)?,
-            context,
-        )?;
+    let package = source_backed::Package::from_read_at_with_options(
+        Arc::new(OwnedSource::new(fixture.archive.clone())),
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .cache_limits(SourceCacheLimits::new(CACHE_BYTES, CACHE_ENTRIES)?)
+            .execution_context(context),
+    )?;
     let mut edit = package.document_snapshot()?.edit();
     stage_edit(&mut edit, fixture, mode)?;
     let commit = edit.commit()?;
@@ -649,13 +649,13 @@ fn run_sample(
     let operation_started = Instant::now();
 
     let phase_started = Instant::now();
-    let package =
-        source_backed::Package::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            source.clone(),
-            SourceLimits::default(),
-            SourceCacheLimits::new(CACHE_BYTES, CACHE_ENTRIES)?,
-            context,
-        )?;
+    let package = source_backed::Package::from_read_at_with_options(
+        source.clone(),
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .cache_limits(SourceCacheLimits::new(CACHE_BYTES, CACHE_ENTRIES)?)
+            .execution_context(context),
+    )?;
     let open_ns = elapsed_ns(phase_started)?;
     let cache_before = package.cache_diagnostics();
 

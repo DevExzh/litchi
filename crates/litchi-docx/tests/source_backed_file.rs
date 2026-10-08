@@ -163,7 +163,7 @@ fn open_and_catalog_leave_payloads_cold_until_selected_queries() {
 }
 
 #[test]
-fn from_path_variants_forward_limits_and_managed_cache_policy() {
+fn path_options_forward_limits_and_managed_cache_policy() {
     let directory = tempfile::tempdir().unwrap();
     let (path, bytes) = write_fixture(&directory, "limits");
 
@@ -173,15 +173,19 @@ fn from_path_variants_forward_limits_and_managed_cache_policy() {
         .build()
         .unwrap();
     assert!(matches!(
-        source_backed::Package::from_path_with_limits(&path, limits),
+        source_backed::Package::open_with_options(
+            &path,
+            litchi_docx::OpenOptions::default().source_limits(limits)
+        ),
         Err(Error::Opc(OpcError::Limit { .. }))
     ));
 
     let cache_limits = SourceCacheLimits::new(1 << 20, 8).unwrap();
-    let package = source_backed::Package::from_path_with_limits_and_cache_limits(
+    let package = source_backed::Package::open_with_options(
         &path,
-        SourceLimits::default(),
-        cache_limits,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .cache_limits(cache_limits),
     )
     .unwrap();
     assert!(!package.cache_diagnostics().budget_managed);
@@ -191,14 +195,14 @@ fn from_path_variants_forward_limits_and_managed_cache_policy() {
     );
 
     let (budget, context) = managed_context(1 << 20);
-    let managed =
-        source_backed::Package::from_path_with_limits_and_cache_limits_and_execution_context(
-            &path,
-            SourceLimits::default(),
-            cache_limits,
-            context,
-        )
-        .unwrap();
+    let managed = source_backed::Package::open_with_options(
+        &path,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .cache_limits(cache_limits)
+            .execution_context(context),
+    )
+    .unwrap();
     assert!(managed.cache_diagnostics().budget_managed);
     assert_eq!(budget.used(Resource::Memory), 0);
     assert_eq!(
@@ -219,7 +223,7 @@ fn exact_noop_and_changed_document_overlay_preserve_raw_unselected_members() {
     let directory = tempfile::tempdir().unwrap();
     let (path, source_bytes) = write_fixture(&directory, "before");
 
-    let package = source_backed::Package::from_path(&path).unwrap();
+    let package = source_backed::Package::open(&path).unwrap();
     let noop = package
         .document_snapshot()
         .unwrap()
@@ -232,7 +236,7 @@ fn exact_noop_and_changed_document_overlay_preserve_raw_unselected_members() {
         .unwrap();
     assert_eq!(output, source_bytes);
 
-    let package = source_backed::Package::from_path(&path).unwrap();
+    let package = source_backed::Package::open(&path).unwrap();
     let mut edit = package.document_snapshot().unwrap().edit();
     edit.replace_paragraph_text(litchi_core::Position::new(0), "after")
         .unwrap();
@@ -267,7 +271,7 @@ fn replacing_the_path_keeps_the_open_source_pinned() {
     let replacement = fixture("replacement");
     fs::write(&replacement_path, &replacement).unwrap();
 
-    let package = source_backed::Package::from_path(&path).unwrap();
+    let package = source_backed::Package::open(&path).unwrap();
     let version = package.source_version().unwrap();
     fs::remove_file(&path).unwrap();
     fs::rename(&replacement_path, &path).unwrap();
@@ -279,7 +283,7 @@ fn replacing_the_path_keeps_the_open_source_pinned() {
     );
     assert_ne!(fs::read(&path).unwrap(), original);
     assert_eq!(
-        source_backed::Package::from_path(&path)
+        source_backed::Package::open(&path)
             .unwrap()
             .document()
             .unwrap()
@@ -293,7 +297,7 @@ fn replacing_the_path_keeps_the_open_source_pinned() {
 fn in_place_file_change_is_reported_as_source_changed() {
     let directory = tempfile::tempdir().unwrap();
     let (path, bytes) = write_fixture(&directory, "changed");
-    let package = source_backed::Package::from_path(&path).unwrap();
+    let package = source_backed::Package::open(&path).unwrap();
     let original_version = package.source_version().unwrap();
 
     let mut file = OpenOptions::new().write(true).open(&path).unwrap();
@@ -317,11 +321,11 @@ fn filesystem_path_errors_are_typed() {
     let directory = tempfile::tempdir().unwrap();
     let missing = directory.path().join("missing.docx");
     assert!(matches!(
-        source_backed::Package::from_path(&missing),
+        source_backed::Package::open(&missing),
         Err(Error::Io(error)) if error.kind() == std::io::ErrorKind::NotFound
     ));
     assert!(matches!(
-        source_backed::Package::from_path(directory.path()),
+        source_backed::Package::open(directory.path()),
         Err(Error::Io(error))
             if matches!(
                 error.kind(),

@@ -1096,10 +1096,11 @@ fn child_relationship_total_is_preflighted_before_the_offending_payload_read() {
 #[test]
 fn managed_story_snapshot_retains_budgeted_part_data() {
     let (budget, context) = managed_context();
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(fixture(false))),
-        SourceLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let snapshot = package.story_hyperlinks_only_snapshot().unwrap();

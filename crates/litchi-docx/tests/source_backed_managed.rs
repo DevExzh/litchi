@@ -187,23 +187,24 @@ fn context(memory: u64) -> (Budget, CancellationSource, ExecutionContext) {
 
 fn managed(memory: u64) -> (Budget, CancellationSource, source_backed::Package) {
     let (budget, cancellation_source, context) = context(memory);
-    let package =
-        source_backed::Package::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            source(),
-            SourceLimits::default(),
-            SourceCacheLimits::new(1 << 20, 8).unwrap(),
-            context,
-        )
-        .unwrap();
+    let package = source_backed::Package::from_read_at_with_options(
+        source(),
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .cache_limits(SourceCacheLimits::new(1 << 20, 8).unwrap())
+            .execution_context(context),
+    )
+    .unwrap();
     (budget, cancellation_source, package)
 }
 
 fn managed_bytes(bytes: Vec<u8>) -> (Budget, CancellationSource, source_backed::Package) {
     let (budget, cancellation_source, context) = context(bytes.len() as u64);
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes)),
-        SourceLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     (budget, cancellation_source, package)
@@ -286,10 +287,11 @@ fn managed_exact_memory_budget_succeeds_and_one_under_fails_before_publication()
     let exact_limit = retained_memory.saturating_add(parser_workspace);
     let (budget, _source, exact_context) = context(exact_limit);
     let exact_source = Arc::new(CountingSource::new(bytes.clone()));
-    let exact = source_backed::Package::from_read_at_with_execution_context(
+    let exact = source_backed::Package::from_read_at_with_options(
         exact_source.clone(),
-        SourceLimits::default(),
-        exact_context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(exact_context),
     )
     .unwrap();
     let document = exact.document().unwrap();
@@ -306,10 +308,11 @@ fn managed_exact_memory_budget_succeeds_and_one_under_fails_before_publication()
 
     let (budget, _source, one_under_context) = context(exact_limit - 1);
     let one_under_source = Arc::new(CountingSource::new(bytes));
-    let one_under = source_backed::Package::from_read_at_with_execution_context(
+    let one_under = source_backed::Package::from_read_at_with_options(
         one_under_source.clone(),
-        SourceLimits::default(),
-        one_under_context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(one_under_context),
     )
     .unwrap();
     let payload_reads_before = one_under_source.payload_reads();
@@ -360,10 +363,11 @@ fn managed_revisions_query_is_admitted_and_charged_like_extract_text() {
     .unwrap();
     opc.relate_to("word/document.xml", rt::OFFICE_DOCUMENT);
     let (budget, _cancellation_source, context) = context(1 << 20);
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(PackageWriter::to_bytes(&opc).unwrap())),
-        SourceLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let document = package.document().unwrap();
@@ -413,20 +417,22 @@ fn managed_cancellation_is_checked_at_open_and_before_lazy_read() {
     let (budget, cancellation_source, open_context) = context(fixture().len() as u64);
     cancellation_source.cancel();
     assert!(matches!(
-        source_backed::Package::from_read_at_with_execution_context(
+        source_backed::Package::from_read_at_with_options(
             source(),
-            SourceLimits::default(),
-            open_context,
+            litchi_docx::OpenOptions::default()
+                .source_limits(SourceLimits::default())
+                .execution_context(open_context)
         ),
         Err(Error::Opc(OpcError::Cancelled))
     ));
     assert_eq!(budget.used(Resource::Memory), 0);
 
     let (_budget, cancellation_source, context) = context(fixture().len() as u64);
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         source(),
-        SourceLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     cancellation_source.cancel();
@@ -476,10 +482,11 @@ fn managed_main_document_edits_retain_source_and_candidate_reservations() {
     let bytes = fixture();
     let source = Arc::new(CountingSource::new(bytes.clone()));
     let (budget, _cancellation_source, context) = context(1 << 20);
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         source.clone(),
-        SourceLimits::default(),
-        context,
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let payload_reads_before = source.payload_reads();
@@ -510,4 +517,104 @@ fn managed_main_document_edits_retain_source_and_candidate_reservations() {
     drop(snapshot);
     drop(package);
     assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn cloned_open_options_share_budget_and_cancellation() {
+    let (budget, cancellation, context) = context(4 << 20);
+    let options = litchi_docx::OpenOptions::default()
+        .cache_limits(SourceCacheLimits::new(1 << 20, 8).unwrap())
+        .execution_context(context);
+    let first =
+        source_backed::Package::from_read_at_with_options(source(), options.clone()).unwrap();
+    let second = source_backed::Package::from_read_at_with_options(source(), options).unwrap();
+    let first_document = first.document().unwrap();
+    let first_memory = budget.used(Resource::Memory);
+    assert!(first_memory > 0);
+    let second_document = second.document().unwrap();
+    assert!(budget.used(Resource::Memory) > first_memory);
+    cancellation.cancel();
+    assert!(first.document().is_err());
+    assert!(second.document().is_err());
+    drop((first, second, first_document, second_document));
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn owning_ingress_refuses_lazy_options_before_io() {
+    use litchi_docx::{OpenOptions, OpenPolicy, Package};
+    struct NeverRead;
+    impl io::Read for NeverRead {
+        fn read(&mut self, _: &mut [u8]) -> io::Result<usize> {
+            panic!("unsupported policies must fail before input I/O");
+        }
+    }
+    let (_, _, context) = context(1 << 20);
+    let cases = [
+        (
+            OpenOptions::default().execution_context(context),
+            OpenPolicy::ExecutionContext,
+        ),
+        (
+            OpenOptions::default().cache_limits(SourceCacheLimits::default()),
+            OpenPolicy::CacheLimits,
+        ),
+        (
+            OpenOptions::default().source_read_policy(litchi_opc::SourceReadPolicy::exact()),
+            OpenPolicy::SourceReadPolicy,
+        ),
+    ];
+    let directory = tempfile::tempdir().unwrap();
+    for (options, expected) in cases {
+        let assert_policy = |result| {
+            assert!(matches!(result,
+            Err(Error::UnsupportedOpenPolicy { policy }) if policy == expected))
+        };
+        assert_policy(Package::from_reader_with_options(
+            NeverRead,
+            options.clone(),
+        ));
+        assert_policy(Package::from_bytes_with_options(&[], options.clone()));
+        assert_policy(Package::open_with_options(
+            directory.path(),
+            options.clone(),
+        ));
+        #[cfg(feature = "encryption")]
+        {
+            let mut clear = Vec::new();
+            Package::new().unwrap().to_stream(&mut clear).unwrap();
+            let decrypted = litchi_docx::encryption::open(clear, "pw").unwrap();
+            assert_policy(Package::from_decrypted(decrypted, options.clone()));
+            assert_policy(Package::from_reader_with_password_and_options(
+                NeverRead,
+                "pw",
+                options.clone(),
+            ));
+            assert_policy(Package::from_bytes_with_password_and_options(
+                &[],
+                "pw",
+                options.clone(),
+            ));
+            assert_policy(Package::open_with_password_and_options(
+                directory.path(),
+                "pw",
+                options.clone(),
+            ));
+        }
+    }
+}
+
+#[cfg(any(unix, windows))]
+#[test]
+fn cancelled_path_options_fail_before_opening_the_file() {
+    let (_, cancellation, context) = context(1 << 20);
+    cancellation.cancel();
+    let directory = tempfile::tempdir().unwrap();
+    let error = source_backed::Package::open_with_options(
+        directory.path().join("missing.docx"),
+        litchi_docx::OpenOptions::default().execution_context(context),
+    )
+    .err()
+    .unwrap();
+    assert!(matches!(error, Error::Opc(OpcError::Cancelled)));
 }
