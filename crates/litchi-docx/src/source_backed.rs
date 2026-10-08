@@ -247,7 +247,7 @@ struct FingerprintingWriter<W> {
 
 struct SourceCheckedTextSink<'a, W: ?Sized> {
     output: &'a mut W,
-    package: &'a SourceBackedPackage,
+    package: &'a Package,
     failure: Arc<Mutex<Option<Error>>>,
 }
 
@@ -263,16 +263,7 @@ impl<'a, W: ?Sized> SourceCheckedTextSink<'a, W> {
     }
 
     fn check(&self) -> std::io::Result<()> {
-        let result = self
-            .package
-            .check_execution()
-            .map_err(Error::from)
-            .and_then(|_| {
-                self.package
-                    .source_version()
-                    .map(|_| ())
-                    .map_err(Error::from)
-            });
+        let result = self.package.check_source();
         match result {
             Ok(()) => Ok(()),
             Err(error) => {
@@ -869,11 +860,15 @@ impl Package {
 
     /// Stream visible main-document paragraphs to a caller-owned sink.
     ///
+    /// Resolves the current main part from the effective graph after a commit,
+    /// including a redirected main part. Retained donor payloads and execution
+    /// contexts stay pinned through output and the final source check.
+    ///
     /// The source catalog and execution policy are checked before deferred
     /// payload work. The parser checks them before and after every XML event
     /// and immediately before each paragraph emission; the source-checked
     /// sink checks both fences around every underlying write and after the
-    /// final object. The main-document ZIP declaration is checked before
+    /// final object. The main-document declared size is checked before
     /// payload materialization; the payload reader still verifies its actual
     /// decoded length and source boundary. Only one bounded paragraph text
     /// value is retained by the semantic parser.
@@ -888,58 +883,29 @@ impl Package {
         options: litchi_core::TextOutputOptions<'_>,
     ) -> std::result::Result<litchi_core::TextOutputReport, litchi_core::TextOutputError<Error>>
     {
-        let physical =
-            self.physical_package()
-                .map_err(|source| litchi_core::TextOutputError::Document {
-                    source,
-                    progress: litchi_core::TextOutputReport::default(),
-                })?;
         let source_failure = Arc::new(Mutex::new(None));
         let mut checked_output = SourceCheckedTextSink {
             output,
-            package: physical,
+            package: self,
             failure: Arc::clone(&source_failure),
         };
         let mut writer = litchi_core::SequentialTextWriter::new(&mut checked_output, options);
         let mut repaired = crate::leniency::ToleranceReport::default();
+        // Keep payload reservations and donor provenance through the final fence.
+        let mut retained_data = None;
 
         let parsed = (|| -> std::result::Result<(), litchi_core::TextOutputError<Error>> {
-            physical
-                .check_execution()
-                .map_err(|source| writer.document_error(source.into()))?;
-            physical
-                .source_version()
-                .map_err(|source| writer.document_error(source.into()))?;
-            let main = physical
-                .main_document_part()
-                .map_err(|source| writer.document_error(source.into()))?;
-            validate_document_main_content_type(main.content_type())
+            self.check_source()
                 .map_err(|source| writer.document_error(source))?;
-            let declared = main
-                .declared_uncompressed_size()
-                .map_err(|source| writer.document_error(source.into()))?;
-            let limit =
-                u64::try_from(crate::paragraph::semantic_text_raw_xml_limit()).map_err(|_| {
-                    writer.document_error(Error::InvalidFormat(
-                        "semantic DOCX XML limit overflow".into(),
-                    ))
-                })?;
+            let data = retained_data.insert(
+                self.main_text_data()
+                    .map_err(|source| writer.document_error(source))?,
+            );
+            let managed = self.execution.is_some();
             let mce_limit = crate::paragraph::semantic_text_raw_xml_limit();
-            if declared > limit {
-                return Err(writer.document_error(Error::InvalidFormat(format!(
-                    "semantic DOCX declared XML exceeds {limit} bytes"
-                ))));
-            }
-            let data = self
-                .main_data(main)
-                .map_err(|source| writer.document_error(source))?;
-            let managed = physical.cache_diagnostics().budget_managed;
             let visible: Cow<'_, [u8]> = if managed {
-                self.ensure_source_document_xml(
-                    data.as_bytes(),
-                    physical.execution_context().as_ref(),
-                )
-                .map_err(|source| writer.document_error(source))?;
+                self.ensure_source_document_xml(data.as_bytes(), self.execution.as_ref())
+                    .map_err(|source| writer.document_error(source))?;
                 Cow::Borrowed(data.as_bytes())
             } else {
                 let mut capabilities = litchi_ooxml_common::mce::Capabilities::default();
@@ -958,29 +924,19 @@ impl Package {
                 .map_err(|source| writer.document_error(source.into()))?
                 .xml
             };
-            physical
-                .source_version()
-                .map_err(|source| writer.document_error(source.into()))?;
-            physical
-                .check_execution()
-                .map_err(|source| writer.document_error(source.into()))?;
+            self.check_source()
+                .map_err(|source| writer.document_error(source))?;
             crate::paragraph::write_text_to_with_operation_check(
                 visible.as_ref(),
                 &mut writer,
-                || {
-                    physical.check_execution().map_err(Error::from)?;
-                    physical.source_version().map_err(Error::from)?;
-                    Ok(())
-                },
+                || self.check_source(),
                 &mut repaired,
             )
         })();
         let progress = writer.progress();
-        let source = physical
-            .check_execution()
+        let source = self
+            .check_source()
             .err()
-            .map(Error::from)
-            .or_else(|| physical.source_version().err().map(Error::from))
             .or_else(|| take_source_text_failure(&source_failure));
         // Every repair the pass applied is merged, output error or not: a
         // failed call still skipped the subtrees it recorded.

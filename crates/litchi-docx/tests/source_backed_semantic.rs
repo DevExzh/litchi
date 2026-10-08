@@ -1011,12 +1011,17 @@ fn effective_owner_refuses_unmigrated_operations_and_foreign_candidates() {
                 .is_err()
         );
         assert!(sink.is_empty());
-        assert!(
-            effective
-                .write_text_to(&mut sink, litchi_core::TextOutputOptions::default())
-                .is_err()
+        effective
+            .write_text_to(&mut sink, litchi_core::TextOutputOptions::default())
+            .unwrap();
+        assert_eq!(
+            sink,
+            if changed {
+                b"after".as_slice()
+            } else {
+                b"before".as_slice()
+            }
         );
-        assert!(sink.is_empty());
     }
     let foreign =
         SourceBackedPackage::from_vec(package_bytes(effective_xml("foreign"), None, false))

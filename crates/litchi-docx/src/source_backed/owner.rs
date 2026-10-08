@@ -276,3 +276,57 @@ impl Package {
         }
     }
 }
+
+#[allow(
+    clippy::large_enum_variant,
+    reason = "inline retained payloads avoid an unadmitted allocation"
+)]
+pub(super) enum MainTextData {
+    Physical(PartData),
+    Effective(litchi_opc::PreparedPartData),
+}
+
+impl MainTextData {
+    pub(super) fn as_bytes(&self) -> &[u8] {
+        match self {
+            Self::Physical(data) => data.as_bytes(),
+            Self::Effective(data) => data.as_bytes(),
+        }
+    }
+}
+
+impl Package {
+    pub(super) fn main_text_data(&self) -> Result<MainTextData> {
+        let preflight = |content_type: &str, declared: u64| -> Result<()> {
+            validate_document_main_content_type(content_type)?;
+            let limit = u64::try_from(crate::paragraph::semantic_text_raw_xml_limit())
+                .map_err(|_| Error::InvalidFormat("semantic DOCX XML limit overflow".into()))?;
+            if declared > limit {
+                return Err(Error::InvalidFormat(format!(
+                    "semantic DOCX declared XML exceeds {limit} bytes"
+                )));
+            }
+            Ok(())
+        };
+        match &self.effective {
+            Some(topology) => {
+                let main = topology.main_document_part()?;
+                preflight(main.content_type(), main.declared_uncompressed_size()?)?;
+                let data = match main.data().map_err(Error::from) {
+                    Ok(data) => data,
+                    Err(error) if is_index_pressure_error(&error) => {
+                        self.paragraph_index_cache.trim_clean();
+                        main.data()?
+                    },
+                    Err(error) => return Err(error),
+                };
+                Ok(MainTextData::Effective(data))
+            },
+            None => {
+                let main = self.physical.main_document_part()?;
+                preflight(main.content_type(), main.declared_uncompressed_size()?)?;
+                Ok(MainTextData::Physical(self.main_data(main)?))
+            },
+        }
+    }
+}

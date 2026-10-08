@@ -385,3 +385,15 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
   deduplicate repeated reads. Managed donor cancellation/release is tested.
 - Other specialized reads and metadata writes remain pending. Record 0033
   documents verification, allocation limits and the remaining full-goal scope.
+
+
+## 0034 — text streaming on retained source owners
+
+- Source DOCX text output follows effective main replacements and relationship
+  redirection, including canonical commit owners and managed donor payloads.
+- Payload handles stay retained through output and final source checks; declared
+  size is checked before capture. Partial-output errors keep exact progress.
+- Canonical managed/unmanaged commits, donor cancellation, early limits and MCE
+  source-failure precedence have integration coverage.
+- Specialized reads/transactions, configurable limits and the wider goal remain
+  open. Record 0034 documents verification and allocation boundaries.

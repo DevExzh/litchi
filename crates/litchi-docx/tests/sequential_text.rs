@@ -1104,3 +1104,174 @@ fn references_and_cdata_outside_text_are_accepted_without_repair() {
         );
     }
 }
+
+#[test]
+fn committed_owner_streams_current_text_and_preserves_old_owner() {
+    for managed in [false, true] {
+        let source = Arc::new(OwnedSource::new(package_bytes(
+            &document_xml(r#"<w:p><w:r><w:t>before</w:t></w:r></w:p>"#),
+            true,
+        )));
+        let owner = if managed {
+            let (_, context) = execution_context();
+            SourceBackedPackage::from_read_at_with_execution_context(
+                source,
+                ReadLimits::default(),
+                context,
+            )
+            .unwrap()
+        } else {
+            SourceBackedPackage::from_read_at(source).unwrap()
+        };
+        let mut edit = owner.edit().unwrap();
+        edit.replace_paragraph_text(litchi_core::Position::new(0), "after & current")
+            .unwrap();
+        let changed = edit.commit().unwrap().into_package();
+        for (package, expected) in [
+            (&owner, b"before".as_slice()),
+            (&changed, b"after & current"),
+        ] {
+            let mut output = Vec::new();
+            let report = package
+                .write_text_to(&mut output, parity_options(false))
+                .unwrap();
+            assert_eq!(output, expected);
+            assert_eq!(report.bytes_written(), expected.len() as u64);
+        }
+        let mut sink = FailAfter {
+            bytes: Vec::new(),
+            remaining: 3,
+        };
+        let error = changed
+            .write_text_to(&mut sink, parity_options(false))
+            .unwrap_err();
+        assert!(
+            matches!(error, TextOutputError::Sink { progress, .. } if progress.bytes_written() == 3)
+        );
+        assert_eq!(sink.bytes, b"aft");
+    }
+}
+
+#[test]
+fn effective_main_donor_cancellation_during_output_keeps_progress() {
+    let (cancellation, context) = execution_context();
+    let donor = litchi_opc::SourceBackedPackage::from_read_at_with_execution_context(
+        Arc::new(OwnedSource::new(package_bytes(
+            &document_xml(r#"<w:p><w:r><w:t>donor</w:t></w:r></w:p>"#),
+            false,
+        ))),
+        ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    let mut base = litchi_opc::OpcPackage::new();
+    base.add_part(Box::new(litchi_opc::BlobPart::new(
+        litchi_opc::PackURI::new("/word/document.xml").unwrap(),
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml".into(),
+        document_xml(r#"<w:p><w:r><w:t>base</w:t></w:r></w:p>"#),
+    )));
+    base.relate_to(
+        "word/document.xml",
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+    );
+    let physical = litchi_opc::SourceBackedPackage::from_vec(
+        litchi_opc::PackageWriter::to_bytes(&base).unwrap(),
+    )
+    .unwrap();
+    let owner = SourceBackedPackage::from_source_backed_package(physical.clone()).unwrap();
+    let mut plan = litchi_opc::SourceTopologyPlan::new();
+    let target = litchi_opc::PackURI::new("/word/copied.xml").unwrap();
+    plan.try_add_source_xml_part(
+        target.clone(),
+        donor.main_document_part().unwrap().source_xml().unwrap(),
+    )
+    .unwrap();
+    plan.try_replace_internal_relationship(
+        litchi_opc::PackURI::new("/").unwrap(),
+        "rId1",
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+        target,
+    )
+    .unwrap();
+    let changed = owner
+        .with_prepared_topology(physical.prepare_topology(plan).unwrap())
+        .unwrap();
+    drop(donor);
+    let mut output = Vec::new();
+    changed
+        .write_text_to(&mut output, parity_options(false))
+        .unwrap();
+    assert_eq!(output, b"donor");
+    let mut sink = CancelOnWrite {
+        source: cancellation,
+        bytes: Vec::new(),
+        cancelled: false,
+    };
+    assert!(matches!(
+        changed.write_text_to(&mut sink, parity_options(false)),
+        Err(TextOutputError::Document { source: litchi_docx::Error::Opc(litchi_opc::OpcError::Cancelled), progress })
+            if progress.bytes_written() == 5 && progress.objects_written() == 1
+    ));
+    assert_eq!(sink.bytes, b"donor");
+    let mut output = Vec::new();
+    owner
+        .write_text_to(&mut output, parity_options(false))
+        .unwrap();
+    assert_eq!(output, b"base");
+}
+
+#[test]
+fn effective_declared_size_is_rejected_before_payload_read() {
+    let source = Arc::new(VersionedSource::new(oversized_declaration(package_bytes(
+        &document_xml(r#"<w:p><w:r><w:t>tiny</w:t></w:r></w:p>"#),
+        true,
+    ))));
+    let physical = litchi_opc::SourceBackedPackage::from_read_at(source.clone()).unwrap();
+    let owner = SourceBackedPackage::from_source_backed_package(physical.clone()).unwrap();
+    let owner = owner
+        .with_prepared_topology(
+            physical
+                .prepare_topology(litchi_opc::SourceTopologyPlan::new())
+                .unwrap(),
+        )
+        .unwrap();
+    let before = source.reads.load(Ordering::SeqCst);
+    let mut output = Vec::new();
+    assert!(
+        matches!(owner.write_text_to(&mut output, parity_options(false)),
+        Err(TextOutputError::Document { progress, .. }) if progress.bytes_written() == 0)
+    );
+    assert!(output.is_empty());
+    assert_eq!(source.reads.load(Ordering::SeqCst), before);
+}
+
+#[test]
+fn effective_mce_stream_checks_source_after_sink_failure() {
+    let xml = format!(
+        r#"<w:document xmlns:w="{W}" xmlns:mc="{MCE}" xmlns:x="urn:unknown"><w:body><mc:AlternateContent><mc:Choice Requires="x"><w:p><w:r><w:t>hidden</w:t></w:r></w:p></mc:Choice><mc:Fallback><w:p><w:r><w:t>visible</w:t></w:r></w:p></mc:Fallback></mc:AlternateContent></w:body></w:document>"#
+    );
+    let source = Arc::new(VersionedSource::new(package_bytes(xml.as_bytes(), true)));
+    let physical = litchi_opc::SourceBackedPackage::from_read_at(source.clone()).unwrap();
+    let owner = SourceBackedPackage::from_source_backed_package(physical.clone()).unwrap();
+    let owner = owner
+        .with_prepared_topology(
+            physical
+                .prepare_topology(litchi_opc::SourceTopologyPlan::new())
+                .unwrap(),
+        )
+        .unwrap();
+    let mut output = Vec::new();
+    owner
+        .write_text_to(&mut output, parity_options(false))
+        .unwrap();
+    assert_eq!(output, b"visible");
+    let mut sink = ChangeAndFail {
+        source,
+        changed: false,
+    };
+    assert!(
+        matches!(owner.write_text_to(&mut sink, parity_options(false)),
+        Err(TextOutputError::Document { source: litchi_docx::Error::Opc(litchi_opc::OpcError::SourceChanged { .. }), progress })
+            if progress.bytes_written() == 0)
+    );
+}
