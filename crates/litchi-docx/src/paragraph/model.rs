@@ -437,7 +437,7 @@ static EMPTY_NAMESPACE_BINDINGS: LazyLock<NamespaceBindings> = LazyLock::new(|| 
 ///     }
 /// }
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Paragraph {
     /// The raw XML bytes for this paragraph
     pub(super) xml_data: XmlData,
@@ -450,7 +450,7 @@ pub struct Paragraph {
 /// owner can represent it without loss. This keeps hyperlinks, fields,
 /// revisions, content controls, bookmarks, Office Math, and future extension
 /// elements visible in document order instead of silently dropping them.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 #[non_exhaustive]
 pub enum Inline {
     /// A typed `WordprocessingML` run.
@@ -471,7 +471,7 @@ pub enum Inline {
 /// The public value deliberately contains the resolved [`Hyperlink`] rather
 /// than its package-local relationship identifier. Its direct runs retain
 /// their formatting and expose ordered content through [`Run::contents`].
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct InlineHyperlink {
     link: Hyperlink,
     runs: Vec<Run>,
@@ -537,22 +537,27 @@ impl InlineHyperlink {
 ///
 /// The payload is inert. Reading it does not resolve relationships, evaluate
 /// fields, apply revisions, activate controls, or execute embedded content.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct OpaqueInline {
     source: XmlRef,
-    word_hyperlink: bool,
+    kind: super::InlineKind,
 }
 
 impl OpaqueInline {
-    pub(super) const fn from_xml_ref(source: XmlRef, word_hyperlink: bool) -> Self {
-        Self {
-            source,
-            word_hyperlink,
-        }
+    pub(super) const fn from_xml_ref(source: XmlRef, kind: super::InlineKind) -> Self {
+        Self { source, kind }
     }
 
     pub(crate) const fn is_word_hyperlink(&self) -> bool {
-        self.word_hyperlink
+        matches!(self.kind, super::InlineKind::Hyperlink)
+    }
+
+    /// What kind of paragraph child this is, as classified by namespace and
+    /// local name when the paragraph's children were read; asking parses
+    /// nothing.
+    #[must_use]
+    pub const fn kind(&self) -> super::InlineKind {
+        self.kind
     }
 
     pub(super) const fn xml_ref(&self) -> &XmlRef {
@@ -908,7 +913,7 @@ impl RunXmlData {
 ///     println!("OMML formula: {}", omml);
 /// }
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Run {
     /// The raw XML data for this run
     pub(super) xml_data: RunXmlData,
@@ -1023,7 +1028,58 @@ impl Run {
         self.xml_data.is_managed()
     }
 
+    pub(crate) fn inherited_namespaces(&self) -> Result<NamespaceBindings> {
+        if matches!(self.xml_data, RunXmlData::Owned(_)) {
+            return Ok(Arc::clone(&EMPTY_NAMESPACE_BINDINGS));
+        }
+        let reference = self.xml_ref()?;
+        let lease = reference.namespace_resolver()?;
+        let bindings = crate::namespace::resolver_bindings(&lease)?;
+        lease.check()?;
+        Ok(bindings)
+    }
+
     pub(crate) fn replace_xml(&mut self, xml_bytes: Vec<u8>) {
         self.xml_data = RunXmlData::Owned(xml_bytes);
+    }
+}
+
+impl std::fmt::Debug for Paragraph {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.debug_struct("Paragraph").finish_non_exhaustive()
+    }
+}
+
+impl std::fmt::Debug for Run {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.debug_struct("Run").finish_non_exhaustive()
+    }
+}
+
+impl std::fmt::Debug for OpaqueInline {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("OpaqueInline")
+            .finish_non_exhaustive()
+    }
+}
+
+impl std::fmt::Debug for InlineHyperlink {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("InlineHyperlink")
+            .finish_non_exhaustive()
+    }
+}
+
+impl std::fmt::Debug for Inline {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::Run(_) => "Inline::Run",
+            Self::Hyperlink(_) => "Inline::Hyperlink",
+            Self::BookmarkStart(_) => "Inline::BookmarkStart",
+            Self::BookmarkEnd(_) => "Inline::BookmarkEnd",
+            Self::Unknown(_) => "Inline::Unknown",
+        })
     }
 }

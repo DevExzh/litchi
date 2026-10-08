@@ -462,3 +462,21 @@ read metadata; property payloads, relationship redirection and absence follow
 that owner's graph. Source/donor fences and per-owner repair deduplication remain
 active. Other specialized read/transaction routes and canonical metadata writes
 remain pending.
+
+
+## 26. DOCX direct property projections (record 0045)
+
+`properties::{Run, Paragraph, Table, Row, Cell}` represent the properties stated
+by one element's own property container. `Run::direct_properties` and
+`Paragraph::direct_properties` avoid conflating those values with existing part
+properties; table, row and cell views expose `properties()`. These are read
+projections, without style inheritance or a new transaction family.
+
+`Paragraph::addressable_runs()` supplies the positional navigation run set;
+`runs()` retains its existing outermost-run contract. `InlineKind` classifies
+inert inline content by resolved namespace and name. Retained XML views resolve
+ancestor namespace bindings. Property values that fail supported schema parsing
+are reported through `invalid_properties`, not repaired into defaults.
+
+Formatting writes, effective relationship integration, caller semantic limits,
+canonical owner consolidation and complete family registration remain pending.

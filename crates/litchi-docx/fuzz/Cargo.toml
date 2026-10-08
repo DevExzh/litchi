@@ -49,6 +49,20 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "direct_properties"
+path = "fuzz_targets/direct_properties.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "smoke_direct_properties"
+path = "fuzz_targets/smoke_direct_properties.rs"
+test = false
+doc = false
+bench = false
+
 [profile.release]
 debug = 1
 codegen-units = 1

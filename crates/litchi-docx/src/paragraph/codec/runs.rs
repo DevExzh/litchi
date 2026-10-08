@@ -301,7 +301,7 @@ impl Paragraph {
             .collect()
     }
 
-    fn push_run_slice(
+    pub(super) fn push_run_slice(
         runs: &mut SmallVec<[Run; 8]>,
         source: &XmlRef,
         start: usize,

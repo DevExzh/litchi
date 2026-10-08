@@ -12,6 +12,7 @@
 mod codec;
 pub mod collapsed;
 pub mod extensions;
+mod kind;
 mod model;
 mod package;
 
@@ -23,6 +24,7 @@ pub use crate::run_effects::Effects;
 pub use crate::run_symbols::{Symbol, Symbols};
 pub use collapsed::{Collapsed, Commit, Patch, Snapshot, Transaction};
 pub use extensions::{Extensions, Id, Ids};
+pub use kind::InlineKind;
 pub use model::{
     Inline, InlineHyperlink, LineSpacingRule, OpaqueInline, OpaqueRunContent, Paragraph,
     ParagraphSpacing, Run, RunBreak, RunBreakClear, RunBreakType, RunContent, RunProperties,

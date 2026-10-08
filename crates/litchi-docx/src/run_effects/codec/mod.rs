@@ -93,7 +93,11 @@ pub fn parse(xml: &[u8]) -> Result<super::model::Effects> {
                 }
                 let direct = rpr_depth == Some(depth);
                 let next_depth = depth + 1;
-                if rpr_depth.is_none() && local.as_slice() == b"rPr" {
+                // Only the fragment's own `w:rPr` (the root, or a direct
+                // child of the `w:r` root) holds its effects: the `w:rPr` of
+                // a run in a text box inside this run is deeper (finding F-8
+                // of record 0010).
+                if rpr_depth.is_none() && next_depth <= 2 && local.as_slice() == b"rPr" {
                     rpr_depth = Some(next_depth);
                 }
                 stack.push(Frame {

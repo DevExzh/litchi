@@ -15,7 +15,7 @@ use crate::run_effects::Effects;
 use litchi_core::VerticalPosition;
 use litchi_ooxml_common::xml::attributes::first_wins;
 use litchi_ooxml_common::xml::{decode_xml_reference, extract_omml_formulas};
-use quick_xml::events::Event;
+use quick_xml::events::{BytesStart, Event};
 use quick_xml::{Reader, XmlVersion};
 use smallvec::SmallVec;
 use std::borrow::Cow;
@@ -301,19 +301,18 @@ impl Run {
 
         let mut props = RunProperties::default();
         let mut text = String::with_capacity(self.xml_bytes().len() / 8);
-        let mut in_r_pr = false;
+        let mut scope = OwnProperties::default();
         let mut in_text_element = false;
 
         loop {
             match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     let name = e.local_name();
+                    let placement = scope.start(&e);
 
                     if name.as_ref() == b"t" {
                         in_text_element = true;
-                    } else if name.as_ref() == b"rPr" {
-                        in_r_pr = true;
-                    } else {
+                    } else if placement != Placement::Container {
                         match name.as_ref() {
                             b"tab" => text.push('\t'),
                             b"br" | b"cr" => text.push('\n'),
@@ -321,7 +320,7 @@ impl Run {
                             b"softHyphen" => text.push('\u{00ad}'),
                             _ => {},
                         }
-                        if in_r_pr {
+                        if placement == Placement::Property {
                             update_run_properties(&mut props, &e)?;
                         }
                     }
@@ -335,7 +334,7 @@ impl Run {
                         b"softHyphen" => text.push('\u{00ad}'),
                         _ => {},
                     }
-                    if in_r_pr {
+                    if scope.empty(&e) == Placement::Property {
                         update_run_properties(&mut props, &e)?;
                     }
                 },
@@ -357,12 +356,10 @@ impl Run {
                     text.push_str(&decode_xml_reference(&reference)?);
                 },
                 Ok(Event::End(e)) => {
-                    let name = e.local_name();
-                    if name.as_ref() == b"t" {
+                    if e.local_name().as_ref() == b"t" {
                         in_text_element = false;
-                    } else if name.as_ref() == b"rPr" {
-                        in_r_pr = false;
                     }
+                    scope.end();
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(Error::Xml(e.to_string())),
@@ -410,24 +407,25 @@ impl Run {
         reader.config_mut().trim_text(true);
 
         let mut props = RunProperties::default();
-        let mut in_r_pr = false;
+        let mut scope = OwnProperties::default();
 
         loop {
             match reader.read_event() {
                 Ok(Event::Start(e)) => {
-                    let name = e.local_name();
-                    if name.as_ref() == b"rPr" {
-                        in_r_pr = true;
-                    } else if in_r_pr {
+                    if scope.start(&e) == Placement::Property {
                         update_run_properties(&mut props, &e)?;
                     }
                 },
-                Ok(Event::Empty(e)) if in_r_pr && e.local_name().as_ref() != b"rPr" => {
-                    update_run_properties(&mut props, &e)?;
+                Ok(Event::Empty(e)) => {
+                    if scope.empty(&e) == Placement::Property {
+                        update_run_properties(&mut props, &e)?;
+                    }
                 },
-                Ok(Event::End(e)) if e.local_name().as_ref() == b"rPr" => {
-                    // The effects snapshot is parsed from the same run fragment below.
-                    break;
+                Ok(Event::End(_)) => {
+                    if scope.end() {
+                        // The effects snapshot is parsed from the same run fragment below.
+                        break;
+                    }
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(Error::Xml(e.to_string())),
@@ -452,35 +450,36 @@ impl Run {
         let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 
-        let mut in_r_pr = false;
+        let mut scope = OwnProperties::default();
 
         loop {
-            match reader.read_event() {
-                Ok(Event::Start(e) | Event::Empty(e)) => {
-                    let name = e.local_name();
-                    if name.as_ref() == b"rPr" {
-                        in_r_pr = true;
-                    } else if in_r_pr && name.as_ref() == b"vertAlign" {
-                        for attr in first_wins(&e).flatten() {
-                            if attr.key.local_name().as_ref() == b"val" {
-                                let value = attr.value.as_ref();
-                                match value {
-                                    b"superscript" => {
-                                        return Ok(Some(VerticalPosition::Superscript));
-                                    },
-                                    b"subscript" => return Ok(Some(VerticalPosition::Subscript)),
-                                    _ => {},
-                                }
-                            }
-                        }
-                    }
+            let (element, placement) = match reader.read_event() {
+                Ok(Event::Start(e)) => {
+                    let placement = scope.start(&e);
+                    (e, placement)
                 },
-                Ok(Event::End(e)) if e.local_name().as_ref() == b"rPr" => {
-                    in_r_pr = false;
+                Ok(Event::Empty(e)) => {
+                    let placement = scope.empty(&e);
+                    (e, placement)
+                },
+                Ok(Event::End(_)) => {
+                    scope.end();
+                    continue;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(Error::Xml(e.to_string())),
-                _ => {},
+                _ => continue,
+            };
+            if placement == Placement::Property && element.local_name().as_ref() == b"vertAlign" {
+                for attr in first_wins(&element).flatten() {
+                    if attr.key.local_name().as_ref() == b"val" {
+                        match attr.value.as_ref() {
+                            b"superscript" => return Ok(Some(VerticalPosition::Superscript)),
+                            b"subscript" => return Ok(Some(VerticalPosition::Subscript)),
+                            _ => {},
+                        }
+                    }
+                }
             }
         }
 
@@ -499,34 +498,37 @@ impl Run {
         let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 
-        let mut in_r_pr = false;
+        let mut scope = OwnProperties::default();
 
         loop {
-            match reader.read_event() {
-                Ok(Event::Start(e) | Event::Empty(e)) => {
-                    let name = e.local_name();
-                    if name.as_ref() == b"rPr" {
-                        in_r_pr = true;
-                    } else if in_r_pr && name.as_ref() == b"rFonts" {
-                        for attr in first_wins(&e).flatten() {
-                            if attr.key.local_name().as_ref() == b"ascii" {
-                                let value = attr
-                                    .decoded_and_normalized_value(
-                                        XmlVersion::Implicit1_0,
-                                        reader.decoder(),
-                                    )
-                                    .unwrap_or(Cow::Borrowed(""));
-                                return Ok(Some(value.to_string()));
-                            }
-                        }
-                    }
+            let (e, placement) = match reader.read_event() {
+                Ok(Event::Start(e)) => {
+                    let placement = scope.start(&e);
+                    (e, placement)
                 },
-                Ok(Event::End(e)) if e.local_name().as_ref() == b"rPr" => {
-                    break;
+                Ok(Event::Empty(e)) => {
+                    let placement = scope.empty(&e);
+                    (e, placement)
+                },
+                Ok(Event::End(_)) => {
+                    if scope.end() {
+                        break;
+                    }
+                    continue;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(Error::Xml(e.to_string())),
-                _ => {},
+                _ => continue,
+            };
+            if placement == Placement::Property && e.local_name().as_ref() == b"rFonts" {
+                for attr in first_wins(&e).flatten() {
+                    if attr.key.local_name().as_ref() == b"ascii" {
+                        let value = attr
+                            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                            .unwrap_or(Cow::Borrowed(""));
+                        return Ok(Some(value.to_string()));
+                    }
+                }
             }
         }
 
@@ -546,31 +548,37 @@ impl Run {
         let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 
-        let mut in_r_pr = false;
+        let mut scope = OwnProperties::default();
 
         loop {
-            match reader.read_event() {
-                Ok(Event::Start(e) | Event::Empty(e)) => {
-                    let name = e.local_name();
-                    if name.as_ref() == b"rPr" {
-                        in_r_pr = true;
-                    } else if in_r_pr && name.as_ref() == b"sz" {
-                        for attr in first_wins(&e).flatten() {
-                            if attr.key.local_name().as_ref() == b"val"
-                                && let Ok(value) = std::str::from_utf8(&attr.value)
-                                && let Ok(size) = value.parse::<u32>()
-                            {
-                                return Ok(Some(size));
-                            }
-                        }
-                    }
+            let (e, placement) = match reader.read_event() {
+                Ok(Event::Start(e)) => {
+                    let placement = scope.start(&e);
+                    (e, placement)
                 },
-                Ok(Event::End(e)) if e.local_name().as_ref() == b"rPr" => {
-                    break;
+                Ok(Event::Empty(e)) => {
+                    let placement = scope.empty(&e);
+                    (e, placement)
+                },
+                Ok(Event::End(_)) => {
+                    if scope.end() {
+                        break;
+                    }
+                    continue;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(Error::Xml(e.to_string())),
-                _ => {},
+                _ => continue,
+            };
+            if placement == Placement::Property && e.local_name().as_ref() == b"sz" {
+                for attr in first_wins(&e).flatten() {
+                    if attr.key.local_name().as_ref() == b"val"
+                        && let Ok(value) = std::str::from_utf8(&attr.value)
+                        && let Ok(size) = value.parse::<u32>()
+                    {
+                        return Ok(Some(size));
+                    }
+                }
             }
         }
 
@@ -600,35 +608,119 @@ impl Run {
         let mut reader = Reader::from_reader(self.xml_bytes());
         reader.config_mut().trim_text(true);
 
-        let mut in_r_pr = false;
+        let mut scope = OwnProperties::default();
 
         loop {
-            match reader.read_event() {
-                Ok(Event::Start(e) | Event::Empty(e)) => {
-                    let name = e.local_name();
-                    if name.as_ref() == b"rPr" {
-                        in_r_pr = true;
-                    } else if in_r_pr && name.as_ref() == property_name {
-                        // Check for w:val attribute
-                        for attr in first_wins(&e).flatten() {
-                            if attr.key.local_name().as_ref() == b"val" {
-                                let value = attr.value.as_ref();
-                                return Ok(Some(is_on(value)));
-                            }
-                        }
-                        // Element present without val attribute means true
-                        return Ok(Some(true));
-                    }
+            let (e, placement) = match reader.read_event() {
+                Ok(Event::Start(e)) => {
+                    let placement = scope.start(&e);
+                    (e, placement)
                 },
-                Ok(Event::End(e)) if e.local_name().as_ref() == b"rPr" => {
-                    in_r_pr = false;
+                Ok(Event::Empty(e)) => {
+                    let placement = scope.empty(&e);
+                    (e, placement)
+                },
+                Ok(Event::End(_)) => {
+                    scope.end();
+                    continue;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(Error::Xml(e.to_string())),
-                _ => {},
+                _ => continue,
+            };
+            if placement == Placement::Property && e.local_name().as_ref() == property_name {
+                // Check for w:val attribute
+                for attr in first_wins(&e).flatten() {
+                    if attr.key.local_name().as_ref() == b"val" {
+                        let value = attr.value.as_ref();
+                        return Ok(Some(is_on(value)));
+                    }
+                }
+                // Element present without val attribute means true
+                return Ok(Some(true));
             }
         }
 
         Ok(None)
     }
 }
+
+/// Where an element sits relative to the run's own `w:rPr`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Placement {
+    /// The run's own `w:rPr`.
+    Container,
+    /// A direct child of the run's own `w:rPr`: one of its properties.
+    Property,
+    /// Anything else: run content, a `w:rPrChange` snapshot's properties,
+    /// or the runs of a text box or phonetic guide inside the run.
+    Other,
+}
+
+/// Depth tracking that confines the single-property readers to the run's
+/// own `w:rPr`: a direct child of the fragment's root, or the root itself
+/// for an `rPr` fragment.
+///
+/// Until this was added the readers took the first matching element below
+/// any `w:rPr`, so a run without a direct property reported the previous
+/// formatting kept in its `w:rPrChange`, or the formatting of a run nested
+/// in a text box it contains (finding F-8 of record 0010). Names keep the
+/// readers' established local-name matching; [`Run::direct_properties`]
+/// also checks namespaces.
+#[derive(Default)]
+struct OwnProperties {
+    depth: usize,
+    /// The depth of the run's own `w:rPr` while it is open.
+    container: Option<usize>,
+}
+
+impl OwnProperties {
+    /// Whether `element`, at `depth`, can be the run's own `w:rPr`. The
+    /// local name is only computed at the two depths where it can.
+    fn is_container(&self, depth: usize, element: &BytesStart<'_>) -> bool {
+        self.container.is_none()
+            && matches!(depth, 1 | 2)
+            && element.local_name().as_ref() == b"rPr"
+    }
+
+    /// Classify a start tag and enter it.
+    #[inline]
+    fn start(&mut self, element: &BytesStart<'_>) -> Placement {
+        self.depth = self.depth.saturating_add(1);
+        if self.container.is_some_and(|depth| depth + 1 == self.depth) {
+            Placement::Property
+        } else if self.is_container(self.depth, element) {
+            self.container = Some(self.depth);
+            Placement::Container
+        } else {
+            Placement::Other
+        }
+    }
+
+    /// Classify a self-closing tag.
+    #[inline]
+    fn empty(&self, element: &BytesStart<'_>) -> Placement {
+        if self.container == Some(self.depth) {
+            Placement::Property
+        } else if self.is_container(self.depth.saturating_add(1), element) {
+            Placement::Container
+        } else {
+            Placement::Other
+        }
+    }
+
+    /// Leave an element; returns whether it was the run's own `w:rPr`.
+    #[inline]
+    fn end(&mut self) -> bool {
+        let closed = self.container == Some(self.depth);
+        if closed {
+            self.container = None;
+        }
+        self.depth = self.depth.saturating_sub(1);
+        closed
+    }
+}
+
+#[cfg(test)]
+#[path = "run_scope_tests.rs"]
+mod scope_tests;

@@ -265,6 +265,24 @@ impl Paragraph {
         let _parser_admission = self.parser_admission()?;
         parse_spacing(self.xml_bytes())
     }
+
+    /// Read this paragraph's direct (local) properties, the children of its
+    /// own `w:pPr`, as typed values, including the paragraph mark's run
+    /// properties.
+    ///
+    /// This reads every property in one pass, resolves names by namespace,
+    /// and never reports a property it cannot type: see the
+    /// [`crate::properties`] module for the rules.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for XML that is not well-formed, a root that is not
+    /// a WordprocessingML `w:p`, a second `w:pPr`, or an execution limit of
+    /// a source-backed paragraph.
+    pub fn direct_properties(&self) -> Result<crate::properties::Paragraph> {
+        let _parser_admission = self.parser_admission()?;
+        crate::properties::parse_paragraph(self.xml_bytes(), &self.xml_data.inherited_namespaces()?)
+    }
 }
 
 fn parse_spacing(xml_bytes: &[u8]) -> Result<Option<ParagraphSpacing>> {

@@ -41,6 +41,7 @@ mod open_options;
 pub mod package;
 pub mod paragraph;
 pub mod parts;
+pub mod properties;
 pub mod redact;
 pub mod revision;
 pub mod run_effects;
@@ -183,8 +184,9 @@ pub use math::{OfficeMath, OfficeMathParagraph};
 pub use open_options::{OpenOptions, OpenPolicy};
 pub use package::Package;
 pub use paragraph::{
-    Collapsed, Inline, InlineHyperlink, OpaqueInline, OpaqueRunContent, Paragraph, Run, RunBreak,
-    RunBreakClear, RunBreakType, RunContent, RunProperties, RunUnderline, RunUnderlineColor,
+    Collapsed, Inline, InlineHyperlink, InlineKind, OpaqueInline, OpaqueRunContent, Paragraph, Run,
+    RunBreak, RunBreakClear, RunBreakType, RunContent, RunProperties, RunUnderline,
+    RunUnderlineColor,
 };
 pub use run_effects::{Effect, Effects, OpaqueExtension};
 pub use section::{Emu, Margins, PageSize, Section, Sections};

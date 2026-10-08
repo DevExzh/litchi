@@ -1,5 +1,6 @@
 //! Semantic layers for the paragraph codec.
 
+mod addressable;
 mod content;
 mod editing;
 mod inlines;

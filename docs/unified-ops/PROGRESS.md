@@ -525,3 +525,15 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 - Added feature-isolated, encryption-mode and byte-publication coverage; see
   record 0044. Managed lazy bytes, immutable publication, owner consolidation
   and the full unified-operations goal remain active.
+
+
+## 0045 — typed DOCX direct property reads
+
+- Added typed run, paragraph, table, row and cell property projections plus the
+  positional run set and inline classification needed by the formatting work.
+- Adapted the earlier M1 leaf candidate to inherited namespace bindings, strict
+  attribute checks, content-free diagnostics and touched-view Debug output.
+  Run and cell reads exclude nested owners and revision snapshots.
+- Added bounded fuzz coverage and corpus/regression checks. Record 0045 lists
+  source provenance, verification and remaining scope. M1/M2 and the complete
+  all-format goal remain active; no candidate branch history was merged.
