@@ -476,3 +476,16 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
   deterministic 1,024-mode smoke driver. Record 0040 documents results.
 - Owner consolidation, semantic/crypto policy migration and the wider unified
   goal remain active; no complete milestone or performance gain is claimed.
+
+
+## 0041 — lazy DOCX canonical publication and atomic save
+
+- Replaced lazy Package::to_stream with write_to and migrated callers; added
+  save (Full durability) and save_with_durability over retained effective graphs.
+- Shared OPC atomic staging admits its fixed buffer to the destination owner's
+  context and checks caller source state after file sync, before replacement.
+  Pre-rename failures preserve the destination; post-rename sync errors retain
+  their Committed classification.
+- Record 0041 documents durability, preservation, refusal and cleanup tests.
+- Owning/specialized output names, budgeted to_bytes, owner consolidation and
+  the wider unified goal remain active. No complete family is claimed.

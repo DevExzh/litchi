@@ -939,7 +939,7 @@ fn effective_owner_reads_publishes_and_materializes_current_graph() {
         "after"
     );
     let mut bytes = Vec::new();
-    changed.to_stream(&mut bytes).unwrap();
+    changed.write_to(&mut bytes).unwrap();
     let reopened = SourceBackedPackage::from_vec(bytes).unwrap();
     assert!(
         reopened
@@ -1101,7 +1101,7 @@ fn effective_owner_checks_donor_fences_through_source_version() {
     assert!(owner.document().is_err());
     assert!(owner.to_owned_package().is_err());
     let mut sink = Vec::new();
-    assert!(owner.to_stream(&mut sink).is_err());
+    assert!(owner.write_to(&mut sink).is_err());
     assert!(sink.is_empty());
     assert_eq!(view.extract_text().unwrap(), "donor");
 }
@@ -1204,9 +1204,9 @@ fn retained_semantic_patches_chain_and_inverse_without_reopening() {
             .apply(&first.patch().inverse())
             .unwrap();
         let mut before = Vec::new();
-        source.to_stream(&mut before).unwrap();
+        source.write_to(&mut before).unwrap();
         let mut after = Vec::new();
-        restored.to_stream(&mut after).unwrap();
+        restored.write_to(&mut after).unwrap();
         assert_eq!(before, after);
         assert_eq!(current.document().unwrap().extract_text().unwrap(), "first");
         assert_eq!(source.document().unwrap().extract_text().unwrap(), "before");
@@ -1257,7 +1257,7 @@ fn retained_semantic_apply_preserves_graph_edits_and_effective_protection() {
                 .unwrap();
             let next = canonical.commit().unwrap().into_package();
             let mut bytes = Vec::new();
-            next.to_stream(&mut bytes).unwrap();
+            next.write_to(&mut bytes).unwrap();
             let package = SourceBackedPackage::from_vec(bytes).unwrap();
             assert!(package.part(&settings).is_ok());
             assert!(

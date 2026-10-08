@@ -947,7 +947,7 @@ fn managed_signed_noop_and_equal_setter_preserve_exact_source() {
     let retained_noop = retained.edit().unwrap().commit().unwrap();
     let applied = retained.apply(retained_noop.patch()).unwrap();
     let mut retained_output = Vec::new();
-    applied.to_stream(&mut retained_output).unwrap();
+    applied.write_to(&mut retained_output).unwrap();
     assert_eq!(retained_output, source);
     drop(applied);
     drop(retained_noop);

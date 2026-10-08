@@ -48,7 +48,7 @@ impl Package {
     }
 
     /// Publish the effective package, preserving unchanged physical members.
-    pub fn to_stream<W: Write>(&self, writer: W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, writer: W) -> Result<()> {
         match &self.effective {
             Some(topology) => Ok(topology.publish_to_stream(writer)?),
             None => Ok(self
@@ -56,6 +56,37 @@ impl Package {
                 .clone()
                 .write_topology_to_stream(writer, SourceTopologyPlan::new())?),
         }
+    }
+
+    /// Save the effective package with full durability and atomic replacement.
+    /// A failure before replacement preserves the destination and removes the
+    /// sibling temporary file. A post-replacement directory-sync failure remains
+    /// a typed [`litchi_opc::OpcError::Committed`] error.
+    pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
+        self.save_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Atomically save with an explicit synchronization policy.
+    /// Every level uses a sibling temporary file and rename. Only the selected
+    /// file/directory syncs differ. Managed saves admit the staging buffer in the
+    /// destination owner’s execution context, as are publication workspace and
+    /// output. An unmanaged destination has unmanaged staging even when it
+    /// retains managed donors; donor policies still govern donor reads and
+    /// retention, and every donor is included in the final fence. Source state is checked again
+    /// after staging and file sync, immediately before replacement.
+    pub fn save_with_durability(
+        &self,
+        path: impl AsRef<Path>,
+        durability: litchi_core::Durability,
+    ) -> Result<()> {
+        self.check_source()?;
+        litchi_opc::atomic::replace_guarded_with_durability(
+            path.as_ref(),
+            durability,
+            self.execution.as_ref(),
+            |sink| self.write_to(sink),
+            || self.check_source(),
+        )
     }
 
     /// Apply an exact-source main-document patch into a new immutable owner.

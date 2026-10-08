@@ -668,7 +668,7 @@ fn sequential_options_preserve_read_ahead_and_publication_release() {
     .unwrap();
     assert!(package.source_read_diagnostics().unwrap().unwrap().enabled);
     let mut output = Vec::new();
-    package.to_stream(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     assert_eq!(output, bytes);
     assert!(!package.source_read_diagnostics().unwrap().unwrap().enabled);
     assert!(budget.used(Resource::Memory) >= bytes.len() as u64);
@@ -711,7 +711,7 @@ fn sequential_default_and_cache_options_preserve_archive_limits_and_bytes() {
         )
         .unwrap();
         let mut output = Vec::new();
-        package.to_stream(&mut output).unwrap();
+        package.write_to(&mut output).unwrap();
         assert_eq!(output, bytes);
         assert!(
             matches!(source_backed::Package::from_reader_with_options(&bytes[..],

@@ -68,10 +68,10 @@ composition (`join`, `three_way`), durable patch formats beyond pptx/xlsx.
 | Open from reader | `from_reader(R)` | — | ✅ docx/xlsx; extended per wave |
 | Configured open | `open_with_options(path, OpenOptions)`, `from_bytes_with_options(bytes, OpenOptions)` | `open_with_limits`, `open_with` (doc), `open_with_options` under other type names | envelope decided in §5 |
 | Minimal fresh artifact | `Package::new()` | `Workbook::create()` duplicate (xlsx) | ✅ docx/pptx · 🔴 xlsx (W2); all formats gain it |
-| Save to path | `save(path)` — **always atomic** (sibling temp + rename) | non-atomic `Builder::save` (odt/odp) | ✅ OOXML · 🔴 ODF (W3, behavior change with CRUD evidence) |
+| Save to path | `save(path)` — **always atomic** (sibling temp + rename) | non-atomic `Builder::save` (odt/odp) | ✅ OOXML, including lazy DOCX (0041) · 🔴 ODF (W3, behavior change with CRUD evidence) |
 | Save with explicit durability | `save_with_durability(path, Durability)` | — | ✅ OOXML; extended everywhere |
 | Bytes output | `to_bytes()` | `Builder::build() -> Vec<u8>` as output (ODF) | `build()` returns `Package`; output lives on `Package` |
-| Stream output | `write_to(impl Write)` | `to_stream`, `write_to_stream` | 🔴 W2 |
+| Stream output | `write_to(impl Write)` | `to_stream`, `write_to_stream` | ✅ lazy DOCX Package (0041); 🔴 owning/specialized routes and W2 |
 | Open encrypted | `open_with_password(path, password)` | — | ✅ where encryption exists; ODF keeps same name |
 | Save encrypted / re-encrypted | `save_encrypted(path, pw, Mode)` / `save_reencrypted(path, pw)` | — | ✅ OOXML |
 | Explicit plain output | `save_plain(path)` / `to_plain_bytes()` | — | ✅ OOXML; the only plain output of an encrypted source |

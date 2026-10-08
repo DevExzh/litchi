@@ -618,7 +618,7 @@ impl Edit<crate::source_backed::Package> {
     /// let (package, patch) = commit.into_parts();
     /// assert!(patch.is_noop());
     /// let mut output = Vec::new();
-    /// package.to_stream(&mut output)?;
+    /// package.write_to(&mut output)?;
     /// assert_eq!(output, bytes);
     /// # Ok(())
     /// # }

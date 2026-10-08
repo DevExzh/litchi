@@ -335,3 +335,91 @@ fn filesystem_path_errors_are_typed() {
             )
     ));
 }
+
+#[test]
+fn atomic_save_preserves_physical_bytes_at_each_durability() {
+    let directory = tempfile::tempdir().unwrap();
+    let (path, bytes) = write_fixture(&directory, "saved");
+    let (budget, context) = managed_context(4 << 20);
+    let package = source_backed::Package::open_with_options(
+        &path,
+        litchi_docx::OpenOptions::default().execution_context(context),
+    )
+    .unwrap();
+    for durability in [
+        litchi_core::Durability::Full,
+        litchi_core::Durability::FileOnly,
+        litchi_core::Durability::NoSync,
+    ] {
+        let destination = directory.path().join("saved.docx");
+        fs::write(&destination, b"previous").unwrap();
+        package
+            .save_with_durability(&destination, durability)
+            .unwrap();
+        assert_eq!(fs::read(destination).unwrap(), bytes);
+        assert_eq!(budget.used(Resource::Memory), 0);
+        assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 2);
+    }
+}
+
+#[test]
+fn atomic_save_publishes_effective_edit_over_original_path() {
+    let directory = tempfile::tempdir().unwrap();
+    let (path, original) = write_fixture(&directory, "before");
+    let source = source_backed::Package::open(&path).unwrap();
+    let mut edit = source.edit().unwrap();
+    edit.replace_paragraph_text(litchi_core::Position::new(0), "after")
+        .unwrap();
+    let changed = edit.commit().unwrap().into_package();
+    changed.save(&path).unwrap();
+    let output = fs::read(&path).unwrap();
+    assert_eq!(
+        package_part_payload(&output, UNUSED),
+        package_part_payload(&original, UNUSED)
+    );
+    let reopened = source_backed::Package::open(&path).unwrap();
+    assert_eq!(
+        reopened.document().unwrap().extract_text().unwrap(),
+        "after"
+    );
+    assert_eq!(source.document().unwrap().extract_text().unwrap(), "before");
+    assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+}
+
+#[test]
+fn atomic_save_of_changed_source_preserves_destination() {
+    let directory = tempfile::tempdir().unwrap();
+    let (path, _) = write_fixture(&directory, "before");
+    let package = source_backed::Package::open(&path).unwrap();
+    let destination = directory.path().join("destination.docx");
+    fs::write(&destination, b"sentinel").unwrap();
+    fs::write(&path, fixture("changed source")).unwrap();
+    assert!(package.save(&destination).is_err());
+    assert_eq!(fs::read(destination).unwrap(), b"sentinel");
+    assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 2);
+}
+
+#[test]
+fn atomic_save_output_refusal_preserves_destination_and_releases_memory() {
+    let directory = tempfile::tempdir().unwrap();
+    let (path, _) = write_fixture(&directory, "before");
+    let budget = Budget::root(
+        "refused-save",
+        CoreLimits::new(4 << 20, u64::MAX, 1, u64::MAX, u64::MAX, u64::MAX),
+    );
+    let (_, token) = CancellationSource::pair();
+    let (_, template) = managed_context(4 << 20);
+    let context = ExecutionContext::new(budget.clone(), token, template.limits());
+    let package = source_backed::Package::open_with_options(
+        &path,
+        litchi_docx::OpenOptions::default().execution_context(context),
+    )
+    .unwrap();
+    let destination = directory.path().join("destination.docx");
+    fs::write(&destination, b"sentinel").unwrap();
+    assert!(package.save(&destination).is_err());
+    assert_eq!(fs::read(destination).unwrap(), b"sentinel");
+    assert_eq!(budget.used(Resource::Memory), 0);
+    assert!(budget.used(Resource::OutputBytes) <= 1);
+    assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 2);
+}

@@ -204,6 +204,11 @@
           "name": "from_reader_with_limits",
           "scope": "litchi_docx::source_backed::Package",
           "replacement": "use from_reader_with_options"
+        },
+        {
+          "name": "to_stream",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use write_to"
         }
       ],
       "families": []
@@ -408,6 +413,11 @@
           "name": "from_reader_with_limits",
           "scope": "litchi_docx::source_backed::Package",
           "replacement": "use from_reader_with_options"
+        },
+        {
+          "name": "to_stream",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use write_to"
         }
       ],
       "families": []

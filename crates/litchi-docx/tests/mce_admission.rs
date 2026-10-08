@@ -605,7 +605,7 @@ fn witness_matrix_on_both_owners_and_the_managed_route() {
                     .commit()
                     .unwrap_or_else(|error| panic!("{label}: {error}"));
                 let mut published = Vec::new();
-                commit.package().to_stream(&mut published).unwrap();
+                commit.package().write_to(&mut published).unwrap();
                 owner = eager_edit.commit().unwrap().into_package();
                 let mut saved = Vec::new();
                 owner.to_stream(&mut saved).unwrap();
