@@ -198,6 +198,35 @@ pub fn read_source_backed_with_report(
     Ok(Some(props))
 }
 
+/// Read relationship-selected core properties from a retained effective graph.
+///
+/// Added, replaced and removed Parts and relationships follow the effective
+/// catalog. Only the selected payload is loaded. Graph and XML repair rules
+/// match [`read_with_report`], including absence and dialect handling.
+/// Base and donor source/execution fences are checked on success and failure.
+///
+/// # Errors
+/// Returns graph, XML, resource, source or execution errors.
+pub fn read_prepared_with_report(
+    package: &litchi_opc::PreparedTopology,
+    report: &mut ToleranceReport,
+) -> Result<Option<Props>> {
+    package.check_source()?;
+    let result = (|| {
+        let graph = graph::inspect_prepared(package, report)?;
+        let Some(part_name) = graph.part else {
+            return Ok(None);
+        };
+        let data = package.part(&part_name)?.data()?;
+        package.check_execution()?;
+        let props = decode_selected(data.as_bytes(), part_name.as_str(), graph.dialect, report)?;
+        package.check_execution()?;
+        Ok(Some(props))
+    })();
+    package.check_source()?;
+    result
+}
+
 /// Decode core-properties XML strictly: every deviation [`read_with_report`]
 /// repairs is
 /// an error here.

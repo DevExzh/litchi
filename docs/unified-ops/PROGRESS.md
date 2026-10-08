@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0033 | Effective source DOCX metadata reads | shared property graph/decoder integrated; remaining specialized routes pending |
 | 0032 | Typed primary DOCX transaction limits | typed kind/count fields migrated; configurable limits and broader policy pending |
 | 0031 | Canonical source DOCX package-owning Edit/Commit | primary owner migrated; specialized families, limits and performance pending |
 | 0030 | Immutable retained DOCX semantic apply | main-document apply integrated; independent managed donor snapshots refused |
@@ -372,3 +373,15 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
   Public boundary/rollback and durable overflow tests accompany the migration.
 - Caller-selected semantic limits, other error families, policy vocabulary and
   full family registration remain open. See 0032 for verification and scope.
+
+
+## 0033 — metadata on retained source owners
+
+- Source DOCX metadata now follows effective property payloads and relationships,
+  including canonical commit owners, additions/redirection and removal.
+- A common OOXML prepared-graph adapter reuses existing property validation,
+  repairs and decoding. Only the selected payload is decoded.
+- Base/donor fences cover success and errors; repair reports stay per-owner and
+  deduplicate repeated reads. Managed donor cancellation/release is tested.
+- Other specialized reads and metadata writes remain pending. Record 0033
+  documents verification, allocation limits and the remaining full-goal scope.

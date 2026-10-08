@@ -1125,23 +1125,28 @@ impl Package {
     }
 
     /// Read relationship-selected OOXML core properties without loading the
-    /// main document or unrelated package members.
+    /// main document or unrelated package members. Retained owners resolve the
+    /// effective graph, including edited relationships and property payloads.
     ///
     /// A missing core-properties relationship yields empty metadata. Present
-    /// properties retain the shared strict graph and dialect validation used
-    /// by eager OOXML readers. Source freshness is checked before and after
+    /// properties retain the shared graph validation and dialect repair rules
+    /// used by eager OOXML readers. Source freshness is checked before and after
     /// the selected payload read by the common source-backed property reader;
     /// execution cancellation is checked at the same boundaries.
     pub fn metadata(&self) -> Result<litchi_core::Metadata> {
         self.trim_clean_paragraph_index_for_operation();
-        self.physical_package()?.check_execution()?;
+        self.check_source()?;
         let mut repaired = litchi_ooxml_common::leniency::ToleranceReport::default();
-        let properties = litchi_ooxml_common::properties::read_source_backed_with_report(
-            self.physical_package()?,
-            &mut repaired,
-        );
-        self.physical_package()?.source_version()?;
-        self.physical_package()?.check_execution()?;
+        let properties = match &self.effective {
+            Some(topology) => {
+                litchi_ooxml_common::properties::read_prepared_with_report(topology, &mut repaired)
+            },
+            None => litchi_ooxml_common::properties::read_source_backed_with_report(
+                &self.physical,
+                &mut repaired,
+            ),
+        };
+        self.check_source()?;
         let properties = properties?;
         let mut tolerance = self
             .tolerance

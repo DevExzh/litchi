@@ -11,7 +11,7 @@ mod read;
 pub mod time;
 mod write;
 
-pub use read::{read_source_backed_with_report, read_with_report};
+pub use read::{read_prepared_with_report, read_source_backed_with_report, read_with_report};
 pub use write::{clear, write};
 
 use crate::Result;

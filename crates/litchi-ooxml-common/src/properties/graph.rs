@@ -16,7 +16,7 @@ pub(super) struct Graph {
 /// Inspect the graph strictly, as the writer needs it: every anomaly is an
 /// error, so a write never acts on an ambiguous graph.
 pub(super) fn inspect(package: &OpcPackage) -> Result<Graph> {
-    inspect_parts(|| package.iter_parts(), package.rels(), || Ok(()), None)
+    inspect_parts(|| Ok(package.iter_parts()), package.rels(), || Ok(()), None)
 }
 
 /// Inspect the graph for a read, repairing and recording the anomalies of
@@ -26,7 +26,7 @@ pub(super) fn inspect_tolerant(
     report: &mut ToleranceReport,
 ) -> Result<Graph> {
     inspect_parts(
-        || package.iter_parts(),
+        || Ok(package.iter_parts()),
         package.rels(),
         || Ok(()),
         Some(report),
@@ -44,12 +44,28 @@ pub(super) fn inspect_source(
 ) -> Result<Graph> {
     package.source_version()?;
     let result = inspect_parts(
-        || package.iter_parts(),
+        || Ok(package.iter_parts()),
         package.rels(),
         || Ok(package.check_execution()?),
         Some(report),
     );
     package.source_version()?;
+    result
+}
+
+/// Inspect a retained effective graph through the same tolerant graph policy.
+pub(super) fn inspect_prepared(
+    package: &litchi_opc::PreparedTopology,
+    report: &mut ToleranceReport,
+) -> Result<Graph> {
+    package.check_source()?;
+    let result = inspect_parts(
+        || Ok(package.iter_parts()?),
+        package.rels(),
+        || Ok(package.check_execution()?),
+        Some(report),
+    );
+    package.check_source()?;
     result
 }
 
@@ -101,6 +117,18 @@ impl GraphPart for PartView<'_> {
     }
 }
 
+impl GraphPart for litchi_opc::PreparedPartView {
+    fn graph_partname(&self) -> &PackURI {
+        self.partname()
+    }
+    fn graph_content_type(&self) -> &str {
+        self.content_type()
+    }
+    fn graph_rels(&self) -> &Relationships {
+        self.rels()
+    }
+}
+
 /// Locate the relationship-selected core-properties part.
 ///
 /// With a `report`, the graph anomalies Word, LibreOffice and POI read past
@@ -118,7 +146,7 @@ fn inspect_parts<F, I, P, C>(
     mut report: Option<&mut ToleranceReport>,
 ) -> Result<Graph>
 where
-    F: Fn() -> I,
+    F: Fn() -> Result<I>,
     I: IntoIterator<Item = P>,
     P: GraphPart,
     C: FnMut() -> Result<()>,
@@ -126,7 +154,7 @@ where
     let mut core_part = None;
     // Further core-typed parts, tolerated only on the read path.
     let mut extra_core_parts = Vec::new();
-    for part in parts() {
+    for part in parts()? {
         check()?;
         if part.graph_content_type() == ct::OPC_CORE_PROPERTIES {
             if core_part.is_some() {
@@ -213,7 +241,7 @@ where
         ))
     })?;
     let mut actual = None;
-    for part in parts() {
+    for part in parts()? {
         check()?;
         if !same_name(part.graph_partname(), &requested) {
             continue;

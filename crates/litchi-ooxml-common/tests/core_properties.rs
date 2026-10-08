@@ -79,3 +79,39 @@ fn absent_core_properties_are_idempotent() {
         Some("Created")
     );
 }
+
+#[test]
+fn retained_metadata_graph_matches_eager_repairs_and_refusals() {
+    use litchi_opc::{PackageWriter, SourceBackedPackage, SourceTopologyPlan};
+    for (relationship, content_type, external) in [
+        (STRICT_REL, ct::OPC_CORE_PROPERTIES, false),
+        (rt::CORE_PROPERTIES, ct::OPC_CORE_PROPERTIES, false),
+        (STRICT_REL, "application/xml", false),
+        (STRICT_REL, ct::OPC_CORE_PROPERTIES, true),
+    ] {
+        let mut package = OpcPackage::new();
+        package.add_part(Box::new(BlobPart::new(PackURI::new(CORE_PATH).unwrap(), content_type.to_owned(), format!("<cp:coreProperties xmlns:cp=\"{STRICT_NS}\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\"><dc:title>first</dc:title><dc:title>duplicate</dc:title></cp:coreProperties>").into_bytes())));
+        if external {
+            package.relate_to_external("https://example.invalid/core.xml", relationship);
+        } else {
+            package.relate_to(CORE_PATH.trim_start_matches('/'), relationship);
+        }
+        let physical =
+            SourceBackedPackage::from_vec(PackageWriter::to_bytes(&package).unwrap()).unwrap();
+        let prepared = physical
+            .prepare_topology(SourceTopologyPlan::new())
+            .unwrap();
+        let mut expected_report = litchi_ooxml_common::leniency::ToleranceReport::default();
+        let expected = properties::read_with_report(&package, &mut expected_report);
+        let mut actual_report = litchi_ooxml_common::leniency::ToleranceReport::default();
+        let actual = properties::read_prepared_with_report(&prepared, &mut actual_report);
+        match (expected, actual) {
+            (Ok(expected), Ok(actual)) => {
+                assert_eq!(actual, expected);
+                assert_eq!(actual_report, expected_report);
+            },
+            (Err(expected), Err(actual)) => assert_eq!(actual.to_string(), expected.to_string()),
+            (expected, actual) => panic!("graph parity differs: {expected:?} / {actual:?}"),
+        }
+    }
+}

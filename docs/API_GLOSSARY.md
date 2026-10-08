@@ -405,3 +405,13 @@ This does not migrate wrapped OPC/source-story errors or add caller-selected
 SemanticLimits. Full family registration and the remaining policy contracts are
 still pending. Existing overflow guards retain their documented saturated
 `usize::MAX` sentinel.
+
+
+## 25. Source DOCX effective metadata (record 0033)
+
+`source_backed::Package::metadata()` now reads retained effective core properties
+through a shared OOXML graph adapter and decoder. Canonical commit owners can
+read metadata; property payloads, relationship redirection and absence follow
+that owner's graph. Source/donor fences and per-owner repair deduplication remain
+active. Other specialized read/transaction routes and canonical metadata writes
+remain pending.
