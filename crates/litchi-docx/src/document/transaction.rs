@@ -2,6 +2,7 @@
 
 #[cfg(test)]
 mod attribute_tests;
+mod debug;
 mod durable;
 #[cfg(test)]
 mod publication_proof_tests;
@@ -254,14 +255,14 @@ impl ParagraphHyperlinkAddress {
 }
 
 /// Authored text paired with one owner-scoped direct hyperlink address.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct HyperlinkTextReplacement {
     address: ParagraphHyperlinkAddress,
     text: String,
 }
 
 /// Authored text paired with one direct-body paragraph position.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct ParagraphTextReplacement {
     position: Position,
     text: String,
@@ -316,7 +317,7 @@ impl HyperlinkTextReplacement {
 /// Dependency-checked paragraph payload prepared for one exact receiving
 /// document. Package planning rewrites relationship references to dependencies
 /// already proven present in the receiver before constructing this value.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct ParagraphTransfer {
     target: Arc<Vec<u8>>,
     fragment: Arc<Vec<u8>>,
@@ -353,7 +354,7 @@ impl ParagraphTransfer {
 ///
 /// Package planning and publication own its bounded contents; callers retain
 /// it only when inspecting or replaying a native operation.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct TransferGraph {
     pub(crate) main_relationships: Arc<[TransferRelationship]>,
     pub(crate) parts: Arc<[TransferPart]>,
@@ -399,7 +400,7 @@ impl RevisionKind {
 
 /// Typed reason why a cross-package paragraph dependency closure cannot be
 /// represented without copying or guessing package resources.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum TransferRefusal {
     /// A relationship reference in the donor paragraph is dangling.
@@ -458,7 +459,7 @@ impl std::fmt::Display for TransferRefusal {
 }
 
 /// A main-document transaction failure.
-#[derive(Debug, Error)]
+#[derive(Error)]
 #[non_exhaustive]
 pub enum Error {
     /// The underlying DOCX document or package is invalid.
@@ -932,7 +933,7 @@ impl XmlStorage {
 }
 
 /// An immutable, cheaply clonable snapshot of the main document XML.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Snapshot {
     xml: XmlStorage,
     paragraphs: Arc<[Range]>,
@@ -1585,7 +1586,7 @@ impl Snapshot {
 }
 
 /// A semantic main-document operation recorded in a reversible patch.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Operation {
     /// Replace the complete text of one direct-body paragraph.
@@ -2139,7 +2140,6 @@ pub enum CompactionPolicy {
 }
 
 /// A staged main-document edit.
-#[derive(Debug)]
 pub struct Edit {
     base: Snapshot,
     projected: Snapshot,
@@ -5269,7 +5269,7 @@ impl Commit {
 }
 
 /// A reversible, exact-source-checked main-document patch.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Patch {
     before: Snapshot,
     after: Snapshot,
@@ -5300,10 +5300,13 @@ impl Patch {
         self.operations.as_slice()
     }
 
-    /// Whether this patch changes the exact main-document bytes.
+    /// Whether this patch preserves the exact main-document source.
+    ///
+    /// Staged operations can cancel each other; the final source/target identity
+    /// determines no-op status, independently of the operation count.
     #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.before.same_source(&self.after)
+    pub fn is_noop(&self) -> bool {
+        self.before.same_source(&self.after)
     }
 
     /// Return the exact inverse patch.
@@ -5331,7 +5334,7 @@ impl Patch {
         if !source.same_source(&self.before) {
             return Err(Error::StaleSource);
         }
-        Ok(if self.changed() {
+        Ok(if !self.is_noop() {
             self.after.clone()
         } else {
             source.clone()
@@ -5357,7 +5360,7 @@ impl Patch {
         if !self.before.retains_exact_unmanaged_xml(bytes) {
             return None;
         }
-        Some(if self.changed() {
+        Some(if !self.is_noop() {
             self.after.clone()
         } else {
             self.before.clone()
@@ -10418,7 +10421,7 @@ mod tests {
             CompactionPolicy::WholeDocument,
         ] {
             let commit = base.edit().with_compaction_policy(policy).commit().unwrap();
-            assert!(!commit.patch().changed());
+            assert!(commit.patch().is_noop());
             assert_eq!(commit.snapshot().xml_bytes(), base.xml_bytes());
         }
     }
@@ -11179,7 +11182,7 @@ mod tests {
             .unwrap();
         let commit = edit.commit().unwrap();
 
-        assert!(!commit.patch().changed());
+        assert!(commit.patch().is_noop());
         assert!(commit.patch().operations().is_empty());
         assert!(matches!(
             (&source.xml, &commit.snapshot().xml),

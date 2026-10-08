@@ -224,7 +224,7 @@ fn a_semantic_edit_of_a_marked_main_part_matches_the_unmarked_edit() {
         edit.replace_paragraph_text(Position::new(4), "").unwrap();
         let commit = edit.commit().unwrap();
         *package = commit.package().clone();
-        format!("{}|{}", commit.patch().changed(), observe(package))
+        format!("{}|{}", !commit.patch().is_noop(), observe(package))
     });
     assert!(kept.contains("word/document.xml"), "{kept:?}");
 }

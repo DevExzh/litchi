@@ -411,7 +411,7 @@ fn an_exact_no_op_commit_still_shares_its_source_allocation() {
     let xml = document("<w:p><w:r><w:t>a</w:t></w:r></w:p><w:sectPr/>");
     let base = Snapshot::from_shared_xml(Arc::new(xml)).unwrap();
     let commit = base.edit().commit().unwrap();
-    assert!(!commit.patch().changed());
+    assert!(commit.patch().is_noop());
     assert!(std::ptr::eq(
         commit.snapshot().xml_bytes(),
         base.xml_bytes()

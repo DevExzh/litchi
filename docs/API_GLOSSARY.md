@@ -342,3 +342,13 @@ current effective payload and shares the edit path's provenance checks.
 that identity is not a logical revision/cache key. These are low-level OPC
 owner facilities. Canonical source DOCX projections/commits and complete
 transaction-family registration remain pending.
+
+## 20. Main-document patch and Debug policy (record 0027)
+
+The primary DOCX `document::Patch` exposes `is_noop()`; its former `changed()`
+method is removed and banned in both DOCX profiles. Commit diagnostics retain
+`changed()`. In-tree publishers, examples and performance consumers are migrated.
+
+Main-document transaction Debug output now omits XML, authored text, transfer
+metadata and local composition identifiers/conflicts. Error Display and shared
+core diagnostics remain pending; this does not register a complete family.

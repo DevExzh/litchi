@@ -1227,7 +1227,7 @@ fn exact_source_patch_reuse_keeps_noop_arcs_stale_conflicts_and_scan_errors() {
     // main-part payload allocation.
     let main_before = package.opc.main_document_part().unwrap().blob_arc();
     let noop = package.edit().unwrap().commit().unwrap();
-    assert!(!noop.patch().changed());
+    assert!(noop.patch().is_noop());
     let next = package.apply(noop.patch()).unwrap();
     let published = next.document_snapshot().unwrap();
     let main_after_noop = package.opc.main_document_part().unwrap().blob_arc();

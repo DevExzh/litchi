@@ -1270,7 +1270,7 @@ fn execute_api(
     let commit_ns = phase_elapsed(commit_started)?;
 
     let diagnostics_xml_identity_started = phase_start(config.phase_diagnostics);
-    let commit_changed = commit.patch().changed();
+    let commit_changed = !commit.patch().is_noop();
     let commit_operations = commit.diagnostics().operations();
     let commit_identity_verified = commit.patch().source().xml_bytes()
         == prepared.source_document_xml.as_slice()

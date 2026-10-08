@@ -34485,7 +34485,7 @@ fn run_semantic_docx(
                 package = commit.package().clone();
                 package.to_stream(&mut sink)?;
                 let duration = started.elapsed();
-                if commit.patch().changed() == selected.is_empty()
+                if commit.patch().is_noop() != selected.is_empty()
                     || commit.diagnostics().operations() != selected.len()
                 {
                     return Err("semantic DOCX commit has an unexpected operation count".into());
@@ -49176,7 +49176,7 @@ fn publish_docx_source_edit<W: Write>(
     let mut edit = package.edit()?;
     edit.replace_paragraph_text(Position::new(target), semantic_docx_text(target, true))?;
     let commit = edit.commit()?;
-    if !commit.patch().changed() || commit.diagnostics().operations() != 1 {
+    if commit.patch().is_noop() || commit.diagnostics().operations() != 1 {
         return Err("DOCX source edit produced unexpected commit diagnostics".into());
     }
     let materializations = usize::try_from(package.cache_diagnostics().successful_loads)?;

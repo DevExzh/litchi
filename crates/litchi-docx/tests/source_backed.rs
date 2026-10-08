@@ -468,7 +468,7 @@ fn rolled_back_document_operations_use_the_exact_signed_source_path() {
     let commit = edit.commit().unwrap();
 
     assert_eq!(commit.patch().operations().len(), 2);
-    assert!(!commit.patch().changed());
+    assert!(commit.patch().is_noop());
     let mut output = Vec::new();
     package
         .publish_document_commit_to_stream(&mut output, &commit)

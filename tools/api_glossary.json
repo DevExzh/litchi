@@ -49,6 +49,11 @@
           "name": "snapshot",
           "scope": "litchi_docx::document::Commit",
           "replacement": "use Commit::package()"
+        },
+        {
+          "name": "changed",
+          "scope": "litchi_docx::document::Patch",
+          "replacement": "use Patch::is_noop(); Diagnostics::changed() describes commits"
         }
       ],
       "families": []
@@ -98,6 +103,11 @@
           "name": "snapshot",
           "scope": "litchi_docx::document::Commit",
           "replacement": "use Commit::package()"
+        },
+        {
+          "name": "changed",
+          "scope": "litchi_docx::document::Patch",
+          "replacement": "use Patch::is_noop(); Diagnostics::changed() describes commits"
         }
       ],
       "families": []

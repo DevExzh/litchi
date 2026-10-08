@@ -293,3 +293,14 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
   limits and execution accessors avoid requiring a parallel raw package owner.
 - Canonical source DOCX integration still needs one effective read/publish adapter
   and logical cache keys. Record 0026 documents those requirements and evidence.
+
+## 0027 — DOCX patch predicate and Debug policy
+
+- Primary main-document `Patch::is_noop()` replaces `changed()` without an alias;
+  commit `Diagnostics::changed()` remains. Publishers and harness consumers are
+  migrated, and both DOCX glossary profiles enforce the new name.
+- Main-document snapshots, patches, operations, transfers, replacement inputs
+  and local error/composition wrappers use content-free Debug formatting.
+- Regression tests cover compact/pretty output and byte-vector disclosure.
+  Display and shared-core diagnostics remain separate open policy work.
+- Record 0027 contains verification and the remaining canonical owner scope.

@@ -1576,7 +1576,7 @@ impl Package {
         self.trim_clean_paragraph_index_for_operation();
         let (main, current) = self.main_document_snapshot_with_before(
             "publish_document_commit_to_stream",
-            commit.patch().changed(),
+            !commit.patch().is_noop(),
             Some(commit.patch().source()),
         )?;
         let target = commit.patch().apply(&current)?;
@@ -1599,10 +1599,10 @@ impl Package {
         // byte-identity check is allowed to select the exact-source path;
         // this also avoids asking a rewritten target to stand in for an
         // unsupported source payload.
-        if commit.patch().changed() {
+        if !commit.patch().is_noop() {
             document_policy::validate_changed_document(self)?;
         }
-        if !commit.patch().changed() {
+        if commit.patch().is_noop() {
             self.package
                 .clone()
                 .write_part_overlays_shared_to_stream(writer, Vec::new())

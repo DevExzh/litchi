@@ -574,7 +574,7 @@ impl Edit {
     /// let commit = edit.commit()?;
     /// assert!(!commit.diagnostics().changed());
     /// let (package, patch) = commit.into_parts();
-    /// assert!(!patch.changed());
+    /// assert!(patch.is_noop());
     /// assert_eq!(package.document()?.paragraph_count()?, 0);
     /// # Ok(())
     /// # }

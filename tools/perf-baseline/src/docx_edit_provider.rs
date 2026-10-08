@@ -952,7 +952,7 @@ fn run_sample(
     let started = Instant::now();
     let (materializations, commit) =
         crate::publish_docx_source_edit(Arc::clone(&provider.source), &mut sink)?;
-    let commit_changed = commit.patch().changed();
+    let commit_changed = !commit.patch().is_noop();
     let commit_operations = commit.diagnostics().operations();
     let commit_identity_verified = commit.patch().source().xml_bytes()
         == prepared.source_document_xml.as_slice()

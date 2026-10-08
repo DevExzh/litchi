@@ -821,7 +821,7 @@ fn run_child(args: &[OsString]) -> Result<(), Box<dyn Error>> {
             let source_version_before = source.version()?;
             let (materializations, commit) =
                 crate::publish_docx_source_edit(Arc::clone(&source), &mut sink)?;
-            let changed = commit.patch().changed();
+            let changed = !commit.patch().is_noop();
             let operations = commit.diagnostics().operations();
             let commit_identity_verified = commit.patch().source().xml_bytes()
                 == case.source_document_xml.as_slice()

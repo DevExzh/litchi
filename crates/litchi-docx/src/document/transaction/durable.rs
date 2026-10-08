@@ -103,8 +103,8 @@ impl fmt::Debug for PreparedEdit {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("PreparedEdit")
-            .field("identifier", &self.identifier())
-            .field("operations", &self.operations())
+            .field("identifier_bytes", &self.identifier().len())
+            .field("operations", &self.operations().len())
             .finish()
     }
 }
@@ -133,7 +133,6 @@ impl fmt::Debug for JoinError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("JoinError")
-            .field("failure", &self.failure)
             .field("rejected", &self.rejected)
             .finish()
     }
@@ -225,7 +224,6 @@ impl fmt::Debug for ThreeWayError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("ThreeWayError")
-            .field("failure", &self.failure)
             .finish_non_exhaustive()
     }
 }
@@ -278,7 +276,7 @@ impl fmt::Debug for ThreeWayPlan {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("ThreeWayPlan")
-            .field("conflicts", self.conflicts())
+            .field("conflicts", &self.conflicts().len())
             .finish_non_exhaustive()
     }
 }

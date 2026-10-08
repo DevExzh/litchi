@@ -307,7 +307,7 @@ fn exact_no_ops_republish_every_fixture_byte_for_byte() {
         let original = fixture(name);
         let package = source(&original);
         let commit = package.edit().unwrap().commit().unwrap();
-        assert!(!commit.patch().changed());
+        assert!(commit.patch().is_noop());
         let mut published = Vec::new();
         package
             .publish_document_commit_to_stream(&mut published, &commit)

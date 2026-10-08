@@ -130,7 +130,7 @@ impl Package {
             // The rescanned route proves the payload in `document_snapshot`;
             // a reused candidate is held to the same admission before it is
             // published, however its source snapshot was built.
-            if patch.changed() {
+            if !patch.is_noop() {
                 self.admit_main_document(&main.blob_arc(), "apply")?;
             }
             return Ok(DocumentPatchSource::Reused(candidate));
@@ -185,7 +185,7 @@ impl Package {
             DocumentPatchSource::Reused(candidate) => candidate,
             DocumentPatchSource::Rescanned(current) => patch.apply(&current)?,
         };
-        if !patch.changed() {
+        if patch.is_noop() {
             return Ok(candidate);
         }
         // Protection and tracked revisions refuse a changed publication here
@@ -239,7 +239,7 @@ impl Package {
         if history.current().xml_bytes() != commit.patch().source().xml_bytes() {
             return Err(crate::document::Error::StaleSource);
         }
-        if !commit.patch().changed() {
+        if commit.patch().is_noop() {
             self.publish_patch(commit.patch())?;
             return Ok(Vec::new());
         }
