@@ -1,5 +1,21 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0973 — fresh instruction-profile pilot stops on event loss
+
+[0973](0973-instruction-profile-loss-gate.md) starts the fresh
+`FloatingPictures/e1/default` pilot under the sealed ASLR-safe helper and
+controls, but child 01 records two `PERF_RECORD_LOST` records totaling eight
+lost samples. The independent audit confirms the separate
+`PERF_RECORD_LOST_SAMPLES` trailer value of eight is the same end counter, not
+additional loss. Native execution exits rc0 and the corrected packet shows
+6,931 sample records, 947 marker samples, 947,000,000 marker period, and zero
+empty chains; the stock decode has 4,540 empty chains. The runner exits 2 at
+the loss gate, does not retry, and never starts children 02–12. The 21-bound
+artifact, raw-range, identity, and reparse checks pass, but these decode counts
+remain descriptive and are not a timing, owner, speedup, or qualification
+baseline. A future capture-loss design is required; no gate relaxation, retry,
+or production change follows.
+
 ## 0972 — offline callchain recovery corrects the 0971 raw diagnosis
 
 [0972](0972-instruction-profile-recovery.md) replays the immutable 0971

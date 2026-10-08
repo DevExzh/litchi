@@ -1,0 +1,631 @@
+{
+  "admission": {
+    "all_twelve_marker_gate_passed": true,
+    "all_twelve_packets_loaded": true,
+    "all_twelve_reduced": true,
+    "later_child_gate_mutations_rejected": true,
+    "native_run_rejects_test_boundary_before_subprocess": true,
+    "parser_ownership_control_passed": true,
+    "unknown_or_overlapping_owner_policy": "not reassigned; production parser fields retained"
+  },
+  "build_started": false,
+  "controls": {
+    "later_child_lost": {
+      "error": "child-02: per-child marker gate failed or was altered",
+      "error_type": "ProtocolError",
+      "status": "rejected"
+    },
+    "later_child_marker_threshold": {
+      "error": "child-02: per-child marker gate failed or was altered",
+      "error_type": "ProtocolError",
+      "status": "rejected"
+    },
+    "later_child_zero_share": {
+      "error": "child-02: per-child marker gate failed or was altered",
+      "error_type": "ProtocolError",
+      "status": "rejected"
+    },
+    "mutated_command": {
+      "error": "child-01: native command environment mismatch",
+      "error_type": "ProtocolError",
+      "status": "rejected"
+    },
+    "mutated_cpu": {
+      "error": "launcher affinity is not exactly CPU 31",
+      "error_type": "ProtocolError",
+      "status": "rejected"
+    },
+    "mutated_dso": {
+      "error": "marker symbol resolved in unexpected DSO: '/wrong/dso'",
+      "error_type": "ProtocolError",
+      "status": "rejected"
+    },
+    "mutated_helper_hash": {
+      "error": "helper binding mismatch: reducer",
+      "error_type": "ProtocolError",
+      "status": "rejected"
+    },
+    "mutated_layout": {
+      "error": "synthetic dynamic layout mutation accepted",
+      "error_type": "ProtocolError",
+      "status": "rejected"
+    },
+    "mutated_period": {
+      "error": "perf sample period changed: 1000001 != 1000000",
+      "error_type": "ProtocolError",
+      "status": "rejected"
+    },
+    "mutated_pid": {
+      "error": "launcher PID/exec PID binding invalid",
+      "error_type": "ProtocolError",
+      "status": "rejected"
+    },
+    "mutated_raw_binding": {
+      "error": "0973 packet artifact raw_stack: SHA mismatch (c6668415bce2d063cc1231042b16ee97f11ce3487fa8e3e69ef86664a2663b46 != 0000000000000000000000000000000000000000000000000000000000000000)",
+      "error_type": "ProtocolError",
+      "status": "rejected"
+    },
+    "mutated_raw_stack": {
+      "error": "raw STACK_USER period/cap contract drift",
+      "error_type": "ProtocolError",
+      "status": "rejected"
+    },
+    "mutated_report": {
+      "error": "child-01: report custody mismatch",
+      "error_type": "ProtocolError",
+      "status": "rejected"
+    },
+    "undeclared_raw_boundary_mock": {
+      "error": "missing plan binding aslr_control",
+      "error_type": "ProtocolError",
+      "status": "rejected"
+    }
+  },
+  "created_utc": "2026-10-08T04:37:09.396127+00:00",
+  "fixture": {
+    "manifest": {
+      "bytes": 1480,
+      "path": "/home/zhuhe/litchi-performance-0973/synthetic-packet-e2e-v4/manifest.json",
+      "sha256": "0425f813cb5fe17075a891b64104970793cb8cb9fe2dd95530de053a4fd9ff85"
+    },
+    "packet_count": 12,
+    "packet_paths": [
+      "/home/zhuhe/litchi-performance-0973/synthetic-packet-e2e-v4/packets/child-01/packet.json",
+      "/home/zhuhe/litchi-performance-0973/synthetic-packet-e2e-v4/packets/child-02/packet.json",
+      "/home/zhuhe/litchi-performance-0973/synthetic-packet-e2e-v4/packets/child-03/packet.json",
+      "/home/zhuhe/litchi-performance-0973/synthetic-packet-e2e-v4/packets/child-04/packet.json",
+      "/home/zhuhe/litchi-performance-0973/synthetic-packet-e2e-v4/packets/child-05/packet.json",
+      "/home/zhuhe/litchi-performance-0973/synthetic-packet-e2e-v4/packets/child-06/packet.json",
+      "/home/zhuhe/litchi-performance-0973/synthetic-packet-e2e-v4/packets/child-07/packet.json",
+      "/home/zhuhe/litchi-performance-0973/synthetic-packet-e2e-v4/packets/child-08/packet.json",
+      "/home/zhuhe/litchi-performance-0973/synthetic-packet-e2e-v4/packets/child-09/packet.json",
+      "/home/zhuhe/litchi-performance-0973/synthetic-packet-e2e-v4/packets/child-10/packet.json",
+      "/home/zhuhe/litchi-performance-0973/synthetic-packet-e2e-v4/packets/child-11/packet.json",
+      "/home/zhuhe/litchi-performance-0973/synthetic-packet-e2e-v4/packets/child-12/packet.json"
+    ],
+    "plan": {
+      "bytes": 13821,
+      "path": "/home/zhuhe/litchi-performance-0973/synthetic-packet-e2e-v4/plan.json",
+      "sha256": "c21fda2dea771e0e13dd22a15682b6dbf54f45226462ea305c5c9e6637da1538"
+    },
+    "root": "/home/zhuhe/litchi-performance-0973/synthetic-packet-e2e-v4"
+  },
+  "layout_mock_calls": 22,
+  "mock_boundary": {
+    "bypassed_plan_bindings": [
+      "aslr_control (synthetic boundary plan branch deliberately omits native ASLR receipt)",
+      "synthetic_e2e self-receipt (the fixture is the E2E under test; no circular self-binding)"
+    ],
+    "layout_check": "protocol_common_0973_v2.check_layout replaced only by synthetic custody/layout validator",
+    "native_perf_or_workload": false,
+    "not_bypassed": [
+      "v2 plan immutable bindings except the explicitly test-only boundary branch",
+      "12 packet artifact custody and terminal/command/launch/report/layout/raw-stack checks",
+      "strict PID/TID/CPU/event/period perf-script parsing",
+      "v2 reducer and all-child marker gate"
+    ],
+    "raw_stack": "protocol_common_0973_v2.check_raw_stack_summary accepted explicit plan.synthetic_boundary declaration"
+  },
+  "parser_ownership_controls": {
+    "inclusive_sum_period": 4000000,
+    "known_inclusive_ancestor_period": {
+      "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::doc_retention_probe_0942_cfb_profile::profiled_measured_case": 1000000,
+      "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::synthetic::ancestor_a": 1000000,
+      "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::synthetic::ancestor_b": 1000000,
+      "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::synthetic::leaf": 1000000
+    },
+    "known_physical_leaf_period": {
+      "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::synthetic::leaf": 1000000
+    },
+    "no_double_counting": true,
+    "status": "pass",
+    "unknown_inclusive_ancestor_period": {
+      "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::doc_retention_probe_0942_cfb_profile::profiled_measured_case": 1000000,
+      "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::synthetic::resolved_parent": 1000000
+    },
+    "unknown_marker_samples": 1,
+    "unknown_physical_leaf_period": 1000000,
+    "unknown_resolved_parent_proxy_period": {
+      "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::synthetic::resolved_parent": 1000000
+    }
+  },
+  "production_v2_helpers": {
+    "plan_generator": {
+      "bytes": 7927,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/prepare_plan_0973_v2.py",
+      "sha256": "c3beab19960e0a7b4d73f252aa015c6b398508f2bf4e33cb6ace4b271129f65f"
+    },
+    "protocol": {
+      "bytes": 39589,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/protocol_common_0973_v2.py",
+      "sha256": "56b509fde01bbd66702ac8cd835da0d09d74d332935926078c6545093ed52bf4"
+    },
+    "raw_stack": {
+      "bytes": 13746,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/raw_stack_0973_v2.py",
+      "sha256": "3a8e36ebc5f21f4f0b8293cafa675d722f2264fb1cfd6c7f48271b4f0a5056d2"
+    },
+    "reducer": {
+      "bytes": 31359,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/reduce_0973_v2.py",
+      "sha256": "f33f14724f6264d87b2c3a0082c16bca711787140d06f3c7cfdd6e78b6f4c63b"
+    },
+    "runner": {
+      "bytes": 20510,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/run_0973_v2.py",
+      "sha256": "f4f7af4ec8b8bb1818f3ce25dec046c8b8ad7c23d0a2611c76e24bf10b6aef5d"
+    },
+    "shim_map": {
+      "bytes": 107,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/dwfl_dynamic_shim_v2.map",
+      "sha256": "d0a7914c5cb02770073db94dc4d2b207a95ae513b436c661d8a9c9a206aefef6"
+    },
+    "shim_so": {
+      "bytes": 16672,
+      "path": "/home/zhuhe/litchi-performance-0973/replay-dwfl-v2/dwfl_dynamic_shim_v2.so",
+      "sha256": "92b256588622a97b0e32a8de2a6149d3e5dce0b2eda3e614ff42daf91279bb03"
+    },
+    "shim_source": {
+      "bytes": 10001,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/dwfl_dynamic_shim_v2.c",
+      "sha256": "6600804eb94fbb81c6b26facc07ff28dc6df101cc75e7a2d2859eb12167f1551"
+    }
+  },
+  "production_v2_helpers_after": {
+    "plan_generator": {
+      "bytes": 7927,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/prepare_plan_0973_v2.py",
+      "sha256": "c3beab19960e0a7b4d73f252aa015c6b398508f2bf4e33cb6ace4b271129f65f"
+    },
+    "protocol": {
+      "bytes": 39589,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/protocol_common_0973_v2.py",
+      "sha256": "56b509fde01bbd66702ac8cd835da0d09d74d332935926078c6545093ed52bf4"
+    },
+    "raw_stack": {
+      "bytes": 13746,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/raw_stack_0973_v2.py",
+      "sha256": "3a8e36ebc5f21f4f0b8293cafa675d722f2264fb1cfd6c7f48271b4f0a5056d2"
+    },
+    "reducer": {
+      "bytes": 31359,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/reduce_0973_v2.py",
+      "sha256": "f33f14724f6264d87b2c3a0082c16bca711787140d06f3c7cfdd6e78b6f4c63b"
+    },
+    "runner": {
+      "bytes": 20510,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/run_0973_v2.py",
+      "sha256": "f4f7af4ec8b8bb1818f3ce25dec046c8b8ad7c23d0a2611c76e24bf10b6aef5d"
+    },
+    "shim_map": {
+      "bytes": 107,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/dwfl_dynamic_shim_v2.map",
+      "sha256": "d0a7914c5cb02770073db94dc4d2b207a95ae513b436c661d8a9c9a206aefef6"
+    },
+    "shim_so": {
+      "bytes": 16672,
+      "path": "/home/zhuhe/litchi-performance-0973/replay-dwfl-v2/dwfl_dynamic_shim_v2.so",
+      "sha256": "92b256588622a97b0e32a8de2a6149d3e5dce0b2eda3e614ff42daf91279bb03"
+    },
+    "shim_source": {
+      "bytes": 10001,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/dwfl_dynamic_shim_v2.c",
+      "sha256": "6600804eb94fbb81c6b26facc07ff28dc6df101cc75e7a2d2859eb12167f1551"
+    }
+  },
+  "production_v2_helpers_before": {
+    "plan_generator": {
+      "bytes": 7927,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/prepare_plan_0973_v2.py",
+      "sha256": "c3beab19960e0a7b4d73f252aa015c6b398508f2bf4e33cb6ace4b271129f65f"
+    },
+    "protocol": {
+      "bytes": 39589,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/protocol_common_0973_v2.py",
+      "sha256": "56b509fde01bbd66702ac8cd835da0d09d74d332935926078c6545093ed52bf4"
+    },
+    "raw_stack": {
+      "bytes": 13746,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/raw_stack_0973_v2.py",
+      "sha256": "3a8e36ebc5f21f4f0b8293cafa675d722f2264fb1cfd6c7f48271b4f0a5056d2"
+    },
+    "reducer": {
+      "bytes": 31359,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/reduce_0973_v2.py",
+      "sha256": "f33f14724f6264d87b2c3a0082c16bca711787140d06f3c7cfdd6e78b6f4c63b"
+    },
+    "runner": {
+      "bytes": 20510,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/run_0973_v2.py",
+      "sha256": "f4f7af4ec8b8bb1818f3ce25dec046c8b8ad7c23d0a2611c76e24bf10b6aef5d"
+    },
+    "shim_map": {
+      "bytes": 107,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/dwfl_dynamic_shim_v2.map",
+      "sha256": "d0a7914c5cb02770073db94dc4d2b207a95ae513b436c661d8a9c9a206aefef6"
+    },
+    "shim_so": {
+      "bytes": 16672,
+      "path": "/home/zhuhe/litchi-performance-0973/replay-dwfl-v2/dwfl_dynamic_shim_v2.so",
+      "sha256": "92b256588622a97b0e32a8de2a6149d3e5dce0b2eda3e614ff42daf91279bb03"
+    },
+    "shim_source": {
+      "bytes": 10001,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/dwfl_dynamic_shim_v2.c",
+      "sha256": "6600804eb94fbb81c6b26facc07ff28dc6df101cc75e7a2d2859eb12167f1551"
+    }
+  },
+  "revalidation": {
+    "accepted_adr_bytes": 3153393,
+    "accepted_adr_count": 33,
+    "accepted_adr_sha256": [
+      "813bf4faf62cedac56fbfa3bf9b7600121b42a3ed5d4cec0028f8c8f2ac2798e",
+      "73f4372ef6948f5a36c83fbf27a96f0b1f680225f331f201c470e04913417719",
+      "9200d3546d91f1604d44a9ade7ad0a6bdea50b6442d12a0517b09db5e8e802ef",
+      "acc23f6b2d334ed1dc1f088d420ddaeee17661cd74a963036935b482b276b393",
+      "8279fd2dc0b074aa104bf0c83df6187d12e18756cd8c8d7f25750b2a997cb0aa",
+      "ae21189eda0acc9524a7c5a57e87bb3566405ede5c015c87105e01337666f44b",
+      "8808b79dcb35eaeaa6be778b5a9593101dd302f866ef20ff4f8fdf8df5d8b100",
+      "5c72d79a7ba78a044471b40ba22ab3f32f7b8f4f878614ab05b416e60b0163a2",
+      "1e9d8a7de81a6d36d03f67acd9887b2b1debbe0727b278a4118d4577c90b5437",
+      "4e1af2c4019842d187804f8356299aa80ba8a6abd8d35a4a021e1bce3c2a6590",
+      "3a1644536af0b66fed47c1a154e829c0e0008cccb89dec679a0328036d305e04",
+      "44cc6b58237288bfc919fc9c8f4b9a0bd89e8c7d611a7c05b7da8ecd3e0d1eae",
+      "9aba58d68e54bcf75c371ba30ce97f92c46f1fc57a8ca7b06351fbcce10d6600",
+      "5667f580efc4650bdb6874143528d237ac04bddd8386e6ff2d2d8b76ca20bdad",
+      "dd0b0cd2f9beebee61cb70582ea6c6cac61105a412e5e5929ccfd05af66aef43",
+      "b9afa735a0b94ea4cedf8a68af9c6a8d2484f17d10e34bc0a464872e8cdc8023",
+      "0d5e076c1e940f7c35c6c907f2291d4adfb731c64e6fe077af45c922b92be046",
+      "7007d34208fdd2e2072f2126b71a79a369e9ef753cb6905c2677a211e1675f7b",
+      "8195cb3c4663d3e503cd58b3fe14cfcf398e812cd56716d2c2b65fc58b49aa63",
+      "6d3a23493e12913220a91ba94e6c1cc61e09aed55ea69c03350ad8e0f0829461",
+      "a6dad467defd96651e8bdc56110dcc85213cc83570c88eaa9aad780188b650e3",
+      "d2672e0413d93cbb295f57fad45d004645a02b6173875f081975fc12c3c5543c",
+      "e906a090afac6de32c338b190927cc4932e01a138b74f527b14284c78fee40a9",
+      "cc134b2a4eb8797a3769cf815f1f09618fd26e215bd7305de1c9890093dbb1b6",
+      "a3370829c8ff45d9c54c5347591ae2dbb1c43ae4bb7f5f5c612a8c52e6f8a6ea",
+      "20e1ebef0bbf3ecd7a4e49964e1c90500688f75a537faa21a09dbf46a3ea9532",
+      "f5333e1a245ccbfe8391219830359de01e1c40e9609401df2abe061600ac8580",
+      "d746f84441a6623c8a6e3731701e614c39544467433615ad83af001da4e52023",
+      "d3f246d7cfb61975a703d1cb47b7ec441f506436ec09e2ea3bcf9c29b1b02df2",
+      "f0a2a679aeb4578f6ca3c4a762e546a820493d27dd205a462ffe2ba89c9f1561",
+      "ce7e16baa101cfdd8abfc6d606dc0a56fad6d86cc79eba997d338f919a063eb3",
+      "33e68f71a2845132ff53aec30422300194b1bc40caa6dd9503848278e342ed70",
+      "2af0e5814378c2765c12213e495d02c2895a27f142bc618ca1f3037824bbe028"
+    ],
+    "goal": {
+      "bytes": 35839,
+      "path": "/home/zhuhe/code/litchi/docs/GOAL.md",
+      "sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1"
+    },
+    "receipt": {
+      "bytes": 8182,
+      "path": "/home/zhuhe/litchi-performance-0973/receipts/adr-goal-revalidation-0973-v1.json",
+      "sha256": "80dc8af647aa4992f2281262e7be5bde40ac192aa1d392b0fc5d6525052d7d90"
+    },
+    "receipt_status": "pass"
+  },
+  "runner_boundary_rejection": {
+    "go_opened": false,
+    "rejection": "synthetic_boundary is test-only and cannot be used for --run",
+    "status": "pass",
+    "subprocess_reached": false
+  },
+  "schema": "litchi.performance.0973.synthetic_packet_pipeline_author_v2.v1",
+  "scope": "offline synthetic 12-packet E2E; no native workload/build",
+  "status": "pass",
+  "valid_pipeline": {
+    "d_m_r_periods": {
+      "D": [
+        111000000.0,
+        122000000.0,
+        113000000.0,
+        124000000.0,
+        115000000.0,
+        126000000.0,
+        117000000.0,
+        128000000.0,
+        119000000.0,
+        130000000.0,
+        121000000.0,
+        132000000.0
+      ],
+      "M": [
+        101000000.0,
+        102000000.0,
+        103000000.0,
+        104000000.0,
+        105000000.0,
+        106000000.0,
+        107000000.0,
+        108000000.0,
+        109000000.0,
+        110000000.0,
+        111000000.0,
+        112000000.0
+      ],
+      "R": [
+        10000000.0,
+        20000000.0,
+        10000000.0,
+        20000000.0,
+        10000000.0,
+        20000000.0,
+        10000000.0,
+        20000000.0,
+        10000000.0,
+        20000000.0,
+        10000000.0,
+        20000000.0
+      ]
+    },
+    "d_m_r_variance_ledger": {
+      "D_label": "total sampled instructions:u period",
+      "M_label": "marker-containing sampled period",
+      "R_label": "marker ancestry not observed",
+      "covariance_M_R": 2500000000000.0,
+      "identity_error": 0.0,
+      "identity_passed": true,
+      "rhs": 41916666666666.664,
+      "scope": "all 12 children; population variance/covariance",
+      "variance_D": 41916666666666.664,
+      "variance_M": 11916666666666.666,
+      "variance_R": 25000000000000.0
+    },
+    "inclusive_owner_periods": {
+      "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::doc_retention_probe_0942_cfb_profile::profiled_measured_case": [
+        101000000.0,
+        102000000.0,
+        103000000.0,
+        104000000.0,
+        105000000.0,
+        106000000.0,
+        107000000.0,
+        108000000.0,
+        109000000.0,
+        110000000.0,
+        111000000.0,
+        112000000.0
+      ],
+      "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::synthetic::leaf_even": [
+        0.0,
+        102000000.0,
+        0.0,
+        104000000.0,
+        0.0,
+        106000000.0,
+        0.0,
+        108000000.0,
+        0.0,
+        110000000.0,
+        0.0,
+        111000000.0
+      ],
+      "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::synthetic::leaf_odd": [
+        101000000.0,
+        0.0,
+        103000000.0,
+        0.0,
+        105000000.0,
+        0.0,
+        107000000.0,
+        0.0,
+        109000000.0,
+        0.0,
+        111000000.0,
+        0.0
+      ],
+      "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::synthetic::stage_timed_commit": [
+        101000000.0,
+        102000000.0,
+        103000000.0,
+        104000000.0,
+        105000000.0,
+        106000000.0,
+        107000000.0,
+        108000000.0,
+        109000000.0,
+        110000000.0,
+        111000000.0,
+        112000000.0
+      ]
+    },
+    "marker_period_all_12": [
+      101000000,
+      102000000,
+      103000000,
+      104000000,
+      105000000,
+      106000000,
+      107000000,
+      108000000,
+      109000000,
+      110000000,
+      111000000,
+      112000000
+    ],
+    "marker_physical_unknown_conservation_all_12": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "marker_sample_count_all_12": [
+      101,
+      102,
+      103,
+      104,
+      105,
+      106,
+      107,
+      108,
+      109,
+      110,
+      111,
+      112
+    ],
+    "non_marker_period_all_12": [
+      10000000.0,
+      20000000.0,
+      10000000.0,
+      20000000.0,
+      10000000.0,
+      20000000.0,
+      10000000.0,
+      20000000.0,
+      10000000.0,
+      20000000.0,
+      10000000.0,
+      20000000.0
+    ],
+    "nonmarker_owner_excluded": true,
+    "owner_associations": {
+      "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::synthetic::leaf_even": [
+        false,
+        true,
+        false,
+        true,
+        false,
+        true,
+        false,
+        true,
+        false,
+        true,
+        false,
+        true
+      ],
+      "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::synthetic::leaf_odd": [
+        true,
+        false,
+        true,
+        false,
+        true,
+        false,
+        true,
+        false,
+        true,
+        false,
+        true,
+        false
+      ]
+    },
+    "owner_periods": {
+      "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::synthetic::leaf_even": [
+        0.0,
+        102000000.0,
+        0.0,
+        104000000.0,
+        0.0,
+        106000000.0,
+        0.0,
+        108000000.0,
+        0.0,
+        110000000.0,
+        0.0,
+        111000000.0
+      ],
+      "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::synthetic::leaf_odd": [
+        101000000.0,
+        0.0,
+        103000000.0,
+        0.0,
+        105000000.0,
+        0.0,
+        107000000.0,
+        0.0,
+        109000000.0,
+        0.0,
+        111000000.0,
+        0.0
+      ]
+    },
+    "p50_ns_all_12": [
+      749500.0,
+      759500.0,
+      769500.0,
+      779500.0,
+      789500.0,
+      799500.0,
+      809500.0,
+      819500.0,
+      829500.0,
+      839500.0,
+      849500.0,
+      859500.0
+    ],
+    "packet_count": 12,
+    "physical_leaf_period_all_12": [
+      101000000.0,
+      102000000.0,
+      103000000.0,
+      104000000.0,
+      105000000.0,
+      106000000.0,
+      107000000.0,
+      108000000.0,
+      109000000.0,
+      110000000.0,
+      111000000.0,
+      111000000.0
+    ],
+    "physical_leaf_unknown_period_all_12": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1000000.0
+    ],
+    "result_children": 12,
+    "status": "pass",
+    "total_period_all_12": [
+      111000000,
+      122000000,
+      113000000,
+      124000000,
+      115000000,
+      126000000,
+      117000000,
+      128000000,
+      119000000,
+      130000000,
+      121000000,
+      132000000
+    ]
+  },
+  "workload_started": false
+}

@@ -1,0 +1,61 @@
+{
+  "build_started": false,
+  "commands": {
+    "raw_stack": {
+      "argv": [
+        "python3",
+        "/home/zhuhe/litchi-performance-0973/tools-v2/raw_stack_0973_v2.py",
+        "--self-test"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "{\"bounds_valid\": true, \"historical_period\": 5000000, \"malformed_bound_rejected\": true, \"sample_count\": 1387, \"schema\": \"litchi.performance.0973.raw_stack_self_test.v2\", \"status\": \"pass\", \"workload_started\": false}\n"
+    },
+    "reducer": {
+      "argv": [
+        "python3",
+        "/home/zhuhe/litchi-performance-0973/tools-v2/reduce_0973_v2.py",
+        "--self-test"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "{\n  \"children\": 12,\n  \"physical_leaf_policy\": \"frame0-or-unknown\",\n  \"schema\": \"litchi.performance.0973.reducer_self_test.v2\",\n  \"status\": \"pass\"\n}\n"
+    },
+    "runner": {
+      "argv": [
+        "python3",
+        "/home/zhuhe/litchi-performance-0973/tools-v2/run_0973_v2.py",
+        "--self-test"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "{\n  \"dynamic_layout\": {\n    \"corrected_base\": \"0x64d1e4e5b000\",\n    \"perf_expected_start\": \"0x64d1e4e5c000\"\n  },\n  \"schema\": \"litchi.performance.0973.self_test.v2\",\n  \"status\": \"pass\",\n  \"synthetic\": \"pass\",\n  \"workload_started\": false\n}\n"
+    }
+  },
+  "created_utc": "2026-10-08T04:37:38.192912+00:00",
+  "helper_bindings": {
+    "protocol": {
+      "bytes": 39589,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/protocol_common_0973_v2.py",
+      "sha256": "56b509fde01bbd66702ac8cd835da0d09d74d332935926078c6545093ed52bf4"
+    },
+    "raw_stack": {
+      "bytes": 13746,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/raw_stack_0973_v2.py",
+      "sha256": "3a8e36ebc5f21f4f0b8293cafa675d722f2264fb1cfd6c7f48271b4f0a5056d2"
+    },
+    "reducer": {
+      "bytes": 31359,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/reduce_0973_v2.py",
+      "sha256": "f33f14724f6264d87b2c3a0082c16bca711787140d06f3c7cfdd6e78b6f4c63b"
+    },
+    "runner": {
+      "bytes": 20510,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/run_0973_v2.py",
+      "sha256": "f4f7af4ec8b8bb1818f3ce25dec046c8b8ad7c23d0a2611c76e24bf10b6aef5d"
+    }
+  },
+  "schema": "litchi.performance.0973.self_test_receipt.final.v2",
+  "status": "pass",
+  "workload_started": false
+}

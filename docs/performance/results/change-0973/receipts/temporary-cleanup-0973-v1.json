@@ -1,0 +1,608 @@
+{
+  "authorization": {
+    "basis": "explicit parent allowlist for the two inventoried unbound __pycache__ directories",
+    "main_checkout_touched": false,
+    "no_build_or_workload": true,
+    "root_go_required": false
+  },
+  "cleanup_commands": [
+    "PYTHONDONTWRITEBYTECODE=1 Python 3: verify exact candidate directories contain only regular .pyc files, hash/size each entry, check process quiescence and lsof.",
+    "PYTHONDONTWRITEBYTECODE=1 Python 3: remove only the two exact tools/__pycache__ directories.",
+    "PYTHONDONTWRITEBYTECODE=1 Python 3: verify candidate absence, targeted /tmp evidence, controls, raw capture, and retained-tree manifest after deletion."
+  ],
+  "deleted_candidates": {
+    "after": [
+      {
+        "allocated_bytes": 0,
+        "apparent_bytes": 0,
+        "exists": false,
+        "path": "/home/zhuhe/litchi-performance-0973/tools/__pycache__"
+      },
+      {
+        "allocated_bytes": 0,
+        "apparent_bytes": 0,
+        "exists": false,
+        "path": "/home/zhuhe/litchi-performance-0973/tools-v2/__pycache__"
+      }
+    ],
+    "allocated_bytes_freed": 548864,
+    "apparent_bytes_freed": 517299,
+    "before": [
+      {
+        "allocated_bytes": 360448,
+        "apparent_bytes": 343307,
+        "entries": [
+          {
+            "bytes": 12173,
+            "inode": 3333296,
+            "rel": "prepare_plan_0973_v1.cpython-314.pyc",
+            "sha256": "5295cee6872cd8bfa121666f98ae179f81d5fc08bc3f4bd974b627e0477bfd38",
+            "type": "file"
+          },
+          {
+            "bytes": 45109,
+            "inode": 3333320,
+            "rel": "protocol_common_0973_v1.cpython-314.pyc",
+            "sha256": "dc7773013305411b07b05063907f97781d7c491230894d978ccc7a1c90d82d5e",
+            "type": "file"
+          },
+          {
+            "bytes": 25850,
+            "inode": 3333294,
+            "rel": "reduce_0973_v1.cpython-314.pyc",
+            "sha256": "d7181df3b2033870df2d127ac0573cac31caa43495c1cedc31d35474bbf24269",
+            "type": "file"
+          },
+          {
+            "bytes": 31478,
+            "inode": 3333312,
+            "rel": "run_0973_v1.cpython-314.pyc",
+            "sha256": "f2fddb9dc9b8976b9fdeed914920e589642b60d6e7d3a839ae869f2aeb3a90b0",
+            "type": "file"
+          },
+          {
+            "bytes": 88062,
+            "inode": 3333439,
+            "rel": "synthetic_packet_pipeline_0973_v1.cpython-314.pyc",
+            "sha256": "47dd6eaee1f08cda5b1961eed7674afeb7ced6f730f0985dd11a33d3697e6d59",
+            "type": "file"
+          },
+          {
+            "bytes": 6168,
+            "inode": 3333311,
+            "rel": "synthetic_pipeline_0973_v1.cpython-314.pyc",
+            "sha256": "d6dd202a5aef72df0bde2be7a2fb52d7454634489494b9dce29db8873da5e738",
+            "type": "file"
+          },
+          {
+            "bytes": 44553,
+            "inode": 3333357,
+            "rel": "test_aslr_translation_0973_v1.cpython-314.pyc",
+            "sha256": "191eef95d492c6b6c0052e489e32937e3f4419602ea6456a45b0bb4fdba91159",
+            "type": "file"
+          },
+          {
+            "bytes": 44957,
+            "inode": 3333358,
+            "rel": "test_aslr_translation_0973_v2.cpython-314.pyc",
+            "sha256": "10dda7c824dba17e5f922d4eb4bdf18500b960e10d801e9e4221acf752ac4f19",
+            "type": "file"
+          },
+          {
+            "bytes": 44957,
+            "inode": 3333364,
+            "rel": "test_aslr_translation_0973_v3.cpython-314.pyc",
+            "sha256": "735705be1234764fc81a883a37a892db047e983d71f204c2242ce8d8c8b258a8",
+            "type": "file"
+          }
+        ],
+        "entry_count": 9,
+        "logical_bytes": 343307,
+        "path": "/home/zhuhe/litchi-performance-0973/tools/__pycache__"
+      },
+      {
+        "allocated_bytes": 188416,
+        "apparent_bytes": 173992,
+        "entries": [
+          {
+            "bytes": 13620,
+            "inode": 3333340,
+            "rel": "prepare_plan_0973_v2.cpython-314.pyc",
+            "sha256": "3228e0d7bd52bea0d57c17cfe3870bc9b9178085ffb888db792c167832114e5c",
+            "type": "file"
+          },
+          {
+            "bytes": 57021,
+            "inode": 3333374,
+            "rel": "protocol_common_0973_v2.cpython-314.pyc",
+            "sha256": "71537e97570c4ff7dff6ee2554fb876199fa3f42bac4efbf2fce9d010059557d",
+            "type": "file"
+          },
+          {
+            "bytes": 19714,
+            "inode": 3333334,
+            "rel": "raw_stack_0973_v2.cpython-314.pyc",
+            "sha256": "ea73637e9eed9cf28a27eb4a5bccf385cc44db11b74f9f61e26cddf36a494ab9",
+            "type": "file"
+          },
+          {
+            "bytes": 43846,
+            "inode": 3333365,
+            "rel": "reduce_0973_v2.cpython-314.pyc",
+            "sha256": "a3c879c18112df10f7cc9df1b799f9e878059d2039d981f43cdddd87ae0dcb68",
+            "type": "file"
+          },
+          {
+            "bytes": 33620,
+            "inode": 3333440,
+            "rel": "run_0973_v2.cpython-314.pyc",
+            "sha256": "ac8ba51720ebc5f0d06fd45cc53699b1560cf99c07e7f5e10b7ebf72cb638600",
+            "type": "file"
+          },
+          {
+            "bytes": 6171,
+            "inode": 3333337,
+            "rel": "synthetic_pipeline_0973_v2.cpython-314.pyc",
+            "sha256": "9b826f4c164cbd5605d1e7f427bec5e12eed76599623fb69f959bc7eef2f9b4b",
+            "type": "file"
+          }
+        ],
+        "entry_count": 6,
+        "logical_bytes": 173992,
+        "path": "/home/zhuhe/litchi-performance-0973/tools-v2/__pycache__"
+      }
+    ],
+    "logical_regular_file_bytes_freed": 517299
+  },
+  "preflight": {
+    "candidate_validation": {
+      "all_candidates_non_symlink": true,
+      "all_entries_regular_pyc": true
+    },
+    "open_file_check": {
+      "candidate_dirs_before": [
+        {
+          "exists": true,
+          "path": "/home/zhuhe/litchi-performance-0973/tools/__pycache__",
+          "records": 0,
+          "returncode": 1,
+          "warnings": [
+            "lsof: WARNING: can't stat() overlay file system /var/lib/docker/rootfs/overlayfs/26a68ec01941e4aa53e6a51ba7effee610db5a50716e8f127549c38e3eb0febd",
+            "      Output information may be incomplete.",
+            "lsof: WARNING: can't stat() nsfs file system /run/docker/netns/e41d5a8804a6",
+            "      Output information may be incomplete."
+          ]
+        },
+        {
+          "exists": true,
+          "path": "/home/zhuhe/litchi-performance-0973/tools-v2/__pycache__",
+          "records": 0,
+          "returncode": 1,
+          "warnings": [
+            "lsof: WARNING: can't stat() overlay file system /var/lib/docker/rootfs/overlayfs/26a68ec01941e4aa53e6a51ba7effee610db5a50716e8f127549c38e3eb0febd",
+            "      Output information may be incomplete.",
+            "lsof: WARNING: can't stat() nsfs file system /run/docker/netns/e41d5a8804a6",
+            "      Output information may be incomplete."
+          ]
+        }
+      ],
+      "candidate_handles_before": 0,
+      "preserved_raw_after": {
+        "exists": true,
+        "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.perf.data",
+        "records": 0,
+        "returncode": 1,
+        "warnings": [
+          "lsof: WARNING: can't stat() overlay file system /var/lib/docker/rootfs/overlayfs/26a68ec01941e4aa53e6a51ba7effee610db5a50716e8f127549c38e3eb0febd",
+          "      Output information may be incomplete.",
+          "lsof: WARNING: can't stat() nsfs file system /run/docker/netns/e41d5a8804a6",
+          "      Output information may be incomplete."
+        ]
+      },
+      "preserved_shim_after": {
+        "exists": true,
+        "path": "/home/zhuhe/litchi-performance-0973/replay-dwfl-v2/dwfl_dynamic_shim_v2.so",
+        "records": 0,
+        "returncode": 1,
+        "warnings": [
+          "lsof: WARNING: can't stat() overlay file system /var/lib/docker/rootfs/overlayfs/26a68ec01941e4aa53e6a51ba7effee610db5a50716e8f127549c38e3eb0febd",
+          "      Output information may be incomplete.",
+          "lsof: WARNING: can't stat() nsfs file system /run/docker/netns/e41d5a8804a6",
+          "      Output information may be incomplete."
+        ]
+      }
+    },
+    "process_check": {
+      "after": [],
+      "before": [],
+      "matches_after": 0,
+      "matches_before": 0,
+      "needles": [
+        "litchi-performance-0973",
+        "aslr-translation",
+        "replay-dwfl",
+        "perf record",
+        "perf script",
+        "synthetic_packet",
+        "doc_retention_probe"
+      ]
+    }
+  },
+  "preserved_controls": {
+    "after": [
+      {
+        "bytes": 228856640,
+        "inode": 10608904,
+        "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.perf.data",
+        "sha256": "4140b417724ea9606b6637ae6aade3a874a682bd9baf84d6fa0f6fdb716acbaa"
+      },
+      {
+        "bytes": 14249,
+        "inode": 3333443,
+        "path": "/home/zhuhe/litchi-performance-0973/plans/plan-0973-final-v2.json",
+        "sha256": "12bd803923586cf73c0881bfd3ef7e3cbc7a1e4853867c91d422b6333fa2e3b4"
+      },
+      {
+        "bytes": 1225,
+        "inode": 3333447,
+        "path": "/home/zhuhe/litchi-performance-0973/receipts/root-terminal-0973-v1.json",
+        "sha256": "07fded0dcafa601a4fea20fb73f8eeb343f997fda4b390aee1b1f80a378f9711"
+      },
+      {
+        "bytes": 6876,
+        "inode": 3333444,
+        "path": "/home/zhuhe/litchi-performance-0973/receipts/author-seal-0973-final-v2.json",
+        "sha256": "e7bab50fefb2b374ac99e67c6963b370c24bc44252ca7ed5f9e2f33f876a1433"
+      },
+      {
+        "bytes": 24850,
+        "inode": 3333445,
+        "path": "/home/zhuhe/litchi-performance-0973/receipts/independent-review-0973-final-v2.json",
+        "sha256": "24533a04dcbba04f47d9a298fbb71bc6934316b9cddf66f60ef982bd415d76de"
+      },
+      {
+        "bytes": 6455,
+        "inode": 3333442,
+        "path": "/home/zhuhe/litchi-performance-0973/receipts/helper-seal-0973-final-v2.json",
+        "sha256": "d7a3bc9807b1339d3ecc8b3de2fffb25cdd07f43b1eefe6d0d151b15f535c2a5"
+      },
+      {
+        "bytes": 32356,
+        "inode": 3333384,
+        "path": "/home/zhuhe/litchi-performance-0973/receipts/aslr-translation-0973-final-v4.json",
+        "sha256": "89a48f57bf35cb556d890bcfd7476a3a6e27601fd030a643c6e3275384bfc74b"
+      },
+      {
+        "bytes": 12027,
+        "inode": 3333310,
+        "path": "/home/zhuhe/litchi-performance-0973/replay-dwfl-v2/dynamic-replay-v2.json",
+        "sha256": "61115c58135f8188942de8f1dea6ee6cb0844140cd85eb3cead795a041dbf2a0"
+      },
+      {
+        "bytes": 16672,
+        "inode": 3333341,
+        "path": "/home/zhuhe/litchi-performance-0973/replay-dwfl-v2/dwfl_dynamic_shim_v2.so",
+        "sha256": "92b256588622a97b0e32a8de2a6149d3e5dce0b2eda3e614ff42daf91279bb03"
+      },
+      {
+        "bytes": 10001,
+        "inode": 3333327,
+        "path": "/home/zhuhe/litchi-performance-0973/tools-v2/dwfl_dynamic_shim_v2.c",
+        "sha256": "6600804eb94fbb81c6b26facc07ff28dc6df101cc75e7a2d2859eb12167f1551"
+      },
+      {
+        "bytes": 107,
+        "inode": 3333328,
+        "path": "/home/zhuhe/litchi-performance-0973/tools-v2/dwfl_dynamic_shim_v2.map",
+        "sha256": "d0a7914c5cb02770073db94dc4d2b207a95ae513b436c661d8a9c9a206aefef6"
+      },
+      {
+        "bytes": 1480,
+        "inode": 10608897,
+        "path": "/home/zhuhe/litchi-performance-0973/synthetic-packet-e2e-v4/manifest.json",
+        "sha256": "0425f813cb5fe17075a891b64104970793cb8cb9fe2dd95530de053a4fd9ff85"
+      },
+      {
+        "bytes": 1957,
+        "inode": 10608617,
+        "path": "/home/zhuhe/litchi-performance-0973/synthetic-packet-e2e-v4/helper-seal-synthetic-v2.json",
+        "sha256": "f686557eb855bd7d707ab98cb665f17851a18aed71eff9aedd70d620be562925"
+      }
+    ],
+    "before": [
+      {
+        "bytes": 228856640,
+        "inode": 10608904,
+        "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.perf.data",
+        "sha256": "4140b417724ea9606b6637ae6aade3a874a682bd9baf84d6fa0f6fdb716acbaa"
+      },
+      {
+        "bytes": 14249,
+        "inode": 3333443,
+        "path": "/home/zhuhe/litchi-performance-0973/plans/plan-0973-final-v2.json",
+        "sha256": "12bd803923586cf73c0881bfd3ef7e3cbc7a1e4853867c91d422b6333fa2e3b4"
+      },
+      {
+        "bytes": 1225,
+        "inode": 3333447,
+        "path": "/home/zhuhe/litchi-performance-0973/receipts/root-terminal-0973-v1.json",
+        "sha256": "07fded0dcafa601a4fea20fb73f8eeb343f997fda4b390aee1b1f80a378f9711"
+      },
+      {
+        "bytes": 6876,
+        "inode": 3333444,
+        "path": "/home/zhuhe/litchi-performance-0973/receipts/author-seal-0973-final-v2.json",
+        "sha256": "e7bab50fefb2b374ac99e67c6963b370c24bc44252ca7ed5f9e2f33f876a1433"
+      },
+      {
+        "bytes": 24850,
+        "inode": 3333445,
+        "path": "/home/zhuhe/litchi-performance-0973/receipts/independent-review-0973-final-v2.json",
+        "sha256": "24533a04dcbba04f47d9a298fbb71bc6934316b9cddf66f60ef982bd415d76de"
+      },
+      {
+        "bytes": 6455,
+        "inode": 3333442,
+        "path": "/home/zhuhe/litchi-performance-0973/receipts/helper-seal-0973-final-v2.json",
+        "sha256": "d7a3bc9807b1339d3ecc8b3de2fffb25cdd07f43b1eefe6d0d151b15f535c2a5"
+      },
+      {
+        "bytes": 32356,
+        "inode": 3333384,
+        "path": "/home/zhuhe/litchi-performance-0973/receipts/aslr-translation-0973-final-v4.json",
+        "sha256": "89a48f57bf35cb556d890bcfd7476a3a6e27601fd030a643c6e3275384bfc74b"
+      },
+      {
+        "bytes": 12027,
+        "inode": 3333310,
+        "path": "/home/zhuhe/litchi-performance-0973/replay-dwfl-v2/dynamic-replay-v2.json",
+        "sha256": "61115c58135f8188942de8f1dea6ee6cb0844140cd85eb3cead795a041dbf2a0"
+      },
+      {
+        "bytes": 16672,
+        "inode": 3333341,
+        "path": "/home/zhuhe/litchi-performance-0973/replay-dwfl-v2/dwfl_dynamic_shim_v2.so",
+        "sha256": "92b256588622a97b0e32a8de2a6149d3e5dce0b2eda3e614ff42daf91279bb03"
+      },
+      {
+        "bytes": 10001,
+        "inode": 3333327,
+        "path": "/home/zhuhe/litchi-performance-0973/tools-v2/dwfl_dynamic_shim_v2.c",
+        "sha256": "6600804eb94fbb81c6b26facc07ff28dc6df101cc75e7a2d2859eb12167f1551"
+      },
+      {
+        "bytes": 107,
+        "inode": 3333328,
+        "path": "/home/zhuhe/litchi-performance-0973/tools-v2/dwfl_dynamic_shim_v2.map",
+        "sha256": "d0a7914c5cb02770073db94dc4d2b207a95ae513b436c661d8a9c9a206aefef6"
+      },
+      {
+        "bytes": 1480,
+        "inode": 10608897,
+        "path": "/home/zhuhe/litchi-performance-0973/synthetic-packet-e2e-v4/manifest.json",
+        "sha256": "0425f813cb5fe17075a891b64104970793cb8cb9fe2dd95530de053a4fd9ff85"
+      },
+      {
+        "bytes": 1957,
+        "inode": 10608617,
+        "path": "/home/zhuhe/litchi-performance-0973/synthetic-packet-e2e-v4/helper-seal-synthetic-v2.json",
+        "sha256": "f686557eb855bd7d707ab98cb665f17851a18aed71eff9aedd70d620be562925"
+      }
+    ],
+    "differences": [],
+    "unchanged": true
+  },
+  "preserved_raw_capture": {
+    "after": {
+      "bytes": 228856640,
+      "inode": 10608904,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.perf.data",
+      "sha256": "4140b417724ea9606b6637ae6aade3a874a682bd9baf84d6fa0f6fdb716acbaa"
+    },
+    "before": {
+      "bytes": 228856640,
+      "inode": 10608904,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.perf.data",
+      "sha256": "4140b417724ea9606b6637ae6aade3a874a682bd9baf84d6fa0f6fdb716acbaa"
+    },
+    "unchanged": true
+  },
+  "preserved_targeted_tmp_evidence": {
+    "after": [
+      {
+        "bytes": 15985,
+        "inode": 4072226,
+        "path": "/tmp/0973-design-diff.txt",
+        "sha256": "6b0337e9905413c3bebe38112caa1944f8a810f989cd427fe0e8a03e7ca3519c"
+      },
+      {
+        "bytes": 0,
+        "inode": 4072374,
+        "path": "/tmp/0973-raw-selftest.err",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "bytes": 214,
+        "inode": 4072373,
+        "path": "/tmp/0973-raw-selftest.out",
+        "sha256": "aac72238b510bb13b5416117b943e5e732e53a192d41538927447170f12c0263"
+      },
+      {
+        "bytes": 148,
+        "inode": 4072287,
+        "path": "/tmp/0973-reduce-self.json",
+        "sha256": "177e37166e934f557d46c63eb675d1fe4c3be176362e37eab278cd09b32b547a"
+      },
+      {
+        "bytes": 0,
+        "inode": 4072372,
+        "path": "/tmp/0973-reduce-selftest.err",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "bytes": 148,
+        "inode": 4072371,
+        "path": "/tmp/0973-reduce-selftest.out",
+        "sha256": "862a296d2b8dc18934f164a49ce55a5dc17e238370e5341759e6f1278666cf62"
+      },
+      {
+        "bytes": 238,
+        "inode": 4072285,
+        "path": "/tmp/0973-run-self.json",
+        "sha256": "73d270497bbe06125c2eac23ca1a8a92cb425ff42eaf79fbe8e80d3905ee096a"
+      },
+      {
+        "bytes": 23,
+        "inode": 4072370,
+        "path": "/tmp/0973-run-selftest.err",
+        "sha256": "4d7a663f6e68be2ef40fd8a91005890d46be18e4bb42aa48f74d8aafcb803913"
+      },
+      {
+        "bytes": 0,
+        "inode": 4072369,
+        "path": "/tmp/0973-run-selftest.out",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "bytes": 326,
+        "inode": 4072288,
+        "path": "/tmp/0973-synth-self.json",
+        "sha256": "4ff36f2ed58120541bce7a66e5078522c903bd65d7c5e9620043ddfc50da48de"
+      }
+    ],
+    "already_absent_before_cleanup": [
+      "/tmp/make_0973_failed_audit.py"
+    ],
+    "before": [
+      {
+        "bytes": 15985,
+        "inode": 4072226,
+        "path": "/tmp/0973-design-diff.txt",
+        "sha256": "6b0337e9905413c3bebe38112caa1944f8a810f989cd427fe0e8a03e7ca3519c"
+      },
+      {
+        "bytes": 0,
+        "inode": 4072374,
+        "path": "/tmp/0973-raw-selftest.err",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "bytes": 214,
+        "inode": 4072373,
+        "path": "/tmp/0973-raw-selftest.out",
+        "sha256": "aac72238b510bb13b5416117b943e5e732e53a192d41538927447170f12c0263"
+      },
+      {
+        "bytes": 148,
+        "inode": 4072287,
+        "path": "/tmp/0973-reduce-self.json",
+        "sha256": "177e37166e934f557d46c63eb675d1fe4c3be176362e37eab278cd09b32b547a"
+      },
+      {
+        "bytes": 0,
+        "inode": 4072372,
+        "path": "/tmp/0973-reduce-selftest.err",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "bytes": 148,
+        "inode": 4072371,
+        "path": "/tmp/0973-reduce-selftest.out",
+        "sha256": "862a296d2b8dc18934f164a49ce55a5dc17e238370e5341759e6f1278666cf62"
+      },
+      {
+        "bytes": 238,
+        "inode": 4072285,
+        "path": "/tmp/0973-run-self.json",
+        "sha256": "73d270497bbe06125c2eac23ca1a8a92cb425ff42eaf79fbe8e80d3905ee096a"
+      },
+      {
+        "bytes": 23,
+        "inode": 4072370,
+        "path": "/tmp/0973-run-selftest.err",
+        "sha256": "4d7a663f6e68be2ef40fd8a91005890d46be18e4bb42aa48f74d8aafcb803913"
+      },
+      {
+        "bytes": 0,
+        "inode": 4072369,
+        "path": "/tmp/0973-run-selftest.out",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "bytes": 326,
+        "inode": 4072288,
+        "path": "/tmp/0973-synth-self.json",
+        "sha256": "4ff36f2ed58120541bce7a66e5078522c903bd65d7c5e9620043ddfc50da48de"
+      }
+    ],
+    "differences": [],
+    "paths": [
+      "/tmp/0973-design-diff.txt",
+      "/tmp/0973-raw-selftest.err",
+      "/tmp/0973-raw-selftest.out",
+      "/tmp/0973-reduce-self.json",
+      "/tmp/0973-reduce-selftest.err",
+      "/tmp/0973-reduce-selftest.out",
+      "/tmp/0973-run-self.json",
+      "/tmp/0973-run-selftest.err",
+      "/tmp/0973-run-selftest.out",
+      "/tmp/0973-synth-self.json"
+    ],
+    "unchanged": true
+  },
+  "preserved_tree_manifest": {
+    "after_count": 1241,
+    "after_digest": "dbfd28a0e9df8663bddfd3cf18d2f4ddbd363103a9a873f8f1dd424df01ed837",
+    "before_count": 1241,
+    "before_digest": "dbfd28a0e9df8663bddfd3cf18d2f4ddbd363103a9a873f8f1dd424df01ed837",
+    "differences": [],
+    "unchanged_outside_deleted_paths": true
+  },
+  "recorded_utc": "2026-10-08T04:45:29.628869Z",
+  "remaining_cache_temp_name_scan": {
+    "count": 0,
+    "paths": [],
+    "patterns": [
+      "cache",
+      "tmp",
+      "temp",
+      "scratch",
+      "*.pyc",
+      "*.pyo",
+      "*.swp",
+      "*.swo",
+      "*~",
+      "*.bak",
+      "*.part",
+      "*.lock"
+    ]
+  },
+  "schema": "litchi.performance.0973.temporary_cleanup.v1",
+  "scope": {
+    "all_bound_data_preserved": true,
+    "deleted_path_count": 2,
+    "deleted_paths": [
+      "/home/zhuhe/litchi-performance-0973/tools/__pycache__",
+      "/home/zhuhe/litchi-performance-0973/tools-v2/__pycache__"
+    ],
+    "deleted_regular_file_count": 15,
+    "deleted_symlink_count": 0,
+    "no_other_0973_paths_deleted": true,
+    "requested_paths": [
+      "/home/zhuhe/litchi-performance-0973/tools/__pycache__",
+      "/home/zhuhe/litchi-performance-0973/tools-v2/__pycache__"
+    ],
+    "targeted_tmp_evidence_deleted": false
+  },
+  "status": "completed",
+  "updated_utc": "2026-10-08T04:45:29.992997Z",
+  "verification": {
+    "all_capture_and_perf_raw_preserved": true,
+    "all_replay_and_shim_outputs_preserved": true,
+    "all_source_headers_and_receipts_preserved": true,
+    "failed_controls_preserved": true,
+    "no_repo_edits": true,
+    "preexisting_missing_tmp_helper_recorded": true,
+    "targeted_tmp_self_test_design_evidence_preserved": true
+  }
+}

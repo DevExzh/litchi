@@ -1,0 +1,168 @@
+{
+  "author_seal": {
+    "bytes": 6876,
+    "path": "/home/zhuhe/litchi-performance-0973/receipts/author-seal-0973-final-v2.json",
+    "sha256": "e7bab50fefb2b374ac99e67c6963b370c24bc44252ca7ed5f9e2f33f876a1433"
+  },
+  "authorized": true,
+  "binary": {
+    "build_id": "e5c457384eeebd057932c444efda77618f137399",
+    "bytes": 47909224,
+    "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+    "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+  },
+  "compiler": {
+    "bytes": 1305304,
+    "path": "/usr/bin/cc",
+    "sha256": "864711037b900acdb7a449cf48d912cefa935b527fb60c767ccb956779e66136",
+    "version": "cc (Ubuntu 15.2.0-16ubuntu1)"
+  },
+  "created_utc": "2026-10-08T04:41:00.328165+00:00",
+  "diagnostic_only": true,
+  "environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "TZ": "UTC"
+  },
+  "fixture": {
+    "bytes": 335360,
+    "path": "/home/zhuhe/litchi-performance-0969/qa-core/test-data/ole/doc/FloatingPictures.doc",
+    "sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d"
+  },
+  "header": {
+    "bytes": 39682,
+    "path": "/home/zhuhe/litchi-performance-0972/header-v2/root/usr/include/elfutils/libdwfl.h",
+    "sha256": "6f9dc2c2f9ca8d691f42f78e7634c2e40750a3af134e8226bd7c5aff395a3657"
+  },
+  "helper_seal": {
+    "bytes": 6455,
+    "path": "/home/zhuhe/litchi-performance-0973/receipts/helper-seal-0973-final-v2.json",
+    "sha256": "d7a3bc9807b1339d3ecc8b3de2fffb25cdd07f43b1eefe6d0d151b15f535c2a5"
+  },
+  "host": {
+    "audited_allowed_affinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31
+    ],
+    "free_bytes": 362923028480,
+    "minimum_free_bytes": 8000000000,
+    "selected_cpu": 31
+  },
+  "independent_review": {
+    "bytes": 24850,
+    "path": "/home/zhuhe/litchi-performance-0973/receipts/independent-review-0973-final-v2.json",
+    "sha256": "24533a04dcbba04f47d9a298fbb71bc6934316b9cddf66f60ef982bd415d76de"
+  },
+  "libdw": {
+    "bytes": 823824,
+    "path": "/usr/lib/x86_64-linux-gnu/libdw-0.194.so",
+    "sha256": "86a59c8071ab57c25daacb275cedae072de83151bd358d4ffdc7844afbd31109",
+    "version": "elfutils 0.194 (libdw1t64:amd64)"
+  },
+  "libelf": {
+    "bytes": 154408,
+    "path": "/usr/lib/x86_64-linux-gnu/libelf-0.194.so",
+    "sha256": "d1e1539cc36403b603deb0d4558711e50bc8144eec1d833ece69df81ce01b527",
+    "version": "elfutils 0.194 (libelf1t64:amd64)"
+  },
+  "no_retry": true,
+  "plan": {
+    "bytes": 14249,
+    "path": "/home/zhuhe/litchi-performance-0973/plans/plan-0973-final-v2.json",
+    "sha256": "12bd803923586cf73c0881bfd3ef7e3cbc7a1e4853867c91d422b6333fa2e3b4"
+  },
+  "quiescence": {
+    "active_measurement_processes": [],
+    "agents": "All assigned preflight agents completed; no concurrent work authorized during native window.",
+    "cooldown_seconds_before_launch": 10,
+    "status": "pass"
+  },
+  "schema": "litchi.performance.0973.root_go.v2",
+  "shim_build": {
+    "argv": [
+      "cc",
+      "-shared",
+      "-fPIC",
+      "-O2",
+      "-std=c11",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-I/home/zhuhe/litchi-performance-0972/header-v2/root/usr/include",
+      "-Wl,--version-script=/home/zhuhe/litchi-performance-0973/tools-v2/dwfl_dynamic_shim_v2.map",
+      "-o",
+      "/home/zhuhe/litchi-performance-0973/replay-dwfl-v2/dwfl_dynamic_shim_v2.so",
+      "/home/zhuhe/litchi-performance-0973/tools-v2/dwfl_dynamic_shim_v2.c",
+      "-ldl"
+    ],
+    "compiler": {
+      "bytes": 1305304,
+      "path": "/usr/bin/cc",
+      "sha256": "864711037b900acdb7a449cf48d912cefa935b527fb60c767ccb956779e66136"
+    },
+    "header": {
+      "bytes": 39682,
+      "path": "/home/zhuhe/litchi-performance-0972/header-v2/root/usr/include/elfutils/libdwfl.h",
+      "sha256": "6f9dc2c2f9ca8d691f42f78e7634c2e40750a3af134e8226bd7c5aff395a3657"
+    },
+    "libdw": {
+      "bytes": 823824,
+      "path": "/usr/lib/x86_64-linux-gnu/libdw-0.194.so",
+      "sha256": "86a59c8071ab57c25daacb275cedae072de83151bd358d4ffdc7844afbd31109",
+      "version": "elfutils 0.194 (libdw1t64:amd64)"
+    },
+    "libelf": {
+      "bytes": 154408,
+      "path": "/usr/lib/x86_64-linux-gnu/libelf-0.194.so",
+      "sha256": "d1e1539cc36403b603deb0d4558711e50bc8144eec1d833ece69df81ce01b527",
+      "version": "elfutils 0.194 (libelf1t64:amd64)"
+    },
+    "shared_object": {
+      "bytes": 16672,
+      "path": "/home/zhuhe/litchi-performance-0973/replay-dwfl-v2/dwfl_dynamic_shim_v2.so",
+      "sha256": "92b256588622a97b0e32a8de2a6149d3e5dce0b2eda3e614ff42daf91279bb03"
+    }
+  },
+  "shim_source": {
+    "bytes": 10001,
+    "path": "/home/zhuhe/litchi-performance-0973/tools-v2/dwfl_dynamic_shim_v2.c",
+    "sha256": "6600804eb94fbb81c6b26facc07ff28dc6df101cc75e7a2d2859eb12167f1551"
+  },
+  "shim_version_script": {
+    "bytes": 107,
+    "path": "/home/zhuhe/litchi-performance-0973/tools-v2/dwfl_dynamic_shim_v2.map",
+    "sha256": "d0a7914c5cb02770073db94dc4d2b207a95ae513b436c661d8a9c9a206aefef6"
+  },
+  "source_commit": "52b225d88e260b5430fdba570ee9d3dc479e41de",
+  "status": "authorized"
+}

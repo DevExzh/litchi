@@ -1,0 +1,172 @@
+{
+  "contracts": {
+    "callgraph": "dwarf,32768",
+    "child_gate": {
+      "all_children": true,
+      "lost_events": 0,
+      "marker_period_share_positive": true,
+      "min_marker_samples": 100,
+      "on_failure": "stop_without_retry"
+    },
+    "children": 12,
+    "cpu": 31,
+    "owner_key_format": "<DSO>::<symbol>",
+    "period": 1000000,
+    "physical_leaf_scope": "marker-containing samples only; frame-0 physical leaf or explicit unknown",
+    "raw_stack_bounds": "0 <= dyn_size <= captured_stack_size <= 32768",
+    "samples": 80,
+    "stack_cap": 32768,
+    "warmups": 5
+  },
+  "created_utc": "2026-10-08T04:37:43.947684+00:00",
+  "dependencies": {
+    "compiler": {
+      "bytes": 1305304,
+      "path": "/usr/bin/cc",
+      "sha256": "864711037b900acdb7a449cf48d912cefa935b527fb60c767ccb956779e66136",
+      "version": "cc (Ubuntu 15.2.0-16ubuntu1)"
+    },
+    "header": {
+      "bytes": 39682,
+      "path": "/home/zhuhe/litchi-performance-0972/header-v2/root/usr/include/elfutils/libdwfl.h",
+      "sha256": "6f9dc2c2f9ca8d691f42f78e7634c2e40750a3af134e8226bd7c5aff395a3657"
+    },
+    "libdw": {
+      "bytes": 823824,
+      "path": "/usr/lib/x86_64-linux-gnu/libdw-0.194.so",
+      "sha256": "86a59c8071ab57c25daacb275cedae072de83151bd358d4ffdc7844afbd31109",
+      "version": "elfutils 0.194 (libdw1t64:amd64)"
+    },
+    "libelf": {
+      "bytes": 154408,
+      "path": "/usr/lib/x86_64-linux-gnu/libelf-0.194.so",
+      "sha256": "d1e1539cc36403b603deb0d4558711e50bc8144eec1d833ece69df81ce01b527",
+      "version": "elfutils 0.194 (libelf1t64:amd64)"
+    },
+    "perf": {
+      "bytes": 25221960,
+      "path": "/usr/bin/perf",
+      "sha256": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b"
+    }
+  },
+  "helpers": {
+    "plan_generator": {
+      "bytes": 7927,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/prepare_plan_0973_v2.py",
+      "sha256": "c3beab19960e0a7b4d73f252aa015c6b398508f2bf4e33cb6ace4b271129f65f"
+    },
+    "protocol": {
+      "bytes": 39589,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/protocol_common_0973_v2.py",
+      "sha256": "56b509fde01bbd66702ac8cd835da0d09d74d332935926078c6545093ed52bf4"
+    },
+    "raw_stack": {
+      "bytes": 13746,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/raw_stack_0973_v2.py",
+      "sha256": "3a8e36ebc5f21f4f0b8293cafa675d722f2264fb1cfd6c7f48271b4f0a5056d2"
+    },
+    "reducer": {
+      "bytes": 31359,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/reduce_0973_v2.py",
+      "sha256": "f33f14724f6264d87b2c3a0082c16bca711787140d06f3c7cfdd6e78b6f4c63b"
+    },
+    "runner": {
+      "bytes": 20510,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/run_0973_v2.py",
+      "sha256": "f4f7af4ec8b8bb1818f3ce25dec046c8b8ad7c23d0a2611c76e24bf10b6aef5d"
+    },
+    "shim_map": {
+      "bytes": 107,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/dwfl_dynamic_shim_v2.map",
+      "sha256": "d0a7914c5cb02770073db94dc4d2b207a95ae513b436c661d8a9c9a206aefef6"
+    },
+    "shim_so": {
+      "bytes": 16672,
+      "path": "/home/zhuhe/litchi-performance-0973/replay-dwfl-v2/dwfl_dynamic_shim_v2.so",
+      "sha256": "92b256588622a97b0e32a8de2a6149d3e5dce0b2eda3e614ff42daf91279bb03"
+    },
+    "shim_source": {
+      "bytes": 10001,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/dwfl_dynamic_shim_v2.c",
+      "sha256": "6600804eb94fbb81c6b26facc07ff28dc6df101cc75e7a2d2859eb12167f1551"
+    }
+  },
+  "immutability": {
+    "build_started": false,
+    "capture_started": false,
+    "native_workload_started": false,
+    "output_overwrite": false
+  },
+  "purpose": "0973 offline dynamic DWFL diagnostic; final frozen helper custody, no native workload/build authorization",
+  "schema": "litchi.performance.0973.helper_seal.v2",
+  "scope": "serial runner/reducer, ASLR-safe dynamic layout, raw STACK_USER admission, and offline decoder controls",
+  "shim_build": {
+    "argv": [
+      "cc",
+      "-shared",
+      "-fPIC",
+      "-O2",
+      "-std=c11",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-I/home/zhuhe/litchi-performance-0972/header-v2/root/usr/include",
+      "-Wl,--version-script=/home/zhuhe/litchi-performance-0973/tools-v2/dwfl_dynamic_shim_v2.map",
+      "-o",
+      "/home/zhuhe/litchi-performance-0973/replay-dwfl-v2/dwfl_dynamic_shim_v2.so",
+      "/home/zhuhe/litchi-performance-0973/tools-v2/dwfl_dynamic_shim_v2.c",
+      "-ldl"
+    ],
+    "native_ld_preload": "absent",
+    "offline_only": true,
+    "target_only": true
+  },
+  "source_bindings": {
+    "adr_revalidation": {
+      "bytes": 8182,
+      "path": "/home/zhuhe/litchi-performance-0973/receipts/adr-goal-revalidation-0973-v1.json",
+      "sha256": "80dc8af647aa4992f2281262e7be5bde40ac192aa1d392b0fc5d6525052d7d90"
+    },
+    "design": {
+      "bytes": 15456,
+      "path": "/home/zhuhe/litchi-performance-0973/design-v1.md",
+      "sha256": "0eba90ae698d18e48f52453791f200456923ae81f2445498b05fc4b3705f060a"
+    },
+    "design_precedence": {
+      "bytes": 1336,
+      "path": "/home/zhuhe/litchi-performance-0973/design-precedence-clarification-v1.md",
+      "sha256": "4075b51bc31596a5d5af34a23ffb32faa43941eacef4de9fb034e7904f613a35"
+    },
+    "metric_proposal": {
+      "bytes": 4133,
+      "path": "/home/zhuhe/litchi-performance-0973/analysis/metric-proposal-v1.md",
+      "sha256": "a09f6535426e5f199c5652d1eec8e4035833f5f4ac0d1b507e2312b70a1c3bcd"
+    },
+    "review_findings": {
+      "bytes": 7923,
+      "path": "/home/zhuhe/litchi-performance-0973/receipts/independent-review-0973-v1.json",
+      "sha256": "2a31dea0857cdcfd6eb77ce4f1352d61fae09c8fde6cdb75daacd53b1fb516d1"
+    }
+  },
+  "status": "sealed",
+  "test_helpers": {
+    "aslr_control": {
+      "bytes": 33729,
+      "path": "/home/zhuhe/litchi-performance-0973/tools/test_aslr_translation_0973_v1.py",
+      "sha256": "5e45e148413249efd3f97523d199226de8cc1462a579d3f2a6f5e33635c39e96"
+    },
+    "synthetic_e2e": {
+      "bytes": 58674,
+      "path": "/home/zhuhe/litchi-performance-0973/tools/synthetic_packet_pipeline_0973_v1.py",
+      "sha256": "83e101413eb9be81cd9ba6ff704e3561eea050182f3a977ffb68f3e1f7b15f92"
+    }
+  },
+  "test_receipts": {
+    "self_tests": {
+      "bytes": 2443,
+      "path": "/home/zhuhe/litchi-performance-0973/receipts/self-test-0973-final-v2.json",
+      "sha256": "527f55ef191e95f45dc7d88653677be23c03979f40f39043b94a77513f872fd2"
+    }
+  },
+  "version": "final-v2"
+}

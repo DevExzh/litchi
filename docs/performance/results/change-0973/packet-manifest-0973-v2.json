@@ -1,0 +1,252 @@
+{
+  "authoritative_receipts": {
+    "helper_seal_sha256": "d7a3bc9807b1339d3ecc8b3de2fffb25cdd07f43b1eefe6d0d151b15f535c2a5",
+    "author_seal_sha256": "e7bab50fefb2b374ac99e67c6963b370c24bc44252ca7ed5f9e2f33f876a1433",
+    "pre_capture_independent_review_sha256": "24533a04dcbba04f47d9a298fbb71bc6934316b9cddf66f60ef982bd415d76de",
+    "analysis_audit_sha256": "872fd7051b098901910bc200da08b9aa68399f7e8ca470a570d82b7143038a67",
+    "independent_failed_pilot_audit_sha256": "977cee099b640a094425d8e7c3641cc71fe658d3c68209c9e8a4209a29e641ea",
+    "root_go_sha256": "c1b014059decec93e528b3b4838c7c9ae905e79909b1b4c7bdeab211fa477d15",
+    "root_terminal_sha256": "07fded0dcafa601a4fea20fb73f8eeb343f997fda4b390aee1b1f80a378f9711",
+    "cleanup_sha256": "5f632cbd85b5832fa14e1c081aeab66c45f865d97c212d2ee13c6ad01f2c5c40",
+    "loss_mitigation_note_sha256": "adf038de8f3c8943e9e8f41b2d93259e2759023c9cb112779bd8fd01d5075d91"
+  },
+  "constraints": {
+    "all_repository_files_below_1_mib": true,
+    "compiled_binaries_copied": false,
+    "max_repository_file_bytes": 292316,
+    "raw_perf_captures_copied": false,
+    "raw_packets_copied": false
+  },
+  "external_root": "/home/zhuhe/litchi-performance-0973",
+  "file_count": 43,
+  "files": [
+    {
+      "bytes": 4163,
+      "path": "docs/performance/results/change-0973/README.md",
+      "sha256": "5bc12482d8afaacfcc72ae2b30ab2d4cf6ff3e82ff28b64fc958fa1ba43527dc"
+    },
+    {
+      "bytes": 3815,
+      "path": "docs/performance/results/change-0973/analysis/diagnostic-proposal-v1.md",
+      "sha256": "c149b0f5b95b6005b7bea0c513aad376c6a8ab32bfba7c2792a0973696c4117c"
+    },
+    {
+      "bytes": 28850,
+      "path": "docs/performance/results/change-0973/analysis/failed-pilot-child01-audit-v1.json",
+      "sha256": "463ca8a41524c865166b63334589cc8720e2072dd639a5c144064e16f7c858ed"
+    },
+    {
+      "bytes": 5735,
+      "path": "docs/performance/results/change-0973/analysis/failed-pilot-child01-audit-v1.md",
+      "sha256": "34b92d8b48e1749d005d7bd47fd662ba780d3ceb8578e48144e139da179bcb9a"
+    },
+    {
+      "bytes": 4170,
+      "path": "docs/performance/results/change-0973/analysis/loss-mitigation-next-design-v1.md",
+      "sha256": "adf038de8f3c8943e9e8f41b2d93259e2759023c9cb112779bd8fd01d5075d91"
+    },
+    {
+      "bytes": 4133,
+      "path": "docs/performance/results/change-0973/analysis/metric-proposal-v1.md",
+      "sha256": "a09f6535426e5f199c5652d1eec8e4035833f5f4ac0d1b507e2312b70a1c3bcd"
+    },
+    {
+      "bytes": 669,
+      "path": "docs/performance/results/change-0973/capture/capture-manifest-v2.json",
+      "sha256": "7c0b0e159c510e63f61fd45ca1af516fa95b72ae21bb7b4c8a080dfc1f2cd6e3"
+    },
+    {
+      "bytes": 1185,
+      "path": "docs/performance/results/change-0973/capture/child-01.command.json",
+      "sha256": "1d40d7d72eb8c8f56e0f6bf8edbcac96041253a8f816e909b48dc51d11982fac"
+    },
+    {
+      "bytes": 1126,
+      "path": "docs/performance/results/change-0973/capture/child-01.launch.json",
+      "sha256": "595a37efa06cbc20b92dd9d2ba4f7d2d731cc5c212b60ebb085818e2278f165a"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0973/capture/child-01.noop.perf.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 571,
+      "path": "docs/performance/results/change-0973/capture/child-01.perf-buildid.txt",
+      "sha256": "6c7729316b6a54fc6ac338ceedfb960f4bb4fc669effac870d8ae58a34902925"
+    },
+    {
+      "bytes": 1919,
+      "path": "docs/performance/results/change-0973/capture/child-01.perf-header.txt",
+      "sha256": "3d04b0f539690b173184dfe1fb15e9aee770f29481f001ca0d0c454bd1b027ca"
+    },
+    {
+      "bytes": 192,
+      "path": "docs/performance/results/change-0973/capture/child-01.perf.stderr",
+      "sha256": "8305826c550c725e0ba1884ef31f3fbe6ce81659a9623e95e5ba26fca1f42ffa"
+    },
+    {
+      "bytes": 4188,
+      "path": "docs/performance/results/change-0973/capture/child-01.raw-stack.json",
+      "sha256": "5242af2a6582233fca6f1719f935eaa8e2728abc87e482a7837f63cde00fe439"
+    },
+    {
+      "bytes": 292316,
+      "path": "docs/performance/results/change-0973/capture/child-01.report.json",
+      "sha256": "22b31d36fc663b85e4a9d0696313ff92b980de75dff55f1a6b484d981668d991"
+    },
+    {
+      "bytes": 44,
+      "path": "docs/performance/results/change-0973/capture/child-01.stock-no-log",
+      "sha256": "a384cfd115707fcd837ef0e3bb68771e20b54d0339cd8f13b871df8d86910d43"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0973/capture/child-01.stock.perf.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 4457,
+      "path": "docs/performance/results/change-0973/capture/child-01.target-layout.json",
+      "sha256": "8540ad7c5b20faacb687679a92a2f6636fcfbecb34b2254eedf5f926f9099e3e"
+    },
+    {
+      "bytes": 1367,
+      "path": "docs/performance/results/change-0973/capture/child-01.terminal.json",
+      "sha256": "340007135f843c3d7c20aa81203b10057b0283ab3659da039e3b5cf279bec896"
+    },
+    {
+      "bytes": 1336,
+      "path": "docs/performance/results/change-0973/design/design-precedence-clarification-v1.md",
+      "sha256": "4075b51bc31596a5d5af34a23ffb32faa43941eacef4de9fb034e7904f613a35"
+    },
+    {
+      "bytes": 15456,
+      "path": "docs/performance/results/change-0973/design/design-v1.md",
+      "sha256": "0eba90ae698d18e48f52453791f200456923ae81f2445498b05fc4b3705f060a"
+    },
+    {
+      "bytes": 14249,
+      "path": "docs/performance/results/change-0973/plans/plan-0973-final-v2.json",
+      "sha256": "12bd803923586cf73c0881bfd3ef7e3cbc7a1e4853867c91d422b6333fa2e3b4"
+    },
+    {
+      "bytes": 26397,
+      "path": "docs/performance/results/change-0973/provenance/external-artifact-descriptor-final-v2.json",
+      "sha256": "1611c81e27710d2732274a715548e9d47ba66fda777f968cb2abf92bd182021d"
+    },
+    {
+      "bytes": 8182,
+      "path": "docs/performance/results/change-0973/receipts/adr-goal-revalidation-0973-v1.json",
+      "sha256": "80dc8af647aa4992f2281262e7be5bde40ac192aa1d392b0fc5d6525052d7d90"
+    },
+    {
+      "bytes": 32356,
+      "path": "docs/performance/results/change-0973/receipts/aslr-translation-0973-final-v4.json",
+      "sha256": "89a48f57bf35cb556d890bcfd7476a3a6e27601fd030a643c6e3275384bfc74b"
+    },
+    {
+      "bytes": 6876,
+      "path": "docs/performance/results/change-0973/receipts/author-seal-0973-final-v2.json",
+      "sha256": "e7bab50fefb2b374ac99e67c6963b370c24bc44252ca7ed5f9e2f33f876a1433"
+    },
+    {
+      "bytes": 2604,
+      "path": "docs/performance/results/change-0973/receipts/failed-pilot-audit-0973-v1.json",
+      "sha256": "872fd7051b098901910bc200da08b9aa68399f7e8ca470a570d82b7143038a67"
+    },
+    {
+      "bytes": 6455,
+      "path": "docs/performance/results/change-0973/receipts/helper-seal-0973-final-v2.json",
+      "sha256": "d7a3bc9807b1339d3ecc8b3de2fffb25cdd07f43b1eefe6d0d151b15f535c2a5"
+    },
+    {
+      "bytes": 34586,
+      "path": "docs/performance/results/change-0973/receipts/independent-failed-pilot-audit-0973-v2.json",
+      "sha256": "977cee099b640a094425d8e7c3641cc71fe658d3c68209c9e8a4209a29e641ea"
+    },
+    {
+      "bytes": 24850,
+      "path": "docs/performance/results/change-0973/receipts/independent-review-0973-final-v2.json",
+      "sha256": "24533a04dcbba04f47d9a298fbb71bc6934316b9cddf66f60ef982bd415d76de"
+    },
+    {
+      "bytes": 5340,
+      "path": "docs/performance/results/change-0973/receipts/root-go-0973-v1.json",
+      "sha256": "c1b014059decec93e528b3b4838c7c9ae905e79909b1b4c7bdeab211fa477d15"
+    },
+    {
+      "bytes": 1225,
+      "path": "docs/performance/results/change-0973/receipts/root-terminal-0973-v1.json",
+      "sha256": "07fded0dcafa601a4fea20fb73f8eeb343f997fda4b390aee1b1f80a378f9711"
+    },
+    {
+      "bytes": 2443,
+      "path": "docs/performance/results/change-0973/receipts/self-test-0973-final-v2.json",
+      "sha256": "527f55ef191e95f45dc7d88653677be23c03979f40f39043b94a77513f872fd2"
+    },
+    {
+      "bytes": 22118,
+      "path": "docs/performance/results/change-0973/receipts/synthetic-packet-pipeline-author-v2-v4.json",
+      "sha256": "d908603da0167a52450982c3d2ceb8f9277d5960e51c1883999a78a0555a494a"
+    },
+    {
+      "bytes": 21969,
+      "path": "docs/performance/results/change-0973/receipts/temporary-cleanup-0973-v1.json",
+      "sha256": "5f632cbd85b5832fa14e1c081aeab66c45f865d97c212d2ee13c6ad01f2c5c40"
+    },
+    {
+      "bytes": 24997,
+      "path": "docs/performance/results/change-0973/tools/audit_failed_pilot_0973_v1.py",
+      "sha256": "ee86ef766fdaa42f5c34038aede7818d57ed9041c7bebc279fd2df3032ed3629"
+    },
+    {
+      "bytes": 10001,
+      "path": "docs/performance/results/change-0973/tools/dwfl_dynamic_shim_v2.c",
+      "sha256": "6600804eb94fbb81c6b26facc07ff28dc6df101cc75e7a2d2859eb12167f1551"
+    },
+    {
+      "bytes": 107,
+      "path": "docs/performance/results/change-0973/tools/dwfl_dynamic_shim_v2.map",
+      "sha256": "d0a7914c5cb02770073db94dc4d2b207a95ae513b436c661d8a9c9a206aefef6"
+    },
+    {
+      "bytes": 7927,
+      "path": "docs/performance/results/change-0973/tools/prepare_plan_0973_v2.py",
+      "sha256": "c3beab19960e0a7b4d73f252aa015c6b398508f2bf4e33cb6ace4b271129f65f"
+    },
+    {
+      "bytes": 39589,
+      "path": "docs/performance/results/change-0973/tools/protocol_common_0973_v2.py",
+      "sha256": "56b509fde01bbd66702ac8cd835da0d09d74d332935926078c6545093ed52bf4"
+    },
+    {
+      "bytes": 13746,
+      "path": "docs/performance/results/change-0973/tools/raw_stack_0973_v2.py",
+      "sha256": "3a8e36ebc5f21f4f0b8293cafa675d722f2264fb1cfd6c7f48271b4f0a5056d2"
+    },
+    {
+      "bytes": 31359,
+      "path": "docs/performance/results/change-0973/tools/reduce_0973_v2.py",
+      "sha256": "f33f14724f6264d87b2c3a0082c16bca711787140d06f3c7cfdd6e78b6f4c63b"
+    },
+    {
+      "bytes": 20510,
+      "path": "docs/performance/results/change-0973/tools/run_0973_v2.py",
+      "sha256": "f4f7af4ec8b8bb1818f3ce25dec046c8b8ad7c23d0a2611c76e24bf10b6aef5d"
+    }
+  ],
+  "generated_utc": "2026-10-08T04:48:47.914472+00:00",
+  "manifest_excludes_self": true,
+  "prior_manifest": {
+    "path": "/home/zhuhe/litchi-performance-0973/analysis/packet-manifest-0973-v1.json",
+    "sha256": "562b761444328767ceb025c29ab0b893c018fdda7d2afd3b70a1bcc330f62e5b",
+    "descriptor_path": "/home/zhuhe/litchi-performance-0973/analysis/external-artifact-descriptor-final-v1.json",
+    "descriptor_sha256": "ce93702b37061821360c9d2664764051378caded15de51c3ee49f6dcd6a61a17",
+    "status": "preserved_external_historical_packet_v1"
+  },
+  "schema": "litchi.performance.0973.packet_manifest.final.v2",
+  "scope": "Final bounded failed-pilot evidence, final-v2 controls, and read-only loss-mitigation design; no all-12 qualification or adoption claim.",
+  "status": "sealed",
+  "total_bytes": 733578
+}

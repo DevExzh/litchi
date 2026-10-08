@@ -1,0 +1,48 @@
+{
+  "all12_reduction_started": false,
+  "children_completed": 1,
+  "children_not_started": [
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12
+  ],
+  "created_utc": "2026-10-08T04:42:53.136789+00:00",
+  "diagnostic_only": true,
+  "failure": {
+    "child": 1,
+    "gate": {
+      "passed": false,
+      "reasons": [
+        "lost_events_nonzero"
+      ]
+    },
+    "reason": "per_child_marker_gate_failed"
+  },
+  "manifest": {
+    "bytes": 669,
+    "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/capture-manifest-v2.json",
+    "sha256": "7c0b0e159c510e63f61fd45ca1af516fa95b72ae21bb7b4c8a080dfc1f2cd6e3"
+  },
+  "no_retry": true,
+  "packet": {
+    "bytes": 36286196,
+    "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.packet.json",
+    "sha256": "dc89d24f10589ba6978262f691b78fd39f66ef0dc0627ca8ef9a9aa2f4859397"
+  },
+  "returncode": 2,
+  "root_go": {
+    "bytes": 5340,
+    "path": "/home/zhuhe/litchi-performance-0973/receipts/root-go-0973-v1.json",
+    "sha256": "c1b014059decec93e528b3b4838c7c9ae905e79909b1b4c7bdeab211fa477d15"
+  },
+  "runner_session": 87860,
+  "schema": "litchi.performance.0973.root_terminal.v1"
+}

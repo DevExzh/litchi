@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## 0973 — capture loss blocks instruction attribution
+
+[0973](0973-instruction-profile-loss-gate.md) stops the first fresh pilot
+child after two lost-event records totaling eight lost samples. The native
+process and corrected decode are otherwise structurally valid, but the hard
+loss gate rejects the child, no retry occurs, and the remaining 11 children
+never start. The independent audit confirms the `LOST_SAMPLES=8` trailer
+corroborates those records rather than adding another eight samples. Marker
+counts and the corrected-versus-stock empty-chain change remain descriptive;
+the audit does not identify a capture, host, or source mechanism. Address
+capture loss in a separately reviewed design before another attribution run;
+do not relax the gate or infer a performance cause.
+
 ## 0972 — decoder map binding is the recovered measurement blocker
 
 [0972](0972-instruction-profile-recovery.md) corrects the 0971 raw-stack

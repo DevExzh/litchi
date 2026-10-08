@@ -1,0 +1,36 @@
+{
+  "actual_affinity": [
+    31
+  ],
+  "cgroup": [
+    "0::/user.slice/user-1001.slice/user@1001.service/tmux-spawn-3a22b971-8fd0-4c28-9367-732dd8523549.scope"
+  ],
+  "created_utc": "2026-10-08T04:41:20.506586+00:00",
+  "exec_argv": [
+    "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+    "--case",
+    "docfloat",
+    "--input",
+    "/home/zhuhe/litchi-performance-0969/qa-core/test-data/ole/doc/FloatingPictures.doc",
+    "--edits",
+    "1",
+    "--retention",
+    "default",
+    "--warmup",
+    "5",
+    "--samples",
+    "80"
+  ],
+  "exec_path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+  "exec_pid": 3726714,
+  "exec_ready_utc": "2026-10-08T04:41:20.506597+00:00",
+  "execve": true,
+  "helper_path": "/home/zhuhe/litchi-performance-0970/tools/launch_baseline_v2.py",
+  "helper_sha256": "3b5b79351883a9b4efb680f47498d8e10bdf77d131a60d11c1ecb54ad95430f5",
+  "packet_id": "child-01",
+  "pid": 3726714,
+  "requested_affinity": [
+    31
+  ],
+  "schema": "litchi.performance.0970.launch.v2"
+}

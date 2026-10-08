@@ -1,0 +1,24 @@
+{
+  "children_requested": 12,
+  "created_utc": "2026-10-08T04:42:18.791157+00:00",
+  "failure": {
+    "child": 1,
+    "gate": {
+      "passed": false,
+      "reasons": [
+        "lost_events_nonzero"
+      ]
+    },
+    "reason": "per_child_marker_gate_failed"
+  },
+  "no_retry": true,
+  "packets": [
+    "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.packet.json"
+  ],
+  "plan": {
+    "path": "/home/zhuhe/litchi-performance-0973/plans/plan-0973-final-v2.json",
+    "sha256": "12bd803923586cf73c0881bfd3ef7e3cbc7a1e4853867c91d422b6333fa2e3b4"
+  },
+  "schema": "litchi.performance.0973.capture_manifest.v2",
+  "status": "failed"
+}

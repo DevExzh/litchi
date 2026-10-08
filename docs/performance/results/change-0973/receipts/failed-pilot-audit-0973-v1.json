@@ -1,0 +1,66 @@
+{
+  "adoption_claim": false,
+  "analysis_only": true,
+  "audit_status": "complete_failed_pilot",
+  "created_utc": "2026-10-08T04:45:36.045023+00:00",
+  "diagnostic_only": true,
+  "helper": {
+    "bytes": 24997,
+    "path": "/home/zhuhe/litchi-performance-0973/tools/audit_failed_pilot_0973_v1.py",
+    "sha256": "ee86ef766fdaa42f5c34038aede7818d57ed9041c7bebc279fd2df3032ed3629"
+  },
+  "loss_record_and_period_check": {
+    "configured_period": 1000000,
+    "interpretation": "Two PERF_RECORD_LOST records (4+4) and one PERF_RECORD_LOST_SAMPLES summary (8) agree. The 8 lost samples have no observed instruction period; the nominal configured-period product is not added to D.",
+    "nominal_period_units_if_one_period_per_lost_sample": 8000000,
+    "observed_period_excludes_lost_samples": true,
+    "perf_record_lost_aggregate": 8,
+    "perf_record_lost_record_count": 2,
+    "perf_record_lost_samples_aggregate": 8,
+    "perf_record_lost_samples_record_count": 1,
+    "perf_record_lost_samples_values": [
+      8
+    ],
+    "perf_record_lost_values": [
+      4,
+      4
+    ],
+    "script_lost_aggregate": 8,
+    "script_lost_record_count": 2,
+    "script_lost_values": [
+      4,
+      4
+    ]
+  },
+  "manifest": {
+    "bytes": 669,
+    "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/capture-manifest-v2.json",
+    "sha256": "7c0b0e159c510e63f61fd45ca1af516fa95b72ae21bb7b4c8a080dfc1f2cd6e3"
+  },
+  "no_new_capture_build_or_workload": true,
+  "packet": {
+    "bytes": 36286196,
+    "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.packet.json",
+    "sha256": "dc89d24f10589ba6978262f691b78fd39f66ef0dc0627ca8ef9a9aa2f4859397"
+  },
+  "qualification_claim": false,
+  "root_terminal": {
+    "bytes": 1225,
+    "path": "/home/zhuhe/litchi-performance-0973/receipts/root-terminal-0973-v1.json",
+    "sha256": "07fded0dcafa601a4fea20fb73f8eeb343f997fda4b390aee1b1f80a378f9711"
+  },
+  "schema": "litchi.performance.0973.failed_pilot_audit_receipt.v1",
+  "scope": "child-01 pilot only; retained failed run; descriptive raw/report/decoded audit",
+  "speed_claim": false,
+  "status": "pass",
+  "summary_json": {
+    "bytes": 28850,
+    "path": "/home/zhuhe/litchi-performance-0973/analysis/failed-pilot-child01-audit-v1.json",
+    "sha256": "463ca8a41524c865166b63334589cc8720e2072dd639a5c144064e16f7c858ed"
+  },
+  "summary_markdown": {
+    "bytes": 5735,
+    "path": "/home/zhuhe/litchi-performance-0973/analysis/failed-pilot-child01-audit-v1.md",
+    "sha256": "34b92d8b48e1749d005d7bd47fd662ba780d3ceb8578e48144e139da179bcb9a"
+  }
+}

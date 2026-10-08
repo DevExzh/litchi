@@ -1,0 +1,647 @@
+{
+  "adoption_claim": false,
+  "all_child_claim": false,
+  "analysis_only": true,
+  "artifact_bindings": {
+    "buildid": {
+      "bytes": 571,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.perf-buildid.txt",
+      "sha256": "6c7729316b6a54fc6ac338ceedfb960f4bb4fc669effac870d8ae58a34902925"
+    },
+    "command": {
+      "bytes": 1185,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.command.json",
+      "sha256": "1d40d7d72eb8c8f56e0f6bf8edbcac96041253a8f816e909b48dc51d11982fac"
+    },
+    "corrected_log": {
+      "bytes": 107306396,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.corrected.dwfl.jsonl",
+      "sha256": "81b01f6a020f537e3524b746f7879ed50ea142b2a1c1a0c8942f4580c467f59c"
+    },
+    "corrected_script": {
+      "bytes": 11270952,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.corrected.perf-script-no-inline.txt",
+      "sha256": "b8d2022b0caa77b02e9fb5a0c4c75c75f7830a7de5a00a037c84eb418583961b"
+    },
+    "corrected_stderr": {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.corrected.perf.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "header": {
+      "bytes": 1919,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.perf-header.txt",
+      "sha256": "3d04b0f539690b173184dfe1fb15e9aee770f29481f001ca0d0c454bd1b027ca"
+    },
+    "inline": {
+      "bytes": 1221376,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.perf-script-inline.txt",
+      "sha256": "b863443207dfc058ea0404e41f09963df3f2b4c87787cbb05ef880ca65ad633b"
+    },
+    "launch": {
+      "bytes": 1126,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.launch.json",
+      "sha256": "595a37efa06cbc20b92dd9d2ba4f7d2d731cc5c212b60ebb085818e2278f165a"
+    },
+    "layout": {
+      "bytes": 4457,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.target-layout.json",
+      "sha256": "8540ad7c5b20faacb687679a92a2f6636fcfbecb34b2254eedf5f926f9099e3e"
+    },
+    "mmap_dump": {
+      "bytes": 1096108065,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.perf-mmap-dump.txt",
+      "sha256": "4f8c8a21304aed1a74e203e1ead5eff9f97dd2c10c0256d601d026c0e5d683ec"
+    },
+    "noop_log": {
+      "bytes": 28384425,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.noop.dwfl.jsonl",
+      "sha256": "27090946ee0734d45f78b20348c513c36253a7689a8b8318b3ecd3176110930d"
+    },
+    "noop_script": {
+      "bytes": 1137729,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.noop.perf-script-no-inline.txt",
+      "sha256": "03f2d314e734608d6ea71dbdf6be1a186ca03dd0cf5f3c37f8a979f4fcf5d1c3"
+    },
+    "noop_stderr": {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.noop.perf.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "perf_data": {
+      "bytes": 228856640,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.perf.data",
+      "sha256": "4140b417724ea9606b6637ae6aade3a874a682bd9baf84d6fa0f6fdb716acbaa"
+    },
+    "raw_stack": {
+      "bytes": 4188,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.raw-stack.json",
+      "sha256": "5242af2a6582233fca6f1719f935eaa8e2728abc87e482a7837f63cde00fe439"
+    },
+    "report": {
+      "bytes": 292316,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.report.json",
+      "sha256": "22b31d36fc663b85e4a9d0696313ff92b980de75dff55f1a6b484d981668d991"
+    },
+    "stderr": {
+      "bytes": 192,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.perf.stderr",
+      "sha256": "8305826c550c725e0ba1884ef31f3fbe6ce81659a9623e95e5ba26fca1f42ffa"
+    },
+    "stock_no_log": {
+      "bytes": 44,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.stock-no-log",
+      "sha256": "a384cfd115707fcd837ef0e3bb68771e20b54d0339cd8f13b871df8d86910d43"
+    },
+    "stock_script": {
+      "bytes": 1137729,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.stock.perf-script-no-inline.txt",
+      "sha256": "03f2d314e734608d6ea71dbdf6be1a186ca03dd0cf5f3c37f8a979f4fcf5d1c3"
+    },
+    "stock_stderr": {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.stock.perf.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "terminal": {
+      "bytes": 1367,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.terminal.json",
+      "sha256": "340007135f843c3d7c20aa81203b10057b0283ab3659da039e3b5cf279bec896"
+    }
+  },
+  "audit_helper": {
+    "argv": [
+      "/home/zhuhe/litchi-performance-0973/tools/audit_failed_pilot_0973_v1.py"
+    ],
+    "path": "/home/zhuhe/litchi-performance-0973/tools/audit_failed_pilot_0973_v1.py",
+    "python": "3.14.4",
+    "sha256": "ee86ef766fdaa42f5c34038aede7818d57ed9041c7bebc279fd2df3032ed3629"
+  },
+  "capture_stop": {
+    "children_completed": 1,
+    "children_not_started": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "manifest_failure": {
+      "child": 1,
+      "gate": {
+        "passed": false,
+        "reasons": [
+          "lost_events_nonzero"
+        ]
+      },
+      "reason": "per_child_marker_gate_failed"
+    },
+    "manifest_status": "failed",
+    "no_retry": true,
+    "root_terminal_returncode": 2
+  },
+  "child_terminal": {
+    "actual_affinity": [
+      31
+    ],
+    "exec_pid": 3726714,
+    "native_ld_preload": "absent",
+    "process_pid": 3726713,
+    "returncode": 0,
+    "timed_out": false
+  },
+  "created_utc": "2026-10-08T04:45:36.029733+00:00",
+  "diagnostic_only": true,
+  "gate": {
+    "passed": false,
+    "reasons": [
+      "lost_events_nonzero"
+    ]
+  },
+  "inputs": {
+    "adr_revalidation": {
+      "bytes": 8182,
+      "path": "/home/zhuhe/litchi-performance-0973/receipts/adr-goal-revalidation-0973-v1.json",
+      "sha256": "80dc8af647aa4992f2281262e7be5bde40ac192aa1d392b0fc5d6525052d7d90"
+    },
+    "binary": {
+      "bytes": 47909224,
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+    },
+    "corrected_script": {
+      "bytes": 11270952,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.corrected.perf-script-no-inline.txt",
+      "sha256": "b8d2022b0caa77b02e9fb5a0c4c75c75f7830a7de5a00a037c84eb418583961b"
+    },
+    "fixture": {
+      "bytes": 335360,
+      "path": "/home/zhuhe/code/litchi/test-data/ole/doc/FloatingPictures.doc",
+      "sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d"
+    },
+    "manifest": {
+      "bytes": 669,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/capture-manifest-v2.json",
+      "sha256": "7c0b0e159c510e63f61fd45ca1af516fa95b72ae21bb7b4c8a080dfc1f2cd6e3"
+    },
+    "mmap_dump": {
+      "bytes": 1096108065,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.perf-mmap-dump.txt",
+      "sha256": "4f8c8a21304aed1a74e203e1ead5eff9f97dd2c10c0256d601d026c0e5d683ec"
+    },
+    "packet": {
+      "bytes": 36286196,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.packet.json",
+      "sha256": "dc89d24f10589ba6978262f691b78fd39f66ef0dc0627ca8ef9a9aa2f4859397"
+    },
+    "perf_data": {
+      "bytes": 228856640,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.perf.data",
+      "sha256": "4140b417724ea9606b6637ae6aade3a874a682bd9baf84d6fa0f6fdb716acbaa"
+    },
+    "plan": {
+      "bytes": 14249,
+      "path": "/home/zhuhe/litchi-performance-0973/plans/plan-0973-final-v2.json",
+      "sha256": "12bd803923586cf73c0881bfd3ef7e3cbc7a1e4853867c91d422b6333fa2e3b4"
+    },
+    "raw_stack": {
+      "bytes": 4188,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.raw-stack.json",
+      "sha256": "5242af2a6582233fca6f1719f935eaa8e2728abc87e482a7837f63cde00fe439"
+    },
+    "report": {
+      "bytes": 292316,
+      "path": "/home/zhuhe/litchi-performance-0973/capture/instruction-profile-v2/child-01/child-01.report.json",
+      "sha256": "22b31d36fc663b85e4a9d0696313ff92b980de75dff55f1a6b484d981668d991"
+    },
+    "root_terminal": {
+      "bytes": 1225,
+      "path": "/home/zhuhe/litchi-performance-0973/receipts/root-terminal-0973-v1.json",
+      "sha256": "07fded0dcafa601a4fea20fb73f8eeb343f997fda4b390aee1b1f80a378f9711"
+    }
+  },
+  "interpretation": "The pilot has usable descriptive report and corrected marker-owner observations, but lost events make the frozen child gate fail. The retained D is observed sample period only; no all-child reduction, speed, causal, exact timed-region, source-owner, or adoption conclusion is valid.",
+  "loss_evidence": {
+    "configured_period": 1000000,
+    "interpretation": "Two PERF_RECORD_LOST records (4+4) and one PERF_RECORD_LOST_SAMPLES summary (8) agree. The 8 lost samples have no observed instruction period; the nominal configured-period product is not added to D.",
+    "nominal_period_units_if_one_period_per_lost_sample": 8000000,
+    "observed_period_excludes_lost_samples": true,
+    "perf_record_lost_aggregate": 8,
+    "perf_record_lost_record_count": 2,
+    "perf_record_lost_samples_aggregate": 8,
+    "perf_record_lost_samples_record_count": 1,
+    "perf_record_lost_samples_values": [
+      8
+    ],
+    "perf_record_lost_values": [
+      4,
+      4
+    ],
+    "script_lost_aggregate": 8,
+    "script_lost_record_count": 2,
+    "script_lost_values": [
+      4,
+      4
+    ]
+  },
+  "no_new_capture_build_or_workload": true,
+  "owner_coverage_observed": {
+    "inclusive_marker_ancestors": {
+      "bucket_count": 261,
+      "external_bucket_count": 13,
+      "external_period": 488000000,
+      "external_share_of_marker": 0.515311510031679,
+      "period_sum": 9416000000,
+      "target_bucket_count": 248,
+      "target_period": 8928000000,
+      "target_share_of_marker": 9.42766631467793,
+      "top20": [
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::doc_retention_probe_0942_cfb_profile::profiled_measured_case",
+          "period": 947000000,
+          "sample_count_at_fixed_period": 947,
+          "share_of_marker": 1.0
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::doc_retention_probe_0942_cfb_profile::run_case",
+          "period": 947000000,
+          "sample_count_at_fixed_period": 947,
+          "share_of_marker": 1.0
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::doc_retention_probe_0942_cfb_profile::measure_one",
+          "period": 915000000,
+          "sample_count_at_fixed_period": 915,
+          "share_of_marker": 0.9662090813093981
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::doc_retention_probe_0942_cfb_profile::run",
+          "period": 798000000,
+          "sample_count_at_fixed_period": 798,
+          "share_of_marker": 0.8426610348468849
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::package::codec::<impl litchi_doc::package::model::Package<R>>::validate_ole_file",
+          "period": 441000000,
+          "sample_count_at_fixed_period": 441,
+          "share_of_marker": 0.4656810982048574
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::body_text::Edit::commit",
+          "period": 328000000,
+          "sample_count_at_fixed_period": 328,
+          "share_of_marker": 0.34635691657866946
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::body_text::Snapshot::open_bounded",
+          "period": 325000000,
+          "sample_count_at_fixed_period": 325,
+          "share_of_marker": 0.34318901795142553
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::body_text::Snapshot::open_bounded_with_policy",
+          "period": 319000000,
+          "sample_count_at_fixed_period": 319,
+          "share_of_marker": 0.3368532206969377
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::tracked_revision::package::RevisionEditor::open_with_ole_file_with_policy",
+          "period": 266000000,
+          "sample_count_at_fixed_period": 266,
+          "share_of_marker": 0.2808870116156283
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::document::package::<impl litchi_doc::document::model::state::Document>::from_ole_with_options",
+          "period": 210000000,
+          "sample_count_at_fixed_period": 210,
+          "share_of_marker": 0.22175290390707497
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::body_text::Edit::replace_paragraph",
+          "period": 199000000,
+          "sample_count_at_fixed_period": 199,
+          "share_of_marker": 0.21013727560718057
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::body_text::Edit::replace_text",
+          "period": 199000000,
+          "sample_count_at_fixed_period": 199,
+          "share_of_marker": 0.21013727560718057
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::sprm::parse_sprms",
+          "period": 166000000,
+          "sample_count_at_fixed_period": 166,
+          "share_of_marker": 0.17529039070749736
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::parts::pap_bin_table::PapBinTable::parse",
+          "period": 146000000,
+          "sample_count_at_fixed_period": 146,
+          "share_of_marker": 0.15417106652587118
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::tracked_revision::package::RevisionEditor::replace_plain_text",
+          "period": 143000000,
+          "sample_count_at_fixed_period": 143,
+          "share_of_marker": 0.15100316789862725
+        },
+        {
+          "dso_class": "external",
+          "owner": "/usr/lib/x86_64-linux-gnu/libc.so.6::__memmove_avx512_unaligned_erms",
+          "period": 112000000,
+          "sample_count_at_fixed_period": 112,
+          "share_of_marker": 0.11826821541710665
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::tracked_revision::package::RevisionEditor::commit",
+          "period": 96000000,
+          "sample_count_at_fixed_period": 96,
+          "share_of_marker": 0.10137275607180571
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_ole_common::object::editor::Editor::put_streams_shared_with_rendered",
+          "period": 96000000,
+          "sample_count_at_fixed_period": 96,
+          "share_of_marker": 0.10137275607180571
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::parts::chp_bin_table::ChpBinTable::parse",
+          "period": 93000000,
+          "sample_count_at_fixed_period": 93,
+          "share_of_marker": 0.09820485744456177
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::body_text::Snapshot::edit",
+          "period": 92000000,
+          "sample_count_at_fixed_period": 92,
+          "share_of_marker": 0.09714889123548047
+        }
+      ]
+    },
+    "inclusive_sum_is_nonadditive": true,
+    "inclusive_sum_period": 9416000000,
+    "marker_period_denominator": 947000000,
+    "owner_key_format": "<DSO>::<symbol>",
+    "physical_leaf_proxy": {
+      "bucket_count": 138,
+      "external_bucket_count": 12,
+      "external_period": 320000000,
+      "external_share_of_marker": 0.337909186906019,
+      "period_sum": 947000000,
+      "target_bucket_count": 126,
+      "target_period": 627000000,
+      "target_share_of_marker": 0.662090813093981,
+      "top20": [
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::sprm::parse_sprms",
+          "period": 149000000,
+          "sample_count_at_fixed_period": 149,
+          "share_of_marker": 0.1573389651531151
+        },
+        {
+          "dso_class": "external",
+          "owner": "/usr/lib/x86_64-linux-gnu/libc.so.6::__memmove_avx512_unaligned_erms",
+          "period": 112000000,
+          "sample_count_at_fixed_period": 112,
+          "share_of_marker": 0.11826821541710665
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::parts::text::TextExtractor::new",
+          "period": 78000000,
+          "sample_count_at_fixed_period": 78,
+          "share_of_marker": 0.08236536430834214
+        },
+        {
+          "dso_class": "external",
+          "owner": "/usr/lib/x86_64-linux-gnu/libc.so.6::_int_malloc",
+          "period": 58000000,
+          "sample_count_at_fixed_period": 58,
+          "share_of_marker": 0.061246040126715945
+        },
+        {
+          "dso_class": "external",
+          "owner": "/usr/lib/x86_64-linux-gnu/libc.so.6::_int_free_merge_chunk",
+          "period": 49000000,
+          "sample_count_at_fixed_period": 49,
+          "share_of_marker": 0.05174234424498416
+        },
+        {
+          "dso_class": "external",
+          "owner": "/usr/lib/x86_64-linux-gnu/libc.so.6::cfree@GLIBC_2.2.5",
+          "period": 28000000,
+          "sample_count_at_fixed_period": 28,
+          "share_of_marker": 0.029567053854276663
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::parts::pap_bin_table::PapBinTable::parse",
+          "period": 25000000,
+          "sample_count_at_fixed_period": 25,
+          "share_of_marker": 0.026399155227032733
+        },
+        {
+          "dso_class": "external",
+          "owner": "/usr/lib/x86_64-linux-gnu/libc.so.6::malloc",
+          "period": 22000000,
+          "sample_count_at_fixed_period": 22,
+          "share_of_marker": 0.023231256599788808
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_cfb::file::SectorChainScratch::collect_bounded",
+          "period": 19000000,
+          "sample_count_at_fixed_period": 19,
+          "share_of_marker": 0.02006335797254488
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_cfb::file::EndChainScratch::collect",
+          "period": 17000000,
+          "sample_count_at_fixed_period": 17,
+          "share_of_marker": 0.01795142555438226
+        },
+        {
+          "dso_class": "external",
+          "owner": "/usr/lib/x86_64-linux-gnu/libc.so.6::unlink_chunk.isra.0",
+          "period": 16000000,
+          "sample_count_at_fixed_period": 16,
+          "share_of_marker": 0.01689545934530095
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::<litchi_doc::parts::pap::model::ParagraphProperties as core::clone::Clone>::clone",
+          "period": 15000000,
+          "sample_count_at_fixed_period": 15,
+          "share_of_marker": 0.01583949313621964
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::body_text::source_paragraphs",
+          "period": 14000000,
+          "sample_count_at_fixed_period": 14,
+          "share_of_marker": 0.014783526927138331
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::parts::proofing::ProofingStateTable::parse_bytes_with_max_cp",
+          "period": 14000000,
+          "sample_count_at_fixed_period": 14,
+          "share_of_marker": 0.014783526927138331
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::tracked_revision::package::RevisionEditor::decode_text_range",
+          "period": 14000000,
+          "sample_count_at_fixed_period": 14,
+          "share_of_marker": 0.014783526927138331
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::parts::fkp::PapxFkp::parse",
+          "period": 11000000,
+          "sample_count_at_fixed_period": 11,
+          "share_of_marker": 0.011615628299894404
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::tracked_revision::package::RevisionEditor::revisions",
+          "period": 11000000,
+          "sample_count_at_fixed_period": 11,
+          "share_of_marker": 0.011615628299894404
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::parts::chp::codec::<impl litchi_doc::parts::chp::model::CharacterProperties>::from_sprm_recording",
+          "period": 10000000,
+          "sample_count_at_fixed_period": 10,
+          "share_of_marker": 0.010559662090813094
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::parts::chp_bin_table::ChpBinTable::parse",
+          "period": 10000000,
+          "sample_count_at_fixed_period": 10,
+          "share_of_marker": 0.010559662090813094
+        },
+        {
+          "dso_class": "target",
+          "owner": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::litchi_doc::parts::fkp::ChpxFkp::parse",
+          "period": 10000000,
+          "sample_count_at_fixed_period": 10,
+          "share_of_marker": 0.010559662090813094
+        }
+      ]
+    },
+    "physical_leaf_unknown_period": 0,
+    "root_resolved_owner_period": {
+      "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::doc_retention_probe_0942_cfb_profile::measure_one": 117000000,
+      "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::doc_retention_probe_0942_cfb_profile::profiled_measured_case": 32000000,
+      "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile::doc_retention_probe_0942_cfb_profile::run": 798000000
+    },
+    "scope": "one failed child; physical frame-0 proxy and overlapping resolved marker-chain tags; no source or phase attribution"
+  },
+  "qualification_claim": false,
+  "report": {
+    "correctness_all_true": true,
+    "elapsed_count": 80,
+    "elapsed_max_ns": 1347816,
+    "elapsed_min_ns": 1180165,
+    "exact_output_equal_reference": true,
+    "mean_ns": 1270959.4,
+    "output_bytes": 342528,
+    "output_capacity": 342528,
+    "p50_ns": 1250276.0,
+    "p95_ns": 1332539.0,
+    "p99_ns": 1338944.2999999998,
+    "region_definition": "public Snapshot::open_bounded source clone, one Edit with all paragraph-0 replacements and retention releases, commit, output Vec copy, and local snapshot/edit/commit destruction; source file read, references, correctness checks, hashing and JSON excluded",
+    "route_count": 3,
+    "route_output_sha256s": [
+      "6ba1bc972d66715e76d882f47c587b22000100f47abaa88428990619fc59fa20"
+    ],
+    "samples_requested": 80,
+    "source_bytes": 335360,
+    "timing_claim": true,
+    "warmups": 5
+  },
+  "sample_evidence": {
+    "corrected_script": {
+      "decoded_empty_callchain_count": 0,
+      "empty_callchain_count": 0,
+      "explicit_stack_truncated_count": 0,
+      "marker_period": 947000000,
+      "marker_period_share": 0.1366325205598038,
+      "marker_sample_count": 947,
+      "physical_leaf_classified_period": 947000000,
+      "physical_leaf_conservation": {
+        "classified_period": 947000000,
+        "marker_period": 947000000,
+        "passed": true,
+        "scope": "marker-containing samples only"
+      },
+      "physical_leaf_unknown_period": 0,
+      "physical_leaf_unknown_samples": 0,
+      "sample_count": 6931,
+      "total_period": 6931000000,
+      "unresolved_frames": 3357
+    },
+    "mmap_sample_record_count": 6931,
+    "observed_period_conservation": {
+      "corrected_total_period": 6931000000,
+      "passed": true,
+      "sample_count_times_period": 6931000000
+    },
+    "raw_stack": {
+      "period": 1000000,
+      "period_valid": true,
+      "pid_tid_cpu_counts": {
+        "3726714/3726714@31": 6931
+      },
+      "raw_event_count": 8049,
+      "record_type_counts": {
+        "9": 6931
+      },
+      "sample_count": 6931,
+      "unconsumed_raw_count": 1118,
+      "violations": []
+    },
+    "stock_noop": {
+      "noop_sample_count": 6931,
+      "noop_total_period": 6931000000,
+      "script_sha_equal": true,
+      "stock_sample_count": 6931,
+      "stock_total_period": 6931000000
+    }
+  },
+  "schema": "litchi.performance.0973.failed_pilot_audit.v1",
+  "scope": "child-01 pilot only; retained failed run; descriptive raw/report/decoded audit",
+  "speed_claim": false,
+  "status": "complete_failed_pilot"
+}
