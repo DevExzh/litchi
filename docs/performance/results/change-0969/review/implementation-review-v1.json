@@ -1,0 +1,85 @@
+{
+  "schema": "litchi.performance.0969.cfb_implementation_review.v1",
+  "status": "pass",
+  "approved_for_next_stage": true,
+  "reviewer_role": "independent read-only implementation, receipt-binding, metadata, fallback, and QA review",
+  "created_utc": "2026-10-08T01:33:01+00:00",
+  "review_mode": {
+    "source_review": "static inspection and baseline diff only",
+    "build_performed": false,
+    "workload_performed": false,
+    "prior_receipts_modified": false,
+    "main_checkout_modified": false
+  },
+  "design_binding": {
+    "path": "/home/zhuhe/litchi-performance-0969/design-v1.md",
+    "sha256": "f043500923af2cb7348845d6f280429a76e11e9c36e744ebfa9bfd572bf9616c",
+    "prior_design_review": "/home/zhuhe/litchi-performance-0969/review/design-review-v1.json",
+    "prior_design_review_sha256": "b83916d26aea5dc30710da60d285558987f498eb6d93211b4c8f97f03c0cad8a"
+  },
+  "candidate_binding": {
+    "root": "/home/zhuhe/litchi-performance-0969/source-candidate",
+    "tree_sha256": "d39b47d024035112c3f71dd06e3ff3d54829e908e9f612e90b2d25a41ffdc884",
+    "baseline_root": "/home/zhuhe/litchi-performance-0969/source-baseline",
+    "baseline_tree_sha256": "9da7843d8b8bce8fe7530a74bfffd2af1ee7d66c0439e93d3c0a57c24c336188",
+    "commit": "34fc85e23ccefcd8ad6ffd4d57d9e2671ef1a5a1",
+    "patch_path": "/home/zhuhe/litchi-performance-0969/manifests/candidate-implementation-v2.patch",
+    "patch_sha256": "219c799de930a1a73a54b0ef545a28cea5eb9a503f0e4e3e232d9753288bd04f",
+    "implementation_seal_v2": {
+      "path": "/home/zhuhe/litchi-performance-0969/review/implementation-seal-v2.json",
+      "sha256": "72230556b623fc4e020553c60e4c37c229ebf8195c5c58a836d573ad80373f7c"
+    },
+    "implementation_seal_v3": {
+      "path": "/home/zhuhe/litchi-performance-0969/review/implementation-seal-v3.json",
+      "sha256": "dbb9a85aca1459cfcf158b1d5d5cc3a3363e047539494501f5c3255e7c4ffe3f"
+    },
+    "build_receipt": {
+      "path": "/home/zhuhe/litchi-performance-0969/review/build-receipt-v1.json",
+      "sha256": "503a26e724911fe1ce53ce5125f10f77ec299040592fc09a35e00dc518440130"
+    },
+    "changed_paths": [
+      "crates/litchi-ole-common/src/object/codec.rs",
+      "crates/litchi-ole-common/src/object/editor.rs",
+      "crates/litchi-ole-common/tests/object.rs"
+    ],
+    "changed_file_sha256": {
+      "crates/litchi-ole-common/src/object/codec.rs": "25e4035e739788e29f10ed4e4ba77d4187221c26f789783d06e473ada6add146",
+      "crates/litchi-ole-common/src/object/editor.rs": "58913ec7125acb061aa5547a2f9a674cd314a1eb8bf3e90bba2df62392bf106c",
+      "crates/litchi-ole-common/tests/object.rs": "738db3f03cb61e860639190ae06cda25c9a0556e9954db79979654c185fd2773"
+    }
+  },
+  "findings": [
+    {
+      "id": "receipt-binding",
+      "status": "pass",
+      "detail": "The fresh-writer render builds RenderedCommit only after successful write_to, flush, immediate layout-report inspection, and a reused-source-layout verdict. ValidatedReuse is private to codec.rs and borrows the exact model and source slice plus Limits; capture consumes the bytes and receipt before editor package/object/changed assignment. The source-bound overlay path uses ordinary full capture."
+    },
+    {
+      "id": "projection-correctness",
+      "status": "pass",
+      "detail": "RenderedCommit::capture opens the final vector and runs codec::open before projection. The projected path reuses the existing root decode, directory traversal, path construction, depth checks, and Budget charge order; it retains final root, storage, and stream Metadata, requires one-to-one path/kind coverage, checks declared stream size against the staged Arc length, and requires Arc identity for every projected stream. Final physical SID, links, CLSID, state, timestamps, start sector, size, and mini-stream choice come from the output directory."
+    },
+    {
+      "id": "fallback-errors-atomicity",
+      "status": "pass",
+      "detail": "Index allocation failure, duplicate/path/coverage mismatch, and wrong declared stream size decline into the existing full Package::capture plus allocation-reuse route; actual open, protection, decode, depth, count, and byte-limit errors propagate in the shared traversal order. Rewrite, no-source, topology changes, plan decline, and copy-through remain receipt-free. Editor publication still occurs only after capture/projection and discovery succeed."
+    },
+    {
+      "id": "source-closure",
+      "status": "pass",
+      "detail": "The candidate diff is confined to the three sealed paths and matches the source-file manifest and patch binding. The changed capture_container is a callback refactor preserving ordinary stream opening and size checks; no unrelated production source changed."
+    },
+    {
+      "id": "qa-claims",
+      "status": "pass",
+      "detail": "The sealed QA receipt reports core clippy with warnings denied, 206 unit tests, 89 integration tests, 9 focused handoff tests, and 1210 library plus 39 selected XLS integration tests; the build receipt is external and explicitly records no workload. JSON receipt inputs were independently parsed with duplicate-key rejection."
+    }
+  ],
+  "non_blocking_notes": [
+    "RenderedCommit::ordinary is crate-visible so editor.rs can wrap the copy-through route, but it always carries reuse: None; the optimized ValidatedReuse constructor and fields remain codec-private.",
+    "The focused allocation-decline assertion exercises the bounded ProjectionIndex constructor directly rather than injecting failure through the production capture_projected call. The implementation's production branch still falls back on ProjectionIndex::new failure; this is a test-injection coverage limitation, not a semantic gap.",
+    "The new handoff tests use a short NotOleFile malformed case and do not independently enumerate every truncated-valid-CFB, bad-link/SID, or source-adoption-decline fault. Existing CFB/object QA covers the unchanged parser and writer boundaries; those cases remain appropriate differential regression follow-up before any broad performance claim."
+  ],
+  "material_blockers": [],
+  "decision": "Independent static review passes the sealed 0969 implementation for the approved external QA/measurement gate. No workload or performance claim is authorized by this receipt."
+}

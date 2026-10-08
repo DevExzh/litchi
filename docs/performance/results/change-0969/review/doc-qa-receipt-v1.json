@@ -1,0 +1,355 @@
+{
+  "schema": "litchi.performance.0969.doc_qa_receipt.v1",
+  "created_utc": "2026-10-08",
+  "status": "qa_pass_with_unrelated_rustdoc_lint_failure",
+  "formal_performance_capture": false,
+  "source": {
+    "revision": "34fc85e23ccefcd8ad6ffd4d57d9e2671ef1a5a1",
+    "candidate_root": "/home/zhuhe/litchi-performance-0969/source-candidate",
+    "candidate_tree_sha256": "d39b47d024035112c3f71dd06e3ff3d54829e908e9f612e90b2d25a41ffdc884",
+    "qa_root": "/home/zhuhe/litchi-performance-0969/qa-xls",
+    "qa_changed_file_hashes": {
+      "crates/litchi-ole-common/src/object/codec.rs": "25e4035e739788e29f10ed4e4ba77d4187221c26f789783d06e473ada6add146",
+      "crates/litchi-ole-common/src/object/editor.rs": "58913ec7125acb061aa5547a2f9a674cd314a1eb8bf3e90bba2df62392bf106c",
+      "crates/litchi-ole-common/tests/object.rs": "738db3f03cb61e860639190ae06cda25c9a0556e9954db79979654c185fd2773"
+    },
+    "rustdoc_diagnostic_files_exact_across_main_baseline_candidate_qa": true,
+    "rustdoc_diagnostic_source_check": {
+      "bookmarks": {
+        "main": {
+          "path": "/home/zhuhe/code/litchi/crates/litchi-doc/src/parts/bookmarks.rs",
+          "bytes": 18042,
+          "sha256": "c5c3554811a6e6c641ed27a2113a2773809aab1d4155987bade1131c94640693",
+          "relative_path": "crates/litchi-doc/src/parts/bookmarks.rs",
+          "parse_recording_visibility": [
+            "pub(crate) fn parse_recording("
+          ]
+        },
+        "baseline": {
+          "path": "/home/zhuhe/litchi-performance-0969/source-baseline/crates/litchi-doc/src/parts/bookmarks.rs",
+          "bytes": 18042,
+          "sha256": "c5c3554811a6e6c641ed27a2113a2773809aab1d4155987bade1131c94640693",
+          "relative_path": "crates/litchi-doc/src/parts/bookmarks.rs",
+          "parse_recording_visibility": [
+            "pub(crate) fn parse_recording("
+          ]
+        },
+        "candidate": {
+          "path": "/home/zhuhe/litchi-performance-0969/source-candidate/crates/litchi-doc/src/parts/bookmarks.rs",
+          "bytes": 18042,
+          "sha256": "c5c3554811a6e6c641ed27a2113a2773809aab1d4155987bade1131c94640693",
+          "relative_path": "crates/litchi-doc/src/parts/bookmarks.rs",
+          "parse_recording_visibility": [
+            "pub(crate) fn parse_recording("
+          ]
+        },
+        "qa_xls": {
+          "path": "/home/zhuhe/litchi-performance-0969/qa-xls/crates/litchi-doc/src/parts/bookmarks.rs",
+          "bytes": 18042,
+          "sha256": "c5c3554811a6e6c641ed27a2113a2773809aab1d4155987bade1131c94640693",
+          "relative_path": "crates/litchi-doc/src/parts/bookmarks.rs",
+          "parse_recording_visibility": [
+            "pub(crate) fn parse_recording("
+          ]
+        }
+      },
+      "comments": {
+        "main": {
+          "path": "/home/zhuhe/code/litchi/crates/litchi-doc/src/parts/comments.rs",
+          "bytes": 40544,
+          "sha256": "8c76f00bcb365288d87b85545a5e82fa22d74d3fdfae213b060b1614707c47dd",
+          "relative_path": "crates/litchi-doc/src/parts/comments.rs",
+          "parse_recording_visibility": [
+            "pub(crate) fn parse_recording("
+          ]
+        },
+        "baseline": {
+          "path": "/home/zhuhe/litchi-performance-0969/source-baseline/crates/litchi-doc/src/parts/comments.rs",
+          "bytes": 40544,
+          "sha256": "8c76f00bcb365288d87b85545a5e82fa22d74d3fdfae213b060b1614707c47dd",
+          "relative_path": "crates/litchi-doc/src/parts/comments.rs",
+          "parse_recording_visibility": [
+            "pub(crate) fn parse_recording("
+          ]
+        },
+        "candidate": {
+          "path": "/home/zhuhe/litchi-performance-0969/source-candidate/crates/litchi-doc/src/parts/comments.rs",
+          "bytes": 40544,
+          "sha256": "8c76f00bcb365288d87b85545a5e82fa22d74d3fdfae213b060b1614707c47dd",
+          "relative_path": "crates/litchi-doc/src/parts/comments.rs",
+          "parse_recording_visibility": [
+            "pub(crate) fn parse_recording("
+          ]
+        },
+        "qa_xls": {
+          "path": "/home/zhuhe/litchi-performance-0969/qa-xls/crates/litchi-doc/src/parts/comments.rs",
+          "bytes": 40544,
+          "sha256": "8c76f00bcb365288d87b85545a5e82fa22d74d3fdfae213b060b1614707c47dd",
+          "relative_path": "crates/litchi-doc/src/parts/comments.rs",
+          "parse_recording_visibility": [
+            "pub(crate) fn parse_recording("
+          ]
+        }
+      },
+      "rsids": {
+        "main": {
+          "path": "/home/zhuhe/code/litchi/crates/litchi-doc/src/parts/rsids.rs",
+          "bytes": 7629,
+          "sha256": "a213ed1018ac461602394a342845940a741cd8560a2eca7841b62da9fa29514d",
+          "relative_path": "crates/litchi-doc/src/parts/rsids.rs",
+          "parse_recording_visibility": [
+            "pub(crate) fn parse_recording("
+          ]
+        },
+        "baseline": {
+          "path": "/home/zhuhe/litchi-performance-0969/source-baseline/crates/litchi-doc/src/parts/rsids.rs",
+          "bytes": 7629,
+          "sha256": "a213ed1018ac461602394a342845940a741cd8560a2eca7841b62da9fa29514d",
+          "relative_path": "crates/litchi-doc/src/parts/rsids.rs",
+          "parse_recording_visibility": [
+            "pub(crate) fn parse_recording("
+          ]
+        },
+        "candidate": {
+          "path": "/home/zhuhe/litchi-performance-0969/source-candidate/crates/litchi-doc/src/parts/rsids.rs",
+          "bytes": 7629,
+          "sha256": "a213ed1018ac461602394a342845940a741cd8560a2eca7841b62da9fa29514d",
+          "relative_path": "crates/litchi-doc/src/parts/rsids.rs",
+          "parse_recording_visibility": [
+            "pub(crate) fn parse_recording("
+          ]
+        },
+        "qa_xls": {
+          "path": "/home/zhuhe/litchi-performance-0969/qa-xls/crates/litchi-doc/src/parts/rsids.rs",
+          "bytes": 7629,
+          "sha256": "a213ed1018ac461602394a342845940a741cd8560a2eca7841b62da9fa29514d",
+          "relative_path": "crates/litchi-doc/src/parts/rsids.rs",
+          "parse_recording_visibility": [
+            "pub(crate) fn parse_recording("
+          ]
+        }
+      },
+      "sections_codec": {
+        "main": {
+          "path": "/home/zhuhe/code/litchi/crates/litchi-doc/src/parts/sections/codec.rs",
+          "bytes": 6875,
+          "sha256": "bf95d8e88516c7b98c4d20d0d6a3dba177a1be4e127ff9d6d6383d6784476d73",
+          "relative_path": "crates/litchi-doc/src/parts/sections/codec.rs",
+          "parse_recording_visibility": [
+            "pub(crate) fn parse_recording("
+          ]
+        },
+        "baseline": {
+          "path": "/home/zhuhe/litchi-performance-0969/source-baseline/crates/litchi-doc/src/parts/sections/codec.rs",
+          "bytes": 6875,
+          "sha256": "bf95d8e88516c7b98c4d20d0d6a3dba177a1be4e127ff9d6d6383d6784476d73",
+          "relative_path": "crates/litchi-doc/src/parts/sections/codec.rs",
+          "parse_recording_visibility": [
+            "pub(crate) fn parse_recording("
+          ]
+        },
+        "candidate": {
+          "path": "/home/zhuhe/litchi-performance-0969/source-candidate/crates/litchi-doc/src/parts/sections/codec.rs",
+          "bytes": 6875,
+          "sha256": "bf95d8e88516c7b98c4d20d0d6a3dba177a1be4e127ff9d6d6383d6784476d73",
+          "relative_path": "crates/litchi-doc/src/parts/sections/codec.rs",
+          "parse_recording_visibility": [
+            "pub(crate) fn parse_recording("
+          ]
+        },
+        "qa_xls": {
+          "path": "/home/zhuhe/litchi-performance-0969/qa-xls/crates/litchi-doc/src/parts/sections/codec.rs",
+          "bytes": 6875,
+          "sha256": "bf95d8e88516c7b98c4d20d0d6a3dba177a1be4e127ff9d6d6383d6784476d73",
+          "relative_path": "crates/litchi-doc/src/parts/sections/codec.rs",
+          "parse_recording_visibility": [
+            "pub(crate) fn parse_recording("
+          ]
+        }
+      }
+    }
+  },
+  "environment": {
+    "target_dir": "/home/zhuhe/litchi-performance-0969/builds/qa-doc-target-v3",
+    "incremental": "0",
+    "term_color": "never",
+    "rustflags": "",
+    "locked": true,
+    "offline": true
+  },
+  "test_summary": {
+    "command_name": "doc_test_v3_pass",
+    "suites": 48,
+    "passed": 1379,
+    "failed": 0,
+    "ignored": 14
+  },
+  "rustdoc_diagnostic": {
+    "files": [
+      {
+        "path": "crates/litchi-doc/src/parts/bookmarks.rs",
+        "line": 20,
+        "visibility": "pub(crate) fn parse_recording"
+      },
+      {
+        "path": "crates/litchi-doc/src/parts/comments.rs",
+        "line": 125,
+        "visibility": "pub(crate) fn parse_recording"
+      },
+      {
+        "path": "crates/litchi-doc/src/parts/rsids.rs",
+        "line": 51,
+        "visibility": "pub(crate) fn parse_recording"
+      },
+      {
+        "path": "crates/litchi-doc/src/parts/sections/codec.rs",
+        "line": 42,
+        "visibility": "pub(crate) fn parse_recording"
+      }
+    ],
+    "interpretation": "Existing HEAD/baseline documentation links from public parse methods to private parse_recording; unrelated to 0969 changed OLE codec/editor/tests files."
+  },
+  "commands": [
+    {
+      "name": "doc_test_v1_invalid_narrow_workspace",
+      "command": "cargo test --manifest-path /home/zhuhe/litchi-performance-0969/qa-core/Cargo.toml -p litchi-doc --all-features --locked --offline",
+      "exit_code": 101,
+      "command_file": {
+        "path": "/home/zhuhe/litchi-performance-0969/qa-logs/doc-test-command.txt",
+        "bytes": 247,
+        "sha256": "1c0d15ccfa90559d92699bf344608410d9782030c4fb1d35537a9fe179124192"
+      },
+      "environment_file": {
+        "path": "/home/zhuhe/litchi-performance-0969/qa-logs/doc-test-environment.txt",
+        "bytes": 301,
+        "sha256": "c92ef48e419ab0ba7820a841283c887c933a079cfbe7c10c6b3885cae21ef5a3"
+      },
+      "stdout": {
+        "path": "/home/zhuhe/litchi-performance-0969/qa-logs/doc-test.stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "path": "/home/zhuhe/litchi-performance-0969/qa-logs/doc-test.stderr.log",
+        "bytes": 65,
+        "sha256": "e8ba25ea0890bf6630709e9f811ccb71944e489015181c521f81c609f9040c2a"
+      },
+      "note": "Invalid setup: qa-core intentionally narrows workspace members to core/OLE crates; Cargo rejected -p litchi-doc."
+    },
+    {
+      "name": "doc_test_v2_invalid_package_manifest",
+      "command": "cargo test --manifest-path /home/zhuhe/litchi-performance-0969/qa-core/crates/litchi-doc/Cargo.toml --all-features --locked --offline",
+      "exit_code": 101,
+      "command_file": {
+        "path": "/home/zhuhe/litchi-performance-0969/qa-logs/doc-test-v2-command.txt",
+        "bytes": 254,
+        "sha256": "327de12ca7196d0c4f8b800cb9a8516f43e013e2167e90241a73d08d56e97d20"
+      },
+      "environment_file": {
+        "path": "/home/zhuhe/litchi-performance-0969/qa-logs/doc-test-v2-environment.txt",
+        "bytes": 304,
+        "sha256": "79513a1a33847e8246aa2a3841754259f14567fdc581b271c2ab30f9ad0d1be6"
+      },
+      "stdout": {
+        "path": "/home/zhuhe/litchi-performance-0969/qa-logs/doc-test-v2.stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "path": "/home/zhuhe/litchi-performance-0969/qa-logs/doc-test-v2.stderr.log",
+        "bytes": 545,
+        "sha256": "62294f2fffc76c38ee4f496d53f02ab1bc61214cd9530866c6c1ae0e35dce06d"
+      },
+      "note": "Invalid setup: package manifest was outside qa-core workspace members."
+    },
+    {
+      "name": "doc_test_v3_pass",
+      "command": "cargo test --manifest-path /home/zhuhe/litchi-performance-0969/qa-xls/Cargo.toml -p litchi-doc --all-features --locked --offline",
+      "exit_code": 0,
+      "command_file": {
+        "path": "/home/zhuhe/litchi-performance-0969/qa-logs/doc-test-v3-command.txt",
+        "bytes": 249,
+        "sha256": "e119fedbe27a2c1d0c8e65ed80369fba03a9ad9fc8be3d801cdbbd17de388952"
+      },
+      "environment_file": {
+        "path": "/home/zhuhe/litchi-performance-0969/qa-logs/doc-test-v3-environment.txt",
+        "bytes": 303,
+        "sha256": "3ef141c5ae877260e3303d18667a867a1fd9d69f4b94f60243f9b2f498bde84e"
+      },
+      "stdout": {
+        "path": "/home/zhuhe/litchi-performance-0969/qa-logs/doc-test-v3.stdout.log",
+        "bytes": 117223,
+        "sha256": "937b08e231d96edf569dfab949d889953fea46169c99c6180f68d5859661aabe"
+      },
+      "stderr": {
+        "path": "/home/zhuhe/litchi-performance-0969/qa-logs/doc-test-v3.stderr.log",
+        "bytes": 11523,
+        "sha256": "44f115a20d4f2467a6742ccd9975a4bbcea914bc5de93730622e07e413598483"
+      }
+    },
+    {
+      "name": "doc_clippy_v1_pass",
+      "command": "cargo clippy --manifest-path /home/zhuhe/litchi-performance-0969/qa-xls/Cargo.toml -p litchi-doc --all-features --all-targets --locked --offline -- -D warnings",
+      "exit_code": 0,
+      "command_file": {
+        "path": "/home/zhuhe/litchi-performance-0969/qa-logs/doc-clippy-v1-command.txt",
+        "bytes": 280,
+        "sha256": "e6fd1a6dc39c37574a9fa7bb1bfead0baf80e08592aa69347f6cc4e75c55dd3d"
+      },
+      "stdout": {
+        "path": "/home/zhuhe/litchi-performance-0969/qa-logs/doc-clippy-v1.stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "path": "/home/zhuhe/litchi-performance-0969/qa-logs/doc-clippy-v1.stderr.log",
+        "bytes": 4054,
+        "sha256": "d9c838435c66011622a7e1197f0f369086f03160d11d7c457c95e95790444c49"
+      }
+    },
+    {
+      "name": "doc_rustdoc_v1_strict_fail",
+      "command": "RUSTDOCFLAGS=-Dwarnings cargo doc --manifest-path /home/zhuhe/litchi-performance-0969/qa-xls/Cargo.toml -p litchi-doc --all-features --no-deps --locked --offline",
+      "exit_code": 101,
+      "command_file": {
+        "path": "/home/zhuhe/litchi-performance-0969/qa-logs/doc-rustdoc-v1-command.txt",
+        "bytes": 282,
+        "sha256": "4fa119e85ebe7e316983bd47fe2acc97f41d5dea6f0ad1a269c85b2dfe57fd3d"
+      },
+      "stdout": {
+        "path": "/home/zhuhe/litchi-performance-0969/qa-logs/doc-rustdoc-v1.stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "path": "/home/zhuhe/litchi-performance-0969/qa-logs/doc-rustdoc-v1.stderr.log",
+        "bytes": 2598,
+        "sha256": "59e6e99226a1fedbfba92fdd23cf388f1821ac5f98e0d94e11d4721df44b979c"
+      },
+      "note": "Four denied public-to-private intra-doc links to Self::parse_recording."
+    },
+    {
+      "name": "doc_rustdoc_v2_workspace_lint_fail",
+      "command": "cargo doc --manifest-path /home/zhuhe/litchi-performance-0969/qa-xls/Cargo.toml -p litchi-doc --all-features --no-deps --locked --offline",
+      "exit_code": 101,
+      "command_file": {
+        "path": "/home/zhuhe/litchi-performance-0969/qa-logs/doc-rustdoc-v2-command.txt",
+        "bytes": 258,
+        "sha256": "b604839f54e8d26af5ecd8e6cf9bda02ff5cd2a07416b556e7e4a5f4cc5f1753"
+      },
+      "stdout": {
+        "path": "/home/zhuhe/litchi-performance-0969/qa-logs/doc-rustdoc-v2.stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "path": "/home/zhuhe/litchi-performance-0969/qa-logs/doc-rustdoc-v2.stderr.log",
+        "bytes": 1706,
+        "sha256": "e49450994767d19777f35ffa701df4412795265965a0781372aacf548194e0dd"
+      },
+      "note": "Same four links remain denied by workspace rustdoc lint private_intra_doc_links; no RUSTDOCFLAGS override."
+    }
+  ],
+  "source_tree_written": false,
+  "workload_started": false
+}

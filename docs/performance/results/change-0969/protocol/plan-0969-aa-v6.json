@@ -1,0 +1,321 @@
+{
+  "aa_noise": {
+    "before_candidate_formal_launch": true,
+    "bootstrap_resamples": 10000,
+    "bootstrap_seed": 969004,
+    "cells": [
+      "docnohf/e1/zero",
+      "docnohf/e1/default",
+      "docnohf/e1/release",
+      "docnohf/e2/zero",
+      "docnohf/e2/default",
+      "docnohf/e2/release",
+      "docnohf/e8/zero",
+      "docnohf/e8/default",
+      "docnohf/e8/release",
+      "docnohf/e32/zero",
+      "docnohf/e32/default",
+      "docnohf/e32/release",
+      "docfloat/e1/zero",
+      "docfloat/e1/default",
+      "docfloat/e1/release",
+      "docfloat/e2/zero",
+      "docfloat/e2/default",
+      "docfloat/e2/release",
+      "docfloat/e8/zero",
+      "docfloat/e8/default",
+      "docfloat/e8/release",
+      "docfloat/e32/zero",
+      "docfloat/e32/default",
+      "docfloat/e32/release"
+    ],
+    "complete_noise_failure": "readiness_fail_uninterpretable",
+    "coverage": "all_real_cells",
+    "missing_or_invalid": "incomplete_no_decision",
+    "native_pairs_per_cell": 12,
+    "order": [
+      "AB",
+      "BA"
+    ],
+    "same_binary": "baseline",
+    "samples": 80,
+    "upper_ci_limit": 1.05,
+    "warmups": 5
+  },
+  "baseline_reuse_review": {
+    "path": "/home/zhuhe/litchi-performance-0969/review/baseline-reuse-v1.json",
+    "sha256": "dbd362dae8e31dfe5ff54d6af5c37883df829bede3a5e5fa19e04337e0a8312e",
+    "status": "pass"
+  },
+  "benefit": {
+    "native_p50_ci_upper": 1.0,
+    "native_p50_median_upper": 0.95,
+    "requested_endpoint_median_upper": 0.95,
+    "requested_endpoints": [
+      "docnohf/e32/default",
+      "docfloat/e32/default"
+    ],
+    "requested_metric": "samples[i].allocation.allocated_bytes"
+  },
+  "binaries": {
+    "allocator_baseline": {
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile_alloc",
+      "sha256": "a520ec154bed62ce26d885f203e2565e756ce618a046b77521db484788c4ccd9"
+    },
+    "allocator_candidate": {
+      "path": "",
+      "sha256": null
+    },
+    "native_baseline": {
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+    },
+    "native_candidate": {
+      "path": "",
+      "sha256": null
+    }
+  },
+  "created_utc": "2026-10-08",
+  "design_review": {
+    "path": "/home/zhuhe/litchi-performance-0969/review/design-review-v1.json",
+    "sha256": "b83916d26aea5dc30710da60d285558987f498eb6d93211b4c8f97f03c0cad8a",
+    "status": "pass"
+  },
+  "execution": {
+    "cargo_processes": 0,
+    "child_timeout_seconds": 900,
+    "quiescence_required": true,
+    "retry": false,
+    "serial": true
+  },
+  "fixtures": {
+    "docfloat": {
+      "bytes": 335360,
+      "path": "/home/zhuhe/litchi-performance-0969/qa-core/test-data/ole/doc/FloatingPictures.doc",
+      "sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d"
+    },
+    "docnohf": {
+      "bytes": 26112,
+      "path": "/home/zhuhe/litchi-performance-0969/qa-core/test-data/ole/doc/NoHeadFoot.doc",
+      "sha256": "45e5df073f34314da6f39d2dad119fb2ef23470878fd2df67f632864cd92ea48"
+    }
+  },
+  "helpers": {
+    "plan_generator": {
+      "path": "/home/zhuhe/litchi-performance-0969/tools/prepare_plan_0969_v4.py",
+      "sha256": "42cd73792bc821d1776cc4b95c2cf33c73abad4b85903826d8857b3e03d6ecb9"
+    },
+    "protocol_common": {
+      "path": "/home/zhuhe/litchi-performance-0969/tools/protocol_common_v4.py",
+      "sha256": "5ce0f2ac08fc7909df054a4cc2d5137b3279af4cd726acf5bfb4558d97b05c5c"
+    },
+    "reducer": {
+      "path": "/home/zhuhe/litchi-performance-0969/tools/reduce_0969_v4.py",
+      "sha256": "cbbbb6d09a981546a9db216c18e4c5e8da4df7202d56dbe3dc7d1c999f2ec2a9"
+    },
+    "runner": {
+      "path": "/home/zhuhe/litchi-performance-0969/tools/run_0969_v4.py",
+      "sha256": "c7315d5c5311c5643aebca16e8cf2b931ee1b74663eb5a8a31e8185f504ddd20"
+    }
+  },
+  "no_build_or_workload": true,
+  "outputs": {
+    "aa_root": "/home/zhuhe/litchi-performance-0969/capture/aa-v4",
+    "analysis_root": "/home/zhuhe/litchi-performance-0969/analysis",
+    "capture_root": "/home/zhuhe/litchi-performance-0969/capture/aa-v4"
+  },
+  "protocol_document": {
+    "path": "/home/zhuhe/litchi-performance-0969/protocol-design-v4.md",
+    "sha256": "7766d1022bfef71ceca4fad7bb1edee9529178fb24b11eb083eb76b34fe94564"
+  },
+  "real_matrix": {
+    "allocator": {
+      "allocation_calls_median_guard": 1.01,
+      "bootstrap_resamples": 10000,
+      "bootstrap_seed": 969004,
+      "pairs_per_cell": 3,
+      "per_repeat_guards": {
+        "allocated_bytes": 1.01,
+        "peak_live_bytes": 1.05,
+        "rss_kb": 1.05
+      },
+      "relative_ratio": "candidate_over_baseline",
+      "requested_metric": "samples[i].allocation.allocated_bytes",
+      "rss_metric": "packet.rss.kb",
+      "samples": 1,
+      "warmups": 0
+    },
+    "cells": [
+      {
+        "case": "docnohf",
+        "cell_id": "docnohf/e1/zero",
+        "edits": 1,
+        "retention": "zero"
+      },
+      {
+        "case": "docnohf",
+        "cell_id": "docnohf/e1/default",
+        "edits": 1,
+        "retention": "default"
+      },
+      {
+        "case": "docnohf",
+        "cell_id": "docnohf/e1/release",
+        "edits": 1,
+        "retention": "release"
+      },
+      {
+        "case": "docnohf",
+        "cell_id": "docnohf/e2/zero",
+        "edits": 2,
+        "retention": "zero"
+      },
+      {
+        "case": "docnohf",
+        "cell_id": "docnohf/e2/default",
+        "edits": 2,
+        "retention": "default"
+      },
+      {
+        "case": "docnohf",
+        "cell_id": "docnohf/e2/release",
+        "edits": 2,
+        "retention": "release"
+      },
+      {
+        "case": "docnohf",
+        "cell_id": "docnohf/e8/zero",
+        "edits": 8,
+        "retention": "zero"
+      },
+      {
+        "case": "docnohf",
+        "cell_id": "docnohf/e8/default",
+        "edits": 8,
+        "retention": "default"
+      },
+      {
+        "case": "docnohf",
+        "cell_id": "docnohf/e8/release",
+        "edits": 8,
+        "retention": "release"
+      },
+      {
+        "case": "docnohf",
+        "cell_id": "docnohf/e32/zero",
+        "edits": 32,
+        "retention": "zero"
+      },
+      {
+        "case": "docnohf",
+        "cell_id": "docnohf/e32/default",
+        "edits": 32,
+        "retention": "default"
+      },
+      {
+        "case": "docnohf",
+        "cell_id": "docnohf/e32/release",
+        "edits": 32,
+        "retention": "release"
+      },
+      {
+        "case": "docfloat",
+        "cell_id": "docfloat/e1/zero",
+        "edits": 1,
+        "retention": "zero"
+      },
+      {
+        "case": "docfloat",
+        "cell_id": "docfloat/e1/default",
+        "edits": 1,
+        "retention": "default"
+      },
+      {
+        "case": "docfloat",
+        "cell_id": "docfloat/e1/release",
+        "edits": 1,
+        "retention": "release"
+      },
+      {
+        "case": "docfloat",
+        "cell_id": "docfloat/e2/zero",
+        "edits": 2,
+        "retention": "zero"
+      },
+      {
+        "case": "docfloat",
+        "cell_id": "docfloat/e2/default",
+        "edits": 2,
+        "retention": "default"
+      },
+      {
+        "case": "docfloat",
+        "cell_id": "docfloat/e2/release",
+        "edits": 2,
+        "retention": "release"
+      },
+      {
+        "case": "docfloat",
+        "cell_id": "docfloat/e8/zero",
+        "edits": 8,
+        "retention": "zero"
+      },
+      {
+        "case": "docfloat",
+        "cell_id": "docfloat/e8/default",
+        "edits": 8,
+        "retention": "default"
+      },
+      {
+        "case": "docfloat",
+        "cell_id": "docfloat/e8/release",
+        "edits": 8,
+        "retention": "release"
+      },
+      {
+        "case": "docfloat",
+        "cell_id": "docfloat/e32/zero",
+        "edits": 32,
+        "retention": "zero"
+      },
+      {
+        "case": "docfloat",
+        "cell_id": "docfloat/e32/default",
+        "edits": 32,
+        "retention": "default"
+      },
+      {
+        "case": "docfloat",
+        "cell_id": "docfloat/e32/release",
+        "edits": 32,
+        "retention": "release"
+      }
+    ],
+    "native": {
+      "bootstrap_resamples": 10000,
+      "bootstrap_seed": 969004,
+      "noninferiority_upper_ci": 1.05,
+      "p99": "descriptive_only",
+      "pairs_per_cell": 12,
+      "relative_ratio": "candidate_over_baseline",
+      "samples": 80,
+      "warmups": 5
+    }
+  },
+  "schema": "litchi.performance.0969.plan.v4",
+  "source": {
+    "baseline": {
+      "manifest": "/home/zhuhe/litchi-performance-0969/manifests/source-manifest-v1.json",
+      "manifest_sha256": "f1818af5c306fb6ea01b59ca8df29710e773386b246071202bd4aa896f4e8e2b",
+      "root": "/home/zhuhe/litchi-performance-0969/source-baseline",
+      "tree_sha256": "df8a842b08fec1792c67921fb1ce3513d3c6cb3dd0149cf13672bad14090bfb0"
+    },
+    "candidate": {
+      "manifest": "/home/zhuhe/litchi-performance-0969/manifests/source-manifest-v1.json",
+      "manifest_sha256": "f1818af5c306fb6ea01b59ca8df29710e773386b246071202bd4aa896f4e8e2b",
+      "root": "/home/zhuhe/litchi-performance-0969/source-candidate",
+      "tree_sha256": "df8a842b08fec1792c67921fb1ce3513d3c6cb3dd0149cf13672bad14090bfb0"
+    }
+  },
+  "status": "aa_authorized"
+}

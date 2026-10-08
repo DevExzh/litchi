@@ -1,0 +1,85 @@
+{
+  "baseline": {
+    "bytes": 18259541,
+    "file_count": 924,
+    "immutable": true,
+    "prior_v1_manifest": "/home/zhuhe/litchi-performance-0969/manifests/source-manifest-v1.json",
+    "root": "/home/zhuhe/litchi-performance-0969/source-baseline",
+    "tree_sha256": "9da7843d8b8bce8fe7530a74bfffd2af1ee7d66c0439e93d3c0a57c24c336188"
+  },
+  "candidate": {
+    "bytes": 18287602,
+    "changed_paths": [
+      "crates/litchi-ole-common/src/object/codec.rs",
+      "crates/litchi-ole-common/src/object/editor.rs",
+      "crates/litchi-ole-common/tests/object.rs"
+    ],
+    "file_count": 924,
+    "prior_v2_manifest": "/home/zhuhe/litchi-performance-0969/manifests/source-manifest-v2.json",
+    "root": "/home/zhuhe/litchi-performance-0969/source-candidate",
+    "tree_sha256": "d39b47d024035112c3f71dd06e3ff3d54829e908e9f612e90b2d25a41ffdc884"
+  },
+  "changes": [
+    {
+      "baseline": {
+        "bytes": 52977,
+        "mode": 436,
+        "path": "crates/litchi-ole-common/src/object/codec.rs",
+        "sha256": "99dc73a358cbe5a76c6fc242e42af6524ba6d0954c2ae508cf55f84cb6a5cafd"
+      },
+      "candidate": {
+        "bytes": 76124,
+        "mode": 436,
+        "path": "crates/litchi-ole-common/src/object/codec.rs",
+        "sha256": "25e4035e739788e29f10ed4e4ba77d4187221c26f789783d06e473ada6add146"
+      },
+      "path": "crates/litchi-ole-common/src/object/codec.rs"
+    },
+    {
+      "baseline": {
+        "bytes": 39109,
+        "mode": 436,
+        "path": "crates/litchi-ole-common/src/object/editor.rs",
+        "sha256": "ee6079567bf85a0ff68a335fb43999d780fab335a09a9cec8b845c16b7b5b319"
+      },
+      "candidate": {
+        "bytes": 39287,
+        "mode": 436,
+        "path": "crates/litchi-ole-common/src/object/editor.rs",
+        "sha256": "58913ec7125acb061aa5547a2f9a674cd314a1eb8bf3e90bba2df62392bf106c"
+      },
+      "path": "crates/litchi-ole-common/src/object/editor.rs"
+    },
+    {
+      "baseline": {
+        "bytes": 54935,
+        "mode": 436,
+        "path": "crates/litchi-ole-common/tests/object.rs",
+        "sha256": "363b84a6deedef63b32f8ab1364c7c506c831833a6830372f01c755a24d0dec4"
+      },
+      "candidate": {
+        "bytes": 59671,
+        "mode": 436,
+        "path": "crates/litchi-ole-common/tests/object.rs",
+        "sha256": "738db3f03cb61e860639190ae06cda25c9a0556e9954db79979654c185fd2773"
+      },
+      "path": "crates/litchi-ole-common/tests/object.rs"
+    }
+  ],
+  "created_utc": "2026-10-08T01:25:58.922629+00:00",
+  "file_manifest": {
+    "path": "/home/zhuhe/litchi-performance-0969/manifests/source-file-manifest-v3.json",
+    "sha256": "f4aff2edd3b9d858e1e688b734dccdbd130f25b6845afd76532b085b69806a8d"
+  },
+  "implementation_patch": {
+    "bytes": 37886,
+    "path": "/home/zhuhe/litchi-performance-0969/manifests/candidate-implementation-v2.patch",
+    "sha256": "219c799de930a1a73a54b0ef545a28cea5eb9a503f0e4e3e232d9753288bd04f"
+  },
+  "qa_fixture_overlay": {
+    "path": "/home/zhuhe/litchi-performance-0969/manifests/qa-fixture-overlay-v2.json",
+    "sha256": "afb243053baf28ca7ca8ac854815f5a2d02eb34e363abef128095d955d258786"
+  },
+  "schema": "litchi.performance.0969.source_manifest.v3",
+  "source_revision": "34fc85e23ccefcd8ad6ffd4d57d9e2671ef1a5a1"
+}

@@ -1,0 +1,253 @@
+{
+  "candidate_custody": {
+    "build_receipt": {
+      "formal_performance_capture": false,
+      "outputs": [
+        {
+          "bytes": 55317368,
+          "path": "/home/zhuhe/litchi-performance-0969/builds/target-candidate-cfb/release/doc_retention_probe_0942_cfb_profile",
+          "sha256": "58d0f9aeb30d716cd25b79855ed17378f9132cc3a707ea1db2429056b87238a9"
+        },
+        {
+          "bytes": 55321184,
+          "path": "/home/zhuhe/litchi-performance-0969/builds/target-candidate-cfb/release/doc_retention_probe_0942_cfb_profile_alloc",
+          "sha256": "ebc63c02151914daf5acb69096a5833ec45ef91e1897976cbd9ba2d17bd5312f"
+        }
+      ],
+      "path": "/home/zhuhe/litchi-performance-0969/review/build-receipt-v1.json",
+      "schema": "litchi.performance.0969.candidate_build_receipt.v1",
+      "sha256": "503a26e724911fe1ce53ce5125f10f77ec299040592fc09a35e00dc518440130",
+      "status": "pass_external_release_build_no_workload",
+      "workload_started": false
+    },
+    "build_review": {
+      "candidate_formal_timing_admission": false,
+      "path": "/home/zhuhe/litchi-performance-0969/review/build-equivalence-audit-v1.json",
+      "schema": "litchi.performance.0969.build_equivalence_audit.v1",
+      "sha256": "4184809dd4cd564a7ce2d8ed498e00765a61121abfeaed4b7a78385fca0159b6",
+      "status": "pass_candidate_build_equivalence_no_observed_instrumentation_or_dependency_confound"
+    },
+    "implementation_built_seal": {
+      "path": "/home/zhuhe/litchi-performance-0969/review/implementation-seal-v3.json",
+      "sha256": "dbb9a85aca1459cfcf158b1d5d5cc3a3363e047539494501f5c3255e7c4ffe3f",
+      "status": "sealed_external_candidate_built_ready_for_independent_review"
+    },
+    "implementation_review": {
+      "approved_for_next_stage": true,
+      "path": "/home/zhuhe/litchi-performance-0969/review/implementation-review-v1.json",
+      "schema": "litchi.performance.0969.cfb_implementation_review.v1",
+      "sha256": "992652e728d24e16816edb20369a9444102d0fcb61e7caa972dbf21591675333",
+      "status": "pass"
+    },
+    "implementation_source_seal": {
+      "path": "/home/zhuhe/litchi-performance-0969/review/implementation-seal-v2.json",
+      "sha256": "72230556b623fc4e020553c60e4c37c229ebf8195c5c58a836d573ad80373f7c",
+      "status": "sealed_external_candidate_ready_for_independent_review"
+    },
+    "source_file_manifest": {
+      "changed_paths_match": true,
+      "entries_rechecked": 924,
+      "path": "/home/zhuhe/litchi-performance-0969/manifests/source-file-manifest-v3.json",
+      "recheck_failures": 0,
+      "regular_files_observed": 924,
+      "schema": "litchi.performance.0969.source_file_manifest.v3",
+      "sha256": "f4aff2edd3b9d858e1e688b734dccdbd130f25b6845afd76532b085b69806a8d",
+      "total_bytes_rechecked": 18287602
+    },
+    "source_manifest": {
+      "bytes": 18287602,
+      "changed_paths": [
+        "crates/litchi-ole-common/src/object/codec.rs",
+        "crates/litchi-ole-common/src/object/editor.rs",
+        "crates/litchi-ole-common/tests/object.rs"
+      ],
+      "file_count": 924,
+      "path": "/home/zhuhe/litchi-performance-0969/manifests/source-manifest-v3.json",
+      "root": "/home/zhuhe/litchi-performance-0969/source-candidate",
+      "schema": "litchi.performance.0969.source_manifest.v3",
+      "sha256": "757d1365a0d7438e9436cd1403e714c43248fe6676dab9697ba86a97f66853d3",
+      "tree_sha256": "d39b47d024035112c3f71dd06e3ff3d54829e908e9f612e90b2d25a41ffdc884"
+    }
+  },
+  "checks": {
+    "candidate_binding": {
+      "detail": "v5 custody code binds the source v3/source-file v3 manifests, changed paths, both implementation seals, build receipt, candidate output SHA/bytes, and passing implementation/build review rows. Current 924-entry re-read and bytes/mode/SHA audit had zero failures.",
+      "status": "pass"
+    },
+    "formal_only_reuse_synthetic": {
+      "detail": "capture_sequence with aa_packets supplied and no-op real runner returned capture_complete and a 24-packet synthetic manifest, but all 24 reused A/A packet paths under the new output root were absent; real case is 576 missing A/A packet paths.",
+      "status": "blocker_reproduced"
+    },
+    "reducer_self_test": {
+      "reported": "self_test_pass; aa_missing=incomplete; aa_noise=readiness_fail",
+      "status": "pass"
+    },
+    "reducer_static_aa_binding": {
+      "detail": "reduce_capture calls check_plan/load_packets/validate_go/reduce_aa_packets but never load_bound_aa or an equivalent comparison; capture manifest plan is optional. Thus terminal reduction can accept a different valid A/A packet set than the plan-bound receipt/manifest.",
+      "status": "bounded_blocker"
+    },
+    "runner_self_test": {
+      "reported": "self_test_pass; aa_pass_go=true; aa_noise_fail_readiness_fail=true; aa_missing_incomplete=true; malformed_packet_incomplete=true; sample_index_mutation_rejected=true",
+      "status": "pass"
+    },
+    "terminal_and_source_packet_checks": {
+      "detail": "check_packet rejects nonzero exit, timeout, launch error, validation_error, binary path/SHA drift, context source-manifest SHA drift, fixture drift, malformed reports, failed correctness/oracle fields, and sample-index mutations.",
+      "status": "pass"
+    },
+    "v4_aa_schema_compatibility": {
+      "detail": "v5 accepts runner.v4 and aa_readiness.v4 packet/receipt schemas; a synthetic v4 packet/receipt normalization reduced to an equivalent v5 pass receipt. Final admission must still bind the exact sealed v4 plan hash below; generic legacy status acceptance is underconstrained.",
+      "status": "pass_with_bounded_identity_condition"
+    },
+    "xls_helper_static_test": {
+      "no_timing_capture": true,
+      "receipt": {
+        "path": "/home/zhuhe/litchi-performance-0969/review/xls-control-helper-seal-v1.json",
+        "sha256": "ed3e14205580dbc1e267cee012d42c45ce3b38083c08f1919f40604b647b06e2",
+        "status": "pass_external_helper_no_workload"
+      },
+      "status": "pass_for_helper_only",
+      "tests_passed": 8,
+      "tests_run": 8
+    },
+    "xls_status_contract_synthetic": {
+      "detail": "prepare_plan.receipt_binding accepts existing helper seal status pass_external_helper_no_workload and forged status pass_forged, but rejects a schema-valid xls decision status regression_guard_pass. This is opposite of the helper output contract.",
+      "status": "blocker_reproduced"
+    }
+  },
+  "created_utc": "2026-10-08T01:41:03.000006+00:00",
+  "findings": [
+    {
+      "evidence": [
+        "tools/run_0969_v5.py:326-370",
+        "tools/run_0969_v5.py:519-523"
+      ],
+      "id": "F1_formal_only_reused_aa_packets_not_materialized",
+      "impact": "Every normal formal-only output is unreducible as captured: load_packets reports missing A/A JSON and reducer returns incomplete despite a passing bound A/A gate. It also breaks the stated terminal custody packet set.",
+      "observed": "--formal-only loads bound A/A packet objects, passes them to capture_sequence, and writes a new capture manifest whose packet_path(output_root, packet) entries are never written. Synthetic replay produced zero A/A packet files at those manifest paths.",
+      "required_before_formal_plan_or_launch": "Materialize exact reused packet JSON under the new output root, or make the manifest retain the bound A/A packet paths with an explicit immutable binding and teach reducer to consume them. Preserve raw sidecar custody and exclusive writes.",
+      "severity": "blocker"
+    },
+    {
+      "evidence": [
+        "tools/prepare_plan_0969_v5.py:60-67",
+        "tools/protocol_common_v5.py:147-156",
+        "tools/protocol_common_v5.py:327-333",
+        "xls-control-design-v2.md:147-154",
+        "tools/xls_regression_guard.py:843-851"
+      ],
+      "id": "F2_xls_receipt_schema_and_safety_only_contract_missing",
+      "impact": "The plan can bind helper readiness as if it were a measured aggregate veto, while a real guard decision cannot be admitted. No XLS improvement gate should be added: the guard is a safety/regression veto only.",
+      "observed": "v5 uses generic status.startswith(\"pass\"). The existing helper seal passes this test although it records only helper tests/no timing; the actual guard output schema status is regression_guard_pass, which v5 rejects. A forged status-only JSON also passes. The guard design explicitly returns guard_only, candidate_adoption:null, performance_claim:false.",
+      "required_before_formal_plan_or_launch": "Add a specialized XLS decision validator requiring schema litchi.performance.0969.xls_regression.decision.v1, status regression_guard_pass, interpretation guard_only, candidate_adoption null, performance_claim false, complete all-case A/A/formal sections and fixed <=1.05 custody result. Reject rejected/uninterpretable/incomplete. Keep benefit/improvement absent or explicitly false.",
+      "severity": "blocker"
+    },
+    {
+      "evidence": [
+        "tools/reduce_0969_v5.py:69-100",
+        "tools/run_0969_v5.py:180-223"
+      ],
+      "id": "F3_terminal_reducer_does_not_rebind_plan_aa_set",
+      "impact": "Offline reduction is not an independent terminal custody check: an alternate valid A/A set could be substituted while retaining the plan-bound receipt. Missing manifest plan is also silently accepted.",
+      "observed": "Runner formal-only has load_bound_aa, which validates the exact bound A/A receipt/manifest and reduction; reducer terminal path does not call it or compare capture-manifest A/A packet paths/reduction to those bindings. manifest.plan is optional at lines 89-91.",
+      "required_before_formal_admission": "Require manifest.plan path equality and exact bound A/A packet identity/reduction equality (or share load_bound_aa logic in common) before reducing formal packets. Any mismatch must be incomplete/no decision.",
+      "severity": "blocker"
+    },
+    {
+      "evidence": [
+        "tools/protocol_common_v5.py:580-604"
+      ],
+      "id": "F4_legacy_aa_plan_identity_is_schema_only",
+      "impact": "A generic authorized legacy plan could satisfy the v4 handoff label without being the reviewed sealed A/A plan.",
+      "observed": "v5 accepts any plan.v4/v5 file with status aa_authorized and only checks packet count/duplicates in its manifest; it does not require the sealed historical v4 plan hash or compare its source/binary/schedule fields to the formal plan.",
+      "required_before_formal_plan": "Bind exact `/home/zhuhe/litchi-performance-0969/plans/plan-0969-aa-v6.json` SHA e853030180d7464c06cf1ed5d525957ce2d50514b8337a1b168392374d00b5df, or independently validate all legacy A/A plan fields against the sealed v4 design and formal baseline binary/source.",
+      "severity": "bounded_prelaunch_condition"
+    }
+  ],
+  "recommendation": {
+    "formal_plan_admission": "hold",
+    "formal_root_go": "hold",
+    "formal_workload": "hold",
+    "reason": "F1 and F2 make the nominal v5 path either unreducible or able to mistake helper readiness for a passing XLS safety guard; F3 leaves terminal A/A custody substitution possible. Candidate source/build/review custody and packet terminal/source validation otherwise pass."
+  },
+  "reviewed_bindings": {
+    "formal_note": {
+      "bytes": 2526,
+      "path": "/home/zhuhe/litchi-performance-0969/protocol/formal-candidate-bindings-v5.md",
+      "sha256": "29b06c2d1ac2608d3468659ac9b7b19bd0f747b7bb31fd6badfa05d297b29991"
+    },
+    "sealed_v4_aa": {
+      "independent_review": {
+        "bytes": 12453,
+        "path": "/home/zhuhe/litchi-performance-0969/review/aa-plan-independent-review-v1.json",
+        "sha256": "2cb5b690cd5202ff5030ba4753c8292d10edd42d300762ff398d9eebc54f4d52",
+        "status": "pass_prospective_aa_plan_no_launch"
+      },
+      "plan": {
+        "bytes": 9290,
+        "path": "/home/zhuhe/litchi-performance-0969/plans/plan-0969-aa-v6.json",
+        "schema": "litchi.performance.0969.plan.v4",
+        "sha256": "e853030180d7464c06cf1ed5d525957ce2d50514b8337a1b168392374d00b5df",
+        "status": "aa_authorized"
+      },
+      "protocol_seal": {
+        "bytes": 3964,
+        "path": "/home/zhuhe/litchi-performance-0969/receipts/protocol-seal-aa-v7.json",
+        "sha256": "7e34cf85065d2a114adceaa6bf33c86c9c4c83827ea7bcc8dba5be7dfc5d8e58"
+      }
+    },
+    "sealed_v4_helpers": {
+      "prepare_plan_0969_v4.py": {
+        "path": "/home/zhuhe/litchi-performance-0969/tools/prepare_plan_0969_v4.py",
+        "sha256": "42cd73792bc821d1776cc4b95c2cf33c73abad4b85903826d8857b3e03d6ecb9"
+      },
+      "protocol_common_v4.py": {
+        "path": "/home/zhuhe/litchi-performance-0969/tools/protocol_common_v4.py",
+        "sha256": "5ce0f2ac08fc7909df054a4cc2d5137b3279af4cd726acf5bfb4558d97b05c5c"
+      },
+      "protocol_design_v4.md": {
+        "bytes": 7855,
+        "path": "/home/zhuhe/litchi-performance-0969/protocol-design-v4.md",
+        "sha256": "7766d1022bfef71ceca4fad7bb1edee9529178fb24b11eb083eb76b34fe94564"
+      },
+      "reduce_0969_v4.py": {
+        "path": "/home/zhuhe/litchi-performance-0969/tools/reduce_0969_v4.py",
+        "sha256": "cbbbb6d09a981546a9db216c18e4c5e8da4df7202d56dbe3dc7d1c999f2ec2a9"
+      },
+      "run_0969_v4.py": {
+        "path": "/home/zhuhe/litchi-performance-0969/tools/run_0969_v4.py",
+        "sha256": "c7315d5c5311c5643aebca16e8cf2b931ee1b74663eb5a8a31e8185f504ddd20"
+      }
+    },
+    "v5_helpers": {
+      "prepare_plan_0969_v5.py": {
+        "bytes": 11984,
+        "path": "/home/zhuhe/litchi-performance-0969/tools/prepare_plan_0969_v5.py",
+        "sha256": "e97675d38fcc00d60d5ebc729761dd092b87b847236f04db23b30d7ac6975017"
+      },
+      "protocol_common_v5.py": {
+        "bytes": 51506,
+        "path": "/home/zhuhe/litchi-performance-0969/tools/protocol_common_v5.py",
+        "sha256": "23f5ef1ca21e493053837556bf212fe10ac9772dc6f6fb18f67ce00a0bd9765f"
+      },
+      "reduce_0969_v5.py": {
+        "bytes": 8973,
+        "path": "/home/zhuhe/litchi-performance-0969/tools/reduce_0969_v5.py",
+        "sha256": "de4db5fc393d5e01501a4c8bf508d48617bce9fcbfb0fad46bd6c5eacad02747"
+      },
+      "run_0969_v5.py": {
+        "bytes": 25606,
+        "path": "/home/zhuhe/litchi-performance-0969/tools/run_0969_v5.py",
+        "sha256": "511fb5167bdb9c1f5a9081154744dbf3300a3bd0aab500f92c6576b572826242"
+      }
+    }
+  },
+  "schema": "litchi.performance.0969.formal_admission_v5_independent_review.v1",
+  "scope": {
+    "external_synthetic_helper_tests_only": true,
+    "no_build_started": true,
+    "no_formal_plan_or_root_go_emitted": true,
+    "no_workload_started": true,
+    "review": "independent read-only review of v5 formal admission delta from sealed v4"
+  },
+  "status": "blocked_bounded_formal_plan_not_admitted"
+}

@@ -1,0 +1,334 @@
+{
+  "baseline_custody": {
+    "allocator": {
+      "actual": {
+        "bytes": 47912992,
+        "mode": "0o775",
+        "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile_alloc",
+        "sha256": "a520ec154bed62ce26d885f203e2565e756ce618a046b77521db484788c4ccd9"
+      },
+      "expected_sha256": "a520ec154bed62ce26d885f203e2565e756ce618a046b77521db484788c4ccd9",
+      "matches": true,
+      "name": "allocator"
+    },
+    "fixtures": [
+      {
+        "actual": {
+          "bytes": 335360,
+          "mode": "0o664",
+          "path": "/home/zhuhe/litchi-performance-0969/qa-core/test-data/ole/doc/FloatingPictures.doc",
+          "sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d"
+        },
+        "expected_bytes": 335360,
+        "expected_sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d",
+        "matches": true,
+        "name": "docfloat"
+      },
+      {
+        "actual": {
+          "bytes": 26112,
+          "mode": "0o664",
+          "path": "/home/zhuhe/litchi-performance-0969/qa-core/test-data/ole/doc/NoHeadFoot.doc",
+          "sha256": "45e5df073f34314da6f39d2dad119fb2ef23470878fd2df67f632864cd92ea48"
+        },
+        "expected_bytes": 26112,
+        "expected_sha256": "45e5df073f34314da6f39d2dad119fb2ef23470878fd2df67f632864cd92ea48",
+        "matches": true,
+        "name": "docnohf"
+      }
+    ],
+    "interpretation": "AA binds and launches only the retained native baseline executable. The allocator binary is sealed for the later matched formal plan; this AA receipt makes no candidate or allocator measurement claim.",
+    "native": {
+      "actual": {
+        "bytes": 47909224,
+        "mode": "0o775",
+        "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+        "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+      },
+      "expected_sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb",
+      "matches": true,
+      "name": "native"
+    }
+  },
+  "constraints": [
+    "This receipt approves the sealed prospective baseline-only AA plan; it does not authorize launching a workload.",
+    "Before AA launch, an external GO must bind the exact immutable plan path/size/SHA, both review receipts, all four helper hashes, source manifest bindings, the native baseline binary binding, and a passing quiescence admission.",
+    "The current AA plan reuses the baseline manifest for its candidate placeholder solely because no candidate formal run is authorized; a formal plan must bind the actual candidate source manifest and candidate binaries and undergo fresh custody validation.",
+    "No candidate source, candidate binary, allocator measurement, performance, timing, or adoption claim is made by this receipt."
+  ],
+  "created_utc": "2026-10-08T01:25:52.646791Z",
+  "decision": {
+    "aa_plan_review_pass": true,
+    "baseline_only_aa_scope": true,
+    "candidate_custody_claim_made": false,
+    "candidate_formal_launch_authorized_by_this_receipt": false,
+    "no_build_or_workload_started": true,
+    "separate_explicit_go_required_before_launch": true,
+    "separate_quiescence_admission_required": true
+  },
+  "execution_and_outputs": {
+    "cargo_processes": 0,
+    "child_timeout_seconds": 900,
+    "fresh_exclusive_outputs": true,
+    "outputs": {
+      "aa_root": {
+        "absent_or_empty": true,
+        "path": "/home/zhuhe/litchi-performance-0969/capture/aa-v4"
+      },
+      "analysis_root": {
+        "absent_or_empty": true,
+        "path": "/home/zhuhe/litchi-performance-0969/analysis"
+      },
+      "capture_root": {
+        "absent_or_empty": true,
+        "path": "/home/zhuhe/litchi-performance-0969/capture/aa-v4"
+      }
+    },
+    "quiescence_required": true,
+    "retry": false,
+    "runner_requires_explicit_plan_go_output_root": true,
+    "runner_success_statuses": [
+      "aa_complete",
+      "capture_complete"
+    ],
+    "serial": true
+  },
+  "findings": [],
+  "go_contract": {
+    "explicit_cli_argument": "--go",
+    "plan_binding": "absolute_path_bytes_sha256",
+    "plan_contains_go_path": false,
+    "quiescence_status_required": "pass",
+    "schema": "litchi.performance.0969.root_go.v1",
+    "sections": [
+      "review_bindings",
+      "helper_bindings",
+      "source_bindings",
+      "binary_bindings"
+    ]
+  },
+  "material_blockers": [],
+  "matrix_and_order": {
+    "aa_children": 576,
+    "bootstrap_resamples": 10000,
+    "bootstrap_seed": 969004,
+    "cells": 24,
+    "expected_cell_order": [
+      "docnohf/e1/zero",
+      "docnohf/e1/default",
+      "docnohf/e1/release",
+      "docnohf/e2/zero",
+      "docnohf/e2/default",
+      "docnohf/e2/release",
+      "docnohf/e8/zero",
+      "docnohf/e8/default",
+      "docnohf/e8/release",
+      "docnohf/e32/zero",
+      "docnohf/e32/default",
+      "docnohf/e32/release",
+      "docfloat/e1/zero",
+      "docfloat/e1/default",
+      "docfloat/e1/release",
+      "docfloat/e2/zero",
+      "docfloat/e2/default",
+      "docfloat/e2/release",
+      "docfloat/e8/zero",
+      "docfloat/e8/default",
+      "docfloat/e8/release",
+      "docfloat/e32/zero",
+      "docfloat/e32/default",
+      "docfloat/e32/release"
+    ],
+    "formal_launch_gate": true,
+    "native_pairs_per_cell": 12,
+    "order": [
+      "AB",
+      "BA"
+    ],
+    "plan_cell_order_exact": true,
+    "positions_per_pair": 2,
+    "same_binary": "baseline",
+    "samples": 80,
+    "symmetric_upper_ci_limit": 1.05,
+    "warmups": 5
+  },
+  "plan_bindings": {
+    "candidate_binary_bindings_unbound": true,
+    "no_build_or_workload": true,
+    "schema": "litchi.performance.0969.plan.v4",
+    "source_baseline_manifest_sha256": "f1818af5c306fb6ea01b59ca8df29710e773386b246071202bd4aa896f4e8e2b",
+    "source_candidate_is_only_plan_time_byte_identical_copy": true,
+    "source_candidate_manifest_sha256": "f1818af5c306fb6ea01b59ca8df29710e773386b246071202bd4aa896f4e8e2b",
+    "status": "aa_authorized"
+  },
+  "readiness_semantics": {
+    "complete_noise_bound_failure": "readiness_fail_uninterpretable_and_no_retry",
+    "complete_noise_pass": "pass_required_before_formal",
+    "missing_or_malformed_or_terminal_or_custody_invalid": "incomplete_no_decision_and_stop_before_candidate_formal",
+    "per_child_checks": [
+      "runner schema and terminal success",
+      "exact baseline binary path/SHA and source/fixture bindings",
+      "positive RSS",
+      "0917 report schema and exact correctness/oracle gate sets",
+      "80 positive integer native elapsed samples",
+      "sample indices 0..79 and output identity",
+      "fixture/cell/retention identity"
+    ]
+  },
+  "reviewer_role": "independent_read_only_cpu_review",
+  "schema": "litchi.performance.0969.aa_plan_independent_review.v1",
+  "schema_version": 1,
+  "sealed_artifacts": {
+    "baseline_binaries": [
+      {
+        "actual": {
+          "bytes": 47912992,
+          "mode": "0o775",
+          "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile_alloc",
+          "sha256": "a520ec154bed62ce26d885f203e2565e756ce618a046b77521db484788c4ccd9"
+        },
+        "expected_sha256": "a520ec154bed62ce26d885f203e2565e756ce618a046b77521db484788c4ccd9",
+        "matches": true,
+        "name": "allocator"
+      },
+      {
+        "actual": {
+          "bytes": 47909224,
+          "mode": "0o775",
+          "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+          "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+        },
+        "expected_sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb",
+        "matches": true,
+        "name": "native"
+      }
+    ],
+    "helper_bindings": [
+      {
+        "actual_sha256": "5ce0f2ac08fc7909df054a4cc2d5137b3279af4cd726acf5bfb4558d97b05c5c",
+        "bytes": 39444,
+        "expected_sha256": "5ce0f2ac08fc7909df054a4cc2d5137b3279af4cd726acf5bfb4558d97b05c5c",
+        "matches": true,
+        "name": "protocol_common",
+        "path": "/home/zhuhe/litchi-performance-0969/tools/protocol_common_v4.py"
+      },
+      {
+        "actual_sha256": "c7315d5c5311c5643aebca16e8cf2b931ee1b74663eb5a8a31e8185f504ddd20",
+        "bytes": 25061,
+        "expected_sha256": "c7315d5c5311c5643aebca16e8cf2b931ee1b74663eb5a8a31e8185f504ddd20",
+        "matches": true,
+        "name": "runner",
+        "path": "/home/zhuhe/litchi-performance-0969/tools/run_0969_v4.py"
+      },
+      {
+        "actual_sha256": "cbbbb6d09a981546a9db216c18e4c5e8da4df7202d56dbe3dc7d1c999f2ec2a9",
+        "bytes": 8948,
+        "expected_sha256": "cbbbb6d09a981546a9db216c18e4c5e8da4df7202d56dbe3dc7d1c999f2ec2a9",
+        "matches": true,
+        "name": "reducer",
+        "path": "/home/zhuhe/litchi-performance-0969/tools/reduce_0969_v4.py"
+      },
+      {
+        "actual_sha256": "42cd73792bc821d1776cc4b95c2cf33c73abad4b85903826d8857b3e03d6ecb9",
+        "bytes": 7819,
+        "expected_sha256": "42cd73792bc821d1776cc4b95c2cf33c73abad4b85903826d8857b3e03d6ecb9",
+        "matches": true,
+        "name": "plan_generator",
+        "path": "/home/zhuhe/litchi-performance-0969/tools/prepare_plan_0969_v4.py"
+      }
+    ],
+    "plan": {
+      "bytes": 9290,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0969/plans/plan-0969-aa-v6.json",
+      "sha256": "e853030180d7464c06cf1ed5d525957ce2d50514b8337a1b168392374d00b5df"
+    },
+    "protocol": {
+      "bytes": 7855,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0969/protocol-design-v4.md",
+      "sha256": "7766d1022bfef71ceca4fad7bb1edee9529178fb24b11eb083eb76b34fe94564"
+    },
+    "protocol_seal": {
+      "bytes": 3964,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0969/receipts/protocol-seal-aa-v7.json",
+      "sha256": "7e34cf85065d2a114adceaa6bf33c86c9c4c83827ea7bcc8dba5be7dfc5d8e58"
+    },
+    "review_bindings": [
+      {
+        "actual": {
+          "bytes": 38058,
+          "mode": "0o664",
+          "path": "/home/zhuhe/litchi-performance-0969/review/baseline-reuse-v1.json",
+          "sha256": "dbd362dae8e31dfe5ff54d6af5c37883df829bede3a5e5fa19e04337e0a8312e"
+        },
+        "expected_sha256": "dbd362dae8e31dfe5ff54d6af5c37883df829bede3a5e5fa19e04337e0a8312e",
+        "matches": true,
+        "name": "baseline_reuse",
+        "status": "pass_bounded_output_oracle_and_matched_baseline_reuse"
+      },
+      {
+        "actual": {
+          "bytes": 3247,
+          "mode": "0o664",
+          "path": "/home/zhuhe/litchi-performance-0969/review/design-review-v1.json",
+          "sha256": "b83916d26aea5dc30710da60d285558987f498eb6d93211b4c8f97f03c0cad8a"
+        },
+        "expected_sha256": "b83916d26aea5dc30710da60d285558987f498eb6d93211b4c8f97f03c0cad8a",
+        "matches": true,
+        "name": "design",
+        "status": "pass"
+      }
+    ],
+    "source_manifest": {
+      "bytes": 14960,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0969/manifests/source-manifest-v1.json",
+      "sha256": "f1818af5c306fb6ea01b59ca8df29710e773386b246071202bd4aa896f4e8e2b"
+    }
+  },
+  "status": "pass_prospective_aa_plan_no_launch",
+  "validation_runs": {
+    "go_binding_positive_negative": {
+      "plan_sha_mutation_rejected": true,
+      "temporary_only": true,
+      "valid_go_accepted": true
+    },
+    "plan_preflight": {
+      "no_workload_started": true,
+      "returncode": 0,
+      "status": "preflight_pass"
+    },
+    "reducer_no_args": {
+      "reason": "--plan, --manifest, and --output required unless --self-test",
+      "returncode": 2
+    },
+    "reducer_self_test": {
+      "checks": [
+        "AA missing incomplete",
+        "AA noise readiness_fail",
+        "formal missing incomplete",
+        "allocator metric mapping",
+        "qualification/rejection"
+      ],
+      "returncode": 0,
+      "status": "self_test_pass"
+    },
+    "runner_no_args": {
+      "reason": "--plan required unless --self-test",
+      "returncode": 2
+    },
+    "runner_self_test": {
+      "checks": [
+        "aa pass/go",
+        "complete noise readiness_fail",
+        "missing incomplete",
+        "malformed packet incomplete",
+        "sample index mutation rejected"
+      ],
+      "returncode": 0,
+      "status": "self_test_pass"
+    }
+  }
+}

@@ -1,5 +1,30 @@
 # Performance hotspot inventory
 
+## 0969 — CFB writer-proof handoff stops at A/A readiness
+
+[0969](0969-cfb-writer-proof-handoff-trial.md) tests a private receipt from a
+fresh source-layout `ReusePlan` render. Final CFB reopen, protection admission,
+physical metadata projection, discovery, and the existing full-capture fallback
+remain mandatory. Implementation correctness QA passes, including the selected
+XLS correctness tests; the separately planned XLS performance guard was not run
+or approved. The baseline-only A/A stage is `readiness_fail`: all 12
+`FloatingPictures` cells fail at least one AB/BA p50/p95 gate (42/48), all 12
+`NoHeadFoot` cells pass, and the maximum symmetric upper bound is `1.307340` at
+`e8/release` AB p95. The stage stopped before any candidate formal native or
+allocator workload. The bounded packet's [independent raw audit](results/change-0969/review/independent-raw-audit-0969-v1.json)
+passes custody for 576 valid packets with zero errors and reproduces the exact
+42/96 readiness-gate reduction (SHA-256
+`f0d0d0b63a896be41dab84550ff39f59954c26538423be2a3d3d017df9f26775`). The
+[maintained decision](results/change-0969/decision/perf-decision-output-v1.json)
+is `uninterpretable` with readiness failure and formal performance/benefit
+unmeasured (SHA-256
+`125818db8bcf05306626230cbedd5864de53991b8a69e7ec7116299ae49ec0ba`), and
+`candidate_adoption` is `null`. [Cleanup](results/change-0969/receipts/build-cache-cleanup-v1.json)
+freed 13,264,674,816 allocated bytes while preserving the four bound
+executables and referenced evidence (SHA-256
+`76611af155005a9f266be5c4a5267ef78ba55808cb76a9e1f7961ce75ab68c80`). No
+runtime candidate, speedup, slowdown, or host-cause claim follows.
+
 ## 0968 — CFB recapture route census completes diagnostic evidence
 
 [0968](0968-cfb-commit-census.md) ranks the current CFB commit path for a

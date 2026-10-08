@@ -1,0 +1,35 @@
+{
+  "schema": "litchi.performance.0969.cfb_design_review.v1",
+  "status": "pass",
+  "approved_for_implementation": true,
+  "scope": {
+    "design": "/home/zhuhe/litchi-performance-0969/design-v1.md",
+    "design_sha256": "f043500923af2cb7348845d6f280429a76e11e9c36e744ebfa9bfd572bf9616c",
+    "source_baseline": "/home/zhuhe/litchi-performance-0969/source-baseline",
+    "source_commit": "34fc85e23ccefcd8ad6ffd4d57d9e2671ef1a5a1",
+    "review_mode": "read-only source and test inspection; no build or workload"
+  },
+  "reviewed_source_sha256": {
+    "crates/litchi-ole-common/src/object/editor.rs": "ee6079567bf85a0ff68a335fb43999d780fab335a09a9cec8b845c16b7b5b319",
+    "crates/litchi-ole-common/src/object/codec.rs": "99dc73a358cbe5a76c6fc242e42af6524ba6d0954c2ae508cf55f84cb6a5cafd",
+    "crates/litchi-cfb/src/writer/core.rs": "a5ead3dded13baa8bdaa350742bfe79185e39cc2f16f86e433701e939fb2b19c",
+    "crates/litchi-cfb/src/writer/layout.rs": "480b30fb1c6c018c3182fc5e0ab1f53bb55f61169396e2f2d8bce257c7d1460c",
+    "crates/litchi-ole-common/src/object/directory/model.rs": "63342c1da1ed1ac79de4f029b8023e6e27a3d5ec07b356583b908403a8f4a196",
+    "crates/litchi-ole-common/src/object/directory/codec.rs": "afd82d7568246ed6dbff202b6525c96329f5061547eadcc360f9d840e2659a0a",
+    "crates/litchi-ole-common/src/object/discovery.rs": "830fa39ca65ef5073d14dabcc60513bca6a1f221eaaa1e28e62e9644bbeffdea"
+  },
+  "findings": [
+    "The receipt is private, operation-local, tied to a fresh writer/output vector, and accepted only after successful reuse-plan validation and emission.",
+    "The source-bound overlay, rewrite, no-source, plan-decline, and from-scratch routes retain full Package::capture and allocation reuse.",
+    "Metadata-only projection covers root, storages, and streams by exact path and kind, retains traversal and Budget order, checks one-to-one coverage and staged stream lengths, and installs final SID/link/class/time/start/size/MiniFAT metadata before discovery.",
+    "Final OleFile open and protection admission remain mandatory; payload omission is justified only by the validated immutable ReusePlan model and same fresh emission.",
+    "The existing tests cover CFB layout faults, MiniFAT transitions, directory metadata, limits, and public atomicity, but do not by themselves prove the new handoff; the design correctly requires an independent full-capture differential oracle."
+  ],
+  "implementation_gates": [
+    "Compare candidate and full-capture packages including root Metadata (SID 0, kind, links, CLSID, state, FILETIMEs, start, size, MiniFAT), storage/stream order, and every stream Arc identity on eligible reuse.",
+    "Prove receipt absence and unchanged full capture for copy-through, changed-but-net-equal batches, add/remove/rename/move/nested topology, rewrite, no source, source-adoption decline, and all plan fallbacks.",
+    "Cover 512/4096 sector files and zero, mini, regular, mixed, partial, and mini-to-regular/regular-to-mini transitions, including root and MiniFAT growth or shrink.",
+    "Exercise malformed/decode/limit/protection and projection mismatch paths, temporary-index allocation fallback, and public failure atomicity while preserving existing error ordering."
+  ],
+  "blockers": []
+}

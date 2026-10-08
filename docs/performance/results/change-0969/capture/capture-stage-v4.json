@@ -1,0 +1,10 @@
+{
+  "aa_reused": false,
+  "aa_status": "readiness_fail",
+  "formal_candidate_launch_permitted": false,
+  "no_retry": true,
+  "real_lanes_started": false,
+  "schema": "litchi.performance.0969.capture_stage.v4",
+  "status": "stopped_before_candidate_formal",
+  "timed_controls_started": false
+}

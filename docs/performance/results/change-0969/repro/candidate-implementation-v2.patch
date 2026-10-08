@@ -1,0 +1,974 @@
+--- a/crates/litchi-ole-common/src/object/codec.rs
++++ b/crates/litchi-ole-common/src/object/codec.rs
+@@ -22,6 +22,134 @@
+     root_directory: Option<directory::Metadata>,
+     storages: Vec<Storage>,
+     streams: Vec<Stream>,
++}
++
++/// The output of the operation-local source-layout render used by an editor
++/// commit.  The optional receipt is private to this module and is only
++/// created after a fresh writer has successfully emitted a validated reuse
++/// plan into the accompanying `Vec`.
++pub(crate) struct RenderedCommit<'a> {
++    bytes: Vec<u8>,
++    reuse: Option<ValidatedReuse<'a>>,
++    model: &'a Package,
++    limits: Limits,
++}
++
++impl<'a> RenderedCommit<'a> {
++    pub(crate) fn ordinary(bytes: Vec<u8>, model: &'a Package, limits: Limits) -> Self {
++        Self {
++            bytes,
++            reuse: None,
++            model,
++            limits,
++        }
++    }
++
++    pub(crate) fn capture(self) -> Result<(Package, Vec<u8>), OleError> {
++        let Self {
++            bytes,
++            reuse,
++            model,
++            limits,
++        } = self;
++        let mut check = OleFile::open(Cursor::new(bytes.as_slice()))?;
++        open(&check, limits.max_package_directory_entries())?;
++        let parsed = if let Some(reuse) = reuse {
++            Package::capture_with_receipt(&mut check, reuse)?
++        } else {
++            let mut parsed = Package::capture(&mut check, limits)?;
++            parsed.reuse_stream_allocations(model)?;
++            parsed
++        };
++        Ok((parsed, bytes))
++    }
++}
++
++/// A proof that the model and source borrowed here are the ones used to
++/// produce `RenderedCommit::bytes`.  This type cannot be constructed outside
++/// this module, and it is consumed before the editor publishes its package.
++struct ValidatedReuse<'a> {
++    model: &'a Package,
++    source: &'a [u8],
++    limits: Limits,
++}
++
++#[derive(Debug)]
++enum CaptureWalkError {
++    Cfb(OleError),
++    Declined,
++}
++
++impl From<OleError> for CaptureWalkError {
++    fn from(error: OleError) -> Self {
++        Self::Cfb(error)
++    }
++}
++
++/// Bounded path index used only while proving that a final CFB directory is
++/// the same logical model that the validated writer emitted.
++struct ProjectionIndex<'a> {
++    storages: HashMap<&'a [String], (&'a Storage, bool)>,
++    streams: HashMap<&'a [String], (&'a Stream, bool)>,
++}
++
++impl<'a> ProjectionIndex<'a> {
++    fn new(model: &'a Package) -> Result<Self, ()> {
++        Self::new_with_reserves(model, model.storages.len(), model.streams.len())
++    }
++
++    fn new_with_reserves(
++        model: &'a Package,
++        storage_reserve: usize,
++        stream_reserve: usize,
++    ) -> Result<Self, ()> {
++        let mut storages = HashMap::new();
++        storages.try_reserve(storage_reserve).map_err(|_| ())?;
++        for storage in &model.storages {
++            if storages.insert(storage.path(), (storage, false)).is_some() {
++                return Err(());
++            }
++        }
++
++        let mut streams = HashMap::new();
++        streams.try_reserve(stream_reserve).map_err(|_| ())?;
++        for stream in &model.streams {
++            if streams.insert(stream.path(), (stream, false)).is_some() {
++                return Err(());
++            }
++        }
++
++        Ok(Self { storages, streams })
++    }
++
++    fn stream_bytes(&self, path: &[String], size: u64) -> Option<Arc<[u8]>> {
++        let (stream, _) = self.streams.get(path)?;
++        let bytes = stream.bytes_shared();
++        (bytes.len() as u64 == size).then_some(bytes)
++    }
++
++    fn verify_package(&mut self, package: &Package) -> bool {
++        for storage in &package.storages {
++            let Some((_expected, seen)) = self.storages.get_mut(storage.path()) else {
++                return false;
++            };
++            if *seen {
++                return false;
++            }
++            *seen = true;
++        }
++        for stream in &package.streams {
++            let Some((expected, seen)) = self.streams.get_mut(stream.path()) else {
++                return false;
++            };
++            if *seen || !Arc::ptr_eq(&expected.bytes_shared(), &stream.bytes_shared()) {
++                return false;
++            }
++            *seen = true;
++        }
++        self.storages.values().all(|(_, seen)| *seen)
++            && self.streams.values().all(|(_, seen)| *seen)
++    }
+ }
+ 
+ impl Package {
+@@ -76,8 +204,93 @@
+             package.root_directory = None;
+         }
+         let mut budget = Budget::new(max_storages, max_streams, max_bytes);
+-        capture_container(ole, &[], &mut package, &mut budget, limits)?;
++        let mut resolve_stream = |ole: &mut OleFile<R>, path: &[String], size: u64| {
++            let data = ole.open_stream(&path_refs(path))?;
++            if data.len() as u64 != size {
++                return Err(OleError::InvalidFormat(format!(
++                    "stream {path:?} size changed during capture"
++                )));
++            }
++            Ok(Some(Arc::<[u8]>::from(data)))
++        };
++        match capture_container(
++            ole,
++            &[],
++            &mut package,
++            &mut budget,
++            limits,
++            &mut resolve_stream,
++        ) {
++            Ok(()) => {},
++            Err(CaptureWalkError::Cfb(error)) => return Err(error),
++            Err(CaptureWalkError::Declined) => {
++                return Err(OleError::InvalidData(
++                    "ordinary CFB capture unexpectedly declined".into(),
++                ));
++            },
++        }
+         Ok(package)
++    }
++
++    fn capture_with_receipt<R: Read + Seek>(
++        ole: &mut OleFile<R>,
++        receipt: ValidatedReuse<'_>,
++    ) -> Result<Self, OleError> {
++        let _source = receipt.source;
++        let projected = Self::capture_projected(ole, receipt.model, receipt.limits)?;
++        if let Some(package) = projected {
++            return Ok(package);
++        }
++
++        let mut package = Self::capture(ole, receipt.limits)?;
++        package.reuse_stream_allocations(receipt.model)?;
++        Ok(package)
++    }
++
++    fn capture_projected<R: Read + Seek>(
++        ole: &mut OleFile<R>,
++        model: &Package,
++        limits: Limits,
++    ) -> Result<Option<Self>, OleError> {
++        let mut index = match ProjectionIndex::new(model) {
++            Ok(index) => index,
++            Err(()) => return Ok(None),
++        };
++        let root_directory = ole.root_entry().map(directory::decode).transpose()?;
++        let mut package = Self {
++            sector_size: ole.sector_size(),
++            root_clsid: root_directory.and_then(directory::Metadata::class_id),
++            root_directory,
++            storages: Vec::new(),
++            streams: Vec::new(),
++        };
++        let mut budget = Budget::new(
++            limits.max_package_storages(),
++            limits.max_streams,
++            limits.max_total_size,
++        );
++        let walk = {
++            let mut resolve_stream = |_ole: &mut OleFile<R>, path: &[String], size: u64| {
++                Ok(index.stream_bytes(path, size))
++            };
++            capture_container(
++                ole,
++                &[],
++                &mut package,
++                &mut budget,
++                limits,
++                &mut resolve_stream,
++            )
++        };
++        match walk {
++            Ok(()) => {},
++            Err(CaptureWalkError::Declined) => return Ok(None),
++            Err(CaptureWalkError::Cfb(error)) => return Err(error),
++        }
++        if !index.verify_package(&package) {
++            return Ok(None);
++        }
++        Ok(Some(package))
+     }
+ 
+     pub(crate) fn capture_target<R: Read + Seek>(
+@@ -630,6 +843,26 @@
+         self.render_with_layout(None, SectorLayoutPolicy::default())
+     }
+ 
++    pub(crate) fn render_with_layout_for_commit<'a>(
++        &'a self,
++        source: &'a [u8],
++        policy: SectorLayoutPolicy,
++        limits: Limits,
++    ) -> Result<RenderedCommit<'a>, OleError> {
++        let (bytes, reused) = self.render_with_layout_inner(Some(source), policy)?;
++        let reuse = reused.then_some(ValidatedReuse {
++            model: self,
++            source,
++            limits,
++        });
++        Ok(RenderedCommit {
++            bytes,
++            reuse,
++            model: self,
++            limits,
++        })
++    }
++
+     /// Renders the package, optionally reusing `source`'s sector layout.
+     ///
+     /// `source` is the artifact this package was captured from. Under
+@@ -641,11 +874,21 @@
+         source: Option<&[u8]>,
+         policy: SectorLayoutPolicy,
+     ) -> Result<Vec<u8>, OleError> {
++        self.render_with_layout_inner(source, policy)
++            .map(|(bytes, _reused)| bytes)
++    }
++
++    fn render_with_layout_inner(
++        &self,
++        source: Option<&[u8]>,
++        policy: SectorLayoutPolicy,
++    ) -> Result<(Vec<u8>, bool), OleError> {
+         let mut writer = OleWriter::with_sector_size(self.sector_size)?;
+         writer.set_sector_layout_policy(policy);
+-        if let Some(source) = source {
+-            writer.adopt_source_layout(source)?;
+-        }
++        let adopted = source
++            .map(|source| writer.adopt_source_layout(source))
++            .transpose()?
++            .unwrap_or(false);
+         // A missing class ID is an explicit clear for a source-backed render;
+         // otherwise the source-layout planner would preserve the old bytes and
+         // make a directory transaction that removed a CLSID ineffective.
+@@ -719,7 +962,13 @@
+         }
+         let mut output = Cursor::new(Vec::new());
+         writer.write_to(&mut output)?;
+-        Ok(output.into_inner())
++        let report = writer.last_sector_layout().ok_or_else(|| {
++            OleError::InvalidData("CFB writer completed without a layout report".into())
++        })?;
++        Ok((
++            output.into_inner(),
++            adopted && policy == SectorLayoutPolicy::Reuse && report.reused_source_layout(),
++        ))
+     }
+ 
+     /// Publishes equal-length stream edits through the validated source-backed
+@@ -1154,70 +1403,77 @@
+     }
+ }
+ 
+-fn capture_container<R: Read + Seek>(
++fn capture_container<R, F>(
+     ole: &mut OleFile<R>,
+     path: &[String],
+     package: &mut Package,
+     budget: &mut Budget,
+     limits: Limits,
+-) -> Result<(), OleError> {
++    resolve_stream: &mut F,
++) -> Result<(), CaptureWalkError>
++where
++    R: Read + Seek,
++    F: FnMut(&mut OleFile<R>, &[String], u64) -> Result<Option<Arc<[u8]>>, OleError>,
++{
+     let max_entries = budget.max_directory_entries();
+     let refs = path_refs(path);
+-    ole.visit_directory_entries(&refs, max_entries, |ole, sid| {
+-        let (metadata, name, size) = {
+-            let entry = ole.directory_entry_by_sid(sid).ok_or_else(|| {
+-                OleError::CorruptedFile("directory visitor returned an unknown SID".into())
+-            })?;
+-            (directory::decode(entry)?, entry.name.clone(), entry.size)
+-        };
+-        let mut child = path.to_vec();
+-        child.push(name);
+-        match metadata.kind() {
+-            EntryKind::Storage => {
+-                if child.len() > limits.max_storage_depth {
+-                    return Err(OleError::InvalidFormat(
+-                        "CFB storage nesting limit exceeded".into(),
+-                    ));
+-                }
+-                budget.charge_storage()?;
+-                package
+-                    .storages
+-                    .try_reserve(1)
+-                    .map_err(|source| OleError::Allocation {
+-                        resource: "CFB storage capture",
+-                        source,
+-                    })?;
+-                package.storages.push(Storage::new(child.clone(), metadata));
+-                capture_container(ole, &child, package, budget, limits)?;
+-            },
+-            EntryKind::Stream => {
+-                if size > limits.max_stream_size {
+-                    return Err(OleError::InvalidFormat(format!(
+-                        "stream {child:?} exceeds size limit"
+-                    )));
+-                }
+-                budget.charge(size)?;
+-                let data = ole.open_stream(&path_refs(&child))?;
+-                if data.len() as u64 != size {
+-                    return Err(OleError::InvalidFormat(format!(
+-                        "stream {child:?} size changed during capture"
+-                    )));
+-                }
+-                package
+-                    .streams
+-                    .try_reserve(1)
+-                    .map_err(|source| OleError::Allocation {
+-                        resource: "CFB stream capture",
+-                        source,
+-                    })?;
+-                package
+-                    .streams
+-                    .push(Stream::new(child, Arc::<[u8]>::from(data), Some(metadata)));
+-            },
+-            EntryKind::Root => {},
+-        }
+-        Ok(())
+-    })
++    ole.visit_directory_entries(
++        &refs,
++        max_entries,
++        |ole, sid| -> Result<(), CaptureWalkError> {
++            let (metadata, name, size) = {
++                let entry = ole.directory_entry_by_sid(sid).ok_or_else(|| {
++                    OleError::CorruptedFile("directory visitor returned an unknown SID".into())
++                })?;
++                (directory::decode(entry)?, entry.name.clone(), entry.size)
++            };
++            let mut child = path.to_vec();
++            child.push(name);
++            match metadata.kind() {
++                EntryKind::Storage => {
++                    if child.len() > limits.max_storage_depth {
++                        return Err(OleError::InvalidFormat(
++                            "CFB storage nesting limit exceeded".into(),
++                        )
++                        .into());
++                    }
++                    budget.charge_storage()?;
++                    package
++                        .storages
++                        .try_reserve(1)
++                        .map_err(|source| OleError::Allocation {
++                            resource: "CFB storage capture",
++                            source,
++                        })?;
++                    package.storages.push(Storage::new(child.clone(), metadata));
++                    capture_container(ole, &child, package, budget, limits, resolve_stream)?;
++                },
++                EntryKind::Stream => {
++                    if size > limits.max_stream_size {
++                        return Err(OleError::InvalidFormat(format!(
++                            "stream {child:?} exceeds size limit"
++                        ))
++                        .into());
++                    }
++                    budget.charge(size)?;
++                    let data =
++                        resolve_stream(ole, &child, size)?.ok_or(CaptureWalkError::Declined)?;
++                    package
++                        .streams
++                        .try_reserve(1)
++                        .map_err(|source| OleError::Allocation {
++                            resource: "CFB stream capture",
++                            source,
++                        })?;
++                    package
++                        .streams
++                        .push(Stream::new(child, data, Some(metadata)));
++                },
++                EntryKind::Root => {},
++            }
++            Ok(())
++        },
++    )
+ }
+ 
+ fn capture_subtree<R: Read + Seek>(
+@@ -1396,3 +1652,373 @@
+     }
+     Ok(())
+ }
++
++#[cfg(test)]
++mod handoff_tests {
++    use super::*;
++    use litchi_cfb::OleWriter;
++
++    fn fixture() -> Vec<u8> {
++        fixture_with(512, 31, 5_000)
++    }
++
++    fn fixture_with(sector_size: usize, small_len: usize, regular_len: usize) -> Vec<u8> {
++        let mut writer = OleWriter::with_sector_size(sector_size).expect("sector size should work");
++        writer
++            .create_stream(&["Small"], &vec![0x11; small_len])
++            .expect("small stream should write");
++        writer
++            .create_stream(&["Regular"], &vec![0x22; regular_len])
++            .expect("regular stream should write");
++        writer
++            .create_storage(&["Nested"])
++            .expect("nested storage should write");
++        writer
++            .create_stream(&["Nested", "Empty"], &[])
++            .expect("empty stream should write");
++        let mut output = Cursor::new(Vec::new());
++        writer.write_to(&mut output).expect("fixture should write");
++        output.into_inner()
++    }
++
++    fn add_nonzero_directory_metadata(model: &mut Package) {
++        let root_class = Guid::from_bytes([0x11; 16]);
++        if let Some(root) = model.root_directory.as_mut() {
++            root.set_class_id(Some(root_class))
++                .set_state_bits(0x1020_3040)
++                .set_creation_time(0x0102_0304_0506_0708)
++                .set_modified_time(0x1112_1314_1516_1718);
++            model.root_clsid = Some(root_class);
++        }
++        for (index, storage) in model.storages.clone().iter().enumerate() {
++            let mut directory = *storage.directory();
++            directory
++                .set_class_id(Some(Guid::from_bytes([0x20 + index as u8; 16])))
++                .set_state_bits(0x2020_0000 + index as u32)
++                .set_creation_time(0x2122_2324_2526_2728 + index as u64)
++                .set_modified_time(0x3132_3334_3536_3738 + index as u64);
++            model.storages[index] = Storage::new(storage.path().to_vec(), directory);
++        }
++        for (index, stream) in model.streams.clone().iter().enumerate() {
++            let mut directory = stream
++                .directory()
++                .copied()
++                .expect("fixture stream metadata");
++            directory
++                .set_state_bits(0x4040_0000 + index as u32)
++                .set_creation_time(0x4142_4344_4546_4748 + index as u64)
++                .set_modified_time(0x5152_5354_5556_5758 + index as u64);
++            model.streams[index] = Stream::new(
++                stream.path().to_vec(),
++                stream.bytes_shared(),
++                Some(directory),
++            );
++        }
++    }
++
++    fn capture(bytes: &[u8], limits: Limits) -> Package {
++        let mut ole = OleFile::open(Cursor::new(bytes.to_vec())).expect("fixture should open");
++        Package::capture(&mut ole, limits).expect("fixture should capture")
++    }
++
++    fn assert_package_matches(left: &Package, right: &Package) {
++        assert_eq!(left.sector_size, right.sector_size);
++        assert_eq!(left.root_clsid, right.root_clsid);
++        assert_eq!(left.root_directory, right.root_directory);
++        assert_eq!(left.storages, right.storages);
++        assert_eq!(left.streams, right.streams);
++    }
++
++    #[test]
++    fn validated_receipt_projects_full_package_and_retains_all_stream_arcs() {
++        let source = fixture();
++        let limits = Limits::default();
++        let mut model = capture(&source, limits);
++        let replacement: Arc<[u8]> = Arc::from(vec![0xA5; 5_000]);
++        model
++            .put_stream(&["Small".to_owned()], Arc::clone(&replacement), limits)
++            .expect("size-changing stream edit should fit");
++
++        let rendered = model
++            .render_with_layout_for_commit(&source, SectorLayoutPolicy::Reuse, limits)
++            .expect("validated render should succeed");
++        assert!(rendered.reuse.is_some(), "test must exercise receipt route");
++        let (projected, bytes) = rendered.capture().expect("validated render should project");
++        let full = capture(&bytes, limits);
++        assert_package_matches(&projected, &full);
++
++        for stream in &projected.streams {
++            let expected = model
++                .streams
++                .iter()
++                .find(|candidate| candidate.path() == stream.path())
++                .expect("projected stream should be in model");
++            assert!(
++                Arc::ptr_eq(&stream.bytes_shared(), &expected.bytes_shared()),
++                "projection must retain each staged stream allocation"
++            );
++        }
++        assert_eq!(
++            projected
++                .streams
++                .iter()
++                .find(|stream| stream.path() == ["Small".to_owned()])
++                .expect("replacement stream should be present")
++                .directory()
++                .expect("replacement metadata should be present")
++                .stream_size(),
++            5_000
++        );
++    }
++
++    #[test]
++    fn validated_receipt_covers_sector_and_size_boundaries_with_metadata() {
++        let cases = [
++            (0usize, 1usize),
++            (1, 63),
++            (63, 64),
++            (64, 65),
++            (4_095, 4_096),
++            (4_096, 5_000),
++            (5_000, 8_193),
++            (8_193, 4_095),
++        ];
++        let mut positive_receipts = 0;
++        for sector_size in [512, 4_096] {
++            for (before, after) in cases {
++                let limits = Limits::default();
++                let mut authored = capture(&fixture_with(sector_size, before, 9_000), limits);
++                add_nonzero_directory_metadata(&mut authored);
++                let source = authored
++                    .render_with_layout(None, SectorLayoutPolicy::Rewrite)
++                    .expect("metadata-bearing source should render");
++                let mut model = capture(&source, limits);
++                model
++                    .put_stream(&["Small".to_owned()], Arc::from(vec![0xA5; after]), limits)
++                    .expect("boundary replacement should fit");
++                let rendered = model
++                    .render_with_layout_for_commit(&source, SectorLayoutPolicy::Reuse, limits)
++                    .expect("boundary render should succeed");
++                let has_receipt = rendered.reuse.is_some();
++                positive_receipts += usize::from(has_receipt);
++                let (projected, bytes) = rendered.capture().expect("boundary capture should pass");
++                let full = capture(&bytes, limits);
++                assert_package_matches(&projected, &full);
++                if has_receipt {
++                    for stream in &projected.streams {
++                        let expected = model
++                            .streams
++                            .iter()
++                            .find(|candidate| candidate.path() == stream.path())
++                            .expect("boundary stream should be in model");
++                        assert!(Arc::ptr_eq(
++                            &stream.bytes_shared(),
++                            &expected.bytes_shared()
++                        ));
++                    }
++                }
++            }
++        }
++        assert!(
++            positive_receipts > 0,
++            "boundary matrix must exercise receipt route"
++        );
++    }
++
++    #[test]
++    fn ordinary_rendered_commit_has_no_receipt_and_uses_full_capture() {
++        let source = fixture();
++        let limits = Limits::default();
++        let model = capture(&source, limits);
++        let rendered = RenderedCommit::ordinary(source.clone(), &model, limits);
++        assert!(rendered.reuse.is_none());
++        let (captured, bytes) = rendered.capture().expect("ordinary capture should succeed");
++        assert_eq!(bytes, source);
++        assert_package_matches(&captured, &capture(&source, limits));
++    }
++
++    #[test]
++    fn malformed_output_keeps_open_error_before_projection() {
++        let source = fixture();
++        let model = capture(&source, Limits::default());
++        let malformed = RenderedCommit::ordinary(vec![0; 8], &model, Limits::default());
++        assert!(matches!(malformed.capture(), Err(OleError::NotOleFile)));
++    }
++
++    #[test]
++    fn receipt_projection_mismatch_falls_back_to_full_capture() {
++        let source = fixture();
++        let limits = Limits::default();
++        let model = capture(&source, limits);
++        let mut writer = OleWriter::new();
++        writer
++            .create_stream(&["Small"], &[0x11; 31])
++            .expect("small stream should write");
++        writer
++            .create_stream(&["Regular"], &[0x22; 5_000])
++            .expect("regular stream should write");
++        writer
++            .create_stream(&["Extra"], b"unmodeled")
++            .expect("extra stream should write");
++        let mut output = Cursor::new(Vec::new());
++        writer
++            .write_to(&mut output)
++            .expect("mismatch fixture should write");
++        let output = output.into_inner();
++        let rendered = RenderedCommit {
++            bytes: output.clone(),
++            reuse: Some(ValidatedReuse {
++                model: &model,
++                source: &source,
++                limits,
++            }),
++            model: &model,
++            limits,
++        };
++        let (captured, _) = rendered
++            .capture()
++            .expect("projection mismatch should fall back");
++        let full = capture(&output, limits);
++        assert_package_matches(&captured, &full);
++        assert!(
++            captured
++                .streams
++                .iter()
++                .any(|stream| stream.path() == ["Extra".to_owned()])
++        );
++    }
++
++    #[test]
++    fn receipt_projection_wrong_size_falls_back_before_later_directory_walk() {
++        let source = fixture();
++        let limits = Limits::default();
++        let model = capture(&source, limits);
++        let mut writer = OleWriter::new();
++        writer
++            .create_stream(&["Small"], &[0x11; 30])
++            .expect("wrong-size stream should write");
++        writer
++            .create_stream(&["Regular"], &[0x22; 5_000])
++            .expect("regular stream should write");
++        writer
++            .create_storage(&["Nested"])
++            .expect("nested storage should write");
++        writer
++            .create_stream(&["Nested", "Empty"], &[])
++            .expect("empty stream should write");
++        let mut output = Cursor::new(Vec::new());
++        writer
++            .write_to(&mut output)
++            .expect("wrong-size fixture should write");
++        let output = output.into_inner();
++        let rendered = RenderedCommit {
++            bytes: output.clone(),
++            reuse: Some(ValidatedReuse {
++                model: &model,
++                source: &source,
++                limits,
++            }),
++            model: &model,
++            limits,
++        };
++        let (captured, _) = rendered
++            .capture()
++            .expect("wrong-size projection should fall back");
++        assert_package_matches(&captured, &capture(&output, limits));
++        assert_eq!(captured.streams[0].bytes().len(), 30);
++    }
++
++    #[test]
++    fn rewrite_and_no_source_routes_are_receipt_free() {
++        let source = fixture();
++        let limits = Limits::default();
++        let mut model = capture(&source, limits);
++        model
++            .put_stream(&["Small".to_owned()], Arc::from(vec![0xA5; 5_000]), limits)
++            .expect("topology-preserving edit should fit");
++        let rewritten = model
++            .render_with_layout_for_commit(&source, SectorLayoutPolicy::Rewrite, limits)
++            .expect("rewrite render should succeed");
++        assert!(rewritten.reuse.is_none());
++        let (captured, bytes) = rewritten.capture().expect("rewrite capture should succeed");
++        assert_package_matches(&captured, &capture(&bytes, limits));
++
++        let fresh_bytes = model
++            .render_with_layout(None, SectorLayoutPolicy::Rewrite)
++            .expect("no-source render should succeed");
++        let fresh = RenderedCommit::ordinary(fresh_bytes.clone(), &model, limits);
++        assert!(fresh.reuse.is_none());
++        let (captured, _) = fresh.capture().expect("no-source capture should succeed");
++        assert_package_matches(&captured, &capture(&fresh_bytes, limits));
++    }
++
++    #[test]
++    fn nested_add_remove_topology_has_no_receipt_and_full_capture_metadata() {
++        let source = fixture();
++        let limits = Limits::default();
++        let mut model = capture(&source, limits);
++        model
++            .add_stream(
++                vec!["Nested".to_owned(), "Added".to_owned()],
++                Arc::from(&b"nested addition"[..]),
++                limits,
++            )
++            .expect("nested stream should be admitted");
++        model
++            .remove_stream(
++                &CfbPath::new(vec!["Small".to_owned()]).expect("path should validate"),
++                limits,
++            )
++            .expect("existing stream should be removed");
++        let rendered = model
++            .render_with_layout_for_commit(&source, SectorLayoutPolicy::Reuse, limits)
++            .expect("topology render should succeed");
++        assert!(
++            rendered.reuse.is_none(),
++            "topology changes cannot use receipt"
++        );
++        let (captured, bytes) = rendered.capture().expect("topology capture should succeed");
++        assert_package_matches(&captured, &capture(&bytes, limits));
++        assert!(
++            captured
++                .streams
++                .iter()
++                .any(|stream| stream.path() == ["Nested".to_owned(), "Added".to_owned()])
++        );
++        assert!(
++            !captured
++                .streams
++                .iter()
++                .any(|stream| stream.path() == ["Small".to_owned()])
++        );
++    }
++
++    #[test]
++    fn duplicate_projection_index_falls_back_and_capture_limits_still_error() {
++        let source = fixture();
++        let mut limits = Limits::default();
++        let mut model = capture(&source, limits);
++        model.streams.push(model.streams[0].clone());
++        assert!(
++            ProjectionIndex::new_with_reserves(&model, usize::MAX, model.streams.len()).is_err()
++        );
++        let rendered = RenderedCommit {
++            bytes: source.clone(),
++            reuse: Some(ValidatedReuse {
++                model: &model,
++                source: &source,
++                limits,
++            }),
++            model: &model,
++            limits,
++        };
++        let (captured, _) = rendered
++            .capture()
++            .expect("duplicate index should use ordinary capture fallback");
++        assert_package_matches(&captured, &capture(&source, Limits::default()));
++
++        limits.max_streams = 0;
++        let limited = RenderedCommit::ordinary(source.clone(), &captured, limits);
++        assert!(matches!(limited.capture(), Err(OleError::InvalidFormat(_))));
++    }
++}
+--- a/crates/litchi-ole-common/src/object/editor.rs
++++ b/crates/litchi-ole-common/src/object/editor.rs
+@@ -981,19 +981,28 @@
+                 .render_copy_through(&self.base_package, &self.original, self.limits)?
+                 .map_or_else(
+                     || {
+-                        self.package
+-                            .render_with_layout(Some(self.original.as_slice()), self.layout)
++                        self.package.render_with_layout_for_commit(
++                            self.original.as_slice(),
++                            self.layout,
++                            self.limits,
++                        )
+                     },
+-                    Ok,
++                    |bytes| {
++                        Ok(codec::RenderedCommit::ordinary(
++                            bytes,
++                            &self.package,
++                            self.limits,
++                        ))
++                    },
+                 )?
+         } else {
+-            self.package
+-                .render_with_layout(Some(self.original.as_slice()), self.layout)?
++            self.package.render_with_layout_for_commit(
++                self.original.as_slice(),
++                self.layout,
++                self.limits,
++            )?
+         };
+-        let mut check = OleFile::open(Cursor::new(rendered.as_slice()))?;
+-        codec::open(&check, self.limits.max_package_directory_entries())?;
+-        let mut parsed = Package::capture(&mut check, self.limits)?;
+-        parsed.reuse_stream_allocations(&self.package)?;
++        let (parsed, rendered) = rendered.capture()?;
+         self.package = parsed;
+         self.objects = discovery::from_package(&self.package, &self.targets, self.limits)?;
+         self.changed = true;
+--- a/crates/litchi-ole-common/tests/object.rs
++++ b/crates/litchi-ole-common/tests/object.rs
+@@ -21,6 +21,17 @@
+ 
+ fn write_cfb(build: impl FnOnce(&mut OleWriter)) -> Vec<u8> {
+     let mut writer = OleWriter::new();
++    build(&mut writer);
++    let mut output = Cursor::new(Vec::new());
++    writer.write_to(&mut output).expect("test CFB should write");
++    output.into_inner()
++}
++
++fn write_cfb_with_sector_size(
++    sector_size: usize,
++    build: impl FnOnce(&mut OleWriter),
++) -> Vec<u8> {
++    let mut writer = OleWriter::with_sector_size(sector_size).expect("sector size should work");
+     build(&mut writer);
+     let mut output = Cursor::new(Vec::new());
+     writer.write_to(&mut output).expect("test CFB should write");
+@@ -901,6 +912,105 @@
+ }
+ 
+ #[test]
++fn source_layout_projection_matches_full_capture_for_all_stream_classes() {
++    for sector_size in [512, 4096] {
++        let original = write_cfb_with_sector_size(sector_size, |writer| {
++            writer.set_root_state_bits(0x1020_3040);
++            writer.set_root_creation_time_from_source(0x0102_0304_0506_0708);
++            writer.set_root_modified_time(0x1112_1314_1516_1718);
++            writer.create_stream(&["Empty"], &[]).unwrap();
++            writer.create_stream(&["Small"], &[0x11; 31]).unwrap();
++            writer.create_stream(&["Regular"], &[0x22; 5_000]).unwrap();
++            writer.create_storage(&["ObjectPool"]).unwrap();
++            writer.create_storage(&["ObjectPool", "_42"]).unwrap();
++            writer
++                .set_storage_metadata(
++                    &["ObjectPool", "_42"],
++                    0xA1A2_A3A4,
++                    0x2122_2324_2526_2728,
++                    0x3132_3334_3536_3738,
++                )
++                .unwrap();
++            writer
++                .create_stream(&["ObjectPool", "_42", "NestedEmpty"], &[])
++                .unwrap();
++            writer
++                .create_stream(&["ObjectPool", "_42", "NestedSmall"], &[0x33; 63])
++                .unwrap();
++            writer
++                .create_stream(
++                    &["ObjectPool", "_42", "NestedRegular"],
++                    &[0x44; 8_192],
++                )
++                .unwrap();
++            writer
++                .set_stream_metadata(
++                    &["ObjectPool", "_42", "NestedRegular"],
++                    0xB1B2_B3B4,
++                    0x4142_4344_4546_4748,
++                    0x5152_5354_5556_5758,
++                )
++                .unwrap();
++        });
++        let selected = targets("object", &["ObjectPool", "_42"]);
++        let mut editor = Editor::open(original, selected.clone(), Limits::default())
++            .expect("source should open");
++        let unchanged = editor
++            .stream_shared(&[
++                "ObjectPool".to_string(),
++                "_42".to_string(),
++                "NestedRegular".to_string(),
++            ])
++            .expect("regular stream should be captured");
++        let replacement: Arc<[u8]> = Arc::from(vec![0xA5; 5_000]);
++        let rendered = editor
++            .put_stream_shared_with_rendered(&["Small".to_string()], Arc::clone(&replacement))
++            .expect("size-changing stream edit should commit");
++        assert!(Arc::ptr_eq(
++            &replacement,
++            &editor
++                .stream_shared(&["Small".to_string()])
++                .expect("replaced stream should be retained")
++        ));
++        assert!(Arc::ptr_eq(
++            &unchanged,
++            &editor
++                .stream_shared(&[
++                    "ObjectPool".to_string(),
++                    "_42".to_string(),
++                    "NestedRegular".to_string(),
++                ])
++                .expect("unchanged stream should retain its allocation")
++        ));
++        let mut oracle_file = OleFile::open(Cursor::new(rendered.clone()))
++            .expect("rendered CFB should reopen");
++        let oracle = discover(&mut oracle_file, &selected, Limits::default())
++            .expect("independent full capture should pass");
++        let projected = editor
++            .objects()
++            .get("object")
++            .expect("projected object should remain selected");
++        let captured = oracle
++            .get("object")
++            .expect("oracle object should remain selected");
++        assert_eq!(projected.storage().path(), captured.storage().path());
++        assert_eq!(projected.storage().directory(), captured.storage().directory());
++        assert_eq!(projected.storages().len(), captured.storages().len());
++        for (left, right) in projected.storages().iter().zip(captured.storages()) {
++            assert_eq!(left.path(), right.path());
++            assert_eq!(left.directory(), right.directory());
++        }
++        assert_eq!(projected.streams().len(), captured.streams().len());
++        for (left, right) in projected.streams().iter().zip(captured.streams()) {
++            assert_eq!(left.path(), right.path());
++            assert_eq!(left.bytes(), right.bytes());
++            assert_eq!(left.directory(), right.directory());
++        }
++        assert_eq!(editor.finish().expect("editor should finish"), rendered);
++    }
++}
++
++#[test]
+ fn same_length_editor_edit_uses_source_backed_copy_through() {
+     let base = write_cfb(|writer| {
+         writer

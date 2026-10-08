@@ -1,0 +1,162 @@
+{
+  "blockers": [
+    "AA readiness failed the retained artifact gate: 42 of 96 cell/order/statistic checks exceeded the 1.05 upper-CI limit.",
+    "The current draft helper test suite still has the maintained-selector integration gap described above.",
+    "The historical v1 seal is invalid for current draft hashes and must not be treated as a current approval."
+  ],
+  "capture": {
+    "readiness": {
+      "bytes": 44568,
+      "path": "/home/zhuhe/litchi-performance-0969/capture/aa-v4/aa-readiness-v4.json",
+      "sha256": "6bb110145d0583be3ff12c3c6e1ada6611be6b5396f55f24698bb0358bb51efe"
+    },
+    "readiness_fields": {
+      "bootstrap_resamples": 10000,
+      "bootstrap_seed": 969004,
+      "cells": 24,
+      "checks": 96,
+      "errors": [],
+      "failed_checks": 42,
+      "pairs_per_cell": 12,
+      "passed_checks": 54,
+      "schema": "litchi.performance.0969.aa_readiness.v4",
+      "status": "readiness_fail",
+      "upper_ci_limit": 1.05
+    },
+    "stage": {
+      "bytes": 293,
+      "path": "/home/zhuhe/litchi-performance-0969/capture/aa-v4/capture-stage-v4.json",
+      "sha256": "59485d2c231f2c56e39300acfc5916c5a14ceea91918ebe0c2706fc7fe666bc3"
+    },
+    "stage_fields": {
+      "aa_reused": false,
+      "aa_status": "readiness_fail",
+      "formal_candidate_launch_permitted": false,
+      "no_retry": true,
+      "real_lanes_started": false,
+      "schema": "litchi.performance.0969.capture_stage.v4",
+      "status": "stopped_before_candidate_formal",
+      "timed_controls_started": false
+    }
+  },
+  "correction": {
+    "basis": "directly parsed retained capture-stage-v4.json and aa-readiness-v4.json; no lane count or policy value is inferred",
+    "prior_receipt": {
+      "bytes": 7471,
+      "path": "/home/zhuhe/litchi-performance-0969/receipts/xls-helper-status-post-aa-v1.json",
+      "sha256": "df02744a38c923fd0c6ab0c6fd69ab77776c950ae298c78e9a9c485638f23130"
+    },
+    "prior_receipt_preserved": true,
+    "supersedes_fields_in": "/home/zhuhe/litchi-performance-0969/receipts/xls-helper-status-post-aa-v1.json"
+  },
+  "created_utc": "2026-10-08T01:51:49.576421Z",
+  "current_draft_bindings": {
+    "aa_reducer": {
+      "bytes": 11143,
+      "path": "/home/zhuhe/litchi-performance-0969/tools/xls_regression_aa.py",
+      "sha256": "594f11e2c919ce2dd41f8c5aab1043bbf2dc054ba4da6c1f61eb449a4cc1c3f1"
+    },
+    "design_v2": {
+      "bytes": 12766,
+      "path": "/home/zhuhe/litchi-performance-0969/xls-control-design-v2.md",
+      "sha256": "dca1fe9e1b1f335d04fa17ae94ae30d4460c13405e6397983f6431fb78b74286"
+    },
+    "go_builder": {
+      "bytes": 4651,
+      "path": "/home/zhuhe/litchi-performance-0969/tools/prepare_xls_launch_go.py",
+      "sha256": "ca31adf124e0449a18b21307dda827abc076908f28606031e8216bb80930ed91"
+    },
+    "guard": {
+      "bytes": 41868,
+      "path": "/home/zhuhe/litchi-performance-0969/tools/xls_regression_guard.py",
+      "sha256": "c4d6df1bd633b30eb61372d66f405fd2405f6fc25956976972d336a323bd6736"
+    },
+    "maintained_abba_validator": {
+      "bytes": 323256,
+      "path": "/home/zhuhe/code/litchi/tools/perf_abba_summary.py",
+      "sha256": "c4d0b8620bf8a7f6c5fa7f1a0ff907efcb1f53c2230c1487e99946937b3153ce"
+    },
+    "plan_builder": {
+      "bytes": 9111,
+      "path": "/home/zhuhe/litchi-performance-0969/tools/prepare_xls_regression_plan.py",
+      "sha256": "0196cfdd958ffd329bf87d319f2dad5d421676e79bfd0f1653cdc49451c9f561"
+    },
+    "runner": {
+      "bytes": 42940,
+      "path": "/home/zhuhe/litchi-performance-0969/tools/xls_regression_runner.py",
+      "sha256": "bb8d97e0a8e2c33afe374f456dec3750113749e48c2f912b3abb2e5c59686ec8"
+    },
+    "tests": {
+      "bytes": 13868,
+      "path": "/home/zhuhe/litchi-performance-0969/tools/test_xls_regression_guard.py",
+      "sha256": "e02b382c8577889d5ada44f38dba053558ce5649d9cc6010cc21d38863555b45"
+    }
+  },
+  "disposition": {
+    "aa_readiness": "fail",
+    "candidate_adoption": null,
+    "candidate_formal_launch_permitted": false,
+    "no_synthetic_measurement_claims": true,
+    "performance_claim": false,
+    "workload_started": false
+  },
+  "historical_seal": {
+    "current_bindings": {
+      "design_v2": {
+        "path": "/home/zhuhe/litchi-performance-0969/xls-control-design-v2.md",
+        "sha256": "dca1fe9e1b1f335d04fa17ae94ae30d4460c13405e6397983f6431fb78b74286"
+      },
+      "guard": {
+        "path": "/home/zhuhe/litchi-performance-0969/tools/xls_regression_guard.py",
+        "sha256": "c4d6df1bd633b30eb61372d66f405fd2405f6fc25956976972d336a323bd6736"
+      },
+      "tests": {
+        "path": "/home/zhuhe/litchi-performance-0969/tools/test_xls_regression_guard.py",
+        "sha256": "e02b382c8577889d5ada44f38dba053558ce5649d9cc6010cc21d38863555b45"
+      }
+    },
+    "original_bindings": {
+      "design_v2": {
+        "path": "/home/zhuhe/litchi-performance-0969/xls-control-design-v2.md",
+        "sha256": "dca1fe9e1b1f335d04fa17ae94ae30d4460c13405e6397983f6431fb78b74286"
+      },
+      "guard": {
+        "path": "/home/zhuhe/litchi-performance-0969/tools/xls_regression_guard.py",
+        "sha256": "94abd08a1b8feedf889267ee5d1a2d51487186fefbea9c744abfca3f9581f8f6"
+      },
+      "tests": {
+        "path": "/home/zhuhe/litchi-performance-0969/tools/test_xls_regression_guard.py",
+        "sha256": "33e4186faf74d814ad68c00cab98ccb7ba7df93f29ae4f2e0bca86e1919ad230"
+      }
+    },
+    "path": "/home/zhuhe/litchi-performance-0969/review/xls-control-helper-seal-v1.json",
+    "reason": "The v1 author seal bound the following hashes, but those draft files were edited in place after sealing. The old seal is retained as historical evidence and does not bind the current drafts; no workload was launched from the edited drafts.",
+    "sha256": "ed3e14205580dbc1e267cee012d42c45ce3b38083c08f1919f40604b647b06e2",
+    "status": "invalidated_by_unexecuted_draft_edits"
+  },
+  "schema": "litchi.performance.0969.xls_helper_status.v2",
+  "scope": "external-only XLS control launch/capture machinery; correction of factual status receipt; no helper-code work, repository edits, formal launch, or workload",
+  "source_revision": "34fc85e23ccefcd8ad6ffd4d57d9e2671ef1a5a1",
+  "status": "unqualified_no_adoption",
+  "validation": {
+    "focused_guard_suite": {
+      "command": "cd tools && python3 -m unittest -v test_xls_regression_guard",
+      "exit_status": 1,
+      "reason": "The maintained perf_abba_summary validator rejects the exact Number corpus for the custom xls_comments_eager_edit_save selector as a native corpus attached to a non-native selector. This remains unresolved; validation was not weakened.",
+      "tests_failed": 3,
+      "tests_passed": 6,
+      "tests_run": 9
+    },
+    "runner_self_test": {
+      "aa_children": 144,
+      "command": "python3 tools/xls_regression_runner.py --self-test",
+      "exit_status": 0,
+      "formal_children": 144,
+      "no_workload_started": true
+    },
+    "syntax_check": {
+      "command": "python3 -m py_compile guard/test/runner/plan/GO/AA drafts",
+      "exit_status": 0
+    }
+  }
+}

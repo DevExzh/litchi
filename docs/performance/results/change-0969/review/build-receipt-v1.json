@@ -1,0 +1,44 @@
+{
+  "command": "CARGO_INCREMENTAL=0 RUSTFLAGS='' CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0969/builds/target-candidate-cfb cargo build --manifest-path /home/zhuhe/litchi-performance-0969/source-candidate/tools/perf-cfb-profile/Cargo.toml --release --locked --offline -j2",
+  "created_utc": "2026-10-08T01:27:50.643073+00:00",
+  "environment": {
+    "RUSTFLAGS": "",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "incremental": "0",
+    "jobs": 2,
+    "locked": true,
+    "offline": true,
+    "profile": "release; debug=1; opt-level default release=3; lto default off; codegen-units default",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14), x86_64-unknown-linux-gnu, LLVM 22.1.2"
+  },
+  "formal_performance_capture": false,
+  "manifest": {
+    "cargo_toml": "/home/zhuhe/litchi-performance-0969/source-candidate/tools/perf-cfb-profile/Cargo.toml",
+    "cargo_toml_sha256": "41dee12e4eb7d1e3853a33a7743afdf6b5d6519d5e7456e61ce4978aa9177945",
+    "path": "/home/zhuhe/litchi-performance-0969/source-candidate/tools/perf-cfb-profile/Cargo.lock",
+    "sha256": "343c5464ae1144cbb72284cbb3e9b52b5dff2b798d09462d3c0d6a74b317bac7"
+  },
+  "outputs": [
+    {
+      "bytes": 55317368,
+      "path": "/home/zhuhe/litchi-performance-0969/builds/target-candidate-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "sha256": "58d0f9aeb30d716cd25b79855ed17378f9132cc3a707ea1db2429056b87238a9"
+    },
+    {
+      "bytes": 55321184,
+      "path": "/home/zhuhe/litchi-performance-0969/builds/target-candidate-cfb/release/doc_retention_probe_0942_cfb_profile_alloc",
+      "sha256": "ebc63c02151914daf5acb69096a5833ec45ef91e1897976cbd9ba2d17bd5312f"
+    }
+  ],
+  "schema": "litchi.performance.0969.candidate_build_receipt.v1",
+  "source": {
+    "commit": "34fc85e23ccefcd8ad6ffd4d57d9e2671ef1a5a1",
+    "manifest": "/home/zhuhe/litchi-performance-0969/manifests/source-manifest-v3.json",
+    "manifest_sha256": "757d1365a0d7438e9436cd1403e714c43248fe6676dab9697ba86a97f66853d3",
+    "root": "/home/zhuhe/litchi-performance-0969/source-candidate",
+    "tree_sha256": "d39b47d024035112c3f71dd06e3ff3d54829e908e9f612e90b2d25a41ffdc884"
+  },
+  "status": "pass_external_release_build_no_workload",
+  "target_dir": "/home/zhuhe/litchi-performance-0969/builds/target-candidate-cfb",
+  "workload_started": false
+}

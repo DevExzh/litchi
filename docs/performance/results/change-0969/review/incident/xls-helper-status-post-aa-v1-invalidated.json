@@ -1,0 +1,142 @@
+{
+  "artifact_sha256": {
+    "aa_readiness": "6bb110145d0583be3ff12c3c6e1ada6611be6b5396f55f24698bb0358bb51efe",
+    "aa_reducer": "594f11e2c919ce2dd41f8c5aab1043bbf2dc054ba4da6c1f61eb449a4cc1c3f1",
+    "baseline_receipt": "7d820aba380ece2613cc2615d53cab28ac6f5ac9153569db25dfaf8c1dfdb7f2",
+    "candidate_receipt": "bef87cf9cdba6170531a60274a5141d9163a54dd00665951ea50c0f05af633b8",
+    "capture_stage": "59485d2c231f2c56e39300acfc5916c5a14ceea91918ebe0c2706fc7fe666bc3",
+    "design_v2": "ee86a98460c31c16d51f2624c47f5ea2f6f21f3e19dfdbda0dc26fdf3ebb3c6b",
+    "go_builder": "ca31adf124e0449a18b21307dda827abc076908f28606031e8216bb80930ed91",
+    "guard": "c4d6df1bd633b30eb61372d66f405fd2405f6fc25956976972d336a323bd6736",
+    "guard_tests": "e02b382c8577889d5ada44f38dba053558ce5649d9cc6010cc21d38863555b45",
+    "plan_builder": "0196cfdd958ffd329bf87d319f2dad5d421676e79bfd0f1653cdc49451c9f561",
+    "runner": "bb8d97e0a8e2c33afe374f456dec3750113749e48c2f912b3abb2e5c59686ec8"
+  },
+  "builds": {
+    "baseline_binary_sha256": "38c1a72fa5381c20e2e1a99a8c3ed39fc0545717965001b96b01a31ad9d1f4b2",
+    "baseline_receipt_sha256": "7d820aba380ece2613cc2615d53cab28ac6f5ac9153569db25dfaf8c1dfdb7f2",
+    "candidate_binary_sha256": "201b2968bc84797b66da7eee5522dc745216740f5d0837a6f1855450cf6c923b",
+    "candidate_receipt_sha256": "bef87cf9cdba6170531a60274a5141d9163a54dd00665951ea50c0f05af633b8"
+  },
+  "capture": {
+    "aa_status": "readiness_fail",
+    "formal_candidate_launch_permitted": false,
+    "path": "/home/zhuhe/litchi-performance-0969/capture/aa-v4/capture-stage-v4.json",
+    "readiness_errors": [],
+    "readiness_path": "/home/zhuhe/litchi-performance-0969/capture/aa-v4/aa-readiness-v4.json",
+    "readiness_policy": {
+      "bootstrap_resamples": 10000,
+      "bootstrap_seed": 969104,
+      "pairs_per_cell": 6,
+      "upper_ci_limit": 1.05
+    },
+    "readiness_schema": "litchi.performance.0969.aa_readiness.v4",
+    "readiness_sha256": "6bb110145d0583be3ff12c3c6e1ada6611be6b5396f55f24698bb0358bb51efe",
+    "readiness_status": "readiness_fail",
+    "real_lanes_started": 576,
+    "schema": "litchi.performance.0969.capture_stage.v4",
+    "sha256": "59485d2c231f2c56e39300acfc5916c5a14ceea91918ebe0c2706fc7fe666bc3",
+    "status": "stopped_before_candidate_formal"
+  },
+  "checks": [
+    {
+      "command": "python3 -m py_compile tools/xls_regression_guard.py tools/test_xls_regression_guard.py tools/xls_regression_runner.py tools/prepare_xls_regression_plan.py tools/prepare_xls_launch_go.py tools/xls_regression_aa.py",
+      "exit_code": 0,
+      "log": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0969/qa-xls-regression-current-v1/logs/py-compile-post-aa.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "name": "py_compile"
+    },
+    {
+      "command": "python3 tools/xls_regression_runner.py --self-test",
+      "exit_code": 0,
+      "log": {
+        "bytes": 165,
+        "path": "/home/zhuhe/litchi-performance-0969/qa-xls-regression-current-v1/logs/runner-self-test-post-aa.log",
+        "sha256": "fc6fa5104fa07fbf59f010bdd5c6dd153e6ddbc65896684ccd01fcd27d70e37e"
+      },
+      "name": "runner_self_test",
+      "result": {
+        "aa_children": 144,
+        "formal_children": 144,
+        "no_workload_started": true
+      }
+    },
+    {
+      "command": "cd tools && python3 -m unittest -v test_xls_regression_guard",
+      "exit_code": 1,
+      "failure": "Maintained perf_abba_summary rejects the exact Number corpus for the custom xls_comments_eager_edit_save selector as a native XLS numeric corpus attached to a non-native selector. No validator weakening or production patch was made.",
+      "log": {
+        "bytes": 3460,
+        "path": "/home/zhuhe/litchi-performance-0969/qa-xls-regression-current-v1/logs/test-xls-regression-guard-post-aa-r3.log",
+        "sha256": "e2fc3b021d6e462d8b575db88bf0b82e242ac0c8931ab2c9dd788d57c89fa88c"
+      },
+      "name": "guard_unittest_corrected",
+      "tests_failed": 3,
+      "tests_passed": 6,
+      "tests_run": 9
+    },
+    {
+      "command": "python3 -m unittest -v /home/zhuhe/litchi-performance-0969/tools/test_xls_regression_guard.py",
+      "exit_code": 1,
+      "failure": "unittest interpreted the absolute filename as a module name",
+      "log": {
+        "bytes": 975,
+        "path": "/home/zhuhe/litchi-performance-0969/qa-xls-regression-current-v1/logs/test-xls-regression-guard-post-aa.log",
+        "sha256": "7522b87db5030c9f5b82af6aee01ea9cae4a594438582e4a03e502ae0161cb4d"
+      },
+      "name": "guard_unittest_initial_invocation"
+    },
+    {
+      "command": "cd tools && python3 -m unittest -v test_xls_regression_guard",
+      "exit_code": 1,
+      "failure": "test fixture imported test_perf_abba_summary for a corpus constant that belongs to perf_abba_summary; test-only import was corrected before the final run",
+      "log": {
+        "bytes": 10741,
+        "path": "/home/zhuhe/litchi-performance-0969/qa-xls-regression-current-v1/logs/test-xls-regression-guard-post-aa-r2.log",
+        "sha256": "b795356fcb226404c5e5a0dd7cd55d4fc0ff4e3a82c344d10cf75a7c6901fc7a"
+      },
+      "name": "guard_unittest_import_before_fixture_fix",
+      "tests_run": 9
+    }
+  ],
+  "created_utc": "2026-10-08T00:00:00Z",
+  "logs": {
+    "py-compile-post-aa.log": {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0969/qa-xls-regression-current-v1/logs/py-compile-post-aa.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "runner-self-test-post-aa.log": {
+      "bytes": 165,
+      "path": "/home/zhuhe/litchi-performance-0969/qa-xls-regression-current-v1/logs/runner-self-test-post-aa.log",
+      "sha256": "fc6fa5104fa07fbf59f010bdd5c6dd153e6ddbc65896684ccd01fcd27d70e37e"
+    },
+    "test-xls-regression-guard-post-aa-r2.log": {
+      "bytes": 10741,
+      "path": "/home/zhuhe/litchi-performance-0969/qa-xls-regression-current-v1/logs/test-xls-regression-guard-post-aa-r2.log",
+      "sha256": "b795356fcb226404c5e5a0dd7cd55d4fc0ff4e3a82c344d10cf75a7c6901fc7a"
+    },
+    "test-xls-regression-guard-post-aa-r3.log": {
+      "bytes": 3460,
+      "path": "/home/zhuhe/litchi-performance-0969/qa-xls-regression-current-v1/logs/test-xls-regression-guard-post-aa-r3.log",
+      "sha256": "e2fc3b021d6e462d8b575db88bf0b82e242ac0c8931ab2c9dd788d57c89fa88c"
+    },
+    "test-xls-regression-guard-post-aa.log": {
+      "bytes": 975,
+      "path": "/home/zhuhe/litchi-performance-0969/qa-xls-regression-current-v1/logs/test-xls-regression-guard-post-aa.log",
+      "sha256": "7522b87db5030c9f5b82af6aee01ea9cae4a594438582e4a03e502ae0161cb4d"
+    }
+  },
+  "schema": "litchi.performance.0969.xls_helper_status.v1",
+  "scope": "external-only XLS control launch/capture machinery; no repository edits, no workload launch, no formal candidate launch",
+  "source_revision": "34fc85e23ccefcd8ad6ffd4d57d9e2671ef1a5a1",
+  "status": "unqualified_no_adoption",
+  "unresolved": [
+    "AA exceeded the fixed 1.05 upper-CI readiness bound; candidate formal launch is forbidden.",
+    "The focused guard fixture cannot complete through the maintained validator for the exact comments corpus under the new custom selector. This remains an external integration gap and is intentionally unresolved.",
+    "Candidate receipt carries an overlay manifest rather than the final source manifest, so no prospective formal plan was sealed."
+  ]
+}

@@ -1,0 +1,494 @@
+{
+  "aa_plan_binding_audit": {
+    "aa_status": "The protocol seal and plan are prospective baseline-only A/A; no build/workload/AA execution was observed.",
+    "current_build_source_binding": {
+      "baseline_tree_sha256": "9da7843d8b8bce8fe7530a74bfffd2af1ee7d66c0439e93d3c0a57c24c336188",
+      "candidate_tree_sha256": "d39b47d024035112c3f71dd06e3ff3d54829e908e9f612e90b2d25a41ffdc884",
+      "manifest": "/home/zhuhe/litchi-performance-0969/manifests/source-manifest-v3.json",
+      "manifest_sha256": "757d1365a0d7438e9436cd1403e714c43248fe6676dab9697ba86a97f66853d3"
+    },
+    "finding": "The v1 df8a value must not be described as the current v3 tree hash. The v1 content scope remains valid by the 924-entry zero-difference proof, so this is a binding/serialization caveat rather than source drift. Any current candidate formal capture must bind v3 manifest and candidate tree/binary; a baseline-only AA may use the historical v1 plan only with this equivalence recorded and no current-v3 tree claim.",
+    "plan_historical_source_binding": {
+      "manifest": "/home/zhuhe/litchi-performance-0969/manifests/source-manifest-v1.json",
+      "manifest_sha256": "f1818af5c306fb6ea01b59ca8df29710e773386b246071202bd4aa896f4e8e2b",
+      "tree_sha256": "df8a842b08fec1792c67921fb1ce3513d3c6cb3dd0149cf13672bad14090bfb0"
+    },
+    "plan_path": "/home/zhuhe/litchi-performance-0969/plans/plan-0969-aa-v6.json",
+    "plan_sha256": "e853030180d7464c06cf1ed5d525957ce2d50514b8337a1b168392374d00b5df",
+    "protocol_seal_path": "/home/zhuhe/litchi-performance-0969/receipts/protocol-seal-aa-v7.json",
+    "protocol_seal_sha256": "7e34cf85065d2a114adceaa6bf33c86c9c4c83827ea7bcc8dba5be7dfc5d8e58",
+    "required_before_current_candidate_formal_capture": [
+      "new or amended plan/GO binding source-manifest-v3 and candidate tree d39b47d0...",
+      "bind candidate ordinary/allocator binary hashes and build receipt 503a26...0130",
+      "retain no-AA-run status for the historical v1 plan"
+    ]
+  },
+  "binary_identity_and_elf_audit": {
+    "allocator_section_deltas": {
+      "debug_sections": {
+        ".debug_abbrev": {
+          "baseline": 127082,
+          "candidate": 191852,
+          "delta": 64770
+        },
+        ".debug_aranges": {
+          "baseline": 268304,
+          "candidate": 330544,
+          "delta": 62240
+        },
+        ".debug_info": {
+          "baseline": 17031991,
+          "candidate": 19864353,
+          "delta": 2832362
+        },
+        ".debug_line": {
+          "baseline": 5944860,
+          "candidate": 7216650,
+          "delta": 1271790
+        },
+        ".debug_ranges": {
+          "baseline": 5755824,
+          "candidate": 6781920,
+          "delta": 1026096
+        },
+        ".debug_str": {
+          "baseline": 14282277,
+          "candidate": 16359424,
+          "delta": 2077147
+        }
+      },
+      "debug_six_delta": 7334405,
+      "debug_six_share_of_file_delta": 0.9900398099833265,
+      "eh_frame_delta": 1544,
+      "eh_frame_hdr_delta": 184,
+      "file_delta": 7408192,
+      "gcc_except_table_delta": 20264,
+      "strtab_delta": 15292,
+      "symtab_delta": 14520,
+      "text_delta": 22368
+    },
+    "binaries": {
+      "candidate_0969_allocator": {
+        "bytes": 55321184,
+        "elf_build_id": "7bd4a2690c7e9f8f9d6bfdf1533a3fd0f4663b5c",
+        "mode": "0o775",
+        "path": "/home/zhuhe/litchi-performance-0969/builds/target-candidate-cfb/release/doc_retention_probe_0942_cfb_profile_alloc",
+        "role": "current_candidate_counting_allocator",
+        "sha256": "ebc63c02151914daf5acb69096a5833ec45ef91e1897976cbd9ba2d17bd5312f"
+      },
+      "candidate_0969_ordinary": {
+        "bytes": 55317368,
+        "elf_build_id": "ce8a5b5a861b819785fa4e99d971f39f995ffb1e",
+        "mode": "0o775",
+        "path": "/home/zhuhe/litchi-performance-0969/builds/target-candidate-cfb/release/doc_retention_probe_0942_cfb_profile",
+        "role": "current_candidate_ordinary",
+        "sha256": "58d0f9aeb30d716cd25b79855ed17378f9132cc3a707ea1db2429056b87238a9"
+      },
+      "retained_0967_allocator": {
+        "bytes": 47912992,
+        "elf_build_id": "ba956d3ede21c7a6405848e985276913a8dd1677",
+        "mode": "0o775",
+        "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile_alloc",
+        "role": "retained_matched_baseline_counting_allocator",
+        "sha256": "a520ec154bed62ce26d885f203e2565e756ce618a046b77521db484788c4ccd9"
+      },
+      "retained_0967_ordinary": {
+        "bytes": 47909224,
+        "elf_build_id": "e5c457384eeebd057932c444efda77618f137399",
+        "mode": "0o775",
+        "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+        "role": "retained_matched_baseline_ordinary_uninstrumented",
+        "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+      }
+    },
+    "elf_common": {
+      "class": "ELF64",
+      "dynamic_needed": [
+        "libc.so.6",
+        "ld-linux-x86-64.so.2",
+        "libgcc_s.so.1"
+      ],
+      "dynamic_needed_equal": true,
+      "gnu_stack_present": true,
+      "machine": "Advanced Micro Devices X86-64",
+      "program_headers": 12,
+      "rustc_comment_equal": "rustc version 1.95.0 (59807616e 2026-04-14)",
+      "section_headers": 42,
+      "type": "DYN (PIE)"
+    },
+    "interpretation": "The candidate is 7.065 MiB larger in each binary primarily because release debug=1 links substantially larger DWARF; this is debug information, not runtime profiling instrumentation. Native code and unwind/exception metadata also change because the three production source files changed, but those changes are small relative to the file delta.",
+    "ordinary_section_deltas": {
+      "debug_sections": {
+        ".debug_abbrev": {
+          "baseline": 127050,
+          "candidate": 191820,
+          "delta": 64770
+        },
+        ".debug_aranges": {
+          "baseline": 268240,
+          "candidate": 330480,
+          "delta": 62240
+        },
+        ".debug_info": {
+          "baseline": 17030631,
+          "candidate": 19862993,
+          "delta": 2832362
+        },
+        ".debug_line": {
+          "baseline": 5944391,
+          "candidate": 7216181,
+          "delta": 1271790
+        },
+        ".debug_ranges": {
+          "baseline": 5755728,
+          "candidate": 6781824,
+          "delta": 1026096
+        },
+        ".debug_str": {
+          "baseline": 14281165,
+          "candidate": 16358313,
+          "delta": 2077148
+        }
+      },
+      "debug_six_delta": 7334406,
+      "debug_six_share_of_file_delta": 0.9900463597899825,
+      "eh_frame_delta": 1544,
+      "eh_frame_hdr_delta": 184,
+      "file_delta": 7408144,
+      "gcc_except_table_delta": 20264,
+      "strtab_delta": 15293,
+      "symtab_delta": 14520,
+      "text_delta": 22368
+    },
+    "section_sizes": {
+      "candidate_0969_allocator": {
+        "debug_six": 50744743,
+        "eh_frame": 270560,
+        "eh_frame_hdr": 35380,
+        "file_bytes": 55321184,
+        "gcc_except_table": 227996,
+        "strtab": 633556,
+        "symtab": 258504,
+        "text": 2672595
+      },
+      "candidate_0969_ordinary": {
+        "debug_six": 50741611,
+        "eh_frame": 270540,
+        "eh_frame_hdr": 35380,
+        "file_bytes": 55317368,
+        "gcc_except_table": 227996,
+        "strtab": 633390,
+        "symtab": 258504,
+        "text": 2672243
+      },
+      "retained_0967_allocator": {
+        "debug_six": 43410338,
+        "eh_frame": 269016,
+        "eh_frame_hdr": 35196,
+        "file_bytes": 47912992,
+        "gcc_except_table": 207732,
+        "strtab": 618264,
+        "symtab": 243984,
+        "text": 2650227
+      },
+      "retained_0967_ordinary": {
+        "debug_six": 43407205,
+        "eh_frame": 268996,
+        "eh_frame_hdr": 35196,
+        "file_bytes": 47909224,
+        "gcc_except_table": 207732,
+        "strtab": 618097,
+        "symtab": 243984,
+        "text": 2649875
+      }
+    }
+  },
+  "build_recipe_audit": {
+    "candidate_command": "CARGO_INCREMENTAL=0 RUSTFLAGS='' CARGO_TARGET_DIR=/home/zhuhe/litchi-performance-0969/builds/target-candidate-cfb cargo build --manifest-path /home/zhuhe/litchi-performance-0969/source-candidate/tools/perf-cfb-profile/Cargo.toml --release --locked --offline -j2",
+    "candidate_receipt_omissions_requiring_explicit_future_binding": [
+      "The candidate command does not include +1.95.0, although receipt rustc/cargo versions, rust-toolchain.toml, .rustc_info.json and ELF .comment all identify 1.95.0.",
+      "The candidate receipt does not record CARGO_TERM_COLOR=never; this is presentation-only and has no observed binary effect, but future formal capture should bind it to the retained baseline policy.",
+      "The candidate command builds both manifest-declared binaries without explicit --bin flags; both expected output binaries are present and hash-verified."
+    ],
+    "candidate_target_fingerprint_summary": {
+      "allocator_output_fingerprint": {
+        "bytes": 860,
+        "compile_kind": 0,
+        "config": 8247474407144887393,
+        "declared_features": "[]",
+        "features": "[]",
+        "path": "/home/zhuhe/litchi-performance-0969/builds/target-candidate-cfb/release/.fingerprint/doc-retention-probe-0942-cfb-profile-0767a694289c1b70/bin-doc_retention_probe_0942_cfb_profile_alloc.json",
+        "profile": 2195198361031172618,
+        "rustc": 7458672600737419911,
+        "rustflags": [],
+        "sha256": "cd708df633b3f9cbbc4590eab052f65045365f91aed9a68f10d67944a61a755e"
+      },
+      "both_output_compile_kind": 0,
+      "both_output_fingerprints_declared_features": "[]",
+      "both_output_fingerprints_features": "[]",
+      "both_output_fingerprints_rustflags": [],
+      "features_unique_count": 56,
+      "fingerprint_json_count": 157,
+      "ordinary_output_fingerprint": {
+        "bytes": 852,
+        "compile_kind": 0,
+        "config": 8247474407144887393,
+        "declared_features": "[]",
+        "features": "[]",
+        "path": "/home/zhuhe/litchi-performance-0969/builds/target-candidate-cfb/release/.fingerprint/doc-retention-probe-0942-cfb-profile-909013eaf7109419/bin-doc_retention_probe_0942_cfb_profile.json",
+        "profile": 2195198361031172618,
+        "rustc": 7458672600737419911,
+        "rustflags": [],
+        "sha256": "f6ba3bf75b25e35ccc3339391660e7052f67210e924b01f563c3d0893890d273"
+      },
+      "rustc_unique_count": 1
+    },
+    "common": {
+      "CARGO_INCREMENTAL": "0",
+      "RUSTFLAGS": "",
+      "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+      "cargo_jobs": 2,
+      "harness_lock_sha256": "343c5464ae1144cbb72284cbb3e9b52b5dff2b798d09462d3c0d6a74b317bac7",
+      "harness_manifest_sha256": "41dee12e4eb7d1e3853a33a7743afdf6b5d6519d5e7456e61ce4978aa9177945",
+      "llvm": "22.1.2",
+      "locked": true,
+      "offline": true,
+      "release": true,
+      "rustc": "rustc 1.95.0 (59807616e 2026-04-14), x86_64-unknown-linux-gnu, LLVM 22.1.2",
+      "target": "x86_64-unknown-linux-gnu"
+    },
+    "effective_release_profile": {
+      "basis": "nested tools/perf-cfb-profile workspace Cargo.toml has [profile.release] debug=1; root workspace profile is ignored by this nested workspace; ordinary Cargo 1.95 release defaults supply the remaining values.",
+      "codegen_units": 16,
+      "debug": 1,
+      "debug_assertions": false,
+      "incremental": false,
+      "lto": false,
+      "opt_level": 3,
+      "overflow_checks": false,
+      "panic": "unwind",
+      "profile": "release",
+      "rpath": false,
+      "split_debuginfo": "off",
+      "strip": "none"
+    },
+    "retained_baseline_command": "cargo +1.95.0 build --release --locked --offline -j2 --manifest-path /home/zhuhe/litchi-performance-0967/harness-control/source-baseline/tools/perf-cfb-profile/Cargo.toml --target-dir /home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb --bin doc_retention_probe_0942_cfb_profile --bin doc_retention_probe_0942_cfb_profile_alloc"
+  },
+  "created_utc": "2026-10-08T01:34:11.177770Z",
+  "decision": {
+    "aa_execution_observed": false,
+    "candidate_binary_receipt_identity_verified": true,
+    "candidate_build_recipe_equivalent_for_timing_inputs": true,
+    "candidate_formal_timing_admission": false,
+    "compiler_instrumentation_observed": false,
+    "dependency_or_profile_confound_observed": false,
+    "effective_release_profile_equivalent": true,
+    "features_empty_for_candidate_binaries": true,
+    "fresh_v3_binding_required_for_current_candidate_formal_capture": true,
+    "harness_manifest_and_lock_equivalent": true,
+    "historical_aa_v1_content_scope_still_valid": true,
+    "historical_v1_tree_digest_is_current_v3_tree_digest": false,
+    "size_delta_explained_by_dwarf_and_source_code_delta": true,
+    "toolchain_target_equivalent": true
+  },
+  "evidence_refs": {
+    "aa_plan_v6": {
+      "bytes": 9290,
+      "path": "/home/zhuhe/litchi-performance-0969/plans/plan-0969-aa-v6.json",
+      "sha256": "e853030180d7464c06cf1ed5d525957ce2d50514b8337a1b168392374d00b5df"
+    },
+    "aa_protocol_seal_v7": {
+      "bytes": 3964,
+      "path": "/home/zhuhe/litchi-performance-0969/receipts/protocol-seal-aa-v7.json",
+      "sha256": "7e34cf85065d2a114adceaa6bf33c86c9c4c83827ea7bcc8dba5be7dfc5d8e58"
+    },
+    "baseline_harness_lock": {
+      "bytes": 33645,
+      "path": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline/tools/perf-cfb-profile/Cargo.lock",
+      "sha256": "343c5464ae1144cbb72284cbb3e9b52b5dff2b798d09462d3c0d6a74b317bac7"
+    },
+    "baseline_harness_manifest": {
+      "bytes": 560,
+      "path": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline/tools/perf-cfb-profile/Cargo.toml",
+      "sha256": "41dee12e4eb7d1e3853a33a7743afdf6b5d6519d5e7456e61ce4978aa9177945"
+    },
+    "baseline_toolchain": {
+      "bytes": 86,
+      "path": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline/rust-toolchain.toml",
+      "sha256": "e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310"
+    },
+    "candidate_build_receipt": {
+      "bytes": 2312,
+      "path": "/home/zhuhe/litchi-performance-0969/review/build-receipt-v1.json",
+      "sha256": "503a26e724911fe1ce53ce5125f10f77ec299040592fc09a35e00dc518440130"
+    },
+    "candidate_harness_lock": {
+      "bytes": 33645,
+      "path": "/home/zhuhe/litchi-performance-0969/source-candidate/tools/perf-cfb-profile/Cargo.lock",
+      "sha256": "343c5464ae1144cbb72284cbb3e9b52b5dff2b798d09462d3c0d6a74b317bac7"
+    },
+    "candidate_harness_manifest": {
+      "bytes": 560,
+      "path": "/home/zhuhe/litchi-performance-0969/source-candidate/tools/perf-cfb-profile/Cargo.toml",
+      "sha256": "41dee12e4eb7d1e3853a33a7743afdf6b5d6519d5e7456e61ce4978aa9177945"
+    },
+    "candidate_rustc_info": {
+      "bytes": 1040,
+      "path": "/home/zhuhe/litchi-performance-0969/builds/target-candidate-cfb/.rustc_info.json",
+      "sha256": "b0ea09b63deab7fcb2b7aa313ffacc545a21fd833cd0d388414a276bce1bf10d"
+    },
+    "candidate_toolchain": {
+      "bytes": 86,
+      "path": "/home/zhuhe/litchi-performance-0969/source-candidate/rust-toolchain.toml",
+      "sha256": "e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310"
+    },
+    "implementation_seal_v3": {
+      "bytes": 4563,
+      "path": "/home/zhuhe/litchi-performance-0969/review/implementation-seal-v3.json",
+      "sha256": "dbb9a85aca1459cfcf158b1d5d5cc3a3363e047539494501f5c3255e7c4ffe3f"
+    },
+    "retained_0967_build_receipt": {
+      "bytes": 15975,
+      "path": "/home/zhuhe/litchi-performance-0967/receipts/build-0967-cfb-v1.json",
+      "sha256": "d1de24c3a310d7f9d6e4c0819a7aac9287138715d835b73d1f062739d37dd5d6"
+    },
+    "retained_0967_config_elf_audit": {
+      "bytes": 22883,
+      "path": "/home/zhuhe/litchi-performance-0967/receipts/build-config-elf-audit-0967-v1.json",
+      "sha256": "a6b30eed1ea78dffd376b23cf7cea7db82bf53301f4ce9c0f3077da15d6853f3"
+    },
+    "retained_0967_control_build": {
+      "bytes": 28355,
+      "path": "/home/zhuhe/litchi-performance-0967/receipts/control-build-0967-v2.json",
+      "sha256": "7aee6b9ddfa1efa68446fbfc09da856b82a9d2028ddabd760b06fba609eeb701"
+    },
+    "source_file_manifest_v1": {
+      "bytes": 362688,
+      "path": "/home/zhuhe/litchi-performance-0969/manifests/source-file-manifest-v1.json",
+      "sha256": "99e65d43e0feed89133eec60b095130d68058a071a02e8a15b05dea01209bb6c"
+    },
+    "source_file_manifest_v3": {
+      "bytes": 186120,
+      "path": "/home/zhuhe/litchi-performance-0969/manifests/source-file-manifest-v3.json",
+      "sha256": "f4aff2edd3b9d858e1e688b734dccdbd130f25b6845afd76532b085b69806a8d"
+    },
+    "source_manifest_v1": {
+      "bytes": 14960,
+      "path": "/home/zhuhe/litchi-performance-0969/manifests/source-manifest-v1.json",
+      "sha256": "f1818af5c306fb6ea01b59ca8df29710e773386b246071202bd4aa896f4e8e2b"
+    },
+    "source_manifest_v3": {
+      "bytes": 3227,
+      "path": "/home/zhuhe/litchi-performance-0969/manifests/source-manifest-v3.json",
+      "sha256": "757d1365a0d7438e9436cd1403e714c43248fe6676dab9697ba86a97f66853d3"
+    }
+  },
+  "instrumentation_and_dependency_checks": {
+    "candidate_build_RUSTFLAGS_empty": true,
+    "candidate_build_features_flag_absent": true,
+    "candidate_fingerprint_declared_features_empty": true,
+    "lock_sha_equal": true,
+    "no_dependency_confounded_by_lock_change": true,
+    "qa_performance_diagnostics_feature_is_not_candidate_build": "The implementation seal records QA test/clippy commands with --features performance-diagnostics; the candidate release build receipt has no feature flag, and its output fingerprints declare features [].",
+    "runtime_string_instrumented_interpretation": "The harness contains an alloc_metrics::instrumented runtime field/string in both ordinary and allocator outputs; no compiler instrumentation sections or sanitizer/profile symbols were observed.",
+    "suspicious_llvm_profile_sanitizer_gcov_sections": [],
+    "suspicious_llvm_profile_sanitizer_gcov_symbols": []
+  },
+  "limitations": [
+    "No rebuild or workload was run; this receipt does not approve timing, performance, RSS, allocator, or adoption claims.",
+    "The retained 0967 baseline target directory no longer retains Cargo fingerprint metadata; effective profile equivalence relies on the retained 0967 config/ELF audit plus current candidate manifest/receipt/fingerprint and matching harness/lock/toolchain.",
+    "The candidate build receipt omits CARGO_TERM_COLOR and explicit +1.95.0/--bin flags; no binary confound was observed, but those should be explicit in any formal capture command.",
+    "The 0968 baseline-reuse proof is bounded to its declared runtime/harness/config/fixture scope and does not claim whole-tree identity."
+  ],
+  "purpose": "Read-only pre-formal audit of the 0969 candidate build against the retained 0967 ordinary and allocator baseline artifacts; no build, workload, timing, or performance claim.",
+  "recommendation": "Admit the current candidate binary as a clean build-equivalence artifact for subsequent review, while withholding formal timing until the execution plan/GO binds the v3 source manifest and current candidate hashes. Preserve the v1 AA plan as historical prospective evidence; do not relabel df8a842... as the current v3 baseline tree.",
+  "reviewer_role": "independent_read_only_cpu_review",
+  "schema": "litchi.performance.0969.build_equivalence_audit.v1",
+  "schema_version": 1,
+  "scope": {
+    "broad_source_scan": false,
+    "builds_run": false,
+    "main_checkout_status_observed": [
+      " M tools/check_iwork_leaf_public_api.py",
+      "?? crates/litchi/examples/bench_word_parse.rs",
+      "?? docs/UNIFIED_OPS_API_DESIGN.md"
+    ],
+    "main_checkout_written": false,
+    "perf_capture_run": false,
+    "read_only": true,
+    "workloads_run": false
+  },
+  "source_binding_audit": {
+    "current_candidate_changes": {
+      "baseline_bytes": 18259541,
+      "candidate_bytes": 18287602,
+      "changed_paths": [
+        {
+          "baseline_bytes": 52977,
+          "baseline_sha256": "99dc73a358cbe5a76c6fc242e42af6524ba6d0954c2ae508cf55f84cb6a5cafd",
+          "candidate_bytes": 76124,
+          "candidate_sha256": "25e4035e739788e29f10ed4e4ba77d4187221c26f789783d06e473ada6add146",
+          "delta_bytes": 23147,
+          "path": "crates/litchi-ole-common/src/object/codec.rs"
+        },
+        {
+          "baseline_bytes": 39109,
+          "baseline_sha256": "ee6079567bf85a0ff68a335fb43999d780fab335a09a9cec8b845c16b7b5b319",
+          "candidate_bytes": 39287,
+          "candidate_sha256": "58913ec7125acb061aa5547a2f9a674cd314a1eb8bf3e90bba2df62392bf106c",
+          "delta_bytes": 178,
+          "path": "crates/litchi-ole-common/src/object/editor.rs"
+        },
+        {
+          "baseline_bytes": 54935,
+          "baseline_sha256": "363b84a6deedef63b32f8ab1364c7c506c831833a6830372f01c755a24d0dec4",
+          "candidate_bytes": 59671,
+          "candidate_sha256": "738db3f03cb61e860639190ae06cda25c9a0556e9954db79979654c185fd2773",
+          "delta_bytes": 4736,
+          "path": "crates/litchi-ole-common/tests/object.rs"
+        }
+      ],
+      "file_count_baseline": 924,
+      "file_count_candidate": 924,
+      "source_bytes_delta": 28061,
+      "source_commit": "34fc85e23ccefcd8ad6ffd4d57d9e2671ef1a5a1"
+    },
+    "current_v3": {
+      "baseline_tree_sha256": "9da7843d8b8bce8fe7530a74bfffd2af1ee7d66c0439e93d3c0a57c24c336188",
+      "candidate_tree_sha256": "d39b47d024035112c3f71dd06e3ff3d54829e908e9f612e90b2d25a41ffdc884",
+      "file_manifest_sha256": "f4aff2edd3b9d858e1e688b734dccdbd130f25b6845afd76532b085b69806a8d",
+      "source_manifest_sha256": "757d1365a0d7438e9436cd1403e714c43248fe6676dab9697ba86a97f66853d3",
+      "tree_hash_method": "sha256 over sorted newline-terminated lines sha256 bytes mode relative_path rooted at each export"
+    },
+    "historical_v1": {
+      "interpretation": "Historical v1 export and tree digest; the v1 manifest does not declare the v3 tree-hash serialization method.",
+      "source_manifest_sha256": "f1818af5c306fb6ea01b59ca8df29710e773386b246071202bd4aa896f4e8e2b",
+      "tree_sha256": "df8a842b08fec1792c67921fb1ce3513d3c6cb3dd0149cf13672bad14090bfb0"
+    },
+    "v1_to_v3_baseline_content_proof": {
+      "actual_directory_checks": {
+        "baseline_v3": {
+          "file_count": 924,
+          "mismatches": [],
+          "total_bytes": 18259541
+        },
+        "candidate_v3": {
+          "file_count": 924,
+          "mismatches": [],
+          "total_bytes": 18287602
+        }
+      },
+      "content_mismatch_paths": [],
+      "content_only_digest_algorithm": "sha256 over sorted newline-terminated path NUL bytes NUL sha256 lines; mode and git_blob omitted",
+      "content_only_digest_equal": true,
+      "mode_encoding_difference": "v1 records mode as string 100644; v3 records mode as integer 436; all 924 entries differ only in this representation when raw records are compared.",
+      "only_v1_paths": [],
+      "only_v3_paths": [],
+      "v1_content_only_digest": "a058091f76916e0f53138301806f97d75b119d75ee8df9c8434ffe5fd510f3d0",
+      "v1_entry_count": 924,
+      "v3_content_only_digest": "a058091f76916e0f53138301806f97d75b119d75ee8df9c8434ffe5fd510f3d0",
+      "v3_reconstructed_baseline_entry_count": 924
+    }
+  },
+  "status": "pass_candidate_build_equivalence_no_observed_instrumentation_or_dependency_confound_historical_aa_binding_caveat"
+}

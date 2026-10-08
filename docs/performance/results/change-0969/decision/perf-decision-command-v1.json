@@ -1,0 +1,44 @@
+{
+  "classification": {
+    "aa_packet_completeness": "complete",
+    "aa_readiness": "readiness_fail",
+    "benefit": "uninterpretable_not_measured",
+    "formal_stage": "not_admitted_after_readiness_stop",
+    "performance": "uninterpretable_not_measured"
+  },
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi/tools/perf_decision.py",
+    "--input",
+    "/home/zhuhe/litchi-performance-0969/analysis/perf-decision-input-v1.json",
+    "--json-out",
+    "/home/zhuhe/litchi-performance-0969/analysis/perf-decision-output-v1.json"
+  ],
+  "created_utc": "2026-10-08T01:55:52Z",
+  "cwd": "/home/zhuhe/code/litchi",
+  "execution": {
+    "formal_candidate_lanes_measured": false,
+    "offline_only": true,
+    "output_created_exclusive": true,
+    "workload_started": false,
+    "xls_facts_used": false
+  },
+  "exit_code": 0,
+  "input": {
+    "path": "/home/zhuhe/litchi-performance-0969/analysis/perf-decision-input-v1.json",
+    "schema": "litchi.performance.qualification_decision_input.v1",
+    "sha256": "918d2ed8e7efdc3832673a9a48366d6ad34a97b5aedd023dbe4569d5ec69b896"
+  },
+  "output": {
+    "candidate_adoption": null,
+    "decision": "uninterpretable",
+    "path": "/home/zhuhe/litchi-performance-0969/analysis/perf-decision-output-v1.json",
+    "schema": "litchi.performance.qualification_decision.v1",
+    "sha256": "125818db8bcf05306626230cbedd5864de53991b8a69e7ec7116299ae49ec0ba"
+  },
+  "schema": "litchi.performance.0969.perf_decision_command_receipt.v1",
+  "tool": {
+    "path": "/home/zhuhe/code/litchi/tools/perf_decision.py",
+    "sha256": "abf9ac42ee7a37475f3985a7202356d41fa13830f595a5366b9abfa78ef92064"
+  }
+}

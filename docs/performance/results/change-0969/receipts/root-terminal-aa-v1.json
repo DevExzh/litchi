@@ -1,0 +1,34 @@
+{
+  "schema": "litchi.performance.0969.root_terminal.v1",
+  "created_utc": "2026-10-08T01:50:18Z",
+  "runner_session_id": 95378,
+  "exit_code": 2,
+  "packet_count": 576,
+  "status": "completed_aa_readiness_fail_stopped_before_candidate_formal",
+  "candidate_native_children": 0,
+  "candidate_allocator_children": 0,
+  "xls_workload_children": 0,
+  "no_retry": true,
+  "bindings": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0969/plans/plan-0969-aa-v6.json",
+      "bytes": 9290,
+      "sha256": "e853030180d7464c06cf1ed5d525957ce2d50514b8337a1b168392374d00b5df"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0969/receipts/root-go-aa-v1.json",
+      "bytes": 3287,
+      "sha256": "f3584215eade930b7748e1e3b7ea5a9b17bf331c037d2cda35f43afe8c93c7fa"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0969/capture/aa-v4/aa-readiness-v4.json",
+      "bytes": 44568,
+      "sha256": "6bb110145d0583be3ff12c3c6e1ada6611be6b5396f55f24698bb0358bb51efe"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0969/capture/aa-v4/capture-stage-v4.json",
+      "bytes": 293,
+      "sha256": "59485d2c231f2c56e39300acfc5916c5a14ceea91918ebe0c2706fc7fe666bc3"
+    }
+  ]
+}

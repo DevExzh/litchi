@@ -1,0 +1,81 @@
+{
+  "build": {
+    "path": "/home/zhuhe/litchi-performance-0969/review/build-receipt-v1.json",
+    "sha256": "503a26e724911fe1ce53ce5125f10f77ec299040592fc09a35e00dc518440130",
+    "status": "pass_external_release_build_no_workload"
+  },
+  "contract": {
+    "fallbacks": "overlay/copy-through, rewrite, no-source, topology change, receipt mismatch and index allocation decline retain existing full-capture/allocation-reuse behavior",
+    "formal_performance_capture": false,
+    "projection": "shared capture_container keeps decode, traversal order, limits and Budget accounting; exact path/kind/coverage and declared stream size are checked; staged Arc payloads are used only on a validated receipt",
+    "public_api_change": false,
+    "receipt": "private ValidatedReuse remains inside opaque RenderedCommit bytes+receipt; codec consumes it and performs final OleFile open, protection/open checks, projected capture or full fallback before returning Package and bytes"
+  },
+  "core_qa": {
+    "clippy_command": "cargo clippy -p litchi-ole-common --features performance-diagnostics --all-targets -- -D warnings",
+    "clippy_exit": 0,
+    "failed": 0,
+    "ignored": 2,
+    "integration_passed": 89,
+    "qa_root": "/home/zhuhe/litchi-performance-0969/qa-core",
+    "test_command": "cargo test -p litchi-ole-common --features performance-diagnostics",
+    "unit_passed": 206
+  },
+  "created_utc": "2026-10-08T01:27:50.643338+00:00",
+  "focused_tests": {
+    "command": "cargo test -p litchi-ole-common --features performance-diagnostics handoff_tests",
+    "coverage": [
+      "receipt positive full root/storage/stream metadata equality and Arc identity",
+      "512/4096 sectors and selected 0,1,63,64,65,4095,4096,5000,8193 transitions",
+      "ordinary, rewrite, no-source and nested add/remove route absence",
+      "extra-path and wrong-size projection fallback",
+      "malformed open error and max-stream limit error",
+      "duplicate index decline and injected try_reserve allocation decline"
+    ],
+    "failed": 0,
+    "passed": 9
+  },
+  "immutability": {
+    "candidate_source_tree_after_build": "d39b47d024035112c3f71dd06e3ff3d54829e908e9f612e90b2d25a41ffdc884",
+    "main_checkout_untouched": true,
+    "no_formal_capture": true,
+    "qa_overlays_runtime_files_match_candidate": true,
+    "source_baseline_unchanged": true
+  },
+  "schema": "litchi.performance.0969.implementation_seal.v3",
+  "source": {
+    "baseline_root": "/home/zhuhe/litchi-performance-0969/source-baseline",
+    "baseline_tree_sha256": "9da7843d8b8bce8fe7530a74bfffd2af1ee7d66c0439e93d3c0a57c24c336188",
+    "candidate_root": "/home/zhuhe/litchi-performance-0969/source-candidate",
+    "candidate_tree_sha256": "d39b47d024035112c3f71dd06e3ff3d54829e908e9f612e90b2d25a41ffdc884",
+    "changed_paths": [
+      "crates/litchi-ole-common/src/object/codec.rs",
+      "crates/litchi-ole-common/src/object/editor.rs",
+      "crates/litchi-ole-common/tests/object.rs"
+    ],
+    "commit": "34fc85e23ccefcd8ad6ffd4d57d9e2671ef1a5a1",
+    "patch_path": "/home/zhuhe/litchi-performance-0969/manifests/candidate-implementation-v2.patch",
+    "patch_sha256": "219c799de930a1a73a54b0ef545a28cea5eb9a503f0e4e3e232d9753288bd04f",
+    "source_file_manifest_path": "/home/zhuhe/litchi-performance-0969/manifests/source-file-manifest-v3.json",
+    "source_file_manifest_sha256": "f4aff2edd3b9d858e1e688b734dccdbd130f25b6845afd76532b085b69806a8d",
+    "source_manifest_path": "/home/zhuhe/litchi-performance-0969/manifests/source-manifest-v3.json",
+    "source_manifest_sha256": "757d1365a0d7438e9436cd1403e714c43248fe6676dab9697ba86a97f66853d3"
+  },
+  "status": "sealed_external_candidate_built_ready_for_independent_review",
+  "toolchain": {
+    "build_profile": "diagnostic QA only; no release candidate build or workload",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14), x86_64-unknown-linux-gnu, LLVM 22.1.2",
+    "toolchain_file": "/home/zhuhe/litchi-performance-0969/qa-core/rust-toolchain.toml"
+  },
+  "xls_qa": {
+    "fixture_overlay_manifest": "/home/zhuhe/litchi-performance-0969/manifests/qa-fixture-overlay-v2.json",
+    "integration_command": "cargo test -p litchi-xls --test xls_comments_writer --test xls_comment_transactions --test xls_user_names --test xls_view --test xls_ole_objects",
+    "integration_failed": 0,
+    "integration_passed": 39,
+    "library_command": "cargo test -p litchi-xls --lib",
+    "library_failed": 0,
+    "library_passed": 1210,
+    "qa_root": "/home/zhuhe/litchi-performance-0969/qa-xls"
+  }
+}

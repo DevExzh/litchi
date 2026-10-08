@@ -1,0 +1,26 @@
+{
+  "schema": "litchi.performance.0969.root_cleanup_go.v1",
+  "created_utc": "2026-10-08T01:53:05Z",
+  "authorized": true,
+  "plan": {
+    "path": "/home/zhuhe/litchi-performance-0969/receipts/cleanup-plan-v1.json",
+    "bytes": 17717,
+    "sha256": "26704c5cfc3ab6c59b5bd4a31d40166b94d7822949cc12e0051f8e0ffa0a309c"
+  },
+  "audit": {
+    "path": "/home/zhuhe/litchi-performance-0969/analysis/aa-independent-audit-v1.json",
+    "bytes": 78464,
+    "sha256": "f0d0d0b63a896be41dab84550ff39f59954c26538423be2a3d3d017df9f26775"
+  },
+  "implementation_review": {
+    "path": "/home/zhuhe/litchi-performance-0969/review/implementation-review-v1.json",
+    "bytes": 6274,
+    "sha256": "992652e728d24e16816edb20369a9444102d0fcb61e7caa972dbf21591675333"
+  },
+  "build_review": {
+    "path": "/home/zhuhe/litchi-performance-0969/review/build-equivalence-audit-v1.json",
+    "bytes": 23527,
+    "sha256": "4184809dd4cd564a7ce2d8ed498e00765a61121abfeaed4b7a78385fca0159b6"
+  },
+  "scope": "Exact targets in cleanup-plan-v1 only, preserving bound executable paths/inodes/hashes, referenced metadata, all source/raw/logs/receipts and 0967. Fresh process/open-file checks required. No other paths authorized."
+}

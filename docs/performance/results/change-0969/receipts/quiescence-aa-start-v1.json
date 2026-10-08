@@ -1,0 +1,32 @@
+{
+  "schema": "litchi.performance.0969.quiescence_start.v1",
+  "snapshot": {
+    "utc": "2026-10-08T01:42:08Z",
+    "loadavg": [
+      0.935546875,
+      2.3408203125,
+      2.39697265625
+    ],
+    "blocking_processes": []
+  },
+  "baseline_files_verified": 924,
+  "plan": {
+    "path": "/home/zhuhe/litchi-performance-0969/plans/plan-0969-aa-v6.json",
+    "bytes": 9290,
+    "sha256": "e853030180d7464c06cf1ed5d525957ce2d50514b8337a1b168392374d00b5df"
+  },
+  "review": {
+    "path": "/home/zhuhe/litchi-performance-0969/review/aa-plan-independent-review-v1.json",
+    "bytes": 12453,
+    "sha256": "2cb5b690cd5202ff5030ba4753c8292d10edd42d300762ff398d9eebc54f4d52"
+  },
+  "host": {
+    "system": "Linux",
+    "node": "ip-172-31-39-190",
+    "release": "7.0.0-1013-aws",
+    "version": "#13-Ubuntu SMP PREEMPT Fri Sep  4 17:02:11 UTC 2026",
+    "machine": "x86_64",
+    "processor": ""
+  },
+  "cpu_count": 32
+}

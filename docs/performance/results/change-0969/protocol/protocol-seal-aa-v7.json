@@ -1,0 +1,110 @@
+{
+  "aa_plan": {
+    "path": "/home/zhuhe/litchi-performance-0969/plans/plan-0969-aa-v6.json",
+    "sha256": "e853030180d7464c06cf1ed5d525957ce2d50514b8337a1b168392374d00b5df"
+  },
+  "baseline_binaries": {
+    "allocator": {
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile_alloc",
+      "sha256": "a520ec154bed62ce26d885f203e2565e756ce618a046b77521db484788c4ccd9"
+    },
+    "native": {
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+    }
+  },
+  "go_contract": {
+    "explicit_cli_argument": "--go",
+    "plan_binding": "absolute_path_bytes_sha256",
+    "plan_contains_go_path": false,
+    "quiescence_status_required": "pass",
+    "schema": "litchi.performance.0969.root_go.v1",
+    "sections": [
+      "review_bindings",
+      "helper_bindings",
+      "source_bindings",
+      "binary_bindings"
+    ]
+  },
+  "helpers": [
+    {
+      "name": "protocol_common",
+      "path": "/home/zhuhe/litchi-performance-0969/tools/protocol_common_v4.py",
+      "sha256": "5ce0f2ac08fc7909df054a4cc2d5137b3279af4cd726acf5bfb4558d97b05c5c"
+    },
+    {
+      "name": "runner",
+      "path": "/home/zhuhe/litchi-performance-0969/tools/run_0969_v4.py",
+      "sha256": "c7315d5c5311c5643aebca16e8cf2b931ee1b74663eb5a8a31e8185f504ddd20"
+    },
+    {
+      "name": "reducer",
+      "path": "/home/zhuhe/litchi-performance-0969/tools/reduce_0969_v4.py",
+      "sha256": "cbbbb6d09a981546a9db216c18e4c5e8da4df7202d56dbe3dc7d1c999f2ec2a9"
+    },
+    {
+      "name": "plan_generator",
+      "path": "/home/zhuhe/litchi-performance-0969/tools/prepare_plan_0969_v4.py",
+      "sha256": "42cd73792bc821d1776cc4b95c2cf33c73abad4b85903826d8857b3e03d6ecb9"
+    }
+  ],
+  "matrix": {
+    "aa_children": 576,
+    "aa_pairs_per_cell": 12,
+    "bootstrap_resamples": 10000,
+    "bootstrap_seed": 969004,
+    "cells": 24,
+    "order": [
+      "AB",
+      "BA"
+    ],
+    "same_binary": "baseline",
+    "samples": 80,
+    "symmetric_upper_ci_limit": 1.05,
+    "warmups": 5
+  },
+  "no_build_started": true,
+  "no_source_mutation": true,
+  "no_workload_started": true,
+  "parser_compatibility": {
+    "allocator_retained_0967_reports": 144,
+    "failures": 0,
+    "native_retained_0967_reports": 576,
+    "report_schema": "litchi.performance.0917.doc_retention.v1"
+  },
+  "protocol": {
+    "path": "/home/zhuhe/litchi-performance-0969/protocol-design-v4.md",
+    "sha256": "7766d1022bfef71ceca4fad7bb1edee9529178fb24b11eb083eb76b34fe94564"
+  },
+  "review_bindings": {
+    "baseline_reuse": {
+      "path": "/home/zhuhe/litchi-performance-0969/review/baseline-reuse-v1.json",
+      "sha256": "dbd362dae8e31dfe5ff54d6af5c37883df829bede3a5e5fa19e04337e0a8312e",
+      "status": "pass_bounded_output_oracle_and_matched_baseline_reuse"
+    },
+    "design": {
+      "path": "/home/zhuhe/litchi-performance-0969/review/design-review-v1.json",
+      "sha256": "b83916d26aea5dc30710da60d285558987f498eb6d93211b4c8f97f03c0cad8a",
+      "status": "pass"
+    }
+  },
+  "schema": "litchi.performance.0969.aa_protocol_seal.v7",
+  "scope": "0969 CFB writerproof baseline-only A/A readiness; no candidate formal launch",
+  "self_tests": {
+    "aa_missing_or_invalid": "incomplete_no_decision",
+    "aa_noise_failure": "readiness_fail_uninterpretable",
+    "go_binding": "pass",
+    "malformed_packet": "incomplete_without_crash",
+    "no_default_run_output": "rejected",
+    "no_plan_without_selftest": "rejected",
+    "plan_preflight": "pass",
+    "reducer": "pass",
+    "runner": "pass",
+    "sample_index_mutation": "rejected"
+  },
+  "source_manifest": {
+    "path": "/home/zhuhe/litchi-performance-0969/manifests/source-manifest-v1.json",
+    "sha256": "f1818af5c306fb6ea01b59ca8df29710e773386b246071202bd4aa896f4e8e2b"
+  },
+  "status": "sealed_prospective_baseline_only_aa"
+}

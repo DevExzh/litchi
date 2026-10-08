@@ -1,0 +1,92 @@
+{
+  "candidate": "cfb_writer_model_handoff",
+  "completeness": {
+    "reason_codes": [
+      "aa_packet_set_complete"
+    ],
+    "status": "complete"
+  },
+  "facets": {
+    "benefit": {
+      "reason_codes": [
+        "formal_not_admitted",
+        "not_measured"
+      ],
+      "status": "uninterpretable"
+    },
+    "correctness": {
+      "reason_codes": [
+        "aa_audit_correctness_pass"
+      ],
+      "status": "pass"
+    },
+    "custody": {
+      "reason_codes": [
+        "aa_audit_custody_pass"
+      ],
+      "status": "pass"
+    },
+    "performance": {
+      "reason_codes": [
+        "formal_not_admitted",
+        "not_measured"
+      ],
+      "status": "uninterpretable"
+    },
+    "readiness": {
+      "reason_codes": [
+        "aa_readiness_fail"
+      ],
+      "status": "fail"
+    }
+  },
+  "provenance": [
+    {
+      "kind": "aa_readiness",
+      "path": "/home/zhuhe/litchi-performance-0969/capture/aa-v4/aa-readiness-v4.json",
+      "sha256": "6bb110145d0583be3ff12c3c6e1ada6611be6b5396f55f24698bb0358bb51efe"
+    },
+    {
+      "kind": "capture_stage",
+      "path": "/home/zhuhe/litchi-performance-0969/capture/aa-v4/capture-stage-v4.json",
+      "sha256": "59485d2c231f2c56e39300acfc5916c5a14ceea91918ebe0c2706fc7fe666bc3"
+    },
+    {
+      "kind": "root_terminal",
+      "path": "/home/zhuhe/litchi-performance-0969/receipts/root-terminal-aa-v1.json",
+      "sha256": "187494d87f4c0e3d7786dffcfb266094cea0faf7a625ac66d7d4e0acbaf71d9e"
+    },
+    {
+      "kind": "independent_aa_audit",
+      "path": "/home/zhuhe/litchi-performance-0969/analysis/aa-independent-audit-v1.json",
+      "sha256": "f0d0d0b63a896be41dab84550ff39f59954c26538423be2a3d3d017df9f26775"
+    },
+    {
+      "kind": "aa_plan",
+      "path": "/home/zhuhe/litchi-performance-0969/plans/plan-0969-aa-v6.json",
+      "sha256": "e853030180d7464c06cf1ed5d525957ce2d50514b8337a1b168392374d00b5df"
+    },
+    {
+      "kind": "root_go",
+      "path": "/home/zhuhe/litchi-performance-0969/receipts/root-go-aa-v1.json",
+      "sha256": "f3584215eade930b7748e1e3b7ea5a9b17bf331c037d2cda35f43afe8c93c7fa"
+    },
+    {
+      "kind": "source_manifest",
+      "path": "/home/zhuhe/litchi-performance-0969/manifests/source-manifest-v1.json",
+      "sha256": "f1818af5c306fb6ea01b59ca8df29710e773386b246071202bd4aa896f4e8e2b"
+    },
+    {
+      "kind": "independent_audit_helper",
+      "path": "/home/zhuhe/litchi-performance-0969/tools/independent_audit_aa_v1.py",
+      "sha256": "09a8749910a1da49579a8ea782c3a6a11b34a303cd56818ac30d1b500069441a"
+    },
+    {
+      "kind": "decision_tool",
+      "path": "/home/zhuhe/code/litchi/tools/perf_decision.py",
+      "sha256": "abf9ac42ee7a37475f3985a7202356d41fa13830f595a5366b9abfa78ef92064"
+    }
+  ],
+  "schema": "litchi.performance.qualification_decision_input.v1",
+  "source_revision": "34fc85e23ccefcd8ad6ffd4d57d9e2671ef1a5a1"
+}

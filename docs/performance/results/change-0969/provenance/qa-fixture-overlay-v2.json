@@ -1,0 +1,46 @@
+{
+  "candidate_patch": {
+    "path": "/home/zhuhe/litchi-performance-0969/manifests/candidate-implementation-v2.patch",
+    "sha256": "219c799de930a1a73a54b0ef545a28cea5eb9a503f0e4e3e232d9753288bd04f"
+  },
+  "created_utc": "2026-10-08T01:25:58.921902+00:00",
+  "fixture_source": {
+    "bytes": 97695460,
+    "file_count": 1426,
+    "git_head": "34fc85e23ccefcd8ad6ffd4d57d9e2671ef1a5a1",
+    "manifest_path": "/home/zhuhe/litchi-performance-0969/manifests/fixture-file-manifest-v2.json",
+    "manifest_sha256": "6a5a2fe0d8b8807d02dd941b2f5bc95da11cbf24fb89cb993ff775a9fa3c99b0",
+    "root": "/home/zhuhe/code/litchi/test-data",
+    "tree_sha256": "24455ea086fac2ef08f136cae52f3737ad09e65128cf6367f0ad9cd495825318"
+  },
+  "overlays": [
+    {
+      "cargo_config_sha256": "50b044c83828f2c448ee59c362afaa79de2dd47fbd390f0cd2888391f1d1119d",
+      "cargo_lock_sha256": "26a33456659279dd3c981d96cd466d0c5f6383278bf071928af67d9565d0f1b1",
+      "cargo_toml_sha256": "b8dd5dac38b3618cc434ad7fdf8bde4d32ba1c61f8e3b2bc36bd37764b03fe88",
+      "fixture_symlink": "/home/zhuhe/code/litchi/test-data",
+      "root": "/home/zhuhe/litchi-performance-0969/qa-core",
+      "runtime_files_match_candidate": true,
+      "runtime_sha256": {
+        "crates/litchi-ole-common/src/object/codec.rs": "25e4035e739788e29f10ed4e4ba77d4187221c26f789783d06e473ada6add146",
+        "crates/litchi-ole-common/src/object/editor.rs": "58913ec7125acb061aa5547a2f9a674cd314a1eb8bf3e90bba2df62392bf106c",
+        "crates/litchi-ole-common/tests/object.rs": "738db3f03cb61e860639190ae06cda25c9a0556e9954db79979654c185fd2773"
+      }
+    },
+    {
+      "cargo_config_sha256": "50b044c83828f2c448ee59c362afaa79de2dd47fbd390f0cd2888391f1d1119d",
+      "cargo_lock_sha256": "e0894cf3b1844d618028e39ce8c899e2ed0cccc145c4a72e32b1f33d76865948",
+      "cargo_toml_sha256": "94a832011482c7e0dd2a706847ff66ab140315e8b78541d31746ec43fff460e7",
+      "fixture_symlink": "/home/zhuhe/code/litchi/test-data",
+      "root": "/home/zhuhe/litchi-performance-0969/qa-xls",
+      "runtime_files_match_candidate": true,
+      "runtime_sha256": {
+        "crates/litchi-ole-common/src/object/codec.rs": "25e4035e739788e29f10ed4e4ba77d4187221c26f789783d06e473ada6add146",
+        "crates/litchi-ole-common/src/object/editor.rs": "58913ec7125acb061aa5547a2f9a674cd314a1eb8bf3e90bba2df62392bf106c",
+        "crates/litchi-ole-common/tests/object.rs": "738db3f03cb61e860639190ae06cda25c9a0556e9954db79979654c185fd2773"
+      }
+    }
+  ],
+  "purpose": "External QA only: use the exact current-HEAD fixture corpus through read-only symlinks because the bounded candidate export selected fewer fixtures.",
+  "schema": "litchi.performance.0969.qa_fixture_overlay.v2"
+}

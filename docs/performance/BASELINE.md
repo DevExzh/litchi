@@ -1,5 +1,31 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0969 — CFB writer-proof handoff stops at A/A readiness
+
+[0969](0969-cfb-writer-proof-handoff-trial.md) records the private CFB
+writer-proof handoff candidate and its implementation correctness QA. The
+candidate seal passes, including the affected XLS correctness tests; the
+separately planned XLS performance guard was not run or approved, and no formal
+candidate workload launched. The baseline-only A/A stage completed 576 children
+across 24 cells and failed readiness: all 12 `FloatingPictures` cells failed at
+least one of four AB/BA p50/p95 gates (42/48 gates), while all 12 `NoHeadFoot`
+cells passed. The worst symmetric upper bound is `1.307340` at
+`FloatingPictures/e8/release` AB p95. Capture stopped before candidate formal
+launch. The bounded packet's [independent raw audit](results/change-0969/review/independent-raw-audit-0969-v1.json)
+passes custody for 576 valid packets with zero errors and reproduces the exact
+42/96 readiness-gate reduction (SHA-256
+`f0d0d0b63a896be41dab84550ff39f59954c26538423be2a3d3d017df9f26775`). The
+[maintained decision](results/change-0969/decision/perf-decision-output-v1.json)
+is `uninterpretable` with readiness failure and formal performance/benefit
+unmeasured (SHA-256
+`125818db8bcf05306626230cbedd5864de53991b8a69e7ec7116299ae49ec0ba`), and
+`candidate_adoption` is `null`. [Cleanup](results/change-0969/receipts/build-cache-cleanup-v1.json)
+freed 13,264,674,816 allocated bytes while preserving the four bound
+executables and referenced evidence (SHA-256
+`76611af155005a9f266be5c4a5267ef78ba55808cb76a9e1f7961ce75ab68c80`).
+Production remains unchanged, with no adoption, rejection, speedup, slowdown,
+or host-cause claim.
+
 ## 0968 — staged CFB commit census completes diagnostic route evidence
 
 [0968](0968-cfb-commit-census.md) records a diagnostic-only census for a

@@ -1,0 +1,877 @@
+{
+  "created_utc": "2026-10-08T01:10:26.384432Z",
+  "current_0969_source_binding": {
+    "key_runtime_harness_config_fixture_files": {
+      "all_current_head_manifest_and_git_blob_checks_pass": true,
+      "all_match_retained_0967_source_baseline": true,
+      "all_match_retained_0968_target_source": true,
+      "declared_count": 21,
+      "entries": [
+        {
+          "bytes": 470,
+          "current_git_blob": "c0e59805cf480523635677e333124885d257dcdd",
+          "manifest_bytes": 470,
+          "manifest_git_blob": "c0e59805cf480523635677e333124885d257dcdd",
+          "manifest_sha256": "50b044c83828f2c448ee59c362afaa79de2dd47fbd390f0cd2888391f1d1119d",
+          "matches_manifest": true,
+          "matches_retained_sources": {
+            "0967_source_baseline": true,
+            "0968_target_source": true
+          },
+          "path": ".cargo/config.toml",
+          "sha256": "50b044c83828f2c448ee59c362afaa79de2dd47fbd390f0cd2888391f1d1119d"
+        },
+        {
+          "bytes": 10257,
+          "current_git_blob": "fda0b2e75ff2f0bd4fd44c643c1bbb523903ef6b",
+          "manifest_bytes": 10257,
+          "manifest_git_blob": "fda0b2e75ff2f0bd4fd44c643c1bbb523903ef6b",
+          "manifest_sha256": "94a832011482c7e0dd2a706847ff66ab140315e8b78541d31746ec43fff460e7",
+          "matches_manifest": true,
+          "matches_retained_sources": {
+            "0967_source_baseline": true,
+            "0968_target_source": true
+          },
+          "path": "Cargo.toml",
+          "sha256": "94a832011482c7e0dd2a706847ff66ab140315e8b78541d31746ec43fff460e7"
+        },
+        {
+          "bytes": 86,
+          "current_git_blob": "8934eb4a5fabfca2502492140bfb51e89f9e0394",
+          "manifest_bytes": 86,
+          "manifest_git_blob": "8934eb4a5fabfca2502492140bfb51e89f9e0394",
+          "manifest_sha256": "e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310",
+          "matches_manifest": true,
+          "matches_retained_sources": {
+            "0967_source_baseline": true,
+            "0968_target_source": true
+          },
+          "path": "rust-toolchain.toml",
+          "sha256": "e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310"
+        },
+        {
+          "bytes": 79,
+          "current_git_blob": "fae354d1f25762f084d5b9099e2cf94b82aad331",
+          "manifest_bytes": 79,
+          "manifest_git_blob": "fae354d1f25762f084d5b9099e2cf94b82aad331",
+          "manifest_sha256": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3",
+          "matches_manifest": true,
+          "matches_retained_sources": {
+            "0967_source_baseline": true,
+            "0968_target_source": true
+          },
+          "path": "rustfmt.toml",
+          "sha256": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3"
+        },
+        {
+          "bytes": 39109,
+          "current_git_blob": "a197c1230825c20caaf28ccc4add68473ce141ba",
+          "manifest_bytes": 39109,
+          "manifest_git_blob": "a197c1230825c20caaf28ccc4add68473ce141ba",
+          "manifest_sha256": "ee6079567bf85a0ff68a335fb43999d780fab335a09a9cec8b845c16b7b5b319",
+          "matches_manifest": true,
+          "matches_retained_sources": {
+            "0967_source_baseline": true,
+            "0968_target_source": true
+          },
+          "path": "crates/litchi-ole-common/src/object/editor.rs",
+          "sha256": "ee6079567bf85a0ff68a335fb43999d780fab335a09a9cec8b845c16b7b5b319"
+        },
+        {
+          "bytes": 52977,
+          "current_git_blob": "189e555851e11cd2b725455d27442887654cd90e",
+          "manifest_bytes": 52977,
+          "manifest_git_blob": "189e555851e11cd2b725455d27442887654cd90e",
+          "manifest_sha256": "99dc73a358cbe5a76c6fc242e42af6524ba6d0954c2ae508cf55f84cb6a5cafd",
+          "matches_manifest": true,
+          "matches_retained_sources": {
+            "0967_source_baseline": true,
+            "0968_target_source": true
+          },
+          "path": "crates/litchi-ole-common/src/object/codec.rs",
+          "sha256": "99dc73a358cbe5a76c6fc242e42af6524ba6d0954c2ae508cf55f84cb6a5cafd"
+        },
+        {
+          "bytes": 2375,
+          "current_git_blob": "487c0df9af58ace2f7942d4265d8ee06994bd957",
+          "manifest_bytes": 2375,
+          "manifest_git_blob": "487c0df9af58ace2f7942d4265d8ee06994bd957",
+          "manifest_sha256": "830fa39ca65ef5073d14dabcc60513bca6a1f221eaaa1e28e62e9644bbeffdea",
+          "matches_manifest": true,
+          "matches_retained_sources": {
+            "0967_source_baseline": true,
+            "0968_target_source": true
+          },
+          "path": "crates/litchi-ole-common/src/object/discovery.rs",
+          "sha256": "830fa39ca65ef5073d14dabcc60513bca6a1f221eaaa1e28e62e9644bbeffdea"
+        },
+        {
+          "bytes": 19315,
+          "current_git_blob": "9cc017cbecacd8f04974e1494ffc1e0fba37b5fb",
+          "manifest_bytes": 19315,
+          "manifest_git_blob": "9cc017cbecacd8f04974e1494ffc1e0fba37b5fb",
+          "manifest_sha256": "83389ca205916eb65b36607bb2f15f13541821989f20abfd1e6b3236ef6aa352",
+          "matches_manifest": true,
+          "matches_retained_sources": {
+            "0967_source_baseline": true,
+            "0968_target_source": true
+          },
+          "path": "crates/litchi-ole-common/src/object/model.rs",
+          "sha256": "83389ca205916eb65b36607bb2f15f13541821989f20abfd1e6b3236ef6aa352"
+        },
+        {
+          "bytes": 10085,
+          "current_git_blob": "a4108a479815b33293bcd0243f98597d30af6c37",
+          "manifest_bytes": 10085,
+          "manifest_git_blob": "a4108a479815b33293bcd0243f98597d30af6c37",
+          "manifest_sha256": "63342c1da1ed1ac79de4f029b8023e6e27a3d5ec07b356583b908403a8f4a196",
+          "matches_manifest": true,
+          "matches_retained_sources": {
+            "0967_source_baseline": true,
+            "0968_target_source": true
+          },
+          "path": "crates/litchi-ole-common/src/object/directory/model.rs",
+          "sha256": "63342c1da1ed1ac79de4f029b8023e6e27a3d5ec07b356583b908403a8f4a196"
+        },
+        {
+          "bytes": 9498,
+          "current_git_blob": "f9654bee68fd3f21a190dfc1a45f36ed2dca5378",
+          "manifest_bytes": 9498,
+          "manifest_git_blob": "f9654bee68fd3f21a190dfc1a45f36ed2dca5378",
+          "manifest_sha256": "afd82d7568246ed6dbff202b6525c96329f5061547eadcc360f9d840e2659a0a",
+          "matches_manifest": true,
+          "matches_retained_sources": {
+            "0967_source_baseline": true,
+            "0968_target_source": true
+          },
+          "path": "crates/litchi-ole-common/src/object/directory/codec.rs",
+          "sha256": "afd82d7568246ed6dbff202b6525c96329f5061547eadcc360f9d840e2659a0a"
+        },
+        {
+          "bytes": 120349,
+          "current_git_blob": "4d993588e904cae17a61339ce0141b2e2c65b941",
+          "manifest_bytes": 120349,
+          "manifest_git_blob": "4d993588e904cae17a61339ce0141b2e2c65b941",
+          "manifest_sha256": "a5ead3dded13baa8bdaa350742bfe79185e39cc2f16f86e433701e939fb2b19c",
+          "matches_manifest": true,
+          "matches_retained_sources": {
+            "0967_source_baseline": true,
+            "0968_target_source": true
+          },
+          "path": "crates/litchi-cfb/src/writer/core.rs",
+          "sha256": "a5ead3dded13baa8bdaa350742bfe79185e39cc2f16f86e433701e939fb2b19c"
+        },
+        {
+          "bytes": 96613,
+          "current_git_blob": "c94b3f92105e76e865233ca2175b876bbdcfd43e",
+          "manifest_bytes": 96613,
+          "manifest_git_blob": "c94b3f92105e76e865233ca2175b876bbdcfd43e",
+          "manifest_sha256": "480b30fb1c6c018c3182fc5e0ab1f53bb55f61169396e2f2d8bce257c7d1460c",
+          "matches_manifest": true,
+          "matches_retained_sources": {
+            "0967_source_baseline": true,
+            "0968_target_source": true
+          },
+          "path": "crates/litchi-cfb/src/writer/layout.rs",
+          "sha256": "480b30fb1c6c018c3182fc5e0ab1f53bb55f61169396e2f2d8bce257c7d1460c"
+        },
+        {
+          "bytes": 275459,
+          "current_git_blob": "7f23eec953b65f1cd3667ca48db91ed89d593aea",
+          "manifest_bytes": 275459,
+          "manifest_git_blob": "7f23eec953b65f1cd3667ca48db91ed89d593aea",
+          "manifest_sha256": "0cc789bfd893a0cd9a10e9d7488c4a8409a54021995dc44c20c29c8baaede5bd",
+          "matches_manifest": true,
+          "matches_retained_sources": {
+            "0967_source_baseline": true,
+            "0968_target_source": true
+          },
+          "path": "crates/litchi-cfb/src/file.rs",
+          "sha256": "0cc789bfd893a0cd9a10e9d7488c4a8409a54021995dc44c20c29c8baaede5bd"
+        },
+        {
+          "bytes": 1689,
+          "current_git_blob": "4d0ad85da5c8271db5e5601843c7496dfba6fb4c",
+          "manifest_bytes": 1689,
+          "manifest_git_blob": "4d0ad85da5c8271db5e5601843c7496dfba6fb4c",
+          "manifest_sha256": "f06b215aa63bf9e80160b38fb683ec692a482e2898f8f86e8f48fa881d4b3618",
+          "matches_manifest": true,
+          "matches_retained_sources": {
+            "0967_source_baseline": true,
+            "0968_target_source": true
+          },
+          "path": "crates/litchi-cfb/src/writer/mod.rs",
+          "sha256": "f06b215aa63bf9e80160b38fb683ec692a482e2898f8f86e8f48fa881d4b3618"
+        },
+        {
+          "bytes": 560,
+          "current_git_blob": "e54bd05ec082d2c08f66471a6ddb262ac273ad04",
+          "manifest_bytes": 560,
+          "manifest_git_blob": "e54bd05ec082d2c08f66471a6ddb262ac273ad04",
+          "manifest_sha256": "41dee12e4eb7d1e3853a33a7743afdf6b5d6519d5e7456e61ce4978aa9177945",
+          "matches_manifest": true,
+          "matches_retained_sources": {
+            "0967_source_baseline": true,
+            "0968_target_source": true
+          },
+          "path": "tools/perf-cfb-profile/Cargo.toml",
+          "sha256": "41dee12e4eb7d1e3853a33a7743afdf6b5d6519d5e7456e61ce4978aa9177945"
+        },
+        {
+          "bytes": 33645,
+          "current_git_blob": "959e4742b588eaaa091374f0004622ff677c077f",
+          "manifest_bytes": 33645,
+          "manifest_git_blob": "959e4742b588eaaa091374f0004622ff677c077f",
+          "manifest_sha256": "343c5464ae1144cbb72284cbb3e9b52b5dff2b798d09462d3c0d6a74b317bac7",
+          "matches_manifest": true,
+          "matches_retained_sources": {
+            "0967_source_baseline": true,
+            "0968_target_source": true
+          },
+          "path": "tools/perf-cfb-profile/Cargo.lock",
+          "sha256": "343c5464ae1144cbb72284cbb3e9b52b5dff2b798d09462d3c0d6a74b317bac7"
+        },
+        {
+          "bytes": 35543,
+          "current_git_blob": "8424e9ca3d2fa6b65f97fad501cd2f414db3ffa4",
+          "manifest_bytes": 35543,
+          "manifest_git_blob": "8424e9ca3d2fa6b65f97fad501cd2f414db3ffa4",
+          "manifest_sha256": "b4893321ac9a9321a9055823a7f05ecb35e59319531913affc49342b8ccd73dc",
+          "matches_manifest": true,
+          "matches_retained_sources": {
+            "0967_source_baseline": true,
+            "0968_target_source": true
+          },
+          "path": "tools/perf-cfb-profile/src/lib.rs",
+          "sha256": "b4893321ac9a9321a9055823a7f05ecb35e59319531913affc49342b8ccd73dc"
+        },
+        {
+          "bytes": 129,
+          "current_git_blob": "caf648fc83d39ad985a62976176899bf74361038",
+          "manifest_bytes": 129,
+          "manifest_git_blob": "caf648fc83d39ad985a62976176899bf74361038",
+          "manifest_sha256": "13206a810887dfcb4897a265167edc8fa3706ae736a2785a27354c7617eb5ca9",
+          "matches_manifest": true,
+          "matches_retained_sources": {
+            "0967_source_baseline": true,
+            "0968_target_source": true
+          },
+          "path": "tools/perf-cfb-profile/src/main.rs",
+          "sha256": "13206a810887dfcb4897a265167edc8fa3706ae736a2785a27354c7617eb5ca9"
+        },
+        {
+          "bytes": 1833,
+          "current_git_blob": "bffa24275e92fb3b11ff75ccb1e32430351ff8d3",
+          "manifest_bytes": 1833,
+          "manifest_git_blob": "bffa24275e92fb3b11ff75ccb1e32430351ff8d3",
+          "manifest_sha256": "2542257a9ab68347d3e8133b5f65a2254cc1e439fef665e327e093470f365f5f",
+          "matches_manifest": true,
+          "matches_retained_sources": {
+            "0967_source_baseline": true,
+            "0968_target_source": true
+          },
+          "path": "tools/perf-cfb-profile/src/bin/alloc.rs",
+          "sha256": "2542257a9ab68347d3e8133b5f65a2254cc1e439fef665e327e093470f365f5f"
+        },
+        {
+          "bytes": 335360,
+          "current_git_blob": "15b06cf3f079bb8d59ae3141b2371c527af73fd3",
+          "manifest_bytes": 335360,
+          "manifest_git_blob": "15b06cf3f079bb8d59ae3141b2371c527af73fd3",
+          "manifest_sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d",
+          "matches_manifest": true,
+          "matches_retained_sources": {
+            "0967_source_baseline": true,
+            "0968_target_source": true
+          },
+          "path": "test-data/ole/doc/FloatingPictures.doc",
+          "sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d"
+        },
+        {
+          "bytes": 26112,
+          "current_git_blob": "8c95f4725a2327d77f3c5a684f641c3794274dff",
+          "manifest_bytes": 26112,
+          "manifest_git_blob": "8c95f4725a2327d77f3c5a684f641c3794274dff",
+          "manifest_sha256": "45e5df073f34314da6f39d2dad119fb2ef23470878fd2df67f632864cd92ea48",
+          "matches_manifest": true,
+          "matches_retained_sources": {
+            "0967_source_baseline": true,
+            "0968_target_source": true
+          },
+          "path": "test-data/ole/doc/NoHeadFoot.doc",
+          "sha256": "45e5df073f34314da6f39d2dad119fb2ef23470878fd2df67f632864cd92ea48"
+        }
+      ],
+      "mismatches": []
+    },
+    "manifest_policy": {
+      "candidate_mutation_authorization": "not yet granted; source-candidate is an immutable byte-identical copy pending design review",
+      "no_build_or_workload": true
+    },
+    "source_export": {
+      "baseline_bytes": 18259541,
+      "baseline_candidate_identical": true,
+      "baseline_file_count": 924,
+      "baseline_tree_sha256": "df8a842b08fec1792c67921fb1ce3513d3c6cb3dd0149cf13672bad14090bfb0",
+      "candidate_bytes": 18259541,
+      "candidate_file_count": 924,
+      "candidate_tree_sha256": "df8a842b08fec1792c67921fb1ce3513d3c6cb3dd0149cf13672bad14090bfb0",
+      "file_manifest_different_paths": [],
+      "file_manifest_entries": 924,
+      "file_manifest_equal_entries": 924
+    },
+    "source_file_manifest": {
+      "bytes": 362688,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0969/manifests/source-file-manifest-v1.json",
+      "sha256": "99e65d43e0feed89133eec60b095130d68058a071a02e8a15b05dea01209bb6c"
+    },
+    "source_manifest": {
+      "bytes": 14960,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0969/manifests/source-manifest-v1.json",
+      "sha256": "f1818af5c306fb6ea01b59ca8df29710e773386b246071202bd4aa896f4e8e2b"
+    },
+    "source_revision": "34fc85e23ccefcd8ad6ffd4d57d9e2671ef1a5a1"
+  },
+  "current_head_commit_path_closure": {
+    "all_changed_paths_outside_focused_runtime_scope": true,
+    "canonical_output_encoding": "raw command stdout bytes with LF line endings",
+    "canonical_output_sha256": "810998d8f917c1fdfd2095f27dc13e14c1a5ab895cdb5789ce35c10e17389c6f",
+    "category_counts": {
+      "docs": 51,
+      "other": 0,
+      "tools": 3,
+      "workflows": 1
+    },
+    "command": "git diff --name-status --no-renames 6493e26155ee05e554f1371dd2fad707cd4bca0e 34fc85e23ccefcd8ad6ffd4d57d9e2671ef1a5a1",
+    "from_revision": "6493e26155ee05e554f1371dd2fad707cd4bca0e",
+    "interpretation": "The 55-path delta consists of 51 docs paths, 3 tools/perf-decision paths, and 1 workflow path. It has no crates, tools/perf-cfb-profile, Cargo/config, rust-toolchain, or test-data/ole/doc path changes.",
+    "path_count": 55,
+    "runtime_scope_intersection": [],
+    "status_counts": {
+      "A": 52,
+      "C": 0,
+      "D": 0,
+      "M": 3,
+      "R": 0
+    },
+    "to_revision": "34fc85e23ccefcd8ad6ffd4d57d9e2671ef1a5a1"
+  },
+  "decision": {
+    "allocator_0967_binary_may_be_reused_as_0969_matched_baseline_control": true,
+    "allocator_or_rss_equivalence_claim_from_reuse": false,
+    "current_0969_candidate_binary_available": false,
+    "current_head_runtime_harness_config_fixture_equivalent_to_retained_0967_inputs": true,
+    "full_tree_or_full_harness_byte_identity_claim": false,
+    "ordinary_0967_binary_may_be_reused_as_0969_output_correctness_oracle": true,
+    "retained_binaries_may_be_used_as_0969_diagnostic_executables": false,
+    "timing_or_performance_equivalence_claim": false
+  },
+  "exclusions": [
+    "No whole repository identity claim: the 0968 proof explicitly records excluded tree differences.",
+    "No performance, timing, optimization, allocation, RSS, or adoption conclusion follows from baseline reuse.",
+    "No diagnostic stack/symbol/source attribution may be taken from the retained ordinary or allocator binary as a substitute for a current 0969 diagnostic build.",
+    "No broad 444174-file scan was performed or required for this bounded proof."
+  ],
+  "findings": [],
+  "focused_0968_equivalence_proof": {
+    "fixture_descriptors": {
+      "old_floatingpictures": {
+        "bytes": 335360,
+        "mode": "0o664",
+        "path": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline/test-data/ole/doc/FloatingPictures.doc",
+        "sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d"
+      },
+      "old_noheadfoot": {
+        "bytes": 26112,
+        "mode": "0o664",
+        "path": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline/test-data/ole/doc/NoHeadFoot.doc",
+        "sha256": "45e5df073f34314da6f39d2dad119fb2ef23470878fd2df67f632864cd92ea48"
+      },
+      "target_floatingpictures": {
+        "bytes": 335360,
+        "mode": "0o664",
+        "path": "/home/zhuhe/litchi-performance-0968/source-baseline/test-data/ole/doc/FloatingPictures.doc",
+        "sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d"
+      },
+      "target_noheadfoot": {
+        "bytes": 26112,
+        "mode": "0o664",
+        "path": "/home/zhuhe/litchi-performance-0968/source-baseline/test-data/ole/doc/NoHeadFoot.doc",
+        "sha256": "45e5df073f34314da6f39d2dad119fb2ef23470878fd2df67f632864cd92ea48"
+      }
+    },
+    "historical_0967_source_revision": "893072657ad8b1d726bfce351b5ec2e98f084e94",
+    "interpretation": "The 0968 proof establishes exact content and mode identity over the 9267-file filtered runtime/harness/config/fixture scope between the retained 0967 baseline and the 0968 target. The present commit-path closure shows that current 0969 HEAD introduces no path in that scope, so the focused identity extends to current HEAD.",
+    "ordinary_harness_file_descriptors": {
+      "old": [
+        {
+          "bytes": 33645,
+          "mode": "0o664",
+          "path": "tools/perf-cfb-profile/Cargo.lock",
+          "sha256": "343c5464ae1144cbb72284cbb3e9b52b5dff2b798d09462d3c0d6a74b317bac7"
+        },
+        {
+          "bytes": 560,
+          "mode": "0o664",
+          "path": "tools/perf-cfb-profile/Cargo.toml",
+          "sha256": "41dee12e4eb7d1e3853a33a7743afdf6b5d6519d5e7456e61ce4978aa9177945"
+        },
+        {
+          "bytes": 3721,
+          "mode": "0o664",
+          "path": "tools/perf-cfb-profile/README.md",
+          "sha256": "ca2206b276a0c84a840945c61853108a23addfe376aebe5c06d27695e1f20ad5"
+        },
+        {
+          "bytes": 4912,
+          "mode": "0o664",
+          "path": "tools/perf-cfb-profile/src/alloc_metrics.rs",
+          "sha256": "048680324eff200dead3b37cabb97582b5f76b6e7ca572b7e2bc2c5bb3a7475d"
+        },
+        {
+          "bytes": 1833,
+          "mode": "0o664",
+          "path": "tools/perf-cfb-profile/src/bin/alloc.rs",
+          "sha256": "2542257a9ab68347d3e8133b5f65a2254cc1e439fef665e327e093470f365f5f"
+        },
+        {
+          "bytes": 35543,
+          "mode": "0o664",
+          "path": "tools/perf-cfb-profile/src/lib.rs",
+          "sha256": "b4893321ac9a9321a9055823a7f05ecb35e59319531913affc49342b8ccd73dc"
+        },
+        {
+          "bytes": 129,
+          "mode": "0o664",
+          "path": "tools/perf-cfb-profile/src/main.rs",
+          "sha256": "13206a810887dfcb4897a265167edc8fa3706ae736a2785a27354c7617eb5ca9"
+        },
+        {
+          "bytes": 58805,
+          "mode": "0o664",
+          "path": "tools/perf-cfb-profile/src/oracle_0730.rs",
+          "sha256": "2b7a4d8e41c53690c8abf8d656e4b90942a7b7a0d84f205f93a1ac811f5f61e6"
+        }
+      ],
+      "target": [
+        {
+          "bytes": 33645,
+          "mode": "0o664",
+          "path": "tools/perf-cfb-profile/Cargo.lock",
+          "sha256": "343c5464ae1144cbb72284cbb3e9b52b5dff2b798d09462d3c0d6a74b317bac7"
+        },
+        {
+          "bytes": 560,
+          "mode": "0o664",
+          "path": "tools/perf-cfb-profile/Cargo.toml",
+          "sha256": "41dee12e4eb7d1e3853a33a7743afdf6b5d6519d5e7456e61ce4978aa9177945"
+        },
+        {
+          "bytes": 3721,
+          "mode": "0o664",
+          "path": "tools/perf-cfb-profile/README.md",
+          "sha256": "ca2206b276a0c84a840945c61853108a23addfe376aebe5c06d27695e1f20ad5"
+        },
+        {
+          "bytes": 4912,
+          "mode": "0o664",
+          "path": "tools/perf-cfb-profile/src/alloc_metrics.rs",
+          "sha256": "048680324eff200dead3b37cabb97582b5f76b6e7ca572b7e2bc2c5bb3a7475d"
+        },
+        {
+          "bytes": 1833,
+          "mode": "0o664",
+          "path": "tools/perf-cfb-profile/src/bin/alloc.rs",
+          "sha256": "2542257a9ab68347d3e8133b5f65a2254cc1e439fef665e327e093470f365f5f"
+        },
+        {
+          "bytes": 35543,
+          "mode": "0o664",
+          "path": "tools/perf-cfb-profile/src/lib.rs",
+          "sha256": "b4893321ac9a9321a9055823a7f05ecb35e59319531913affc49342b8ccd73dc"
+        },
+        {
+          "bytes": 129,
+          "mode": "0o664",
+          "path": "tools/perf-cfb-profile/src/main.rs",
+          "sha256": "13206a810887dfcb4897a265167edc8fa3706ae736a2785a27354c7617eb5ca9"
+        },
+        {
+          "bytes": 58805,
+          "mode": "0o664",
+          "path": "tools/perf-cfb-profile/src/oracle_0730.rs",
+          "sha256": "2b7a4d8e41c53690c8abf8d656e4b90942a7b7a0d84f205f93a1ac811f5f61e6"
+        }
+      ]
+    },
+    "proof": {
+      "bytes": 28337,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0968/review/ordinary-oracle-equivalence-v1.json",
+      "sha256": "b01f9a3d76ad5a4a11537c21c3d84a78421cc449018f0acc084a173976020a75"
+    },
+    "proof_decision": {
+      "allocator_or_rss_equivalence_claim": false,
+      "full_harness_byte_identity_claim": false,
+      "ordinary_0967_binary_may_be_reused_as_0968_diagnostic_executable": false,
+      "ordinary_0967_binary_may_be_reused_as_0968_output_oracle": true,
+      "performance_or_timing_equivalence_claim": false
+    },
+    "schema": "litchi.performance.0968.ordinary_oracle_equivalence.v1",
+    "selected_scope": {
+      "content_or_mode_mismatches": [],
+      "identical": true,
+      "missing_from_old": [],
+      "missing_from_target": [],
+      "old": {
+        "bytes": 155547493,
+        "file_count": 9267,
+        "tree_sha256": "8ef3c1a5ab9769518dd6c5c1b739fa4ae45fd1559bdfcf46a904ccae05d10498"
+      },
+      "paths": [
+        "crates",
+        "tools/perf-cfb-profile",
+        ".cargo/config.toml",
+        "Cargo.toml",
+        "rust-toolchain.toml",
+        "test-data/ole/doc/NoHeadFoot.doc",
+        "test-data/ole/doc/FloatingPictures.doc"
+      ],
+      "target": {
+        "bytes": 155547493,
+        "file_count": 9267,
+        "tree_sha256": "8ef3c1a5ab9769518dd6c5c1b739fa4ae45fd1559bdfcf46a904ccae05d10498"
+      }
+    },
+    "selected_scope_group_descriptors": {
+      ".cargo/config.toml": {
+        "content_or_mode_mismatches": [],
+        "identical": true,
+        "missing_from_new": [],
+        "missing_from_old": [],
+        "new": {
+          "bytes": 470,
+          "file_count": 1,
+          "tree_sha256": "5e996e5000bbe117dbbfa84d5d8a9cbbfc302e0f40a8e9c0721a47d628475993"
+        },
+        "old": {
+          "bytes": 470,
+          "file_count": 1,
+          "tree_sha256": "5e996e5000bbe117dbbfa84d5d8a9cbbfc302e0f40a8e9c0721a47d628475993"
+        }
+      },
+      "Cargo.toml": {
+        "content_or_mode_mismatches": [],
+        "identical": true,
+        "missing_from_new": [],
+        "missing_from_old": [],
+        "new": {
+          "bytes": 10257,
+          "file_count": 1,
+          "tree_sha256": "2a157857f3b781d6479172839f5610b91eb562559c525f5f34f498e3b3078964"
+        },
+        "old": {
+          "bytes": 10257,
+          "file_count": 1,
+          "tree_sha256": "2a157857f3b781d6479172839f5610b91eb562559c525f5f34f498e3b3078964"
+        }
+      },
+      "crates": {
+        "content_or_mode_mismatches": [],
+        "identical": true,
+        "missing_from_new": [],
+        "missing_from_old": [],
+        "new": {
+          "bytes": 155036060,
+          "file_count": 9254,
+          "tree_sha256": "6675c66b8d55342906a46fa87624517370a20455911655b520490e8f5ff617bf"
+        },
+        "old": {
+          "bytes": 155036060,
+          "file_count": 9254,
+          "tree_sha256": "6675c66b8d55342906a46fa87624517370a20455911655b520490e8f5ff617bf"
+        }
+      },
+      "rust-toolchain.toml": {
+        "content_or_mode_mismatches": [],
+        "identical": true,
+        "missing_from_new": [],
+        "missing_from_old": [],
+        "new": {
+          "bytes": 86,
+          "file_count": 1,
+          "tree_sha256": "8e671503a3ae4531e7d52a3732359f3518dce603b6d898284ccf7a8cc20e1e1e"
+        },
+        "old": {
+          "bytes": 86,
+          "file_count": 1,
+          "tree_sha256": "8e671503a3ae4531e7d52a3732359f3518dce603b6d898284ccf7a8cc20e1e1e"
+        }
+      },
+      "test-data/ole/doc/FloatingPictures.doc": {
+        "content_or_mode_mismatches": [],
+        "identical": true,
+        "missing_from_new": [],
+        "missing_from_old": [],
+        "new": {
+          "bytes": 335360,
+          "file_count": 1,
+          "tree_sha256": "06249f90bb32995ffb008d0a19e182830c90fc37b40e1153fb4a2fd933ad9644"
+        },
+        "old": {
+          "bytes": 335360,
+          "file_count": 1,
+          "tree_sha256": "06249f90bb32995ffb008d0a19e182830c90fc37b40e1153fb4a2fd933ad9644"
+        }
+      },
+      "test-data/ole/doc/NoHeadFoot.doc": {
+        "content_or_mode_mismatches": [],
+        "identical": true,
+        "missing_from_new": [],
+        "missing_from_old": [],
+        "new": {
+          "bytes": 26112,
+          "file_count": 1,
+          "tree_sha256": "a6ec7feabcc99b81becb8f937ebbe7ab62713a94f92279e86a62579cfcdbf184"
+        },
+        "old": {
+          "bytes": 26112,
+          "file_count": 1,
+          "tree_sha256": "a6ec7feabcc99b81becb8f937ebbe7ab62713a94f92279e86a62579cfcdbf184"
+        }
+      },
+      "tools/perf-cfb-profile": {
+        "content_or_mode_mismatches": [],
+        "identical": true,
+        "missing_from_new": [],
+        "missing_from_old": [],
+        "new": {
+          "bytes": 139148,
+          "file_count": 8,
+          "tree_sha256": "25871593125f169b23165e69cf7b1d8c1ae97ada6101474ba11e6e9897854077"
+        },
+        "old": {
+          "bytes": 139148,
+          "file_count": 8,
+          "tree_sha256": "25871593125f169b23165e69cf7b1d8c1ae97ada6101474ba11e6e9897854077"
+        }
+      }
+    },
+    "status": "pass_byte_equivalent_output_oracle_only",
+    "target_0968_source_revision": "6493e26155ee05e554f1371dd2fad707cd4bca0e"
+  },
+  "material_blockers": [],
+  "retained_0967_binaries": {
+    "binaries": [
+      {
+        "actual_matches_receipt": true,
+        "build_id_sha1": "e5c457384eeebd057932c444efda77618f137399",
+        "build_receipt_bytes": 47909224,
+        "build_receipt_mode": "0o775",
+        "build_receipt_sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb",
+        "bytes": 47909224,
+        "executable": true,
+        "mode": "0o775",
+        "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+        "role": "ordinary_uninstrumented",
+        "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+      },
+      {
+        "actual_matches_receipt": true,
+        "build_id_sha1": "ba956d3ede21c7a6405848e985276913a8dd1677",
+        "build_receipt_bytes": 47912992,
+        "build_receipt_mode": "0o775",
+        "build_receipt_sha256": "a520ec154bed62ce26d885f203e2565e756ce618a046b77521db484788c4ccd9",
+        "bytes": 47912992,
+        "executable": true,
+        "mode": "0o775",
+        "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile_alloc",
+        "role": "counting_allocator",
+        "sha256": "a520ec154bed62ce26d885f203e2565e756ce618a046b77521db484788c4ccd9"
+      }
+    ],
+    "binary_identity_verified_against_build_receipt": true,
+    "interpretation": "These are retained 0967 baseline artifacts. Their exact hashes bind the historical ordinary output oracle and allocator control; they are not a newly built 0969 candidate binary.",
+    "source_build_role": "baseline"
+  },
+  "retained_0967_build_configuration": {
+    "baseline_build_argv": [
+      "cargo",
+      "+1.95.0",
+      "build",
+      "--release",
+      "--locked",
+      "--offline",
+      "-j2",
+      "--manifest-path",
+      "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline/tools/perf-cfb-profile/Cargo.toml",
+      "--target-dir",
+      "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb",
+      "--bin",
+      "doc_retention_probe_0942_cfb_profile",
+      "--bin",
+      "doc_retention_probe_0942_cfb_profile_alloc"
+    ],
+    "baseline_build_environment": {
+      "cargo_incremental": "0",
+      "cargo_term_color": "never",
+      "cwd": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline",
+      "lock_sha256": "343c5464ae1144cbb72284cbb3e9b52b5dff2b798d09462d3c0d6a74b317bac7",
+      "manifest_sha256": "41dee12e4eb7d1e3853a33a7743afdf6b5d6519d5e7456e61ce4978aa9177945",
+      "rustflags": "",
+      "source_head": "893072657ad8b1d726bfce351b5ec2e98f084e94",
+      "target_dir": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb",
+      "toolchain": "+1.95.0"
+    },
+    "baseline_build_returncode": 0,
+    "build_policy": {
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_TERM_COLOR": "never",
+      "RUSTFLAGS": "",
+      "cargo_jobs": 2,
+      "concurrency": 1,
+      "locked": true,
+      "offline": true,
+      "profile": "release (ordinary default)",
+      "toolchain": "1.95.0"
+    },
+    "build_receipt": {
+      "bytes": 15975,
+      "mode": "0o664",
+      "path": "/home/zhuhe/litchi-performance-0967/receipts/build-0967-cfb-v1.json",
+      "sha256": "d1de24c3a310d7f9d6e4c0819a7aac9287138715d835b73d1f062739d37dd5d6"
+    },
+    "config_elf_audit": {
+      "build_inputs": {
+        "cargo_env": "CARGO_INCREMENTAL=0, CARGO_TERM_COLOR=never, RUSTFLAGS=empty, --locked --offline -j2",
+        "llvm_version": "22.1.2",
+        "rustc_info_byte_identical": true,
+        "rustc_version": "1.95.0 (59807616e 2026-04-14)",
+        "target": "x86_64-unknown-linux-gnu"
+      },
+      "conclusion": "No effective build configuration mismatch found. The candidate binary is larger because changed source produces larger linked DWARF and a modest exception/unwind footprint change, while optimized machine code (.text) changes by only 496 bytes. Existing binaries and build summary receipt remain untouched.",
+      "effective_fields_equal_baseline_candidate": true,
+      "effective_release_profile": {
+        "effective_fields": {
+          "codegen_units": {
+            "basis": "Cargo 1.95 release default; not overridden",
+            "value": 16
+          },
+          "debug": {
+            "basis": "tools/perf-cfb-profile/Cargo.toml [profile.release] override",
+            "value": 1
+          },
+          "debug_assertions": {
+            "basis": "Cargo 1.95 release default; not overridden",
+            "value": false
+          },
+          "incremental": {
+            "basis": "Cargo 1.95 release default and CARGO_INCREMENTAL=0",
+            "value": false
+          },
+          "lto": {
+            "basis": "Cargo 1.95 release default; root workspace lto=true is outside nested workspace",
+            "value": false
+          },
+          "opt_level": {
+            "basis": "Cargo 1.95 release default; not overridden in nested harness profile",
+            "value": 3
+          },
+          "overflow_checks": {
+            "basis": "Cargo 1.95 release default; not overridden",
+            "value": false
+          },
+          "panic": {
+            "basis": "Cargo 1.95 release default; confirmed by identical .rustc_info.json target cfg; root panic=abort is outside nested workspace",
+            "value": "unwind"
+          },
+          "rpath": {
+            "basis": "Cargo 1.95 release default; not overridden",
+            "value": false
+          },
+          "split_debuginfo": {
+            "basis": "Cargo 1.95 release default; not overridden",
+            "value": "off"
+          },
+          "strip": {
+            "basis": "Cargo 1.95 release default; not overridden",
+            "value": "none"
+          }
+        },
+        "effective_fields_equal_baseline_candidate": true,
+        "manifest_override": "debug = 1",
+        "name": "release",
+        "observed_cargo_status_line": "Finished release profile [optimized + debuginfo]",
+        "other_values": "ordinary Cargo release defaults (no harness override; both sides use the same Cargo/toolchain)"
+      },
+      "fingerprint_config_relevant_multisets_exact_equal": {
+        "compile_kind_multiset_sha256": true,
+        "config_hash_counts": true,
+        "config_hash_multiset_sha256": true,
+        "features_multiset_sha256": true,
+        "features_unique_count": true,
+        "json_count": true,
+        "profile_hash_counts": true,
+        "profile_hash_multiset_sha256": true,
+        "rustc_hash_multiset_sha256": true,
+        "rustflags_multiset_sha256": true,
+        "rustflags_unique": true
+      },
+      "fingerprint_json_count": 157,
+      "nested_harness_is_workspace_root": true,
+      "purpose": "Independent read-only audit of ordinary matched builds before acceptance; no rebuild, workload, timing, or performance capture.",
+      "receipt": {
+        "bytes": 22883,
+        "mode": "0o664",
+        "path": "/home/zhuhe/litchi-performance-0967/receipts/build-config-elf-audit-0967-v1.json",
+        "sha256": "a6b30eed1ea78dffd376b23cf7cea7db82bf53301f4ce9c0f3077da15d6853f3"
+      },
+      "root_profile_ignored_by_nested_workspace": true,
+      "schema": "litchi.performance.0967.build-config-elf-audit.v1",
+      "status": "matched_effective_cargo_configuration_size_delta_is_dwarf"
+    },
+    "ordinary_lock_sha256": "343c5464ae1144cbb72284cbb3e9b52b5dff2b798d09462d3c0d6a74b317bac7",
+    "ordinary_manifest_sha256": "41dee12e4eb7d1e3853a33a7743afdf6b5d6519d5e7456e61ce4978aa9177945",
+    "purpose": "Build-only staging; no workload, timing, perf capture, or adoption claim.",
+    "schema": "litchi.performance.0967.matched-build-summary.v1",
+    "source_revision": "893072657ad8b1d726bfce351b5ec2e98f084e94",
+    "source_root": "/home/zhuhe/litchi-performance-0967/harness-control/source-baseline",
+    "status": "matched_ordinary_native_and_allocator_builds_passed"
+  },
+  "reuse_conditions": [
+    "Use the ordinary binary only for byte/output correctness comparison against a current 0969 candidate built from current HEAD under the frozen harness inputs.",
+    "Use the allocator binary only as the retained matched baseline control for a separately built current 0969 allocator candidate; this receipt makes no allocator-count, RSS, or memory-equivalence claim.",
+    "Build the current 0969 candidate before any performance or diagnostic interpretation; retained 0967 binaries must not be used as the current revision diagnostic executable.",
+    "Preserve +1.95.0, --release, --locked, --offline, -j2, CARGO_INCREMENTAL=0, CARGO_TERM_COLOR=never, empty RUSTFLAGS, nested tools/perf-cfb-profile harness, lockfile, config, and declared OLE fixtures.",
+    "Path-only differences for isolated source/target/build directories may be used by a future candidate procedure; they do not relax content, lock, toolchain, profile, fixture, or harness identity checks.",
+    "Revalidate the focused scope, binary hashes, fixture hashes, and build configuration if any of those inputs change before capture or comparison."
+  ],
+  "review_scope": {
+    "broad_444174_file_scan_run": false,
+    "builds_run": false,
+    "checkout_head": "34fc85e23ccefcd8ad6ffd4d57d9e2671ef1a5a1",
+    "checkout_status_after_read_only_checks": [
+      " M tools/check_iwork_leaf_public_api.py",
+      "?? crates/litchi/examples/bench_word_parse.rs",
+      "?? docs/UNIFIED_OPS_API_DESIGN.md"
+    ],
+    "checkout_status_before": [
+      " M tools/check_iwork_leaf_public_api.py",
+      "?? crates/litchi/examples/bench_word_parse.rs",
+      "?? docs/UNIFIED_OPS_API_DESIGN.md"
+    ],
+    "checkout_status_unchanged_during_review": true,
+    "historical_evidence_written": false,
+    "main_checkout_written": false,
+    "no_broad_scan_interpretation": "The 0968 proof records 444174 new files outside its filtered old export; this review uses the declared focused scope and the 6493..34fc path closure, without claiming whole-tree identity.",
+    "perf_captures_run": false,
+    "read_only": true,
+    "workloads_run": false
+  },
+  "reviewer_role": "independent_read_only_cpu_review",
+  "schema": "litchi.performance.0969.baseline_reuse_review.v1",
+  "schema_version": 1,
+  "status": "pass_bounded_output_oracle_and_matched_baseline_reuse"
+}

@@ -1,0 +1,166 @@
+{
+  "schema": "litchi.performance.0969.pending-artifacts.v1",
+  "status": "complete_aa_readiness_failed_candidate_formal_stopped_decision_uninterpretable_cleanup_complete",
+  "formal_candidate": {
+    "candidate_formal_children": 0,
+    "candidate_allocator_children": 0,
+    "candidate_xls_children": 0,
+    "launch_status": "forbidden_after_aa_readiness_fail",
+    "independent_audit": "authoritative_pass_review/independent-raw-audit-0969-v1.json",
+    "maintained_decision": "authoritative_uninterpretable_decision/decision/perf-decision-output-v1.json",
+    "cleanup_receipt": "complete_receipts/build-cache-cleanup-v1.json"
+  },
+  "historical_formal_drafts": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0969/protocol/formal-candidate-bindings-v5.md",
+      "bytes": 2526,
+      "sha256": "29b06c2d1ac2608d3468659ac9b7b19bd0f747b7bb31fd6badfa05d297b29991",
+      "status": "prospective_unapproved_v5_blocked_by_independent_review",
+      "kind": "draft_design"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0969/protocol/formal-candidate-bindings-v6.md",
+      "bytes": 1950,
+      "sha256": "029c6857a2d35b49720323d0880257563e5dff415126242a790eff7400810cd1",
+      "status": "prospective_unapproved_v6_superseded_by_aa_readiness_stop",
+      "kind": "draft_design"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0969/review/formal-admission-v5-independent-review-v1.json",
+      "bytes": 14713,
+      "sha256": "00017b56a022b30ae9b736b771aa7846ff5927af540458a02f359a1663e6f4b8",
+      "status": "authoritative_historical_blocker_no_formal_admission",
+      "kind": "review_receipt"
+    }
+  ],
+  "xls_unexecuted_unapproved": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0969/xls-control-design-v2.md",
+      "bytes": 12766,
+      "sha256": "dca1fe9e1b1f335d04fa17ae94ae30d4460c13405e6397983f6431fb78b74286",
+      "status": "unexecuted_unapproved_draft_current_bytes_not_sealed",
+      "kind": "draft_design"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0969/xls-control-launch-design-v2.md",
+      "bytes": 9704,
+      "sha256": "ee86a98460c31c16d51f2624c47f5ea2f6f21f3e19dfdbda0dc26fdf3ebb3c6b",
+      "status": "unexecuted_unapproved_draft_current_bytes_not_sealed",
+      "kind": "draft_design"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0969/tools/xls_regression_guard.py",
+      "bytes": 41868,
+      "sha256": "c4d6df1bd633b30eb61372d66f405fd2405f6fc25956976972d336a323bd6736",
+      "status": "draft_helper_not_copied_post_seal_edits_invalidate_historical_binding",
+      "kind": "draft_code_external_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0969/tools/xls_regression_runner.py",
+      "bytes": 42940,
+      "sha256": "bb8d97e0a8e2c33afe374f456dec3750113749e48c2f912b3abb2e5c59686ec8",
+      "status": "draft_helper_not_copied_post_seal_edits_invalidate_historical_binding",
+      "kind": "draft_code_external_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0969/tools/prepare_xls_regression_plan.py",
+      "bytes": 9111,
+      "sha256": "0196cfdd958ffd329bf87d319f2dad5d421676e79bfd0f1653cdc49451c9f561",
+      "status": "draft_helper_not_copied_post_seal_edits_invalidate_historical_binding",
+      "kind": "draft_code_external_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0969/tools/prepare_xls_launch_go.py",
+      "bytes": 4651,
+      "sha256": "ca31adf124e0449a18b21307dda827abc076908f28606031e8216bb80930ed91",
+      "status": "draft_helper_not_copied_post_seal_edits_invalidate_historical_binding",
+      "kind": "draft_code_external_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0969/tools/xls_regression_aa.py",
+      "bytes": 11143,
+      "sha256": "594f11e2c919ce2dd41f8c5aab1043bbf2dc054ba4da6c1f61eb449a4cc1c3f1",
+      "status": "draft_helper_not_copied_post_seal_edits_invalidate_historical_binding",
+      "kind": "draft_code_external_only"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0969/review/xls-control-helper-seal-v1.json",
+      "bytes": 4428,
+      "sha256": "ed3e14205580dbc1e267cee012d42c45ce3b38083c08f1919f40604b647b06e2",
+      "status": "historical_helper_review_not_copied_unqualified_no_adoption",
+      "kind": "review_receipt"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0969/review/xls-control-independent-review-v1.json",
+      "bytes": 5616,
+      "sha256": "713406928b73d2515c364b79f72653b89a9d796054773b97b9ab44d246eeb1cb",
+      "status": "historical_blocker_not_copied_unqualified_no_adoption",
+      "kind": "review_receipt"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0969/receipts/xls-helper-status-post-aa-v1.json",
+      "bytes": 7471,
+      "sha256": "df02744a38c923fd0c6ab0c6fd69ab77776c950ae298c78e9a9c485638f23130",
+      "status": "historical_invalidated_v1_factual_receipt_errors_and_unexecuted_post_seal_edits",
+      "kind": "receipt",
+      "packet_path": "review/incident/xls-helper-status-post-aa-v1-invalidated.json",
+      "packet_sha256": "df02744a38c923fd0c6ab0c6fd69ab77776c950ae298c78e9a9c485638f23130",
+      "packet_bytes": 7471,
+      "note": "Preserved as historical incident evidence; never an approval or workload result."
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0969/receipts/xls-helper-status-post-aa-v2-correction.json",
+      "bytes": 7032,
+      "sha256": "8ac0a66f07e715b77028c0df885688d3bde02a5f58bb98ab5c0e9296b315b845",
+      "packet_path": "review/xls-helper-status-post-aa-v2-correction.json",
+      "status": "current_correction_unqualified_no_adoption_external_only_no_workload",
+      "kind": "corrected_status_receipt",
+      "note": "Corrects v1 factual fields from retained AA readiness/stage artifacts; does not approve XLS or authorize launch."
+    }
+  ],
+  "incident_note": "The post-AA XLS v1 status receipt is preserved under review/incident as historical evidence only: root identified a factual design hash error in that receipt and unexecuted post-seal edits to the original XLS guard/test drafts. The v2 design bytes were unchanged; only the guard/tests changed after the old seal, so the historical seal is invalidated and provides no approval. The corrected v2 receipt is copied under review; it directly parses the retained AA readiness/stage artifacts (42 of 96 checks failed, 54 passed, 24 cells, 12 pairs per cell, bootstrap seed 969004) and remains unqualified_no_adoption with no workload or formal launch. This does not alter the used DOC v4 protocol or the 576-child AA raw capture. The authoritative independent A/A audit is now copied; it reports 576 valid packets, zero errors, custody/oracle passes, and exact agreement with the 42-of-96 readiness failure.",
+  "rule": "External raw packets, source trees/archives, target directories, compiled binaries, draft helper code, and unapproved XLS artifacts remain outside the repository.",
+  "authoritative_audit": {
+    "path": "/home/zhuhe/litchi-performance-0969/analysis/aa-independent-audit-v1.json",
+    "packet_path": "review/independent-raw-audit-0969-v1.json",
+    "bytes": 78464,
+    "sha256": "f0d0d0b63a896be41dab84550ff39f59954c26538423be2a3d3d017df9f26775",
+    "helper_path": "/home/zhuhe/litchi-performance-0969/tools/independent_audit_aa_v1.py",
+    "helper_packet_path": "tools/independent_audit_aa_v1.py",
+    "helper_bytes": 35015,
+    "helper_sha256": "09a8749910a1da49579a8ea782c3a6a11b34a303cd56818ac30d1b500069441a",
+    "status": "authoritative_pass_576_valid_packets_zero_errors_custody_and_oracles_pass_exact_42_of_96_readiness_fail",
+    "scope": "read_only_audit_of_retained_baseline_aa_capture; no_candidate_formal_or_xls_workload"
+  },
+  "maintained_decision": {
+    "input_path": "/home/zhuhe/litchi-performance-0969/analysis/perf-decision-input-v1.json",
+    "input_packet_path": "decision/perf-decision-input-v1.json",
+    "input_bytes": 2866,
+    "input_sha256": "918d2ed8e7efdc3832673a9a48366d6ad34a97b5aedd023dbe4569d5ec69b896",
+    "output_path": "/home/zhuhe/litchi-performance-0969/analysis/perf-decision-output-v1.json",
+    "output_packet_path": "decision/perf-decision-output-v1.json",
+    "output_bytes": 3187,
+    "output_sha256": "125818db8bcf05306626230cbedd5864de53991b8a69e7ec7116299ae49ec0ba",
+    "command_receipt_packet_path": "decision/perf-decision-command-v1.json",
+    "command_receipt_sha256": "8fbc96089046ac31a10ffa2646e014b1dcc58f913ec2d78124834d6285a07c76",
+    "replay_review_packet_path": "review/perf-decision-replay-independent-v1.json",
+    "decision": "uninterpretable",
+    "candidate_adoption": null,
+    "formal_candidate_lanes_measured": false,
+    "status": "authoritative_complete_no_adoption"
+  },
+  "cleanup": {
+    "plan_path": "/home/zhuhe/litchi-performance-0969/receipts/cleanup-plan-v1.json",
+    "plan_packet_path": "receipts/cleanup-plan-v1.json",
+    "plan_sha256": "26704c5cfc3ab6c59b5bd4a31d40166b94d7822949cc12e0051f8e0ffa0a309c",
+    "root_go_path": "/home/zhuhe/litchi-performance-0969/receipts/root-go-cleanup-v1.json",
+    "root_go_packet_path": "receipts/root-go-cleanup-v1.json",
+    "root_go_sha256": "284aa78eff5a612cdd7516f38da09293062974696e43a4032946498541d762b9",
+    "receipt_path": "/home/zhuhe/litchi-performance-0969/receipts/build-cache-cleanup-v1.json",
+    "receipt_packet_path": "receipts/build-cache-cleanup-v1.json",
+    "receipt_bytes": 25785,
+    "receipt_sha256": "76611af155005a9f266be5c4a5267ef78ba55808cb76a9e1f7961ce75ab68c80",
+    "bytes_freed_allocated": 13264674816,
+    "status": "complete_preserves_executables_metadata_source_raw_logs_receipts"
+  }
+}
