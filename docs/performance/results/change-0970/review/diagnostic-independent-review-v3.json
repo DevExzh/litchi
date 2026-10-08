@@ -1,0 +1,253 @@
+{
+  "admission": "approved_for_root_go_only",
+  "approved_cli": [
+    "env LC_ALL=C LANG=C PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.14 /home/zhuhe/litchi-performance-0970/tools/run_0970_v3.py --plan /home/zhuhe/litchi-performance-0970/plans/plan-0970-v6.json --run --go /home/zhuhe/litchi-performance-0970/receipts/root-go-0970-v4.json --output-root /home/zhuhe/litchi-performance-0970/capture/diagnostic-v3"
+  ],
+  "created_utc": "2026-10-08T02:37:06.777839+00:00",
+  "custody_review": {
+    "binary": "0967 ordinary baseline exact SHA/bytes/executable binding",
+    "design_and_correction": "final v3 design and correction-v2 hash-bound",
+    "fixtures": "both exact fixture path/bytes/SHA bindings",
+    "result": "pass",
+    "source": "0969 v1 baseline_sha256 manifest, 924 entries; plan preflight revalidated source custody",
+    "tools": "perf/time/python addendum and hashes bound"
+  },
+  "delta_review": {
+    "F1_affinity_arm_binding": "pass: controls v2 is bound and validated before reduction; condition mask custody rejects swapped pinned/unpinned packet masks.",
+    "F2_audited_mask": "pass: plan/runner/root GO require live allowed [0..31] and pin CPU 31 before child 1.",
+    "F3_locale": "pass: plan, runner child environment, packet/stage fields, and root GO bind LC_ALL=C, LANG=C, PYTHONDONTWRITEBYTECODE=1.",
+    "F4_seal_time": "pass: correction-v2 binds the prior unknown-time correction; original placeholder seals remain immutable.",
+    "F5_perf_scope": "pass: plan/reducer/correction state perf measures launched GNU time and inherited launcher/baseline tree while excluding perf bookkeeping; GNU time and harness Instant scopes remain separate.",
+    "F6_header_admission": "pass: protocol v3 admits blank lines and only the exact # started on  prefix, then requires exactly the six expected events; malformed, unexpected comments, duplicate, missing, and not-counted cases reject."
+  },
+  "hash_verification": {
+    "all_direct_bindings_match_disk": true,
+    "correction_binding_consistent": true,
+    "final_helper_seal_schema": "litchi.performance.0970.helper_seal.v2",
+    "final_plan_schema": "litchi.performance.0970.plan.v2",
+    "final_seal_schema": "litchi.performance.0970.diagnostic_seal.v2",
+    "helper_rows_match_final_seal": true,
+    "helper_rows_match_plan": true,
+    "prior_blocked_review_preserved": true,
+    "prior_manual_digest_typo_not_reused": true
+  },
+  "material_conclusion": "Final F6 parser correction is independently verified against the actual frozen wrapper shape. The v3/v6 implementation is approved for root GO preparation; no measurement or candidate conclusion is implied, and the root GO must bind this receipt plus a fresh quiescence receipt before capture.",
+  "reviewer": "/root/cpu_review",
+  "root_go_required_fields": {
+    "authorized": true,
+    "binary": "historical baseline path/SHA/bytes binding",
+    "correction_receipt": "exact correction-v2 path/SHA/bytes binding; validator also requires prior F1-F5 correction and original seal time unknown",
+    "design": "exact design-v3 path/SHA/bytes binding",
+    "environment": {
+      "LANG": "C",
+      "LC_ALL": "C",
+      "PYTHONDONTWRITEBYTECODE": "1"
+    },
+    "fixtures": "both fixture path/SHA/bytes bindings",
+    "helper_seal": "exact helper-seal-final-v6 path/SHA/bytes binding",
+    "helpers": "all five final helper path/SHA/bytes bindings",
+    "host": {
+      "affinity_probe": "plan-bound child affinity probe",
+      "allowed_affinity": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31
+      ],
+      "audit": "plan-bound host audit",
+      "pin_cpu": 31,
+      "telemetry_probe": "plan-bound six-event probe",
+      "tool_addendum": "plan-bound tool addendum"
+    },
+    "independent_review": "this review receipt path/SHA/bytes with status pass",
+    "no_retry": true,
+    "plan": "exact binding to /home/zhuhe/litchi-performance-0970/receipts/root-go-0970-v4.json plan target /home/zhuhe/litchi-performance-0970/plans/plan-0970-v6.json SHA/bytes",
+    "quiescence": "fresh status-pass receipt binding with no Cargo/rustc/test/benchmark/workload offenders",
+    "schema": "litchi.performance.0970.root_go.v1",
+    "source": "v1 source and source-file manifest path/SHA/bytes bindings",
+    "status": "authorized",
+    "validator": "0969 strict validator path/SHA binding"
+  },
+  "schedule_and_scope": {
+    "bootstrap_resamples": 10000,
+    "bootstrap_seed": 970001,
+    "candidate": false,
+    "cells": 4,
+    "children_per_cell": 24,
+    "historical_baseline_only": true,
+    "pair_order": "odd unpinned->pinned; even pinned->unpinned",
+    "pairs_per_cell": 12,
+    "qualification": false,
+    "result": "pass",
+    "retry": false,
+    "samples": 80,
+    "serial": true,
+    "total_children": 96,
+    "warmups": 5
+  },
+  "schema": "litchi.performance.0970.independent_review.v3",
+  "scope": "read-only final independent review of F6-corrected v3/v6 seal set; no benchmark workload, build, capture, or sealed-artifact mutation",
+  "sealed_inputs": {
+    "correction_receipt": {
+      "bytes": 1370,
+      "path": "/home/zhuhe/litchi-performance-0970/receipts/correction-0970-v2.json",
+      "sha256": "2b3f2bf4651d1381820c318909e08b489bdd16eedd6e71fd9168c901904342af"
+    },
+    "design": {
+      "bytes": 15310,
+      "path": "/home/zhuhe/litchi-performance-0970/diagnostic-design-v3.md",
+      "sha256": "95aa5817f95a038c32dfbd4af7906eb474df3546aa321f0adf72c1572e3b462b"
+    },
+    "diagnostic_seal": {
+      "bytes": 2622,
+      "path": "/home/zhuhe/litchi-performance-0970/receipts/diagnostic-seal-0970-v3.json",
+      "sha256": "ce9b47c4734ef489e13fb0fcc3e88cd029d973228209868a7e3e43567ad3e0a8"
+    },
+    "helper_seal": {
+      "bytes": 3294,
+      "path": "/home/zhuhe/litchi-performance-0970/receipts/helper-seal-0970-final-v6.json",
+      "sha256": "e3c9cefcbf0fec93234ba3e6fec8431ac0fc7bf0d715d3c4aeceaa70386dd4e5"
+    },
+    "helpers": {
+      "launcher": {
+        "bytes": 3597,
+        "path": "/home/zhuhe/litchi-performance-0970/tools/launch_baseline_v2.py",
+        "sha256": "3b5b79351883a9b4efb680f47498d8e10bdf77d131a60d11c1ecb54ad95430f5"
+      },
+      "plan_generator": {
+        "bytes": 9902,
+        "path": "/home/zhuhe/litchi-performance-0970/tools/prepare_plan_0970_v3.py",
+        "sha256": "1f4cd838bcf5eff859e9f893d0ba420b8e0e5904af51f855d11fe5f3e0ee2e93"
+      },
+      "protocol": {
+        "bytes": 29808,
+        "path": "/home/zhuhe/litchi-performance-0970/tools/protocol_0970_v3.py",
+        "sha256": "f060aef4e863e8953811e3f9fbec2d4cbee51dce80881245e5eb7ba0f21ec28e"
+      },
+      "reducer": {
+        "bytes": 17419,
+        "path": "/home/zhuhe/litchi-performance-0970/tools/reduce_0970_v3.py",
+        "sha256": "d00cdd48e9cb92dfc23a980c5962cc9b91884eb09c3bc52e4dd27d93382d1c39"
+      },
+      "runner": {
+        "bytes": 33212,
+        "path": "/home/zhuhe/litchi-performance-0970/tools/run_0970_v3.py",
+        "sha256": "f8ebf05d10ca3e493abe18d8a3fb9739d51d57d9cf9156057b5f8bcb0e891454"
+      }
+    },
+    "host_receipts": {
+      "affinity_probe": {
+        "bytes": 2350,
+        "path": "/home/zhuhe/litchi-performance-0970/affinity-probe-v1.json",
+        "sha256": "0f2e97080d2ba9898a3c0c74660f3280a4cbb66e4546997fa93749d476ce6a17"
+      },
+      "audit": {
+        "bytes": 18839,
+        "path": "/home/zhuhe/litchi-performance-0970/host-audit-v1.md",
+        "sha256": "37e204363bee72eb7d3080300dd32ce5ce21d53be86dee2c9e726b086f6901c5"
+      },
+      "telemetry_probe": {
+        "bytes": 887,
+        "path": "/home/zhuhe/litchi-performance-0970/telemetry-probe-v1.json",
+        "sha256": "8cb97d377c6162c57e1ae092c7c8e33f9b2b23c38aa2d44f188d3831e20614dc"
+      },
+      "tool_addendum": {
+        "bytes": 6614,
+        "path": "/home/zhuhe/litchi-performance-0970/host-tool-addendum-v1.json",
+        "sha256": "0e013628d436d00b2ca13b17c89458cf6288c56655b442e1b20965c90cc79a81"
+      }
+    },
+    "plan": {
+      "bytes": 8753,
+      "path": "/home/zhuhe/litchi-performance-0970/plans/plan-0970-v6.json",
+      "sha256": "4043a33e413476961feb5c4712689be9bd392f341c30d7d5a8bd73406d033e7b"
+    }
+  },
+  "status": "pass",
+  "tests": [
+    {
+      "actual_perf_header_accepted": true,
+      "build_started": false,
+      "command": "PYTHONDONTWRITEBYTECODE=1 LC_ALL=C LANG=C /usr/bin/python3.14 tools/run_0970_v3.py --self-test",
+      "duplicate_event_rejected": true,
+      "malformed_row_rejected": true,
+      "missing_event_rejected": true,
+      "returncode": 0,
+      "status": "pass",
+      "unexpected_comment_rejected": true,
+      "workload_started": false
+    },
+    {
+      "build_started": false,
+      "command": "PYTHONDONTWRITEBYTECODE=1 LC_ALL=C LANG=C /usr/bin/python3.14 tools/reduce_0970_v3.py --self-test",
+      "missing_affinity_rejected": true,
+      "returncode": 0,
+      "status": "pass",
+      "swapped_affinity_rejected": true,
+      "workload_started": false
+    },
+    {
+      "build_started": false,
+      "command": "PYTHONDONTWRITEBYTECODE=1 LC_ALL=C LANG=C /usr/bin/python3.14 tools/run_0970_v3.py --plan /home/zhuhe/litchi-performance-0970/plans/plan-0970-v6.json",
+      "returncode": 0,
+      "status": "preflight_pass",
+      "workload_started": false
+    },
+    {
+      "status": "pass",
+      "test": "AST parse of launch_v2/protocol_v3/prepare_v3/runner_v3/reducer_v3"
+    },
+    {
+      "all_mutations_rejected": true,
+      "status": "pass",
+      "test": "direct affinity-control valid/swapped/missing/wrong-allowed mutation set",
+      "valid_accepted": true
+    },
+    {
+      "both_rejected": true,
+      "status": "pass",
+      "test": "direct packet condition-mask mutation (pinned full and unpinned pin)"
+    },
+    {
+      "comment_header_observed": "# started on <timestamp>",
+      "execve": true,
+      "launch_parser": "launch.v2 accepted",
+      "multiplexed_events": [],
+      "perf_parser": "six expected events accepted",
+      "pid_equals_exec_pid": true,
+      "returncode": 0,
+      "status": "pass",
+      "test": "exact perf->time->launch_v2->/usr/bin/true wrapper under C locale",
+      "time_parser": "all seven fields accepted",
+      "workload_started": false
+    }
+  ]
+}

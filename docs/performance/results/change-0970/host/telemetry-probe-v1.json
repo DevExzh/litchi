@@ -1,0 +1,29 @@
+{
+  "schema": "litchi.performance.0970.perf_capability_probe.v1",
+  "started_utc": "2026-10-08T02:08:02.142091+00:00",
+  "ended_utc": "2026-10-08T02:08:02.191669+00:00",
+  "host": "ip-172-31-39-190",
+  "command": [
+    "/usr/bin/perf",
+    "stat",
+    "-x,",
+    "-e",
+    "task-clock,cycles,instructions,context-switches,cpu-migrations,page-faults",
+    "--",
+    "/usr/bin/true"
+  ],
+  "returncode": 0,
+  "stdout": "",
+  "stderr": "27.51,msec,task-clock,27514249,100.00,,\n961846,,cycles,27514249,100.00,,\n741538,,instructions,27514249,100.00,,\n0,,context-switches,27514249,100.00,,\n0,,cpu-migrations,27514249,100.00,,\n59,,page-faults,27514249,100.00,,\n",
+  "events": [
+    "task-clock",
+    "cycles",
+    "instructions",
+    "context-switches",
+    "cpu-migrations",
+    "page-faults"
+  ],
+  "target": "/usr/bin/true",
+  "workload_started": false,
+  "benchmark_started": false
+}

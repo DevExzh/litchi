@@ -1,0 +1,67 @@
+{
+  "bindings": {
+    "correction_receipt": {
+      "bytes": 8455,
+      "path": "/home/zhuhe/litchi-performance-0970/receipts/reducer-correction-0970-v3.json",
+      "sha256": "f394858ba3aa43a912cc7abb4dc6e0fbae1fc5d089c9f82ce93e0fcd5e33af1c"
+    },
+    "manifest": {
+      "bytes": 19187,
+      "path": "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/capture-manifest-v2.json",
+      "sha256": "b0943c4572304dccc3a70dde17cce3894a35535e4c52fb7efb2526eb760b8685"
+    },
+    "output": {
+      "bytes": 555437,
+      "path": "/home/zhuhe/litchi-performance-0970/analysis/affinity-diagnostic-v6-final.json",
+      "sha256": "560e4cae2cd338fd936c57d8f3aa9ecd663aa84736ce8ea5aa431a161066c4da"
+    },
+    "raw_audit_receipt": {
+      "bytes": 17744,
+      "path": "/home/zhuhe/litchi-performance-0970/review/raw-independent-audit-receipt-0970-v1.json",
+      "sha256": "a0289335606c81deafa601c5334e71cdd542e4137ab82241c572fa1b02a363a2"
+    },
+    "reducer": {
+      "bytes": 24906,
+      "path": "/home/zhuhe/litchi-performance-0970/tools/reduce_0970_v6.py",
+      "sha256": "1cc1245b9132c80ff57172e146e5628b148f2d108ed108c4c80b9de6777e2423"
+    }
+  },
+  "definition_verification": {
+    "between_cv": "population SD/mean across 12 child p50 centers",
+    "between_percentiles": "nearest-rank ceil(q*n), one-indexed, for p25/p75/p95; linear median",
+    "child_percentiles": "linear interpolation at (n-1)*q for p50/p95/p99; within_tail p95/p50",
+    "context_adapter": "context.pair/condition/order_position copied before child summary",
+    "dispersion": "pinned/unpinned aggregate IQR, MAD, IQR/median, MAD/median point ratios with paired bootstrap",
+    "telemetry": "raw launch/time/perf retained; whole-process scope explicit; derived ratios frequency_claim false",
+    "within_cv": "per-child population SD/mean over 80 elapsed samples, then linear median across 12 children",
+    "within_iqr": "v6 retained order-statistic indices floor(.75*(n-1))-floor(.25*(n-1)) for each 80-sample child",
+    "zero_handling": "null with explicit reason; no zero substitution"
+  },
+  "errors": [],
+  "generated_utc": "2026-10-08T02:48:03.575295+00:00",
+  "interpretation": "Pass resolves the prior reducer adapter/tooling failure for this frozen capture. The result remains descriptive historical-baseline affinity telemetry and makes no host-cause, candidate qualification, optimization, or adoption claim.",
+  "replay_checks": {
+    "between_summaries_recomputed": 16,
+    "bootstrap_groups_recomputed": 56,
+    "cells": 4,
+    "children_recomputed": 96,
+    "decision_null": true,
+    "output_errors_empty": true,
+    "output_status_complete": true,
+    "qualification_null": true,
+    "raw_packets": 96,
+    "raw_packets_retained": true
+  },
+  "schema": "litchi.performance.0970.independent_reducer_review.v1",
+  "scope": "Independent read-only arithmetic replay against frozen raw packets and reducer v6 output; no workload/build and no shared reducer import.",
+  "static_fix_checks": {
+    "context_adapter": true,
+    "diagnostic_only": true,
+    "exclusive_output": true,
+    "iqr_mad_ratios": true,
+    "nearest_rank": true,
+    "population_sample_cv": true,
+    "whole_process_scope": true
+  },
+  "status": "pass"
+}

@@ -1,0 +1,63 @@
+{
+  "created_utc": "2026-10-08T02:39:17.290537+00:00",
+  "exit_code": 0,
+  "result": {
+    "allowed_affinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31
+    ],
+    "expected_packet_count": 96,
+    "failure": null,
+    "lang": "C",
+    "lc_all": "C",
+    "no_retry": true,
+    "packet_count": 96,
+    "pin_cpu": 31,
+    "python_dontwritebytecode": "1",
+    "schema": "litchi.performance.0970.capture_stage.v2",
+    "status": "complete"
+  },
+  "retries": 0,
+  "root_go": {
+    "bytes": 6564,
+    "path": "/home/zhuhe/litchi-performance-0970/receipts/root-go-0970-v4.json",
+    "sha256": "0a3b31d4ed1daad2b8bf0ce04f3977b97e7e4510580c81ccab50d82b775f6310"
+  },
+  "schema": "litchi.performance.0970.root_terminal.v1",
+  "session_id": 80049,
+  "stage": {
+    "bytes": 533,
+    "path": "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/capture-stage-v2.json",
+    "sha256": "244e033250f303328b7c4f3b1b729c4d3548886e9153b7ecfe5a996669871143"
+  }
+}

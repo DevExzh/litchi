@@ -1,0 +1,121 @@
+{
+  "bindings": {
+    "author_output": {
+      "bytes": 555437,
+      "path": "/home/zhuhe/litchi-performance-0970/analysis/affinity-diagnostic-v6-final.json",
+      "sha256": "560e4cae2cd338fd936c57d8f3aa9ecd663aa84736ce8ea5aa431a161066c4da"
+    },
+    "correction_receipt": {
+      "bytes": 8455,
+      "path": "/home/zhuhe/litchi-performance-0970/receipts/reducer-correction-0970-v3.json",
+      "sha256": "f394858ba3aa43a912cc7abb4dc6e0fbae1fc5d089c9f82ce93e0fcd5e33af1c"
+    },
+    "independent_review": {
+      "bytes": 3225,
+      "path": "/home/zhuhe/litchi-performance-0970/review/independent-reducer-review-0970-v1.json",
+      "sha256": "b2582eff6624b90eeaaa42568b2fbbb095e9d4a5319b65bda61355fd5fe7d732"
+    },
+    "manifest": {
+      "bytes": 19187,
+      "path": "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/capture-manifest-v2.json",
+      "sha256": "b0943c4572304dccc3a70dde17cce3894a35535e4c52fb7efb2526eb760b8685"
+    },
+    "plan": {
+      "bytes": 8753,
+      "path": "/home/zhuhe/litchi-performance-0970/plans/plan-0970-v6.json",
+      "sha256": "4043a33e413476961feb5c4712689be9bd392f341c30d7d5a8bd73406d033e7b"
+    },
+    "raw_audit_receipt": {
+      "bytes": 17744,
+      "path": "/home/zhuhe/litchi-performance-0970/review/raw-independent-audit-receipt-0970-v1.json",
+      "sha256": "a0289335606c81deafa601c5334e71cdd542e4137ab82241c572fa1b02a363a2"
+    },
+    "reducer": {
+      "bytes": 24906,
+      "path": "/home/zhuhe/litchi-performance-0970/tools/reduce_0970_v6.py",
+      "sha256": "1cc1245b9132c80ff57172e146e5628b148f2d108ed108c4c80b9de6777e2423"
+    },
+    "root_go": {
+      "bytes": 6564,
+      "path": "/home/zhuhe/litchi-performance-0970/receipts/root-go-0970-v4.json",
+      "sha256": "0a3b31d4ed1daad2b8bf0ce04f3977b97e7e4510580c81ccab50d82b775f6310"
+    },
+    "self_test_stdout": {
+      "bytes": 392,
+      "path": "/tmp/reducer-0970-v6-selftest-final.stdout",
+      "sha256": "5e98953fbc0a12d2ec305117ae4c8754b5f4c8a3d77ff6ce6c49663d6d215aa5"
+    },
+    "v5_to_v6_diff": {
+      "bytes": 9772,
+      "path": "/tmp/reducer-0970-v5-v6.diff",
+      "sha256": "dd2594951ce707cc1ed6d1adae7f11fcc9e9507c600b8b5818fbe30b7fe82f31"
+    }
+  },
+  "created_utc": "2026-10-08T02:48:37.736632+00:00",
+  "deterministic_replay": {
+    "byte_identical_to_author_output": true,
+    "command": "PYTHONDONTWRITEBYTECODE=1 python3 tools/reduce_0970_v6.py --plan plans/plan-0970-v6.json --manifest capture/diagnostic-v3/capture-manifest-v2.json --output /tmp/affinity-diagnostic-v6-independent-replay-20261008.json",
+    "output_sha256": "560e4cae2cd338fd936c57d8f3aa9ecd663aa84736ce8ea5aa431a161066c4da",
+    "returncode": 0,
+    "sealed_output_overwritten": false,
+    "status": "complete",
+    "workload_started": false
+  },
+  "independent_review": {
+    "definitions": {
+      "between_cv": "population SD/mean across 12 child p50 centers",
+      "between_percentiles": "nearest-rank ceil(q*n), one-indexed, for p25/p75/p95; linear median",
+      "child_percentiles": "linear interpolation at (n-1)*q for p50/p95/p99; within_tail p95/p50",
+      "context_adapter": "context.pair/condition/order_position copied before child summary",
+      "dispersion": "pinned/unpinned aggregate IQR, MAD, IQR/median, MAD/median point ratios with paired bootstrap",
+      "telemetry": "raw launch/time/perf retained; whole-process scope explicit; derived ratios frequency_claim false",
+      "within_cv": "per-child population SD/mean over 80 elapsed samples, then linear median across 12 children",
+      "within_iqr": "v6 retained order-statistic indices floor(.75*(n-1))-floor(.25*(n-1)) for each 80-sample child",
+      "zero_handling": "null with explicit reason; no zero substitution"
+    },
+    "path": "/home/zhuhe/litchi-performance-0970/review/independent-reducer-review-0970-v1.json",
+    "replay_checks": {
+      "between_summaries_recomputed": 16,
+      "bootstrap_groups_recomputed": 56,
+      "cells": 4,
+      "children_recomputed": 96,
+      "decision_null": true,
+      "output_errors_empty": true,
+      "output_status_complete": true,
+      "qualification_null": true,
+      "raw_packets": 96,
+      "raw_packets_retained": true
+    },
+    "sha256": "b2582eff6624b90eeaaa42568b2fbbb095e9d4a5319b65bda61355fd5fe7d732",
+    "static_fix_checks": {
+      "context_adapter": true,
+      "diagnostic_only": true,
+      "exclusive_output": true,
+      "iqr_mad_ratios": true,
+      "nearest_rank": true,
+      "population_sample_cv": true,
+      "whole_process_scope": true
+    },
+    "status": "pass"
+  },
+  "interpretation_constraint": "Approval resolves the v6 reducer tooling failure only. The output remains descriptive historical-baseline affinity telemetry and makes no host-cause, source-owner, candidate qualification, optimization, or adoption claim.",
+  "review_conclusion": {
+    "adapter_fix": "pass: context pair/condition/order_position are copied before child summary.",
+    "between_quantiles": "pass: nearest-rank ceil(q*n) p25/p75/p95; linear median.",
+    "blockers": [],
+    "custody": "pass: output is complete 96/96 with zero errors and raw packet retention; prior independent raw audit also passed.",
+    "iqr_mad": "pass: raw and normalized IQR/MAD dispersion ratios plus paired bootstrap intervals are present and independently matched.",
+    "whole_process": "pass: time/perf telemetry retained, derived cycles/instructions and cycles/task-clock retain frequency_claim=false and explicit process-tree scope.",
+    "within_cv": "pass: population SD/mean per child over 80 elapsed samples, then median over 12 children."
+  },
+  "schema": "litchi.performance.0970.reducer_v6_independent_approval.v1",
+  "scope": "Independent read-only review/replay of reducer v6 over the frozen 0970 capture; no native workload, build, raw mutation, or sealed-output overwrite.",
+  "self_test": {
+    "command": "PYTHONDONTWRITEBYTECODE=1 python3 tools/reduce_0970_v6.py --self-test",
+    "returncode": 0,
+    "status": "self_test_pass",
+    "stdout_sha256": "5e98953fbc0a12d2ec305117ae4c8754b5f4c8a3d77ff6ce6c49663d6d215aa5",
+    "workload_started": false
+  },
+  "status": "pass"
+}

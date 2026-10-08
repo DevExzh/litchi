@@ -1,0 +1,26 @@
+{
+  "correction": {
+    "F6": "The fresh protocol parser admits blank lines and the exact perf header prefix # started on , then requires exactly the six expected CSV events. Other comments, malformed rows, duplicates, missing events, and missing counters remain rejected.",
+    "scope": "Wrapper-only parser admission; no measurement thresholds, workload schedule, binary, source, affinity, or custody changes."
+  },
+  "created_utc": "2026-10-08T02:34:41.730793+00:00",
+  "independent_review_blocked_v2": {
+    "bytes": 9133,
+    "path": "/home/zhuhe/litchi-performance-0970/review/diagnostic-independent-review-v2.json",
+    "sha256": "7d7a4c9459de1c9a6fadc233183dd0562749f4f4150c66acd13ed921c520c141"
+  },
+  "no_build_or_workload": true,
+  "prior_combined_seal": {
+    "bytes": 4346,
+    "path": "/home/zhuhe/litchi-performance-0970/receipts/diagnostic-seal-0970-v2.json",
+    "sha256": "2d43ced5c96ede56999ebdb2a2ab86c000d82325c6dbb8d0da6ce89c3e760f65"
+  },
+  "prior_correction": {
+    "bytes": 1691,
+    "path": "/home/zhuhe/litchi-performance-0970/receipts/seal-timestamp-correction-0970-v1.json",
+    "sha256": "35e06a7cda902c9126b464b98b9ccd3767b307d99a64ce0fad0efe8579ca2081"
+  },
+  "purpose": "additive F6 perf CSV parser correction; all prior F1-F5 receipts remain immutable",
+  "schema": "litchi.performance.0970.correction_receipt.v2",
+  "status": "pass"
+}

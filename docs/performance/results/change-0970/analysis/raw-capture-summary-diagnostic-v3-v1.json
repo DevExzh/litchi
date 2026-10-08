@@ -1,0 +1,165 @@
+{
+  "capture_manifest": {
+    "bytes": 19187,
+    "path": "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/capture-manifest-v2.json",
+    "sha256": "b0943c4572304dccc3a70dde17cce3894a35535e4c52fb7efb2526eb760b8685"
+  },
+  "capture_root": "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3",
+  "capture_stage": {
+    "bytes": 533,
+    "path": "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/capture-stage-v2.json",
+    "sha256": "244e033250f303328b7c4f3b1b729c4d3548886e9153b7ecfe5a996669871143"
+  },
+  "copy_policy": {
+    "capture_metadata_copied_to_repository": true,
+    "compiled_executables_copied_to_repository": false,
+    "raw_packets_copied_to_repository": false,
+    "raw_stdout_stderr_copied_to_repository": false,
+    "sidecars_copied_to_repository": false
+  },
+  "final_manifest": {
+    "path": "docs/performance/results/change-0970/packet-manifest-0970-v1.json",
+    "status": "sealed_after_cleanup"
+  },
+  "independent_raw_audit": {
+    "affinity": "pass: pinned expected/observed CPU 31; unpinned observed within allowed CPUs 0..31",
+    "correctness": "pass: exact packet/report/route/sample gate and oracle checks",
+    "helper": {
+      "bytes": 39998,
+      "path": "/home/zhuhe/litchi-performance-0970/review/independent_raw_audit_0970_v1.py",
+      "sha256": "ab24c3cafeb9db4151c5f1677b01cb490b90e7eaa782507078d6e4be1865b25f"
+    },
+    "interpretation": "Independent scalar output is descriptive diagnostics only; it does not qualify a candidate, establish causality, or replace the corrected shared reducer review.",
+    "raw_custody": "pass: 582 capture files exactly referenced; 96 packets, 192 stdout/stderr files, 288 perf/time/launch sidecars; terminal 0 with zero retries",
+    "receipt": {
+      "bytes": 17744,
+      "path": "/home/zhuhe/litchi-performance-0970/review/raw-independent-audit-receipt-0970-v1.json",
+      "sha256": "a0289335606c81deafa601c5334e71cdd542e4137ab82241c572fa1b02a363a2"
+    },
+    "report": {
+      "bytes": 18712,
+      "path": "/home/zhuhe/litchi-performance-0970/review/raw-independent-audit-0970-v1.json",
+      "sha256": "30e2c51dbf541fdacc15d9ac23e2528b64551f4949c27659d8df409593cdf000"
+    },
+    "scalar_output": {
+      "bytes": 202643,
+      "path": "/home/zhuhe/litchi-performance-0970/review/raw-independent-scalars-0970-v1.json",
+      "sha256": "c9bca1f01c575678f20632e7ecdd7ded0075e7baf7094523b22914f11abfcd70"
+    },
+    "status": "pass_with_historical_tooling_status",
+    "tooling_resolution": "The shared v3 reducer failure is historical; the independently approved v6 reducer replay resolves the tooling finding."
+  },
+  "interpretation": "The v6 reduction is complete and independently approved as descriptive pinned-versus-unpinned historical-baseline telemetry over 96 packets. It provides no host-cause, source-owner, candidate qualification, optimization, adoption, or causal conclusion. Cleanup and final packet validation are complete.",
+  "raw_inventory": {
+    "bytes": 210822,
+    "capture_set_sha256": "2b0b8d30b2983e0de6ff11914c57a13317854088c39d861e0f2be2a832667346",
+    "file_count": 582,
+    "inventory_is_external_only": true,
+    "max_file_bytes": 702262,
+    "path": "/home/zhuhe/litchi-performance-0970/analysis/raw-inventory-diagnostic-v3-v1.json",
+    "raw_file_count": 576,
+    "raw_max_file_bytes": 702262,
+    "raw_set_sha256": "ec510a06c331809d77b8c25ec3f681e20e2a4641da430f54d20884fcf6c2b7b4",
+    "raw_total_bytes": 95242613,
+    "role_bytes": {
+      "capture_metadata": 23260,
+      "launch_sidecar": 133344,
+      "packet": 60909956,
+      "perf_sidecar": 26559,
+      "raw_stderr": 0,
+      "raw_stdout": 34158068,
+      "time_sidecar": 14686
+    },
+    "role_counts": {
+      "capture_metadata": 6,
+      "launch_sidecar": 96,
+      "packet": 96,
+      "perf_sidecar": 96,
+      "raw_stderr": 96,
+      "raw_stdout": 96,
+      "time_sidecar": 96
+    },
+    "schema": "litchi.performance.0970.raw_capture_inventory.v1",
+    "sha256": "d52b0eea9d7db551233317d59acf4a2ea857ee9630d3c23be83539649831d74d",
+    "total_bytes": 95265873
+  },
+  "reduction": {
+    "cleanup": {
+      "allocated_bytes_freed": 1830912,
+      "deleted_path_count": 4,
+      "deleted_regular_file_count": 21,
+      "main_checkout_touched": false,
+      "raw_and_authoritative_output_unchanged": true,
+      "receipt": {
+        "bytes": 13427,
+        "path": "/home/zhuhe/litchi-performance-0970/receipts/temporary-cleanup-0970-v1.json",
+        "sha256": "f17b2eca44d8a9111dec458cd18e26a6aed6b0d85b67f01140c4cd7cccda97cb"
+      },
+      "status": "completed"
+    },
+    "independent_raw_audit": "pass; immutable receipt historical tooling status retained and resolved by independent v6 reducer approval",
+    "shared_reducer_tooling": "resolved by independently approved v6 replay",
+    "v3_first_attempt": {
+      "capture_rerun": false,
+      "failure": "KeyError: pair",
+      "receipt_path": "/home/zhuhe/litchi-performance-0970/receipts/reducer-first-attempt-v1.json",
+      "receipt_sha256": "0b55e391aad14fcd17d07e362dfca33a07f85a3c94e7067e90d89cfd2669f33c",
+      "status": "failed_before_output"
+    },
+    "v4_correction_history": {
+      "receipt_path": "/home/zhuhe/litchi-performance-0970/receipts/reducer-correction-0970-v1.json",
+      "receipt_sha256": "087f2da6242ac84993e97d8b05c6daad84a10327ebb8af0af05196cede707735",
+      "status": "historical_intermediate"
+    },
+    "v6_authoritative": {
+      "approval": {
+        "bytes": 6130,
+        "path": "/home/zhuhe/litchi-performance-0970/review/reducer-v6-independent-approval-0970-v1.json",
+        "sha256": "3b73b06783d9a697ad846fd3cf9ff2c616a56853779db69f0b0923fdf23ee1d5"
+      },
+      "correction_receipt": {
+        "bytes": 8455,
+        "path": "/home/zhuhe/litchi-performance-0970/receipts/reducer-correction-0970-v3.json",
+        "sha256": "f394858ba3aa43a912cc7abb4dc6e0fbae1fc5d089c9f82ce93e0fcd5e33af1c"
+      },
+      "decision": null,
+      "diagnostic_only": true,
+      "errors": [],
+      "expected_packet_count": 96,
+      "independent_review": {
+        "bytes": 3225,
+        "path": "/home/zhuhe/litchi-performance-0970/review/independent-reducer-review-0970-v1.json",
+        "sha256": "b2582eff6624b90eeaaa42568b2fbbb095e9d4a5319b65bda61355fd5fe7d732"
+      },
+      "output": {
+        "bytes": 555437,
+        "path": "/home/zhuhe/litchi-performance-0970/analysis/affinity-diagnostic-v6-final.json",
+        "sha256": "560e4cae2cd338fd936c57d8f3aa9ecd663aa84736ce8ea5aa431a161066c4da"
+      },
+      "packet_count": 96,
+      "qualification": null,
+      "raw_packets_retained": true,
+      "reducer": {
+        "bytes": 24906,
+        "path": "/home/zhuhe/litchi-performance-0970/tools/reduce_0970_v6.py",
+        "sha256": "1cc1245b9132c80ff57172e146e5628b148f2d108ed108c4c80b9de6777e2423"
+      },
+      "status": "complete"
+    }
+  },
+  "regeneration": {
+    "inventory_descriptor": "The external inventory above contains one absolute path, relative path, byte count, and SHA-256 for every regular file under packets/, raw/, sidecars/, plus the six capture metadata files. Its raw_set_sha256 is the SHA-256 of sorted UTF-8 rows role\\trelative_path\\tbytes\\tsha256\\n; no repository copy of the raw inventory rows is made.",
+    "runner_cli": "env LC_ALL=C LANG=C PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.14 /home/zhuhe/litchi-performance-0970/tools/run_0970_v3.py --plan /home/zhuhe/litchi-performance-0970/plans/plan-0970-v6.json --run --go /home/zhuhe/litchi-performance-0970/receipts/root-go-0970-v4.json --output-root /home/zhuhe/litchi-performance-0970/capture/diagnostic-v3"
+  },
+  "schema": "litchi.performance.0970.raw_capture_summary.v1",
+  "status": "sealed",
+  "terminal": {
+    "bytes": 1218,
+    "expected_packet_count": 96,
+    "no_retry": true,
+    "packet_count": 96,
+    "path": "/home/zhuhe/litchi-performance-0970/receipts/root-terminal-0970-v1.json",
+    "retries": 0,
+    "sha256": "65cd348f4d5b45af972bf19c875ca6df8ccaa8687add15e47e9614f621d5c773"
+  }
+}

@@ -1,0 +1,723 @@
+{
+  "analysis": {
+    "cells": [
+      {
+        "cell": "docfloat/e1/default",
+        "children": 24,
+        "correlations": {
+          "p50_vs_output_bytes": {
+            "n_children": 24,
+            "pearson_r": null,
+            "spearman_rho": null,
+            "undefined_reason": "one or both variables are constant"
+          },
+          "p50_vs_output_capacity": {
+            "n_children": 24,
+            "pearson_r": null,
+            "spearman_rho": null,
+            "undefined_reason": "one or both variables are constant"
+          },
+          "p50_vs_rss": {
+            "n_children": 24,
+            "pearson_r": -0.3358738866924904,
+            "spearman_rho": -0.4196564569742881
+          },
+          "p50_vs_whole_child_wall": {
+            "n_children": 24,
+            "pearson_r": 0.5778700769152945,
+            "spearman_rho": 0.42434782608695654
+          }
+        },
+        "measured_sample_count": 1920,
+        "output_bytes_unique_values": [
+          342528
+        ],
+        "output_capacity_unique_values": [
+          342528
+        ],
+        "quartile_tails": [
+          {
+            "children": 6,
+            "label": "fastest_p50_quartile",
+            "measured_sample_count": 480,
+            "median_output_capacity_bytes": 342528.0,
+            "median_rss_kb": 13580.0,
+            "median_whole_child_wall_ns": 614425848.5,
+            "ranges": {
+              "elapsed_p50_ns": {
+                "max": 982049.0,
+                "median": 977456.5,
+                "min": 972389.0,
+                "n": 6
+              },
+              "output_bytes": {
+                "max": 342528.0,
+                "median": 342528.0,
+                "min": 342528.0,
+                "n": 6
+              },
+              "output_capacity_bytes": {
+                "max": 342528.0,
+                "median": 342528.0,
+                "min": 342528.0,
+                "n": 6
+              },
+              "rss_kb": {
+                "max": 14040.0,
+                "median": 13580.0,
+                "min": 13204.0,
+                "n": 6
+              },
+              "whole_child_wall_ns": {
+                "max": 614460909.0,
+                "median": 614425848.5,
+                "min": 614376390.0,
+                "n": 6
+              }
+            }
+          },
+          {
+            "children": 6,
+            "label": "slowest_p50_quartile",
+            "measured_sample_count": 480,
+            "median_output_capacity_bytes": 342528.0,
+            "median_rss_kb": 13382.0,
+            "median_whole_child_wall_ns": 639502033.0,
+            "ranges": {
+              "elapsed_p50_ns": {
+                "max": 1244070.0,
+                "median": 1219530.0,
+                "min": 1199425.0,
+                "n": 6
+              },
+              "output_bytes": {
+                "max": 342528.0,
+                "median": 342528.0,
+                "min": 342528.0,
+                "n": 6
+              },
+              "output_capacity_bytes": {
+                "max": 342528.0,
+                "median": 342528.0,
+                "min": 342528.0,
+                "n": 6
+              },
+              "rss_kb": {
+                "max": 13460.0,
+                "median": 13382.0,
+                "min": 13252.0,
+                "n": 6
+              },
+              "whole_child_wall_ns": {
+                "max": 664571407.0,
+                "median": 639502033.0,
+                "min": 614390540.0,
+                "n": 6
+              }
+            }
+          }
+        ],
+        "ranges": {
+          "elapsed_p50_ns": {
+            "max": 1244070.0,
+            "median": 1096306.75,
+            "min": 972389.0,
+            "n": 24
+          },
+          "output_bytes": {
+            "max": 342528.0,
+            "median": 342528.0,
+            "min": 342528.0,
+            "n": 24
+          },
+          "output_capacity_bytes": {
+            "max": 342528.0,
+            "median": 342528.0,
+            "min": 342528.0,
+            "n": 24
+          },
+          "rss_kb": {
+            "max": 14268.0,
+            "median": 13498.0,
+            "min": 13204.0,
+            "n": 24
+          },
+          "whole_child_wall_ns": {
+            "max": 664580903.0,
+            "median": 614462669.5,
+            "min": 614373353.0,
+            "n": 24
+          }
+        }
+      },
+      {
+        "cell": "docfloat/e32/default",
+        "children": 24,
+        "correlations": {
+          "p50_vs_output_bytes": {
+            "n_children": 24,
+            "pearson_r": null,
+            "spearman_rho": null,
+            "undefined_reason": "one or both variables are constant"
+          },
+          "p50_vs_output_capacity": {
+            "n_children": 24,
+            "pearson_r": null,
+            "spearman_rho": null,
+            "undefined_reason": "one or both variables are constant"
+          },
+          "p50_vs_rss": {
+            "n_children": 24,
+            "pearson_r": -0.39960712202715704,
+            "spearman_rho": -0.28608695652173916
+          },
+          "p50_vs_whole_child_wall": {
+            "n_children": 24,
+            "pearson_r": 0.8167101683746437,
+            "spearman_rho": 0.5539130434782609
+          }
+        },
+        "measured_sample_count": 1920,
+        "output_bytes_unique_values": [
+          686592
+        ],
+        "output_capacity_unique_values": [
+          686592
+        ],
+        "quartile_tails": [
+          {
+            "children": 6,
+            "label": "fastest_p50_quartile",
+            "measured_sample_count": 480,
+            "median_output_capacity_bytes": 686592.0,
+            "median_rss_kb": 16804.0,
+            "median_whole_child_wall_ns": 1365536424.5,
+            "ranges": {
+              "elapsed_p50_ns": {
+                "max": 7949552.5,
+                "median": 7855849.5,
+                "min": 7373035.0,
+                "n": 6
+              },
+              "output_bytes": {
+                "max": 686592.0,
+                "median": 686592.0,
+                "min": 686592.0,
+                "n": 6
+              },
+              "output_capacity_bytes": {
+                "max": 686592.0,
+                "median": 686592.0,
+                "min": 686592.0,
+                "n": 6
+              },
+              "rss_kb": {
+                "max": 17324.0,
+                "median": 16804.0,
+                "min": 16436.0,
+                "n": 6
+              },
+              "whole_child_wall_ns": {
+                "max": 1365604469.0,
+                "median": 1365536424.5,
+                "min": 1265320941.0,
+                "n": 6
+              }
+            }
+          },
+          {
+            "children": 6,
+            "label": "slowest_p50_quartile",
+            "measured_sample_count": 480,
+            "median_output_capacity_bytes": 686592.0,
+            "median_rss_kb": 16674.0,
+            "median_whole_child_wall_ns": 1415547472.0,
+            "ranges": {
+              "elapsed_p50_ns": {
+                "max": 8130358.0,
+                "median": 8094420.25,
+                "min": 8084718.0,
+                "n": 6
+              },
+              "output_bytes": {
+                "max": 686592.0,
+                "median": 686592.0,
+                "min": 686592.0,
+                "n": 6
+              },
+              "output_capacity_bytes": {
+                "max": 686592.0,
+                "median": 686592.0,
+                "min": 686592.0,
+                "n": 6
+              },
+              "rss_kb": {
+                "max": 17352.0,
+                "median": 16674.0,
+                "min": 16460.0,
+                "n": 6
+              },
+              "whole_child_wall_ns": {
+                "max": 1415700464.0,
+                "median": 1415547472.0,
+                "min": 1365548930.0,
+                "n": 6
+              }
+            }
+          }
+        ],
+        "ranges": {
+          "elapsed_p50_ns": {
+            "max": 8130358.0,
+            "median": 8056737.75,
+            "min": 7373035.0,
+            "n": 24
+          },
+          "output_bytes": {
+            "max": 686592.0,
+            "median": 686592.0,
+            "min": 686592.0,
+            "n": 24
+          },
+          "output_capacity_bytes": {
+            "max": 686592.0,
+            "median": 686592.0,
+            "min": 686592.0,
+            "n": 24
+          },
+          "rss_kb": {
+            "max": 17352.0,
+            "median": 16678.0,
+            "min": 16420.0,
+            "n": 24
+          },
+          "whole_child_wall_ns": {
+            "max": 1415700464.0,
+            "median": 1365595216.0,
+            "min": 1265320941.0,
+            "n": 24
+          }
+        }
+      },
+      {
+        "cell": "docnohf/e1/default",
+        "children": 24,
+        "correlations": {
+          "p50_vs_output_bytes": {
+            "n_children": 24,
+            "pearson_r": null,
+            "spearman_rho": null,
+            "undefined_reason": "one or both variables are constant"
+          },
+          "p50_vs_output_capacity": {
+            "n_children": 24,
+            "pearson_r": null,
+            "spearman_rho": null,
+            "undefined_reason": "one or both variables are constant"
+          },
+          "p50_vs_rss": {
+            "n_children": 24,
+            "pearson_r": 0.10850463186214294,
+            "spearman_rho": 0.04652371759464157
+          },
+          "p50_vs_whole_child_wall": {
+            "n_children": 24,
+            "pearson_r": 0.1556237005730272,
+            "spearman_rho": 0.2744074863738609
+          }
+        },
+        "measured_sample_count": 1920,
+        "output_bytes_unique_values": [
+          27648
+        ],
+        "output_capacity_unique_values": [
+          27648
+        ],
+        "quartile_tails": [
+          {
+            "children": 6,
+            "label": "fastest_p50_quartile",
+            "measured_sample_count": 480,
+            "median_output_capacity_bytes": 27648.0,
+            "median_rss_kb": 7374.0,
+            "median_whole_child_wall_ns": 113637242.0,
+            "ranges": {
+              "elapsed_p50_ns": {
+                "max": 115451.0,
+                "median": 115140.75,
+                "min": 114316.0,
+                "n": 6
+              },
+              "output_bytes": {
+                "max": 27648.0,
+                "median": 27648.0,
+                "min": 27648.0,
+                "n": 6
+              },
+              "output_capacity_bytes": {
+                "max": 27648.0,
+                "median": 27648.0,
+                "min": 27648.0,
+                "n": 6
+              },
+              "rss_kb": {
+                "max": 7572.0,
+                "median": 7374.0,
+                "min": 7356.0,
+                "n": 6
+              },
+              "whole_child_wall_ns": {
+                "max": 113664992.0,
+                "median": 113637242.0,
+                "min": 113619212.0,
+                "n": 6
+              }
+            }
+          },
+          {
+            "children": 6,
+            "label": "slowest_p50_quartile",
+            "measured_sample_count": 480,
+            "median_output_capacity_bytes": 27648.0,
+            "median_rss_kb": 7372.0,
+            "median_whole_child_wall_ns": 113644797.5,
+            "ranges": {
+              "elapsed_p50_ns": {
+                "max": 118761.0,
+                "median": 117485.5,
+                "min": 117030.5,
+                "n": 6
+              },
+              "output_bytes": {
+                "max": 27648.0,
+                "median": 27648.0,
+                "min": 27648.0,
+                "n": 6
+              },
+              "output_capacity_bytes": {
+                "max": 27648.0,
+                "median": 27648.0,
+                "min": 27648.0,
+                "n": 6
+              },
+              "rss_kb": {
+                "max": 7608.0,
+                "median": 7372.0,
+                "min": 7356.0,
+                "n": 6
+              },
+              "whole_child_wall_ns": {
+                "max": 113661982.0,
+                "median": 113644797.5,
+                "min": 113619603.0,
+                "n": 6
+              }
+            }
+          }
+        ],
+        "ranges": {
+          "elapsed_p50_ns": {
+            "max": 118761.0,
+            "median": 116603.0,
+            "min": 114316.0,
+            "n": 24
+          },
+          "output_bytes": {
+            "max": 27648.0,
+            "median": 27648.0,
+            "min": 27648.0,
+            "n": 24
+          },
+          "output_capacity_bytes": {
+            "max": 27648.0,
+            "median": 27648.0,
+            "min": 27648.0,
+            "n": 24
+          },
+          "rss_kb": {
+            "max": 7608.0,
+            "median": 7372.0,
+            "min": 7308.0,
+            "n": 24
+          },
+          "whole_child_wall_ns": {
+            "max": 113671722.0,
+            "median": 113642512.0,
+            "min": 113604843.0,
+            "n": 24
+          }
+        }
+      },
+      {
+        "cell": "docnohf/e32/default",
+        "children": 24,
+        "correlations": {
+          "p50_vs_output_bytes": {
+            "n_children": 24,
+            "pearson_r": null,
+            "spearman_rho": null,
+            "undefined_reason": "one or both variables are constant"
+          },
+          "p50_vs_output_capacity": {
+            "n_children": 24,
+            "pearson_r": null,
+            "spearman_rho": null,
+            "undefined_reason": "one or both variables are constant"
+          },
+          "p50_vs_rss": {
+            "n_children": 24,
+            "pearson_r": -0.19015786501089407,
+            "spearman_rho": -0.16242126418216776
+          },
+          "p50_vs_whole_child_wall": {
+            "n_children": 24,
+            "pearson_r": 0.4561265954390425,
+            "spearman_rho": 0.27217391304347827
+          }
+        },
+        "measured_sample_count": 1920,
+        "output_bytes_unique_values": [
+          63488
+        ],
+        "output_capacity_unique_values": [
+          63488
+        ],
+        "quartile_tails": [
+          {
+            "children": 6,
+            "label": "fastest_p50_quartile",
+            "measured_sample_count": 480,
+            "median_output_capacity_bytes": 63488.0,
+            "median_rss_kb": 7746.0,
+            "median_whole_child_wall_ns": 163717048.0,
+            "ranges": {
+              "elapsed_p50_ns": {
+                "max": 1003529.0,
+                "median": 1000536.75,
+                "min": 999139.5,
+                "n": 6
+              },
+              "output_bytes": {
+                "max": 63488.0,
+                "median": 63488.0,
+                "min": 63488.0,
+                "n": 6
+              },
+              "output_capacity_bytes": {
+                "max": 63488.0,
+                "median": 63488.0,
+                "min": 63488.0,
+                "n": 6
+              },
+              "rss_kb": {
+                "max": 7828.0,
+                "median": 7746.0,
+                "min": 7564.0,
+                "n": 6
+              },
+              "whole_child_wall_ns": {
+                "max": 163747923.0,
+                "median": 163717048.0,
+                "min": 163688653.0,
+                "n": 6
+              }
+            }
+          },
+          {
+            "children": 6,
+            "label": "slowest_p50_quartile",
+            "measured_sample_count": 480,
+            "median_output_capacity_bytes": 63488.0,
+            "median_rss_kb": 7628.0,
+            "median_whole_child_wall_ns": 163752268.5,
+            "ranges": {
+              "elapsed_p50_ns": {
+                "max": 1030384.5,
+                "median": 1025561.5,
+                "min": 1020134.0,
+                "n": 6
+              },
+              "output_bytes": {
+                "max": 63488.0,
+                "median": 63488.0,
+                "min": 63488.0,
+                "n": 6
+              },
+              "output_capacity_bytes": {
+                "max": 63488.0,
+                "median": 63488.0,
+                "min": 63488.0,
+                "n": 6
+              },
+              "rss_kb": {
+                "max": 7840.0,
+                "median": 7628.0,
+                "min": 7556.0,
+                "n": 6
+              },
+              "whole_child_wall_ns": {
+                "max": 163842153.0,
+                "median": 163752268.5,
+                "min": 163698582.0,
+                "n": 6
+              }
+            }
+          }
+        ],
+        "ranges": {
+          "elapsed_p50_ns": {
+            "max": 1030384.5,
+            "median": 1012114.0,
+            "min": 999139.5,
+            "n": 24
+          },
+          "output_bytes": {
+            "max": 63488.0,
+            "median": 63488.0,
+            "min": 63488.0,
+            "n": 24
+          },
+          "output_capacity_bytes": {
+            "max": 63488.0,
+            "median": 63488.0,
+            "min": 63488.0,
+            "n": 24
+          },
+          "rss_kb": {
+            "max": 7840.0,
+            "median": 7668.0,
+            "min": 7556.0,
+            "n": 24
+          },
+          "whole_child_wall_ns": {
+            "max": 163842153.0,
+            "median": 163723518.5,
+            "min": 163688653.0,
+            "n": 24
+          }
+        }
+      }
+    ],
+    "pooled": {
+      "children": 96,
+      "correlations": {
+        "p50_vs_output_bytes": {
+          "n_children": 96,
+          "pearson_r": 0.9165411941004686,
+          "spearman_rho": 0.8876098506418056
+        },
+        "p50_vs_output_capacity": {
+          "n_children": 96,
+          "pearson_r": 0.9165411941004686,
+          "spearman_rho": 0.8876098506418056
+        },
+        "p50_vs_rss": {
+          "n_children": 96,
+          "pearson_r": 0.8208625711141456,
+          "spearman_rho": 0.8336182572019668
+        },
+        "p50_vs_whole_child_wall": {
+          "n_children": 96,
+          "pearson_r": 0.9431129625232116,
+          "spearman_rho": 0.8946517046026233
+        }
+      },
+      "interpretation": "Pooled correlations are descriptive and include between-cell composition; per-cell rows are the within-cell comparison.",
+      "measured_sample_count": 7680,
+      "ranges": {
+        "elapsed_p50_ns": {
+          "max": 8130358.0,
+          "median": 1013264.0,
+          "min": 114316.0,
+          "n": 96
+        },
+        "output_bytes": {
+          "max": 686592.0,
+          "median": 203008.0,
+          "min": 27648.0,
+          "n": 96
+        },
+        "output_capacity_bytes": {
+          "max": 686592.0,
+          "median": 203008.0,
+          "min": 27648.0,
+          "n": 96
+        },
+        "rss_kb": {
+          "max": 17352.0,
+          "median": 10522.0,
+          "min": 7308.0,
+          "n": 96
+        },
+        "whole_child_wall_ns": {
+          "max": 1415700464.0,
+          "median": 389107753.0,
+          "min": 113604843.0,
+          "n": 96
+        }
+      }
+    }
+  },
+  "analyzer": {
+    "path": "/home/zhuhe/litchi-performance-0970/tools/analyze_aa_resource_correlation_v1.py",
+    "sha256": "5e5c0dcdcbc728777fd9b04598332584a4a7140d633347ce2abd4513a59f5e83"
+  },
+  "created_utc": "2026-10-08T02:21:10.779463+00:00",
+  "errors": [],
+  "revalidation": {
+    "pass": true,
+    "prior_audit": {
+      "complete_valid_packet_set": true,
+      "error_count": 0,
+      "expected_sha256": "f0d0d0b63a896be41dab84550ff39f59954c26538423be2a3d3d017df9f26775",
+      "match": true,
+      "path": "/home/zhuhe/litchi-performance-0969/analysis/aa-independent-audit-v1.json",
+      "sha256": "f0d0d0b63a896be41dab84550ff39f59954c26538423be2a3d3d017df9f26775"
+    },
+    "raw_packet_set": {
+      "expected_file_count": 2304,
+      "expected_json_packet_count": 576,
+      "expected_set_sha256": "3eecb0db82fb14be38852685956dd6fa485fad2c609b23261fa5c75443befdd8",
+      "file_count": 2304,
+      "json_packet_count": 576,
+      "match": true,
+      "root": "/home/zhuhe/litchi-performance-0969/capture/aa-v4/aa",
+      "set_sha256": "3eecb0db82fb14be38852685956dd6fa485fad2c609b23261fa5c75443befdd8",
+      "total_bytes": 539114360
+    },
+    "selected_packet_binding": {
+      "binary_sha256_values": [
+        "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+      ],
+      "fixture_sha256_values": [
+        "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d",
+        "45e5df073f34314da6f39d2dad119fb2ef23470878fd2df67f632864cd92ea48"
+      ],
+      "selected_cells": {
+        "docfloat/e1/default": 24,
+        "docfloat/e32/default": 24,
+        "docnohf/e1/default": 24,
+        "docnohf/e32/default": 24
+      },
+      "source_manifest_sha256_values": [
+        "f1818af5c306fb6ea01b59ca8df29710e773386b246071202bd4aa896f4e8e2b"
+      ]
+    }
+  },
+  "schema": "litchi.performance.0970.aa_resource_correlation.v1",
+  "scope": {
+    "no_build": true,
+    "no_causal_claim": true,
+    "no_reducer": true,
+    "no_tests": true,
+    "no_workload": true,
+    "offline_only": true,
+    "selected_cells": [
+      "docfloat/e1/default",
+      "docfloat/e32/default",
+      "docnohf/e1/default",
+      "docnohf/e32/default"
+    ],
+    "tail_method": "Within each 24-child cell, sort by child elapsed p50 and describe fixed six-child lower/upper quartile tails; no value threshold is selected."
+  }
+}

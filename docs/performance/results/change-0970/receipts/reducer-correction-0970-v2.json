@@ -1,0 +1,94 @@
+{
+  "bound_manifest": {
+    "bytes": 19187,
+    "path": "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/capture-manifest-v2.json",
+    "sha256": "b0943c4572304dccc3a70dde17cce3894a35535e4c52fb7efb2526eb760b8685"
+  },
+  "bound_plan": {
+    "bytes": 8753,
+    "path": "/home/zhuhe/litchi-performance-0970/plans/plan-0970-v6.json",
+    "sha256": "4043a33e413476961feb5c4712689be9bd392f341c30d7d5a8bd73406d033e7b"
+  },
+  "bound_root_go": {
+    "bytes": 6564,
+    "path": "/home/zhuhe/litchi-performance-0970/receipts/root-go-0970-v4.json",
+    "sha256": "0a3b31d4ed1daad2b8bf0ce04f3977b97e7e4510580c81ccab50d82b775f6310"
+  },
+  "bound_terminal": {
+    "bytes": 1218,
+    "path": "/home/zhuhe/litchi-performance-0970/receipts/root-terminal-0970-v1.json",
+    "sha256": "65cd348f4d5b45af972bf19c875ca6df8ccaa8687add15e47e9614f621d5c773"
+  },
+  "created_utc": "2026-10-08T02:42:33.469301+00:00",
+  "exact_delta": {
+    "between_cv_over_within_cv": "between_cv_population divided by within_cv_median; null with reason when denominator is zero.",
+    "between_cv_population": "Population SD/mean across the 12 child p50 elapsed centers.",
+    "custody_oracle_changed": false,
+    "files_changed": [
+      "/home/zhuhe/litchi-performance-0970/tools/reduce_0970_v5.py"
+    ],
+    "metric_definitions_changed": "corrected semantic definition only",
+    "population_cv": "For each child, population SD(elapsed_ns)/mean(elapsed_ns) over its 80 elapsed samples.",
+    "preserved": [
+      "IQR median and between-IQR/within-IQR ratio",
+      "all paired metrics and telemetry",
+      "bootstrap seed/resamples",
+      "custody/oracle checks",
+      "raw capture and plan"
+    ],
+    "raw_capture_changed": false,
+    "seed_schedule_changed": false,
+    "source_or_binary_changed": false,
+    "within_cv_median": "Median of the 12 child population CV values per condition."
+  },
+  "new_reducer": {
+    "bytes": 19395,
+    "path": "/home/zhuhe/litchi-performance-0970/tools/reduce_0970_v5.py",
+    "sha256": "efd86f5a12e04c006467e8195a6740fc679842d8e8ded7b40b73ea8b173a4359"
+  },
+  "no_rerun_or_build": true,
+  "old_reducer": {
+    "bytes": 17994,
+    "path": "/home/zhuhe/litchi-performance-0970/tools/reduce_0970_v4.py",
+    "sha256": "ac48011ef26a63fb24f45aa1caedc460c16159cf059608d87fd89725c543fb68"
+  },
+  "prior_correction": {
+    "bytes": 3225,
+    "path": "/home/zhuhe/litchi-performance-0970/receipts/reducer-correction-0970-v1.json",
+    "sha256": "087f2da6242ac84993e97d8b05c6daad84a10327ebb8af0af05196cede707735"
+  },
+  "purpose": "bounded semantic correction to the offline 0970 diagnostic reducer; no native rerun or raw mutation",
+  "retained_capture_test": {
+    "authoritative_output_written": false,
+    "cells": 4,
+    "children_per_cell": 24,
+    "errors": [],
+    "expected_packet_count": 96,
+    "interpretation": "diagnostic-only pinned-versus-unpinned historical-baseline telemetry; no qualification claim",
+    "output_status": "complete",
+    "packet_count": 96,
+    "returncode": 0,
+    "status": "complete",
+    "test_output_path": "/tmp/affinity-diagnostic-v5-test.json"
+  },
+  "review_basis": {
+    "design": {
+      "bytes": 15310,
+      "path": "/home/zhuhe/litchi-performance-0970/diagnostic-design-v3.md",
+      "sha256": "95aa5817f95a038c32dfbd4af7906eb474df3546aa321f0adf72c1572e3b462b"
+    },
+    "finding": "The design requires a between/within CV ratio; cpu_analyzer recommended population child timing CV denominator."
+  },
+  "schema": "litchi.performance.0970.reducer_correction.v2",
+  "self_test": {
+    "build_started": false,
+    "command": "PYTHONDONTWRITEBYTECODE=1 python3 tools/reduce_0970_v5.py --self-test",
+    "status": "pass",
+    "workload_started": false
+  },
+  "status": "pending_root_authorization",
+  "synthetic_tests": {
+    "shifted_centers_constant_iqr_nonzero_child_cv": "pass",
+    "zero_within_cv_null_reason": "pass"
+  }
+}

@@ -1,5 +1,24 @@
 # Performance hotspot inventory
 
+## 0970 — FloatingPictures/e1 variance persists under pinning
+
+[0970](0970-baseline-affinity-diagnostic.md) is a same-binary historical
+baseline diagnostic, not a candidate trial. In `FloatingPictures/e1`, the
+child-p50 sample CV is 10.3561% pinned to CPU 31 and 9.52625% on the audited
+0–31 mask; `e32` is 1.49012%/1.19979%. `NoHeadFoot` is 0.777451%/0.823071%
+for `e1` and 0.476417%/0.647617% for `e32`. The corresponding pinned/unpinned
+p50 ratios are 0.943838 [0.864919, 1.061762], 0.999429 [0.988469, 1.001782],
+1.001952 [0.992972, 1.004463], and 0.992554 [0.991235, 0.996702], with
+10,000 paired bootstrap resamples and seed 970001. Within `FloatingPictures/e1`,
+whole-process instructions correlate with child p50 at 0.955 pinned and
+0.892 unpinned; cycles correlate at 0.954 and 0.909. These associations are
+descriptive within-cell telemetry, with wrapper/process-tree scope distinct
+from the harness `Instant` region. Pinned packets have zero CPU migrations;
+8/48 unpinned packets have 11 total. This supports a process-level diagnostic
+lead, not source, frequency, or host-root-cause attribution. The independent
+raw audit passes and [v6 reducer approval](results/change-0970/review/reducer-v6-independent-approval-0970-v1.json)
+is complete; no candidate or runtime change is adopted.
+
 ## 0969 — CFB writer-proof handoff stops at A/A readiness
 
 [0969](0969-cfb-writer-proof-handoff-trial.md) tests a private receipt from a

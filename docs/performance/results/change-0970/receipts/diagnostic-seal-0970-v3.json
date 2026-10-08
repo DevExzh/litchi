@@ -1,0 +1,62 @@
+{
+  "correction": {
+    "F6": "The fresh protocol parser admits blank lines and only the exact # started on  perf header before requiring all six expected events. Other comments and malformed, duplicate, missing, or not-counted rows remain rejected.",
+    "scope": "Wrapper parser admission only; no source, binary, affinity, schedule, threshold, or measurement change."
+  },
+  "correction_receipt": {
+    "bytes": 1370,
+    "path": "/home/zhuhe/litchi-performance-0970/receipts/correction-0970-v2.json",
+    "sha256": "2b3f2bf4651d1381820c318909e08b489bdd16eedd6e71fd9168c901904342af"
+  },
+  "created_utc": "2026-10-08T02:35:39.216500+00:00",
+  "design": {
+    "bytes": 15310,
+    "path": "/home/zhuhe/litchi-performance-0970/diagnostic-design-v3.md",
+    "sha256": "95aa5817f95a038c32dfbd4af7906eb474df3546aa321f0adf72c1572e3b462b"
+  },
+  "helper_seal": {
+    "bytes": 3294,
+    "path": "/home/zhuhe/litchi-performance-0970/receipts/helper-seal-0970-final-v6.json",
+    "sha256": "e3c9cefcbf0fec93234ba3e6fec8431ac0fc7bf0d715d3c4aeceaa70386dd4e5"
+  },
+  "independent_review_pending": {
+    "bytes": 9133,
+    "path": "/home/zhuhe/litchi-performance-0970/review/diagnostic-independent-review-v2.json",
+    "sha256": "7d7a4c9459de1c9a6fadc233183dd0562749f4f4150c66acd13ed921c520c141"
+  },
+  "no_workload_or_build": true,
+  "plan": {
+    "bytes": 8753,
+    "path": "/home/zhuhe/litchi-performance-0970/plans/plan-0970-v6.json",
+    "sha256": "4043a33e413476961feb5c4712689be9bd392f341c30d7d5a8bd73406d033e7b"
+  },
+  "prior_combined_seal": {
+    "bytes": 4346,
+    "path": "/home/zhuhe/litchi-performance-0970/receipts/diagnostic-seal-0970-v2.json",
+    "sha256": "2d43ced5c96ede56999ebdb2a2ab86c000d82325c6dbb8d0da6ce89c3e760f65"
+  },
+  "purpose": "fresh workload-inert F6 perf CSV parser correction seal retaining F1-F5",
+  "root_go": {
+    "path": "/home/zhuhe/litchi-performance-0970/receipts/root-go-0970-v4.json",
+    "required_schema": "litchi.performance.0970.root_go.v1",
+    "status": "pending"
+  },
+  "root_go_required": true,
+  "schema": "litchi.performance.0970.diagnostic_seal.v2",
+  "status": "ready_for_independent_review",
+  "validation": {
+    "actual_perf_wrapper_true": "pass",
+    "blank_lines_admitted": "pass",
+    "build_started": false,
+    "capture_started": false,
+    "duplicate_event_rejected": "pass",
+    "exact_perf_header_admitted": "pass",
+    "malformed_row_rejected": "pass",
+    "missing_event_rejected": "pass",
+    "plan_preflight": "pass",
+    "reducer_self_test": "pass",
+    "runner_self_test": "pass",
+    "unexpected_comment_rejected": "pass",
+    "workload_started": false
+  }
+}

@@ -1,0 +1,310 @@
+{
+  "affinity_controls": {
+    "bytes": 2225,
+    "path": "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/affinity-controls-v2.json",
+    "sha256": "900a914a93223d427e4746f25213901bb56e73d9c25efc78bf058f9cb3f043fd"
+  },
+  "complete": true,
+  "no_retry": true,
+  "packets": [
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e1-default-p01-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e1-default-p01-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e1-default-p02-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e1-default-p02-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e1-default-p03-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e1-default-p03-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e1-default-p04-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e1-default-p04-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e1-default-p05-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e1-default-p05-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e1-default-p06-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e1-default-p06-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e1-default-p07-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e1-default-p07-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e1-default-p08-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e1-default-p08-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e1-default-p09-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e1-default-p09-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e1-default-p10-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e1-default-p10-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e1-default-p11-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e1-default-p11-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e1-default-p12-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e1-default-p12-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e32-default-p01-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e32-default-p01-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e32-default-p02-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e32-default-p02-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e32-default-p03-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e32-default-p03-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e32-default-p04-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e32-default-p04-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e32-default-p05-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e32-default-p05-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e32-default-p06-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e32-default-p06-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e32-default-p07-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e32-default-p07-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e32-default-p08-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e32-default-p08-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e32-default-p09-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e32-default-p09-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e32-default-p10-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e32-default-p10-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e32-default-p11-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e32-default-p11-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e32-default-p12-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docnohf-e32-default-p12-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e1-default-p01-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e1-default-p01-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e1-default-p02-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e1-default-p02-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e1-default-p03-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e1-default-p03-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e1-default-p04-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e1-default-p04-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e1-default-p05-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e1-default-p05-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e1-default-p06-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e1-default-p06-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e1-default-p07-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e1-default-p07-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e1-default-p08-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e1-default-p08-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e1-default-p09-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e1-default-p09-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e1-default-p10-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e1-default-p10-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e1-default-p11-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e1-default-p11-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e1-default-p12-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e1-default-p12-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e32-default-p01-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e32-default-p01-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e32-default-p02-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e32-default-p02-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e32-default-p03-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e32-default-p03-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e32-default-p04-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e32-default-p04-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e32-default-p05-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e32-default-p05-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e32-default-p06-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e32-default-p06-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e32-default-p07-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e32-default-p07-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e32-default-p08-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e32-default-p08-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e32-default-p09-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e32-default-p09-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e32-default-p10-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e32-default-p10-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e32-default-p11-unpinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e32-default-p11-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e32-default-p12-pinned.json",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/packets/diag-docfloat-e32-default-p12-unpinned.json"
+  ],
+  "plan": {
+    "path": "/home/zhuhe/litchi-performance-0970/plans/plan-0970-v6.json",
+    "sha256": "4043a33e413476961feb5c4712689be9bd392f341c30d7d5a8bd73406d033e7b"
+  },
+  "root_go": {
+    "path": "/home/zhuhe/litchi-performance-0970/receipts/root-go-0970-v4.json",
+    "receipt": {
+      "authorized": true,
+      "binary": {
+        "bytes": 47909224,
+        "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+        "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+      },
+      "combined_seal": {
+        "bytes": 2622,
+        "path": "/home/zhuhe/litchi-performance-0970/receipts/diagnostic-seal-0970-v3.json",
+        "sha256": "ce9b47c4734ef489e13fb0fcc3e88cd029d973228209868a7e3e43567ad3e0a8"
+      },
+      "correction_receipt": {
+        "bytes": 1370,
+        "path": "/home/zhuhe/litchi-performance-0970/receipts/correction-0970-v2.json",
+        "sha256": "2b3f2bf4651d1381820c318909e08b489bdd16eedd6e71fd9168c901904342af"
+      },
+      "created_utc": "2026-10-08T02:37:56.523955+00:00",
+      "design": {
+        "bytes": 15310,
+        "path": "/home/zhuhe/litchi-performance-0970/diagnostic-design-v3.md",
+        "sha256": "95aa5817f95a038c32dfbd4af7906eb474df3546aa321f0adf72c1572e3b462b"
+      },
+      "environment": {
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "fixtures": {
+        "docfloat": {
+          "bytes": 335360,
+          "case": "docfloat",
+          "path": "/home/zhuhe/litchi-performance-0969/qa-core/test-data/ole/doc/FloatingPictures.doc",
+          "sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d"
+        },
+        "docnohf": {
+          "bytes": 26112,
+          "case": "docnohf",
+          "path": "/home/zhuhe/litchi-performance-0969/qa-core/test-data/ole/doc/NoHeadFoot.doc",
+          "sha256": "45e5df073f34314da6f39d2dad119fb2ef23470878fd2df67f632864cd92ea48"
+        }
+      },
+      "helper_seal": {
+        "bytes": 3294,
+        "path": "/home/zhuhe/litchi-performance-0970/receipts/helper-seal-0970-final-v6.json",
+        "sha256": "e3c9cefcbf0fec93234ba3e6fec8431ac0fc7bf0d715d3c4aeceaa70386dd4e5"
+      },
+      "helpers": {
+        "launcher": {
+          "bytes": 3597,
+          "path": "/home/zhuhe/litchi-performance-0970/tools/launch_baseline_v2.py",
+          "sha256": "3b5b79351883a9b4efb680f47498d8e10bdf77d131a60d11c1ecb54ad95430f5"
+        },
+        "plan_generator": {
+          "bytes": 9902,
+          "path": "/home/zhuhe/litchi-performance-0970/tools/prepare_plan_0970_v3.py",
+          "sha256": "1f4cd838bcf5eff859e9f893d0ba420b8e0e5904af51f855d11fe5f3e0ee2e93"
+        },
+        "protocol": {
+          "bytes": 29808,
+          "path": "/home/zhuhe/litchi-performance-0970/tools/protocol_0970_v3.py",
+          "sha256": "f060aef4e863e8953811e3f9fbec2d4cbee51dce80881245e5eb7ba0f21ec28e"
+        },
+        "reducer": {
+          "bytes": 17419,
+          "path": "/home/zhuhe/litchi-performance-0970/tools/reduce_0970_v3.py",
+          "sha256": "d00cdd48e9cb92dfc23a980c5962cc9b91884eb09c3bc52e4dd27d93382d1c39"
+        },
+        "runner": {
+          "bytes": 33212,
+          "path": "/home/zhuhe/litchi-performance-0970/tools/run_0970_v3.py",
+          "sha256": "f8ebf05d10ca3e493abe18d8a3fb9739d51d57d9cf9156057b5f8bcb0e891454"
+        }
+      },
+      "host": {
+        "affinity_probe": {
+          "bytes": 2350,
+          "path": "/home/zhuhe/litchi-performance-0970/affinity-probe-v1.json",
+          "sha256": "0f2e97080d2ba9898a3c0c74660f3280a4cbb66e4546997fa93749d476ce6a17"
+        },
+        "allowed_affinity": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31
+        ],
+        "audit": {
+          "bytes": 18839,
+          "path": "/home/zhuhe/litchi-performance-0970/host-audit-v1.md",
+          "sha256": "37e204363bee72eb7d3080300dd32ce5ce21d53be86dee2c9e726b086f6901c5"
+        },
+        "pin_cpu": 31,
+        "telemetry_probe": {
+          "bytes": 887,
+          "path": "/home/zhuhe/litchi-performance-0970/telemetry-probe-v1.json",
+          "sha256": "8cb97d377c6162c57e1ae092c7c8e33f9b2b23c38aa2d44f188d3831e20614dc"
+        },
+        "tool_addendum": {
+          "bytes": 6614,
+          "path": "/home/zhuhe/litchi-performance-0970/host-tool-addendum-v1.json",
+          "sha256": "0e013628d436d00b2ca13b17c89458cf6288c56655b442e1b20965c90cc79a81"
+        },
+        "tools": {
+          "/usr/bin/perf": {
+            "bytes": 25221960,
+            "path": "/usr/bin/perf",
+            "sha256": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b"
+          },
+          "/usr/bin/python3.14": {
+            "bytes": 7468968,
+            "path": "/usr/bin/python3.14",
+            "sha256": "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd"
+          },
+          "/usr/bin/time": {
+            "bytes": 27232,
+            "path": "/usr/bin/time",
+            "sha256": "919efdcc04c1dbc7a1479c2f3310d491c95f028e1762a84c47810ac0ec1c0d88"
+          }
+        }
+      },
+      "independent_review": {
+        "bytes": 10474,
+        "path": "/home/zhuhe/litchi-performance-0970/review/diagnostic-independent-review-v3.json",
+        "sha256": "c612bf37d2d80c4fb7ef9f547eb8d9a86a950e04b758c380d306a0f62a770e6d",
+        "status": "pass"
+      },
+      "no_retry": true,
+      "output_root": "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3",
+      "plan": {
+        "bytes": 8753,
+        "path": "/home/zhuhe/litchi-performance-0970/plans/plan-0970-v6.json",
+        "sha256": "4043a33e413476961feb5c4712689be9bd392f341c30d7d5a8bd73406d033e7b"
+      },
+      "quiescence": {
+        "bytes": 453,
+        "path": "/home/zhuhe/litchi-performance-0970/receipts/root-quiescence-0970-v1.json",
+        "sha256": "395e266c8c3fb8f68c2af2304cc4d5e950d31185d61ad36177611f0682fd6335",
+        "status": "pass"
+      },
+      "schema": "litchi.performance.0970.root_go.v1",
+      "scope": "96 serial historical-baseline children; descriptive affinity diagnostic only; no candidate qualification",
+      "source": {
+        "bytes": 18259541,
+        "file_count": 924,
+        "file_manifest": {
+          "bytes": 362688,
+          "path": "/home/zhuhe/litchi-performance-0969/manifests/source-file-manifest-v1.json",
+          "sha256": "99e65d43e0feed89133eec60b095130d68058a071a02e8a15b05dea01209bb6c"
+        },
+        "manifest": {
+          "bytes": 14960,
+          "path": "/home/zhuhe/litchi-performance-0969/manifests/source-manifest-v1.json",
+          "sha256": "f1818af5c306fb6ea01b59ca8df29710e773386b246071202bd4aa896f4e8e2b"
+        },
+        "mode_policy": "manifest_mode_with_umask_0022_normalization",
+        "root": "/home/zhuhe/litchi-performance-0969/source-baseline",
+        "tree_sha256": "df8a842b08fec1792c67921fb1ce3513d3c6cb3dd0149cf13672bad14090bfb0"
+      },
+      "status": "authorized",
+      "validator": {
+        "path": "/home/zhuhe/litchi-performance-0969/tools/protocol_common_v4.py",
+        "schema": "litchi.performance.0969.protocol_common.v4",
+        "sha256": "5ce0f2ac08fc7909df054a4cc2d5137b3279af4cd726acf5bfb4558d97b05c5c"
+      }
+    },
+    "sha256": "0a3b31d4ed1daad2b8bf0ce04f3977b97e7e4510580c81ccab50d82b775f6310"
+  },
+  "schema": "litchi.performance.0970.capture_manifest.v2",
+  "stage": "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/capture-stage-v2.json"
+}

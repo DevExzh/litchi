@@ -1,0 +1,27 @@
+{
+  "corrections": {
+    "F1": "Fresh v2 reducer binds and validates the retained affinity-controls receipt before reduction and enforces condition-to-mask packet custody.",
+    "F2": "Fresh v2 runner and GO require live/audited allowed affinity [0..31] and pin CPU 31 before child 1.",
+    "F3": "Fresh v2 plan, GO, wrapper environment, and child environment bind LC_ALL=C, LANG=C, and PYTHONDONTWRITEBYTECODE=1.",
+    "F5": "Fresh v2 plan/reducer scope states perf measures the launched GNU time command and inherited launcher/baseline process tree; perf bookkeeping is excluded; GNU time includes launcher startup and same-PID execed baseline; harness Instant samples remain separate."
+  },
+  "created_utc": "2026-10-08T02:29:59.560247+00:00",
+  "no_build_or_workload": true,
+  "original_receipts": {
+    "diagnostic_seal": {
+      "bytes": 2490,
+      "path": "/home/zhuhe/litchi-performance-0970/receipts/diagnostic-seal-0970-v1.json",
+      "sha256": "ccdf3b495def9fe4aeb4d68c4e8a457268ee3e98abf72af227db50146a119d0f"
+    },
+    "helper_seal": {
+      "bytes": 2431,
+      "path": "/home/zhuhe/litchi-performance-0970/receipts/helper-seal-0970-final-v3.json",
+      "sha256": "b9b396cc5726a0b45a029602f2bc027d089672af4e21fc249ffa41cba6cbe2d0"
+    }
+  },
+  "original_seal_time": "unknown",
+  "original_seal_time_explanation": "The original helper and diagnostic receipts contain a hardcoded 2026-10-08T00:00:00Z placeholder. Their actual creation times are not recoverable from those files.",
+  "purpose": "additive corrections to provenance and interpretation; original sealed artifacts remain immutable",
+  "schema": "litchi.performance.0970.seal_correction.v1",
+  "status": "pass"
+}

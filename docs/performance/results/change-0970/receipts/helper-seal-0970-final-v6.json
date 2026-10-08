@@ -1,0 +1,88 @@
+{
+  "correction_receipt": {
+    "bytes": 1370,
+    "path": "/home/zhuhe/litchi-performance-0970/receipts/correction-0970-v2.json",
+    "sha256": "2b3f2bf4651d1381820c318909e08b489bdd16eedd6e71fd9168c901904342af"
+  },
+  "created_utc": "2026-10-08T02:35:24.574275+00:00",
+  "design": {
+    "bytes": 15310,
+    "path": "/home/zhuhe/litchi-performance-0970/diagnostic-design-v3.md",
+    "sha256": "95aa5817f95a038c32dfbd4af7906eb474df3546aa321f0adf72c1572e3b462b"
+  },
+  "helpers": {
+    "launcher": {
+      "bytes": 3597,
+      "path": "/home/zhuhe/litchi-performance-0970/tools/launch_baseline_v2.py",
+      "sha256": "3b5b79351883a9b4efb680f47498d8e10bdf77d131a60d11c1ecb54ad95430f5"
+    },
+    "plan_generator": {
+      "bytes": 9902,
+      "path": "/home/zhuhe/litchi-performance-0970/tools/prepare_plan_0970_v3.py",
+      "sha256": "1f4cd838bcf5eff859e9f893d0ba420b8e0e5904af51f855d11fe5f3e0ee2e93"
+    },
+    "protocol": {
+      "bytes": 29808,
+      "path": "/home/zhuhe/litchi-performance-0970/tools/protocol_0970_v3.py",
+      "sha256": "f060aef4e863e8953811e3f9fbec2d4cbee51dce80881245e5eb7ba0f21ec28e"
+    },
+    "reducer": {
+      "bytes": 17419,
+      "path": "/home/zhuhe/litchi-performance-0970/tools/reduce_0970_v3.py",
+      "sha256": "d00cdd48e9cb92dfc23a980c5962cc9b91884eb09c3bc52e4dd27d93382d1c39"
+    },
+    "runner": {
+      "bytes": 33212,
+      "path": "/home/zhuhe/litchi-performance-0970/tools/run_0970_v3.py",
+      "sha256": "f8ebf05d10ca3e493abe18d8a3fb9739d51d57d9cf9156057b5f8bcb0e891454"
+    }
+  },
+  "no_capture": true,
+  "no_workload_or_build": true,
+  "prior_review": {
+    "bytes": 9133,
+    "path": "/home/zhuhe/litchi-performance-0970/review/diagnostic-independent-review-v2.json",
+    "sha256": "7d7a4c9459de1c9a6fadc233183dd0562749f4f4150c66acd13ed921c520c141"
+  },
+  "purpose": "fresh workload-inert F6 perf-header parser correction helper seal, retaining F1-F5 custody",
+  "schema": "litchi.performance.0970.helper_seal.v2",
+  "self_tests": [
+    {
+      "actual_perf_wrapper": "/usr/bin/perf stat -x, -o FILE -- /usr/bin/time ... /usr/bin/true",
+      "build_started": false,
+      "command": "LC_ALL=C LANG=C PYTHONDONTWRITEBYTECODE=1 python3 tools/run_0970_v3.py --self-test",
+      "status": "pass",
+      "workload_started": false
+    },
+    {
+      "build_started": false,
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 tools/reduce_0970_v3.py --self-test",
+      "status": "pass",
+      "workload_started": false
+    },
+    {
+      "build_started": false,
+      "command": "AST parse of fresh v3 helpers",
+      "status": "pass",
+      "workload_started": false
+    },
+    {
+      "build_started": false,
+      "command": "perf header parser: exact # started on header and blank lines accepted",
+      "status": "pass",
+      "workload_started": false
+    },
+    {
+      "build_started": false,
+      "command": "perf parser malformed row, duplicate event, missing event, unexpected comment, and not-counted negatives rejected",
+      "status": "pass",
+      "workload_started": false
+    }
+  ],
+  "status": "pass",
+  "supersedes_unadmitted": {
+    "bytes": 3072,
+    "path": "/home/zhuhe/litchi-performance-0970/receipts/helper-seal-0970-final-v5.json",
+    "sha256": "638f1d7e5b2bb070d413aef524e2b6ee835af7ea0c294944d14d0f2b4fc1ebba"
+  }
+}

@@ -1,0 +1,204 @@
+{
+  "schema": "litchi.performance.0970.host_tool_addendum.v1",
+  "generated_utc": "2026-10-08T02:10:55.398618+00:00",
+  "host": "ip-172-31-39-190",
+  "cwd": "/home/zhuhe/code/litchi",
+  "git_head_observation": {
+    "argv": [
+      "/usr/bin/git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "returncode": 0,
+    "stdout": "68b17e83b0290da5ad9dd2669a6a466ec7c69dca\n",
+    "stderr": ""
+  },
+  "scope": "read-only executable identity metadata; no build, benchmark, native capture, or production edit",
+  "purpose": "Resolve the tool identities used by retained runner/probes and bind them to frozen 0970 audit/probe receipts.",
+  "tools": [
+    {
+      "name": "GNU time wrapper",
+      "requested_path": "/usr/bin/time",
+      "resolution": {
+        "argv": [
+          "/usr/bin/realpath",
+          "-e",
+          "/usr/bin/time"
+        ],
+        "returncode": 0,
+        "stdout": "/usr/bin/time\n",
+        "stderr": ""
+      },
+      "resolved_path": "/usr/bin/time",
+      "requested_path_sha256": "919efdcc04c1dbc7a1479c2f3310d491c95f028e1762a84c47810ac0ec1c0d88",
+      "requested_sha256_command": {
+        "argv": [
+          "/usr/bin/sha256sum",
+          "/usr/bin/time"
+        ],
+        "returncode": 0,
+        "stdout": "919efdcc04c1dbc7a1479c2f3310d491c95f028e1762a84c47810ac0ec1c0d88  /usr/bin/time\n",
+        "stderr": ""
+      },
+      "resolved_path_sha256": "919efdcc04c1dbc7a1479c2f3310d491c95f028e1762a84c47810ac0ec1c0d88",
+      "resolved_sha256_command": {
+        "argv": [
+          "/usr/bin/sha256sum",
+          "/usr/bin/time"
+        ],
+        "returncode": 0,
+        "stdout": "919efdcc04c1dbc7a1479c2f3310d491c95f028e1762a84c47810ac0ec1c0d88  /usr/bin/time\n",
+        "stderr": ""
+      },
+      "stat_following_symlink": {
+        "mode_octal": "0755",
+        "size_bytes": 27232,
+        "mtime_utc": "2026-01-14T17:45:32+00:00"
+      },
+      "version": {
+        "argv": [
+          "/usr/bin/time",
+          "--version"
+        ],
+        "returncode": 0,
+        "stdout": "time (GNU Time) UNKNOWN\nCopyright (C) 2018 Free Software Foundation, Inc.\nLicense GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.\n\nWritten by David Keppel, David MacKenzie, and Assaf Gordon.\n",
+        "stderr": ""
+      }
+    },
+    {
+      "name": "Python 3 interpreter",
+      "requested_path": "/usr/bin/python3",
+      "resolution": {
+        "argv": [
+          "/usr/bin/realpath",
+          "-e",
+          "/usr/bin/python3"
+        ],
+        "returncode": 0,
+        "stdout": "/usr/bin/python3.14\n",
+        "stderr": ""
+      },
+      "resolved_path": "/usr/bin/python3.14",
+      "requested_path_sha256": "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd",
+      "requested_sha256_command": {
+        "argv": [
+          "/usr/bin/sha256sum",
+          "/usr/bin/python3"
+        ],
+        "returncode": 0,
+        "stdout": "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd  /usr/bin/python3\n",
+        "stderr": ""
+      },
+      "resolved_path_sha256": "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd",
+      "resolved_sha256_command": {
+        "argv": [
+          "/usr/bin/sha256sum",
+          "/usr/bin/python3.14"
+        ],
+        "returncode": 0,
+        "stdout": "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd  /usr/bin/python3.14\n",
+        "stderr": ""
+      },
+      "stat_following_symlink": {
+        "mode_octal": "0755",
+        "size_bytes": 7468968,
+        "mtime_utc": "2026-08-20T10:41:58+00:00"
+      },
+      "version": {
+        "argv": [
+          "/usr/bin/python3",
+          "--version"
+        ],
+        "returncode": 0,
+        "stdout": "Python 3.14.4\n",
+        "stderr": ""
+      },
+      "requested_path_lstat": {
+        "mode_octal": "0777",
+        "size_bytes": 10,
+        "target": "python3.14"
+      }
+    },
+    {
+      "name": "Linux perf",
+      "requested_path": "/usr/bin/perf",
+      "resolution": {
+        "argv": [
+          "/usr/bin/realpath",
+          "-e",
+          "/usr/bin/perf"
+        ],
+        "returncode": 0,
+        "stdout": "/usr/bin/perf\n",
+        "stderr": ""
+      },
+      "resolved_path": "/usr/bin/perf",
+      "requested_path_sha256": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b",
+      "requested_sha256_command": {
+        "argv": [
+          "/usr/bin/sha256sum",
+          "/usr/bin/perf"
+        ],
+        "returncode": 0,
+        "stdout": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b  /usr/bin/perf\n",
+        "stderr": ""
+      },
+      "resolved_path_sha256": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b",
+      "resolved_sha256_command": {
+        "argv": [
+          "/usr/bin/sha256sum",
+          "/usr/bin/perf"
+        ],
+        "returncode": 0,
+        "stdout": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b  /usr/bin/perf\n",
+        "stderr": ""
+      },
+      "stat_following_symlink": {
+        "mode_octal": "0755",
+        "size_bytes": 25221960,
+        "mtime_utc": "2026-09-02T09:35:43+00:00"
+      },
+      "version": {
+        "argv": [
+          "/usr/bin/perf",
+          "--version"
+        ],
+        "returncode": 0,
+        "stdout": "perf version 7.0.14\n",
+        "stderr": ""
+      }
+    }
+  ],
+  "frozen_receipt_bindings": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0970/host-audit-v1.md",
+      "sha256": "37e204363bee72eb7d3080300dd32ce5ce21d53be86dee2c9e726b086f6901c5",
+      "status": "frozen; not edited by this addendum"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0970/telemetry-probe-v1.json",
+      "sha256": "8cb97d377c6162c57e1ae092c7c8e33f9b2b23c38aa2d44f188d3831e20614dc",
+      "status": "fixed six-event perf capability probe receipt"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0970/affinity-probe-v1.json",
+      "sha256": "0f2e97080d2ba9898a3c0c74660f3280a4cbb66e4546997fa93749d476ce6a17",
+      "status": "child-only CPU31 affinity probe receipt"
+    }
+  ],
+  "future_diagnostic_binding": {
+    "perf_events": [
+      "task-clock",
+      "cycles",
+      "instructions",
+      "context-switches",
+      "cpu-migrations",
+      "page-faults"
+    ],
+    "perf_mode": "fixed CSV perf stat; no per-child fallback",
+    "runner_time_program": "/usr/bin/time",
+    "affinity_probe_program": "/usr/bin/python3"
+  },
+  "no_global_settings_changed": true,
+  "benchmark_started": false
+}

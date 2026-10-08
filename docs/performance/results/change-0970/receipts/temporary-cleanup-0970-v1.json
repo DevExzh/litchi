@@ -1,0 +1,340 @@
+{
+  "authorization": {
+    "basis": "explicit parent cleanup task authorization for the four named paths",
+    "main_checkout_touched": false,
+    "root_go_required": false
+  },
+  "cleanup_commands": [
+    "Python 3: validate exact four authorized paths, regular .pyc/JSON shape, historical baseline SHA/size, raw inventory descriptor, and process/open-file quiescence.",
+    "Python 3: remove only /home/zhuhe/litchi-performance-0970/tools/__pycache__, /home/zhuhe/litchi-performance-0970/review/__pycache__ when present, and the two named /tmp affinity diagnostic test JSON files.",
+    "Python 3: revalidate the preserved baseline binary, raw inventory descriptor, control receipts, process/open-file quiescence, and byte accounting.",
+    "Python 3: after reducer-v6 approval identified the exact owned replay JSON, bind its path/size/SHA and remove only /tmp/affinity-diagnostic-v6-independent-replay-20261008.json; preserve self-test stdout and diff."
+  ],
+  "deleted_bytes": {
+    "allocated_bytes_freed": 1830912,
+    "apparent_bytes_freed": 1777837,
+    "logical_file_bytes": 1777837,
+    "per_path": {
+      "/home/zhuhe/litchi-performance-0970/review/__pycache__": {
+        "allocated_bytes_after": 0,
+        "allocated_bytes_before": 0,
+        "apparent_bytes_after": 0,
+        "apparent_bytes_before": 0,
+        "logical_regular_file_bytes_before": 0
+      },
+      "/home/zhuhe/litchi-performance-0970/tools/__pycache__": {
+        "allocated_bytes_after": 0,
+        "allocated_bytes_before": 602112,
+        "apparent_bytes_after": 0,
+        "apparent_bytes_before": 555345,
+        "logical_regular_file_bytes_before": 555345
+      },
+      "/tmp/affinity-diagnostic-v4-test.json": {
+        "allocated_bytes_after": 0,
+        "allocated_bytes_before": 335872,
+        "apparent_bytes_after": 0,
+        "apparent_bytes_before": 332310,
+        "logical_regular_file_bytes_before": 0
+      },
+      "/tmp/affinity-diagnostic-v5-test.json": {
+        "allocated_bytes_after": 0,
+        "allocated_bytes_before": 335872,
+        "apparent_bytes_after": 0,
+        "apparent_bytes_before": 334745,
+        "logical_regular_file_bytes_before": 0
+      },
+      "/tmp/affinity-diagnostic-v6-independent-replay-20261008.json": {
+        "allocated_bytes_after": 0,
+        "allocated_bytes_before": 557056,
+        "apparent_bytes_after": 0,
+        "apparent_bytes_before": 555437,
+        "logical_regular_file_bytes_before": 555437
+      }
+    }
+  },
+  "other_obvious_temp_inspection": {
+    "action": "reported only; no expansion of deletion scope",
+    "name_tokens_checked": [
+      "tmp",
+      "temp",
+      "scratch",
+      "test",
+      "attempt"
+    ],
+    "other_candidates": [],
+    "retained_similar_receipt": {
+      "bytes": 712,
+      "path": "/home/zhuhe/litchi-performance-0970/receipts/reducer-first-attempt-v1.json"
+    },
+    "scope": "/home/zhuhe/litchi-performance-0970"
+  },
+  "preflight": {
+    "known_temp_json_valid_before": [
+      "/tmp/affinity-diagnostic-v4-test.json",
+      "/tmp/affinity-diagnostic-v5-test.json"
+    ],
+    "open_file_check": {
+      "command_after": "lsof -nP +D on preserved 0970 capture root; lsof -nP on historical baseline binary",
+      "command_before": "lsof -nP +D on 0970 tools/review pycache and capture root; lsof -nP on two named temp outputs and historical baseline binary",
+      "environment_warning": "lsof reported container overlay/nsfs stat warnings where applicable; no named open-file records were returned",
+      "paths_after": 2,
+      "paths_before": 5,
+      "records_after": 0,
+      "records_before": 0,
+      "supplemental_replay_after": {
+        "path": "/tmp/affinity-diagnostic-v6-independent-replay-20261008.json",
+        "records": 0,
+        "timeouts": 0
+      },
+      "supplemental_replay_before": {
+        "path": "/tmp/affinity-diagnostic-v6-independent-replay-20261008.json",
+        "records": 0,
+        "timeouts": 0
+      },
+      "timeouts_after": 0,
+      "timeouts_before": 0
+    },
+    "process_check": {
+      "command": "ps -eo pid=,ppid=,stat=,comm=,args=; exact native names plus 0970 helper script paths",
+      "matches_after": 0,
+      "matches_before": 0,
+      "supplemental_review_gate_after": 0,
+      "supplemental_review_gate_before": 0
+    },
+    "pycache_entries_regular_pyc_only": true
+  },
+  "preserved_control_files": {
+    "all_unchanged": true,
+    "before_after": [
+      {
+        "after": {
+          "bytes": 8753,
+          "inode": 2580709,
+          "path": "/home/zhuhe/litchi-performance-0970/plans/plan-0970-v6.json",
+          "sha256": "4043a33e413476961feb5c4712689be9bd392f341c30d7d5a8bd73406d033e7b"
+        },
+        "before": {
+          "bytes": 8753,
+          "inode": 2580709,
+          "path": "/home/zhuhe/litchi-performance-0970/plans/plan-0970-v6.json",
+          "sha256": "4043a33e413476961feb5c4712689be9bd392f341c30d7d5a8bd73406d033e7b"
+        },
+        "unchanged": true
+      },
+      {
+        "after": {
+          "bytes": 6564,
+          "inode": 2580713,
+          "path": "/home/zhuhe/litchi-performance-0970/receipts/root-go-0970-v4.json",
+          "sha256": "0a3b31d4ed1daad2b8bf0ce04f3977b97e7e4510580c81ccab50d82b775f6310"
+        },
+        "before": {
+          "bytes": 6564,
+          "inode": 2580713,
+          "path": "/home/zhuhe/litchi-performance-0970/receipts/root-go-0970-v4.json",
+          "sha256": "0a3b31d4ed1daad2b8bf0ce04f3977b97e7e4510580c81ccab50d82b775f6310"
+        },
+        "unchanged": true
+      },
+      {
+        "after": {
+          "bytes": 1218,
+          "inode": 2581300,
+          "path": "/home/zhuhe/litchi-performance-0970/receipts/root-terminal-0970-v1.json",
+          "sha256": "65cd348f4d5b45af972bf19c875ca6df8ccaa8687add15e47e9614f621d5c773"
+        },
+        "before": {
+          "bytes": 1218,
+          "inode": 2581300,
+          "path": "/home/zhuhe/litchi-performance-0970/receipts/root-terminal-0970-v1.json",
+          "sha256": "65cd348f4d5b45af972bf19c875ca6df8ccaa8687add15e47e9614f621d5c773"
+        },
+        "unchanged": true
+      },
+      {
+        "after": {
+          "bytes": 18712,
+          "inode": 2581314,
+          "path": "/home/zhuhe/litchi-performance-0970/review/raw-independent-audit-0970-v1.json",
+          "sha256": "30e2c51dbf541fdacc15d9ac23e2528b64551f4949c27659d8df409593cdf000"
+        },
+        "before": {
+          "bytes": 18712,
+          "inode": 2581314,
+          "path": "/home/zhuhe/litchi-performance-0970/review/raw-independent-audit-0970-v1.json",
+          "sha256": "30e2c51dbf541fdacc15d9ac23e2528b64551f4949c27659d8df409593cdf000"
+        },
+        "unchanged": true
+      },
+      {
+        "after": {
+          "bytes": 712,
+          "inode": 2581303,
+          "path": "/home/zhuhe/litchi-performance-0970/receipts/reducer-first-attempt-v1.json",
+          "sha256": "0b55e391aad14fcd17d07e362dfca33a07f85a3c94e7067e90d89cfd2669f33c"
+        },
+        "before": {
+          "bytes": 712,
+          "inode": 2581303,
+          "path": "/home/zhuhe/litchi-performance-0970/receipts/reducer-first-attempt-v1.json",
+          "sha256": "0b55e391aad14fcd17d07e362dfca33a07f85a3c94e7067e90d89cfd2669f33c"
+        },
+        "unchanged": true
+      }
+    ]
+  },
+  "preserved_historical_baseline_binary": {
+    "after": {
+      "bytes": 47909224,
+      "inode": 9349713,
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+    },
+    "before": {
+      "bytes": 47909224,
+      "inode": 9349713,
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+    },
+    "expected_sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb",
+    "unchanged": true
+  },
+  "preserved_raw_inventory_descriptor": {
+    "after": {
+      "bytes": 210822,
+      "capture_root": "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3",
+      "capture_set_sha256": "2b0b8d30b2983e0de6ff11914c57a13317854088c39d861e0f2be2a832667346",
+      "file_count": 582,
+      "path": "/home/zhuhe/litchi-performance-0970/analysis/raw-inventory-diagnostic-v3-v1.json",
+      "raw_file_count": 576,
+      "raw_set_sha256": "ec510a06c331809d77b8c25ec3f681e20e2a4641da430f54d20884fcf6c2b7b4",
+      "raw_total_bytes": 95242613,
+      "role_bytes": {
+        "capture_metadata": 23260,
+        "launch_sidecar": 133344,
+        "packet": 60909956,
+        "perf_sidecar": 26559,
+        "raw_stderr": 0,
+        "raw_stdout": 34158068,
+        "time_sidecar": 14686
+      },
+      "role_counts": {
+        "capture_metadata": 6,
+        "launch_sidecar": 96,
+        "packet": 96,
+        "perf_sidecar": 96,
+        "raw_stderr": 96,
+        "raw_stdout": 96,
+        "time_sidecar": 96
+      },
+      "sha256": "d52b0eea9d7db551233317d59acf4a2ea857ee9630d3c23be83539649831d74d",
+      "total_bytes": 95265873
+    },
+    "before": {
+      "bytes": 210822,
+      "capture_root": "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3",
+      "capture_set_sha256": "2b0b8d30b2983e0de6ff11914c57a13317854088c39d861e0f2be2a832667346",
+      "file_count": 582,
+      "path": "/home/zhuhe/litchi-performance-0970/analysis/raw-inventory-diagnostic-v3-v1.json",
+      "raw_file_count": 576,
+      "raw_set_sha256": "ec510a06c331809d77b8c25ec3f681e20e2a4641da430f54d20884fcf6c2b7b4",
+      "raw_total_bytes": 95242613,
+      "role_bytes": {
+        "capture_metadata": 23260,
+        "launch_sidecar": 133344,
+        "packet": 60909956,
+        "perf_sidecar": 26559,
+        "raw_stderr": 0,
+        "raw_stdout": 34158068,
+        "time_sidecar": 14686
+      },
+      "role_counts": {
+        "capture_metadata": 6,
+        "launch_sidecar": 96,
+        "packet": 96,
+        "perf_sidecar": 96,
+        "raw_stderr": 96,
+        "raw_stdout": 96,
+        "time_sidecar": 96
+      },
+      "sha256": "d52b0eea9d7db551233317d59acf4a2ea857ee9630d3c23be83539649831d74d",
+      "total_bytes": 95265873
+    },
+    "unchanged": true
+  },
+  "recorded_utc": "2026-10-08T02:49:09.216938Z",
+  "recorded_utc_initial": "2026-10-08T02:49:09.216938Z",
+  "schema": "litchi.performance.0970.temporary_cleanup.v1",
+  "scope": {
+    "already_absent_paths": [
+      "/home/zhuhe/litchi-performance-0970/review/__pycache__"
+    ],
+    "deleted_path_count": 4,
+    "deleted_paths": [
+      "/home/zhuhe/litchi-performance-0970/tools/__pycache__",
+      "/tmp/affinity-diagnostic-v4-test.json",
+      "/tmp/affinity-diagnostic-v5-test.json",
+      "/tmp/affinity-diagnostic-v6-independent-replay-20261008.json"
+    ],
+    "deleted_regular_file_count": 21,
+    "no_other_0970_paths_deleted": true,
+    "no_unrelated_tmp_paths_deleted": true,
+    "requested_paths": [
+      "/home/zhuhe/litchi-performance-0970/tools/__pycache__",
+      "/home/zhuhe/litchi-performance-0970/review/__pycache__",
+      "/tmp/affinity-diagnostic-v4-test.json",
+      "/tmp/affinity-diagnostic-v5-test.json"
+    ]
+  },
+  "status": "completed",
+  "supplemental_review_temp_cleanup": {
+    "approval_receipt": {
+      "bytes": 6130,
+      "inode": 2581322,
+      "path": "/home/zhuhe/litchi-performance-0970/review/reducer-v6-independent-approval-0970-v1.json",
+      "sha256": "3b73b06783d9a697ad846fd3cf9ff2c616a56853779db69f0b0923fdf23ee1d5",
+      "status": "pass"
+    },
+    "authorization": "explicit parent authorization after reducer-v6 independent approval",
+    "deleted_file_count": 1,
+    "deleted_path": {
+      "allocated_bytes": 557056,
+      "apparent_bytes": 555437,
+      "bytes": 555437,
+      "inode": 4067302,
+      "path": "/tmp/affinity-diagnostic-v6-independent-replay-20261008.json",
+      "sha256": "560e4cae2cd338fd936c57d8f3aa9ecd663aa84736ce8ea5aa431a161066c4da"
+    },
+    "deterministic_replay": {
+      "byte_identical_to_author_output": true,
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 tools/reduce_0970_v6.py --plan plans/plan-0970-v6.json --manifest capture/diagnostic-v3/capture-manifest-v2.json --output /tmp/affinity-diagnostic-v6-independent-replay-20261008.json",
+      "output_sha256": "560e4cae2cd338fd936c57d8f3aa9ecd663aa84736ce8ea5aa431a161066c4da",
+      "returncode": 0
+    },
+    "open_file_warning": "lsof emitted container overlay/nsfs stat warnings; no named open-file records",
+    "post_exists": false,
+    "review_output_binding": {
+      "bytes": 555437,
+      "path": "/home/zhuhe/litchi-performance-0970/analysis/affinity-diagnostic-v6-final.json",
+      "preserved": true,
+      "sha256": "560e4cae2cd338fd936c57d8f3aa9ecd663aa84736ce8ea5aa431a161066c4da"
+    },
+    "supporting_temps_preserved": [
+      {
+        "bytes": 392,
+        "inode": 4067298,
+        "path": "/tmp/reducer-0970-v6-selftest-final.stdout",
+        "reason": "approval self-test stdout; not the authorized replay JSON",
+        "sha256": "5e98953fbc0a12d2ec305117ae4c8754b5f4c8a3d77ff6ce6c49663d6d215aa5"
+      },
+      {
+        "bytes": 9772,
+        "inode": 4067299,
+        "path": "/tmp/reducer-0970-v5-v6.diff",
+        "reason": "approval v5-to-v6 diff; not the authorized replay JSON",
+        "sha256": "dd2594951ce707cc1ed6d1adae7f11fcc9e9507c600b8b5818fbe30b7fe82f31"
+      }
+    ]
+  },
+  "updated_utc": "2026-10-08T02:49:43.457025Z"
+}

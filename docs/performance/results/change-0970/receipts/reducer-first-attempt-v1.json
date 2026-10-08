@@ -1,0 +1,22 @@
+{
+  "schema": "litchi.performance.0970.reducer_attempt.v1",
+  "created_utc": "2026-10-08T02:39:56.678690+00:00",
+  "command": [
+    "env",
+    "LC_ALL=C",
+    "LANG=C",
+    "PYTHONDONTWRITEBYTECODE=1",
+    "/usr/bin/python3.14",
+    "/home/zhuhe/litchi-performance-0970/tools/reduce_0970_v3.py",
+    "--plan",
+    "/home/zhuhe/litchi-performance-0970/plans/plan-0970-v6.json",
+    "--manifest",
+    "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/capture-manifest-v2.json",
+    "--output",
+    "/home/zhuhe/litchi-performance-0970/analysis/affinity-diagnostic-v1.json"
+  ],
+  "returncode": 2,
+  "stderr": "reducer rejected input: 'pair'\n",
+  "output_exists": false,
+  "native_capture_rerun": false
+}

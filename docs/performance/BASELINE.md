@@ -1,5 +1,36 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0970 — historical baseline affinity diagnostic remains descriptive
+
+[0970](0970-baseline-affinity-diagnostic.md) completes 96 serial historical
+baseline children with the same retained 0967 ordinary binary in every arm:
+four cells, 12 pairs per cell, five warmups, 80 samples, CPU 31 pinned versus
+the audited 0–31 mask. The independent raw audit passes custody, completion,
+affinity, sidecar, and correctness checks. Child-p50 sample CV is 10.3561%
+pinned versus 9.52625% unpinned for `FloatingPictures/e1`; the other cells are
+1.49012%/1.19979%, 0.777451%/0.823071%, and 0.476417%/0.647617% in the same
+table order. Descriptive pinned/unpinned p50 ratios with 95% paired-bootstrap
+intervals are 0.943838 [0.864919, 1.061762], 0.999429 [0.988469, 1.001782],
+1.001952 [0.992972, 1.004463], and 0.992554 [0.991235, 0.996702]. These
+summaries use seed 970001 and 10,000 resamples; they are not qualification
+statistics. The audit receipt is
+[`raw-independent-audit-receipt-0970-v1.json`](results/change-0970/review/raw-independent-audit-receipt-0970-v1.json)
+(SHA-256
+`a0289335606c81deafa601c5334e71cdd542e4137ab82241c572fa1b02a363a2`), and
+the scalar receipt is
+[`raw-independent-scalars-0970-v1.json`](results/change-0970/review/raw-independent-scalars-0970-v1.json)
+(SHA-256
+`c9bca1f01c575678f20632e7ecdd7ded0075e7baf7094523b22914f11abfcd70`). The
+final [v6 reduction](results/change-0970/analysis/affinity-diagnostic-v6-final.json)
+is byte-identical to the independently replayed output (SHA-256
+`560e4cae2cd338fd936c57d8f3aa9ecd663aa84736ce8ea5aa431a161066c4da`), and
+the [independent approval](results/change-0970/review/reducer-v6-independent-approval-0970-v1.json)
+passes (SHA-256
+`3b73b06783d9a697ad846fd3cf9ff2c616a56853779db69f0b0923fdf23ee1d5`). The
+v6 reduction and independent approval resolve the earlier reducer tooling
+issue; no candidate qualification, source/host cause, speedup, or production
+change follows.
+
 ## 0969 — CFB writer-proof handoff stops at A/A readiness
 
 [0969](0969-cfb-writer-proof-handoff-trial.md) records the private CFB

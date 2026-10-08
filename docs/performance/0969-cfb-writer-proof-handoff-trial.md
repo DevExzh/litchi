@@ -56,7 +56,8 @@ errors, duplicate-index decline, and bounded index-allocation decline.
 The shared XLS correctness tests remain green: `litchi-xls --lib` passed 1,210
 tests and the selected `xls_comments_writer`,
 `xls_comment_transactions`, `xls_user_names`, `xls_view`, and `xls_ole_objects`
-suites passed 39 tests. These are library/integration guards, not an XLS
+suites passed 39 tests. These are library/integration correctness tests, not an
+XLS performance workload. The document QA receipt reports 1,379 passed and 14
 ignored tests; its remaining rustdoc diagnostic names four pre-existing private
 `parse_recording` links in `litchi-doc`, outside the changed OLE codec/editor
 paths. The build-equivalence audit found no observed compiler instrumentation or
@@ -125,6 +126,6 @@ projection, and full-capture fallback described above.
 | `review/doc-qa-receipt-v1.json` | `bc9f44519f771c89f097e9b82c4755b4840b9a0bfacf589ee75f034dde1ce11b` |
 | `review/build-equivalence-audit-v1.json` | `4184809dd4cd564a7ce2d8ed498e00765a61121abfeaed4b7a78385fca0159b6` |
 | `review/independent-raw-audit-0969-v1.json` | `f0d0d0b63a896be41dab84550ff39f59954c26538423be2a3d3d017df9f26775` |
-| `analysis/perf-decision-output-v1.json` | `125818db8bcf05306626230cbedd5864de53991b8a69e7ec7116299ae49ec0ba` |
+| `decision/perf-decision-output-v1.json` | `125818db8bcf05306626230cbedd5864de53991b8a69e7ec7116299ae49ec0ba` |
 | `receipts/build-cache-cleanup-v1.json` | `76611af155005a9f266be5c4a5267ef78ba55808cb76a9e1f7961ce75ab68c80` |
 | `protocol-design-v4.md` | `7766d1022bfef71ceca4fad7bb1edee9529178fb24b11eb083eb76b34fe94564` |

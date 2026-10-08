@@ -1,0 +1,227 @@
+{
+  "bindings": {
+    "design": {
+      "bytes": 15310,
+      "path": "/home/zhuhe/litchi-performance-0970/diagnostic-design-v3.md",
+      "sha256": "95aa5817f95a038c32dfbd4af7906eb474df3546aa321f0adf72c1572e3b462b"
+    },
+    "independent_output": {
+      "bytes": 555437,
+      "path": "/home/zhuhe/litchi-performance-0970/analysis/affinity-diagnostic-v6-final.json",
+      "sha256": "560e4cae2cd338fd936c57d8f3aa9ecd663aa84736ce8ea5aa431a161066c4da"
+    },
+    "manifest": {
+      "bytes": 19187,
+      "path": "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/capture-manifest-v2.json",
+      "sha256": "b0943c4572304dccc3a70dde17cce3894a35535e4c52fb7efb2526eb760b8685"
+    },
+    "new_reducer": {
+      "bytes": 24906,
+      "path": "/home/zhuhe/litchi-performance-0970/tools/reduce_0970_v6.py",
+      "sha256": "1cc1245b9132c80ff57172e146e5628b148f2d108ed108c4c80b9de6777e2423"
+    },
+    "plan": {
+      "bytes": 8753,
+      "path": "/home/zhuhe/litchi-performance-0970/plans/plan-0970-v6.json",
+      "sha256": "4043a33e413476961feb5c4712689be9bd392f341c30d7d5a8bd73406d033e7b"
+    },
+    "prior_correction": {
+      "bytes": 3882,
+      "path": "/home/zhuhe/litchi-performance-0970/receipts/reducer-correction-0970-v2.json",
+      "sha256": "1876705445033e9a41e4da57ac4fe9146f14c81e6a02d0d0a095bc2019c82070"
+    },
+    "prior_reducer": {
+      "bytes": 19395,
+      "path": "/home/zhuhe/litchi-performance-0970/tools/reduce_0970_v5.py",
+      "sha256": "efd86f5a12e04c006467e8195a6740fc679842d8e8ded7b40b73ea8b173a4359"
+    },
+    "protocol_unchanged": {
+      "bytes": 29808,
+      "path": "/home/zhuhe/litchi-performance-0970/tools/protocol_0970_v3.py",
+      "sha256": "f060aef4e863e8953811e3f9fbec2d4cbee51dce80881245e5eb7ba0f21ec28e"
+    },
+    "root_go": {
+      "bytes": 6564,
+      "path": "/home/zhuhe/litchi-performance-0970/receipts/root-go-0970-v4.json",
+      "sha256": "0a3b31d4ed1daad2b8bf0ce04f3977b97e7e4510580c81ccab50d82b775f6310"
+    },
+    "runner_unchanged": {
+      "bytes": 33212,
+      "path": "/home/zhuhe/litchi-performance-0970/tools/run_0970_v3.py",
+      "sha256": "f8ebf05d10ca3e493abe18d8a3fb9739d51d57d9cf9156057b5f8bcb0e891454"
+    },
+    "self_test_stdout": {
+      "bytes": 392,
+      "path": "/tmp/reducer-0970-v6-selftest-final.stdout",
+      "sha256": "5e98953fbc0a12d2ec305117ae4c8754b5f4c8a3d77ff6ce6c49663d6d215aa5"
+    },
+    "terminal": {
+      "bytes": 1218,
+      "path": "/home/zhuhe/litchi-performance-0970/receipts/root-terminal-0970-v1.json",
+      "sha256": "65cd348f4d5b45af972bf19c875ca6df8ccaa8687add15e47e9614f621d5c773"
+    },
+    "v5_to_v6_diff": {
+      "bytes": 9772,
+      "path": "/tmp/reducer-0970-v5-v6.diff",
+      "sha256": "dd2594951ce707cc1ed6d1adae7f11fcc9e9507c600b8b5818fbe30b7fe82f31"
+    }
+  },
+  "created_utc": "2026-10-08T02:45:50.210536+00:00",
+  "definitions": {
+    "between_cv_over_within_cv": "between_cv_population / within_cv_median, null with reason for zero denominator",
+    "between_cv_population": "population stdev/mean across the 12 child p50 elapsed centers",
+    "nearest_rank": "rank=ceil(q*n), one-indexed, for between-child p25/p75/p95; group median remains the protocol linear median",
+    "observed_affinity": "categorical actual_affinity from validated launch sidecars; no numeric affinity difference inferred",
+    "paired_dispersion": "pinned aggregate dispersion / unpinned aggregate dispersion over paired children for p50 and p95; includes raw IQR/MAD and normalized IQR/median, MAD/median point ratios plus frozen paired bootstrap intervals",
+    "population_cv": "per child population stdev(elapsed_ns)/mean(elapsed_ns) over 80 elapsed samples",
+    "within_cv_median": "median of the 12 per-child population CV values per condition/cell"
+  },
+  "design_checklist": [
+    {
+      "evidence": "p50/p95/mean/spread/within_tail present for every retained child",
+      "name": "child summaries",
+      "status": "pass"
+    },
+    {
+      "evidence": "p50/p95 nearest-rank p25/p75/p95, dispersion ratios, and explicit population-CV denominator present",
+      "name": "between-child summaries and CV",
+      "status": "pass"
+    },
+    {
+      "evidence": "first/second summaries retained per condition/cell",
+      "name": "order stratification",
+      "status": "pass"
+    },
+    {
+      "evidence": "child ratios, within-tail ratios, IQR/MAD ratios, and categorical observed affinity present",
+      "name": "paired comparisons",
+      "status": "pass"
+    },
+    {
+      "evidence": "raw and normalized IQR/MAD pinned-over-unpinned point ratios plus paired bootstrap intervals",
+      "name": "paired IQR/MAD ratios",
+      "status": "pass"
+    },
+    {
+      "evidence": "validated launch/time/perf telemetry retained per child; actual affinity summarized categorically",
+      "name": "telemetry and affinity",
+      "status": "pass"
+    },
+    {
+      "evidence": "cycles/instructions and cycles/task-clock present with frequency_claim false",
+      "name": "whole-process ratios",
+      "status": "pass"
+    },
+    {
+      "evidence": "v6 retained replay complete with 96/96 packets, no errors, raw retained",
+      "name": "custody/oracle gates",
+      "status": "pass"
+    },
+    {
+      "evidence": "no qualification status, decision, or performance threshold emitted",
+      "name": "diagnostic scope",
+      "status": "pass"
+    }
+  ],
+  "exact_delta": {
+    "custody_oracle_changed": false,
+    "diff_bytes": 9772,
+    "diff_lines": 202,
+    "diff_sha256": "dd2594951ce707cc1ed6d1adae7f11fcc9e9507c600b8b5818fbe30b7fe82f31",
+    "local_only_changes": [
+      "nearest-rank group summaries",
+      "population child-CV denominator retained from v5",
+      "paired between-child IQR/MAD ratios with frozen paired bootstrap",
+      "validated categorical observed-affinity summary and launch telemetry retention",
+      "regression self-tests"
+    ],
+    "protocol_unchanged": true,
+    "raw_capture_changed": false,
+    "runner_unchanged": true,
+    "seed_schedule_changed": false,
+    "source_or_binary_changed": false,
+    "v5_unchanged": true
+  },
+  "interpretation": "v6 is ready for independent CPU review. It does not authorize a performance or host-cause claim; raw capture and source/binary custody remain bound to the preplanned diagnostic.",
+  "regression_controls": {
+    "affinity_controls": [
+      "swapped_affinity_rejected",
+      "missing_affinity_rejected"
+    ],
+    "nearest_rank_hand_example": {
+      "iqr": 6,
+      "mad": 3,
+      "median": 6.5,
+      "p25": 3,
+      "p75": 9,
+      "p95": 12,
+      "values": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ]
+    },
+    "self_test_command": "PYTHONDONTWRITEBYTECODE=1 python3 tools/reduce_0970_v6.py --self-test",
+    "self_test_output_sha256": "5e98953fbc0a12d2ec305117ae4c8754b5f4c8a3d77ff6ce6c49663d6d215aa5",
+    "self_test_status": "pass",
+    "shifted_identical_iqr_example": {
+      "a": [
+        9,
+        10,
+        11
+      ],
+      "a_iqr": 2,
+      "b": [
+        99,
+        100,
+        101
+      ],
+      "b_iqr": 2,
+      "centers_differ": true,
+      "population_cv_nonzero": true
+    },
+    "zero_handling": "safe_ratio returns null with reason zero_within_cv/zero_within_iqr; no zero is substituted"
+  },
+  "retained_output_test": {
+    "bootstrap_resamples": 10000,
+    "cells": 4,
+    "children_per_cell": {
+      "docfloat/e1/default": 24,
+      "docfloat/e32/default": 24,
+      "docnohf/e1/default": 24,
+      "docnohf/e32/default": 24
+    },
+    "command": "PYTHONDONTWRITEBYTECODE=1 python3 tools/reduce_0970_v6.py --plan plans/plan-0970-v6.json --manifest capture/diagnostic-v3/capture-manifest-v2.json --output analysis/affinity-diagnostic-v6-final.json",
+    "decision": null,
+    "diagnostic_only": true,
+    "errors": [],
+    "expected_packet_count": 96,
+    "output_bytes": 555437,
+    "output_sha256": "560e4cae2cd338fd936c57d8f3aa9ecd663aa84736ce8ea5aa431a161066c4da",
+    "packet_count": 96,
+    "qualification": null,
+    "raw_packets_retained": true,
+    "returncode": 0,
+    "seed": 970001,
+    "status": "complete"
+  },
+  "schema": "litchi.performance.0970.reducer_correction.v3",
+  "scope": {
+    "authoritative_output_written": false,
+    "no_build": true,
+    "no_native_rerun": true,
+    "no_workload": true,
+    "offline_only": true,
+    "raw_capture_mutated": false
+  },
+  "status": "ready_for_cpu_review"
+}

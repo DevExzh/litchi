@@ -1,0 +1,478 @@
+{
+  "affinity": {
+    "allowed_cpus": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31
+    ],
+    "context_and_launcher_masks_checked": true,
+    "control_receipt_pass": true,
+    "pin_cpu": 31,
+    "pinned_expected_and_observed": [
+      31
+    ],
+    "unpinned_expected_and_observed": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31
+    ]
+  },
+  "correctness": {
+    "report_correctness_gate_values": "96 packets x 20 exact boolean gates, all true",
+    "route_count_per_packet": 3,
+    "route_oracle_values": "96 packets x 3 routes x 12 exact boolean oracle gates, all true; failure_reasons empty",
+    "route_stage_count": 32,
+    "sample_count_per_packet": 80,
+    "sample_gate_values": "96 packets x 80 samples x 5 exact boolean gates, all true",
+    "sample_oracle_values": "96 packets x 80 samples x 12 exact boolean oracle gates, all true; failure_reasons empty"
+  },
+  "created_utc": "2026-10-08T02:43:59.124250+00:00",
+  "independent_scalar_reduction": {
+    "child_p50_cv_verification": {
+      "docfloat/e1/default": {
+        "pinned": {
+          "child_p50_elapsed_ns": 1134933.0,
+          "sample_cv_pct": 10.356087013704768
+        },
+        "unpinned": {
+          "child_p50_elapsed_ns": 1170647.75,
+          "sample_cv_pct": 9.526248399152717
+        }
+      },
+      "docfloat/e32/default": {
+        "pinned": {
+          "child_p50_elapsed_ns": 8072500.25,
+          "sample_cv_pct": 1.4901223083401078
+        },
+        "unpinned": {
+          "child_p50_elapsed_ns": 8087049.5,
+          "sample_cv_pct": 1.1997943833240265
+        }
+      },
+      "docnohf/e1/default": {
+        "pinned": {
+          "child_p50_elapsed_ns": 116308.0,
+          "sample_cv_pct": 0.7774505051654003
+        },
+        "unpinned": {
+          "child_p50_elapsed_ns": 116190.5,
+          "sample_cv_pct": 0.8230711345221353
+        }
+      },
+      "docnohf/e32/default": {
+        "pinned": {
+          "child_p50_elapsed_ns": 1004896.75,
+          "sample_cv_pct": 0.4764169456183089
+        },
+        "unpinned": {
+          "child_p50_elapsed_ns": 1009462.25,
+          "sample_cv_pct": 0.6476171683179999
+        }
+      }
+    },
+    "cpu_migrations": {
+      "by_cell": {
+        "docfloat/e1/default": {
+          "nonzero_packets": 4,
+          "packets": 24,
+          "sum": 7
+        },
+        "docfloat/e32/default": {
+          "nonzero_packets": 1,
+          "packets": 24,
+          "sum": 1
+        },
+        "docnohf/e1/default": {
+          "nonzero_packets": 1,
+          "packets": 24,
+          "sum": 1
+        },
+        "docnohf/e32/default": {
+          "nonzero_packets": 2,
+          "packets": 24,
+          "sum": 2
+        }
+      },
+      "by_condition": {
+        "pinned": {
+          "sum": 0
+        },
+        "unpinned": {
+          "sum": 11
+        }
+      },
+      "event": "cpu-migrations",
+      "max_per_packet": 2,
+      "median_per_packet": 0.0,
+      "nonzero_packets": 8,
+      "packets": 96,
+      "scope": "perf sidecar whole launched GNU time/launcher/baseline process tree; descriptive only",
+      "sum": 11,
+      "zero_packets": 88
+    },
+    "estimator": {
+      "association": "Pearson and tie-aware Spearman over 12 child p50 elapsed_ns values versus whole-process perf event values; descriptive only",
+      "child_cv": "sample standard deviation / child mean * 100 across 12 child p50 elapsed_ns values",
+      "sample_quantiles": "linear interpolation at (n-1)*q over each 80-sample elapsed_ns vector"
+    },
+    "output": {
+      "bytes": 202643,
+      "path": "/home/zhuhe/litchi-performance-0970/review/raw-independent-scalars-0970-v1.json",
+      "sha256": "c9bca1f01c575678f20632e7ecdd7ded0075e7baf7094523b22914f11abfcd70"
+    },
+    "p50_vs_whole_process_association": {
+      "docfloat/e1/default": {
+        "pinned": {
+          "cycles": {
+            "elapsed_p50_vs_event_pearson": 0.9543482031088071,
+            "elapsed_p50_vs_event_spearman": 0.9300699300699301,
+            "n": 12,
+            "scope": "whole launched GNU time/launcher/baseline process tree; descriptive association only"
+          },
+          "instructions": {
+            "elapsed_p50_vs_event_pearson": 0.9552515503939408,
+            "elapsed_p50_vs_event_spearman": 0.8811188811188811,
+            "n": 12,
+            "scope": "whole launched GNU time/launcher/baseline process tree; descriptive association only"
+          },
+          "task-clock": {
+            "elapsed_p50_vs_event_pearson": 0.9541771278808255,
+            "elapsed_p50_vs_event_spearman": 0.9230769230769231,
+            "n": 12,
+            "scope": "whole launched GNU time/launcher/baseline process tree; descriptive association only"
+          }
+        },
+        "unpinned": {
+          "cycles": {
+            "elapsed_p50_vs_event_pearson": 0.9094283101421676,
+            "elapsed_p50_vs_event_spearman": 0.8811188811188811,
+            "n": 12,
+            "scope": "whole launched GNU time/launcher/baseline process tree; descriptive association only"
+          },
+          "instructions": {
+            "elapsed_p50_vs_event_pearson": 0.8918102135472826,
+            "elapsed_p50_vs_event_spearman": 0.8671328671328671,
+            "n": 12,
+            "scope": "whole launched GNU time/launcher/baseline process tree; descriptive association only"
+          },
+          "task-clock": {
+            "elapsed_p50_vs_event_pearson": 0.9084798920549105,
+            "elapsed_p50_vs_event_spearman": 0.8671328671328671,
+            "n": 12,
+            "scope": "whole launched GNU time/launcher/baseline process tree; descriptive association only"
+          }
+        }
+      },
+      "docfloat/e32/default": {
+        "pinned": {
+          "cycles": {
+            "elapsed_p50_vs_event_pearson": 0.9173629986328147,
+            "elapsed_p50_vs_event_spearman": 0.9020979020979021,
+            "n": 12,
+            "scope": "whole launched GNU time/launcher/baseline process tree; descriptive association only"
+          },
+          "instructions": {
+            "elapsed_p50_vs_event_pearson": 0.8931621987572899,
+            "elapsed_p50_vs_event_spearman": 0.8181818181818182,
+            "n": 12,
+            "scope": "whole launched GNU time/launcher/baseline process tree; descriptive association only"
+          },
+          "task-clock": {
+            "elapsed_p50_vs_event_pearson": 0.9184510700343167,
+            "elapsed_p50_vs_event_spearman": 0.9020979020979021,
+            "n": 12,
+            "scope": "whole launched GNU time/launcher/baseline process tree; descriptive association only"
+          }
+        },
+        "unpinned": {
+          "cycles": {
+            "elapsed_p50_vs_event_pearson": 0.7885912209245051,
+            "elapsed_p50_vs_event_spearman": 0.7692307692307693,
+            "n": 12,
+            "scope": "whole launched GNU time/launcher/baseline process tree; descriptive association only"
+          },
+          "instructions": {
+            "elapsed_p50_vs_event_pearson": 0.7950601109126154,
+            "elapsed_p50_vs_event_spearman": 0.7062937062937062,
+            "n": 12,
+            "scope": "whole launched GNU time/launcher/baseline process tree; descriptive association only"
+          },
+          "task-clock": {
+            "elapsed_p50_vs_event_pearson": 0.779936215381987,
+            "elapsed_p50_vs_event_spearman": 0.7482517482517482,
+            "n": 12,
+            "scope": "whole launched GNU time/launcher/baseline process tree; descriptive association only"
+          }
+        }
+      },
+      "docnohf/e1/default": {
+        "pinned": {
+          "cycles": {
+            "elapsed_p50_vs_event_pearson": 0.7561341143035331,
+            "elapsed_p50_vs_event_spearman": 0.7692307692307693,
+            "n": 12,
+            "scope": "whole launched GNU time/launcher/baseline process tree; descriptive association only"
+          },
+          "instructions": {
+            "elapsed_p50_vs_event_pearson": -0.15810499849580312,
+            "elapsed_p50_vs_event_spearman": -0.25874125874125875,
+            "n": 12,
+            "scope": "whole launched GNU time/launcher/baseline process tree; descriptive association only"
+          },
+          "task-clock": {
+            "elapsed_p50_vs_event_pearson": 0.7699279585288363,
+            "elapsed_p50_vs_event_spearman": 0.7368466411136291,
+            "n": 12,
+            "scope": "whole launched GNU time/launcher/baseline process tree; descriptive association only"
+          }
+        },
+        "unpinned": {
+          "cycles": {
+            "elapsed_p50_vs_event_pearson": 0.5584184897602286,
+            "elapsed_p50_vs_event_spearman": 0.6024527627709777,
+            "n": 12,
+            "scope": "whole launched GNU time/launcher/baseline process tree; descriptive association only"
+          },
+          "instructions": {
+            "elapsed_p50_vs_event_pearson": 0.3637426763338613,
+            "elapsed_p50_vs_event_spearman": 0.30122638138548885,
+            "n": 12,
+            "scope": "whole launched GNU time/launcher/baseline process tree; descriptive association only"
+          },
+          "task-clock": {
+            "elapsed_p50_vs_event_pearson": 0.6061604601295614,
+            "elapsed_p50_vs_event_spearman": 0.7705791151721808,
+            "n": 12,
+            "scope": "whole launched GNU time/launcher/baseline process tree; descriptive association only"
+          }
+        }
+      },
+      "docnohf/e32/default": {
+        "pinned": {
+          "cycles": {
+            "elapsed_p50_vs_event_pearson": 0.9257907963347182,
+            "elapsed_p50_vs_event_spearman": 0.9300699300699301,
+            "n": 12,
+            "scope": "whole launched GNU time/launcher/baseline process tree; descriptive association only"
+          },
+          "instructions": {
+            "elapsed_p50_vs_event_pearson": 0.461992379197717,
+            "elapsed_p50_vs_event_spearman": 0.4965034965034965,
+            "n": 12,
+            "scope": "whole launched GNU time/launcher/baseline process tree; descriptive association only"
+          },
+          "task-clock": {
+            "elapsed_p50_vs_event_pearson": 0.9383086665247836,
+            "elapsed_p50_vs_event_spearman": 0.9300699300699301,
+            "n": 12,
+            "scope": "whole launched GNU time/launcher/baseline process tree; descriptive association only"
+          }
+        },
+        "unpinned": {
+          "cycles": {
+            "elapsed_p50_vs_event_pearson": 0.7918651053304879,
+            "elapsed_p50_vs_event_spearman": 0.7552447552447552,
+            "n": 12,
+            "scope": "whole launched GNU time/launcher/baseline process tree; descriptive association only"
+          },
+          "instructions": {
+            "elapsed_p50_vs_event_pearson": 0.3726772927695353,
+            "elapsed_p50_vs_event_spearman": 0.42657342657342656,
+            "n": 12,
+            "scope": "whole launched GNU time/launcher/baseline process tree; descriptive association only"
+          },
+          "task-clock": {
+            "elapsed_p50_vs_event_pearson": 0.8194642451641002,
+            "elapsed_p50_vs_event_spearman": 0.8181818181818182,
+            "n": 12,
+            "scope": "whole launched GNU time/launcher/baseline process tree; descriptive association only"
+          }
+        }
+      }
+    }
+  },
+  "interpretation_constraints": [
+    "This packet validates frozen raw custody, terminal completion, affinity masks, correctness gates, and sidecar parseability.",
+    "The scalar summary uses sample SD over 12 child p50 centers for the reported child CV; this is distinct from a reducer population-CV denominator.",
+    "Perf/task-clock/instructions/cycles values cover the launched process tree, while elapsed_ns samples are the harness timed region; correlations are descriptive only.",
+    "No candidate qualification, optimization decision, source-owner attribution, or causal claim is admitted by this diagnostic receipt."
+  ],
+  "performance_scope": {
+    "association_warning": "Within-arm associations are descriptive whole-process telemetry correlations and cannot identify a source-level cause or replace timed-region attribution.",
+    "events": [
+      "task-clock",
+      "cycles",
+      "instructions",
+      "context-switches",
+      "cpu-migrations",
+      "page-faults"
+    ],
+    "gnu_time": "launcher startup plus same-PID execed historical baseline",
+    "harness": "baseline Instant samples only; excludes wrappers and sidecar I/O",
+    "perf": "perf measures launched GNU time command and inherited launcher/baseline process tree; perf bookkeeping excluded"
+  },
+  "raw_capture": {
+    "all_packet_tuple_coverage": true,
+    "capture_root": "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3",
+    "manifest_complete": true,
+    "packet_files": 96,
+    "packet_hash_list_sha256": "dd732bf65224c96257b01def3d6871d437a7bd8bfe23d216a51977ad770ca984",
+    "perf_event_rows": 576,
+    "perf_time_launch_sidecars": 288,
+    "raw_stdout_stderr_files": 192,
+    "referenced_raw_sidecar_hash_list_sha256": "809ca627c94f0fbc79c7df2f925954f318b52424ffe0a627cc389d6f94415f30",
+    "sample_rows": 7680,
+    "stage_complete": true,
+    "terminal_exit_code": 0,
+    "terminal_retries": 0,
+    "tree_exactly_referenced": true,
+    "tree_files": 582,
+    "unique_launcher_pids": true
+  },
+  "schema": "litchi.performance.0970.independent_raw_audit_receipt.v1",
+  "scope": "Independent read-only audit of the frozen 0970 historical-baseline affinity diagnostic; no workload, build, raw mutation, or capture retry.",
+  "sealed_inputs": {
+    "affinity_controls": {
+      "bytes": 2225,
+      "path": "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/affinity-controls-v2.json",
+      "sha256": "900a914a93223d427e4746f25213901bb56e73d9c25efc78bf058f9cb3f043fd"
+    },
+    "audit_output": {
+      "bytes": 18712,
+      "path": "/home/zhuhe/litchi-performance-0970/review/raw-independent-audit-0970-v1.json",
+      "sha256": "30e2c51dbf541fdacc15d9ac23e2528b64551f4949c27659d8df409593cdf000"
+    },
+    "audit_script": {
+      "bytes": 39998,
+      "path": "/home/zhuhe/litchi-performance-0970/review/independent_raw_audit_0970_v1.py",
+      "sha256": "ab24c3cafeb9db4151c5f1677b01cb490b90e7eaa782507078d6e4be1865b25f"
+    },
+    "capture_manifest": {
+      "bytes": 19187,
+      "path": "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/capture-manifest-v2.json",
+      "sha256": "b0943c4572304dccc3a70dde17cce3894a35535e4c52fb7efb2526eb760b8685"
+    },
+    "capture_stage": {
+      "bytes": 533,
+      "path": "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/capture-stage-v2.json",
+      "sha256": "244e033250f303328b7c4f3b1b729c4d3548886e9153b7ecfe5a996669871143"
+    },
+    "plan": {
+      "bytes": 8753,
+      "path": "/home/zhuhe/litchi-performance-0970/plans/plan-0970-v6.json",
+      "sha256": "4043a33e413476961feb5c4712689be9bd392f341c30d7d5a8bd73406d033e7b"
+    },
+    "root_go": {
+      "bytes": 6564,
+      "path": "/home/zhuhe/litchi-performance-0970/receipts/root-go-0970-v4.json",
+      "sha256": "0a3b31d4ed1daad2b8bf0ce04f3977b97e7e4510580c81ccab50d82b775f6310"
+    },
+    "root_terminal": {
+      "bytes": 1218,
+      "path": "/home/zhuhe/litchi-performance-0970/receipts/root-terminal-0970-v1.json",
+      "sha256": "65cd348f4d5b45af972bf19c875ca6df8ccaa8687add15e47e9614f621d5c773"
+    },
+    "scalar_output": {
+      "bytes": 202643,
+      "path": "/home/zhuhe/litchi-performance-0970/review/raw-independent-scalars-0970-v1.json",
+      "sha256": "c9bca1f01c575678f20632e7ecdd7ded0075e7baf7094523b22914f11abfcd70"
+    }
+  },
+  "status": "pass_with_tooling_pending",
+  "tooling_finding": {
+    "capture_impact": "none; no retry or raw mutation",
+    "error": "KeyError: 'pair' before output; retained packet stores pair/condition/order_position under context.",
+    "first_attempt": {
+      "bytes": 712,
+      "path": "/home/zhuhe/litchi-performance-0970/receipts/reducer-first-attempt-v1.json",
+      "sha256": "0b55e391aad14fcd17d07e362dfca33a07f85a3c94e7067e90d89cfd2669f33c"
+    },
+    "first_attempt_receipt": {
+      "command": [
+        "env",
+        "LC_ALL=C",
+        "LANG=C",
+        "PYTHONDONTWRITEBYTECODE=1",
+        "/usr/bin/python3.14",
+        "/home/zhuhe/litchi-performance-0970/tools/reduce_0970_v3.py",
+        "--plan",
+        "/home/zhuhe/litchi-performance-0970/plans/plan-0970-v6.json",
+        "--manifest",
+        "/home/zhuhe/litchi-performance-0970/capture/diagnostic-v3/capture-manifest-v2.json",
+        "--output",
+        "/home/zhuhe/litchi-performance-0970/analysis/affinity-diagnostic-v1.json"
+      ],
+      "created_utc": "2026-10-08T02:39:56.678690+00:00",
+      "native_capture_rerun": false,
+      "output_exists": false,
+      "returncode": 2,
+      "schema": "litchi.performance.0970.reducer_attempt.v1",
+      "stderr": "reducer rejected input: 'pair'\n"
+    },
+    "independent_audit_impact": "none; this audit did not import or execute the shared reducer.",
+    "old_reducer": {
+      "bytes": 17419,
+      "path": "/home/zhuhe/litchi-performance-0970/tools/reduce_0970_v3.py",
+      "sha256": "d00cdd48e9cb92dfc23a980c5962cc9b91884eb09c3bc52e4dd27d93382d1c39"
+    },
+    "status": "pending_corrected_reducer_replay"
+  }
+}
