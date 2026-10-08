@@ -483,7 +483,7 @@ impl Docx {
                 litchi_docx::Package::from_opc_package(package.opc_package().clone())?
             },
             DocxOwner::Source(package) => {
-                let bytes = signature::exact_source(package.source_backed_package())?;
+                let bytes = signature::exact_source(package.source_backed_package()?)?;
                 litchi_docx::Package::from_opc_package(OpcPackage::from_vec_with_limits(
                     bytes,
                     self.0.ooxml_limits,

@@ -10,6 +10,7 @@
 
 pub(crate) mod document_policy;
 mod ink;
+mod owner;
 mod svg_lifecycle;
 
 #[cfg(test)]
@@ -128,7 +129,10 @@ use std::sync::{Arc, Mutex, OnceLock};
 /// the original package while any share remains alive.
 #[derive(Clone)]
 pub struct Package {
-    package: SourceBackedPackage,
+    physical: SourceBackedPackage,
+    // Installed only through with_prepared_topology, which creates fresh caches.
+    // Never replace this while retaining the prior owner's paragraph/admission caches.
+    effective: Option<litchi_opc::PreparedTopology>,
     execution: Option<ExecutionContext>,
     paragraph_index_cache: Arc<ParagraphIndexCache>,
     /// Everything repaired while the package was read, aggregated from the
@@ -325,6 +329,21 @@ impl<W: Write> Write for FingerprintingWriter<W> {
 }
 
 impl Package {
+    /// Central boundary for operations that require the original OPC graph.
+    fn physical_package(&self) -> Result<&SourceBackedPackage> {
+        Ok(self.physical_opc_package()?)
+    }
+
+    fn physical_opc_package(&self) -> litchi_opc::Result<&SourceBackedPackage> {
+        if let Some(effective) = &self.effective {
+            effective.check_source()?;
+            return Err(litchi_opc::OpcError::SourceBackedOverlayUnavailable {
+                reason: "this DOCX operation requires migration to the effective graph".into(),
+            });
+        }
+        Ok(&self.physical)
+    }
+
     /// Open a DOCX package from a regular filesystem file without slurping it
     /// into memory.
     ///
@@ -631,7 +650,8 @@ impl Package {
         let mut tolerance = crate::leniency::ToleranceReport::default();
         tolerance.append_package(package.tolerance_report());
         Ok(Self {
-            package,
+            physical: package,
+            effective: None,
             execution,
             paragraph_index_cache: Arc::new(ParagraphIndexCache::new()),
             tolerance: Arc::new(Mutex::new(tolerance)),
@@ -653,16 +673,18 @@ impl Package {
         Self::with_execution(package, execution)
     }
 
-    /// Borrow the validated deferred OPC package this document reads from.
+    /// Borrow the original OPC graph when no effective candidate is installed.
+    ///
+    /// Returns a typed refusal for effective owners so callers cannot silently
+    /// discard retained edits by operating on the physical archive.
     ///
     /// This is the package indexed when the document was opened: no ZIP
     /// directory, content-type catalog, or relationship graph is rebuilt.
     /// Borrowed package services, such as
     /// [`SourceBackedPackage::source_artifact`], read through the same
     /// positional source and observe the same source-version fence.
-    #[must_use]
-    pub fn source_backed_package(&self) -> &SourceBackedPackage {
-        &self.package
+    pub fn source_backed_package(&self) -> Result<&SourceBackedPackage> {
+        self.physical_package()
     }
 
     /// Materialize this source-backed DOCX into the established owning
@@ -675,7 +697,10 @@ impl Package {
     /// OPC layer before ordinary payload reads so their budget reservations
     /// cannot be detached accidentally.
     pub fn to_owned_package(&self) -> Result<crate::Package> {
-        let package = self.package.to_opc_package()?;
+        let package = match &self.effective {
+            Some(effective) => effective.to_opc_package()?,
+            None => self.physical.to_opc_package()?,
+        };
         let result = crate::Package::from_opc_package(package);
         // The OPC conversion checks freshness through its final payload read,
         // but the owning DOCX constructor still performs graph/property
@@ -683,8 +708,7 @@ impl Package {
         // exposing either success or a constructor error so a mutation in
         // this publication window cannot yield a stale owner (or mask the
         // stale-source failure with an eager parse error).
-        self.package.source_version()?;
-        self.package.check_execution()?;
+        self.check_source()?;
         result
     }
 
@@ -696,18 +720,26 @@ impl Package {
     /// queries do not revisit the positional source. Managed opens retain the
     /// budgeted [`PartData`] handle instead of detaching an `Arc`.
     pub fn document(&self) -> Result<Document> {
+        if let Some(effective) = &self.effective {
+            return self.effective_document(effective);
+        }
         let result: Result<Document> = (|| {
-            self.package.check_execution()?;
-            let main = self.package.main_document_part()?;
+            self.physical_package()?.check_execution()?;
+            let main = self.physical_package()?.main_document_part()?;
             validate_document_main_content_type(main.content_type())?;
             let data = self.main_data(main)?;
-            let managed = self.package.cache_diagnostics().budget_managed;
-            let source_version = self.package.source_version()?;
+            let managed = self.physical_package()?.cache_diagnostics().budget_managed;
+            let source_version = self.physical_package()?.source_version()?;
             let document: Result<Document> = (|| {
                 let (xml, paragraph_memo, index_admission, paragraph_route) = if managed {
-                    let context = self.package.execution_context().ok_or_else(|| {
-                        Error::InvalidFormat("managed document context is unavailable".into())
-                    })?;
+                    let context =
+                        self.physical_package()?
+                            .execution_context()
+                            .ok_or_else(|| {
+                                Error::InvalidFormat(
+                                    "managed document context is unavailable".into(),
+                                )
+                            })?;
                     let build = self.paragraph_index_cache.get_or_build_source(
                         source_version,
                         ParagraphIndexRoute::Managed,
@@ -718,7 +750,7 @@ impl Package {
                             // contend for budget before joining the memo.
                             ensure_source_document_xml(
                                 data.as_bytes(),
-                                self.package.execution_context().as_ref(),
+                                self.physical_package()?.execution_context().as_ref(),
                             )?;
                             let index_admission =
                                 DocumentIndexAdmission::new(&context, data.as_bytes().len())?;
@@ -731,8 +763,8 @@ impl Package {
                             let paragraph_index = ParagraphIndex::from_xml(data.as_bytes()).ok();
                             // Do not publish an index whose source or execution
                             // fence was crossed while the managed scan ran.
-                            self.package.source_version()?;
-                            self.package.check_execution()?;
+                            self.physical_package()?.source_version()?;
+                            self.physical_package()?.check_execution()?;
                             Ok(match paragraph_index {
                                 Some(index) => {
                                     ParagraphIndexBuild::indexed(index, Some(index_admission))
@@ -761,6 +793,7 @@ impl Package {
                 };
                 Ok(Document {
                     xml,
+                    _retained: None,
                     paragraph_memo,
                     _index_admission: index_admission,
                     source_version,
@@ -776,8 +809,8 @@ impl Package {
             // completed. Check freshness once more before exposing that error so
             // a source mutation during parsing wins over a stale parse result.
             let freshness = (|| {
-                self.package.source_version()?;
-                self.package.check_execution()?;
+                self.physical_package()?.source_version()?;
+                self.physical_package()?.check_execution()?;
                 Ok::<_, Error>(())
             })();
             match freshness {
@@ -855,24 +888,29 @@ impl Package {
         options: litchi_core::TextOutputOptions<'_>,
     ) -> std::result::Result<litchi_core::TextOutputReport, litchi_core::TextOutputError<Error>>
     {
+        let physical =
+            self.physical_package()
+                .map_err(|source| litchi_core::TextOutputError::Document {
+                    source,
+                    progress: litchi_core::TextOutputReport::default(),
+                })?;
         let source_failure = Arc::new(Mutex::new(None));
         let mut checked_output = SourceCheckedTextSink {
             output,
-            package: &self.package,
+            package: physical,
             failure: Arc::clone(&source_failure),
         };
         let mut writer = litchi_core::SequentialTextWriter::new(&mut checked_output, options);
         let mut repaired = crate::leniency::ToleranceReport::default();
 
         let parsed = (|| -> std::result::Result<(), litchi_core::TextOutputError<Error>> {
-            self.package
+            physical
                 .check_execution()
                 .map_err(|source| writer.document_error(source.into()))?;
-            self.package
+            physical
                 .source_version()
                 .map_err(|source| writer.document_error(source.into()))?;
-            let main = self
-                .package
+            let main = physical
                 .main_document_part()
                 .map_err(|source| writer.document_error(source.into()))?;
             validate_document_main_content_type(main.content_type())
@@ -895,11 +933,11 @@ impl Package {
             let data = self
                 .main_data(main)
                 .map_err(|source| writer.document_error(source))?;
-            let managed = self.package.cache_diagnostics().budget_managed;
+            let managed = physical.cache_diagnostics().budget_managed;
             let visible: Cow<'_, [u8]> = if managed {
                 self.ensure_source_document_xml(
                     data.as_bytes(),
-                    self.package.execution_context().as_ref(),
+                    physical.execution_context().as_ref(),
                 )
                 .map_err(|source| writer.document_error(source))?;
                 Cow::Borrowed(data.as_bytes())
@@ -920,30 +958,29 @@ impl Package {
                 .map_err(|source| writer.document_error(source.into()))?
                 .xml
             };
-            self.package
+            physical
                 .source_version()
                 .map_err(|source| writer.document_error(source.into()))?;
-            self.package
+            physical
                 .check_execution()
                 .map_err(|source| writer.document_error(source.into()))?;
             crate::paragraph::write_text_to_with_operation_check(
                 visible.as_ref(),
                 &mut writer,
                 || {
-                    self.package.check_execution().map_err(Error::from)?;
-                    self.package.source_version().map_err(Error::from)?;
+                    physical.check_execution().map_err(Error::from)?;
+                    physical.source_version().map_err(Error::from)?;
                     Ok(())
                 },
                 &mut repaired,
             )
         })();
         let progress = writer.progress();
-        let source = self
-            .package
+        let source = physical
             .check_execution()
             .err()
             .map(Error::from)
-            .or_else(|| self.package.source_version().err().map(Error::from))
+            .or_else(|| physical.source_version().err().map(Error::from))
             .or_else(|| take_source_text_failure(&source_failure));
         // Every repair the pass applied is merged, output error or not: a
         // failed call still skipped the subtrees it recorded.
@@ -963,7 +1000,7 @@ impl Package {
     /// a document-level report.
     fn opened_tolerance(&self) -> crate::leniency::ToleranceReport {
         let mut report = crate::leniency::ToleranceReport::default();
-        report.append_package(self.package.tolerance_report());
+        report.append_package(self.physical.tolerance_report());
         report
     }
 
@@ -1000,10 +1037,10 @@ impl Package {
         limits: &crate::section::Limits,
     ) -> Result<crate::section::Snapshot> {
         self.trim_clean_paragraph_index_for_operation();
-        self.package.check_execution()?;
-        let main = self.package.main_document_part()?;
+        self.physical_package()?.check_execution()?;
+        let main = self.physical_package()?.main_document_part()?;
         validate_document_main_content_type(main.content_type())?;
-        let source_version = self.package.source_version()?;
+        let source_version = self.physical_package()?.source_version()?;
         let raw = self.main_data(main)?;
         let snapshot = (|| {
             ensure_source_section_inventory_xml(raw.as_bytes(), limits)?;
@@ -1011,7 +1048,7 @@ impl Package {
         })();
         // Detect hostile adapters that mutate immediately after the payload
         // read and semantic scan, before publishing the closure to the caller.
-        let observed = self.package.source_version()?;
+        let observed = self.physical_package()?.source_version()?;
         if observed != source_version {
             return Err(litchi_opc::OpcError::SourceChanged {
                 expected: source_version,
@@ -1019,7 +1056,7 @@ impl Package {
             }
             .into());
         }
-        self.package.check_execution()?;
+        self.physical_package()?.check_execution()?;
         if let Ok(snapshot) = &snapshot {
             let repaired = snapshot.inventory().tolerance_report();
             if !repaired.is_clean() {
@@ -1070,17 +1107,21 @@ impl Package {
     /// Return content-free cache activity for this source-backed DOCX.
     #[must_use]
     pub fn cache_diagnostics(&self) -> SourceCacheDiagnostics {
-        self.package.cache_diagnostics()
+        self.physical.cache_diagnostics()
     }
 
     /// Inspect the opt-in source-read window; exact constructors return `None`.
     pub fn source_read_diagnostics(&self) -> Result<Option<SourceReadDiagnostics>> {
-        Ok(self.package.source_read_diagnostics()?)
+        Ok(self.physical_package()?.source_read_diagnostics()?)
     }
 
-    /// Return the exact source identity and revision captured at open.
+    /// Return the physical source version after checking all effective guards.
+    /// Logical candidates can share this version; it is not a semantic cache key.
     pub fn source_version(&self) -> Result<SourceVersion> {
-        Ok(self.package.source_version()?)
+        match &self.effective {
+            Some(topology) => Ok(topology.physical_source_version()?),
+            None => Ok(self.physical.source_version()?),
+        }
     }
 
     /// Read relationship-selected OOXML core properties without loading the
@@ -1093,14 +1134,14 @@ impl Package {
     /// execution cancellation is checked at the same boundaries.
     pub fn metadata(&self) -> Result<litchi_core::Metadata> {
         self.trim_clean_paragraph_index_for_operation();
-        self.package.check_execution()?;
+        self.physical_package()?.check_execution()?;
         let mut repaired = litchi_ooxml_common::leniency::ToleranceReport::default();
         let properties = litchi_ooxml_common::properties::read_source_backed_with_report(
-            &self.package,
+            self.physical_package()?,
             &mut repaired,
         );
-        self.package.source_version()?;
-        self.package.check_execution()?;
+        self.physical_package()?.source_version()?;
+        self.physical_package()?.check_execution()?;
         let properties = properties?;
         let mut tolerance = self
             .tolerance
@@ -1124,7 +1165,9 @@ impl Package {
     /// inventory call.
     pub fn embedded(&self) -> Result<Vec<litchi_ooxml_common::embedded::SourceEntry<'_>>> {
         self.trim_clean_paragraph_index_for_operation();
-        Ok(litchi_ooxml_common::embedded::scan_source(&self.package)?)
+        Ok(litchi_ooxml_common::embedded::scan_source(
+            self.physical_package()?,
+        )?)
     }
 
     /// Inventory embedded relationships with explicit resource limits.
@@ -1138,7 +1181,7 @@ impl Package {
     ) -> Result<Vec<litchi_ooxml_common::embedded::SourceEntry<'_>>> {
         self.trim_clean_paragraph_index_for_operation();
         Ok(litchi_ooxml_common::embedded::scan_source_with(
-            &self.package,
+            self.physical_package()?,
             limits,
         )?)
     }
@@ -1255,21 +1298,23 @@ impl Package {
                 current.snapshot.variables(),
             )?;
         }
-        let original_artifact = self.package.source_artifact();
+        let original_artifact = self.physical_package()?.source_artifact();
         let mut output = FingerprintingWriter {
             inner: writer,
             hasher: Sha256::new(),
         };
         if commit.patch().is_empty() {
-            self.package
+            self.physical_package()?
                 .clone()
                 .write_part_overlays_shared_to_stream(&mut output, Vec::new())?;
         } else {
-            self.package.clone().write_part_overlay_shared_to_stream(
-                &mut output,
-                &current.partname,
-                target.shared_xml(),
-            )?;
+            self.physical_package()?
+                .clone()
+                .write_part_overlay_shared_to_stream(
+                    &mut output,
+                    &current.partname,
+                    target.shared_xml(),
+                )?;
         }
         let published_artifact =
             SourceArtifactFingerprint::from_sha256(output.hasher.finalize().into());
@@ -1301,7 +1346,8 @@ impl Package {
         let current = self
             .settings_document_variables_source("publish_document_variables_inverse_to_stream")?;
         if !current.snapshot.same_content(&publication.snapshot)
-            || self.package.source_artifact().fingerprint()? != publication.published_artifact
+            || self.physical_package()?.source_artifact().fingerprint()?
+                != publication.published_artifact
         {
             return Err(Error::DocumentVariablesConflict);
         }
@@ -1357,7 +1403,7 @@ impl Package {
         current: layout::Snapshot,
         target: layout::Snapshot,
     ) -> Result<layout::Publication> {
-        let original_artifact = self.package.source_artifact();
+        let original_artifact = self.physical_package()?.source_artifact();
         let mut output = FingerprintingWriter {
             inner: writer,
             hasher: Sha256::new(),
@@ -1365,11 +1411,9 @@ impl Package {
         if patch.is_noop() {
             original_artifact.write_to_stream(&mut output)?;
         } else {
-            self.package.clone().write_part_overlay_shared_to_stream(
-                &mut output,
-                main,
-                target.shared_xml(),
-            )?;
+            self.physical_package()?
+                .clone()
+                .write_part_overlay_shared_to_stream(&mut output, main, target.shared_xml())?;
         }
         let published_fingerprint =
             SourceArtifactFingerprint::from_sha256(output.hasher.finalize().into());
@@ -1439,7 +1483,7 @@ impl Package {
             .main_document_snapshot("external_hyperlink_sanitization_snapshot", false)
             .map_err(transaction_error_to_document)?;
         self.refuse_protected_external_hyperlink_detachment()?;
-        let main = self.package.main_document_part()?;
+        let main = self.physical_package()?.main_document_part()?;
         let mut relationships = Vec::new();
         relationships
             .try_reserve_exact(main.rels().len())
@@ -1512,7 +1556,7 @@ impl Package {
             .map_err(transaction_error_to_document)?;
         self.refuse_protected_external_hyperlink_detachment()?;
         self.refuse_external_hyperlink_redaction_topology()?;
-        let main = self.package.main_document_part()?;
+        let main = self.physical_package()?.main_document_part()?;
         let mut relationships = Vec::new();
         relationships
             .try_reserve_exact(main.rels().len())
@@ -1528,8 +1572,8 @@ impl Package {
                 relationship.is_external(),
             ));
         }
-        let source_version = self.package.source_version()?;
-        let source_fingerprint = self.package.source_artifact().fingerprint()?;
+        let source_version = self.physical_package()?.source_version()?;
+        let source_fingerprint = self.physical_package()?.source_artifact().fingerprint()?;
         redact::Snapshot::from_source(
             document
                 .shared_xml()
@@ -1603,7 +1647,7 @@ impl Package {
             document_policy::validate_changed_document(self)?;
         }
         if commit.patch().is_noop() {
-            self.package
+            self.physical_package()?
                 .clone()
                 .write_part_overlays_shared_to_stream(writer, Vec::new())
                 .map_err(Error::from)?;
@@ -1611,12 +1655,12 @@ impl Package {
             let mut plan = SourceTopologyPlan::new();
             plan.try_replace_source_xml_part(main, source_xml)
                 .map_err(Error::from)?;
-            self.package
+            self.physical_package()?
                 .clone()
                 .write_topology_to_stream(writer, plan)
                 .map_err(Error::from)?;
         } else {
-            self.package
+            self.physical_package()?
                 .clone()
                 .write_part_overlay_shared_to_stream(
                     writer,
@@ -1647,7 +1691,7 @@ impl Package {
         commit: &Commit,
     ) -> TransactionResult<DocumentPublication> {
         self.trim_clean_paragraph_index_for_operation();
-        let original_artifact = self.package.source_artifact();
+        let original_artifact = self.physical_package()?.source_artifact();
         let original_sha256 = original_artifact.fingerprint().map_err(Error::from)?;
         let original_len = original_artifact.len();
         let mut output = DocumentPublicationWriter {
@@ -1692,7 +1736,7 @@ impl Package {
         publication: &DocumentPublication,
     ) -> TransactionResult<Snapshot> {
         self.trim_clean_paragraph_index_for_operation();
-        self.package
+        self.physical_package()?
             .restore_source_artifact_to_stream(
                 &publication.original_artifact,
                 publication.proof,
@@ -1741,7 +1785,7 @@ impl Package {
             replacement.media_type(),
             replacement.extension(),
         )?;
-        self.package
+        self.physical_package()?
             .clone()
             .write_part_overlay_to_stream(writer, &target, replacement.into_bytes())
             .map_err(Error::from)
@@ -1771,20 +1815,22 @@ impl Package {
         commit: &sanitize::Commit,
     ) -> Result<sanitize::Snapshot> {
         self.trim_clean_paragraph_index_for_operation();
-        let main = self.package.main_document_part()?.partname().clone();
+        let main = self
+            .physical_package()?
+            .main_document_part()?
+            .partname()
+            .clone();
         let current =
             self.external_hyperlink_sanitization_snapshot_with_limits(commit.patch().limits())?;
         let target = commit.patch().apply(&current)?;
         if commit.patch().is_noop() {
-            self.package
+            self.physical_package()?
                 .clone()
                 .write_part_overlays_shared_to_stream(writer, Vec::new())?;
         } else {
-            self.package.clone().write_part_overlay_shared_to_stream(
-                writer,
-                &main,
-                target.shared_xml(),
-            )?;
+            self.physical_package()?
+                .clone()
+                .write_part_overlay_shared_to_stream(writer, &main, target.shared_xml())?;
         }
         Ok(target)
     }
@@ -1801,17 +1847,23 @@ impl Package {
         commit: &redact::Commit,
     ) -> Result<redact::EffectReport> {
         self.trim_clean_paragraph_index_for_operation();
-        let main = self.package.main_document_part()?.partname().clone();
+        let main = self
+            .physical_package()?
+            .main_document_part()?
+            .partname()
+            .clone();
         let current =
             self.external_hyperlink_redaction_snapshot_with_limits(commit.patch().limits())?;
         commit.patch().validate_source(&current)?;
         let report = commit.effect_report();
         if report.is_noop() {
-            self.package.source_artifact().write_to_stream(writer)?;
+            self.physical_package()?
+                .source_artifact()
+                .write_to_stream(writer)?;
             return Ok(report);
         }
         let (replacement, removed_ids) = redact::publication_parts(commit);
-        self.package
+        self.physical_package()?
             .clone()
             .write_part_overlay_with_external_relationship_removals_to_stream(
                 writer,
@@ -1837,8 +1889,8 @@ impl Package {
         limits: crate::story_hyperlinks::Limits,
     ) -> Result<crate::story_hyperlinks::Snapshot> {
         self.trim_clean_paragraph_index_for_operation();
-        self.package.check_execution()?;
-        crate::story_hyperlinks::capture_source(&self.package, limits)
+        self.physical_package()?.check_execution()?;
+        crate::story_hyperlinks::capture_source(self.physical_package()?, limits)
     }
 
     /// Plan exact target URL removal across all relationship-owned stories.
@@ -1881,15 +1933,19 @@ impl Package {
         commit: &crate::story_hyperlinks::Commit,
     ) -> Result<crate::story_hyperlinks::Report> {
         self.trim_clean_paragraph_index_for_operation();
-        self.package.check_execution()?;
-        commit.patch().validate_source_identity(&self.package)?;
+        self.physical_package()?.check_execution()?;
+        commit
+            .patch()
+            .validate_source_identity(self.physical_package()?)?;
         let report = commit.report().clone();
         if report.effect().is_noop() {
-            self.package.source_artifact().write_to_stream(writer)?;
+            self.physical_package()?
+                .source_artifact()
+                .write_to_stream(writer)?;
             return Ok(report);
         }
         let parts = crate::story_hyperlinks::publication_parts(commit)?;
-        self.package
+        self.physical_package()?
             .clone()
             .write_part_overlays_with_external_relationship_removals_to_stream(writer, parts)?;
         Ok(report)
@@ -1901,8 +1957,8 @@ impl Package {
         media_type: &str,
         extension: &str,
     ) -> Result<PackURI> {
-        self.package.check_execution()?;
-        let main = self.package.main_document_part()?;
+        self.physical_package()?.check_execution()?;
+        let main = self.physical_package()?.main_document_part()?;
         let main_name = main.partname().clone();
         let data = self.main_data(main)?;
         let chunks = crate::alt::scan(data.as_bytes())?;
@@ -1953,7 +2009,7 @@ impl Package {
             });
         }
         let target = relationship.target_partname()?;
-        let target_part = self.package.part(&target)?;
+        let target_part = self.physical_package()?.part(&target)?;
         if target == main_name {
             return Err(Error::UnsafeEdit {
                 format: "DOCX",
@@ -2005,14 +2061,14 @@ impl Package {
         }
 
         let mut inbound = 0usize;
-        for candidate in self.package.rels().iter() {
+        for candidate in self.physical_package()?.rels().iter() {
             if !candidate.is_external() && candidate.target_partname()? == target {
                 inbound = inbound.checked_add(1).ok_or_else(|| {
                     Error::InvalidFormat("altChunk inbound count overflow".into())
                 })?;
             }
         }
-        for part in self.package.iter_parts() {
+        for part in self.physical_package()?.iter_parts() {
             for candidate in part.rels().iter() {
                 if !candidate.is_external() && candidate.target_partname()? == target {
                     inbound = inbound.checked_add(1).ok_or_else(|| {
@@ -2028,7 +2084,7 @@ impl Package {
                 reason: "the selected altChunk target is shared by an ambiguous relationship closure",
             });
         }
-        self.package.source_version()?;
+        self.physical_package()?.source_version()?;
         Ok(target)
     }
 
@@ -2046,21 +2102,31 @@ impl Package {
         source_authorized: bool,
         before: Option<&Snapshot>,
     ) -> TransactionResult<(PackURI, Snapshot)> {
-        self.package.source_version().map_err(Error::from)?;
+        self.physical_package()?
+            .source_version()
+            .map_err(Error::from)?;
         let result = (|| {
-            self.package.check_execution().map_err(Error::from)?;
-            let main = self.package.main_document_part().map_err(Error::from)?;
+            self.physical_package()?
+                .check_execution()
+                .map_err(Error::from)?;
+            let main = self
+                .physical_package()?
+                .main_document_part()
+                .map_err(Error::from)?;
             validate_document_main_content_type(main.content_type())?;
             let partname = main.partname();
-            let context = self.package.execution_context();
-            let managed = self.package.cache_diagnostics().budget_managed;
+            let context = self.physical_package()?.execution_context();
+            let managed = self.physical_package()?.cache_diagnostics().budget_managed;
             if managed {
                 // Transaction snapshots do not use the paragraph memo. Drop
                 // only an unpinned clean entry before their own admissions.
                 self.paragraph_index_cache.trim_clean();
             }
-            let source_version = self.package.source_version().map_err(Error::from)?;
-            let source_lineage = self.package.source_lineage();
+            let source_version = self
+                .physical_package()?
+                .source_version()
+                .map_err(Error::from)?;
+            let source_lineage = self.physical_package()?.source_lineage();
             let snapshot = if managed {
                 if source_authorized {
                     let hinted_before = before
@@ -2130,7 +2196,7 @@ impl Package {
                     let data = self.main_data(main)?;
                     self.ensure_source_document_xml(
                         data.as_bytes(),
-                        self.package.execution_context().as_ref(),
+                        self.physical_package()?.execution_context().as_ref(),
                     )?;
                     Snapshot::from_managed_part(
                         data,
@@ -2158,8 +2224,12 @@ impl Package {
             };
             Ok((partname.clone(), snapshot))
         })();
-        self.package.source_version().map_err(Error::from)?;
-        self.package.check_execution().map_err(Error::from)?;
+        self.physical_package()?
+            .source_version()
+            .map_err(Error::from)?;
+        self.physical_package()?
+            .check_execution()
+            .map_err(Error::from)?;
         result
     }
 
@@ -2196,22 +2266,22 @@ impl Package {
         limits: &crate::section::Limits,
         retained_base: Option<&layout::Snapshot>,
     ) -> Result<(PackURI, layout::Snapshot)> {
-        self.package.check_execution()?;
-        let main = self.package.main_document_part()?;
+        self.physical_package()?.check_execution()?;
+        let main = self.physical_package()?.main_document_part()?;
         validate_document_main_content_type(main.content_type())?;
         let partname = main.partname().clone();
-        if self.package.cache_diagnostics().budget_managed {
+        if self.physical_package()?.cache_diagnostics().budget_managed {
             return Err(Error::UnsafeEdit {
                 format: "DOCX",
                 operation,
                 reason: "source-backed section layout edits require an owned immutable main-document snapshot",
             });
         }
-        let source_version = self.package.source_version()?;
-        let lineage = self.package.source_lineage();
+        let source_version = self.physical_package()?.source_version()?;
+        let lineage = self.physical_package()?.source_lineage();
         let data = self.main_data(main)?;
         let raw = data.into_arc()?;
-        let artifact_fingerprint = self.package.source_artifact().fingerprint()?;
+        let artifact_fingerprint = self.physical_package()?.source_artifact().fingerprint()?;
         let snapshot = if let Some(base) =
             retained_base.filter(|base| base.xml_matches(&raw) && base.limits() == limits)
         {
@@ -2232,7 +2302,7 @@ impl Package {
                 limits,
             )
         };
-        let observed = self.package.source_version()?;
+        let observed = self.physical_package()?.source_version()?;
         if observed != source_version {
             return Err(litchi_opc::OpcError::SourceChanged {
                 expected: source_version,
@@ -2240,7 +2310,7 @@ impl Package {
             }
             .into());
         }
-        self.package.check_execution()?;
+        self.physical_package()?.check_execution()?;
         Ok((partname, snapshot?))
     }
 
@@ -2248,18 +2318,22 @@ impl Package {
         &self,
         operation: &'static str,
     ) -> Result<DocumentVariablesSource> {
-        self.package.check_execution()?;
+        self.physical_package()?.check_execution()?;
         const STRICT_SETTINGS: &str =
             "http://purl.oclc.org/ooxml/officeDocument/relationships/settings";
 
-        let main = self.package.main_document_part()?;
-        let package_strict = self.package.rels().iter().find_map(|relationship| {
-            matches!(
-                relationship.reltype(),
-                rt::OFFICE_DOCUMENT | rt::STRICT_OFFICE_DOCUMENT
-            )
-            .then_some(relationship.reltype() == rt::STRICT_OFFICE_DOCUMENT)
-        });
+        let main = self.physical_package()?.main_document_part()?;
+        let package_strict = self
+            .physical_package()?
+            .rels()
+            .iter()
+            .find_map(|relationship| {
+                matches!(
+                    relationship.reltype(),
+                    rt::OFFICE_DOCUMENT | rt::STRICT_OFFICE_DOCUMENT
+                )
+                .then_some(relationship.reltype() == rt::STRICT_OFFICE_DOCUMENT)
+            });
         let mut matching = main.rels().iter().filter(|relationship| {
             matches!(relationship.reltype(), rt::SETTINGS | STRICT_SETTINGS)
         });
@@ -2281,26 +2355,26 @@ impl Package {
         }
         let target = relationship.target_partname()?;
         let mut inbound_owners = 0usize;
-        for candidate in self.package.rels().iter() {
+        for candidate in self.physical_package()?.rels().iter() {
             if !candidate.is_external() && candidate.target_partname()? == target {
                 inbound_owners = inbound_owners.saturating_add(1);
             }
         }
-        for part in self.package.iter_parts() {
+        for part in self.physical_package()?.iter_parts() {
             for candidate in part.rels().iter() {
                 if !candidate.is_external() && candidate.target_partname()? == target {
                     inbound_owners = inbound_owners.saturating_add(1);
                 }
             }
         }
-        let settings_part = self.package.part(&target)?;
+        let settings_part = self.physical_package()?.part(&target)?;
         if settings_part.content_type() != ct::WML_SETTINGS {
             return Err(Error::InvalidContentType {
                 expected: ct::WML_SETTINGS.into(),
                 got: settings_part.content_type().into(),
             });
         }
-        if self.package.cache_diagnostics().budget_managed {
+        if self.physical_package()?.cache_diagnostics().budget_managed {
             return Err(Error::UnsafeEdit {
                 format: "DOCX",
                 operation,
@@ -2327,7 +2401,10 @@ impl Package {
         }
         Ok(DocumentVariablesSource {
             partname: target,
-            snapshot: variables::Snapshot::from_source_xml(raw, self.package.source_version()?)?,
+            snapshot: variables::Snapshot::from_source_xml(
+                raw,
+                self.physical_package()?.source_version()?,
+            )?,
             protected: policy.protected,
             unique_inbound_owner: inbound_owners == 1,
         })
@@ -2337,7 +2414,7 @@ impl Package {
         const STRICT_SETTINGS: &str =
             "http://purl.oclc.org/ooxml/officeDocument/relationships/settings";
 
-        if self.package.cache_diagnostics().budget_managed {
+        if self.physical_package()?.cache_diagnostics().budget_managed {
             return Err(Error::UnsafeEdit {
                 format: "DOCX",
                 operation: "external_hyperlink_wrapper_detachment",
@@ -2345,7 +2422,7 @@ impl Package {
             });
         }
 
-        let main = self.package.main_document_part()?;
+        let main = self.physical_package()?.main_document_part()?;
         let mut settings_relationships = main.rels().iter().filter(|relationship| {
             matches!(relationship.reltype(), rt::SETTINGS | STRICT_SETTINGS)
         });
@@ -2363,7 +2440,7 @@ impl Package {
             ));
         }
         let target = relationship.target_partname()?;
-        let settings_part = self.package.part(&target)?;
+        let settings_part = self.physical_package()?.part(&target)?;
         if settings_part.content_type() != ct::WML_SETTINGS {
             return Err(Error::InvalidContentType {
                 expected: ct::WML_SETTINGS.into(),
@@ -2400,9 +2477,9 @@ impl Package {
             "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/signature",
             "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/certificate",
         ];
-        let main = self.package.main_document_part()?;
+        let main = self.physical_package()?.main_document_part()?;
         if self
-            .package
+            .physical_package()?
             .rels()
             .iter()
             .any(|relationship| SIGNATURE_TYPES.contains(&relationship.reltype()))
@@ -2410,7 +2487,7 @@ impl Package {
             return Err(litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy.into());
         }
         if self
-            .package
+            .physical_package()?
             .rels()
             .iter()
             .any(|relationship| relationship.is_external())
@@ -2421,7 +2498,7 @@ impl Package {
                 reason: "a package-level relationship has an external target outside the redaction closure",
             });
         }
-        for part in self.package.iter_parts() {
+        for part in self.physical_package()?.iter_parts() {
             if part.partname().as_str().starts_with("/_xmlsignatures/")
                 || matches!(
                     part.content_type(),
@@ -3247,12 +3324,17 @@ fn is_legal_xml_character(value: char) -> bool {
 }
 
 #[derive(Clone)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "inline retained handles avoid an extra unadmitted allocation on managed reads"
+)]
 enum DocumentPayload {
     /// Compatibility payload whose Arc ownership is not attached to a
     /// hierarchical execution budget.
     Owned(Arc<Vec<u8>>),
     /// Managed payload retaining its OPC reservation for the document view.
     Managed(PartData),
+    Effective(litchi_opc::PreparedPartData),
 }
 
 impl DocumentPayload {
@@ -3260,11 +3342,12 @@ impl DocumentPayload {
         match self {
             Self::Owned(xml) => xml.as_slice(),
             Self::Managed(data) => data.as_bytes(),
+            Self::Effective(data) => data.as_bytes(),
         }
     }
 
     const fn is_managed(&self) -> bool {
-        matches!(self, Self::Managed(_))
+        matches!(self, Self::Managed(_) | Self::Effective(_))
     }
 }
 
@@ -3314,6 +3397,7 @@ fn admit_document_query_parser(
 #[derive(Clone)]
 pub struct Document {
     xml: DocumentPayload,
+    _retained: Option<litchi_opc::PreparedPartData>,
     /// Bounded offsets into the pinned XML, admitted separately from its
     /// payload. Managed opens fill this during [`Package::document`]; unmanaged
     /// opens fill it on the first paragraph query.
@@ -3384,6 +3468,9 @@ impl Document {
     }
 
     fn check_execution(&self) -> Result<()> {
+        if let Some(data) = &self._retained {
+            data.check_execution()?;
+        }
         let Some(context) = self.execution.as_ref() else {
             return Ok(());
         };
@@ -3412,7 +3499,8 @@ impl Document {
         Ok(())
     }
 
-    /// Return the exact source identity and revision captured for this view.
+    /// Return the physical source version captured for this view.
+    /// Logical candidates can share this version; it is not a semantic cache key.
     #[must_use]
     pub const fn source_version(&self) -> SourceVersion {
         self.source_version

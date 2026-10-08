@@ -359,3 +359,12 @@ core diagnostics remain pending; this does not register a complete family.
 catalog, preserving retained graph changes. It refuses managed base and donor
 sources and rechecks all source guards. Source DOCX integration remains pending;
 this is a conversion seam, not a complete transaction-family registration.
+
+## 22. Source DOCX effective ownership (record 0029)
+
+Source DOCX can retain an effective OPC graph for main-document reads, owning
+conversion and publication. Legacy physical operations and the now-fallible
+`source_backed_package()` accessor refuse effective owners. Semantic caches are
+isolated per adopted owner; pinned views retain donor execution checks.
+Canonical source Edit/Commit/Patch integration and complete family registration
+remain pending.

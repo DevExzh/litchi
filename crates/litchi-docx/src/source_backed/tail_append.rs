@@ -504,7 +504,7 @@ impl Publication {
     pub fn write_inverse_to_stream(&self, current: &Package, writer: impl Write) -> Result<()> {
         current.trim_clean_paragraph_index_for_operation();
         self.splice
-            .write_inverse_to_stream(&current.package, writer)
+            .write_inverse_to_stream(current.physical_package()?, writer)
             .map_err(|error| Error::Document(DocumentError::from(error)))
     }
 }
@@ -562,10 +562,10 @@ fn prepare_edit<'package, 'text>(mut edit: Edit<'package, 'text>) -> Result<Plan
     let package = edit.package;
     package.trim_clean_paragraph_index_for_operation();
     check_options(&edit.options)?;
-    let options = effective_options(package, &edit.options);
+    let options = effective_options(package, &edit.options)?;
     check_options(&options)?;
     let source_version = package
-        .package
+        .physical_package()?
         .source_version()
         .map_err(|error| Error::Document(DocumentError::from(error)))?;
 
@@ -598,7 +598,7 @@ fn prepare_edit<'package, 'text>(mut edit: Edit<'package, 'text>) -> Result<Plan
         "tail append text disappeared during admission".into(),
     ))?;
 
-    if package.package.has_encrypted_entries() {
+    if package.physical_package()?.has_encrypted_entries() {
         return Err(Error::Refused(Refusal::Encrypted));
     }
 
@@ -621,7 +621,7 @@ fn prepare_edit<'package, 'text>(mut edit: Edit<'package, 'text>) -> Result<Plan
         options.cancellation.as_ref(),
     )?;
     let main = package
-        .package
+        .physical_package()?
         .main_document_part()
         .map_err(|error| Error::Document(DocumentError::from(error)))?;
     validate_document_main_content_type(main.content_type()).map_err(Error::Document)?;
@@ -635,11 +635,13 @@ fn prepare_edit<'package, 'text>(mut edit: Edit<'package, 'text>) -> Result<Plan
         options.cancellation.as_ref(),
         None,
     )?;
-    if package_strict_dialect(package.package.rels())? != Some(source_scan.strict_namespace) {
+    if package_strict_dialect(package.physical_package()?.rels())?
+        != Some(source_scan.strict_namespace)
+    {
         return Err(Error::Refused(Refusal::MainDocumentShape));
     }
     let fragment = encode_fragment(
-        &package.package,
+        package.physical_package()?,
         text.as_ref(),
         source_scan.strict_namespace,
         edit.limits,
@@ -686,7 +688,7 @@ fn prepare_edit<'package, 'text>(mut edit: Edit<'package, 'text>) -> Result<Plan
     };
     let splice_limits = make_splice_limits(edit.limits)?;
     let splice = package
-        .package
+        .physical_package()?
         .prepare_source_part_splice_with_fragment(
             main.partname(),
             splice_proof,
@@ -695,7 +697,7 @@ fn prepare_edit<'package, 'text>(mut edit: Edit<'package, 'text>) -> Result<Plan
         )
         .map_err(|error| Error::Document(DocumentError::from(error)))?;
     package
-        .package
+        .physical_package()?
         .source_version()
         .map_err(|error| Error::Document(DocumentError::from(error)))?;
     check_options(&options)?;
@@ -709,12 +711,12 @@ fn prepare_edit<'package, 'text>(mut edit: Edit<'package, 'text>) -> Result<Plan
     })
 }
 
-fn effective_options(package: &Package, requested: &Options) -> Options {
+fn effective_options(package: &Package, requested: &Options) -> Result<Options> {
     let mut options = requested.clone();
     // One source-owned execution authority covers both format and package
     // work. An edit cannot replace or bypass its hierarchical budget.
-    options.execution = package.package.execution_context();
-    options
+    options.execution = package.physical_package()?.execution_context();
+    Ok(options)
 }
 
 fn prepare_noop(
@@ -724,11 +726,11 @@ fn prepare_noop(
     options: Options,
 ) -> Result<Plan<'_>> {
     let main = package
-        .package
+        .physical_package()?
         .main_document_part()
         .map_err(|error| Error::Document(DocumentError::from(error)))?;
     let source_len = checked_declared_size(&main, limits.max_source_xml_bytes, "source XML bytes")?;
-    let charge_hash_work = package.package.execution_context().is_none();
+    let charge_hash_work = package.physical_package()?.execution_context().is_none();
     let hash_context = options.execution.as_ref();
     let hash_cancellation = options.cancellation.as_ref();
     let (source_sha256, observed_len) = main
@@ -752,7 +754,7 @@ fn prepare_noop(
         candidate_sha256: source_sha256,
     };
     let splice = package
-        .package
+        .physical_package()?
         .prepare_source_part_splice(
             main.partname(),
             splice_proof,
@@ -1268,20 +1270,20 @@ pub(super) fn validate_topology(
         cancellation: cancellation.cloned(),
     })?;
     let main = package
-        .package
+        .physical_package()?
         .main_document_part()
         .map_err(|error| Error::Document(DocumentError::from(error)))?;
     if main.partname().as_str() != "/word/document.xml" {
         return Err(Error::Refused(Refusal::MainDocumentShape));
     }
     if package
-        .package
+        .physical_package()?
         .physical_member_names()
         .any(is_signature_physical_member)
     {
         return Err(Error::Refused(Refusal::SignatureInfrastructure));
     }
-    let package_strict = package_strict_dialect(package.package.rels())?;
+    let package_strict = package_strict_dialect(package.physical_package()?.rels())?;
     if matches!(
         main.content_type(),
         ct::WML_DOCUMENT_MACRO_MAIN | ct::WML_TEMPLATE_MACRO_MAIN
@@ -1292,11 +1294,11 @@ pub(super) fn validate_topology(
         return Err(Error::Refused(Refusal::MainDocumentShape));
     }
 
-    for relationship in package.package.rels().iter() {
+    for relationship in package.physical_package()?.rels().iter() {
         validate_relationship(relationship)?;
     }
     let mut settings = None;
-    for part in package.package.iter_parts() {
+    for part in package.physical_package()?.iter_parts() {
         check_progress(context, cancellation, 1).map_err(map_scan_error)?;
         validate_part(part.partname().as_str(), part.content_type())?;
         for relationship in part.rels().iter() {
@@ -1323,7 +1325,7 @@ pub(super) fn validate_topology(
             return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         let settings_part = package
-            .package
+            .physical_package()?
             .part(&settings_name)
             .map_err(|error| Error::Document(DocumentError::from(error)))?;
         if settings_part.content_type() != ct::WML_SETTINGS {
@@ -1334,9 +1336,8 @@ pub(super) fn validate_topology(
             limits.max_settings_xml_bytes,
             "settings XML bytes",
         )?;
-        let managed_context = context
-            .cloned()
-            .or_else(|| package.package.execution_context());
+        let package_context = package.physical_package()?.execution_context();
+        let managed_context = context.cloned().or(package_context);
         let settings_data = settings_part
             .data()
             .map_err(|error| Error::Document(DocumentError::from(error)))?;

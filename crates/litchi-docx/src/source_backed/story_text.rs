@@ -1224,11 +1224,11 @@ impl Package {
         patch: &Patch,
     ) -> Result<Publication> {
         self.trim_clean_paragraph_index_for_operation();
-        self.package.check_execution()?;
-        let execution = self.package.execution_context();
+        self.physical_package()?.check_execution()?;
+        let execution = self.physical_package()?.execution_context();
         let current = capture(self, patch.before.selector.clone(), patch.before.limits)?;
         let target = patch.apply(&current)?;
-        let original_artifact = self.package.source_artifact();
+        let original_artifact = self.physical_package()?.source_artifact();
         let mut output = FingerprintingWriter::new(writer);
         if patch.is_noop() {
             let mut cancellation_writer = CancellationWriter {
@@ -1238,7 +1238,8 @@ impl Package {
             original_artifact.write_to_stream(&mut cancellation_writer)?;
             check_execution_context(execution.as_ref())?;
         } else {
-            self.package.validate_topology_source_boundary()?;
+            self.physical_package()?
+                .validate_topology_source_boundary()?;
             if target.raw_bytes().len() > patch.before.limits.max_output_bytes {
                 return Err(Error::Limit {
                     resource: "story output bytes",
@@ -1250,11 +1251,9 @@ impl Package {
                 target.raw_bytes(),
                 "story publication replacement",
             )?);
-            self.package.clone().write_part_overlay_shared_to_stream(
-                &mut output,
-                &current.partname,
-                replacement,
-            )?;
+            self.physical_package()?
+                .clone()
+                .write_part_overlay_shared_to_stream(&mut output, &current.partname, replacement)?;
         }
         let published_fingerprint = output.finish();
         let published_snapshot = target.with_artifact_fingerprint(published_fingerprint);
@@ -1278,9 +1277,9 @@ impl Package {
         publication: &Publication,
     ) -> Result<Snapshot> {
         self.trim_clean_paragraph_index_for_operation();
-        self.package.check_execution()?;
-        let execution = self.package.execution_context();
-        let current = self.package.source_artifact().fingerprint()?;
+        self.physical_package()?.check_execution()?;
+        let execution = self.physical_package()?.execution_context();
+        let current = self.physical_package()?.source_artifact().fingerprint()?;
         if current != publication.published_fingerprint {
             return Err(Error::ArtifactConflict);
         }
@@ -1299,14 +1298,15 @@ impl Package {
 
 fn capture(package: &Package, selector: Selector, limits: Limits) -> Result<Snapshot> {
     package.trim_clean_paragraph_index_for_operation();
-    package.package.check_execution()?;
+    package.physical_package()?.check_execution()?;
     if let Selector::Glossary(glossary) = &selector {
         validate_glossary_selector(glossary)?;
     }
-    let source_version = package.package.source_version()?;
-    let source_lineage = package.package.source_lineage();
-    let execution = package.package.execution_context();
-    let (partname, part, relationship_word_namespace) = resolve_part(&package.package, &selector)?;
+    let source_version = package.physical_package()?.source_version()?;
+    let source_lineage = package.physical_package()?.source_lineage();
+    let execution = package.physical_package()?.execution_context();
+    let (partname, part, relationship_word_namespace) =
+        resolve_part(package.physical_package()?, &selector)?;
     let declared = part.declared_uncompressed_size()?;
     if declared > limits.max_xml_bytes as u64 {
         return Err(Error::Limit {
@@ -1323,7 +1323,10 @@ fn capture(package: &Package, selector: Selector, limits: Limits) -> Result<Snap
             maximum: limits.max_xml_bytes,
         });
     }
-    let managed = package.package.cache_diagnostics().budget_managed;
+    let managed = package
+        .physical_package()?
+        .cache_diagnostics()
+        .budget_managed;
     let payload = if managed {
         Payload::Managed(data)
     } else {
@@ -1338,7 +1341,7 @@ fn capture(package: &Package, selector: Selector, limits: Limits) -> Result<Snap
     )?;
     let (envelope, transaction) = (None, None);
     let part_fingerprint = digest(payload.as_bytes());
-    let observed = package.package.source_version()?;
+    let observed = package.physical_package()?.source_version()?;
     if observed != source_version {
         return Err(Error::Document(crate::Error::Opc(
             litchi_opc::OpcError::SourceChanged {
@@ -1347,7 +1350,7 @@ fn capture(package: &Package, selector: Selector, limits: Limits) -> Result<Snap
             },
         )));
     }
-    package.package.check_execution()?;
+    package.physical_package()?.check_execution()?;
     Ok(Snapshot {
         selector,
         partname,
@@ -5103,12 +5106,12 @@ impl Package {
         patch: &GlossaryBatchPatch,
     ) -> Result<GlossaryBatchPublication> {
         self.trim_clean_paragraph_index_for_operation();
-        self.package.check_execution()?;
-        let execution = self.package.execution_context();
+        self.physical_package()?.check_execution()?;
+        let execution = self.physical_package()?.execution_context();
         let current =
             capture_glossary_batch(self, patch.before.selector.clone(), patch.before.limits)?;
         let target = patch.apply(&current)?;
-        let original_artifact = self.package.source_artifact();
+        let original_artifact = self.physical_package()?.source_artifact();
         let mut output = FingerprintingWriter::new(writer);
         if patch.is_noop() {
             let mut cancellation_writer = CancellationWriter {
@@ -5118,7 +5121,8 @@ impl Package {
             original_artifact.write_to_stream(&mut cancellation_writer)?;
             check_execution_context(execution.as_ref())?;
         } else {
-            self.package.validate_topology_source_boundary()?;
+            self.physical_package()?
+                .validate_topology_source_boundary()?;
             if target.raw_bytes().len() > patch.before.limits.max_output_bytes {
                 return Err(Error::Limit {
                     resource: "glossary batch output bytes",
@@ -5130,11 +5134,9 @@ impl Package {
                 target.raw_bytes(),
                 "glossary batch publication replacement",
             )?);
-            self.package.clone().write_part_overlay_shared_to_stream(
-                &mut output,
-                &current.partname,
-                replacement,
-            )?;
+            self.physical_package()?
+                .clone()
+                .write_part_overlay_shared_to_stream(&mut output, &current.partname, replacement)?;
         }
         let published_fingerprint = output.finish();
         let published_snapshot = target.with_artifact_fingerprint(published_fingerprint);
@@ -5158,9 +5160,9 @@ impl Package {
         publication: &GlossaryBatchPublication,
     ) -> Result<GlossaryBatchSnapshot> {
         self.trim_clean_paragraph_index_for_operation();
-        self.package.check_execution()?;
-        let execution = self.package.execution_context();
-        let current = self.package.source_artifact().fingerprint()?;
+        self.physical_package()?.check_execution()?;
+        let execution = self.physical_package()?.execution_context();
+        let current = self.physical_package()?.source_artifact().fingerprint()?;
         if current != publication.published_fingerprint {
             return Err(Error::ArtifactConflict);
         }
@@ -5183,12 +5185,12 @@ fn capture_glossary_batch(
     limits: Limits,
 ) -> Result<GlossaryBatchSnapshot> {
     package.trim_clean_paragraph_index_for_operation();
-    package.package.check_execution()?;
+    package.physical_package()?.check_execution()?;
     validate_glossary_batch_selector_limits(&selector.selectors, limits)?;
 
-    let source_version = package.package.source_version()?;
-    let source_lineage = package.package.source_lineage();
-    let execution = package.package.execution_context();
+    let source_version = package.physical_package()?.source_version()?;
+    let source_lineage = package.physical_package()?.source_lineage();
+    let execution = package.physical_package()?.execution_context();
     let first_selector = Selector::Glossary(
         selector
             .selectors
@@ -5199,7 +5201,7 @@ fn capture_glossary_batch(
     // Resolve the package topology and materialize the glossary Part once.
     // One semantic inventory scan resolves every selector against those bytes.
     let (partname, part, relationship_word_namespace) =
-        resolve_part(&package.package, &first_selector)?;
+        resolve_part(package.physical_package()?, &first_selector)?;
     let declared = part.declared_uncompressed_size()?;
     if declared > limits.max_xml_bytes as u64 {
         return Err(Error::Limit {
@@ -5216,7 +5218,10 @@ fn capture_glossary_batch(
             maximum: limits.max_xml_bytes,
         });
     }
-    let managed = package.package.cache_diagnostics().budget_managed;
+    let managed = package
+        .physical_package()?
+        .cache_diagnostics()
+        .budget_managed;
     let payload = if managed {
         Payload::Managed(data)
     } else {
@@ -5265,7 +5270,7 @@ fn capture_glossary_batch(
             layout,
         });
     }
-    let observed = package.package.source_version()?;
+    let observed = package.physical_package()?.source_version()?;
     if observed != source_version {
         return Err(Error::Document(crate::Error::Opc(
             litchi_opc::OpcError::SourceChanged {
@@ -5274,7 +5279,7 @@ fn capture_glossary_batch(
             },
         )));
     }
-    package.package.check_execution()?;
+    package.physical_package()?.check_execution()?;
 
     entries.sort_unstable_by_key(|entry| entry.layout.root_start_end);
     validate_batch_ranges(&entries, payload.as_bytes().len())?;

@@ -1765,7 +1765,7 @@ impl ParagraphStreamPublication {
     ) -> Result<(), Error> {
         current.trim_clean_paragraph_index_for_operation();
         self.splice
-            .write_inverse_to_stream(&current.package, writer)
+            .write_inverse_to_stream(current.physical_opc_package()?, writer)
             .map_err(Error::Opc)
     }
 }
@@ -1892,7 +1892,7 @@ impl Package {
 
 fn ensure_current_archive(package: &Package, expected: patch::ArtifactProof) -> Result<(), Error> {
     package.trim_clean_paragraph_index_for_operation();
-    let artifact = package.package.source_artifact();
+    let artifact = package.physical_opc_package()?.source_artifact();
     let actual = patch::ArtifactProof::new(
         artifact.len(),
         artifact.fingerprint().map_err(Error::Opc)?.into_sha256(),
@@ -1909,7 +1909,7 @@ fn ensure_current_archive(package: &Package, expected: patch::ArtifactProof) -> 
 }
 
 fn check_package_execution_context(package: &Package) -> Result<(), Error> {
-    if let Some(context) = package.package.execution_context() {
+    if let Some(context) = package.physical_opc_package()?.execution_context() {
         context
             .check()
             .map_err(|error| Error::TailAppend(tail_append::Error::Execution(error)))?;
@@ -1943,7 +1943,7 @@ fn prepare_stream<'package, S>(
         marker: _,
     } = edit;
     package.trim_clean_paragraph_index_for_operation();
-    let context = package.package.execution_context();
+    let context = package.physical_opc_package()?.execution_context();
     if let Some(context) = context.as_ref() {
         context
             .check()
@@ -1961,11 +1961,11 @@ fn prepare_stream<'package, S>(
         cancellation.as_ref(),
     )?;
     let source_version = package
-        .package
+        .physical_opc_package()?
         .source_version()
         .map_err(|error| Error::TailAppend(tail_append::Error::Document(error.into())))?;
     let main = package
-        .package
+        .physical_opc_package()?
         .main_document_part()
         .map_err(|error| Error::TailAppend(tail_append::Error::Document(error.into())))?;
     if let Some(expected) = expected.as_ref() {
@@ -1994,7 +1994,7 @@ fn prepare_stream<'package, S>(
         cancellation.as_ref(),
         None,
     )?;
-    let source_artifact = package.package.source_artifact();
+    let source_artifact = package.physical_opc_package()?.source_artifact();
     let source_artifact_length = source_artifact.len();
     let source_artifact_fingerprint = source_artifact.fingerprint().map_err(Error::Opc)?;
     if let Some(expected) = expected.as_ref() {
@@ -2111,7 +2111,7 @@ fn prepare_stream<'package, S>(
     let opc_replay: Arc<dyn SourcePartSpliceReplay> =
         Arc::new(OpcReplayAdapter::new(Arc::clone(&authored)));
     let splice = package
-        .package
+        .physical_opc_package()?
         .prepare_source_part_splice_with_replay(
             main.partname(),
             splice_proof,
@@ -2120,7 +2120,7 @@ fn prepare_stream<'package, S>(
         )
         .map_err(Error::Opc)?;
     package
-        .package
+        .physical_opc_package()?
         .source_version()
         .map_err(|error| Error::TailAppend(tail_append::Error::Document(error.into())))?;
     if let Some(context) = context.as_ref() {

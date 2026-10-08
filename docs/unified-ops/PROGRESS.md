@@ -315,3 +315,15 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 - This supplies DOCX's future effective `to_owned_package` route. Canonical
   source ownership and logical caches remain open; record 0028 also records
   the empty-topology/read-ahead migration hazard.
+
+## 0029 — source DOCX effective-owner boundary
+
+- Same-lineage retained topologies can be adopted into immutable DOCX owners.
+  Main-document views, explicit owning conversion and publication use the
+  effective graph; logical owners receive fresh semantic caches.
+- Pinned effective views retain payload admissions and donor execution guards.
+  Queries observe cancellation while captured bytes survive source changes.
+- All unmigrated physical operations refuse effective owners, including no-op
+  requests. The raw package accessor is fallible; the unified consumer is adapted.
+- Canonical source semantic Edit/Commit and specialized effective routes remain
+  open. Record 0029 documents scope, verification and current allocation limits.

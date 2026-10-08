@@ -865,7 +865,7 @@ pub fn apply_exact_inverse<W: Write, P: OriginalArtifactProvider>(
     provider: &P,
     writer: W,
 ) -> Result<()> {
-    let current_package: &SourceBackedPackage = &current.package;
+    let current_package: &SourceBackedPackage = current.physical_opc_package()?;
     authenticate_current_artifact(current_package, inverse.current)?;
     let original = match provider.open(&inverse.reference) {
         Ok(original) => original,

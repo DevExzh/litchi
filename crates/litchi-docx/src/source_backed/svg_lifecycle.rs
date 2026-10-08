@@ -1174,15 +1174,18 @@ impl SourceBackedSvgAttachmentBatchEdit<'_> {
             patch.is_changed(),
         );
         if patch.is_changed() {
-            let plan =
-                build_batch_topology_plan(&self.package.package, &patch.before, &patch.after)?;
+            let plan = build_batch_topology_plan(
+                self.package.physical_package()?,
+                &patch.before,
+                &patch.after,
+            )?;
             // Validate the complete effective relationship/content-type/Part
             // closure before returning the commit. Publication repeats this
             // callback on its fresh source boundary, but a caller must never
             // receive a frozen commit whose prepared candidate was not
             // checked against the same typed graph.
             self.package
-                .package
+                .physical_package()?
                 .with_prepared_topology(plan, |candidate| {
                     Ok(validate_effective_candidate(
                         candidate,
@@ -1191,7 +1194,7 @@ impl SourceBackedSvgAttachmentBatchEdit<'_> {
                     ))
                 })??;
         }
-        self.package.package.check_execution()?;
+        self.package.physical_package()?.check_execution()?;
         Ok(SourceBackedSvgAttachmentBatchCommit {
             snapshot: patch.after.clone(),
             patch,
@@ -1314,9 +1317,9 @@ impl SourceBackedSvgAttachmentBatchEdit<'_> {
     }
 
     fn ensure_source_current(&self) -> Result<()> {
-        self.package.package.check_execution()?;
-        if self.package.package.source_version()? != self.context.source_version
-            || self.package.package.source_lineage() != self.context.lineage
+        self.package.physical_package()?.check_execution()?;
+        if self.package.physical_package()?.source_version()? != self.context.source_version
+            || self.package.physical_package()?.source_lineage() != self.context.lineage
         {
             return Err(Error::Invalid(
                 "DOCX SVG batch source changed during staging".into(),
@@ -1607,7 +1610,7 @@ fn reserve_payload_memory(
     package: &super::Package,
     payload_len: usize,
 ) -> Result<Option<Arc<Reservation>>> {
-    let Some(context) = package.package.execution_context() else {
+    let Some(context) = package.physical_package()?.execution_context() else {
         return Ok(None);
     };
     let bytes = (payload_len as u64)
@@ -1817,11 +1820,11 @@ impl super::Package {
                 "only the main Word story is in this lifecycle batch",
             ));
         }
-        self.package.check_execution()?;
-        let capture_version = self.package.source_version()?;
-        let main = self.package.main_document_part()?;
+        self.physical_package()?.check_execution()?;
+        let capture_version = self.physical_package()?.source_version()?;
+        let main = self.physical_package()?.main_document_part()?;
         let source = main.source_xml()?;
-        let drawing = scan_story(source.bytes(), self.package.read_limits())?;
+        let drawing = scan_story(source.bytes(), self.physical_package()?.read_limits())?;
         let mut views = Vec::new();
         views
             .try_reserve_exact(drawing.pictures().len())
@@ -1837,8 +1840,8 @@ impl super::Package {
                 PictureSelector::new(0, picture.picture_ordinal()),
             )?);
         }
-        self.package.check_execution()?;
-        if self.package.source_version()? != capture_version {
+        self.physical_package()?.check_execution()?;
+        if self.physical_package()?.source_version()? != capture_version {
             return Err(Error::Invalid(
                 "DOCX SVG picture source changed during capture".into(),
             ));
@@ -1878,7 +1881,7 @@ impl super::Package {
         &self,
         selector: impl Into<PictureSelector>,
     ) -> Result<SourceBackedSvgAttachmentEdit<'_>> {
-        self.package.check_execution()?;
+        self.physical_package()?.check_execution()?;
         let selector = selector.into();
         let batch = self.edit_svg_attachments([selector])?;
         Ok(SourceBackedSvgAttachmentEdit { batch, selector })
@@ -1895,8 +1898,11 @@ impl super::Package {
         I: IntoIterator<Item = S>,
         S: Into<PictureSelector>,
     {
-        self.package.check_execution()?;
-        let selector_limit = self.package.read_limits().max_total_relationships();
+        self.physical_package()?.check_execution()?;
+        let selector_limit = self
+            .physical_package()?
+            .read_limits()
+            .max_total_relationships();
         let mut selected = Vec::new();
         for selector in selectors {
             if selected.len() >= selector_limit {
@@ -1984,7 +1990,7 @@ impl super::Package {
         writer: W,
         commit: &SourceBackedSvgAttachmentCommit,
     ) -> Result<SourceBackedSvgAttachmentPublication> {
-        self.package.check_execution()?;
+        self.physical_package()?.check_execution()?;
         let current = capture_picture(self, commit.patch.before.state.selector)?;
         if !same_source(&current, &commit.patch.before.state) {
             return Err(Error::Invalid(
@@ -1993,7 +1999,7 @@ impl super::Package {
         }
         let target = commit.patch.apply(&current_snapshot(&current))?;
         let original_snapshot = current_snapshot(&current);
-        let original_artifact = self.package.source_artifact();
+        let original_artifact = self.physical_package()?.source_artifact();
         let before = SourceBackedSvgAttachmentBatchSnapshot {
             states: vec![current.clone()],
             story: current.xml.clone(),
@@ -2005,10 +2011,16 @@ impl super::Package {
             context: None,
         };
         let published_fingerprint = if target_state_changed(&current, &target.state) {
-            let plan = build_batch_topology_plan(&self.package, &before, &expected)?;
-            publish_checked_topology(self.package.clone(), writer, plan, &before, &expected)?
+            let plan = build_batch_topology_plan(self.physical_package()?, &before, &expected)?;
+            publish_checked_topology(
+                self.physical_package()?.clone(),
+                writer,
+                plan,
+                &before,
+                &expected,
+            )?
         } else {
-            publish_exact_source_with_fingerprint(self.package.clone(), writer)?
+            publish_exact_source_with_fingerprint(self.physical_package()?.clone(), writer)?
         };
         Ok(SourceBackedSvgAttachmentPublication {
             snapshot: target,
@@ -2037,7 +2049,7 @@ impl super::Package {
         writer: W,
         commit: &SourceBackedSvgAttachmentBatchCommit,
     ) -> Result<SourceBackedSvgAttachmentBatchPublication> {
-        self.package.check_execution()?;
+        self.physical_package()?.check_execution()?;
         let selectors = commit
             .patch
             .before
@@ -2053,12 +2065,18 @@ impl super::Package {
         }
         let target = commit.patch.apply(&current)?;
         let original_snapshot = current.clone();
-        let original_artifact = self.package.source_artifact();
+        let original_artifact = self.physical_package()?.source_artifact();
         let published_fingerprint = if !same_batch_state(&current, &target) {
-            let plan = build_batch_topology_plan(&self.package, &current, &target)?;
-            publish_checked_topology(self.package.clone(), writer, plan, &current, &target)?
+            let plan = build_batch_topology_plan(self.physical_package()?, &current, &target)?;
+            publish_checked_topology(
+                self.physical_package()?.clone(),
+                writer,
+                plan,
+                &current,
+                &target,
+            )?
         } else {
-            publish_exact_source_with_fingerprint(self.package.clone(), writer)?
+            publish_exact_source_with_fingerprint(self.physical_package()?.clone(), writer)?
         };
         Ok(SourceBackedSvgAttachmentBatchPublication {
             snapshot: target,
@@ -2076,10 +2094,11 @@ impl super::Package {
         writer: W,
         publication: &SourceBackedSvgAttachmentPublication,
     ) -> Result<SourceBackedSvgAttachmentSnapshot> {
-        self.package.check_execution()?;
+        self.physical_package()?.check_execution()?;
         let current = capture_picture(self, publication.snapshot.selector())?;
         if !same_state(&current, &publication.snapshot.state)
-            || self.package.source_artifact().fingerprint()? != publication.published_fingerprint()
+            || self.physical_package()?.source_artifact().fingerprint()?
+                != publication.published_fingerprint()
         {
             return Err(Error::Invalid(
                 "SVG lifecycle inverse publication source is stale or foreign".into(),
@@ -2097,7 +2116,7 @@ impl super::Package {
         writer: W,
         publication: &SourceBackedSvgAttachmentBatchPublication,
     ) -> Result<SourceBackedSvgAttachmentBatchSnapshot> {
-        self.package.check_execution()?;
+        self.physical_package()?.check_execution()?;
         let selectors = publication
             .snapshot
             .states
@@ -2106,7 +2125,8 @@ impl super::Package {
             .collect::<Vec<_>>();
         let current = capture_batch(self, selectors)?;
         if !same_batch_state(&current, &publication.snapshot)
-            || self.package.source_artifact().fingerprint()? != publication.published_fingerprint()
+            || self.physical_package()?.source_artifact().fingerprint()?
+                != publication.published_fingerprint()
         {
             return Err(Error::Invalid(
                 "SVG lifecycle batch inverse publication source is stale or foreign".into(),
@@ -2573,11 +2593,11 @@ fn current_snapshot(state: &SnapshotState) -> SourceBackedSvgAttachmentSnapshot 
 }
 
 fn capture_inventory(package: &super::Package) -> Result<Vec<SnapshotState>> {
-    let inventory_version = package.package.source_version()?;
-    let main = package.package.main_document_part()?;
+    let inventory_version = package.physical_package()?.source_version()?;
+    let main = package.physical_package()?.main_document_part()?;
     let source = main.source_xml()?;
     let source_bytes = source.bytes();
-    let drawing = scan_story(source_bytes, package.package.read_limits())?;
+    let drawing = scan_story(source_bytes, package.physical_package()?.read_limits())?;
     let identities = identity_inventory(package, &main)?;
     let closure = closure_inventory(package)?;
     let budget = package_budget(package)?;
@@ -2603,7 +2623,7 @@ fn capture_inventory(package: &super::Package) -> Result<Vec<SnapshotState>> {
             drawing.relationship_dialect(),
         )?);
     }
-    if package.package.source_version()? != inventory_version {
+    if package.physical_package()?.source_version()? != inventory_version {
         return Err(Error::Invalid(
             "DOCX SVG picture inventory source changed during capture".into(),
         ));
@@ -2640,10 +2660,10 @@ fn capture_batch(
             ));
         }
     }
-    let inventory_version = package.package.source_version()?;
-    let main = package.package.main_document_part()?;
+    let inventory_version = package.physical_package()?.source_version()?;
+    let main = package.physical_package()?.main_document_part()?;
     let source = main.source_xml()?;
-    let drawing = scan_story(source.bytes(), package.package.read_limits())?;
+    let drawing = scan_story(source.bytes(), package.physical_package()?.read_limits())?;
     let identities = identity_inventory(package, &main)?;
     let closure = closure_inventory(package)?;
     let budget = package_budget(package)?;
@@ -2681,7 +2701,7 @@ fn capture_batch(
     for picture in drawing.pictures() {
         layouts.push(layout_from_picture(picture)?);
     }
-    if package.package.source_version()? != inventory_version {
+    if package.physical_package()?.source_version()? != inventory_version {
         return Err(Error::Invalid(
             "DOCX SVG selected-picture capture source changed during capture".into(),
         ));
@@ -2689,7 +2709,7 @@ fn capture_batch(
     let context = Arc::new(BatchSourceContext {
         source_xml: source.clone(),
         source_version: inventory_version,
-        lineage: package.package.source_lineage(),
+        lineage: package.physical_package()?.source_lineage(),
         layouts: Arc::from(layouts.into_boxed_slice()),
     });
     Ok(SourceBackedSvgAttachmentBatchSnapshot {
@@ -2700,7 +2720,7 @@ fn capture_batch(
 }
 
 fn capture_picture(package: &super::Package, selector: PictureSelector) -> Result<SnapshotState> {
-    let capture_version = package.package.source_version()?;
+    let capture_version = package.physical_package()?.source_version()?;
     if selector.drawing != 0 {
         return Err(Error::OutOfBounds {
             object: "DOCX main-story drawing",
@@ -2708,10 +2728,13 @@ fn capture_picture(package: &super::Package, selector: PictureSelector) -> Resul
             len: 1,
         });
     }
-    let main = package.package.main_document_part()?;
+    let main = package.physical_package()?.main_document_part()?;
     let source = main.source_xml()?;
     let scan_source = source.clone();
-    let drawing = scan_story(scan_source.bytes(), package.package.read_limits())?;
+    let drawing = scan_story(
+        scan_source.bytes(),
+        package.physical_package()?.read_limits(),
+    )?;
     let picture = drawing.picture(selector.picture)?;
     let identities = identity_inventory(package, &main)?;
     let closure = closure_inventory(package)?;
@@ -2729,7 +2752,7 @@ fn capture_picture(package: &super::Package, selector: PictureSelector) -> Resul
         budget,
         drawing.relationship_dialect(),
     )?;
-    if package.package.source_version()? != capture_version {
+    if package.physical_package()?.source_version()? != capture_version {
         return Err(Error::Invalid(
             "DOCX SVG picture source changed during capture".into(),
         ));
@@ -2753,7 +2776,7 @@ fn capture_from_picture(
     let raster_id = picture
         .raster_relationship_id()
         .ok_or_else(|| Error::Invalid("direct DOCX picture has no raster relationship".into()))?;
-    let main = package.package.part(&part_uri)?;
+    let main = package.physical_package()?.part(&part_uri)?;
     let raster = main
         .rels()
         .get(raster_id)
@@ -2772,7 +2795,7 @@ fn capture_from_picture(
                 .into(),
         ));
     }
-    let raster_part = package.package.part(&raster_uri)?;
+    let raster_part = package.physical_package()?.part(&raster_uri)?;
     if raster_part.content_type() != ct::PNG {
         return Err(Error::Invalid(format!(
             "selected raster fallback has content type '{}', expected image/png",
@@ -2806,7 +2829,7 @@ fn capture_from_picture(
                     "SVG relationship does not use an image relationship type".into(),
                 ));
             }
-            let svg_part = package.package.part(&svg_uri)?;
+            let svg_part = package.physical_package()?.part(&svg_uri)?;
             if !is_svg_content_type(svg_part.content_type()) {
                 return Err(Error::Invalid(format!(
                     "SVG relationship target has content type '{}'",
@@ -2847,10 +2870,10 @@ fn capture_from_picture(
         relationship_fingerprint,
         content_type_fingerprint,
         package_budget,
-        limits: package.package.read_limits(),
-        lineage: package.package.source_lineage(),
-        source_version: package.package.source_version()?,
-        source_artifact: package.package.source_artifact(),
+        limits: package.physical_package()?.read_limits(),
+        lineage: package.physical_package()?.source_lineage(),
+        source_version: package.physical_package()?.source_version()?,
+        source_artifact: package.physical_package()?.source_artifact(),
     })
 }
 
@@ -2897,7 +2920,7 @@ fn source_view_from_picture<'a>(
         ));
     }
     let raster_uri = raster.target_partname()?;
-    let raster_part = package.package.part(&raster_uri)?;
+    let raster_part = package.physical_package()?.part(&raster_uri)?;
     if !raster_uri.as_str().starts_with("/word/media/")
         || (raster.reltype() != rt::IMAGE && raster.reltype() != rt::STRICT_IMAGE)
         || raster_part.content_type() != ct::PNG
@@ -2928,7 +2951,7 @@ fn source_view_from_picture<'a>(
                     "SVG relationship does not target an image media Part".into(),
                 ));
             }
-            let svg_part = package.package.part(&svg_uri)?;
+            let svg_part = package.physical_package()?.part(&svg_uri)?;
             if !is_svg_content_type(svg_part.content_type()) || !svg_part.rels().is_empty() {
                 return Err(Error::Invalid(
                     "SVG media Part is not a relationship-free image/svg+xml leaf".into(),
@@ -3043,12 +3066,12 @@ fn identity_inventory(
     }
     let mut physical_names = Vec::new();
     physical_names
-        .try_reserve_exact(package.package.physical_member_names().len())
+        .try_reserve_exact(package.physical_package()?.physical_member_names().len())
         .map_err(|source| Error::Allocation {
             resource: "DOCX SVG physical identity inventory",
             source,
         })?;
-    for name in package.package.physical_member_names() {
+    for name in package.physical_package()?.physical_member_names() {
         physical_names.push(name.to_owned());
     }
     Ok((
@@ -3060,8 +3083,8 @@ fn identity_inventory(
 fn package_budget(package: &super::Package) -> Result<Arc<PackageBudget>> {
     let mut part_count = 0usize;
     let mut total_part_bytes = 0u64;
-    let mut relationship_count = package.package.rels().len();
-    for part in package.package.iter_parts() {
+    let mut relationship_count = package.physical_package()?.rels().len();
+    for part in package.physical_package()?.iter_parts() {
         part_count = part_count
             .checked_add(1)
             .ok_or_else(|| Error::Invalid("DOCX package Part count overflows".into()))?;
@@ -3072,7 +3095,7 @@ fn package_budget(package: &super::Package) -> Result<Arc<PackageBudget>> {
             .checked_add(part.rels().len())
             .ok_or_else(|| Error::Invalid("DOCX package relationship count overflows".into()))?;
     }
-    let physical_member_count = package.package.physical_member_names().len();
+    let physical_member_count = package.physical_package()?.physical_member_names().len();
     Ok(Arc::new(PackageBudget {
         part_count,
         total_part_bytes,
@@ -3094,12 +3117,12 @@ fn closure_inventory(
     let mut relationships = Vec::new();
     let root = PackURI::new("/").map_err(|error| Error::Uri(error.to_string()))?;
     relationships
-        .try_reserve(package.package.rels().len())
+        .try_reserve(package.physical_package()?.rels().len())
         .map_err(|source| Error::Allocation {
             resource: "DOCX SVG package relationship fingerprint",
             source,
         })?;
-    for relation in package.package.rels().iter() {
+    for relation in package.physical_package()?.rels().iter() {
         relationships.push(RelationshipFingerprint {
             owner: root.clone(),
             id: relation.r_id().to_owned(),
@@ -3112,12 +3135,12 @@ fn closure_inventory(
     }
     let mut content_types = Vec::new();
     content_types
-        .try_reserve_exact(package.package.iter_parts().count())
+        .try_reserve_exact(package.physical_package()?.iter_parts().count())
         .map_err(|source| Error::Allocation {
             resource: "DOCX SVG content-type fingerprint",
             source,
         })?;
-    for part in package.package.iter_parts() {
+    for part in package.physical_package()?.iter_parts() {
         content_types.push(ContentTypeFingerprint {
             part_uri: part.partname().clone(),
             content_type: part.content_type().to_owned(),

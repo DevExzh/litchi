@@ -57,6 +57,28 @@ impl PreparedTopology {
         self.state.check_readback_sources(&self.package)
     }
 
+    /// Check all retained execution contexts without re-observing source bytes.
+    ///
+    /// Pinned semantic views use this after capture: immutable bytes remain
+    /// readable after a physical source change, but cancellation and deadlines
+    /// on either the base or a managed donor still govern new semantic work.
+    pub fn check_execution(&self) -> Result<()> {
+        self.package.check_execution()?;
+        if let Some(sources) = self
+            .state
+            .retained
+            .as_ref()
+            .and_then(|retained| retained.transfer_sources.as_ref())
+        {
+            for source in sources.iter() {
+                if let Some(context) = &source.context {
+                    context.check().map_err(map_execution_error)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Whether publication uses the exact original-artifact path.
     #[must_use]
     pub fn is_noop(&self) -> bool {
@@ -325,6 +347,12 @@ impl PreparedPartView {
 }
 
 impl PreparedPartData {
+    /// Check base and donor execution contexts while retaining captured bytes.
+    /// This does not re-observe the physical source version.
+    pub fn check_execution(&self) -> Result<()> {
+        self.part.topology.check_execution()
+    }
+
     /// Borrow the exact decoded bytes captured by this immutable handle.
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {

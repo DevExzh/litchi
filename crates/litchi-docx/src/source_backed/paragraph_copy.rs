@@ -949,10 +949,13 @@ impl Package {
     /// Capture the exact closure under caller-selected finite limits.
     pub fn plain_paragraph_copy_snapshot_with_limits(&self, limits: Limits) -> Result<Snapshot> {
         self.trim_clean_paragraph_index_for_operation();
-        let source_version = self.package.source_version().map_err(crate::Error::from)?;
+        let source_version = self
+            .physical_package()?
+            .source_version()
+            .map_err(crate::Error::from)?;
         self.validate_plain_paragraph_copy_topology()?;
         let main = self
-            .package
+            .physical_package()?
             .main_document_part()
             .map_err(crate::Error::from)?;
         validate_document_main_content_type(main.content_type())?;
@@ -962,8 +965,12 @@ impl Package {
             .into_arc()
             .map_err(crate::Error::from)?;
         let layout = scan_document(xml.as_slice(), limits)?;
-        let artifact_fingerprint = fingerprint_artifact(&self.package.source_artifact())?;
-        let observed = self.package.source_version().map_err(crate::Error::from)?;
+        let artifact_fingerprint =
+            fingerprint_artifact(&self.physical_package()?.source_artifact())?;
+        let observed = self
+            .physical_package()?
+            .source_version()
+            .map_err(crate::Error::from)?;
         if observed != source_version {
             return Err(crate::Error::Opc(litchi_opc::OpcError::SourceChanged {
                 expected: source_version,
@@ -1022,9 +1029,9 @@ impl Package {
         self.trim_clean_paragraph_index_for_operation();
         let current = self.plain_paragraph_copy_snapshot_with_limits(patch.limits)?;
         let target = patch.apply(&current)?;
-        let original_artifact = self.package.source_artifact();
+        let original_artifact = self.physical_package()?.source_artifact();
         let main = self
-            .package
+            .physical_package()?
             .main_document_part()
             .map_err(crate::Error::from)?
             .partname()
@@ -1036,7 +1043,7 @@ impl Package {
                 .map_err(crate::Error::from)?;
         } else {
             let replacement = Arc::clone(&target.xml);
-            self.package
+            self.physical_package()?
                 .clone()
                 .write_part_overlay_shared_to_stream(&mut output, &main, replacement)
                 .map_err(crate::Error::from)?;
@@ -1061,7 +1068,7 @@ impl Package {
         publication: &Publication,
     ) -> Result<Snapshot> {
         self.trim_clean_paragraph_index_for_operation();
-        let current = fingerprint_artifact(&self.package.source_artifact())?;
+        let current = fingerprint_artifact(&self.physical_package()?.source_artifact())?;
         if current != publication.published_fingerprint {
             return Err(Error::StaleSource);
         }
@@ -1092,9 +1099,9 @@ impl Package {
         self.trim_clean_paragraph_index_for_operation();
         let current = self.plain_paragraph_removal_snapshot_with_limits(patch.limits)?;
         let target = patch.apply(&current)?;
-        let original_artifact = self.package.source_artifact();
+        let original_artifact = self.physical_package()?.source_artifact();
         let main = self
-            .package
+            .physical_package()?
             .main_document_part()
             .map_err(crate::Error::from)?
             .partname()
@@ -1106,7 +1113,7 @@ impl Package {
                 .map_err(crate::Error::from)?;
         } else {
             let replacement = checked_clone(target.xml_bytes(), "removal publication replacement")?;
-            self.package
+            self.physical_package()?
                 .clone()
                 .write_part_overlay_to_stream(&mut output, &main, replacement)
                 .map_err(crate::Error::from)?;
@@ -1131,7 +1138,7 @@ impl Package {
         publication: &RemovalPublication,
     ) -> Result<Snapshot> {
         self.trim_clean_paragraph_index_for_operation();
-        let current = fingerprint_artifact(&self.package.source_artifact())?;
+        let current = fingerprint_artifact(&self.physical_package()?.source_artifact())?;
         if current != publication.published_fingerprint {
             return Err(Error::StaleSource);
         }
@@ -1144,16 +1151,20 @@ impl Package {
 
     fn validate_plain_paragraph_copy_topology(&self) -> Result<()> {
         let main = self
-            .package
+            .physical_package()?
             .main_document_part()
             .map_err(crate::Error::from)?;
-        let package_strict = self.package.rels().iter().find_map(|relationship| {
-            matches!(
-                relationship.reltype(),
-                rt::OFFICE_DOCUMENT | rt::STRICT_OFFICE_DOCUMENT
-            )
-            .then_some(relationship.reltype() == rt::STRICT_OFFICE_DOCUMENT)
-        });
+        let package_strict = self
+            .physical_package()?
+            .rels()
+            .iter()
+            .find_map(|relationship| {
+                matches!(
+                    relationship.reltype(),
+                    rt::OFFICE_DOCUMENT | rt::STRICT_OFFICE_DOCUMENT
+                )
+                .then_some(relationship.reltype() == rt::STRICT_OFFICE_DOCUMENT)
+            });
         if main.partname().as_str() != "/word/document.xml" {
             return Err(Error::Refused(Refusal::MainDocumentShape));
         }
@@ -1175,11 +1186,11 @@ impl Package {
             ));
         }
 
-        for relationship in self.package.rels().iter() {
+        for relationship in self.physical_package()?.rels().iter() {
             validate_relationship(relationship)?;
         }
         let mut settings = None;
-        for part in self.package.iter_parts() {
+        for part in self.physical_package()?.iter_parts() {
             validate_part(part.partname().as_str(), part.content_type())?;
             for relationship in part.rels().iter() {
                 validate_relationship(relationship)?;
@@ -1203,7 +1214,7 @@ impl Package {
                 return Err(Error::Refused(Refusal::UnsupportedDependency));
             }
             let settings_part = self
-                .package
+                .physical_package()?
                 .part(&settings_name)
                 .map_err(crate::Error::from)?;
             if settings_part.content_type() != ct::WML_SETTINGS {

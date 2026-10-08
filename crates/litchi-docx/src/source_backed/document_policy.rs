@@ -43,18 +43,18 @@ const SETTINGS_TARGET_MEMORY_HEADROOM: u64 = 4_096;
 /// bounded policy scanner run.  Exact no-op callers deliberately do not invoke
 /// this function.
 pub(super) fn validate_changed_document(package: &Package) -> Result<()> {
-    let version = package.package.source_version()?;
+    let version = package.physical_package()?.source_version()?;
     let result = validate_changed_document_inner(package);
     finish_source_fence(package, version)?;
     result
 }
 
 fn validate_changed_document_inner(package: &Package) -> Result<()> {
-    let context = package.package.execution_context();
-    package.package.check_execution()?;
-    let source_version = package.package.source_version()?;
+    let context = package.physical_package()?.execution_context();
+    package.physical_package()?.check_execution()?;
+    let source_version = package.physical_package()?.source_version()?;
 
-    let main = package.package.main_document_part()?;
+    let main = package.physical_package()?.main_document_part()?;
     let package_dialect = package_dialect(package)?;
     let mut settings_relationship = None;
     for relationship in main.rels().iter().filter(|relationship| {
@@ -92,7 +92,7 @@ fn validate_changed_document_inner(package: &Package) -> Result<()> {
     let _target_admission =
         admit_target_metadata(context.as_ref(), relationship.target_path().len())?;
     let target = relationship.target_partname()?;
-    let settings_part = package.package.part(&target)?;
+    let settings_part = package.physical_package()?.part(&target)?;
     if settings_part.content_type() != ct::WML_SETTINGS {
         return Err(Error::InvalidContentType {
             expected: ct::WML_SETTINGS.into(),
@@ -192,12 +192,17 @@ pub(crate) fn validate_changed_owned_document(opc: &litchi_opc::OpcPackage) -> R
 
 fn package_dialect(package: &Package) -> Result<Option<bool>> {
     let mut dialect = None;
-    for relationship in package.package.rels().iter().filter(|relationship| {
-        matches!(
-            relationship.reltype(),
-            rt::OFFICE_DOCUMENT | rt::STRICT_OFFICE_DOCUMENT
-        )
-    }) {
+    for relationship in package
+        .physical_package()?
+        .rels()
+        .iter()
+        .filter(|relationship| {
+            matches!(
+                relationship.reltype(),
+                rt::OFFICE_DOCUMENT | rt::STRICT_OFFICE_DOCUMENT
+            )
+        })
+    {
         if dialect
             .replace(relationship.reltype() == rt::STRICT_OFFICE_DOCUMENT)
             .is_some()
@@ -211,14 +216,14 @@ fn package_dialect(package: &Package) -> Result<Option<bool>> {
 }
 
 fn finish_source_fence(package: &Package, expected: litchi_core::SourceVersion) -> Result<()> {
-    let actual = package.package.source_version()?;
+    let actual = package.physical_package()?.source_version()?;
     if actual != expected {
         return Err(Error::Opc(litchi_opc::OpcError::SourceChanged {
             expected,
             actual,
         }));
     }
-    package.package.check_execution()?;
+    package.physical_package()?.check_execution()?;
     Ok(())
 }
 
