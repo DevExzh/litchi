@@ -1,0 +1,112 @@
+{
+  "command": {
+    "argv": [
+      "/usr/bin/python3.14",
+      "-B",
+      "/home/zhuhe/litchi-performance-0977/tools/focuseddecode_0977_v2.py",
+      "--plan",
+      "/home/zhuhe/litchi-performance-0977/plans/plan-0977-v2.json",
+      "--child",
+      "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "elapsed_ms": 38204.136,
+    "environment": {
+      "LANG": "C",
+      "LC_ALL": "C",
+      "PATH": "/usr/bin:/bin",
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "TZ": "UTC"
+    },
+    "finished_utc": "2026-10-08T07:48:38.139118+00:00",
+    "returncode": -15,
+    "started_utc": "2026-10-08T07:47:59.934941+00:00",
+    "stderr": {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/focuseddecode.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout": {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/focuseddecode.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "created_utc": "2026-10-08T07:48:38.139118+00:00",
+  "decoder": {
+    "bytes": 67772,
+    "path": "/home/zhuhe/litchi-performance-0977/tools/focuseddecode_0977_v2.py",
+    "sha256": "31184f1dc044022f262def181af909bf987c04936e1f926acd73f2c10e46e23c"
+  },
+  "interpretation": "The retained focused decoder reached the raw STACK_USER scanner and rejected child-02 before corrected perf-script decoding; this is the known parser boundary under investigation, not a native capture failure.",
+  "native_actions": {
+    "build": false,
+    "recording": false,
+    "workload": false
+  },
+  "outputs_before_forensic_fallback": [
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-buildid.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 571,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-buildid.txt",
+      "sha256": "6c7729316b6a54fc6ac338ceedfb960f4bb4fc669effac870d8ae58a34902925"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-evlist-v.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 499,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-evlist-v.txt",
+      "sha256": "29f2a64536a635ac827b283009f72855d998151954c3000f867cbeaf8b8058af"
+    },
+    {
+      "bytes": 49,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-header.stderr",
+      "sha256": "73b3a559eb66337c5f0ae4ed3b5f31a3ed98bcccc0058df070ede34679d955df"
+    },
+    {
+      "bytes": 1209,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-header.txt",
+      "sha256": "9ab9c93af7f8e0a3a5c0b8488af57771855b7ca9853fbf921958aeee9732dec1"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-mmap-dump.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1140014935,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-mmap-dump.txt",
+      "sha256": "06d9529bf1c741e33105e4dd79a86466c64ba84ff8f58cdde8ab2abb8b0b41ce"
+    },
+    {
+      "bytes": 4484,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.target-layout.json",
+      "sha256": "6ea5571906e31f15dd0387c0ae5aac107af0732bf3197072181be681c4a23a6f"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.terminal-report.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1383,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.terminal-report.txt",
+      "sha256": "f46285b4be0b246d827afc3f18689fc58e34401a01faee55437a39a34f708cbf"
+    }
+  ],
+  "plan": {
+    "bytes": 17335,
+    "path": "/home/zhuhe/litchi-performance-0977/plans/plan-0977-v2.json",
+    "sha256": "12abb6239a7f14a82a84e87306deffca4231c83377bf19a123cfb503a3684a1c"
+  },
+  "schema": "litchi.performance.0978.focuseddecode_run.v1",
+  "scope": "one final-v2 decoder invocation on fresh external child-02 clone; offline perf subcommands only",
+  "status": "rejected_at_raw_stack_boundary"
+}

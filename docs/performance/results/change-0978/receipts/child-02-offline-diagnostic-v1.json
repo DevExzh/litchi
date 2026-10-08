@@ -1,0 +1,194 @@
+{
+  "analysis_script": {
+    "bytes": 17115,
+    "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/tools/analyze_child02_0978_v1.py",
+    "sha256": "2ea8d0651c003fe9aee4eeec3522d94485158bf5666208ea78aef6ba2c2964a7"
+  },
+  "cohort_admission": false,
+  "corrected_script_run": {
+    "command": {
+      "argv": [
+        "/usr/bin/perf",
+        "script",
+        "--show-lost-events",
+        "--no-inline",
+        "-F",
+        "cpu,pid,tid,time,event,period,ip,sym,symoff,dso",
+        "-i",
+        "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf.data"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "elapsed_ms": 714.819,
+      "environment": {
+        "LANG": "C",
+        "LC_ALL": "C",
+        "LD_PRELOAD": "/home/zhuhe/litchi-performance-0976/tools/dwfl_dynamic_shim_0976_cache_final_v2.so",
+        "LITCHI_0973_CORRECTED_BASE": "0x5610fab1f000",
+        "LITCHI_0973_PERF_EXPECTED_START": "0x5610fab20000",
+        "LITCHI_0973_SHIM_LOG": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.corrected.dwfl.jsonl",
+        "LITCHI_0973_SHIM_MODE": "corrected",
+        "LITCHI_0973_TARGET_NAME": "doc_retention_probe_0942_cfb_profile",
+        "LITCHI_0973_TARGET_PATH": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+        "LITCHI_0976_EXPECTED_DELTA": "0x1000",
+        "LITCHI_0976_TARGET_BUILD_ID": "e5c457384eeebd057932c444efda77618f137399",
+        "LITCHI_0976_TARGET_SHA256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb",
+        "PATH": "/usr/bin:/bin",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "UTC"
+      },
+      "finished_utc": "2026-10-08T07:48:52.058210+00:00",
+      "name": "corrected_script",
+      "returncode": 0,
+      "shim_log": {
+        "bytes": 221387538,
+        "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.corrected.dwfl.jsonl",
+        "sha256": "a8a53430500b75ba697bc2e65b42f90ff4f9524ffa8d2ab0ba7d722742be9d39"
+      },
+      "started_utc": "2026-10-08T07:48:51.343357+00:00",
+      "stderr": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.corrected.perf.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 11598818,
+        "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.corrected.perf-script-no-inline.txt",
+        "sha256": "371eee38919ec71a916c0a386c2b289d4dd82ff1f2c4932f3c47e050965b8338"
+      }
+    },
+    "created_utc": "2026-10-08T07:48:52.058210+00:00",
+    "native_actions": {
+      "build": false,
+      "recording": false,
+      "workload": false
+    },
+    "preflight": {
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/receipts/offline-custody-and-perf-script-v1.json",
+      "sha256": "9440e2473c26f35ccc12a7f471312c5b2917822bcbb6352a1fc935eed575d37b"
+    },
+    "schema": "litchi.performance.0978.corrected_perf_script_run.v1",
+    "scope": "one direct offline perf script invocation against retained child-02 perf.data with exact final 0976 shim; no native workload",
+    "status": "pass"
+  },
+  "created_utc": "2026-10-08T07:54:37.825223+00:00",
+  "diagnostic_output": {
+    "bytes": 12179,
+    "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/analysis/child-02-offline-diagnostic-v1.json",
+    "sha256": "f0083ceb7711bd164aab277b7d55f8ec73a438d4129972128e233455685e078f"
+  },
+  "focused_decoder_correction": {
+    "actual_scope": {
+      "corrected_script_invocation_was_not_part_of_this_terminated_process": true,
+      "failed_0977_tree_mutated": false,
+      "native_build": false,
+      "native_recording": false,
+      "native_workload": false,
+      "offline_decoder_started": true
+    },
+    "corrects": {
+      "cause": "The focused decoder subprocess was terminated by root instruction while still in its redundant raw perf-script dump phase; no natural decoder rejection was observed.",
+      "field": "status/interpretation",
+      "natural_raw_stack_rejection_observed": false,
+      "observed_returncode": -15,
+      "receipt": {
+        "bytes": 4792,
+        "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/receipts/focuseddecode-run-v1.json",
+        "sha256": "0e153a3a6568b64d767c0451b92caef261ab694fdde43d85a246f22228e5eacd"
+      },
+      "signal": "SIGTERM"
+    },
+    "created_utc": "2026-10-08T07:54:27.663696+00:00",
+    "interpretation": "The v1 receipt is retained as historical process evidence. Its statement that the decoder reached the raw scanner/rejected child is withdrawn; the only observed terminal outcome was SIGTERM before process completion. The direct corrected perf-script run and forensic ledger are authoritative for the 0978 offline diagnostic.",
+    "outputs_retained": [
+      {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-buildid.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "bytes": 571,
+        "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-buildid.txt",
+        "sha256": "6c7729316b6a54fc6ac338ceedfb960f4bb4fc669effac870d8ae58a34902925"
+      },
+      {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-evlist-v.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "bytes": 499,
+        "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-evlist-v.txt",
+        "sha256": "29f2a64536a635ac827b283009f72855d998151954c3000f867cbeaf8b8058af"
+      },
+      {
+        "bytes": 49,
+        "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-header.stderr",
+        "sha256": "73b3a559eb66337c5f0ae4ed3b5f31a3ed98bcccc0058df070ede34679d955df"
+      },
+      {
+        "bytes": 1209,
+        "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-header.txt",
+        "sha256": "9ab9c93af7f8e0a3a5c0b8488af57771855b7ca9853fbf921958aeee9732dec1"
+      },
+      {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-mmap-dump.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "bytes": 1140014935,
+        "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-mmap-dump.txt",
+        "sha256": "06d9529bf1c741e33105e4dd79a86466c64ba84ff8f58cdde8ab2abb8b0b41ce"
+      },
+      {
+        "bytes": 4484,
+        "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.target-layout.json",
+        "sha256": "6ea5571906e31f15dd0387c0ae5aac107af0732bf3197072181be681c4a23a6f"
+      },
+      {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.terminal-report.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "bytes": 1383,
+        "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.terminal-report.txt",
+        "sha256": "f46285b4be0b246d827afc3f18689fc58e34401a01faee55437a39a34f708cbf"
+      }
+    ],
+    "schema": "litchi.performance.0978.focuseddecode_run_correction.v1",
+    "status": "corrected_metadata"
+  },
+  "full_ledger": {
+    "bytes": 5093072,
+    "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/analysis/child-02-forensic-summary-v1.json",
+    "sha256": "42b89638080b20ffb10213c29c3ea4a783af385c7c41e30b19c01a7f91425783"
+  },
+  "interpretation": {
+    "72_byte_empty_kernel_sample": "One 0x48 (72-byte) PERF_RECORD_SAMPLE has a kernel-like IP 0xffffffff920000a7, raw mode IP, 0x1, and no user-stack/callchain output. It occurs before the doc_retention_p COMM exec image.",
+    "cohort_admission": "This child is diagnostic only; the 0977 all-12 cohort remains failed at child 2 and is not admitted.",
+    "focused_parser_boundary": "The retained raw STACK_USER scanner can reject a child when sample-line accounting requires one decoded frame-bearing line per sample. Direct corrected perf-script output conserves all 7201 samples and exposes 76 empty callchains, so the focused decoder rejection is a parser/admission boundary rather than evidence of capture loss.",
+    "remaining_empty_mass": "The other 75 empty callchains are 0x80f0 (33008-byte) sample records; 74 are raw mode IP, 0x2 and one is IP, 0x1. Their retained user-stack payloads do not yield decoded callchain frames in perf script. Keep their full period as unknown/empty mass.",
+    "source_attribution_limit": "Only marker-containing samples support marker-owner views. Keep D=all period, M=marker period, R=D-M labeled marker ancestry not observed; do not assign R or empty/non-resolved periods to a source owner. For a future admitted 12-child cohort, retain physical frame-0 owner plus explicit unknown, deepest-resolved proxy, and inclusive owners with separate denominators; require all-child conservation and never infer causality or speedup."
+  },
+  "native_actions": {
+    "build": false,
+    "recording": false,
+    "workload": false
+  },
+  "policy": {
+    "D": "all decoded instructions:u period = 7,201,000,000",
+    "M": "marker-containing period = 945,000,000; denominator T for marker owner views",
+    "R": "D-M = 6,256,000,000; label marker ancestry not observed; it may include non-marker/setup/wrapper work or missing/truncated marker ancestry",
+    "future_cohort": "Require all 12 children, raw/terminal loss zero, CPU/task/conservation gates, and per-child vectors. Do not nominate an owner or infer optimization causality automatically.",
+    "physical_leaf": "For marker samples only, mapped DSOs may be valid physical leaves; target-source eligibility is a separate filter.",
+    "unknown": "Keep all empty/no-resolved period explicit. Marker owner lower/upper bound is [K_j/T, (K_j+U)/T], where U is marker physical-leaf unknown period; inclusive views are non-additive."
+  },
+  "schema": "litchi.performance.0978.child02_offline_diagnostic_receipt.v1",
+  "source_manifest": {
+    "bytes": 17335,
+    "path": "/home/zhuhe/litchi-performance-0977/plans/plan-0977-v2.json",
+    "sha256": "12abb6239a7f14a82a84e87306deffca4231c83377bf19a123cfb503a3684a1c"
+  },
+  "status": "pass_diagnostic_only"
+}

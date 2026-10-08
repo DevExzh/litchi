@@ -1,0 +1,69 @@
+{
+  "changed_contract_labels": [
+    {
+      "after": "known physical-leaf period in target execution across all mapped DSOs",
+      "before": "target-source-eligible physical-leaf period",
+      "field": "attribution_contract.Tknown"
+    },
+    {
+      "after": "target execution period without a defensible physical owner",
+      "before": "target execution period without an eligible physical owner",
+      "field": "attribution_contract.U_target"
+    },
+    {
+      "after": "known physical-leaf period in target execution across all mapped DSOs; U_target is unresolved/unknown physical-owner period; bounds are per-owner and non-additive",
+      "before": "target-source eligible physical-leaf period; unknown target period is shared bound mass; bounds are per-owner and non-additive",
+      "field": "owner_bounds.scope"
+    }
+  ],
+  "diff": {
+    "bytes": 1757,
+    "path": "/home/zhuhe/litchi-performance-0978/analysis/reducer-v2-label-correction.diff",
+    "sha256": "8272dde2255afdb02da5fcab913818c263b8fef57efdaf3ee1da0baf59547a75"
+  },
+  "lineage": {
+    "final_reducer": {
+      "bytes": 104870,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/reduce_0978_v2.py",
+      "sha256": "e925755639ccdca3b75ed5b6e64265f711f506b6e6478bcee9a94990ce08521f"
+    },
+    "pre_label_snapshot": {
+      "bytes": 104807,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/reduce_0978_v3.py",
+      "sha256": "16c76e1b9cc76899500b358814bbc3a2952bc3adfebb9e39133b029f6203739e"
+    },
+    "unmodified_ip_fix_snapshot_note": "pre-label snapshot contains the base-16 perf-IP parser and hex regression; final reducer adds only the semantic label correction",
+    "unmodified_ip_fix_snapshot_path": "/home/zhuhe/litchi-performance-0978/tools/reduce_0978_v3.py",
+    "unmodified_ip_fix_snapshot_sha256": "16c76e1b9cc76899500b358814bbc3a2952bc3adfebb9e39133b029f6203739e",
+    "unmodified_original_reducer_sha256": "e904caa12e395cc7b6917cc03cf82509168338c94291575b3ecef282639ae626"
+  },
+  "schema": "litchi.performance.0978.reducer_metadata_correction.v1",
+  "scope": {
+    "change_kind": "metadata labels only; no derived periods, owner maps, parser logic, or packet inputs changed",
+    "native_actions": {
+      "build": false,
+      "recording": false,
+      "workload": false
+    },
+    "offline_only": true,
+    "raw_dump_rerun": false
+  },
+  "separate_source_eligibility": "target_source_owner_period remains the separate target-source-eligible owner map",
+  "status": "complete",
+  "validation": {
+    "receipt": {
+      "bytes": 26513,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/packet-validation-v4.json",
+      "sha256": "a970f7309ab455c74a73b80c9ff7d99fcd2859b8ba05801aaf8c6f3a59643aab"
+    },
+    "requested_child": "child-02",
+    "required_failures": [],
+    "source_inputs_stable_before_after": true,
+    "status": "pass",
+    "validator": {
+      "bytes": 25800,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/validate_packet_integration_0978_v4.py",
+      "sha256": "d8820bfa4b352c95abe80a1bde26b1f694c67fbbf26676095b5a984ac8603f68"
+    }
+  }
+}

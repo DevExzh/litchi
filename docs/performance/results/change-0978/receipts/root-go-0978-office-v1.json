@@ -1,0 +1,87 @@
+{
+  "adr_goal_revalidation": {
+    "bytes": 8560,
+    "path": "/home/zhuhe/litchi-performance-0978/receipts/adr-goal-revalidation-0978-v2.json",
+    "sha256": "a446e648cb692bc97e80ff0fc9adcec807dded924cce2f3a3e95520673cd6f2b"
+  },
+  "authorized": true,
+  "control_audit": {
+    "bytes": 20771,
+    "path": "/home/zhuhe/litchi-performance-0977/analysis/cpu-review-control-audit-0977-v2.json",
+    "sha256": "2d2f70cb800239201a941d9f78d55129be2344bb6887f8fe34fc6dc2187d7927"
+  },
+  "control_manifest": {
+    "bytes": 781,
+    "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/capture-manifest.json",
+    "sha256": "15e2a2e04f7263a61402cd846c94ea479c7db9034462537cd7baead68418074c"
+  },
+  "created_utc": "2026-10-08T09:37:15.547601+00:00",
+  "head": "172d66458abacc224427bc9b86cf2d3bf3effe78",
+  "helper_seal": {
+    "bytes": 6649,
+    "path": "/home/zhuhe/litchi-performance-0978/receipts/helper-seal-0978-v3.json",
+    "sha256": "a9735d56b4a73fab0ef8e6f14a2e05b19813e686c99e850283c06f4c2c8281fe"
+  },
+  "independent_native_boundary_review": {
+    "bytes": 9223,
+    "path": "/home/zhuhe/litchi-performance-0978/review/independent-native-boundary-review-v4.json",
+    "sha256": "a3e29e8a9512ac43aaeb7bf736ac709549d67682cfc059cde63428de6b1a041a"
+  },
+  "independent_review": {
+    "bytes": 18780,
+    "path": "/home/zhuhe/litchi-performance-0978/review/final-readiness-review-v5.json",
+    "sha256": "f424f6ebac813616656abc82ac595de3c1426a53058cc17d35c2496106347a7f"
+  },
+  "mode": "office",
+  "plan": {
+    "bytes": 31010,
+    "path": "/home/zhuhe/litchi-performance-0978/plans/plan-0978-v3.json",
+    "sha256": "9849dfd914463db998f02df7505db85ff02eb84215143d4ac1e67af267fa6424"
+  },
+  "quiescence": {
+    "active_capture_or_target_processes": [],
+    "allowed_cpus": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31
+    ],
+    "cooldown_seconds": 10,
+    "free_bytes": 345399619584,
+    "status": "pass"
+  },
+  "schema": "litchi.performance.0978.root_go.v1",
+  "scope": "Exactly 12 serial Office children; stop first failure; no retry or selective replacement. Complete 0978 only, commit, then pause.",
+  "status": "authorized",
+  "synthetic_boundary": {
+    "enabled": false
+  }
+}

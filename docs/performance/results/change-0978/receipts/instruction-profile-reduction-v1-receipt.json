@@ -1,0 +1,76 @@
+{
+  "command": {
+    "argv": [
+      "python3",
+      "-B",
+      "/home/zhuhe/litchi-performance-0978/tools/reduce_0978_v4.py",
+      "--plan",
+      "/home/zhuhe/litchi-performance-0978/plans/plan-0978-v3.json",
+      "--manifest",
+      "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/capture-manifest.json",
+      "--output",
+      "/home/zhuhe/litchi-performance-0978/analysis/instruction-profile-reduction-v1.json"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "native_actions": {
+      "build": false,
+      "recording": false,
+      "workload": false
+    },
+    "offline_only": true,
+    "raw_parse": false
+  },
+  "expected_disposition": "cohort_incomplete rejection after child-03 loss gate; no workaround or retry",
+  "output": {
+    "exists": false,
+    "path": "/home/zhuhe/litchi-performance-0978/analysis/instruction-profile-reduction-v1.json"
+  },
+  "returncode": 2,
+  "schema": "litchi.performance.0978.reduction_attempt.v1",
+  "source_bindings_after": {
+    "manifest": {
+      "bytes": 1035,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/capture-manifest.json",
+      "sha256": "f0bef5ff1cbd9eae486314ea076457736bbecee60c75e1b7b0792cfde94bca25"
+    },
+    "plan": {
+      "bytes": 31010,
+      "path": "/home/zhuhe/litchi-performance-0978/plans/plan-0978-v3.json",
+      "sha256": "9849dfd914463db998f02df7505db85ff02eb84215143d4ac1e67af267fa6424"
+    },
+    "reducer": {
+      "bytes": 104834,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/reduce_0978_v4.py",
+      "sha256": "1c40193d0debcea9feb696d82f029cc058b10e39e20ceb2183e2444223fc756c"
+    }
+  },
+  "source_bindings_before": {
+    "manifest": {
+      "bytes": 1035,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/capture-manifest.json",
+      "sha256": "f0bef5ff1cbd9eae486314ea076457736bbecee60c75e1b7b0792cfde94bca25"
+    },
+    "plan": {
+      "bytes": 31010,
+      "path": "/home/zhuhe/litchi-performance-0978/plans/plan-0978-v3.json",
+      "sha256": "9849dfd914463db998f02df7505db85ff02eb84215143d4ac1e67af267fa6424"
+    },
+    "reducer": {
+      "bytes": 104834,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/reduce_0978_v4.py",
+      "sha256": "1c40193d0debcea9feb696d82f029cc058b10e39e20ceb2183e2444223fc756c"
+    }
+  },
+  "source_inputs_stable_before_after": true,
+  "status": "rejected",
+  "stderr": {
+    "bytes": 76,
+    "path": "/home/zhuhe/litchi-performance-0978/analysis/instruction-profile-reduction-v1.stderr.txt",
+    "sha256": "b7832cfa258779395a32e0cd70fc76ccbbfb76e0d1f1642ab25358a928a56acc"
+  },
+  "stdout": {
+    "bytes": 0,
+    "path": "/home/zhuhe/litchi-performance-0978/analysis/instruction-profile-reduction-v1.stdout.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

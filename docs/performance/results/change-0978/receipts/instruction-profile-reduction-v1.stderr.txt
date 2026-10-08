@@ -1,0 +1,1 @@
+0978 reducer rejected: cohort_incomplete: manifest is not complete/no-retry

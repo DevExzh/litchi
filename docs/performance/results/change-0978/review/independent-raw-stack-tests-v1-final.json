@@ -1,0 +1,54 @@
+{
+  "schema": "litchi.performance.0978.independent_raw_stack_tests.v1",
+  "status": "pass_independent_offline_mutation_controls",
+  "created_utc": "2026-10-08T08:03:10.305963+00:00",
+  "repository": {
+    "head": "172d66458abacc224427bc9b86cf2d3bf3effe78"
+  },
+  "review_scope": "offline independent mutation tests for variable-layout raw scanner; no parser, build, native capture, workload, or timing changes",
+  "command": "PYTHONDONTWRITEBYTECODE=1 python3 -B /home/zhuhe/litchi-performance-0978/tests/independent_raw_stack_tests_v1.py",
+  "observed": {
+    "tests_run": 10,
+    "tests_passed": 10,
+    "result": "PASS",
+    "source_hash_before": "5f844b82a40426662ffaed5ba21dd0687fefa3f98ecc233dc572eeb3041017b7",
+    "source_hash_after": "5f844b82a40426662ffaed5ba21dd0687fefa3f98ecc233dc572eeb3041017b7",
+    "test_hash_before": "bb3e98178dc66821335f34eab0717dac8e7e006a2607ad11625122a1ad4f1295",
+    "test_hash_after": "bb3e98178dc66821335f34eab0717dac8e7e006a2607ad11625122a1ad4f1295",
+    "bytecode_cache_created": false
+  },
+  "source_binding": {
+    "path": "/home/zhuhe/litchi-performance-0978/tools/raw_stack_0978.py",
+    "sha256": "5f844b82a40426662ffaed5ba21dd0687fefa3f98ecc233dc572eeb3041017b7",
+    "sealed_source_receipt": {
+      "path": "/home/zhuhe/litchi-performance-0978/receipts/raw-stack-scanner-controls-0978-v2.json",
+      "sha256": "7b9445c1a3c95bd8bb69366e8fdcc9aaa3a1a1c87055809acbd0caa2a51769d3"
+    }
+  },
+  "test_binding": {
+    "path": "/home/zhuhe/litchi-performance-0978/tests/independent_raw_stack_tests_v1.py",
+    "sha256": "bb3e98178dc66821335f34eab0717dac8e7e006a2607ad11625122a1ad4f1295"
+  },
+  "normative_revalidation": {
+    "accepted_adr_count": 32,
+    "status": "pass",
+    "receipt_path": "/home/zhuhe/litchi-performance-0978/receipts/adr-goal-revalidation-0978-v1.json",
+    "receipt_sha256": "24c6caafaa870a3e3e7be9e07e5e206aa0ebdefd1d087ea068d38f07adf7fff8"
+  },
+  "controls": [
+    "variable CALLCHAIN nr and REGS_USER ABI NONE/32/64 with changed register masks",
+    "valid zero-stack conditional dyn-size omission and invalid zero-stack trailer",
+    "missing, duplicated, overlapping, and fixed-width ASCII-gutter hex rows",
+    "missing sample pairing and duplicate descriptions on one physical raw event",
+    "identical contents at distinct physical offsets conserved; repeated physical offset rejected",
+    "unrelated non-sample raw record counted without sample pairing",
+    "raw/text CPU, TIME, PERIOD, PID/TID, CPU and MISC mismatch visibility",
+    "raw header size/type mismatch",
+    "duplicate evlist attributes, empty sample-type component, duplicate sample type",
+    "raw event size above u16 perf header rejected before payload allocation"
+  ],
+  "limitations": [
+    "This receipt qualifies only the independent offline mutation suite and sealed scanner source binding.",
+    "It does not qualify retained native artifacts, workload capture, timing, or production integration beyond the bound scanner interface."
+  ]
+}

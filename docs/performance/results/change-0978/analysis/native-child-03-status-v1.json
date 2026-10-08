@@ -1,0 +1,7 @@
+{
+  "error": "loss_gate: raw or terminal loss is nonzero",
+  "no_retry": true,
+  "packet_id": "child-03",
+  "schema": "litchi.performance.0978.child_progress.v1",
+  "status": "decoder_failure"
+}

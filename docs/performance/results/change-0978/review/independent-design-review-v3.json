@@ -1,0 +1,289 @@
+{
+  "clarification": "v3 corrects the zero-stack synthetic layout control and separates target-source eligibility from all-DSO physical-leaf ownership. No retained evidence, capture, or admission conclusion changed.",
+  "created_utc": "2026-10-08T07:49:51.575694+00:00",
+  "decision": {
+    "answer_to_scope_question": "Retain every valid sample in a disjoint lifecycle/attribution ledger. Use the bound target COMM_EXEC plus target executable PF_X MMAP2/build ID for source scope, and keep startup, transition, non-user-context, missing-unwind, unresolved-DSO, and non-marker periods explicit as unknown or outside-marker remainder. Do not require zero empty/unwind-unavailable samples across the whole lifetime.",
+    "do_not_do": [
+      "Do not silently skip a valid variable-layout sample.",
+      "Do not condition a source owner share on samples that happen to unwind.",
+      "Do not infer that D-minus-marker-period is outside the marker; it includes startup, non-marker target work, and unassigned samples.",
+      "Do not add an unknown-share exemption or cutoff tuned to the one 72-byte record.",
+      "Do not claim measured-only attribution from the combined five-warmup plus eighty-measured marker scope."
+    ],
+    "future_admission": "No future native cohort should launch until the variable-layout parser, lifecycle ledger, conservation checks, and mutation controls are independently reviewed and hash-bound.",
+    "recommendation": "phase_scoped_marker_inclusive_attribution_with_explicit_unknown_remainder",
+    "source_vs_physical_scope": {
+      "physical_leaf_ownership": "Within the target execution or marker phase, a resolved physical leaf in libc, the dynamic loader, Python, or another validated mapped DSO is a known physical owner. It is not automatically unknown and it is not automatically a target-source claim.",
+      "target_source_eligibility": "A target-source claim requires the preregistered target COMM_EXEC/BuildID/PF_X identity and marker ancestry, with the owner symbol actually bound to the target DSO/source map.",
+      "unknown_rule": "A physical sample is unknown only when no defensible active DSO/map owner exists, ancestry is absent/unresolved, the record is a valid but unassignable context, or the phase/lifecycle binding is unavailable. All known DSO owners plus unknown conserve T and M."
+    }
+  },
+  "interpretation_limits": [
+    "The retained 72-byte record proves a valid framed sample accepted by perf script with no usable user ancestry; it does not prove a PMU skid, kernel defect, or stack corruption cause.",
+    "The target binary COMM_EXEC/MMAP2 evidence permits a conservative startup classification for this sample. It does not prove that every future empty sample is startup; each future sample must be classified from its own event timeline.",
+    "The existing marker physical-leaf conservation is useful within M, but it is not whole-process source attribution. D/M/R and target-window unknown periods must remain separately visible.",
+    "A successful native run with unresolved/unknown periods can support bounded descriptive evidence. It cannot support a causal optimization or source-owner claim when the decision changes under the unknown bound.",
+    "This receipt is a policy/design review only. It does not qualify 0977, authorize a native recapture, or claim any source hotspot.",
+    "A raw IP outside the target executable PF_X interval is not by itself unknown: resolve it against the active DSO map. This physical owner may be valid libc/loader/Python work while remaining ineligible for a target-source owner claim."
+  ],
+  "normative_revalidation": {
+    "accepted_adr_count": 32,
+    "bound_files": {
+      "adr_0005": {
+        "bytes": 150126,
+        "path": "/home/zhuhe/code/litchi/docs/adr/0005-io-memory-and-performance.md",
+        "sha256": "8279fd2dc0b074aa104bf0c83df6187d12e18756cd8c8d7f25750b2a997cb0aa"
+      },
+      "adr_0006": {
+        "bytes": 9529,
+        "path": "/home/zhuhe/code/litchi/docs/adr/0006-validation-security-and-compatibility.md",
+        "sha256": "ae21189eda0acc9524a7c5a57e87bb3566405ede5c015c87105e01337666f44b"
+      },
+      "adr_0008": {
+        "bytes": 1145334,
+        "path": "/home/zhuhe/code/litchi/docs/adr/0008-migration-and-verification.md",
+        "sha256": "5c72d79a7ba78a044471b40ba22ab3f32f7b8f4f878614ab05b416e60b0163a2"
+      },
+      "adr_readme": {
+        "bytes": 5766,
+        "path": "/home/zhuhe/code/litchi/docs/adr/README.md",
+        "sha256": "2af0e5814378c2765c12213e495d02c2895a27f142bc618ca1f3037824bbe028"
+      },
+      "goal": {
+        "bytes": 35839,
+        "path": "/home/zhuhe/code/litchi/docs/GOAL.md",
+        "sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1"
+      },
+      "linux_perf_event_h": {
+        "bytes": 46419,
+        "path": "/usr/include/linux/perf_event.h",
+        "sha256": "4c2e217b87afecaa002ec35dd748319b02fbf98ddc301c60238146fa2ab057b7"
+      }
+    },
+    "constraints_applied": [
+      "GOAL preserves correctness, safety, reproducibility, and explicit metric scope over speed.",
+      "ADR 0005 requires representative profiles and statistical evidence; unsupported attribution is not a performance claim.",
+      "ADR 0006 requires structured validation evidence and does not permit silent repair or guessed interpretation.",
+      "ADR 0008 keeps unsupported or failed evidence visible and withholds support claims until required gates pass."
+    ],
+    "current_head": "172d66458abacc224427bc9b86cf2d3bf3effe78",
+    "receipt": {
+      "bytes": 1109,
+      "path": "/home/zhuhe/litchi-performance-0978/receipts/adr-goal-revalidation-0978-v1.json",
+      "sha256": "24c6caafaa870a3e3e7be9e07e5e206aa0ebdefd1d087ea068d38f07adf7fff8"
+    },
+    "status": "pass"
+  },
+  "observed_child02": {
+    "capture_disposition": "decoder_failure_before_packet; native process returned 0; no retry; no cohort admission",
+    "lifecycle": {
+      "comm_perf_exec": {
+        "name": "perf-exec",
+        "record_line": 46
+      },
+      "comm_python_exec": {
+        "name": "python3.14",
+        "record_line": 77,
+        "timestamp_ns": 310425450191349
+      },
+      "interpretation": "The short sample is about 75 ms before the bound binary COMM_EXEC and executable MMAP2, after the Python exec in the same PID. It is startup/launcher lifetime evidence, not a target source frame.",
+      "offending_sample_timestamp_ns": 310425464699693,
+      "startup_to_target_comm_delta_ns": 75082181,
+      "startup_to_target_rx_map_delta_ns": 75098861,
+      "target_comm_exec": {
+        "name": "doc_retention_p",
+        "record_line": 878614,
+        "timestamp_ns": 310425539781874
+      },
+      "target_exit": {
+        "record_line": 15132292,
+        "timestamp_ns": 310426280487989
+      },
+      "target_first_r_x_mmap2": {
+        "build_id": "e5c457384eeebd057932c444efda77618f137399",
+        "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+        "record_line": 878678,
+        "timestamp_ns": 310425539798554
+      }
+    },
+    "marker_and_source_scope": {
+      "calls": 85,
+      "calls_scope": "five warmups plus eighty measured calls combined",
+      "marker": "doc_retention_probe_0942_cfb_profile::profiled_measured_case",
+      "source_wrapper_hash": "47e77b319d74ea91fc6952ae9e99c2fd43c735710b7f7e10783b90d192265712",
+      "source_wrapper_path": "/home/zhuhe/litchi-performance-0967/harness-perf/src/lib.rs",
+      "warning": "The source shows the same wrapper around warmups and measured calls; native stack samples do not carry a measured-sample index. Measured-only source attribution requires a separately preregistered boundary or must remain combined."
+    },
+    "offending_sample": {
+      "callchain_nr": 0,
+      "classification": "valid framed variable-layout sample with no usable user ancestry for source attribution; not a malformed record and not evidence of perf-data corruption",
+      "cpu": 31,
+      "dyn_size": "not present because the valid retained record ends at 0x48",
+      "ip_hex": "0xffffffff920000a7",
+      "misc_label": "PERF_RECORD_MISC_KERNEL",
+      "perf_text": "FP chain: nr:0; ustack: size 0, offset 0x40",
+      "period": 1000000,
+      "pid": 3849325,
+      "raw_data_offset_hex": "0x26f5b0",
+      "record_misc_hex": "0x1",
+      "record_size_bytes": 72,
+      "record_type": 9,
+      "regs_user_abi": 0,
+      "sample_index_1_based": 78,
+      "tid": 3849325,
+      "user_stack_size": 0
+    },
+    "raw_sample_ledger": {
+      "expected_cpu": 31,
+      "expected_pid": 3849325,
+      "expected_tid": 3849325,
+      "fixed_scanner_reported_unconsumed_raw_records": 1990,
+      "period": 1000000,
+      "period_valid": true,
+      "pid_tid_cpu_valid": true,
+      "record_size_counts": {
+        "33008": 7200,
+        "72": 1
+      },
+      "record_type_counts": {
+        "PERF_RECORD_SAMPLE": 7201
+      },
+      "sample_records": 7201,
+      "unconsumed_note": "The retained fixed scanner only consumes sample records; this count is not data loss. A replacement lifecycle parser must frame and account for all event types."
+    },
+    "terminal_and_loss": {
+      "native_returncode": 0,
+      "policy": "PERF_RECORD_LOST fields and terminal PERF_RECORD_LOST_SAMPLES are distinct reports and must be recorded separately; never add the terminal value to raw LOST records.",
+      "raw_lost_sum": "not produced by the failed fixed scanner; must be independently parsed in any replacement",
+      "terminal_total_lost_samples": 0
+    }
+  },
+  "recommended_future_protocol": {
+    "disjoint_period_ledger": {
+      "conservation": [
+        "D = startup_period + transition_period + T + post_target_period + other_phase_period",
+        "T = sum(K_owner) + U_target",
+        "M = sum(marker_exclusive_owner_period) + U_marker",
+        "Inclusive ancestor tables are intentionally non-additive and are never used in these equalities."
+      ],
+      "definitions": {
+        "D": "sum of periods for all valid PERF_RECORD_SAMPLE records in the process lifetime",
+        "K_owner": "exclusive physical-leaf periods assigned to one owner after exact target/source binding",
+        "M": "sum of periods for samples whose decoded ancestry contains the preregistered marker; marker samples can be known or unknown-owner",
+        "R": "D - M, reported as explicit non-marker/remainder only; never described as outside-marker work solely from subtraction",
+        "T": "sum of periods in the target execution window, including every target-window unknown sample",
+        "U_target": "target-window periods with no defensible physical owner, including empty/missing user ancestry, unresolved frame or DSO, invalid/unavailable map binding, kernel/transition context, or marker ancestry with no resolved physical leaf. A resolved libc/loader/Python/other-DSO leaf in an active validated map remains a known physical owner even when it is outside the target executable PF_X interval."
+      },
+      "minimum_output": "Report sample count and period for every phase/status bucket, including unknown and malformed/loss counts; retain the raw record identity for every bucket."
+    },
+    "gates": {
+      "decision_rule": "For owner j with known exclusive period K_j and unknown target period U_target, report [K_j/T, (K_j + U_target)/T]. A source-owner ranking is robust only when the relevant lower bound exceeds competing upper bounds, or the preregistered decision remains unchanged across the full unknown allocation. Otherwise report inconclusive/descriptive and do not nominate an optimization.",
+      "explicitly_not_required": [
+        "zero empty callchains across the entire perf lifetime",
+        "a user stack or user register payload on startup/kernel-context samples",
+        "all samples resolving to the target binary or to a source owner"
+      ],
+      "source_quality_gate": [
+        "Retain the existing preregistered minimum marker-sample gate (100) and positive marker period only if it is frozen before the next cohort; do not create an unknown-share cutoff from this failure.",
+        "Require positive target-window PF_X evidence and exact marker DSO/build ID for a target-source attribution report. This gate does not exclude resolved non-target DSO leaves from the physical ledger.",
+        "A valid target-window unknown remainder does not by itself reject the raw cohort; it downgrades the result to bounded/descriptive. The unknown bound never qualifies an optimization claim.",
+        "A resolved libc/loader/Python/other-DSO leaf is reported as its own physical owner; only an owner decision that is invariant under U_target can support a source hypothesis."
+      ],
+      "structural_hard_fail": [
+        "Declared event/sample layout cannot be framed from record size, record size is inconsistent, or required fields are truncated.",
+        "Any raw PERF_RECORD_LOST or terminal PERF_RECORD_LOST_SAMPLES loss is nonzero for a complete attribution cohort.",
+        "Required period, PID/TID/CPU, exact target binary identity, target lifecycle, or phase/period conservation cannot be proven.",
+        "Target COMM_EXEC/MMAP2/EXIT identity is absent or ambiguous."
+      ]
+    },
+    "parser_and_mutation_controls": [
+      "Exercise a full user sample, the retained valid 72-byte zero-callchain/zero-stack variant, and a nonzero-stack sample whose dynamic-size field is present and bounded. For the v6.12 evsel layout, a zero-size stack record must end after its zero-size field: a zero-size record carrying a dynamic-size field is a malformed-layout negative control and must be rejected. Also exercise normal callchain plus user registers/stack and every other valid record-size variant declared by the exact evlist.",
+      "Reject a record truncated before its declared layout, record-size mismatch, malformed hex/frame data, unexpected sample fields, and impossible stack bounds; do not mistake a valid zero-payload variant for truncation.",
+      "Parse and account COMM/COMM_EXEC, MMAP2/build ID/PF_X, EXIT, FORK/CLONE/THREAD_MAP, PERF_RECORD_LOST, PERF_RECORD_LOST_SAMPLES, and sample records. Test event ordering around Python/launcher exec and target exec.",
+      "Mutation tests must reject dropped or duplicated samples, changed period/PID/TID/CPU, altered record size, moved phase boundary, changed build ID/path, lost records, and broken conservation.",
+      "Test target-window samples whose physical leaf is target, libc, loader, Python, or another validated DSO, plus kernel/transition samples, empty ancestry, unresolved frames, and marker-containing samples with no physical leaf. Resolved mapped DSOs remain known physical owners; only unassignable cases enter the explicit unknown bucket.",
+      "Cross-check the lifecycle parser against raw perf-script text and raw record bytes, with all artifacts hash-bound. A scanner that only consumes SAMPLE records is insufficient for startup/target phase classification."
+    ],
+    "physical_leaf_policy": {
+      "inclusive_view": "marker-inclusive ancestors may overlap and are diagnostic only; they never replace the disjoint physical-leaf ledger",
+      "physical_owner_key": "active validated DSO identity plus resolved symbol/source key; target and non-target DSOs are separate owners",
+      "target_source_flag": "true only when the owner is bound to the target executable BuildID/path and source mapping; marker ancestry alone does not relabel libc or loader work as target source",
+      "unknown_conservation": "sum(all known physical DSO owners) + explicit unknown period == target period T, and the corresponding marker ledger conserves M"
+    },
+    "scope_definition": {
+      "all_lifetime": "Parse every framed PERF_RECORD_SAMPLE and every lifecycle/control record. Keep startup, target transition, target execution, and post-exit records in the ledger.",
+      "marker_window": "Keep marker-inclusive attribution as a declared sub-scope. The current 0977 marker is combined warmup plus measured scope; do not relabel it as measured-only.",
+      "target_window": "Use preregistered target COMM_EXEC identity plus target executable MMAP2 path/build ID and PF_X intervals to classify the target execution phase. Samples before target COMM_EXEC are startup; samples after target exec but before an active target PF_X mapping are transition/unknown for target-source eligibility. During a valid target/marker phase, resolve the physical leaf against every active validated DSO map: target, libc, loader, Python, and other DSOs are additive physical owners. Target-source eligibility is a separate flag and requires target DSO/source binding; a non-target DSO leaf is physical evidence but is not a target-source owner."
+    },
+    "threshold_policy": {
+      "marker_gate": "The existing minimum marker gate may be retained only as a pre-registered inherited design parameter. It is not tuned to the 72-byte sample and does not waive unknown-period bounds.",
+      "owner_selection": "Nominate a target source owner only when the bound-invariant decision rule passes; otherwise retain a hypothesis for source inspection without causal or adoption language.",
+      "unknown_period": "No unknown-period percentage cutoff is introduced. Any nonzero unknown bound makes the result descriptive/bounded; it is never silently discarded or admitted as an optimization claim."
+    }
+  },
+  "required_next_artifact": "A fresh, independently reviewed protocol/decoder version must bind the exact helper bytes, implement variable-layout and lifecycle ledgers, pass the controls above, and obtain a new GO. Existing 0977 raw captures and failed-cohort receipts remain immutable historical evidence. This v2 receipt corrects only byte-count metadata from v1; no policy or evidence conclusion changed.",
+  "retained_0977_bindings": {
+    "child02_perf_data": {
+      "bytes": 237904472,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-02/child-02.perf.data",
+      "sha256": "3b929236dc8378e2804d1d7421e0a2f9bfc22fbad7c6f29cc0f8cf1774df22dc"
+    },
+    "child02_perf_script_dump": {
+      "bytes": 1140014935,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-02/child-02.perf-mmap-dump.txt",
+      "sha256": "7bc5c5d1710bc03c7b72b8962febfe5733e152516259ba7d94f7b5b3ad7f08bb"
+    },
+    "child02_status": {
+      "bytes": 210,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-02/child-02.status.json",
+      "sha256": "53df19f1359f0841ef5468bc5787dcf44b6bb22e2477cfbb8d8e9b353a69708d"
+    },
+    "child02_target_layout": {
+      "bytes": 4484,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-02/child-02.target-layout.json",
+      "sha256": "aa0fc81aac8721b238fc8c31fb04bf040db895f84fca3d2961072e375ed3bbb1"
+    },
+    "child02_terminal_report": {
+      "bytes": 1383,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-02/child-02.terminal-report.txt",
+      "sha256": "f46285b4be0b246d827afc3f18689fc58e34401a01faee55437a39a34f708cbf"
+    },
+    "fixed_offset_scanner": {
+      "bytes": 13746,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/raw_stack_0973_v2.py",
+      "sha256": "3a8e36ebc5f21f4f0b8293cafa675d722f2264fb1cfd6c7f48271b4f0a5056d2"
+    },
+    "helper_seal": {
+      "bytes": 3132,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/helper-seal-0977-v2.json",
+      "sha256": "d51ea07cdca58e700a82ff8f4789fffc3dd40e4f284b086026458308fbd78e2e"
+    },
+    "independent_failed_cohort_audit_v3": {
+      "bytes": 14676,
+      "path": "/home/zhuhe/litchi-performance-0977/analysis/cpu-review-office-failed-cohort-0977-v3.json",
+      "sha256": "050b5c6006122ce5ab5fb780971069196bcc03cc7a32ced93f262231d50c1e3d"
+    },
+    "plan": {
+      "bytes": 17335,
+      "path": "/home/zhuhe/litchi-performance-0977/plans/plan-0977-v2.json",
+      "sha256": "12abb6239a7f14a82a84e87306deffca4231c83377bf19a123cfb503a3684a1c"
+    },
+    "raw_diagnostic_v3": {
+      "bytes": 6565,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/child02-rawstack-diagnostic-0977-v3.json",
+      "sha256": "dbfb076ec8010d82bb81125569dcc94907b8fcadd67035572a4e4b5532631a1b"
+    },
+    "target_binary": {
+      "bytes": 47909224,
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+    }
+  },
+  "schema": "litchi.performance.0978.independent_design_review.v3",
+  "scope": "Independent offline design/policy review only; no native perf command, workload, build, source edit, or sealed-artifact mutation.",
+  "status": "offline_policy_pass_with_required_variable_layout_protocol",
+  "supersedes": {
+    "path": "/home/zhuhe/litchi-performance-0978/review/independent-design-review-v2.json",
+    "sha256": "dd3432111594334db866211162aa97e65386abd0f5241aa64de6b986d4c74139"
+  }
+}

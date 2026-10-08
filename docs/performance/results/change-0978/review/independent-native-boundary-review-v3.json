@@ -1,0 +1,221 @@
+{
+  "checks": {
+    "control_boundary_equivalence_v5": {
+      "all_checks_passed": true,
+      "bridge_exact_sha": true,
+      "build_started": false,
+      "candidate_runner_matches_current": true,
+      "native_workload_started": false,
+      "reusable_boundary": {
+        "period": 1000000,
+        "process_group_cleanup": "SIGTERM then bounded SIGKILL and verify_group_gone",
+        "recorder_cpu": 30,
+        "retry": false,
+        "root_go_still_required": true,
+        "same_pid_bridge_exec": true,
+        "serial_children": true,
+        "stack_cap": 32768,
+        "stop_on_first_failure": true,
+        "target_cpu": 31,
+        "timeout_seconds": 900
+      },
+      "schema": "litchi.performance.0978.control_boundary_equivalence.v5",
+      "status": "pass"
+    },
+    "native_command_and_environment": {
+      "control_contract": {
+        "period": 1000000,
+        "process_group_cleanup": "SIGTERM then bounded SIGKILL and verify_group_gone",
+        "recorder_cpu": 30,
+        "retry": false,
+        "root_go_still_required": true,
+        "same_pid_bridge_exec": true,
+        "serial_children": true,
+        "stack_cap": 32768,
+        "stop_on_first_failure": true,
+        "target_cpu": 31,
+        "timeout_seconds": 900
+      },
+      "environment": {
+        "LANG": "C",
+        "LC_ALL": "C",
+        "LD_PRELOAD": "absent",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "UTC"
+      },
+      "reader_artifact_gate_bound": true,
+      "serial_stop_first_no_retry": true
+    },
+    "native_constants": {
+      "actual": {
+        "CHILDREN": 12,
+        "CPU": 31,
+        "PERIOD": 1000000,
+        "RECORDER_CPU": 30,
+        "SAMPLES": 80,
+        "STACK_CAP": 32768,
+        "TIMEOUT_SECONDS": 900,
+        "WARMUPS": 5
+      },
+      "equal": true,
+      "expected": {
+        "CHILDREN": 12,
+        "CPU": 31,
+        "PERIOD": 1000000,
+        "RECORDER_CPU": 30,
+        "SAMPLES": 80,
+        "STACK_CAP": 32768,
+        "TIMEOUT_SECONDS": 900,
+        "WARMUPS": 5
+      }
+    },
+    "native_function_source_equal_to_sealed_0977": {
+      "affinity_observation_gate": true,
+      "native_env": true,
+      "target_argv": true,
+      "terminate_group": true,
+      "verify_group_gone": true
+    },
+    "plan_binding_validate_plan": {
+      "returncode": 0,
+      "status_pass": true
+    },
+    "pre_capture_plan_contract": {
+      "batch": true,
+      "control_equivalence_binding": true,
+      "cwd_contract": true,
+      "execution": true,
+      "focused_decoder_binding": true,
+      "helper_seal_binding": true,
+      "native_environment": true,
+      "outputs": true,
+      "plan_binding_binding": true,
+      "plan_generator_binding": true,
+      "pre_capture": true,
+      "reducer_v2_binding": true,
+      "retained_reducer_v1_binding": true,
+      "runner_binding": true,
+      "schema_status": true,
+      "self_path": true
+    },
+    "runner_check_plan": {
+      "returncode": 0,
+      "status_pass": true,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "0471041a9a734a8054f01f28b092c093ef33250d57b68a25b7eaee89f5305929"
+    },
+    "runner_self_test": {
+      "returncode": 0,
+      "status_pass": true,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "777f2734e91b5747a28ff50b9ee29a97cd59f0039bf008eaec2187db2d184ae7",
+      "workload_started": false
+    }
+  },
+  "decision": "pass_for_native_boundary_and_pre_capture_plan_admission_only",
+  "findings": [],
+  "limitations": [
+    "This receipt admits the exact pre-capture plan/helper/native boundary only; it does not authorize or observe a native workload.",
+    "Root GO and any final authorized capture plan remain separate gates.",
+    "Reducer and lifecycle semantics remain outside this independent native-boundary review.",
+    "No performance, correctness, or production-adoption conclusion follows."
+  ],
+  "reviewed_utc": "2026-10-08T09:27:10.037998+00:00",
+  "schema": "litchi.performance.0978.independent_native_boundary_review.v3",
+  "scope": {
+    "build_started": false,
+    "decoder_reducer_lifecycle": false,
+    "helper_seal": true,
+    "native_boundary": true,
+    "native_workload_started": false,
+    "pre_capture_plan": true,
+    "retained_0977_control_reuse": true,
+    "root_go_authorization": false
+  },
+  "source_bindings": {
+    "control_equivalence_v5": {
+      "bytes": 3388,
+      "path": "/home/zhuhe/litchi-performance-0978/receipts/control-boundary-equivalence-0978-v5.json",
+      "sha256": "c4b0c814ce93cb3a3f2bc3d30c92a91c0f8ca814fbc9003d38200a162a91432d"
+    },
+    "current_head": "172d66458abacc224427bc9b86cf2d3bf3effe78",
+    "focuseddecode_0978_v3": {
+      "bytes": 62748,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/focuseddecode_0978_v3.py",
+      "sha256": "9596e246c7c627fb3810e7c6c6d3dda12af58b62477f1f1233654c4256e2dac9"
+    },
+    "helper_seal": {
+      "bytes": 6649,
+      "path": "/home/zhuhe/litchi-performance-0978/receipts/helper-seal-0978-v1.json",
+      "sha256": "a5d4becad0a27096ced0b6167fcc1b08e527460e621444490bb334b8d4a72f9b"
+    },
+    "plan": {
+      "bytes": 31010,
+      "path": "/home/zhuhe/litchi-performance-0978/plans/plan-0978-v1.json",
+      "sha256": "acdae82274e614ae7834a74cd25624828454cc2bdddd9ae30bcef99f98269013"
+    },
+    "plan_binding_0978": {
+      "bytes": 40141,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/plan_binding_0978_v1.py",
+      "sha256": "eacb12d1ae15a1930bc1b5efabefd044367ecaec8cf446f3f1f7e5a310a53efc"
+    },
+    "prepare_plan_0978": {
+      "bytes": 20673,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/prepare_plan_0978_v1.py",
+      "sha256": "d17352c73346e559fb554b6da1204c1baaf53aa32cd203ac47b4e18181dc6b58"
+    },
+    "reducer_0978_v2": {
+      "bytes": 104870,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/reduce_0978_v2.py",
+      "sha256": "e925755639ccdca3b75ed5b6e64265f711f506b6e6478bcee9a94990ce08521f"
+    },
+    "retained_bridge_0977": {
+      "bytes": 13348,
+      "path": "/home/zhuhe/litchi-performance-0977/tools/affinity_bridge_0977.py",
+      "sha256": "2c9f5839c23da769625d3b9fdf339ec00d9c8a3209e6f6c1a5c166d475800a43"
+    },
+    "retained_runner_0977": {
+      "bytes": 38108,
+      "path": "/home/zhuhe/litchi-performance-0977/tools/run_0977_v2.py",
+      "sha256": "d7904b4773cc17d96c7194c5d4df7e83520795580af17a8217da93cfffa565a4"
+    },
+    "runner_0978": {
+      "bytes": 48826,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/run_0978_v1.py",
+      "sha256": "c24da0749dd6d5dd1464e23dffbb9a3650634f0a803ac3a372a6d365cfc9837a"
+    }
+  },
+  "source_stability": {
+    "hashes_after": {
+      "/home/zhuhe/litchi-performance-0977/tools/affinity_bridge_0977.py": "2c9f5839c23da769625d3b9fdf339ec00d9c8a3209e6f6c1a5c166d475800a43",
+      "/home/zhuhe/litchi-performance-0977/tools/run_0977_v2.py": "d7904b4773cc17d96c7194c5d4df7e83520795580af17a8217da93cfffa565a4",
+      "/home/zhuhe/litchi-performance-0978/plans/plan-0978-v1.json": "acdae82274e614ae7834a74cd25624828454cc2bdddd9ae30bcef99f98269013",
+      "/home/zhuhe/litchi-performance-0978/receipts/control-boundary-equivalence-0978-v5.json": "c4b0c814ce93cb3a3f2bc3d30c92a91c0f8ca814fbc9003d38200a162a91432d",
+      "/home/zhuhe/litchi-performance-0978/receipts/helper-seal-0978-v1.json": "a5d4becad0a27096ced0b6167fcc1b08e527460e621444490bb334b8d4a72f9b",
+      "/home/zhuhe/litchi-performance-0978/tools/focuseddecode_0978_v3.py": "9596e246c7c627fb3810e7c6c6d3dda12af58b62477f1f1233654c4256e2dac9",
+      "/home/zhuhe/litchi-performance-0978/tools/plan_binding_0978_v1.py": "eacb12d1ae15a1930bc1b5efabefd044367ecaec8cf446f3f1f7e5a310a53efc",
+      "/home/zhuhe/litchi-performance-0978/tools/prepare_plan_0978_v1.py": "d17352c73346e559fb554b6da1204c1baaf53aa32cd203ac47b4e18181dc6b58",
+      "/home/zhuhe/litchi-performance-0978/tools/reduce_0978_v2.py": "e925755639ccdca3b75ed5b6e64265f711f506b6e6478bcee9a94990ce08521f",
+      "/home/zhuhe/litchi-performance-0978/tools/run_0978_v1.py": "c24da0749dd6d5dd1464e23dffbb9a3650634f0a803ac3a372a6d365cfc9837a"
+    },
+    "hashes_before": {
+      "/home/zhuhe/litchi-performance-0977/tools/affinity_bridge_0977.py": "2c9f5839c23da769625d3b9fdf339ec00d9c8a3209e6f6c1a5c166d475800a43",
+      "/home/zhuhe/litchi-performance-0977/tools/run_0977_v2.py": "d7904b4773cc17d96c7194c5d4df7e83520795580af17a8217da93cfffa565a4",
+      "/home/zhuhe/litchi-performance-0978/plans/plan-0978-v1.json": "acdae82274e614ae7834a74cd25624828454cc2bdddd9ae30bcef99f98269013",
+      "/home/zhuhe/litchi-performance-0978/receipts/control-boundary-equivalence-0978-v5.json": "c4b0c814ce93cb3a3f2bc3d30c92a91c0f8ca814fbc9003d38200a162a91432d",
+      "/home/zhuhe/litchi-performance-0978/receipts/helper-seal-0978-v1.json": "a5d4becad0a27096ced0b6167fcc1b08e527460e621444490bb334b8d4a72f9b",
+      "/home/zhuhe/litchi-performance-0978/tools/focuseddecode_0978_v3.py": "9596e246c7c627fb3810e7c6c6d3dda12af58b62477f1f1233654c4256e2dac9",
+      "/home/zhuhe/litchi-performance-0978/tools/plan_binding_0978_v1.py": "eacb12d1ae15a1930bc1b5efabefd044367ecaec8cf446f3f1f7e5a310a53efc",
+      "/home/zhuhe/litchi-performance-0978/tools/prepare_plan_0978_v1.py": "d17352c73346e559fb554b6da1204c1baaf53aa32cd203ac47b4e18181dc6b58",
+      "/home/zhuhe/litchi-performance-0978/tools/reduce_0978_v2.py": "e925755639ccdca3b75ed5b6e64265f711f506b6e6478bcee9a94990ce08521f",
+      "/home/zhuhe/litchi-performance-0978/tools/run_0978_v1.py": "c24da0749dd6d5dd1464e23dffbb9a3650634f0a803ac3a372a6d365cfc9837a"
+    },
+    "unchanged_during_review": true
+  },
+  "status": "pass",
+  "supersedes": {
+    "path": "/home/zhuhe/litchi-performance-0978/review/independent-native-boundary-review-v2.json",
+    "reason": "final pre-capture plan and helper seal now bound; v2 retained unchanged",
+    "sha256": "37d5b1666e67dab8f04dfe5e5b319c83aa03431d2b86bf4fc7e9cd6c19f5eda1"
+  }
+}

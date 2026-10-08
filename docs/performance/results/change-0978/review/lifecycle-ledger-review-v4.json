@@ -1,0 +1,181 @@
+{
+  "bindings": {
+    "author_correction_receipt": {
+      "bytes": 5918,
+      "path": "/home/zhuhe/litchi-performance-0978/review/lifecycle-ledger-author-correction-v3.json",
+      "sha256": "c5d76fc5e612ec56c4daed1de1e46e43a0261004b26b6a737bd2f3895d0e6620"
+    },
+    "child02_integration_output": {
+      "bytes": 6574487,
+      "path": "/home/zhuhe/litchi-performance-0978/analysis/child-02-build-ledger-integration-v3.json",
+      "sha256": "337f48b4c0ce4669e7216e8ce08994821dc00ce21057ad4dfcad53bc6c119016"
+    },
+    "child02_perf_data": {
+      "bytes": 237904472,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf.data",
+      "sha256": "3b929236dc8378e2804d1d7421e0a2f9bfc22fbad7c6f29cc0f8cf1774df22dc"
+    },
+    "child02_raw_dump": {
+      "bytes": 1140014935,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-mmap-dump.txt",
+      "sha256": "06d9529bf1c741e33105e4dd79a86466c64ba84ff8f58cdde8ab2abb8b0b41ce"
+    },
+    "focused_decoder_current_snapshot": {
+      "bytes": 52308,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/focuseddecode_0978.py",
+      "sha256": "c445a8bc622c6b1e30e0886b13ee155985dd5d016b243756634463db9b66e52f"
+    },
+    "lifecycle_controls": {
+      "bytes": 15358,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/test_lifecycle_ledger_0978.py",
+      "sha256": "dab8a3ef52274ef705f6ad01a61d5c19d126ee9b8b6ed278e05671f9695fbca4"
+    },
+    "lifecycle_helper": {
+      "bytes": 56966,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/lifecycle_ledger_0978.py",
+      "sha256": "6296e2dd20f911b2d989f1a8c7b9e337c9a34efc5c0f04831a50111192b9e7d0"
+    },
+    "raw_scanner": {
+      "bytes": 32486,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/raw_stack_0978.py",
+      "sha256": "5f844b82a40426662ffaed5ba21dd0687fefa3f98ecc233dc572eeb3041017b7"
+    },
+    "raw_scanner_controls": {
+      "bytes": 8365,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/test_raw_stack_0978.py",
+      "sha256": "c7b2ce2fe23f2736201444733dfe467ef1f92f42b8dd81a57cb9ec9f8fd96820"
+    },
+    "reducer_current_snapshot": {
+      "bytes": 99085,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/reduce_0978.py",
+      "sha256": "cd2614f672ab346eb2318f979e506c41ea7aec7a38c44663ea9b13d42e9faaf0"
+    }
+  },
+  "created_utc": "2026-10-08T08:34:41.509599+00:00",
+  "decoder_scope_caveat": {
+    "evidence": "focuseddecode_0978.py _make_attributions currently skips descriptors before target COMM_EXEC (the startup row has no attribution), while the lifecycle helper supports pre-exec physical owners. The retained child-02 integration used a separate attribution harness that explicitly handled startup maps.",
+    "required_before_decoder_admission": "Make the production decoder preserve startup physical-owner rows or explicitly document/classify them as unknown, and run the full reducer replay against the frozen decoder output. Marker rows must carry marker IP and map_record_sequence, including physical_unknown/U_marker rows.",
+    "status": "withheld"
+  },
+  "disposition": "The lifecycle helper is ready for the separately owned offline decoder/reducer replay. This is not approval of the focused decoder or a native 0978 GO; the decoder must satisfy the marker/startup contract recorded below.",
+  "earlier_controls_review": {
+    "loss_and_abi": "PASS: raw LOST and LOST_SAMPLES are separate; terminal values must agree; COMM_EXEC, MMAP2 build-id, sample-ID, EXIT/FORK, and THREAD_MAP controls are present.",
+    "map_lifetime_and_phase": "PASS: expected PID/TID maps are sequence-scoped; pre-exec maps remain usable for startup; target COMM_EXEC/PF_X/EXIT are unique and ordered.",
+    "owner_and_marker": "PASS: exact DSO/build/symbol/IP/map sequence and target-source PF_X checks are fail-closed; marker phase/DSO/build/IP/active map are checked.",
+    "raw_framing_and_metadata": "PASS: every framed raw event is fully covered, paired with one descriptor, type/size/body fields are checked, and raw metadata count/offset uniqueness are required.",
+    "sample_identity": "PASS: scanner and lifecycle rows require index, time, PID/TID, CPU, IP, period, bytes, dump line, raw event line, physical offset, and record offset agreement."
+  },
+  "executed_checks": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -B /home/zhuhe/litchi-performance-0978/tools/test_lifecycle_ledger_0978.py",
+      "coverage": "physical offset join, marker unknown conservation, pre-exec owner map, PF_X source eligibility, bootstrap zero trailer, raw LOST_SAMPLES binding, text/raw mutation, THREAD_MAP ABI",
+      "output": "0978 lifecycle ledger controls: PASS",
+      "result": "pass"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -B /home/zhuhe/litchi-performance-0978/tools/test_raw_stack_0978.py",
+      "output": "0978 synthetic scanner controls: PASS",
+      "result": "pass"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -B /home/zhuhe/litchi-performance-0978/tools/test_reduce_0978.py",
+      "output": "0978 reducer controls: PASS",
+      "result": "pass",
+      "scope": "current reducer synthetic controls only; reducer replay remains separately pending"
+    }
+  ],
+  "independent_adversarial_results": [
+    {
+      "probe": "scanner physical_offset incremented by one",
+      "result": "LedgerFailure: sample_identity"
+    },
+    {
+      "probe": "raw type-13 LOST_SAMPLES count 7 versus descriptor count 99",
+      "result": "LedgerFailure: raw_metadata"
+    },
+    {
+      "probe": "all-zero sample-ID trailer on non-bootstrap COMM descriptor",
+      "result": "LedgerFailure: raw_metadata"
+    },
+    {
+      "probe": "target path/build ID on permissions r--p / pf_x=false mapping",
+      "result": "LedgerFailure: owner_binding"
+    },
+    {
+      "probe": "marker decoder attribution synthetic row",
+      "result": "marker_frame contains ip and active map_record_sequence"
+    }
+  ],
+  "integration_evidence": {
+    "attribution": {
+      "marker_rows": 945,
+      "rows": 6871
+    },
+    "ledger": {
+      "D": 7201000000,
+      "M": 945000000,
+      "R": 6256000000,
+      "T": 6788000000,
+      "U_marker": 6000000,
+      "U_target": 50000000,
+      "conservation": {
+        "D_equals_phase_sum": true,
+        "M_equals_known_plus_U_marker": true,
+        "R_equals_D_minus_M": true,
+        "T_equals_known_plus_U_target": true
+      }
+    },
+    "lifecycle": {
+      "raw_event_count": 9191,
+      "raw_lost_sum": 0,
+      "raw_metadata_count": 9191,
+      "raw_metadata_crosscheck": true,
+      "sample_descriptor_count": 7201,
+      "unique_record_offsets": true
+    },
+    "raw_scanner": {
+      "bounds_valid": true,
+      "period_valid": true,
+      "pid_tid_cpu_valid": true,
+      "sample_conservation": true,
+      "sample_count": 7201,
+      "time_valid": true,
+      "violations": []
+    },
+    "source": "author correction v3 and retained child-02 integration v3; no native workload started"
+  },
+  "limitations": [
+    "This receipt approves only lifecycle helper readiness for offline replay.",
+    "The focused decoder and reducer are bound for custody but not approved by this receipt.",
+    "No native capture, workload, build, or retry was performed."
+  ],
+  "schema": "litchi.performance.0978.lifecycle_ledger_review.v4",
+  "scope": "Independent read-only review of the frozen lifecycle helper and its retained child-02 build_ledger integration. No native/perf command, build, workload, or capture was run.",
+  "status": "pass_lifecycle_helper_ready_decoder_contract_pending",
+  "supersedes": {
+    "path": "/home/zhuhe/litchi-performance-0978/review/lifecycle-ledger-review-v3.json",
+    "sha256": "d5b155dafc897127b8b6aba49fa2612653f6a5456bea21fd191a79c8383cf407"
+  },
+  "verified_corrections": [
+    {
+      "finding": "scanner physical_offset now required equal to lifecycle descriptor record_offset; output retains both fields",
+      "id": "L19"
+    },
+    {
+      "finding": "type-13 PERF_RECORD_LOST_SAMPLES decodes u64 count at raw offset 8 and compares descriptor text",
+      "id": "L20"
+    },
+    {
+      "finding": "all-zero sample-ID trailer is restricted to exact initial non-exec perf-exec, time=0, cpu=0 bootstrap; later lifecycle records require nonzero identity trailer",
+      "id": "L21"
+    },
+    {
+      "finding": "target-source eligibility and marker map linkage require an executable PF_X active map",
+      "id": "L22"
+    },
+    {
+      "finding": "marker-only physical_unknown attributions preserve M/U_marker; marker IP and map sequence are bound",
+      "id": "L18/L23"
+    }
+  ]
+}

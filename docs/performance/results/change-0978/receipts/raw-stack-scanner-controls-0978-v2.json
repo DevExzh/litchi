@@ -1,0 +1,227 @@
+{
+  "created_utc": "2026-10-08T08:02:28.840070+00:00",
+  "replay_tool": {
+    "bytes": 3801,
+    "path": "/home/zhuhe/litchi-performance-0978/tools/replay_raw_stack_0978.py",
+    "sha256": "3888932603ad41a15b0542a095c54d4e8cc4aa6bf361ae7113725b072f22348e"
+  },
+  "retained_replay": {
+    "children": [
+      {
+        "bounds_valid": true,
+        "child": 1,
+        "inputs": {
+          "dump": {
+            "bytes": 1139326734,
+            "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-01/child-01.perf-mmap-dump.txt",
+            "sha256": "d2fcdd02073d07ae0e08130eae07f4c065713648bbadc3c073bae05776929f85"
+          },
+          "evlist": {
+            "bytes": 499,
+            "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-01/child-01.perf-evlist-v.txt",
+            "sha256": "29f2a64536a635ac827b283009f72855d998151954c3000f867cbeaf8b8058af"
+          },
+          "launch": {
+            "bytes": 1106,
+            "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-01/child-01.launch.json",
+            "sha256": "6c5c25ff0dffd6ef3ea8055d3a89793818071761978f99e5405307dbd73c3b46"
+          },
+          "perf_data": {
+            "bytes": 237785552,
+            "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-01/child-01.perf.data",
+            "sha256": "ba3d8834e670f6189c7d8e4e7dd8c985f32d62ebcc9724b08e46876db3152e3c"
+          },
+          "report": {
+            "bytes": 292296,
+            "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-01/child-01.report.json",
+            "sha256": "5feff2a4ab527e22e994e569d9c20778f1486ca2d81047e6b4e5c586283e5add"
+          },
+          "terminal": {
+            "bytes": 2618,
+            "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-01/child-01.terminal.json",
+            "sha256": "0611c23bb7010fb468d0f2d58449456318548de76a14c2e90e122fc8d526e963"
+          }
+        },
+        "mode_counts": {
+          "kernel": 32,
+          "user": 7168
+        },
+        "mode_missing_unwindability_counts": {
+          "kernel": 32,
+          "user": 7168
+        },
+        "period_valid": true,
+        "physical_identity_valid": true,
+        "physical_location_count": 8050,
+        "pid_tid_cpu_valid": true,
+        "raw_event_count": 8050,
+        "raw_sample_record_count": 7200,
+        "raw_unconsumed_count": 850,
+        "regs_abi_counts": {
+          "64": 7200
+        },
+        "sample_conservation": true,
+        "sample_count": 7200,
+        "stack_shape_counts": {
+          "nonzero": 7200
+        },
+        "status": "complete",
+        "time_valid": true,
+        "violations": []
+      },
+      {
+        "bounds_valid": true,
+        "child": 2,
+        "inputs": {
+          "dump": {
+            "bytes": 1140014935,
+            "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-02/child-02.perf-mmap-dump.txt",
+            "sha256": "7bc5c5d1710bc03c7b72b8962febfe5733e152516259ba7d94f7b5b3ad7f08bb"
+          },
+          "evlist": {
+            "bytes": 499,
+            "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-02/child-02.perf-evlist-v.txt",
+            "sha256": "29f2a64536a635ac827b283009f72855d998151954c3000f867cbeaf8b8058af"
+          },
+          "launch": {
+            "bytes": 1106,
+            "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-02/child-02.launch.json",
+            "sha256": "96c6ffaab2a0100cd0f11aa2a065986fb6c9e3d6d44209c88a3cdc8d7833fb5a"
+          },
+          "perf_data": {
+            "bytes": 237904472,
+            "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-02/child-02.perf.data",
+            "sha256": "3b929236dc8378e2804d1d7421e0a2f9bfc22fbad7c6f29cc0f8cf1774df22dc"
+          },
+          "report": {
+            "bytes": 292296,
+            "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-02/child-02.report.json",
+            "sha256": "c28abb5f47fdef1353edd3c4da11572376fd69462b2e19c739cb2b55515e8bbf"
+          },
+          "terminal": {
+            "bytes": 2618,
+            "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-02/child-02.terminal.json",
+            "sha256": "24d96015d18e117c3772045fc4f9b7b97cc9e60936988b3d6680f6f1e7ba91e5"
+          }
+        },
+        "mode_counts": {
+          "kernel": 56,
+          "user": 7145
+        },
+        "mode_missing_unwindability_counts": {
+          "kernel": 56,
+          "user": 7145
+        },
+        "period_valid": true,
+        "physical_identity_valid": true,
+        "physical_location_count": 9191,
+        "pid_tid_cpu_valid": true,
+        "raw_event_count": 9191,
+        "raw_sample_record_count": 7201,
+        "raw_unconsumed_count": 1990,
+        "regs_abi_counts": {
+          "64": 7200,
+          "NONE": 1
+        },
+        "sample_conservation": true,
+        "sample_count": 7201,
+        "stack_shape_counts": {
+          "nonzero": 7200,
+          "zero": 1
+        },
+        "status": "complete",
+        "time_valid": true,
+        "violations": []
+      }
+    ],
+    "commands": [
+      "PYTHONDONTWRITEBYTECODE=1 python3 tools/replay_raw_stack_0978.py --child 1 --output receipts/replay-0977-child01-v2.json",
+      "PYTHONDONTWRITEBYTECODE=1 python3 tools/replay_raw_stack_0978.py --child 2 --output receipts/replay-0977-child02-v2.json"
+    ],
+    "execution_output_tool_bindings": [
+      {
+        "bytes": 3739,
+        "path": "/home/zhuhe/litchi-performance-0978/tools/replay_raw_stack_0978.py",
+        "sha256": "db33ff4c1179a2f221cab0e5fbe6d8c961adb4e37fdfbd52939d446f60033980"
+      },
+      {
+        "bytes": 3739,
+        "path": "/home/zhuhe/litchi-performance-0978/tools/replay_raw_stack_0978.py",
+        "sha256": "db33ff4c1179a2f221cab0e5fbe6d8c961adb4e37fdfbd52939d446f60033980"
+      }
+    ],
+    "outputs": [
+      {
+        "bytes": 6852,
+        "path": "/home/zhuhe/litchi-performance-0978/receipts/replay-0977-child01-v2.json",
+        "sha256": "608a15c5c956943b786217e10b8062283b358d132db757c0cb52dc508122e7fd"
+      },
+      {
+        "bytes": 6916,
+        "path": "/home/zhuhe/litchi-performance-0978/receipts/replay-0977-child02-v2.json",
+        "sha256": "c90bb3412ddff092b9e96e40f14656cf2df3e10e043fe939ffe6d82220409328"
+      }
+    ],
+    "replay_tool_at_execution": {
+      "bytes": 3739,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/replay_raw_stack_0978.py",
+      "sha256": "db33ff4c1179a2f221cab0e5fbe6d8c961adb4e37fdfbd52939d446f60033980"
+    },
+    "replay_tool_current": {
+      "bytes": 3801,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/replay_raw_stack_0978.py",
+      "sha256": "3888932603ad41a15b0542a095c54d4e8cc4aa6bf361ae7113725b072f22348e"
+    },
+    "source_binding_at_replay": {
+      "bytes": 32486,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/raw_stack_0978.py",
+      "sha256": "5f844b82a40426662ffaed5ba21dd0687fefa3f98ecc233dc572eeb3041017b7"
+    }
+  },
+  "scanner": {
+    "bytes": 32486,
+    "path": "/home/zhuhe/litchi-performance-0978/tools/raw_stack_0978.py",
+    "sha256": "5f844b82a40426662ffaed5ba21dd0687fefa3f98ecc233dc572eeb3041017b7"
+  },
+  "schema": "litchi.performance.0978.raw_stack_controls.v2",
+  "semantics": {
+    "conservation": "all raw records are counted; every PERF_RECORD_SAMPLE raw record must pair to exactly one decoded sample line",
+    "identity": "raw location path+offset is retained and duplicate physical offsets are rejected when location lines are present",
+    "new_build": false,
+    "new_capture": false,
+    "new_workload": false,
+    "offline_only": true,
+    "regs_user": "ABI_NONE consumes only ABI u64; ABI_32/ABI_64 consume popcount(regs_user_mask) u64 values",
+    "sample_serialization": "fixed kernel order IP,TID,TIME,CPU,PERIOD,CALLCHAIN,REGS_USER,STACK_USER; evlist display order is not used",
+    "source": "Linux UAPI /usr/include/linux/perf_event.h bound by runtime SHA; conditional rules cited to https://raw.githubusercontent.com/torvalds/linux/v6.12/tools/perf/util/evsel.c",
+    "stack_user": "size zero consumes no dynamic-size trailer; nonzero consumes exactly size bytes followed immediately by u64 dyn_size, with no alignment inserted",
+    "unwindability": "payload presence and missing fields are descriptive; no unwind or owner claim is made"
+  },
+  "status": "pass",
+  "supersedes": {
+    "path": "/home/zhuhe/litchi-performance-0978/receipts/raw-stack-scanner-controls-0978-v1.json",
+    "sha256": "1d340cd1e171e17c4d7f5a2f3691005177e6ffac8d7ab36910b1ffa23d17baeb"
+  },
+  "tests": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 tools/test_raw_stack_0978.py",
+      "name": "focused_synthetic_controls",
+      "result": "PASS",
+      "source": {
+        "bytes": 8365,
+        "path": "/home/zhuhe/litchi-performance-0978/tools/test_raw_stack_0978.py",
+        "sha256": "c7b2ce2fe23f2736201444733dfe467ef1f92f42b8dd81a57cb9ec9f8fd96820"
+      }
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 tests/independent_raw_stack_tests_v1.py",
+      "name": "independent_mutation_controls",
+      "result": "10 tests PASS",
+      "source": {
+        "bytes": 18651,
+        "path": "/home/zhuhe/litchi-performance-0978/tests/independent_raw_stack_tests_v1.py",
+        "sha256": "bb3e98178dc66821335f34eab0717dac8e7e006a2607ad11625122a1ad4f1295"
+      }
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "/usr/bin/python3.14",
+    "-B",
+    "/home/zhuhe/litchi-performance-0978/tools/run_0978_v1.py",
+    "--run",
+    "--plan",
+    "/home/zhuhe/litchi-performance-0978/plans/plan-0978-v3.json",
+    "--go",
+    "/home/zhuhe/litchi-performance-0978/receipts/root-go-0978-office-v1.json"
+  ],
+  "finished_utc": "2026-10-08T09:47:18.338929+00:00",
+  "log": {
+    "bytes": 1650,
+    "path": "/home/zhuhe/litchi-performance-0978/receipts/root-office-run-0978-v1.log",
+    "sha256": "3209af17a9a2d3e5633c52689d10407572e698546f10035879f70aae4b093de3"
+  },
+  "no_retry": true,
+  "returncode": 2,
+  "started_utc": "2026-10-08T09:37:30.615784+00:00"
+}

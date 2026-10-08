@@ -1,0 +1,11 @@
+--- /home/zhuhe/litchi-performance-0978/tools/reduce_0978_v2.py
++++ /home/zhuhe/litchi-performance-0978/tools/reduce_0978_v4.py
+@@ -1582,7 +1582,7 @@
+             "K": known, "T": t, "U_target": unknown,
+             "lower": known / t if t else 0.0,
+             "upper": (known + unknown) / t if t else 0.0,
+-            "scope": "known physical-leaf period in target execution across all mapped DSOs; U_target is unresolved/unknown physical-owner period; bounds are per-owner and non-additive",
++            "scope": "target-source eligible physical-leaf period; unknown target period is shared bound mass; bounds are per-owner and non-additive",
+         }
+     return result
+ 

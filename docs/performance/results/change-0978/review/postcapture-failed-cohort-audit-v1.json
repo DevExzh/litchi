@@ -1,0 +1,589 @@
+{
+  "children": {
+    "child-01": {
+      "affinity_gate": {
+        "active_target_rows": 47,
+        "parent_task_keys": [
+          [
+            3908164,
+            31792976
+          ]
+        ],
+        "passed": true,
+        "post_handoff_rows": 48,
+        "postexit_target_rows": 1,
+        "scope": "bounded sampled observations; raw task stream remains lifetime authority"
+      },
+      "bridge_binding": {
+        "bytes": 2056,
+        "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.bridge.json",
+        "sha256": "2c0974a92e313b21f162eef77e71a6ed9d1f49fefd38219d53e6592c8b570520"
+      },
+      "bridge_native_exec_same_pid": true,
+      "bridge_pid": 3908165,
+      "bridge_recorder_cpu": 30,
+      "bridge_target_cpu": 31,
+      "command_binding": {
+        "bytes": 2379,
+        "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.command.json",
+        "sha256": "2bfb09b42849ecc90cbe9eeec6b57435a40b562a3ef69790bc706b6d37c4b1d9"
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "launch_binding": {
+        "bytes": 1106,
+        "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.launch.json",
+        "sha256": "e797b45da0986c05835c330920ddccd225cd9c95cfda29d1f3754c7f28c1d7a8"
+      },
+      "loss_binding": {
+        "bytes": 213,
+        "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.loss.json",
+        "sha256": "13ecf0abfbfb013cbe46e9760c9f02ab2d518e1be9c6b7ee0a76e1ea5289cc02"
+      },
+      "loss_sidecar": {
+        "raw_lost_record_count": 0,
+        "raw_lost_sum": 0,
+        "raw_scope": "PERF_RECORD_LOST fields; separate from PERF_RECORD_LOST_SAMPLES",
+        "terminal_lost_samples": 0
+      },
+      "native_ld_preload": "absent",
+      "no_retry": true,
+      "packet_binding": {
+        "bytes": 1007612,
+        "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.packet.json",
+        "sha256": "08d8d57962b03801e0e1ccf554f1455f3468ddda4606ffc86c270462d5575b41"
+      },
+      "packet_decoder_gate": {
+        "empty_callchain_count": 0,
+        "minimum_marker_samples": 100,
+        "passed": true,
+        "passed_structural_conservation": true,
+        "raw_lost_sum": 0,
+        "reasons": [],
+        "terminal_lost_samples": 0,
+        "unresolved_frames": 7621,
+        "valid_empty_is_unknown": true
+      },
+      "packet_focused_decoder": {
+        "bytes": 62748,
+        "path": "/home/zhuhe/litchi-performance-0978/tools/focuseddecode_0978_v3.py",
+        "sha256": "9596e246c7c627fb3810e7c6c6d3dda12af58b62477f1f1233654c4256e2dac9"
+      },
+      "packet_plan": {
+        "path": "/home/zhuhe/litchi-performance-0978/plans/plan-0978-v3.json",
+        "schema": "litchi.performance.0978.plan.v1"
+      },
+      "packet_runner_gate": {
+        "affinity": {
+          "active_target_rows": 47,
+          "parent_task_keys": [
+            [
+              3908164,
+              31792976
+            ]
+          ],
+          "passed": true,
+          "post_handoff_rows": 48,
+          "postexit_target_rows": 1,
+          "scope": "bounded sampled observations; raw task stream remains lifetime authority"
+        },
+        "passed": true,
+        "process_group_cleanup": {
+          "checked": true,
+          "passed": true,
+          "status": "gone"
+        },
+        "reasons": []
+      },
+      "packet_status": "complete",
+      "packet_summary": {
+        "empty_callchain_count": 0,
+        "marker_period": 955000000,
+        "marker_period_share": 0.1326388888888889,
+        "marker_sample_count": 955,
+        "raw_lost_sum": 0,
+        "sample_count": 7200,
+        "scope": "0978 corrected physical stream plus disjoint lifecycle ledger",
+        "terminal_lost_samples": 0
+      },
+      "perf_data_binding": {
+        "bytes": 237819904,
+        "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.perf.data",
+        "sha256": "528d098d8f2696003b772c9478c41fcc800a6831082e3018e50553229e42ce34"
+      },
+      "process_group_cleanup": {
+        "checked": true,
+        "passed": true,
+        "status": "gone"
+      },
+      "raw_stack_binding": {
+        "bytes": 7697553,
+        "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.raw-stack.json",
+        "sha256": "73fdc9ef5851e3f5c7d62e6ecff22d06af5a33bf2d505974af0939a41ddc7af1"
+      },
+      "raw_stack_summary": {
+        "bounds_valid": true,
+        "expected_cpu": 31,
+        "expected_period": 1000000,
+        "expected_pid": 3908165,
+        "period_valid": true,
+        "physical_identity_valid": true,
+        "pid_tid_cpu_valid": true,
+        "raw_event_count": 8384,
+        "raw_sample_record_count": 7200,
+        "raw_unconsumed_count": 1184,
+        "sample_conservation": true,
+        "sample_count": 7200,
+        "sample_line_count": 7200,
+        "status": "complete",
+        "time_valid": true,
+        "violations": []
+      },
+      "requested_affinity": [
+        31
+      ],
+      "status_binding": {
+        "bytes": 1066,
+        "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.status.json",
+        "sha256": "2b191db148491b08985d8f2bcb713d24cb8fdc837733d3c369ead4f4a9e5e370"
+      },
+      "status_sidecar": "gated",
+      "target_actual_affinity": [
+        31
+      ],
+      "target_exec_pid": 3908165,
+      "terminal_binding": {
+        "bytes": 2618,
+        "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.terminal.json",
+        "sha256": "c22b0c34b2730f00810b5e91c268971cc98ae120e1d5dfa5d421e659bf4f267d"
+      },
+      "terminal_launch_error": false,
+      "terminal_report": {
+        "bytes": 1097,
+        "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.terminal-report.txt",
+        "sha256": "591fb7d5c516276bffab3c22b73a5a20985ea9ac4129a5e0abfc3a8b8624b716"
+      },
+      "terminal_returncode": 0,
+      "terminal_summary": {
+        "bytes": 813,
+        "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.terminal-summary.json",
+        "sha256": "3b0c5310c56b8f0076ac3cbdc0b4cb6a93fd5f60f393036dabb4142573581fdf"
+      },
+      "terminal_summary_lost_samples": 0,
+      "terminal_timed_out": false
+    },
+    "child-02": {
+      "affinity_gate": {
+        "active_target_rows": 43,
+        "parent_task_keys": [
+          [
+            3909341,
+            31812740
+          ]
+        ],
+        "passed": true,
+        "post_handoff_rows": 45,
+        "postexit_target_rows": 2,
+        "scope": "bounded sampled observations; raw task stream remains lifetime authority"
+      },
+      "bridge_binding": {
+        "bytes": 2056,
+        "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.bridge.json",
+        "sha256": "adf3a648ba6fb6e0021eabf27f711f8688ff8c071831e3b44d8b7d7f812e23c6"
+      },
+      "bridge_native_exec_same_pid": true,
+      "bridge_pid": 3909342,
+      "bridge_recorder_cpu": 30,
+      "bridge_target_cpu": 31,
+      "command_binding": {
+        "bytes": 2379,
+        "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.command.json",
+        "sha256": "da6b0f728646dd66911776fd8d758b09db0def9164393dfa3ff33dade9cf31b6"
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "launch_binding": {
+        "bytes": 1106,
+        "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.launch.json",
+        "sha256": "cf1ce3d5e2395a8539661aece0dea44eb83907eb0ceb368b1003165a8a086e75"
+      },
+      "loss_binding": {
+        "bytes": 213,
+        "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.loss.json",
+        "sha256": "13ecf0abfbfb013cbe46e9760c9f02ab2d518e1be9c6b7ee0a76e1ea5289cc02"
+      },
+      "loss_sidecar": {
+        "raw_lost_record_count": 0,
+        "raw_lost_sum": 0,
+        "raw_scope": "PERF_RECORD_LOST fields; separate from PERF_RECORD_LOST_SAMPLES",
+        "terminal_lost_samples": 0
+      },
+      "native_ld_preload": "absent",
+      "no_retry": true,
+      "packet_binding": {
+        "bytes": 999873,
+        "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.packet.json",
+        "sha256": "30cf5f4340eb3182cc4986d781bda701d4898e40f12039c05e6068374094ab58"
+      },
+      "packet_decoder_gate": {
+        "empty_callchain_count": 52,
+        "minimum_marker_samples": 100,
+        "passed": true,
+        "passed_structural_conservation": true,
+        "raw_lost_sum": 0,
+        "reasons": [],
+        "terminal_lost_samples": 0,
+        "unresolved_frames": 6018,
+        "valid_empty_is_unknown": true
+      },
+      "packet_focused_decoder": {
+        "bytes": 62748,
+        "path": "/home/zhuhe/litchi-performance-0978/tools/focuseddecode_0978_v3.py",
+        "sha256": "9596e246c7c627fb3810e7c6c6d3dda12af58b62477f1f1233654c4256e2dac9"
+      },
+      "packet_plan": {
+        "path": "/home/zhuhe/litchi-performance-0978/plans/plan-0978-v3.json",
+        "schema": "litchi.performance.0978.plan.v1"
+      },
+      "packet_runner_gate": {
+        "affinity": {
+          "active_target_rows": 43,
+          "parent_task_keys": [
+            [
+              3909341,
+              31812740
+            ]
+          ],
+          "passed": true,
+          "post_handoff_rows": 45,
+          "postexit_target_rows": 2,
+          "scope": "bounded sampled observations; raw task stream remains lifetime authority"
+        },
+        "passed": true,
+        "process_group_cleanup": {
+          "checked": true,
+          "passed": true,
+          "status": "gone"
+        },
+        "reasons": []
+      },
+      "packet_status": "complete",
+      "packet_summary": {
+        "empty_callchain_count": 52,
+        "marker_period": 950000000,
+        "marker_period_share": 0.13192612137203166,
+        "marker_sample_count": 950,
+        "raw_lost_sum": 0,
+        "sample_count": 7201,
+        "scope": "0978 corrected physical stream plus disjoint lifecycle ledger",
+        "terminal_lost_samples": 0
+      },
+      "perf_data_binding": {
+        "bytes": 237867856,
+        "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.perf.data",
+        "sha256": "a62de67e4db3aaf08acfcbb2c27a124f516bc4a7947ea8de8d3b8e77a78216d6"
+      },
+      "process_group_cleanup": {
+        "checked": true,
+        "passed": true,
+        "status": "gone"
+      },
+      "raw_stack_binding": {
+        "bytes": 7698412,
+        "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.raw-stack.json",
+        "sha256": "d1a172a4e4d6c02eefb9a300277f71133bdb74e7fc71709b4f9b4bf4fa7e2e87"
+      },
+      "raw_stack_summary": {
+        "bounds_valid": true,
+        "expected_cpu": 31,
+        "expected_period": 1000000,
+        "expected_pid": 3909342,
+        "period_valid": true,
+        "physical_identity_valid": true,
+        "pid_tid_cpu_valid": true,
+        "raw_event_count": 8525,
+        "raw_sample_record_count": 7201,
+        "raw_unconsumed_count": 1324,
+        "sample_conservation": true,
+        "sample_count": 7201,
+        "sample_line_count": 7201,
+        "status": "complete",
+        "time_valid": true,
+        "violations": []
+      },
+      "requested_affinity": [
+        31
+      ],
+      "status_binding": {
+        "bytes": 1067,
+        "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.status.json",
+        "sha256": "ca8f8c3e2bc6afbfc4312b6f4461e38916df142eaec31647efe52f76a1d54931"
+      },
+      "status_sidecar": "gated",
+      "target_actual_affinity": [
+        31
+      ],
+      "target_exec_pid": 3909342,
+      "terminal_binding": {
+        "bytes": 2618,
+        "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.terminal.json",
+        "sha256": "d1af2010022fb7eaf738dc587eb4e5fb62f203aaf20b031554aab7c1cbb0a275"
+      },
+      "terminal_launch_error": false,
+      "terminal_report": {
+        "bytes": 3399,
+        "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.terminal-report.txt",
+        "sha256": "4df4905a847a2c4e6ed6129708cdeeb8ead9b8eeb4c7f8fefca2129da39f9245"
+      },
+      "terminal_returncode": 0,
+      "terminal_summary": {
+        "bytes": 813,
+        "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.terminal-summary.json",
+        "sha256": "7eca0d2225ef6d3143f2046ef60621fe76e257d95d75bb75defb901601003f41"
+      },
+      "terminal_summary_lost_samples": 0,
+      "terminal_timed_out": false
+    },
+    "child-03": {
+      "affinity_gate": {
+        "active_target_rows": 57,
+        "parent_task_keys": [
+          [
+            3910596,
+            31832833
+          ]
+        ],
+        "passed": true,
+        "post_handoff_rows": 59,
+        "postexit_target_rows": 2,
+        "scope": "bounded sampled observations; raw task stream remains lifetime authority"
+      },
+      "bridge_binding": {
+        "bytes": 2056,
+        "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.bridge.json",
+        "sha256": "260cf14887eb3f7dadbe00c0da4763f4dd26ac55d3b8106923a5016734dca5c8"
+      },
+      "bridge_native_exec_same_pid": true,
+      "bridge_pid": 3910597,
+      "bridge_recorder_cpu": 30,
+      "bridge_target_cpu": 31,
+      "command_binding": {
+        "bytes": 2379,
+        "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.command.json",
+        "sha256": "328f46707ade730636cee4262a777d07040457eff729496b88458f9fc35d441c"
+      },
+      "cwd": "/home/zhuhe/code/litchi",
+      "launch_binding": {
+        "bytes": 1106,
+        "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.launch.json",
+        "sha256": "a3b782a4b2b7bb846271808a3236b70f387e6f6f0494220a9d5565116f4b5041"
+      },
+      "native_ld_preload": "absent",
+      "no_retry": true,
+      "process_group_cleanup": {
+        "checked": true,
+        "passed": true,
+        "status": "gone"
+      },
+      "requested_affinity": [
+        31
+      ],
+      "status_binding": {
+        "bytes": 195,
+        "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.status.json",
+        "sha256": "093455f77850072f4389ece28251ff89ef94f9e0d69fe76a866271cec6933360"
+      },
+      "status_sidecar": "decoder_failure",
+      "target_actual_affinity": [
+        31
+      ],
+      "target_exec_pid": 3910597,
+      "terminal_binding": {
+        "bytes": 2618,
+        "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.terminal.json",
+        "sha256": "350116e6ad093020423ea92565f1253b84f90e93fdde31ffd3b77a214be6ca07"
+      },
+      "terminal_launch_error": false,
+      "terminal_report": {
+        "bytes": 1727,
+        "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.terminal-report.txt",
+        "sha256": "995e4800cce2481b6ef397ed307bf841fd88a9ccef3c4147c97558135b19c3ab"
+      },
+      "terminal_returncode": 0,
+      "terminal_summary": {
+        "bytes": 813,
+        "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.terminal-summary.json",
+        "sha256": "dc36942a5ffab25ef25c913932c0aa98b63af38250fdfc123b6ebf8b76d8dab5"
+      },
+      "terminal_summary_lost_samples": 4,
+      "terminal_timed_out": false
+    }
+  },
+  "created_utc": "2026-10-08T09:49:33.699346+00:00",
+  "custody_and_cleanup": {
+    "child-01": {
+      "packet_and_gates_passed": true,
+      "process_group_cleanup": "gone",
+      "raw_loss": 0,
+      "recorder_parent_cpu_after_handoff": 30,
+      "target_cpu": 31,
+      "target_pid": 3908165,
+      "terminal_loss": 0
+    },
+    "child-02": {
+      "packet_and_gates_passed": true,
+      "process_group_cleanup": "gone",
+      "raw_loss": 0,
+      "recorder_parent_cpu_after_handoff": 30,
+      "target_cpu": 31,
+      "target_pid": 3909342,
+      "terminal_loss": 0
+    },
+    "child-03": {
+      "decoder_gate": "failed_loss_gate",
+      "native_terminal_returncode": 0,
+      "packet_emitted": false,
+      "process_group_cleanup": "gone",
+      "recorder_parent_cpu_after_handoff": 30,
+      "retry": false,
+      "target_cpu": 31,
+      "target_pid": 3910597
+    },
+    "cleanup_basis": "per-child terminal process_group_cleanup fields; no broad host quiescence claim",
+    "host_idle_claim": false,
+    "post_failure_children_04_12_launched": false
+  },
+  "decision": "reject_cohort_incomplete_no_retry",
+  "limitations": [
+    "Only child-01 and child-02 have complete packets; they cannot be treated as a 12-child cohort.",
+    "Child-03 raw loss evidence is bounded to explicit PERF_RECORD_LOST and PERF_RECORD_LOST_SAMPLES lines in the retained perf script dump; no full raw reparse was performed.",
+    "No attribution ranking, optimization decision, timing comparison, or causal claim is admitted.",
+    "The raw loss total and terminal total are duplicate views of the same loss quantity for accounting purposes and must not be summed."
+  ],
+  "loss_accounting": {
+    "accounting_rule": "PERF_RECORD_LOST sum and PERF_RECORD_LOST_SAMPLES terminal total are separate fields; the matching value 4 is not added to 4.",
+    "child": "child-03",
+    "decoder_failure_reason": "loss_gate: raw or terminal loss is nonzero",
+    "raw_dump": {
+      "bytes": 1139402935,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.perf-mmap-dump.txt",
+      "sha256": "b5cc077ade40b1931efcc9746b7f0b918ed5966d1974fb93b0a363f8c75cf7fb"
+    },
+    "raw_lost_record_count": 2,
+    "raw_lost_sum": 4,
+    "raw_lost_values": [
+      1,
+      3
+    ],
+    "raw_record_lines": [
+      {
+        "byte_offset": 125602702,
+        "text": "31 318327226538470 0x18d1f38 [0x30]: PERF_RECORD_LOST: id:5320: lost:1"
+      },
+      {
+        "byte_offset": 125605928,
+        "text": "31 318327228629879 0x18d20a8 [0x30]: PERF_RECORD_LOST: id:5320: lost:3"
+      },
+      {
+        "byte_offset": 1125957249,
+        "text": "0 0 0xe2b1a38 [0x28]: PERF_RECORD_LOST_SAMPLES: id:18446744073709551615: lost samples :4"
+      }
+    ],
+    "reconciles": true,
+    "terminal_lost_samples": 4,
+    "terminal_lost_samples_record_count": 1,
+    "terminal_lost_samples_values": [
+      4
+    ],
+    "terminal_report_declared_total": 4
+  },
+  "manifest": {
+    "children_completed_packets": 2,
+    "children_requested": 12,
+    "failure": {
+      "child": 3,
+      "error": "child-03: decoder failed: loss_gate: raw or terminal loss is nonzero",
+      "no_retry": true,
+      "type": "RunnerError"
+    },
+    "interpretation": "children_completed is the count of emitted packet files; child-03 was attempted and stopped before packet/loss/raw-stack sidecars were written.",
+    "mode": "office",
+    "no_retry": true,
+    "packets": [
+      "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.packet.json",
+      "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.packet.json"
+    ],
+    "schema": "litchi.performance.0978.capture_manifest.v1",
+    "serial": true,
+    "status": "failed"
+  },
+  "reduction_disposition": {
+    "expected_disposition": "cohort_incomplete rejection after child-03 loss gate; no workaround or retry",
+    "interpretation": "The reducer correctly rejected the incomplete manifest before raw parsing and emitted no cohort output.",
+    "output_exists": false,
+    "raw_parse": false,
+    "receipt": {
+      "bytes": 2833,
+      "path": "/home/zhuhe/litchi-performance-0978/analysis/instruction-profile-reduction-v1-receipt.json",
+      "sha256": "883316ec1d4ad7223ebb6245d56f6f3908afe1f681c2d58905238cbb7fc76234"
+    },
+    "returncode": 2,
+    "status": "rejected"
+  },
+  "schema": "litchi.performance.0978.postcapture_failed_cohort_audit.v1",
+  "scope": {
+    "causality_or_performance_claim": false,
+    "full_raw_reparse": false,
+    "native_capture_started": true,
+    "native_workload_started": true,
+    "perf_record_invoked_by_root": true,
+    "review": "bounded native custody, loss accounting, child stop, and cleanup audit",
+    "source_optimization_claim": false
+  },
+  "source_bindings": {
+    "capture_manifest": {
+      "bytes": 1035,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/capture-manifest.json",
+      "sha256": "f0bef5ff1cbd9eae486314ea076457736bbecee60c75e1b7b0792cfde94bca25"
+    },
+    "decoder_v3": {
+      "bytes": 62748,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/focuseddecode_0978_v3.py",
+      "sha256": "9596e246c7c627fb3810e7c6c6d3dda12af58b62477f1f1233654c4256e2dac9"
+    },
+    "helper_seal": {
+      "bytes": 6649,
+      "path": "/home/zhuhe/litchi-performance-0978/receipts/helper-seal-0978-v3.json",
+      "sha256": "a9735d56b4a73fab0ef8e6f14a2e05b19813e686c99e850283c06f4c2c8281fe"
+    },
+    "plan": {
+      "bytes": 31010,
+      "path": "/home/zhuhe/litchi-performance-0978/plans/plan-0978-v3.json",
+      "sha256": "9849dfd914463db998f02df7505db85ff02eb84215143d4ac1e67af267fa6424"
+    },
+    "raw_scanner": {
+      "bytes": 32486,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/raw_stack_0978.py",
+      "sha256": "5f844b82a40426662ffaed5ba21dd0687fefa3f98ecc233dc572eeb3041017b7"
+    },
+    "reducer_v4": {
+      "bytes": 104834,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/reduce_0978_v4.py",
+      "sha256": "1c40193d0debcea9feb696d82f029cc058b10e39e20ceb2183e2444223fc756c"
+    },
+    "reduction_attempt": {
+      "bytes": 2833,
+      "path": "/home/zhuhe/litchi-performance-0978/analysis/instruction-profile-reduction-v1-receipt.json",
+      "sha256": "883316ec1d4ad7223ebb6245d56f6f3908afe1f681c2d58905238cbb7fc76234"
+    },
+    "root_go": {
+      "bytes": 2466,
+      "path": "/home/zhuhe/litchi-performance-0978/receipts/root-go-0978-office-v1.json",
+      "sha256": "94cb8410778ba388cb3a7c80f5086b8fc080c21a62b7dcda5ffbc72c4fd4a789"
+    },
+    "runner_v1": {
+      "bytes": 48826,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/run_0978_v1.py",
+      "sha256": "c24da0749dd6d5dd1464e23dffbb9a3650634f0a803ac3a372a6d365cfc9837a"
+    }
+  },
+  "status": "failed_cohort_audited_no_admission"
+}

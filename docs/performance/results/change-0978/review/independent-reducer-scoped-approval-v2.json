@@ -1,0 +1,86 @@
+{
+  "created_utc": "2026-10-08T09:25:23.546556+00:00",
+  "fresh_packet_validation": {
+    "checks_passed": 23,
+    "child": "child-02",
+    "cohort_admitted": false,
+    "native_actions": {
+      "build": false,
+      "recording": false,
+      "workload": false
+    },
+    "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/packet-validation-v4.json",
+    "raw_dump_scanner_rerun": false,
+    "reducer_binding_sha256": "e925755639ccdca3b75ed5b6e64265f711f506b6e6478bcee9a94990ce08521f",
+    "required_failures": 0,
+    "sha256": "a970f7309ab455c74a73b80c9ff7d99fcd2859b8ba05801aaf8c6f3a59643aab",
+    "source_inputs_stable_before_after": true,
+    "status": "pass"
+  },
+  "independent_mutation_controls": {
+    "accepted_invalid_count": 0,
+    "baseline": "PASS",
+    "path": "/home/zhuhe/litchi-performance-0978/tests/independent_reducer_mutation_tests_v2.py",
+    "rejected_mutations": [
+      "per-child D/M/R conservation",
+      "required lifecycle D/M/R/T/unknown ledger fields",
+      "attribution owner proof requires full frames",
+      "target source eligibility is explicit",
+      "raw reparse compares full raw census",
+      "lifecycle reparse compares sample identities",
+      "packet plan binding is required"
+    ],
+    "sha256": "51df072987a4c4525d9984a931fdce8d0e47b80b7b87dca9fed5047ac2285082",
+    "unexpected_exception_count": 0
+  },
+  "ip_and_frame_controls": {
+    "alphabetic_token": "e59f0 -> 0xe59f0",
+    "full_frame_mutations": {
+      "frame_order": "rejected",
+      "ip": "rejected",
+      "symbol_base": "rejected"
+    },
+    "numeric_token": "591928 -> 0x591928",
+    "self_test": "PASS",
+    "symbol_base_owner": "PASS",
+    "text_parser_frame_ips": "PASS"
+  },
+  "limitations": [
+    "The packet validation is an offline retained-capture bridge and does not admit a native 0978 cohort.",
+    "No perf, build, workload, raw-stream reparse, speed, timing, optimization, or causal-owner claim follows."
+  ],
+  "schema": "litchi.performance.0978.independent_reducer_scoped_approval.v2",
+  "scope": {
+    "cohort_go": false,
+    "kind": "scoped reducer v2 readiness",
+    "native_capture_claim": false,
+    "qualification_claim": false,
+    "raw_reparse_performed_this_review": false
+  },
+  "source": {
+    "before_after_hash_equal": true,
+    "bytes": 104870,
+    "lineage": "final v2 candidate; explicit base-16 perf IP parser and corrected Tknown/U_target labels",
+    "path": "/home/zhuhe/litchi-performance-0978/tools/reduce_0978_v2.py",
+    "sha256": "e925755639ccdca3b75ed5b6e64265f711f506b6e6478bcee9a94990ce08521f"
+  },
+  "status": "pass",
+  "summary_bridge_controls": {
+    "allowlisted_lifecycle_unknown_period": "accepted and retained for downstream claim checks",
+    "forbidden_extra_summary_key": "rejected with decoder_summary_contract",
+    "labels": {
+      "Tknown": "known physical-leaf period in target execution across all mapped DSOs",
+      "U_target": "target execution period without a defensible physical owner"
+    },
+    "retained_0977_callset": [
+      "base._packet_artifacts",
+      "base._check_launch_terminal",
+      "base._check_report",
+      "base._check_layout",
+      "base._check_loss",
+      "base.p.parse_perf_script_strict",
+      "_compare_legacy_decoder_summary",
+      "base._check_final_log"
+    ]
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "command": {
+    "argv": [
+      "/usr/bin/perf",
+      "script",
+      "--show-lost-events",
+      "--no-inline",
+      "-F",
+      "cpu,pid,tid,time,event,period,ip,sym,symoff,dso",
+      "-i",
+      "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf.data"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "elapsed_ms": 714.819,
+    "environment": {
+      "LANG": "C",
+      "LC_ALL": "C",
+      "LD_PRELOAD": "/home/zhuhe/litchi-performance-0976/tools/dwfl_dynamic_shim_0976_cache_final_v2.so",
+      "LITCHI_0973_CORRECTED_BASE": "0x5610fab1f000",
+      "LITCHI_0973_PERF_EXPECTED_START": "0x5610fab20000",
+      "LITCHI_0973_SHIM_LOG": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.corrected.dwfl.jsonl",
+      "LITCHI_0973_SHIM_MODE": "corrected",
+      "LITCHI_0973_TARGET_NAME": "doc_retention_probe_0942_cfb_profile",
+      "LITCHI_0973_TARGET_PATH": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "LITCHI_0976_EXPECTED_DELTA": "0x1000",
+      "LITCHI_0976_TARGET_BUILD_ID": "e5c457384eeebd057932c444efda77618f137399",
+      "LITCHI_0976_TARGET_SHA256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb",
+      "PATH": "/usr/bin:/bin",
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "TZ": "UTC"
+    },
+    "finished_utc": "2026-10-08T07:48:52.058210+00:00",
+    "name": "corrected_script",
+    "returncode": 0,
+    "shim_log": {
+      "bytes": 221387538,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.corrected.dwfl.jsonl",
+      "sha256": "a8a53430500b75ba697bc2e65b42f90ff4f9524ffa8d2ab0ba7d722742be9d39"
+    },
+    "started_utc": "2026-10-08T07:48:51.343357+00:00",
+    "stderr": {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.corrected.perf.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout": {
+      "bytes": 11598818,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.corrected.perf-script-no-inline.txt",
+      "sha256": "371eee38919ec71a916c0a386c2b289d4dd82ff1f2c4932f3c47e050965b8338"
+    }
+  },
+  "created_utc": "2026-10-08T07:48:52.058210+00:00",
+  "native_actions": {
+    "build": false,
+    "recording": false,
+    "workload": false
+  },
+  "preflight": {
+    "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/receipts/offline-custody-and-perf-script-v1.json",
+    "sha256": "9440e2473c26f35ccc12a7f471312c5b2917822bcbb6352a1fc935eed575d37b"
+  },
+  "schema": "litchi.performance.0978.corrected_perf_script_run.v1",
+  "scope": "one direct offline perf script invocation against retained child-02 perf.data with exact final 0976 shim; no native workload",
+  "status": "pass"
+}

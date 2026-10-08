@@ -1,0 +1,52 @@
+{
+  "schema": "litchi.performance.0978.dependency_pointer.v1",
+  "status": "sealed_external_dependency_pointer",
+  "purpose": "Reference immutable 0977 plan, decoder, raw captures, and binary custody without duplicating prior helpers or receipts.",
+  "source_packet": {
+    "path": "docs/performance/results/change-0977",
+    "manifest_path": "docs/performance/results/change-0977/packet-manifest-0977-v1.json",
+    "manifest_sha256": "86412a14687bd4aa4276a4eb54bf1bee7bb9d07ea3d35cdd3a0546ffd42b6021",
+    "external_descriptor_path": "docs/performance/results/change-0977/provenance/external-artifact-descriptor-final-v1.json",
+    "external_descriptor_sha256": "12cb620e141cea7c5332ce98dbe7d97b23bb93b10b4ffa15770c6791af54ffae"
+  },
+  "reused_bindings": {
+    "plan": {
+      "path": "/home/zhuhe/litchi-performance-0977/plans/plan-0977-v2.json",
+      "bytes": 17335,
+      "sha256": "12abb6239a7f14a82a84e87306deffca4231c83377bf19a123cfb503a3684a1c"
+    },
+    "focused_decoder": {
+      "path": "/home/zhuhe/litchi-performance-0977/tools/focuseddecode_0977_v2.py",
+      "bytes": 67772,
+      "sha256": "31184f1dc044022f262def181af909bf987c04936e1f926acd73f2c10e46e23c"
+    },
+    "target_binary": {
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "bytes": 47909224,
+      "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+    },
+    "child01_perf_data": {
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-01/child-01.perf.data",
+      "bytes": 237785552,
+      "sha256": "ba3d8834e670f6189c7d8e4e7dd8c985f32d62ebcc9724b08e46876db3152e3c"
+    },
+    "child02_perf_data": {
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-02/child-02.perf.data",
+      "bytes": 237904472,
+      "sha256": "3b929236dc8378e2804d1d7421e0a2f9bfc22fbad7c6f29cc0f8cf1774df22dc"
+    },
+    "child02_mmap_dump": {
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-02/child-02.perf-mmap-dump.txt",
+      "bytes": 1140014935,
+      "sha256": "7bc5c5d1710bc03c7b72b8962febfe5733e152516259ba7d94f7b5b3ad7f08bb"
+    }
+  },
+  "copy_policy": {
+    "duplicate_0977_helpers": false,
+    "duplicate_0977_receipts": false,
+    "raw_captures_copied": false,
+    "compiled_artifacts_copied": false,
+    "native_workload_started": false,
+    "build_started": false
+  }
+}

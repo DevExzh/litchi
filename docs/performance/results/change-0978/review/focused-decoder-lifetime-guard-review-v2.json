@@ -1,0 +1,214 @@
+{
+  "checks": {
+    "author_receipt_schema": "litchi.performance.0978.full_lifetime_evlist_guard_receipt.v3",
+    "author_receipt_sha256": "689dc4ea2c1fbb85fee7732d038db4c7b46f6f4236327263122b3930bc51dd31",
+    "author_receipt_status": "pass"
+  },
+  "command_boundary": {
+    "all_five_original_command_paths_tested": true,
+    "command_boundary_test_status": "pass",
+    "guard_receipt": {
+      "argv": [
+        "/usr/bin/perf",
+        "evlist",
+        "-v",
+        "-i",
+        "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.perf.data"
+      ],
+      "native_workload_started": false,
+      "receipt_sha256": "b984846c7f0662811f268caaed518449a269fca2b7b49359360bdd05950af8cc",
+      "returncode": 0,
+      "status": "pass"
+    },
+    "native_workload_started": false,
+    "strict_reuse_negative_status": "pass"
+  },
+  "created_utc": "2026-10-08T09:22:04.652512+00:00",
+  "decision": {
+    "fresh_packet_admitted_as_v3": false,
+    "future_native_plan_must_bind": {
+      "bytes": 62748,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/focuseddecode_0978_v3.py",
+      "sha256": "9596e246c7c627fb3810e7c6c6d3dda12af58b62477f1f1233654c4256e2dac9"
+    },
+    "no_reader_rerun_required_for_this_validation_only_change": true,
+    "offline_guard_admitted": true,
+    "remaining_external_dependency": "formal native plan must bind v3 and reducer IP fix must be independently sealed before native GO"
+  },
+  "lineage": {
+    "fresh_evlist": {
+      "bytes": 499,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.perf-evlist-v.txt",
+      "sha256": "29f2a64536a635ac827b283009f72855d998151954c3000f867cbeaf8b8058af"
+    },
+    "fresh_evlist_command": {
+      "bytes": 1021,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.perf-evlist-v.command.json",
+      "sha256": "b984846c7f0662811f268caaed518449a269fca2b7b49359360bdd05950af8cc"
+    },
+    "fresh_packet": {
+      "bytes": 1002735,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.packet.json",
+      "sha256": "fe8fd0662eb00eaee9ffbcef4337debe8d95bc041f167ba53d75d8f689707e47"
+    },
+    "fresh_result": {
+      "bytes": 16854,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/result-v1.json",
+      "sha256": "cde5d9f72d3d8c7f4c08641746efde82b174cd2f5949bbb4265de58197bdb76c"
+    },
+    "fresh_result_decoder_sha256": "866723324881a57ce7c4282cdfd2dabe497397b1612e8d7c4f975cb7e9fe2134",
+    "fresh_result_not_run_under_v3": true,
+    "original_source_hash_restored": true
+  },
+  "schema": "litchi.performance.0978.independent_decoder_v3_guard_review.v1",
+  "scope": {
+    "build_started": false,
+    "native_capture": false,
+    "native_workload_started": false,
+    "new_perf_or_decode_run": false,
+    "review": "v3 validation-only evlist guard, canonical event-contract preservation, retained fresh result lineage, and unchanged command boundary"
+  },
+  "source_bindings": {
+    "command_boundary_test": {
+      "bytes": 3430,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/test_focuseddecode_command_boundary_0978_v1.py",
+      "sha256": "f4801d9ad586a4fbfade1f3fb861b219297871f137967108b60f61ce6960e942"
+    },
+    "fresh_plan": {
+      "bytes": 4165,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/plan.json",
+      "sha256": "b1a96b011370c2390ce962db63d69618942fdb592a6b1b276745d67709f6eb1d"
+    },
+    "guard_test": {
+      "bytes": 4155,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/test_full_lifetime_evlist_guard_0978_v1.py",
+      "sha256": "a676a4460b60a10b35abb0e0681f4718ce57ba8441bdc205e9cb7b159abdaf03"
+    },
+    "original_fresh_decoder": {
+      "bytes": 61705,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/focuseddecode_0978.py",
+      "sha256": "866723324881a57ce7c4282cdfd2dabe497397b1612e8d7c4f975cb7e9fe2134"
+    },
+    "raw_scanner": {
+      "bytes": 32486,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/raw_stack_0978.py",
+      "sha256": "5f844b82a40426662ffaed5ba21dd0687fefa3f98ecc233dc572eeb3041017b7"
+    },
+    "v3_decoder": {
+      "bytes": 62748,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/focuseddecode_0978_v3.py",
+      "sha256": "9596e246c7c627fb3810e7c6c6d3dda12af58b62477f1f1233654c4256e2dac9"
+    },
+    "v3_guard_author_receipt": {
+      "bytes": 10214,
+      "path": "/home/zhuhe/litchi-performance-0978/receipts/focused-decoder-full-lifetime-guard-0978-v3.json",
+      "sha256": "689dc4ea2c1fbb85fee7732d038db4c7b46f6f4236327263122b3930bc51dd31"
+    }
+  },
+  "status": "pass_offline_decoder_v3_guard",
+  "v3_guard_checks": {
+    "attributes": [
+      "comm",
+      "comm_exec",
+      "mmap_data",
+      "mmap2",
+      "build_id"
+    ],
+    "contract_unchanged": true,
+    "guard_return_validation_only": true,
+    "negative_controls": {
+      "cases": [
+        {
+          "attribute": "comm",
+          "code": "evlist_lifetime_contract",
+          "mutation": "missing"
+        },
+        {
+          "attribute": "comm",
+          "code": "evlist_lifetime_contract",
+          "mutation": "zero"
+        },
+        {
+          "attribute": "comm",
+          "code": "evlist_lifetime_contract",
+          "mutation": "duplicate"
+        },
+        {
+          "attribute": "comm_exec",
+          "code": "evlist_lifetime_contract",
+          "mutation": "missing"
+        },
+        {
+          "attribute": "comm_exec",
+          "code": "evlist_lifetime_contract",
+          "mutation": "zero"
+        },
+        {
+          "attribute": "comm_exec",
+          "code": "evlist_lifetime_contract",
+          "mutation": "duplicate"
+        },
+        {
+          "attribute": "mmap_data",
+          "code": "evlist_lifetime_contract",
+          "mutation": "missing"
+        },
+        {
+          "attribute": "mmap_data",
+          "code": "evlist_lifetime_contract",
+          "mutation": "zero"
+        },
+        {
+          "attribute": "mmap_data",
+          "code": "evlist_lifetime_contract",
+          "mutation": "duplicate"
+        },
+        {
+          "attribute": "mmap2",
+          "code": "evlist_lifetime_contract",
+          "mutation": "missing"
+        },
+        {
+          "attribute": "mmap2",
+          "code": "evlist_lifetime_contract",
+          "mutation": "zero"
+        },
+        {
+          "attribute": "mmap2",
+          "code": "evlist_lifetime_contract",
+          "mutation": "duplicate"
+        },
+        {
+          "attribute": "build_id",
+          "code": "evlist_lifetime_contract",
+          "mutation": "missing"
+        },
+        {
+          "attribute": "build_id",
+          "code": "evlist_lifetime_contract",
+          "mutation": "zero"
+        },
+        {
+          "attribute": "build_id",
+          "code": "evlist_lifetime_contract",
+          "mutation": "duplicate"
+        }
+      ],
+      "count": 15
+    },
+    "positive_actual_fresh_evlist": {
+      "contract_unchanged": true,
+      "reducer_contract_equal": true,
+      "required": {
+        "build_id": "1",
+        "comm": "1",
+        "comm_exec": "1",
+        "mmap2": "1",
+        "mmap_data": "1"
+      },
+      "status": "pass"
+    },
+    "reducer_contract_equal": true,
+    "scanner_unchanged": true
+  }
+}

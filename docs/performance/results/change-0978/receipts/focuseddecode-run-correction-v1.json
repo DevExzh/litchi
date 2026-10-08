@@ -1,0 +1,83 @@
+{
+  "actual_scope": {
+    "corrected_script_invocation_was_not_part_of_this_terminated_process": true,
+    "failed_0977_tree_mutated": false,
+    "native_build": false,
+    "native_recording": false,
+    "native_workload": false,
+    "offline_decoder_started": true
+  },
+  "corrects": {
+    "cause": "The focused decoder subprocess was terminated by root instruction while still in its redundant raw perf-script dump phase; no natural decoder rejection was observed.",
+    "field": "status/interpretation",
+    "natural_raw_stack_rejection_observed": false,
+    "observed_returncode": -15,
+    "receipt": {
+      "bytes": 4792,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/receipts/focuseddecode-run-v1.json",
+      "sha256": "0e153a3a6568b64d767c0451b92caef261ab694fdde43d85a246f22228e5eacd"
+    },
+    "signal": "SIGTERM"
+  },
+  "created_utc": "2026-10-08T07:54:27.663696+00:00",
+  "interpretation": "The v1 receipt is retained as historical process evidence. Its statement that the decoder reached the raw scanner/rejected child is withdrawn; the only observed terminal outcome was SIGTERM before process completion. The direct corrected perf-script run and forensic ledger are authoritative for the 0978 offline diagnostic.",
+  "outputs_retained": [
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-buildid.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 571,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-buildid.txt",
+      "sha256": "6c7729316b6a54fc6ac338ceedfb960f4bb4fc669effac870d8ae58a34902925"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-evlist-v.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 499,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-evlist-v.txt",
+      "sha256": "29f2a64536a635ac827b283009f72855d998151954c3000f867cbeaf8b8058af"
+    },
+    {
+      "bytes": 49,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-header.stderr",
+      "sha256": "73b3a559eb66337c5f0ae4ed3b5f31a3ed98bcccc0058df070ede34679d955df"
+    },
+    {
+      "bytes": 1209,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-header.txt",
+      "sha256": "9ab9c93af7f8e0a3a5c0b8488af57771855b7ca9853fbf921958aeee9732dec1"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-mmap-dump.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1140014935,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-mmap-dump.txt",
+      "sha256": "06d9529bf1c741e33105e4dd79a86466c64ba84ff8f58cdde8ab2abb8b0b41ce"
+    },
+    {
+      "bytes": 4484,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.target-layout.json",
+      "sha256": "6ea5571906e31f15dd0387c0ae5aac107af0732bf3197072181be681c4a23a6f"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.terminal-report.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1383,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.terminal-report.txt",
+      "sha256": "f46285b4be0b246d827afc3f18689fc58e34401a01faee55437a39a34f708cbf"
+    }
+  ],
+  "schema": "litchi.performance.0978.focuseddecode_run_correction.v1",
+  "status": "corrected_metadata"
+}

@@ -1,0 +1,312 @@
+{
+  "attribution_policy": {
+    "D": "all decoded instructions:u period = 7,201,000,000",
+    "M": "marker-containing period = 945,000,000; denominator T for marker owner views",
+    "R": "D-M = 6,256,000,000; label marker ancestry not observed; it may include non-marker/setup/wrapper work or missing/truncated marker ancestry",
+    "future_cohort": "Require all 12 children, raw/terminal loss zero, CPU/task/conservation gates, and per-child vectors. Do not nominate an owner or infer optimization causality automatically.",
+    "physical_leaf": "For marker samples only, mapped DSOs may be valid physical leaves; target-source eligibility is a separate filter.",
+    "unknown": "Keep all empty/no-resolved period explicit. Marker owner lower/upper bound is [K_j/T, (K_j+U)/T], where U is marker physical-leaf unknown period; inclusive views are non-additive."
+  },
+  "commands": {
+    "analysis_script": {
+      "bytes": 17115,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/tools/analyze_child02_0978_v1.py",
+      "sha256": "2ea8d0651c003fe9aee4eeec3522d94485158bf5666208ea78aef6ba2c2964a7"
+    },
+    "corrected_script_run": {
+      "bytes": 2921,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/receipts/corrected-script-run-v1.json",
+      "sha256": "a45865bda16679ea3ff1de687dbf543dd5072f5e3bf1fc67049f569d6fc94219"
+    },
+    "focused_decoder_correction": {
+      "bytes": 4006,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/receipts/focuseddecode-run-correction-v1.json",
+      "sha256": "80b1a72e028333779c069ac73ff714222de375be761222bfabf00bbbe20c0949"
+    },
+    "focused_decoder_historical": {
+      "bytes": 4792,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/receipts/focuseddecode-run-v1.json",
+      "sha256": "0e153a3a6568b64d767c0451b92caef261ab694fdde43d85a246f22228e5eacd"
+    },
+    "preflight": {
+      "bytes": 15427,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/receipts/offline-custody-and-perf-script-v1.json",
+      "sha256": "9440e2473c26f35ccc12a7f471312c5b2917822bcbb6352a1fc935eed575d37b"
+    }
+  },
+  "corrected_decode": {
+    "decoder_parser_summary": {
+      "empty_callchain_count": 76,
+      "explicit_stack_truncated_count": 0,
+      "marker": "doc_retention_probe_0942_cfb_profile::profiled_measured_case",
+      "marker_no_resolved_frame_samples": 0,
+      "marker_period": 945000000,
+      "marker_period_share": 0.13123177336481046,
+      "marker_sample_count": 945,
+      "marker_unknown_physical_leaf_samples": 0,
+      "physical_leaf_conservation": {
+        "classified_period": 945000000,
+        "marker_period": 945000000,
+        "passed": true,
+        "scope": "marker-containing samples only"
+      },
+      "physical_leaf_unknown_period": 0,
+      "physical_leaf_unknown_samples": 0,
+      "sample_count": 7201,
+      "total_period": 7201000000,
+      "unresolved_frames": 5695
+    },
+    "marker": {
+      "dso": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "first_time": 310425.579227,
+      "last_time": 310426.272293,
+      "period": 945000000,
+      "samples": 945,
+      "share_of_all_period": 0.13123177336481046,
+      "symbol": "doc_retention_probe_0942_cfb_profile::profiled_measured_case"
+    },
+    "shim_log": {
+      "adjusted": 0,
+      "cache_stored": 1,
+      "fallback": 0,
+      "infos": 284864,
+      "reports": 111082,
+      "result_module_null": 0,
+      "reused_existing": 110901,
+      "rows": 395946,
+      "target_infos": 221803,
+      "target_reports": 110902
+    }
+  },
+  "created_utc": "2026-10-08T07:54:37.825223+00:00",
+  "inputs": {
+    "binary": {
+      "bytes": 47909224,
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+    },
+    "decoder": {
+      "bytes": 67772,
+      "path": "/home/zhuhe/litchi-performance-0977/tools/focuseddecode_0977_v2.py",
+      "sha256": "31184f1dc044022f262def181af909bf987c04936e1f926acd73f2c10e46e23c"
+    },
+    "perf_data": {
+      "bytes": 237904472,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf.data",
+      "sha256": "3b929236dc8378e2804d1d7421e0a2f9bfc22fbad7c6f29cc0f8cf1774df22dc"
+    },
+    "plan": {
+      "bytes": 17335,
+      "path": "/home/zhuhe/litchi-performance-0977/plans/plan-0977-v2.json",
+      "sha256": "12abb6239a7f14a82a84e87306deffca4231c83377bf19a123cfb503a3684a1c"
+    },
+    "raw_mmap": {
+      "bytes": 1140014935,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-mmap-dump.txt",
+      "sha256": "06d9529bf1c741e33105e4dd79a86466c64ba84ff8f58cdde8ab2abb8b0b41ce"
+    },
+    "script": {
+      "bytes": 11598818,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.corrected.perf-script-no-inline.txt",
+      "sha256": "371eee38919ec71a916c0a386c2b289d4dd82ff1f2c4932f3c47e050965b8338"
+    },
+    "shim_log": {
+      "bytes": 221387538,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.corrected.dwfl.jsonl",
+      "sha256": "a8a53430500b75ba697bc2e65b42f90ff4f9524ffa8d2ab0ba7d722742be9d39"
+    },
+    "target_layout": {
+      "bytes": 4484,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.target-layout.json",
+      "sha256": "6ea5571906e31f15dd0387c0ae5aac107af0732bf3197072181be681c4a23a6f"
+    },
+    "terminal_report": {
+      "bytes": 1383,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.terminal-report.txt",
+      "sha256": "f46285b4be0b246d827afc3f18689fc58e34401a01faee55437a39a34f708cbf"
+    }
+  },
+  "interpretation": {
+    "72_byte_empty_kernel_sample": "One 0x48 (72-byte) PERF_RECORD_SAMPLE has a kernel-like IP 0xffffffff920000a7, raw mode IP, 0x1, and no user-stack/callchain output. It occurs before the doc_retention_p COMM exec image.",
+    "cohort_admission": "This child is diagnostic only; the 0977 all-12 cohort remains failed at child 2 and is not admitted.",
+    "focused_parser_boundary": "The retained raw STACK_USER scanner can reject a child when sample-line accounting requires one decoded frame-bearing line per sample. Direct corrected perf-script output conserves all 7201 samples and exposes 76 empty callchains, so the focused decoder rejection is a parser/admission boundary rather than evidence of capture loss.",
+    "remaining_empty_mass": "The other 75 empty callchains are 0x80f0 (33008-byte) sample records; 74 are raw mode IP, 0x2 and one is IP, 0x1. Their retained user-stack payloads do not yield decoded callchain frames in perf script. Keep their full period as unknown/empty mass.",
+    "source_attribution_limit": "Only marker-containing samples support marker-owner views. Keep D=all period, M=marker period, R=D-M labeled marker ancestry not observed; do not assign R or empty/non-resolved periods to a source owner. For a future admitted 12-child cohort, retain physical frame-0 owner plus explicit unknown, deepest-resolved proxy, and inclusive owners with separate denominators; require all-child conservation and never infer causality or speedup."
+  },
+  "limitations": [
+    "The 0977 source manifest remains failed at child 2; this child is diagnostic only.",
+    "The focused decoder process receipt is corrected separately because it was SIGTERM-terminated before natural rejection; direct corrected-script output is the authoritative result.",
+    "The 75 large empty callchains retain raw user-stack payloads but no decoded frame chain; this does not establish why each individual unwind failed."
+  ],
+  "sample_ledger": {
+    "comm_exec_timeline": [
+      {
+        "comm": "perf-exec",
+        "ns": 0,
+        "pid": 3849325,
+        "raw": "0 0 0x198 [0x38]: PERF_RECORD_COMM: perf-exec:3849325/3849325",
+        "tid": 3849325
+      },
+      {
+        "comm": "python3.14",
+        "ns": 310425450191349,
+        "pid": 3849325,
+        "raw": "31 310425450191349 0x1d8 [0x38]: PERF_RECORD_COMM exec: python3.14:3849325/3849325",
+        "tid": 3849325
+      },
+      {
+        "comm": "python3.14",
+        "ns": 310425506788237,
+        "pid": 3849325,
+        "raw": "31 310425506788237 0x82b930 [0x38]: PERF_RECORD_COMM exec: python3.14:3849325/3849325",
+        "tid": 3849325
+      },
+      {
+        "comm": "doc_retention_p",
+        "ns": 310425539781874,
+        "pid": 3849325,
+        "raw": "31 310425539781874 0xd007f0 [0x38]: PERF_RECORD_COMM exec: doc_retention_p:3849325/3849325",
+        "tid": 3849325
+      }
+    ],
+    "empty_callchain": {
+      "by_comm_exec_image": {
+        "python3.14": 76
+      },
+      "by_raw_mode": {
+        "IP, 0x1": 2,
+        "IP, 0x2": 74
+      },
+      "by_record_size": {
+        "33008": 75,
+        "72": 1
+      },
+      "first_time": 310425.464699,
+      "last_time": 310425.539301,
+      "period": 76000000,
+      "samples": 76
+    },
+    "loss": {
+      "raw_lost_sum": 0,
+      "raw_lost_values": [],
+      "terminal_lost_samples": 0,
+      "terminal_lost_values": [
+        0
+      ]
+    },
+    "period_conservation": {
+      "expected_period": 7201000000,
+      "expected_samples": 7201,
+      "observed_period": 7201000000,
+      "observed_samples": 7201,
+      "passed": true
+    },
+    "period_values": {
+      "counts": {
+        "1000000": 7201
+      },
+      "values": [
+        1000000
+      ]
+    },
+    "pid_tid_cpu": {
+      "cpus": [
+        31
+      ],
+      "pids": [
+        3849325
+      ],
+      "tids": [
+        3849325
+      ]
+    },
+    "raw_kernel_ip_like": 56,
+    "raw_record_sizes": {
+      "33008": 7200,
+      "72": 1
+    },
+    "raw_sample_modes": {
+      "IP, 0x1": {
+        "empty": 2,
+        "kernel_ip_like": 56,
+        "no_resolved": 2,
+        "period": 56000000,
+        "samples": 56
+      },
+      "IP, 0x2": {
+        "empty": 74,
+        "kernel_ip_like": 0,
+        "no_resolved": 76,
+        "period": 7145000000,
+        "samples": 7145
+      }
+    },
+    "sample_by_comm_and_raw_mode": {
+      "doc_retention_p|IP, 0x1": {
+        "comm_exec_image": "doc_retention_p",
+        "empty": 0,
+        "marker": 6,
+        "period": 50000000,
+        "raw_mode": "IP, 0x1",
+        "samples": 50
+      },
+      "doc_retention_p|IP, 0x2": {
+        "comm_exec_image": "doc_retention_p",
+        "empty": 0,
+        "marker": 939,
+        "period": 6738000000,
+        "raw_mode": "IP, 0x2",
+        "samples": 6738
+      },
+      "python3.14|IP, 0x1": {
+        "comm_exec_image": "python3.14",
+        "empty": 2,
+        "marker": 0,
+        "period": 6000000,
+        "raw_mode": "IP, 0x1",
+        "samples": 6
+      },
+      "python3.14|IP, 0x2": {
+        "comm_exec_image": "python3.14",
+        "empty": 74,
+        "marker": 0,
+        "period": 407000000,
+        "raw_mode": "IP, 0x2",
+        "samples": 407
+      }
+    },
+    "sample_by_comm_exec_image": {
+      "doc_retention_p": {
+        "empty": 0,
+        "marker": 945,
+        "no_resolved": 0,
+        "period": 6788000000,
+        "samples": 6788
+      },
+      "python3.14": {
+        "empty": 76,
+        "marker": 0,
+        "no_resolved": 78,
+        "period": 413000000,
+        "samples": 413
+      }
+    },
+    "sample_count": 7201,
+    "sample_window": {
+      "duration_seconds": 0.8295280000311323,
+      "first_time": 310425.450784,
+      "last_time": 310426.280312
+    },
+    "total_period": 7201000000,
+    "unknown_mass_all_samples": {
+      "empty_period": 76000000,
+      "empty_samples": 76,
+      "no_resolved_period": 78000000,
+      "no_resolved_samples": 78,
+      "unresolved_frame_count": 5695
+    }
+  },
+  "schema": "litchi.performance.0978.child02_offline_diagnostic.v1",
+  "scope": "retained 0977 child-02 only; direct corrected offline perf-script decode; no 0977 cohort admission, native workload, build, speedup, or causal claim",
+  "status": "pass_diagnostic_only"
+}

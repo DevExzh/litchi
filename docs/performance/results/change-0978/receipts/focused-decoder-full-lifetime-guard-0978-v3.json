@@ -1,0 +1,187 @@
+{
+  "bindings": {
+    "evlist_command_receipt": {
+      "bytes": 1021,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.perf-evlist-v.command.json",
+      "sha256": "b984846c7f0662811f268caaed518449a269fca2b7b49359360bdd05950af8cc"
+    },
+    "fresh_evlist": {
+      "bytes": 499,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.perf-evlist-v.txt",
+      "sha256": "29f2a64536a635ac827b283009f72855d998151954c3000f867cbeaf8b8058af"
+    },
+    "fresh_packet_event_contract": {
+      "contract_equal_to_scanner": true,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.packet.json",
+      "sha256": "fe8fd0662eb00eaee9ffbcef4337debe8d95bc041f167ba53d75d8f689707e47"
+    },
+    "fresh_result": {
+      "bytes": 16854,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/result-v1.json",
+      "sha256": "cde5d9f72d3d8c7f4c08641746efde82b174cd2f5949bbb4265de58197bdb76c"
+    },
+    "fresh_result_source_sha256": "866723324881a57ce7c4282cdfd2dabe497397b1612e8d7c4f975cb7e9fe2134",
+    "raw_scanner": {
+      "bytes": 32486,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/raw_stack_0978.py",
+      "sha256": "5f844b82a40426662ffaed5ba21dd0687fefa3f98ecc233dc572eeb3041017b7"
+    },
+    "test": {
+      "bytes": 4155,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/test_full_lifetime_evlist_guard_0978_v1.py",
+      "sha256": "a676a4460b60a10b35abb0e0681f4718ce57ba8441bdc205e9cb7b159abdaf03"
+    }
+  },
+  "changed_scope": {
+    "callsite_added": true,
+    "command_generation_changed": false,
+    "guard_added": true,
+    "guard_mutates_contract": false,
+    "native_capture": false,
+    "new_perf_or_decode_run": false,
+    "original_frozen_hash_restored": true,
+    "raw_scanner_changed": false
+  },
+  "command_equivalence": {
+    "argv": [
+      "/usr/bin/perf",
+      "evlist",
+      "-v",
+      "-i",
+      "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.perf.data"
+    ],
+    "native_workload_started": false,
+    "receipt_sha256": "b984846c7f0662811f268caaed518449a269fca2b7b49359360bdd05950af8cc",
+    "returncode": 0,
+    "status": "pass"
+  },
+  "completed_utc": "2026-10-08T09:14:37.044528+00:00",
+  "negative_controls": {
+    "cases": [
+      {
+        "attribute": "comm",
+        "code": "evlist_lifetime_contract",
+        "mutation": "missing"
+      },
+      {
+        "attribute": "comm",
+        "code": "evlist_lifetime_contract",
+        "mutation": "zero"
+      },
+      {
+        "attribute": "comm",
+        "code": "evlist_lifetime_contract",
+        "mutation": "duplicate"
+      },
+      {
+        "attribute": "comm_exec",
+        "code": "evlist_lifetime_contract",
+        "mutation": "missing"
+      },
+      {
+        "attribute": "comm_exec",
+        "code": "evlist_lifetime_contract",
+        "mutation": "zero"
+      },
+      {
+        "attribute": "comm_exec",
+        "code": "evlist_lifetime_contract",
+        "mutation": "duplicate"
+      },
+      {
+        "attribute": "mmap_data",
+        "code": "evlist_lifetime_contract",
+        "mutation": "missing"
+      },
+      {
+        "attribute": "mmap_data",
+        "code": "evlist_lifetime_contract",
+        "mutation": "zero"
+      },
+      {
+        "attribute": "mmap_data",
+        "code": "evlist_lifetime_contract",
+        "mutation": "duplicate"
+      },
+      {
+        "attribute": "mmap2",
+        "code": "evlist_lifetime_contract",
+        "mutation": "missing"
+      },
+      {
+        "attribute": "mmap2",
+        "code": "evlist_lifetime_contract",
+        "mutation": "zero"
+      },
+      {
+        "attribute": "mmap2",
+        "code": "evlist_lifetime_contract",
+        "mutation": "duplicate"
+      },
+      {
+        "attribute": "build_id",
+        "code": "evlist_lifetime_contract",
+        "mutation": "missing"
+      },
+      {
+        "attribute": "build_id",
+        "code": "evlist_lifetime_contract",
+        "mutation": "zero"
+      },
+      {
+        "attribute": "build_id",
+        "code": "evlist_lifetime_contract",
+        "mutation": "duplicate"
+      }
+    ],
+    "count": 15
+  },
+  "positive_actual_fresh_evlist": {
+    "contract_unchanged": true,
+    "reducer_contract_equal": true,
+    "required": {
+      "build_id": "1",
+      "comm": "1",
+      "comm_exec": "1",
+      "mmap2": "1",
+      "mmap_data": "1"
+    },
+    "status": "pass"
+  },
+  "schema": "litchi.performance.0978.full_lifetime_evlist_guard_receipt.v3",
+  "scope": "decoder-side required full-lifetime evlist guard only; sealed raw scanner unchanged; canonical event contract remains exact",
+  "source": {
+    "diff_from_original_bytes": 2264,
+    "diff_from_original_sha256": "fb5501f7f5ce6a34cd905a29bccc576799b8a9b318687f99a82db1c2adc7c29b",
+    "diff_from_v2_bytes": 1537,
+    "diff_from_v2_sha256": "17c6a167d3807d346ff3ea5d5bb1e76a2568c74127f7c5b178116c77781d7335",
+    "frozen_original": {
+      "bytes": 61705,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/focuseddecode_0978.py",
+      "sha256": "866723324881a57ce7c4282cdfd2dabe497397b1612e8d7c4f975cb7e9fe2134"
+    },
+    "old_guard_backup": {
+      "bytes": 61705,
+      "path": "/home/zhuhe/litchi-performance-0978/analysis/focuseddecode_0978-pre-full-lifetime-guard-866723.py",
+      "sha256": "866723324881a57ce7c4282cdfd2dabe497397b1612e8d7c4f975cb7e9fe2134"
+    },
+    "unified_diff_from_original": "--- focuseddecode_0978.py@866723\n+++ focuseddecode_0978_v3.py\n@@ -42,6 +42,7 @@\n DEFAULT_STACK_CAP = 32_768\n DEFAULT_MARKER = \"doc_retention_probe_0942_cfb_profile::profiled_measured_case\"\n DEFAULT_BUILD_ID = \"e5c457384eeebd057932c444efda77618f137399\"\n+FULL_LIFETIME_EVLIST_ATTRIBUTES = (\"comm\", \"comm_exec\", \"mmap_data\", \"mmap2\", \"build_id\")\n TERMINAL_LOST_RE = re.compile(r\"^#\\s*Total Lost Samples:\\s*(\\d+)\\s*$\", re.MULTILINE)\n LOST_EVENT_RE = re.compile(r\"(?:^|\\s)(?:lost|dropped)[^0-9]*(\\d+)\", re.IGNORECASE)\n HEADER_RE = re.compile(\n@@ -415,6 +416,23 @@\n     return output, stderr, receipt\n \n \n+def _require_full_lifetime_evlist(contract: Mapping[str, Any]) -> None:\n+    \"\"\"Require the event metadata needed to reconstruct process lifetime maps.\"\"\"\n+    line = contract.get(\"line\")\n+    if not isinstance(line, str) or not line:\n+        _fail(\"evlist_lifetime_contract\", \"perf evlist contract has no authoritative event line\")\n+    required: dict[str, str] = {}\n+    for label in FULL_LIFETIME_EVLIST_ATTRIBUTES:\n+        values = re.findall(rf\"(?:^|,\\s*){re.escape(label)}:\\s*([^,]*)\", line)\n+        if len(values) != 1:\n+            _fail(\"evlist_lifetime_contract\", \"required lifetime event attribute is missing or duplicated\", attribute=label, occurrences=len(values))\n+        value = values[0].strip()\n+        if value != \"1\":\n+            _fail(\"evlist_lifetime_contract\", \"required lifetime event attribute is not enabled\", attribute=label, value=value)\n+        required[label] = value\n+    return None\n+\n+\n def _evlist_and_dump(child_dir: Path, cfg: Mapping[str, Any]) -> tuple[dict[str, Any], Path]:\n     data = _input(child_dir, \"perf.data\")\n     evlist = _path(child_dir, \"perf-evlist-v.txt\")\n@@ -433,6 +451,7 @@\n         contract = scanner.parse_evlist_contract(evlist.read_text(encoding=\"utf-8\", errors=\"strict\"), expected_period=cfg[\"period\"], expected_stack_cap=cfg[\"stack_cap\"])\n     except Exception as exc:  # noqa: BLE001\n         _fail(\"evlist_contract\", \"bound perf evlist contract failed\", error=str(exc))\n+    _require_full_lifetime_evlist(contract)\n     dump = _path(child_dir, \"perf-mmap-dump.txt\")\n     dump_stderr = _path(child_dir, \"perf-mmap-dump.stderr\")\n     dump_receipt = _path(child_dir, \"perf-mmap-dump.command.json\")\n",
+    "unified_diff_from_v2": "--- focuseddecode_0978_v2.py@438156\n+++ focuseddecode_0978_v3.py\n@@ -416,7 +416,7 @@\n     return output, stderr, receipt\n \n \n-def _require_full_lifetime_evlist(contract: Mapping[str, Any]) -> dict[str, Any]:\n+def _require_full_lifetime_evlist(contract: Mapping[str, Any]) -> None:\n     \"\"\"Require the event metadata needed to reconstruct process lifetime maps.\"\"\"\n     line = contract.get(\"line\")\n     if not isinstance(line, str) or not line:\n@@ -430,9 +430,7 @@\n         if value != \"1\":\n             _fail(\"evlist_lifetime_contract\", \"required lifetime event attribute is not enabled\", attribute=label, value=value)\n         required[label] = value\n-    result = dict(contract)\n-    result[\"full_lifetime\"] = {\"status\": \"pass\", \"source\": \"decoder-side perf evlist guard\", \"required\": required}\n-    return result\n+    return None\n \n \n def _evlist_and_dump(child_dir: Path, cfg: Mapping[str, Any]) -> tuple[dict[str, Any], Path]:\n@@ -453,7 +451,7 @@\n         contract = scanner.parse_evlist_contract(evlist.read_text(encoding=\"utf-8\", errors=\"strict\"), expected_period=cfg[\"period\"], expected_stack_cap=cfg[\"stack_cap\"])\n     except Exception as exc:  # noqa: BLE001\n         _fail(\"evlist_contract\", \"bound perf evlist contract failed\", error=str(exc))\n-    contract = _require_full_lifetime_evlist(contract)\n+    _require_full_lifetime_evlist(contract)\n     dump = _path(child_dir, \"perf-mmap-dump.txt\")\n     dump_stderr = _path(child_dir, \"perf-mmap-dump.stderr\")\n     dump_receipt = _path(child_dir, \"perf-mmap-dump.command.json\")\n",
+    "v2_reviewed_variant": {
+      "bytes": 62914,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/focuseddecode_0978_v2.py",
+      "sha256": "438156ca459002aa44578de446648e82f1194f73fe17cad845b6464dbe1ea911"
+    },
+    "v3_final_variant": {
+      "bytes": 62748,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/focuseddecode_0978_v3.py",
+      "sha256": "9596e246c7c627fb3810e7c6c6d3dda12af58b62477f1f1233654c4256e2dac9"
+    }
+  },
+  "status": "pass",
+  "supersedes": {
+    "bytes": 7939,
+    "path": "/home/zhuhe/litchi-performance-0978/receipts/focused-decoder-full-lifetime-guard-0978-v2.json",
+    "sha256": "dadce2552675e052e9f3bcff71243d88cc3e7643298b5cd7533953674917679c"
+  }
+}

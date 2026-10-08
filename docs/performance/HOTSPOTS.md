@@ -1,5 +1,20 @@
 # Performance hotspot inventory
 
+## 0978 — native capture loss blocks cohort qualification
+
+[0978](0978-variable-layout-profile-accounting.md) supplies a bounded offline
+accounting enabler for valid variable-layout and unknown samples, but its
+native run is not a hotspot measurement. Children 01 and 02 pass their
+individual gates with raw and terminal loss zero; child 03 returns 0 from the
+native command but fails the decoder loss gate. The audit records raw
+`PERF_RECORD_LOST` values 1 and 3 and a matching terminal
+`PERF_RECORD_LOST_SAMPLES=4`; the terminal value corroborates the raw sum and
+is not additional loss. The serial runner stops with return code 2, performs no
+retry, and never launches children 04--12. The reducer emits no cohort output.
+This establishes a capture-admission blocker, not a source, host, timing, or
+performance hotspot. Preserve the loss gate and require a separately reviewed
+capture/decoder design before another cohort is considered.
+
 ## 0977 — decoder admission is the blocker, not a source hotspot
 
 [0977](0977-combined-profile-qualification.md) stops after child 01 passes and

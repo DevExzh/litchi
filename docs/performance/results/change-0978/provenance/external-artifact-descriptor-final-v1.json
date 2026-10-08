@@ -1,0 +1,1822 @@
+{
+  "descriptor_excludes_self": true,
+  "external_artifact_total_bytes": 8199474652,
+  "external_artifacts": [
+    {
+      "bound_by": "0978 final offline artifacts; repository copy omitted",
+      "bytes": 6574487,
+      "path": "/home/zhuhe/litchi-performance-0978/analysis/child-02-build-ledger-integration-v3.json",
+      "repository_copy": false,
+      "role": "retained child-02 lifecycle build-ledger integration output; external >=1 MiB",
+      "sha256": "337f48b4c0ce4669e7216e8ce08994821dc00ce21057ad4dfcad53bc6c119016"
+    },
+    {
+      "bound_by": "0978 final offline artifacts; repository copy omitted",
+      "bytes": 5665461,
+      "path": "/home/zhuhe/litchi-performance-0978/analysis/reducer-replay-child02-v1/ledger-replay-v5.json",
+      "repository_copy": false,
+      "role": "derived child-02 reducer ledger; external >=1 MiB",
+      "sha256": "ceb28465eee186cb2e029d65b56b25d086c821d3c676680a902afcb012f27936"
+    },
+    {
+      "bound_by": "0978 final offline artifacts; repository copy omitted",
+      "bytes": 14347606,
+      "path": "/home/zhuhe/litchi-performance-0978/analysis/reducer-replay-child02-v1/lifecycle-stream-v2.json",
+      "repository_copy": false,
+      "role": "retained child-02 lifecycle stream used by offline replay; external >=1 MiB",
+      "sha256": "2ec935924bc854e53f7ee9288ac7c2e24317821bd2e3dea507a757b1bbfc7eb5"
+    },
+    {
+      "bound_by": "0978 final offline artifacts; repository copy omitted",
+      "bytes": 5850204,
+      "path": "/home/zhuhe/litchi-performance-0978/analysis/reducer-replay-child02-v1/raw-summary.json",
+      "repository_copy": false,
+      "role": "retained child-02 raw summary; external >=1 MiB",
+      "sha256": "2bb22763da4750a2c03feee1d8a74e25988cb4b3154815842c3a9247689b5a47"
+    },
+    {
+      "bound_by": "0978 offline diagnostic receipt",
+      "bytes": 5093072,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/analysis/child-02-forensic-summary-v1.json",
+      "repository_copy": false,
+      "role": "full 0978 forensic sample ledger; external because >=1 MiB",
+      "sha256": "42b89638080b20ffb10213c29c3ea4a783af385c7c41e30b19c01a7f91425783"
+    },
+    {
+      "bound_by": "0978 offline diagnostic receipts; no repository copy",
+      "bytes": 2379,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.command.json",
+      "repository_copy": false,
+      "role": "retained child-02 capture input or bounded capture metadata",
+      "sha256": "265736f27d135a4420c2fc6a15e461e07ba367bae96ba925184d622f9cabcff6"
+    },
+    {
+      "bound_by": "0978 offline diagnostic receipts; no repository copy",
+      "bytes": 221387538,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.corrected.dwfl.jsonl",
+      "repository_copy": false,
+      "role": "retained child-02 capture input or bounded capture metadata",
+      "sha256": "a8a53430500b75ba697bc2e65b42f90ff4f9524ffa8d2ab0ba7d722742be9d39"
+    },
+    {
+      "bound_by": "0978 offline diagnostic receipts; no repository copy",
+      "bytes": 11598818,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.corrected.perf-script-no-inline.txt",
+      "repository_copy": false,
+      "role": "retained child-02 capture input or bounded capture metadata",
+      "sha256": "371eee38919ec71a916c0a386c2b289d4dd82ff1f2c4932f3c47e050965b8338"
+    },
+    {
+      "bound_by": "0978 offline diagnostic receipts; no repository copy",
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.corrected.perf.stderr",
+      "repository_copy": false,
+      "role": "retained child-02 capture input or bounded capture metadata",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bound_by": "0978 offline diagnostic receipts; no repository copy",
+      "bytes": 1106,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.launch.json",
+      "repository_copy": false,
+      "role": "retained child-02 capture input or bounded capture metadata",
+      "sha256": "96c6ffaab2a0100cd0f11aa2a065986fb6c9e3d6d44209c88a3cdc8d7833fb5a"
+    },
+    {
+      "bound_by": "0978 offline diagnostic receipts; no repository copy",
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-buildid.stderr",
+      "repository_copy": false,
+      "role": "retained child-02 capture input or bounded capture metadata",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bound_by": "0978 offline diagnostic receipts; no repository copy",
+      "bytes": 571,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-buildid.txt",
+      "repository_copy": false,
+      "role": "retained child-02 capture input or bounded capture metadata",
+      "sha256": "6c7729316b6a54fc6ac338ceedfb960f4bb4fc669effac870d8ae58a34902925"
+    },
+    {
+      "bound_by": "0978 offline diagnostic receipts; no repository copy",
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-evlist-v.stderr",
+      "repository_copy": false,
+      "role": "retained child-02 capture input or bounded capture metadata",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bound_by": "0978 offline diagnostic receipts; no repository copy",
+      "bytes": 499,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-evlist-v.txt",
+      "repository_copy": false,
+      "role": "retained child-02 capture input or bounded capture metadata",
+      "sha256": "29f2a64536a635ac827b283009f72855d998151954c3000f867cbeaf8b8058af"
+    },
+    {
+      "bound_by": "0978 offline diagnostic receipts; no repository copy",
+      "bytes": 49,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-header.stderr",
+      "repository_copy": false,
+      "role": "retained child-02 capture input or bounded capture metadata",
+      "sha256": "73b3a559eb66337c5f0ae4ed3b5f31a3ed98bcccc0058df070ede34679d955df"
+    },
+    {
+      "bound_by": "0978 offline diagnostic receipts; no repository copy",
+      "bytes": 1209,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-header.txt",
+      "repository_copy": false,
+      "role": "retained child-02 capture input or bounded capture metadata",
+      "sha256": "9ab9c93af7f8e0a3a5c0b8488af57771855b7ca9853fbf921958aeee9732dec1"
+    },
+    {
+      "bound_by": "0978 offline diagnostic receipts; no repository copy",
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-mmap-dump.stderr",
+      "repository_copy": false,
+      "role": "retained child-02 capture input or bounded capture metadata",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bound_by": "0978 offline diagnostic receipts; no repository copy",
+      "bytes": 1140014935,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-mmap-dump.txt",
+      "repository_copy": false,
+      "role": "retained child-02 capture input or bounded capture metadata",
+      "sha256": "06d9529bf1c741e33105e4dd79a86466c64ba84ff8f58cdde8ab2abb8b0b41ce"
+    },
+    {
+      "bound_by": "0978 offline diagnostic receipts; no repository copy",
+      "bytes": 237904472,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf.data",
+      "repository_copy": false,
+      "role": "retained child-02 capture input or bounded capture metadata",
+      "sha256": "3b929236dc8378e2804d1d7421e0a2f9bfc22fbad7c6f29cc0f8cf1774df22dc"
+    },
+    {
+      "bound_by": "0978 offline diagnostic receipts; no repository copy",
+      "bytes": 292296,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.report.json",
+      "repository_copy": false,
+      "role": "retained child-02 capture input or bounded capture metadata",
+      "sha256": "c28abb5f47fdef1353edd3c4da11572376fd69462b2e19c739cb2b55515e8bbf"
+    },
+    {
+      "bound_by": "0978 offline diagnostic receipts; no repository copy",
+      "bytes": 4484,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.target-layout.json",
+      "repository_copy": false,
+      "role": "retained child-02 capture input or bounded capture metadata",
+      "sha256": "6ea5571906e31f15dd0387c0ae5aac107af0732bf3197072181be681c4a23a6f"
+    },
+    {
+      "bound_by": "0978 offline diagnostic receipts; no repository copy",
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.terminal-report.stderr",
+      "repository_copy": false,
+      "role": "retained child-02 capture input or bounded capture metadata",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bound_by": "0978 offline diagnostic receipts; no repository copy",
+      "bytes": 1383,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.terminal-report.txt",
+      "repository_copy": false,
+      "role": "retained child-02 capture input or bounded capture metadata",
+      "sha256": "f46285b4be0b246d827afc3f18689fc58e34401a01faee55437a39a34f708cbf"
+    },
+    {
+      "bound_by": "0978 offline diagnostic receipts; no repository copy",
+      "bytes": 2618,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.terminal.json",
+      "repository_copy": false,
+      "role": "retained child-02 capture input or bounded capture metadata",
+      "sha256": "24d96015d18e117c3772045fc4f9b7b97cc9e60936988b3d6680f6f1e7ba91e5"
+    },
+    {
+      "bound_by": "fresh-offline-child02-v1/result-v1.json and packet-validation-v4.json; repository copy omitted",
+      "bytes": 568,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.abi-scan.json",
+      "repository_copy": false,
+      "role": "fresh retained child-02 decoder/perf sidecar; external custody only",
+      "sha256": "11cda522d9148c6658d95781407383e75571484cfc97014135ac964ce61835bf"
+    },
+    {
+      "bound_by": "fresh-offline-child02-v1/result-v1.json and packet-validation-v4.json; repository copy omitted",
+      "bytes": 50302283,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.attribution-samples.json",
+      "repository_copy": false,
+      "role": "fresh retained child-02 raw or derived sidecar; external because large evidence",
+      "sha256": "b2861d3b8b4d972a15a91c2a6ca3264c368678e5c1033a86a0e6c5e4e0a8521b"
+    },
+    {
+      "bound_by": "fresh-offline-child02-v1/result-v1.json and packet-validation-v4.json; repository copy omitted",
+      "bytes": 1966,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.corrected.command.json",
+      "repository_copy": false,
+      "role": "fresh retained child-02 decoder/perf sidecar; external custody only",
+      "sha256": "b8266f022fd5d07e956bd1c8a94df3a9b132342ab60c07fe70e6eed27f93d791"
+    },
+    {
+      "bound_by": "fresh-offline-child02-v1/result-v1.json and packet-validation-v4.json; repository copy omitted",
+      "bytes": 221387538,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.corrected.dwfl.jsonl",
+      "repository_copy": false,
+      "role": "fresh retained child-02 raw or derived sidecar; external because large evidence",
+      "sha256": "632cd497f67e8089a3b1c5ca6552d96f1a1f1b85ec86ddf67901228a6c80e983"
+    },
+    {
+      "bound_by": "fresh-offline-child02-v1/result-v1.json and packet-validation-v4.json; repository copy omitted",
+      "bytes": 11598818,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.corrected.perf-script-no-inline.txt",
+      "repository_copy": false,
+      "role": "fresh retained child-02 raw or derived sidecar; external because large evidence",
+      "sha256": "371eee38919ec71a916c0a386c2b289d4dd82ff1f2c4932f3c47e050965b8338"
+    },
+    {
+      "bound_by": "fresh-offline-child02-v1/result-v1.json and packet-validation-v4.json; repository copy omitted",
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.corrected.perf.stderr",
+      "repository_copy": false,
+      "role": "fresh retained child-02 decoder/perf sidecar; external custody only",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bound_by": "fresh-offline-child02-v1/result-v1.json and packet-validation-v4.json; repository copy omitted",
+      "bytes": 23640829,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.lifecycle-ledger.json",
+      "repository_copy": false,
+      "role": "fresh retained child-02 raw or derived sidecar; external because large evidence",
+      "sha256": "9694d1d7ea9c7c1bea6bb6810aae00b93409560c7f9668ebfc505cd8e3589c56"
+    },
+    {
+      "bound_by": "fresh-offline-child02-v1/result-v1.json and packet-validation-v4.json; repository copy omitted",
+      "bytes": 213,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.loss.json",
+      "repository_copy": false,
+      "role": "fresh retained child-02 decoder/perf sidecar; external custody only",
+      "sha256": "13ecf0abfbfb013cbe46e9760c9f02ab2d518e1be9c6b7ee0a76e1ea5289cc02"
+    },
+    {
+      "bound_by": "fresh-offline-child02-v1/result-v1.json and packet-validation-v4.json; repository copy omitted",
+      "bytes": 1002735,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.packet.json",
+      "repository_copy": false,
+      "role": "fresh retained child-02 packet; external near 1 MiB to keep repository packet bounded",
+      "sha256": "fe8fd0662eb00eaee9ffbcef4337debe8d95bc041f167ba53d75d8f689707e47"
+    },
+    {
+      "bound_by": "fresh-offline-child02-v1/result-v1.json and packet-validation-v4.json; repository copy omitted",
+      "bytes": 1021,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.perf-evlist-v.command.json",
+      "repository_copy": false,
+      "role": "fresh retained child-02 decoder/perf sidecar; external custody only",
+      "sha256": "b984846c7f0662811f268caaed518449a269fca2b7b49359360bdd05950af8cc"
+    },
+    {
+      "bound_by": "fresh-offline-child02-v1/result-v1.json and packet-validation-v4.json; repository copy omitted",
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.perf-evlist-v.stderr",
+      "repository_copy": false,
+      "role": "fresh retained child-02 decoder/perf sidecar; external custody only",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bound_by": "fresh-offline-child02-v1/result-v1.json and packet-validation-v4.json; repository copy omitted",
+      "bytes": 499,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.perf-evlist-v.txt",
+      "repository_copy": false,
+      "role": "fresh retained child-02 decoder/perf sidecar; external custody only",
+      "sha256": "29f2a64536a635ac827b283009f72855d998151954c3000f867cbeaf8b8058af"
+    },
+    {
+      "bound_by": "fresh-offline-child02-v1/result-v1.json and packet-validation-v4.json; repository copy omitted",
+      "bytes": 1045,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.perf-header.command.json",
+      "repository_copy": false,
+      "role": "fresh retained child-02 decoder/perf sidecar; external custody only",
+      "sha256": "727c40cd8d23487676df091be0f913cee4064cbf1336493229cbbffd05c4281a"
+    },
+    {
+      "bound_by": "fresh-offline-child02-v1/result-v1.json and packet-validation-v4.json; repository copy omitted",
+      "bytes": 49,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.perf-header.stderr",
+      "repository_copy": false,
+      "role": "fresh retained child-02 decoder/perf sidecar; external custody only",
+      "sha256": "73b3a559eb66337c5f0ae4ed3b5f31a3ed98bcccc0058df070ede34679d955df"
+    },
+    {
+      "bound_by": "fresh-offline-child02-v1/result-v1.json and packet-validation-v4.json; repository copy omitted",
+      "bytes": 1209,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.perf-header.txt",
+      "repository_copy": false,
+      "role": "fresh retained child-02 decoder/perf sidecar; external custody only",
+      "sha256": "9ab9c93af7f8e0a3a5c0b8488af57771855b7ca9853fbf921958aeee9732dec1"
+    },
+    {
+      "bound_by": "fresh-offline-child02-v1/result-v1.json and packet-validation-v4.json; repository copy omitted",
+      "bytes": 1033,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.perf-mmap-dump.command.json",
+      "repository_copy": false,
+      "role": "fresh retained child-02 raw or derived sidecar; external because large evidence",
+      "sha256": "4bf78c18638b16d49209eb5e0eba0946f016a75747d789df3b222f4de989e0ca"
+    },
+    {
+      "bound_by": "fresh-offline-child02-v1/result-v1.json and packet-validation-v4.json; repository copy omitted",
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.perf-mmap-dump.stderr",
+      "repository_copy": false,
+      "role": "fresh retained child-02 raw or derived sidecar; external because large evidence",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bound_by": "fresh-offline-child02-v1/result-v1.json and packet-validation-v4.json; repository copy omitted",
+      "bytes": 1139959789,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.perf-mmap-dump.txt",
+      "repository_copy": false,
+      "role": "fresh retained child-02 raw or derived sidecar; external because large evidence",
+      "sha256": "bc6b814b8e34554270f6a1a73270d2387f86a1a294cadd631f2b1f48ea8769d8"
+    },
+    {
+      "bound_by": "fresh-offline-child02-v1/result-v1.json and packet-validation-v4.json; repository copy omitted",
+      "bytes": 7694079,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.raw-stack.json",
+      "repository_copy": false,
+      "role": "fresh retained child-02 raw or derived sidecar; external because large evidence",
+      "sha256": "3a9d03cfb722566004bad88c147b2690d0ad02ce1f05e965959d95ced9de950a"
+    },
+    {
+      "bound_by": "fresh-offline-child02-v1/result-v1.json and packet-validation-v4.json; repository copy omitted",
+      "bytes": 9693,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.target-layout.json",
+      "repository_copy": false,
+      "role": "fresh retained child-02 decoder/perf sidecar; external custody only",
+      "sha256": "8a32ed1c05af39f4a47639d1d3bf68cc8b0dc62ed37a7a2e67b3b17d191770c9"
+    },
+    {
+      "bound_by": "fresh-offline-child02-v1/result-v1.json and packet-validation-v4.json; repository copy omitted",
+      "bytes": 1069,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.terminal-report.command.json",
+      "repository_copy": false,
+      "role": "fresh retained child-02 decoder/perf sidecar; external custody only",
+      "sha256": "aacd27a7d35b5cf0a4a355793955977003851e28173af8f991349c1902287fc0"
+    },
+    {
+      "bound_by": "fresh-offline-child02-v1/result-v1.json and packet-validation-v4.json; repository copy omitted",
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.terminal-report.stderr",
+      "repository_copy": false,
+      "role": "fresh retained child-02 decoder/perf sidecar; external custody only",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bound_by": "fresh-offline-child02-v1/result-v1.json and packet-validation-v4.json; repository copy omitted",
+      "bytes": 1383,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.terminal-report.txt",
+      "repository_copy": false,
+      "role": "fresh retained child-02 decoder/perf sidecar; external custody only",
+      "sha256": "f46285b4be0b246d827afc3f18689fc58e34401a01faee55437a39a34f708cbf"
+    },
+    {
+      "bound_by": "fresh-offline-child02-v1/result-v1.json and packet-validation-v4.json; repository copy omitted",
+      "bytes": 795,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/child-02/child-02.terminal-summary.json",
+      "repository_copy": false,
+      "role": "fresh retained child-02 decoder/perf sidecar; external custody only",
+      "sha256": "7c40d84a6f4f33e34fdfacf95416cf76577083f935791ac0729276504b20e7b3"
+    },
+    {
+      "bound_by": "0978 final offline artifacts; repository copy omitted",
+      "bytes": 51431312,
+      "path": "/home/zhuhe/litchi-performance-0978/integration-decoder-v3/child-01/child-01.attribution-samples.json",
+      "repository_copy": false,
+      "role": "unsealed retained decoder integration attribution ledger; external only, no qualification claim",
+      "sha256": "7b1942250140ff10aa74a500aeb0e9fc382f26f79fff974fca7b940a60fc8589"
+    },
+    {
+      "bound_by": "0978 final offline artifacts; repository copy omitted",
+      "bytes": 229236372,
+      "path": "/home/zhuhe/litchi-performance-0978/integration-decoder-v3/child-01/child-01.corrected.dwfl.jsonl",
+      "repository_copy": false,
+      "role": "unsealed retained decoder integration DWFL log; external only",
+      "sha256": "1bf17f836cd9a68ca9feb2cf0f0fc58751dcbb0a14d2f745e857bcda13c5df4b"
+    },
+    {
+      "bound_by": "0978 final offline artifacts; repository copy omitted",
+      "bytes": 11865277,
+      "path": "/home/zhuhe/litchi-performance-0978/integration-decoder-v3/child-01/child-01.corrected.perf-script-no-inline.txt",
+      "repository_copy": false,
+      "role": "unsealed retained decoder integration perf-script output; external only",
+      "sha256": "07c0ace894c19e4ac567edab2f7626b52fb4bd0354cfc25f270f1e0ce2402528"
+    },
+    {
+      "bound_by": "0978 final offline artifacts; repository copy omitted",
+      "bytes": 22004237,
+      "path": "/home/zhuhe/litchi-performance-0978/integration-decoder-v3/child-01/child-01.lifecycle-ledger.json",
+      "repository_copy": false,
+      "role": "unsealed retained decoder integration lifecycle ledger; external only, no qualification claim",
+      "sha256": "eb889d8fb2d317b0d219c9d27f7f4e0786534ddc1fc7971c8196cf609b814db6"
+    },
+    {
+      "bound_by": "0978 final offline artifacts; repository copy omitted",
+      "bytes": 7697277,
+      "path": "/home/zhuhe/litchi-performance-0978/integration-decoder-v3/child-01/child-01.raw-stack.json",
+      "repository_copy": false,
+      "role": "unsealed retained decoder integration raw-stack sidecar; external only",
+      "sha256": "cbba7c0a138dda7fafb40bf041eec8d6b00a0fda6f5e938e8012aefd668ea94e"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 1035,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/capture-manifest.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "f0bef5ff1cbd9eae486314ea076457736bbecee60c75e1b7b0792cfde94bca25"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 568,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.abi-scan.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "81d64d9259ea30c15d6f64e2f03c70b4d5c5bcceff1e080f2fdf6227c7f7c51a"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 81025,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.affinity-observations.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "b36664ba20e2b9cf6ae12224824b2c871b8154c21249f04914b3d09056d75425"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 51362979,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.attribution-samples.json",
+      "repository_copy": false,
+      "role": "terminal native attribution sample ledger; external derived evidence",
+      "sha256": "c69d13eedd15401b30e943c488f4989fac88917db5a78644b3f277f7ac25de62"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 2056,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.bridge.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "2c0974a92e313b21f162eef77e71a6ed9d1f49fefd38219d53e6592c8b570520"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 2379,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.command.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "2bfb09b42849ecc90cbe9eeec6b57435a40b562a3ef69790bc706b6d37c4b1d9"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 1990,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.corrected.command.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "2cdf71f87b3477d6ce9105bbc0827c5113af626ceb2d6b5072995ab17a3a9b25"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 228344225,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.corrected.dwfl.jsonl",
+      "repository_copy": false,
+      "role": "terminal native corrected DWFL output; external derived evidence",
+      "sha256": "58419f34e7114f47e0e3f0adae3d18ece5da446c15ec730318b295e98b81eaa4"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 11821553,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.corrected.perf-script-no-inline.txt",
+      "repository_copy": false,
+      "role": "terminal native corrected perf-script output; external derived evidence",
+      "sha256": "52f7cb3b3cc3d763456b70dd36b384223c826d515cec300cc038cfc948214b35"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.corrected.perf.stderr",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 8974,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.decoder.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "da6c1308e2bdf5a97f7c395ca1ed18ebdeb54693b94cefc8402a4fdbc281846d"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 1106,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.launch.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "e797b45da0986c05835c330920ddccd225cd9c95cfda29d1f3754c7f28c1d7a8"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 22488402,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.lifecycle-ledger.json",
+      "repository_copy": false,
+      "role": "terminal native lifecycle ledger; external derived evidence",
+      "sha256": "771e30468ccfddae4ef9cecee3bd2aa0d33cf8b1009b9d2b89fbaf012e2a32ae"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 213,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.loss.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "13ecf0abfbfb013cbe46e9760c9f02ab2d518e1be9c6b7ee0a76e1ea5289cc02"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 1007612,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.packet.json",
+      "repository_copy": false,
+      "role": "terminal native decoded packet; external bounded capture evidence",
+      "sha256": "08d8d57962b03801e0e1ccf554f1455f3468ddda4606ffc86c270462d5575b41"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 1039,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.perf-evlist-v.command.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "175da549d196430ac35384f4438f8994306e46631781eb0b866e5a2f849d3309"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.perf-evlist-v.stderr",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 499,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.perf-evlist-v.txt",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "29f2a64536a635ac827b283009f72855d998151954c3000f867cbeaf8b8058af"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 1063,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.perf-header.command.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "349c24b3c19d334b902c511d56d03021922f08d0ca23ddc20dc91408eab4e85d"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 49,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.perf-header.stderr",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "73b3a559eb66337c5f0ae4ed3b5f31a3ed98bcccc0058df070ede34679d955df"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 1209,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.perf-header.txt",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "29bc60d009108f55b891b947f64fb4ba3d804bb52cd7e8982771e2766724a0aa"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 1051,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.perf-mmap-dump.command.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "4625d03472bafa94a3c676e5e31812434523bb1ecf87a3979dd44f9f800e6951"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.perf-mmap-dump.stderr",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 1139598151,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.perf-mmap-dump.txt",
+      "repository_copy": false,
+      "role": "terminal native perf mmap dump; external raw evidence",
+      "sha256": "88a0ac8d9545f3ee05e623c56eadd2cb604a6700c3ab6c871ab8beaeef2c8296"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 237819904,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.perf.data",
+      "repository_copy": false,
+      "role": "terminal native perf.data capture; external raw evidence",
+      "sha256": "528d098d8f2696003b772c9478c41fcc800a6831082e3018e50553229e42ce34"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 191,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.perf.stderr",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "e53053d03f13da0cd570537f0c7966c2383e0a791e6574f629fe0329043fe7bc"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 7697553,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.raw-stack.json",
+      "repository_copy": false,
+      "role": "terminal native raw-stack sidecar; external bounded capture evidence",
+      "sha256": "73fdc9ef5851e3f5c7d62e6ecff22d06af5a33bf2d505974af0939a41ddc7af1"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 292304,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.report.json",
+      "repository_copy": false,
+      "role": "terminal native report; external bounded capture evidence",
+      "sha256": "f95c1a03800c97685bcc991638dc43d07e4a9a7aced3fd0ca422017f7f5cad1e"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 1066,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.status.json",
+      "repository_copy": false,
+      "role": "terminal native child gate status; external bounded failure evidence",
+      "sha256": "2b191db148491b08985d8f2bcb713d24cb8fdc837733d3c369ead4f4a9e5e370"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 9709,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.target-layout.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "099ed68281420d7bda7a6f1d2be4e4bbd54d12980f117e41662d2b6f3bf38b97"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 1087,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.terminal-report.command.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "e4225f7e0a562f9c26278ea7c1f929dfb12d6b53c0e6f4869f5ad25781361420"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.terminal-report.stderr",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 1097,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.terminal-report.txt",
+      "repository_copy": false,
+      "role": "terminal native loss/terminal report; external bounded failure evidence",
+      "sha256": "591fb7d5c516276bffab3c22b73a5a20985ea9ac4129a5e0abfc3a8b8624b716"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 813,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.terminal-summary.json",
+      "repository_copy": false,
+      "role": "terminal native loss/terminal report; external bounded failure evidence",
+      "sha256": "3b0c5310c56b8f0076ac3cbdc0b4cb6a93fd5f60f393036dabb4142573581fdf"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 2618,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.terminal.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "c22b0c34b2730f00810b5e91c268971cc98ae120e1d5dfa5d421e659bf4f267d"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 568,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.abi-scan.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "84096aa458314689c3764a1b6feaab5a317ed27ce886ff211c870785f10a081c"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 75974,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.affinity-observations.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "d71f7c00490ae046f2871e203a61d9b32f06d06d69f57df5ec366dd0d04687e3"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 50611909,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.attribution-samples.json",
+      "repository_copy": false,
+      "role": "terminal native attribution sample ledger; external derived evidence",
+      "sha256": "4403e1f3a9cdc935ecc465cb4b76eff627949798e2e8d83c443bcecb93ebb58d"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 2056,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.bridge.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "adf3a648ba6fb6e0021eabf27f711f8688ff8c071831e3b44d8b7d7f812e23c6"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 2379,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.command.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "da6b0f728646dd66911776fd8d758b09db0def9164393dfa3ff33dade9cf31b6"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 1990,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.corrected.command.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "9ff906573b2db38730633c4e0003aff6ef06c6f848e1c3a6650ebedf92e31bf9"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 223101758,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.corrected.dwfl.jsonl",
+      "repository_copy": false,
+      "role": "terminal native corrected DWFL output; external derived evidence",
+      "sha256": "467ff3919d48917da86fdf65de1dbc3391ab864d1d850e5df14f33d2a4756d5c"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 11652749,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.corrected.perf-script-no-inline.txt",
+      "repository_copy": false,
+      "role": "terminal native corrected perf-script output; external derived evidence",
+      "sha256": "485def9dc0399a84e0755be6c2db2cf77e8dab9d16015fd30238e82bb4eef2db"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.corrected.perf.stderr",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 8974,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.decoder.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "9d8a7210af7dc350ac41d8a3fc887395504ee2c14f4e0571b8266f121d3b46bc"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 1106,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.launch.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "cf1ce3d5e2395a8539661aece0dea44eb83907eb0ceb368b1003165a8a086e75"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 22690002,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.lifecycle-ledger.json",
+      "repository_copy": false,
+      "role": "terminal native lifecycle ledger; external derived evidence",
+      "sha256": "97c135fd09aae16f4eb0438dbfbdae693384e033b44a27658ebd3964114091b1"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 213,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.loss.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "13ecf0abfbfb013cbe46e9760c9f02ab2d518e1be9c6b7ee0a76e1ea5289cc02"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 999873,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.packet.json",
+      "repository_copy": false,
+      "role": "terminal native decoded packet; external bounded capture evidence",
+      "sha256": "30cf5f4340eb3182cc4986d781bda701d4898e40f12039c05e6068374094ab58"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 1039,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.perf-evlist-v.command.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "236623417519af1942c19fa6ba4954c58efbf2eb2dd772fad53a348beb828db1"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.perf-evlist-v.stderr",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 499,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.perf-evlist-v.txt",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "29f2a64536a635ac827b283009f72855d998151954c3000f867cbeaf8b8058af"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 1063,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.perf-header.command.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "c125446bd333cedb75f83efcbeb9e81a3d5dad898b0a5a75f5425c723d3b9e49"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 49,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.perf-header.stderr",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "73b3a559eb66337c5f0ae4ed3b5f31a3ed98bcccc0058df070ede34679d955df"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 1209,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.perf-header.txt",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "3562fd05b7950f0c001159218afda49ac7ddab361d5e8507cadea62fa91c3ebb"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 1051,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.perf-mmap-dump.command.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "42223e7ced5cdc825ebdcfca8b8bb73e61cf74114095ca7dd24a308c6dab8520"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.perf-mmap-dump.stderr",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 1139737588,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.perf-mmap-dump.txt",
+      "repository_copy": false,
+      "role": "terminal native perf mmap dump; external raw evidence",
+      "sha256": "a10bc599fa9b402f2c8e25411e8a71638e2734f10b6ff1f62856ec67c024b944"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 237867856,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.perf.data",
+      "repository_copy": false,
+      "role": "terminal native perf.data capture; external raw evidence",
+      "sha256": "a62de67e4db3aaf08acfcbb2c27a124f516bc4a7947ea8de8d3b8e77a78216d6"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 191,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.perf.stderr",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "5343843c11074849169cdb819843fdc9d9a74b79c9beda625f0c40616557cdf6"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 7698412,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.raw-stack.json",
+      "repository_copy": false,
+      "role": "terminal native raw-stack sidecar; external bounded capture evidence",
+      "sha256": "d1a172a4e4d6c02eefb9a300277f71133bdb74e7fc71709b4f9b4bf4fa7e2e87"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 292302,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.report.json",
+      "repository_copy": false,
+      "role": "terminal native report; external bounded capture evidence",
+      "sha256": "81ee1b8e8f76ea7244ba2bf5b62419b2e8c12d6898025f1b8f5e1b616a5a348e"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 1067,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.status.json",
+      "repository_copy": false,
+      "role": "terminal native child gate status; external bounded failure evidence",
+      "sha256": "ca8f8c3e2bc6afbfc4312b6f4461e38916df142eaec31647efe52f76a1d54931"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 9709,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.target-layout.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "1cfce783624395f5a48212a35eb119b34971155e7551a40b697a0683d0108800"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 1087,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.terminal-report.command.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "cf0f1a35c54fb1c155fc84a1a2b052ba5524839f7cd88f859b3a44e8ba56afe5"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.terminal-report.stderr",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 3399,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.terminal-report.txt",
+      "repository_copy": false,
+      "role": "terminal native loss/terminal report; external bounded failure evidence",
+      "sha256": "4df4905a847a2c4e6ed6129708cdeeb8ead9b8eeb4c7f8fefca2129da39f9245"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 813,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.terminal-summary.json",
+      "repository_copy": false,
+      "role": "terminal native loss/terminal report; external bounded failure evidence",
+      "sha256": "7eca0d2225ef6d3143f2046ef60621fe76e257d95d75bb75defb901601003f41"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 2618,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.terminal.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "d1af2010022fb7eaf738dc587eb4e5fb62f203aaf20b031554aab7c1cbb0a275"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 98659,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.affinity-observations.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "897cea240ed2353eb82cbfebc6a39a0dd44eb3d24e222304e1749f33f5c7f4ec"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 2056,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.bridge.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "260cf14887eb3f7dadbe00c0da4763f4dd26ac55d3b8106923a5016734dca5c8"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 2379,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.command.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "328f46707ade730636cee4262a777d07040457eff729496b88458f9fc35d441c"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 1106,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.launch.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "a3b782a4b2b7bb846271808a3236b70f387e6f6f0494220a9d5565116f4b5041"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 1039,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.perf-evlist-v.command.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "458252a281a602a18242233ba3cada410a1f81897c96f9dcea0ec14c389cdc67"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.perf-evlist-v.stderr",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 499,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.perf-evlist-v.txt",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "29f2a64536a635ac827b283009f72855d998151954c3000f867cbeaf8b8058af"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 1063,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.perf-header.command.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "a09df38a84e085aedad58022e97c1fc2e9165fe9c029596f487b716e4fee2256"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 49,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.perf-header.stderr",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "73b3a559eb66337c5f0ae4ed3b5f31a3ed98bcccc0058df070ede34679d955df"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 1209,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.perf-header.txt",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "6329fe553011d7c8b5cb0edea6149a3228687f1b085de8c2ff62503864f02c0c"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 1052,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.perf-mmap-dump.command.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "e3a61091059bac19bf7db59cde59d18cf05de3732fcca4ed91b548ed94631dbe"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 75,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.perf-mmap-dump.stderr",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "16dec10f6d36f3d7b29ef9530a875dfc027c5594271934e06fdf0826ddf706c8"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 1139402935,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.perf-mmap-dump.txt",
+      "repository_copy": false,
+      "role": "terminal native perf mmap dump; external raw evidence",
+      "sha256": "b5cc077ade40b1931efcc9746b7f0b918ed5966d1974fb93b0a363f8c75cf7fb"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 237746512,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.perf.data",
+      "repository_copy": false,
+      "role": "terminal native perf.data capture; external raw evidence",
+      "sha256": "e2d90e0b9a75779864bbee58fb22a32c94c176a3fd2dfd973ca0b5cee924f769"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 191,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.perf.stderr",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "104c2b392018e5caf31f0763367a962af61a298e9e3cd42b3f4a5710b60ddad2"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 292304,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.report.json",
+      "repository_copy": false,
+      "role": "terminal native report; external bounded capture evidence",
+      "sha256": "923b6a975ce64d60b1b771fd886ece1af4b02e85350a23843b4880e2d3efcfd3"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 195,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.status.json",
+      "repository_copy": false,
+      "role": "terminal native child gate status; external bounded failure evidence",
+      "sha256": "093455f77850072f4389ece28251ff89ef94f9e0d69fe76a866271cec6933360"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 9709,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.target-layout.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "501039f00ede8508e379fc61960f752670480fd208048875fdb410cf66b54625"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 1088,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.terminal-report.command.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "b1d4bbf1518c85a8fe3c7685288a75a24af45c270c5793a4bcd3a49af6ebf159"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 75,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.terminal-report.stderr",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "16dec10f6d36f3d7b29ef9530a875dfc027c5594271934e06fdf0826ddf706c8"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 1727,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.terminal-report.txt",
+      "repository_copy": false,
+      "role": "terminal native loss/terminal report; external bounded failure evidence",
+      "sha256": "995e4800cce2481b6ef397ed307bf841fd88a9ccef3c4147c97558135b19c3ab"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 813,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.terminal-summary.json",
+      "repository_copy": false,
+      "role": "terminal native loss/terminal report; external bounded failure evidence",
+      "sha256": "dc36942a5ffab25ef25c913932c0aa98b63af38250fdfc123b6ebf8b76d8dab5"
+    },
+    {
+      "bound_by": "0978 terminal capture summary and post-capture failed-cohort audit; repository copy omitted",
+      "bytes": 2618,
+      "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-03/child-03.terminal.json",
+      "repository_copy": false,
+      "role": "terminal native capture metadata/sidecar; external custody evidence",
+      "sha256": "350116e6ad093020423ea92565f1253b84f90e93fdde31ffd3b77a214be6ca07"
+    }
+  ],
+  "external_root": "/home/zhuhe/litchi-performance-0978",
+  "historical_exclusions": [
+    {
+      "bytes": 31010,
+      "path": "/home/zhuhe/litchi-performance-0978/plans/plan-0978-v1.json",
+      "sha256": "acdae82274e614ae7834a74cd25624828454cc2bdddd9ae30bcef99f98269013",
+      "status": "superseded metadata-label plan snapshot; no GO; external only"
+    },
+    {
+      "bytes": 32663,
+      "path": "/home/zhuhe/litchi-performance-0978/plans/plan-0978-v2.json",
+      "sha256": "3d7601645076439bfc6024488fea3136182f5de0b817719ceb7e5840906deb09",
+      "status": "superseded incoherent v2 plan snapshot; no GO; external only"
+    },
+    {
+      "bytes": 3392,
+      "path": "/home/zhuhe/litchi-performance-0978/receipts/control-boundary-equivalence-0978-v1.json",
+      "sha256": "95e1452843a7d2bb217cda6fb20e2bcc72174cea321de7db9a284aa61bb63b0c",
+      "status": "superseded failed static equivalence receipt"
+    },
+    {
+      "bytes": 3388,
+      "path": "/home/zhuhe/litchi-performance-0978/receipts/control-boundary-equivalence-0978-v2.json",
+      "sha256": "3fcd7907aa5180f09d8d89ee10ff3e2b97c32262ab09fc775cfc03b71b038b19",
+      "status": "superseded equivalence receipt"
+    },
+    {
+      "bytes": 3388,
+      "path": "/home/zhuhe/litchi-performance-0978/receipts/control-boundary-equivalence-0978-v3.json",
+      "sha256": "c3b3fc32f7d88903439d993cdd1f3351483919dcc29a5033dcc230525c5a508d",
+      "status": "superseded equivalence receipt"
+    },
+    {
+      "bytes": 3388,
+      "path": "/home/zhuhe/litchi-performance-0978/receipts/control-boundary-equivalence-0978-v4.json",
+      "sha256": "cecbb5041f88e50fd7e88abe7f1a5b09d1fd64585171e6850c77d890b9c637a1",
+      "status": "superseded equivalence receipt; no GO; external only"
+    },
+    {
+      "bytes": 6649,
+      "path": "/home/zhuhe/litchi-performance-0978/receipts/helper-seal-0978-v1.json",
+      "sha256": "a5d4becad0a27096ced0b6167fcc1b08e527460e621444490bb334b8d4a72f9b",
+      "status": "superseded metadata-label helper seal; no GO; external only"
+    },
+    {
+      "bytes": 6877,
+      "path": "/home/zhuhe/litchi-performance-0978/receipts/helper-seal-0978-v2.json",
+      "sha256": "9642bd8d13f7eea2a345e9929b30c7aa797c685d7bc621644b6be98f9c07072d",
+      "status": "superseded incoherent v2 helper seal; no GO; external only"
+    },
+    {
+      "bytes": 8468,
+      "path": "/home/zhuhe/litchi-performance-0978/receipts/raw-stack-scanner-controls-0978-v1.json",
+      "sha256": "1d340cd1e171e17c4d7f5a2f3691005177e6ffac8d7ab36910b1ffa23d17baeb",
+      "status": "superseded by scanner-controls-v2"
+    },
+    {
+      "bytes": 12508,
+      "path": "/home/zhuhe/litchi-performance-0978/receipts/replay-0977-child01-02-v1.json",
+      "sha256": "f99dcf9bae516741ee68848cc30ac0d2139e7f707b165d993c50ce04564c5597",
+      "status": "superseded by separate child replay-v2 receipts"
+    },
+    {
+      "bytes": 9687,
+      "path": "/home/zhuhe/litchi-performance-0978/review/focused-decoder-readiness-v1.json",
+      "sha256": "66d0a98f989c78364a8ca0f285001273ca1bbd8eaf4280fe955d179d119b7c5e",
+      "status": "superseded blocked readiness review; final offline guard does not imply native readiness"
+    },
+    {
+      "bytes": 17137,
+      "path": "/home/zhuhe/litchi-performance-0978/review/independent-design-review-v1.json",
+      "sha256": "79621bc2055c078fbbef288988320d3afd1980e6a82777bf38d50dedbf93f062",
+      "status": "superseded by policy/design review v3"
+    },
+    {
+      "bytes": 17305,
+      "path": "/home/zhuhe/litchi-performance-0978/review/independent-design-review-v2.json",
+      "sha256": "dd3432111594334db866211162aa97e65386abd0f5241aa64de6b986d4c74139",
+      "status": "superseded by policy/design review v3"
+    },
+    {
+      "bytes": 6919,
+      "path": "/home/zhuhe/litchi-performance-0978/review/independent-native-boundary-review-v1.json",
+      "sha256": "f9d335fc5247e7cdef85f13157be802b14612ada06fed97d52c1d57cbb9a6472",
+      "status": "superseded native-boundary review; no GO; external only"
+    },
+    {
+      "bytes": 9534,
+      "path": "/home/zhuhe/litchi-performance-0978/review/independent-native-boundary-review-v2.json",
+      "sha256": "37d5b1666e67dab8f04dfe5e5b319c83aa03431d2b86bf4fc7e9cd6c19f5eda1",
+      "status": "superseded native-boundary review; no GO; external only"
+    },
+    {
+      "bytes": 2547,
+      "path": "/home/zhuhe/litchi-performance-0978/review/independent-raw-stack-tests-v1-provisional.json",
+      "sha256": "9a37669d35da1fc5fec2d4654257585d246d0fbbf34e6d14890a5963ac9afee1",
+      "status": "provisional, superseded by final independent review"
+    },
+    {
+      "bytes": 2401,
+      "path": "/home/zhuhe/litchi-performance-0978/review/independent-raw-stack-tests-v2-provisional-pass.json",
+      "sha256": "a7119570f401d1eccb65e90c5beae732e90f7ccad57b389d2022ed26d71ff18b",
+      "status": "provisional, superseded by final independent review"
+    },
+    {
+      "bytes": 2132,
+      "path": "/home/zhuhe/litchi-performance-0978/review/independent-reducer-mutation-tests-v1-provisional.json",
+      "sha256": "5412cdf5f841137dcc906b12dffad577b156769f521d67304a82b90f1095586f",
+      "status": "provisional fail-open WIP mutation review; superseded by final scoped approval"
+    },
+    {
+      "bytes": 2859,
+      "path": "/home/zhuhe/litchi-performance-0978/review/independent-reducer-scoped-approval-v1.json",
+      "sha256": "26847e9aeb7d517ec1d9153e0223432d0c3fdde58687a561e81a6fe953ea1122",
+      "status": "superseded by scoped approval v3"
+    },
+    {
+      "bytes": 15119,
+      "path": "/home/zhuhe/litchi-performance-0978/review/lifecycle-ledger-review-v2.json",
+      "sha256": "a7617a44986dd1478b811a2add203856807b79fad25131e67abb72beb64049f0",
+      "status": "WIP integration blocker; not copied or authorized"
+    },
+    {
+      "bytes": 11208,
+      "path": "/home/zhuhe/litchi-performance-0978/review/lifecycle-ledger-review-v3.json",
+      "sha256": "d5b155dafc897127b8b6aba49fa2612653f6a5456bea21fd191a79c8383cf407",
+      "status": "superseded blocked review; corrected helper reviewed by v4"
+    },
+    {
+      "bytes": 53527,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/focuseddecode_0978.py",
+      "sha256": "ecabcd01ba6f9bae6b397f80573bc3d170b538d9d0f1d08477486875420afc34",
+      "status": "decoder integration WIP source; deliberately not copied"
+    },
+    {
+      "bytes": 62914,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/focuseddecode_0978_v2.py",
+      "sha256": "438156ca459002aa44578de446648e82f1194f73fe17cad845b6464dbe1ea911",
+      "status": "superseded decoder candidate; not authoritative and not copied"
+    },
+    {
+      "bytes": 50884,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/lifecycle_ledger_0978.py",
+      "sha256": "c63b6475e459f475e19f3fd39ded373c9fc0fae7c327e0088f5dc70f061bb3e9",
+      "status": "WIP helper; not copied"
+    },
+    {
+      "bytes": 40141,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/plan_binding_0978_v1-historical-pre-v4.py",
+      "sha256": "eacb12d1ae15a1930bc1b5efabefd044367ecaec8cf446f3f1f7e5a310a53efc",
+      "status": "superseded pre-v4 plan-binding snapshot; no GO; external only"
+    },
+    {
+      "bytes": 43856,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/plan_binding_0978_v2.py",
+      "sha256": "c261433ebcda20603709c028acd8e74c65b7a1e1408a6e17072b9becb752fa26",
+      "status": "superseded incoherent plan-binding v2; no GO; external only"
+    },
+    {
+      "bytes": 21100,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/prepare_plan_0978_v2.py",
+      "sha256": "290940ef30701b020912c2c9bdee220aa62c948aa6ba47e4648b63a0362b32ce",
+      "status": "superseded helper-generator v2; no GO; external only"
+    },
+    {
+      "bytes": 103753,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/reduce_0978.py",
+      "sha256": "e904caa12e395cc7b6917cc03cf82509168338c94291575b3ecef282639ae626",
+      "status": "superseded by final reducer v4; retained external only"
+    },
+    {
+      "bytes": 104807,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/reduce_0978_v3.py",
+      "sha256": "16c76e1b9cc76899500b358814bbc3a2952bc3adfebb9e39133b029f6203739e",
+      "status": "pre-label snapshot; not authoritative and not copied"
+    },
+    {
+      "bytes": 46994,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/run_0978_v1.py",
+      "sha256": "45cbf5372ed969cb238788bda796244cfa1ef291a55b62619db5259ecf0fddae",
+      "status": "WIP runner; not copied"
+    },
+    {
+      "bytes": 10201,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/test_reduce_0978.py",
+      "sha256": "b2ea77dfc5a3a45ff4ba017b6d08909e00bf63a542d34e37551d4d7cb18a44d1",
+      "status": "v1 lineage control; retained external only"
+    }
+  ],
+  "manifest_not_created": false,
+  "notes": [
+    "This is the final external-artifact descriptor for the failed 0978 Office capture, bound by the final packet manifest. The final readiness and native-boundary reviews preceded one root-authorized run; post-capture audit rejects the incomplete cohort and no retry or replacement occurred.",
+    "Children 1 and 2 passed their decoder/runner gates with raw and terminal loss zero. Child 3 had terminal lost samples 4; its raw PERF_RECORD_LOST counter values were 1 and 3 (two records, total 4) and are not added to the terminal count. Children 4--12 were never started.",
+    "The final lifecycle helper and final offline decoder guard remain bound by separate receipts; the fresh retained-child result was produced with the original decoder and the v3 guard was validated without a new reader run.",
+    "The final reducer v4 is a string-only owner-bounds metadata correction over validated v2 evidence; the packet-validation v4 result remains the bound offline evidence. The one post-capture reducer invocation rejected the incomplete manifest with return code 2 and wrote no output.",
+    "Full offline and terminal perf, mmap, perf-script, DWFL, forensic, lifecycle, packet, ledger, and compiled artifacts stay external with exact size/SHA-256 and regeneration references.",
+    "The compact native capture summary binds all 92 files under the terminal capture root. No terminal raw capture, full ledger, compiled executable, shared object, or file at or above 1 MiB is copied into this packet.",
+    "Plan/seal v1 and v2 snapshots and incoherent helper lineages remain historical exclusions; plan/seal v3, root GO, terminal result, manifest, post-capture audit, and cleanup receipt are the selected custody artifacts."
+  ],
+  "payload_constraints": {
+    "all_repository_files_below_1_mib": true,
+    "build_started": false,
+    "compiled_binaries_copied": false,
+    "final_packet_manifest_created": true,
+    "full_sample_ledgers_copied": false,
+    "mmap_dumps_copied": false,
+    "native_workload_started": true,
+    "raw_perf_captures_copied": false,
+    "native_capture_completed": false,
+    "capture_children_requested": 12,
+    "capture_children_completed": 2,
+    "capture_failure_child": 3,
+    "capture_retry": false,
+    "capture_selective_replacement": false,
+    "capture_all12_reduction_admitted": false
+  },
+  "regeneration": {
+    "independent_scanner_controls": "PYTHONDONTWRITEBYTECODE=1 python3 -B tests/independent_raw_stack_tests_v1.py",
+    "lifecycle_controls": "PYTHONDONTWRITEBYTECODE=1 python3 -B tools/test_lifecycle_ledger_0978.py && PYTHONDONTWRITEBYTECODE=1 python3 -B tools/test_child02_ledger_integration_0978.py",
+    "lifecycle_reparse": "PYTHONDONTWRITEBYTECODE=1 python3 -B tools/reparse_lifecycle_0978_v1.py --dump <bound-perf-D-dump> --output <fresh-stream>.json --receipt <fresh-receipt>.json --pid 3849325 --cpu 31",
+    "native_boundary": "PYTHONDONTWRITEBYTECODE=1 python3 -B tools/run_0978_v1.py --self-test; this checks the runner boundary only. The historical --run command and failed disposition are recorded separately; do not rerun sealed paths or generate a replacement cohort.",
+    "plan_helpers": "Plan binding/generation sources are copied for custody; any check/generation requires a copied external root and fresh exclusive outputs.",
+    "reducer_controls": "PYTHONDONTWRITEBYTECODE=1 python3 -B tools/test_reduce_0978.py && PYTHONDONTWRITEBYTECODE=1 python3 -B tests/independent_reducer_mutation_tests_v2.py",
+    "reducer_replay": "PYTHONDONTWRITEBYTECODE=1 python3 -B tools/replay_attribution_0978_v1.py --output <fresh-receipt>.json --ledger-output <fresh-ledger>.json --lifecycle-stream <bound-stream-v2>.json --stream-generation-receipt <bound-build-ledger-v3>.json",
+    "scanner_controls": "PYTHONDONTWRITEBYTECODE=1 python3 -B tools/test_raw_stack_0978.py",
+    "raw_replay_child01": "PYTHONDONTWRITEBYTECODE=1 python3 tools/replay_raw_stack_0978.py --child 1 --output <fresh-external-child01-output>.json",
+    "raw_replay_child02": "PYTHONDONTWRITEBYTECODE=1 python3 tools/replay_raw_stack_0978.py --child 2 --output <fresh-external-child02-output>.json",
+    "decoder_guard_controls": "PYTHONDONTWRITEBYTECODE=1 python3 -B tools/test_full_lifetime_evlist_guard_0978_v1.py && PYTHONDONTWRITEBYTECODE=1 python3 -B tools/test_focuseddecode_command_boundary_0978_v1.py",
+    "reducer_v4_self_test": "PYTHONDONTWRITEBYTECODE=1 python3 -B tools/reduce_0978_v4.py --self-test",
+    "fresh_offline_validation": "PYTHONDONTWRITEBYTECODE=1 python3 -B tools/validate_packet_integration_0978_v4.py --integration-root <fresh-external-root>/fresh-offline-child02-v1 --child child-02 --output <fresh-external-output>/packet-validation-v4-new.json",
+    "fresh_result_decoder": "PYTHONDONTWRITEBYTECODE=1 python3 -B tools/focuseddecode_0978.py --plan <fresh-external-root>/fresh-offline-child02-v1/plan.json --child <fresh-external-root>/fresh-offline-child02-v1/child-02",
+    "plan_and_seal_generation": "PYTHONDONTWRITEBYTECODE=1 python3 -B tools/prepare_plan_0978_v1.py --seal-output <fresh-helper-seal-v3.json> --decoder tools/focuseddecode_0978_v3.py --reducer tools/reduce_0978_v4.py && PYTHONDONTWRITEBYTECODE=1 python3 -B tools/prepare_plan_0978_v1.py --helper-seal <fresh-helper-seal-v3.json> --decoder tools/focuseddecode_0978_v3.py --reducer tools/reduce_0978_v4.py --output <fresh-plan-v3.json>",
+    "native_capture_historical": "HISTORICAL ONLY; do not rerun sealed paths: /usr/bin/python3.14 -B /home/zhuhe/litchi-performance-0978/tools/run_0978_v1.py --run --plan /home/zhuhe/litchi-performance-0978/plans/plan-0978-v3.json --go /home/zhuhe/litchi-performance-0978/receipts/root-go-0978-office-v1.json",
+    "native_reduction_rejection": "HISTORICAL OFFLINE ONLY; no output was written: python3 -B /home/zhuhe/litchi-performance-0978/tools/reduce_0978_v4.py --plan /home/zhuhe/litchi-performance-0978/plans/plan-0978-v3.json --manifest /home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/capture-manifest.json --output /home/zhuhe/litchi-performance-0978/analysis/instruction-profile-reduction-v1.json"
+  },
+  "repository_packet": "docs/performance/results/change-0978",
+  "repository_payload_file_count": 79,
+  "repository_payload_files": [
+    {
+      "path": "docs/performance/results/change-0978/README.md",
+      "bytes": 8322,
+      "sha256": "90ee3b1c4e9f5ad4415ef67121d75142fe6e65f46af50fd09d3c8d1a0c17ef02"
+    },
+    {
+      "path": "docs/performance/results/change-0978/analysis/child-02-offline-diagnostic-v1.json",
+      "bytes": 12179,
+      "sha256": "f0083ceb7711bd164aab277b7d55f8ec73a438d4129972128e233455685e078f"
+    },
+    {
+      "path": "docs/performance/results/change-0978/analysis/focuseddecode_0978-pre-full-lifetime-guard-866723.py",
+      "bytes": 61705,
+      "sha256": "866723324881a57ce7c4282cdfd2dabe497397b1612e8d7c4f975cb7e9fe2134"
+    },
+    {
+      "path": "docs/performance/results/change-0978/analysis/fresh-offline-child02-packet-validation-v4.json",
+      "bytes": 26513,
+      "sha256": "a970f7309ab455c74a73b80c9ff7d99fcd2859b8ba05801aaf8c6f3a59643aab"
+    },
+    {
+      "path": "docs/performance/results/change-0978/analysis/fresh-offline-child02-plan-v1.json",
+      "bytes": 4165,
+      "sha256": "b1a96b011370c2390ce962db63d69618942fdb592a6b1b276745d67709f6eb1d"
+    },
+    {
+      "path": "docs/performance/results/change-0978/analysis/fresh-offline-child02-result-v1.json",
+      "bytes": 16854,
+      "sha256": "cde5d9f72d3d8c7f4c08641746efde82b174cd2f5949bbb4265de58197bdb76c"
+    },
+    {
+      "path": "docs/performance/results/change-0978/analysis/native-capture-summary-v1.json",
+      "bytes": 30620,
+      "sha256": "bc2e8b501ef61fd51bda00a76d54636cccc4543db5906bfc35d8c3df5312e478"
+    },
+    {
+      "path": "docs/performance/results/change-0978/analysis/native-child-01-status-v1.json",
+      "bytes": 1066,
+      "sha256": "2b191db148491b08985d8f2bcb713d24cb8fdc837733d3c369ead4f4a9e5e370"
+    },
+    {
+      "path": "docs/performance/results/change-0978/analysis/native-child-01-terminal-summary-v1.json",
+      "bytes": 813,
+      "sha256": "3b0c5310c56b8f0076ac3cbdc0b4cb6a93fd5f60f393036dabb4142573581fdf"
+    },
+    {
+      "path": "docs/performance/results/change-0978/analysis/native-child-02-status-v1.json",
+      "bytes": 1067,
+      "sha256": "ca8f8c3e2bc6afbfc4312b6f4461e38916df142eaec31647efe52f76a1d54931"
+    },
+    {
+      "path": "docs/performance/results/change-0978/analysis/native-child-02-terminal-summary-v1.json",
+      "bytes": 813,
+      "sha256": "7eca0d2225ef6d3143f2046ef60621fe76e257d95d75bb75defb901601003f41"
+    },
+    {
+      "path": "docs/performance/results/change-0978/analysis/native-child-03-status-v1.json",
+      "bytes": 195,
+      "sha256": "093455f77850072f4389ece28251ff89ef94f9e0d69fe76a866271cec6933360"
+    },
+    {
+      "path": "docs/performance/results/change-0978/analysis/native-child-03-terminal-report-v1.txt",
+      "bytes": 1727,
+      "sha256": "995e4800cce2481b6ef397ed307bf841fd88a9ccef3c4147c97558135b19c3ab"
+    },
+    {
+      "path": "docs/performance/results/change-0978/analysis/native-child-03-terminal-summary-v1.json",
+      "bytes": 813,
+      "sha256": "dc36942a5ffab25ef25c913932c0aa98b63af38250fdfc123b6ebf8b76d8dab5"
+    },
+    {
+      "path": "docs/performance/results/change-0978/analysis/packet-integration-validation-v4.json",
+      "bytes": 35645,
+      "sha256": "9713657bb505d2d39dbd7f0c5ed6f87650e04f06bfe9223b2da84aed063e1a92"
+    },
+    {
+      "path": "docs/performance/results/change-0978/analysis/reducer-v2-label-correction-v1.json",
+      "bytes": 3109,
+      "sha256": "3eafab167aec570f0bb5d3f09791a3ebf346097aecdf1092e1c0130aa171b151"
+    },
+    {
+      "path": "docs/performance/results/change-0978/analysis/reducer-v2-label-correction.diff",
+      "bytes": 1757,
+      "sha256": "8272dde2255afdb02da5fcab913818c263b8fef57efdaf3ee1da0baf59547a75"
+    },
+    {
+      "path": "docs/performance/results/change-0978/analysis/reducer-v4-owner-bounds-scope.diff",
+      "bytes": 682,
+      "sha256": "f0ad89bdb9a06535ff5427ac54da5bc6bccf082107542bb33c5f3362b3082dd4"
+    },
+    {
+      "path": "docs/performance/results/change-0978/analysis/reducer-v4-owner-bounds-scope.json",
+      "bytes": 2139,
+      "sha256": "348c107eae8f8e3c637fdd635eaa5655da60571c8b7180c6e62adbb030daf24a"
+    },
+    {
+      "path": "docs/performance/results/change-0978/design/protocol-design-v1.md",
+      "bytes": 4943,
+      "sha256": "a21cbc08803ef5988c14eea762158c942e7d157463b8bee1ba9ba37fabaa4d12"
+    },
+    {
+      "path": "docs/performance/results/change-0978/plans/plan-0978-v3.json",
+      "bytes": 31010,
+      "sha256": "9849dfd914463db998f02df7505db85ff02eb84215143d4ac1e67af267fa6424"
+    },
+    {
+      "path": "docs/performance/results/change-0978/provenance/dependency-0977-v1.json",
+      "bytes": 2463,
+      "sha256": "dcc81b5ed18b39c2d204d539535611258c0806221e095a2a1d2811253851d1fb"
+    },
+    {
+      "path": "docs/performance/results/change-0978/provenance/reproduction-v1.md",
+      "bytes": 8566,
+      "sha256": "a69e18f29a5895d7e7299a9eaec0e18f29b6949e11cbdd65b37797ccb8abae16"
+    },
+    {
+      "path": "docs/performance/results/change-0978/receipts/adr-goal-revalidation-0978-v1.json",
+      "bytes": 1109,
+      "sha256": "24c6caafaa870a3e3e7be9e07e5e206aa0ebdefd1d087ea068d38f07adf7fff8"
+    },
+    {
+      "path": "docs/performance/results/change-0978/receipts/adr-goal-revalidation-0978-v2.json",
+      "bytes": 8560,
+      "sha256": "a446e648cb692bc97e80ff0fc9adcec807dded924cce2f3a3e95520673cd6f2b"
+    },
+    {
+      "path": "docs/performance/results/change-0978/receipts/capture-manifest-0978-v1.json",
+      "bytes": 1035,
+      "sha256": "f0bef5ff1cbd9eae486314ea076457736bbecee60c75e1b7b0792cfde94bca25"
+    },
+    {
+      "path": "docs/performance/results/change-0978/receipts/child-02-offline-diagnostic-v1.json",
+      "bytes": 10857,
+      "sha256": "a61db73c3bbb9d41d1de4f9ea6755aabc42ed8f64caabeaa4bda1db603e8048f"
+    },
+    {
+      "path": "docs/performance/results/change-0978/receipts/control-boundary-equivalence-0978-v5.json",
+      "bytes": 3388,
+      "sha256": "c4b0c814ce93cb3a3f2bc3d30c92a91c0f8ca814fbc9003d38200a162a91432d"
+    },
+    {
+      "path": "docs/performance/results/change-0978/receipts/corrected-script-run-v1.json",
+      "bytes": 2921,
+      "sha256": "a45865bda16679ea3ff1de687dbf543dd5072f5e3bf1fc67049f569d6fc94219"
+    },
+    {
+      "path": "docs/performance/results/change-0978/receipts/focused-decoder-full-lifetime-guard-0978-v3.json",
+      "bytes": 10214,
+      "sha256": "689dc4ea2c1fbb85fee7732d038db4c7b46f6f4236327263122b3930bc51dd31"
+    },
+    {
+      "path": "docs/performance/results/change-0978/receipts/focuseddecode-run-correction-v1.json",
+      "bytes": 4006,
+      "sha256": "80b1a72e028333779c069ac73ff714222de375be761222bfabf00bbbe20c0949"
+    },
+    {
+      "path": "docs/performance/results/change-0978/receipts/focuseddecode-run-v1.json",
+      "bytes": 4792,
+      "sha256": "0e153a3a6568b64d767c0451b92caef261ab694fdde43d85a246f22228e5eacd"
+    },
+    {
+      "path": "docs/performance/results/change-0978/receipts/helper-seal-0978-v3.json",
+      "bytes": 6649,
+      "sha256": "a9735d56b4a73fab0ef8e6f14a2e05b19813e686c99e850283c06f4c2c8281fe"
+    },
+    {
+      "path": "docs/performance/results/change-0978/receipts/instruction-profile-reduction-v1-receipt.json",
+      "bytes": 2833,
+      "sha256": "883316ec1d4ad7223ebb6245d56f6f3908afe1f681c2d58905238cbb7fc76234"
+    },
+    {
+      "path": "docs/performance/results/change-0978/receipts/instruction-profile-reduction-v1.stderr.txt",
+      "bytes": 76,
+      "sha256": "b7832cfa258779395a32e0cd70fc76ccbbfb76e0d1f1642ab25358a928a56acc"
+    },
+    {
+      "path": "docs/performance/results/change-0978/receipts/instruction-profile-reduction-v1.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/performance/results/change-0978/receipts/lifecycle-stream-v2-receipt.json",
+      "bytes": 2811,
+      "sha256": "520c11fb2bbeb98dbe7b0f99d69538e0699807e15cbd7fbb74b076b0f80c9f21"
+    },
+    {
+      "path": "docs/performance/results/change-0978/receipts/offline-custody-and-perf-script-v1.json",
+      "bytes": 15427,
+      "sha256": "9440e2473c26f35ccc12a7f471312c5b2917822bcbb6352a1fc935eed575d37b"
+    },
+    {
+      "path": "docs/performance/results/change-0978/receipts/raw-stack-scanner-controls-0978-v2.json",
+      "bytes": 9593,
+      "sha256": "7b9445c1a3c95bd8bb69366e8fdcc9aaa3a1a1c87055809acbd0caa2a51769d3"
+    },
+    {
+      "path": "docs/performance/results/change-0978/receipts/replay-0977-child01-v2.json",
+      "bytes": 6852,
+      "sha256": "608a15c5c956943b786217e10b8062283b358d132db757c0cb52dc508122e7fd"
+    },
+    {
+      "path": "docs/performance/results/change-0978/receipts/replay-0977-child02-v2.json",
+      "bytes": 6916,
+      "sha256": "c90bb3412ddff092b9e96e40f14656cf2df3e10e043fe939ffe6d82220409328"
+    },
+    {
+      "path": "docs/performance/results/change-0978/receipts/replay-receipt-v6.json",
+      "bytes": 6560,
+      "sha256": "b758f3abef173a452a8c928a9a9023a7ec611b45aafbad8f90df61c47c2f1b31"
+    },
+    {
+      "path": "docs/performance/results/change-0978/receipts/root-go-0978-office-v1.json",
+      "bytes": 2466,
+      "sha256": "94cb8410778ba388cb3a7c80f5086b8fc080c21a62b7dcda5ffbc72c4fd4a789"
+    },
+    {
+      "path": "docs/performance/results/change-0978/receipts/root-office-command-0978-v1.json",
+      "bytes": 1057,
+      "sha256": "9c6e0985c26d6fb595fbe76f45297f8ad18f3e59291e9aa4472c5a885be17f34"
+    },
+    {
+      "path": "docs/performance/results/change-0978/receipts/root-office-result-0978-v1.json",
+      "bytes": 656,
+      "sha256": "4b06345d0172277e74a579e31a1ddb9791624d2ca96130785dbb2f4265fc6e68"
+    },
+    {
+      "path": "docs/performance/results/change-0978/receipts/root-office-run-0978-v1.log",
+      "bytes": 1650,
+      "sha256": "3209af17a9a2d3e5633c52689d10407572e698546f10035879f70aae4b093de3"
+    },
+    {
+      "path": "docs/performance/results/change-0978/receipts/temporary-cleanup-0978-v1.json",
+      "bytes": 33063,
+      "sha256": "0b891b4603fd18a7b6fdd5c1db8b5d7fd027731cd14154160670e586ffc41866"
+    },
+    {
+      "path": "docs/performance/results/change-0978/review/final-readiness-review-v5.json",
+      "bytes": 18780,
+      "sha256": "f424f6ebac813616656abc82ac595de3c1426a53058cc17d35c2496106347a7f"
+    },
+    {
+      "path": "docs/performance/results/change-0978/review/focused-decoder-lifetime-guard-review-v2.json",
+      "bytes": 7330,
+      "sha256": "01d4ae822ef4e69e39e7d4a442b697d24cf0d9e85c6e5e994f4ab97eadb8df5c"
+    },
+    {
+      "path": "docs/performance/results/change-0978/review/independent-design-review-v3.json",
+      "bytes": 21092,
+      "sha256": "7181d28ff5f18dc21ec60ba30472328676eafb9da0ece36f4d5c08bc97c6fb39"
+    },
+    {
+      "path": "docs/performance/results/change-0978/review/independent-native-boundary-review-v3.json",
+      "bytes": 9961,
+      "sha256": "b793c8c393cb29b8ba79dfc0cef1ecaaac420a4cf5f4c8efdd1f59a784c1aaea"
+    },
+    {
+      "path": "docs/performance/results/change-0978/review/independent-native-boundary-review-v4.json",
+      "bytes": 9223,
+      "sha256": "a3e29e8a9512ac43aaeb7bf736ac709549d67682cfc059cde63428de6b1a041a"
+    },
+    {
+      "path": "docs/performance/results/change-0978/review/independent-raw-stack-tests-v1-final.json",
+      "bytes": 2995,
+      "sha256": "1c1de0aeaefb5badf0dbcc6eb8860e7e6cc70bbc632f2ac776bc9b4a3995577c"
+    },
+    {
+      "path": "docs/performance/results/change-0978/review/independent-reducer-scoped-approval-v2.json",
+      "bytes": 3303,
+      "sha256": "4250122dc0eb1390557d955684f2b2721223f302a637874160dd27263d1274ad"
+    },
+    {
+      "path": "docs/performance/results/change-0978/review/independent-reducer-scoped-approval-v3.json",
+      "bytes": 2602,
+      "sha256": "ef96bd4601f339ad6ac282cd94cdca8591051d1f05fb2eded7617281c032458f"
+    },
+    {
+      "path": "docs/performance/results/change-0978/review/independent-reducer-v4-final-review-v1.json",
+      "bytes": 2778,
+      "sha256": "2b713bc35b0a46e447e9b41eb475f65b8f2f23b7bba15537c354e987fa3fde75"
+    },
+    {
+      "path": "docs/performance/results/change-0978/review/lifecycle-ledger-author-correction-v3.json",
+      "bytes": 5918,
+      "sha256": "c5d76fc5e612ec56c4daed1de1e46e43a0261004b26b6a737bd2f3895d0e6620"
+    },
+    {
+      "path": "docs/performance/results/change-0978/review/lifecycle-ledger-review-v4.json",
+      "bytes": 8676,
+      "sha256": "9fbd3c6d833f7267aaee5f75e74139efd41f5fcf29bf7cc8b37a6f4d3a1226e2"
+    },
+    {
+      "path": "docs/performance/results/change-0978/review/postcapture-failed-cohort-audit-v1.json",
+      "bytes": 22716,
+      "sha256": "3065afc51308416e01f303f4acf20d052e8e9809cf8c9f2fb6b8c846fd5dadb0"
+    },
+    {
+      "path": "docs/performance/results/change-0978/tests/independent_raw_stack_tests_v1.py",
+      "bytes": 18651,
+      "sha256": "bb3e98178dc66821335f34eab0717dac8e7e006a2607ad11625122a1ad4f1295"
+    },
+    {
+      "path": "docs/performance/results/change-0978/tests/independent_reducer_mutation_tests_v2.py",
+      "bytes": 16700,
+      "sha256": "51df072987a4c4525d9984a931fdce8d0e47b80b7b87dca9fed5047ac2285082"
+    },
+    {
+      "path": "docs/performance/results/change-0978/tools/analyze_child02_0978_v1.py",
+      "bytes": 17115,
+      "sha256": "2ea8d0651c003fe9aee4eeec3522d94485158bf5666208ea78aef6ba2c2964a7"
+    },
+    {
+      "path": "docs/performance/results/change-0978/tools/focuseddecode_0978_v3.py",
+      "bytes": 62748,
+      "sha256": "9596e246c7c627fb3810e7c6c6d3dda12af58b62477f1f1233654c4256e2dac9"
+    },
+    {
+      "path": "docs/performance/results/change-0978/tools/lifecycle_ledger_0978.py",
+      "bytes": 56966,
+      "sha256": "6296e2dd20f911b2d989f1a8c7b9e337c9a34efc5c0f04831a50111192b9e7d0"
+    },
+    {
+      "path": "docs/performance/results/change-0978/tools/plan_binding_0978_v1.py",
+      "bytes": 40141,
+      "sha256": "eb703fdbfecb672358eedcba64fd23bdf09a7b3b0af03adbe7be89cb32078497"
+    },
+    {
+      "path": "docs/performance/results/change-0978/tools/prepare_plan_0978_v1.py",
+      "bytes": 20673,
+      "sha256": "d17352c73346e559fb554b6da1204c1baaf53aa32cd203ac47b4e18181dc6b58"
+    },
+    {
+      "path": "docs/performance/results/change-0978/tools/raw_stack_0978.py",
+      "bytes": 32486,
+      "sha256": "5f844b82a40426662ffaed5ba21dd0687fefa3f98ecc233dc572eeb3041017b7"
+    },
+    {
+      "path": "docs/performance/results/change-0978/tools/reduce_0978_v2.py",
+      "bytes": 104870,
+      "sha256": "e925755639ccdca3b75ed5b6e64265f711f506b6e6478bcee9a94990ce08521f"
+    },
+    {
+      "path": "docs/performance/results/change-0978/tools/reduce_0978_v4.py",
+      "bytes": 104834,
+      "sha256": "1c40193d0debcea9feb696d82f029cc058b10e39e20ceb2183e2444223fc756c"
+    },
+    {
+      "path": "docs/performance/results/change-0978/tools/reparse_lifecycle_0978_v1.py",
+      "bytes": 4570,
+      "sha256": "22d2d4950301f9afcb1ccab8fc9c34145b8ee5ac8ed477f578f80377388f9f99"
+    },
+    {
+      "path": "docs/performance/results/change-0978/tools/replay_attribution_0978_v1.py",
+      "bytes": 15621,
+      "sha256": "ba240445dd7353687654a9ca2adeeaecd60c78a795fe38a06671844e004169c3"
+    },
+    {
+      "path": "docs/performance/results/change-0978/tools/replay_raw_stack_0978.py",
+      "bytes": 3801,
+      "sha256": "3888932603ad41a15b0542a095c54d4e8cc4aa6bf361ae7113725b072f22348e"
+    },
+    {
+      "path": "docs/performance/results/change-0978/tools/run_0978_v1.py",
+      "bytes": 48826,
+      "sha256": "c24da0749dd6d5dd1464e23dffbb9a3650634f0a803ac3a372a6d365cfc9837a"
+    },
+    {
+      "path": "docs/performance/results/change-0978/tools/test_child02_ledger_integration_0978.py",
+      "bytes": 7751,
+      "sha256": "8ea1baa01199550f13df7c9b8b99686f02a8eba12c64b7f5c8fe13e6fa414282"
+    },
+    {
+      "path": "docs/performance/results/change-0978/tools/test_focuseddecode_command_boundary_0978_v1.py",
+      "bytes": 3430,
+      "sha256": "f4801d9ad586a4fbfade1f3fb861b219297871f137967108b60f61ce6960e942"
+    },
+    {
+      "path": "docs/performance/results/change-0978/tools/test_full_lifetime_evlist_guard_0978_v1.py",
+      "bytes": 4155,
+      "sha256": "a676a4460b60a10b35abb0e0681f4718ce57ba8441bdc205e9cb7b159abdaf03"
+    },
+    {
+      "path": "docs/performance/results/change-0978/tools/test_lifecycle_ledger_0978.py",
+      "bytes": 15358,
+      "sha256": "dab8a3ef52274ef705f6ad01a61d5c19d126ee9b8b6ed278e05671f9695fbca4"
+    },
+    {
+      "path": "docs/performance/results/change-0978/tools/test_raw_stack_0978.py",
+      "bytes": 8365,
+      "sha256": "c7b2ce2fe23f2736201444733dfe467ef1f92f42b8dd81a57cb9ec9f8fd96820"
+    },
+    {
+      "path": "docs/performance/results/change-0978/tools/validate_packet_integration_0978_v4.py",
+      "bytes": 25800,
+      "sha256": "d8820bfa4b352c95abe80a1bde26b1f694c67fbbf26676095b5a984ac8603f68"
+    }
+  ],
+  "repository_payload_total_bytes": 1128892,
+  "reused_dependency_pointer": {
+    "copy_policy": "Reuse the sealed 0977 descriptor and packet bindings; do not duplicate 0977 helpers, receipts, raw captures, or binaries.",
+    "path": "docs/performance/results/change-0978/provenance/dependency-0977-v1.json",
+    "source_descriptor": "docs/performance/results/change-0977/provenance/external-artifact-descriptor-final-v1.json",
+    "source_descriptor_sha256": "12cb620e141cea7c5332ce98dbe7d97b23bb93b10b4ffa15770c6791af54ffae"
+  },
+  "schema": "litchi.performance.0978.external_artifact_descriptor.final.v1",
+  "status": "sealed_failed_capture",
+  "packet_manifest_path": "docs/performance/results/change-0978/packet-manifest-0978-v1.json",
+  "postcapture_audit": {
+    "path": "docs/performance/results/change-0978/review/postcapture-failed-cohort-audit-v1.json",
+    "bytes": 22716,
+    "sha256": "3065afc51308416e01f303f4acf20d052e8e9809cf8c9f2fb6b8c846fd5dadb0",
+    "decision": "reject_cohort_incomplete_no_retry"
+  },
+  "cleanup_receipt": {
+    "path": "docs/performance/results/change-0978/receipts/temporary-cleanup-0978-v1.json",
+    "bytes": 33063,
+    "sha256": "0b891b4603fd18a7b6fdd5c1db8b5d7fd027731cd14154160670e586ffc41866",
+    "status": "verified_no_bound_evidence_deleted"
+  }
+}

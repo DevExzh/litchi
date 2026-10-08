@@ -1,0 +1,77 @@
+{
+  "command": {
+    "argv": [
+      "/usr/bin/python3",
+      "-B",
+      "/home/zhuhe/litchi-performance-0978/tools/reparse_lifecycle_0978_v1.py",
+      "--dump",
+      "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-mmap-dump.txt",
+      "--output",
+      "/home/zhuhe/litchi-performance-0978/analysis/reducer-replay-child02-v1/lifecycle-stream-v2.json",
+      "--receipt",
+      "/home/zhuhe/litchi-performance-0978/analysis/reducer-replay-child02-v1/lifecycle-stream-v2-receipt.json",
+      "--pid",
+      "3849325",
+      "--cpu",
+      "31"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "offline_only": true,
+    "perf_subprocess": false
+  },
+  "native_actions": {
+    "build": false,
+    "recording": false,
+    "workload": false
+  },
+  "output": {
+    "bytes": 14347606,
+    "path": "/home/zhuhe/litchi-performance-0978/analysis/reducer-replay-child02-v1/lifecycle-stream-v2.json",
+    "sha256": "2ec935924bc854e53f7ee9288ac7c2e24317821bd2e3dea507a757b1bbfc7eb5"
+  },
+  "result": {
+    "raw_lost_sum": 0,
+    "raw_metadata_crosscheck": true,
+    "record_count": 9191,
+    "sample_descriptor_count": 7201,
+    "terminal_lost_values": [],
+    "unique_record_offsets": true
+  },
+  "schema": "litchi.performance.0978.lifecycle_stream_reparse.v1",
+  "scope": "one offline parse of retained child-02 perf -D dump with frozen helper",
+  "source_after": {
+    "dump": {
+      "bytes": 1140014935,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-mmap-dump.txt",
+      "sha256": "06d9529bf1c741e33105e4dd79a86466c64ba84ff8f58cdde8ab2abb8b0b41ce"
+    },
+    "helper": {
+      "bytes": 56966,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/lifecycle_ledger_0978.py",
+      "sha256": "6296e2dd20f911b2d989f1a8c7b9e337c9a34efc5c0f04831a50111192b9e7d0"
+    },
+    "script": {
+      "bytes": 4570,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/reparse_lifecycle_0978_v1.py",
+      "sha256": "22d2d4950301f9afcb1ccab8fc9c34145b8ee5ac8ed477f578f80377388f9f99"
+    }
+  },
+  "source_before": {
+    "dump": {
+      "bytes": 1140014935,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-mmap-dump.txt",
+      "sha256": "06d9529bf1c741e33105e4dd79a86466c64ba84ff8f58cdde8ab2abb8b0b41ce"
+    },
+    "helper": {
+      "bytes": 56966,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/lifecycle_ledger_0978.py",
+      "sha256": "6296e2dd20f911b2d989f1a8c7b9e337c9a34efc5c0f04831a50111192b9e7d0"
+    },
+    "script": {
+      "bytes": 4570,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/reparse_lifecycle_0978_v1.py",
+      "sha256": "22d2d4950301f9afcb1ccab8fc9c34145b8ee5ac8ed477f578f80377388f9f99"
+    }
+  },
+  "status": "pass"
+}

@@ -1,0 +1,97 @@
+{
+  "build_started": false,
+  "candidate_bridge_binding": {
+    "bytes": 13348,
+    "path": "/home/zhuhe/litchi-performance-0977/tools/affinity_bridge_0977.py",
+    "sha256": "2c9f5839c23da769625d3b9fdf339ec00d9c8a3209e6f6c1a5c166d475800a43"
+  },
+  "candidate_runner": {
+    "bytes": 48826,
+    "path": "/home/zhuhe/litchi-performance-0978/tools/run_0978_v1.py",
+    "sha256": "c24da0749dd6d5dd1464e23dffbb9a3650634f0a803ac3a372a6d365cfc9837a"
+  },
+  "checks": {
+    "all_checks_passed": true,
+    "bridge_binding_equal": true,
+    "bridge_path_equal": true,
+    "cleanup_and_affinity_source_equal": {
+      "affinity_observation_gate": true,
+      "terminate_group": true,
+      "verify_group_gone": true
+    },
+    "command_token_checks": {
+      "control": {
+        "bridge_once": true,
+        "dwarf_stack": true,
+        "event_period": true,
+        "forbidden_broad_recording_absent": true,
+        "launcher_count": true,
+        "per_thread": true,
+        "recorder_memory": true,
+        "taskset_prefix": true
+      },
+      "office": {
+        "bridge_once": true,
+        "dwarf_stack": true,
+        "event_period": true,
+        "forbidden_broad_recording_absent": true,
+        "launcher_count": true,
+        "per_thread": true,
+        "recorder_memory": true,
+        "taskset_prefix": true
+      }
+    },
+    "control_argv_byte_equal": true,
+    "native_constants_equal": {
+      "CHILDREN": true,
+      "CPU": true,
+      "PERIOD": true,
+      "RECORDER_CPU": true,
+      "SAMPLES": true,
+      "STACK_CAP": true,
+      "TIMEOUT_SECONDS": true,
+      "WARMUPS": true
+    },
+    "native_environment_contract_equal": true,
+    "office_argv_byte_equal": true,
+    "runner_self_test": {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 tools/run_0978_v1.py --self-test",
+      "returncode": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "777f2734e91b5747a28ff50b9ee29a97cd59f0039bf008eaec2187db2d184ae7"
+    }
+  },
+  "commands": [
+    "PYTHONDONTWRITEBYTECODE=1 python3 tools/run_0978_v1.py --self-test",
+    "offline Python import/record_argv comparison against /home/zhuhe/litchi-performance-0977/tools/run_0977_v2.py"
+  ],
+  "created_utc": "2026-10-08T09:00:21.054272+00:00",
+  "current_head": "172d66458abacc224427bc9b86cf2d3bf3effe78",
+  "native_workload_started": false,
+  "retained_bridge": {
+    "bytes": 13348,
+    "path": "/home/zhuhe/litchi-performance-0977/tools/affinity_bridge_0977.py",
+    "sha256": "2c9f5839c23da769625d3b9fdf339ec00d9c8a3209e6f6c1a5c166d475800a43"
+  },
+  "retained_runner": {
+    "bytes": 38108,
+    "path": "/home/zhuhe/litchi-performance-0977/tools/run_0977_v2.py",
+    "sha256": "d7904b4773cc17d96c7194c5d4df7e83520795580af17a8217da93cfffa565a4"
+  },
+  "reusable_control_boundary": {
+    "period": 1000000,
+    "process_group_cleanup": "SIGTERM then bounded SIGKILL and verify_group_gone",
+    "recorder_cpu": 30,
+    "retry": false,
+    "root_go_still_required": true,
+    "same_pid_bridge_exec": true,
+    "serial_children": true,
+    "stack_cap": 32768,
+    "stop_on_first_failure": true,
+    "target_cpu": 31,
+    "timeout_seconds": 900
+  },
+  "schema": "litchi.performance.0978.control_boundary_equivalence.v5",
+  "scope": "static retained-control equivalence; exact command/affinity/cleanup comparison; no native GO or workload",
+  "status": "pass"
+}

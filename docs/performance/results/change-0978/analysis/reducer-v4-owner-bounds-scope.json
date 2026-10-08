@@ -1,0 +1,49 @@
+{
+  "base_accepted_reducer": {
+    "bytes": 104870,
+    "path": "/home/zhuhe/litchi-performance-0978/tools/reduce_0978_v2.py",
+    "sha256": "e925755639ccdca3b75ed5b6e64265f711f506b6e6478bcee9a94990ce08521f"
+  },
+  "changed_contract_label": {
+    "after": "target-source eligible physical-leaf period; unknown target period is shared bound mass; bounds are per-owner and non-additive",
+    "before": "known physical-leaf period in target execution across all mapped DSOs; U_target is unresolved/unknown physical-owner period; bounds are per-owner and non-additive",
+    "field": "owner_bounds.scope",
+    "reason": "owner_bounds is built from actual[target_source_owner_period], so this scope remains source-eligible; attribution_contract.Tknown/U_target retain their corrected all-DSO/defensible-owner labels"
+  },
+  "diff": {
+    "bytes": 682,
+    "path": "/home/zhuhe/litchi-performance-0978/analysis/reducer-v4-owner-bounds-scope.diff",
+    "sha256": "f0ad89bdb9a06535ff5427ac54da5bc6bccf082107542bb33c5f3362b3082dd4"
+  },
+  "final_reducer": {
+    "bytes": 104834,
+    "path": "/home/zhuhe/litchi-performance-0978/tools/reduce_0978_v4.py",
+    "sha256": "1c40193d0debcea9feb696d82f029cc058b10e39e20ceb2183e2444223fc756c"
+  },
+  "inherited_validation": {
+    "note": "string-only correction after the accepted behavioral validation; no packet inputs or parser/derivation logic changed",
+    "receipt_path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/packet-validation-v4.json",
+    "receipt_sha256": "a970f7309ab455c74a73b80c9ff7d99fcd2859b8ba05801aaf8c6f3a59643aab",
+    "status": "pass"
+  },
+  "schema": "litchi.performance.0978.reducer_metadata_correction.v2",
+  "scope": {
+    "change_kind": "one metadata label only",
+    "native_actions": {
+      "build": false,
+      "recording": false,
+      "workload": false
+    },
+    "offline_only": true,
+    "raw_dump_rerun": false
+  },
+  "self_test": {
+    "command": "PYTHONDONTWRITEBYTECODE=1 python3 -B tools/reduce_0978_v4.py --self-test",
+    "hex_cases": {
+      "591928": 5839144,
+      "e59f0": 940528
+    },
+    "status": "pass"
+  },
+  "status": "complete"
+}

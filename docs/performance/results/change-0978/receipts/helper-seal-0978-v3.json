@@ -1,0 +1,151 @@
+{
+  "build_started": false,
+  "created_utc": "2026-10-08T09:30:16.950480+00:00",
+  "helpers": {
+    "bridge": {
+      "bytes": 13348,
+      "path": "/home/zhuhe/litchi-performance-0977/tools/affinity_bridge_0977.py",
+      "sha256": "2c9f5839c23da769625d3b9fdf339ec00d9c8a3209e6f6c1a5c166d475800a43"
+    },
+    "decoder": {
+      "bytes": 62748,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/focuseddecode_0978_v3.py",
+      "sha256": "9596e246c7c627fb3810e7c6c6d3dda12af58b62477f1f1233654c4256e2dac9"
+    },
+    "launcher": {
+      "bytes": 3597,
+      "path": "/home/zhuhe/litchi-performance-0970/tools/launch_baseline_v2.py",
+      "sha256": "3b5b79351883a9b4efb680f47498d8e10bdf77d131a60d11c1ecb54ad95430f5"
+    },
+    "lifecycle": {
+      "bytes": 56966,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/lifecycle_ledger_0978.py",
+      "sha256": "6296e2dd20f911b2d989f1a8c7b9e337c9a34efc5c0f04831a50111192b9e7d0"
+    },
+    "plan_binding": {
+      "bytes": 40141,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/plan_binding_0978_v1.py",
+      "sha256": "eb703fdbfecb672358eedcba64fd23bdf09a7b3b0af03adbe7be89cb32078497"
+    },
+    "plan_generator": {
+      "bytes": 20673,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/prepare_plan_0978_v1.py",
+      "sha256": "d17352c73346e559fb554b6da1204c1baaf53aa32cd203ac47b4e18181dc6b58"
+    },
+    "policy": {
+      "bytes": 21092,
+      "path": "/home/zhuhe/litchi-performance-0978/review/independent-design-review-v3.json",
+      "sha256": "7181d28ff5f18dc21ec60ba30472328676eafb9da0ece36f4d5c08bc97c6fb39"
+    },
+    "reducer": {
+      "bytes": 104834,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/reduce_0978_v4.py",
+      "sha256": "1c40193d0debcea9feb696d82f029cc058b10e39e20ceb2183e2444223fc756c"
+    },
+    "runner": {
+      "bytes": 48826,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/run_0978_v1.py",
+      "sha256": "c24da0749dd6d5dd1464e23dffbb9a3650634f0a803ac3a372a6d365cfc9837a"
+    },
+    "scanner": {
+      "bytes": 32486,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/raw_stack_0978.py",
+      "sha256": "5f844b82a40426662ffaed5ba21dd0687fefa3f98ecc233dc572eeb3041017b7"
+    },
+    "tests": [
+      {
+        "bytes": 8365,
+        "path": "/home/zhuhe/litchi-performance-0978/tools/test_raw_stack_0978.py",
+        "sha256": "c7b2ce2fe23f2736201444733dfe467ef1f92f42b8dd81a57cb9ec9f8fd96820"
+      },
+      {
+        "bytes": 15358,
+        "path": "/home/zhuhe/litchi-performance-0978/tools/test_lifecycle_ledger_0978.py",
+        "sha256": "dab8a3ef52274ef705f6ad01a61d5c19d126ee9b8b6ed278e05671f9695fbca4"
+      },
+      {
+        "bytes": 10201,
+        "path": "/home/zhuhe/litchi-performance-0978/tools/test_reduce_0978.py",
+        "sha256": "b2ea77dfc5a3a45ff4ba017b6d08909e00bf63a542d34e37551d4d7cb18a44d1"
+      }
+    ]
+  },
+  "policy": {
+    "bytes": 21092,
+    "path": "/home/zhuhe/litchi-performance-0978/review/independent-design-review-v3.json",
+    "sha256": "7181d28ff5f18dc21ec60ba30472328676eafb9da0ece36f4d5c08bc97c6fb39"
+  },
+  "retained_lineage": {
+    "affinity_bridge_0977": {
+      "bytes": 13348,
+      "path": "/home/zhuhe/litchi-performance-0977/tools/affinity_bridge_0977.py",
+      "scope": "retained byte-for-byte; exact native handoff and command boundary",
+      "sha256": "2c9f5839c23da769625d3b9fdf339ec00d9c8a3209e6f6c1a5c166d475800a43"
+    },
+    "base_0969_protocol_common": {
+      "bytes": 39444,
+      "path": "/home/zhuhe/litchi-performance-0969/tools/protocol_common_v4.py",
+      "scope": "loaded by retained 0971 protocol helper; immutable dependency",
+      "sha256": "5ce0f2ac08fc7909df054a4cc2d5137b3279af4cd726acf5bfb4558d97b05c5c"
+    },
+    "base_0971_protocol_common": {
+      "bytes": 29320,
+      "path": "/home/zhuhe/litchi-performance-0971/tools/protocol_common_0971_v2.py",
+      "scope": "loaded by retained 0973 protocol helper; immutable dependency",
+      "sha256": "4ff9af4c64b50896f39a6a30286d445ebe0c9364435888593ade45a11c5cab43"
+    },
+    "base_0973_protocol_common": {
+      "bytes": 39589,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/protocol_common_0973_v2.py",
+      "scope": "loaded by retained 0977 reducer; immutable protocol helper",
+      "sha256": "56b509fde01bbd66702ac8cd835da0d09d74d332935926078c6545093ed52bf4"
+    },
+    "base_0973_reducer": {
+      "bytes": 31359,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/reduce_0973_v2.py",
+      "scope": "loaded by retained 0977 reducer; immutable arithmetic implementation",
+      "sha256": "f33f14724f6264d87b2c3a0082c16bca711787140d06f3c7cfdd6e78b6f4c63b"
+    },
+    "base_0977_helper_seal": {
+      "bytes": 3132,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/helper-seal-0977-v2.json",
+      "scope": "immutable sealed helper lineage",
+      "sha256": "d51ea07cdca58e700a82ff8f4789fffc3dd40e4f284b086026458308fbd78e2e"
+    },
+    "base_0977_plan_binding": {
+      "bytes": 24729,
+      "path": "/home/zhuhe/litchi-performance-0977/tools/plan_binding_0977_v2.py",
+      "scope": "immutable reference; custody checks retained",
+      "sha256": "acd82a2ac09037be84fd3f9ea8def808131d49203fd0748f6e6d9ea68574544b"
+    },
+    "base_0977_reducer": {
+      "bytes": 41138,
+      "path": "/home/zhuhe/litchi-performance-0977/tools/reduce_0977.py",
+      "scope": "immutable delegated custody/oracle implementation; exact SHA required",
+      "sha256": "65746c0f22f3434567830a479775e568528657bcc9ecb7467e8f8ea116f817d1"
+    },
+    "base_0977_runner": {
+      "bytes": 38108,
+      "path": "/home/zhuhe/litchi-performance-0977/tools/run_0977_v2.py",
+      "scope": "immutable reference; native launch contract retained",
+      "sha256": "d7904b4773cc17d96c7194c5d4df7e83520795580af17a8217da93cfffa565a4"
+    },
+    "base_0978_reducer_v1": {
+      "bytes": 103753,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/reduce_0978.py",
+      "scope": "prior frozen 0978 reducer; superseded by versioned v2 helper and retained byte-for-byte",
+      "sha256": "e904caa12e395cc7b6917cc03cf82509168338c94291575b3ecef282639ae626"
+    },
+    "bridge_lineage_0976": {
+      "bytes": 16721,
+      "path": "/home/zhuhe/litchi-performance-0976/tools/affinity_bridge_0976_v2.py",
+      "scope": "historical handoff lineage",
+      "sha256": "6b19f065d3a4183cad9d5ed6ae020628c7512c49e92b8a07dbdf338cc069270a"
+    }
+  },
+  "schema": "litchi.performance.0978.helper_seal.v1",
+  "scope": "fresh variable-layout scanner/lifecycle ledger/adapter runner and plan; no workload started",
+  "status": "sealed",
+  "version": "0978-v1",
+  "workload_started": false
+}

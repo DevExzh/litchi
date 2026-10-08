@@ -1,0 +1,20 @@
+--- /home/zhuhe/litchi-performance-0978/tools/reduce_0978_v3.py
++++ /home/zhuhe/litchi-performance-0978/tools/reduce_0978_v2.py
+@@ -1582,7 +1582,7 @@
+             "K": known, "T": t, "U_target": unknown,
+             "lower": known / t if t else 0.0,
+             "upper": (known + unknown) / t if t else 0.0,
+-            "scope": "target-source eligible physical-leaf period; unknown target period is shared bound mass; bounds are per-owner and non-additive",
++            "scope": "known physical-leaf period in target execution across all mapped DSOs; U_target is unresolved/unknown physical-owner period; bounds are per-owner and non-additive",
+         }
+     return result
+ 
+@@ -1676,7 +1676,7 @@
+         },
+         "attribution_contract": {
+             "D": "all valid instructions:u period", "M": "period from marker-containing samples", "R": "marker ancestry not observed; may include missing/truncated ancestry, setup, or non-marker work",
+-            "T": "target execution period", "Tknown": "target-source-eligible physical-leaf period", "U_target": "target execution period without an eligible physical owner",
++            "T": "target execution period", "Tknown": "known physical-leaf period in target execution across all mapped DSOs", "U_target": "target execution period without a defensible physical owner",
+             "U_marker": "marker period without a resolved physical leaf", "physical_leaf": "frame-0 owner across all mapped DSOs; disjoint with unknown",
+             "inclusive": "deduplicated resolved marker-chain owners; overlapping and never summed", "owner_bounds": "per-owner [K/T,(K+U_target)/T]; bounds are non-additive",
+             "scope": "all 12 children; descriptive diagnostic; no causal or speedup claim",

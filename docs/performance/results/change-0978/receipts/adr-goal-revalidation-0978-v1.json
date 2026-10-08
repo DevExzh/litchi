@@ -1,0 +1,31 @@
+{
+  "accepted_adr_count": 32,
+  "adr_readme": {
+    "bytes": 5766,
+    "path": "/home/zhuhe/code/litchi/docs/adr/README.md",
+    "sha256": "2af0e5814378c2765c12213e495d02c2895a27f142bc618ca1f3037824bbe028"
+  },
+  "build_started": false,
+  "comparison": {
+    "accepted_adr_count": 32,
+    "all_hashes_equal_prior_fullread": true,
+    "changed_files": [],
+    "files_checked": 34
+  },
+  "created_utc": "2026-10-08T07:45:29.067840+00:00",
+  "current_head": "172d66458abacc224427bc9b86cf2d3bf3effe78",
+  "goal": {
+    "bytes": 35839,
+    "path": "/home/zhuhe/code/litchi/docs/GOAL.md",
+    "sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1"
+  },
+  "prior_full_read_receipt": {
+    "bytes": 7819,
+    "path": "/home/zhuhe/litchi-performance-0977/receipts/adr-goal-revalidation-0977-v1.json",
+    "sha256": "cb09d8c6331cde7f9ce44d6c5bb6fd984c8df97780a0e8c47fa0ee2edbdf27b9"
+  },
+  "schema": "litchi.performance.0978.adr_goal_revalidation.v1",
+  "scope": "offline variable-layout raw scanner only; no source/build/native capture changes",
+  "status": "pass",
+  "workload_started": false
+}

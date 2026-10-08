@@ -1,0 +1,154 @@
+{
+  "checks": {
+    "active_map_build_id_linkage": true,
+    "corrected_lost_events": 0,
+    "corrected_sample_count": 7201,
+    "exact_frame_and_marker_linkage": true,
+    "input_hashes_stable_before_after": true,
+    "lifecycle_record_count": 9191,
+    "lifecycle_sample_descriptor_count": 7201,
+    "raw_sample_count": 7201,
+    "saved_ledger_matches_current_helper": true
+  },
+  "command": {
+    "argv": [
+      "/usr/bin/python3",
+      "-B",
+      "/home/zhuhe/litchi-performance-0978/tools/replay_attribution_0978_v1.py",
+      "--output",
+      "/home/zhuhe/litchi-performance-0978/analysis/reducer-replay-child02-v1/replay-receipt-v6.json",
+      "--ledger-output",
+      "/home/zhuhe/litchi-performance-0978/analysis/reducer-replay-child02-v1/ledger-replay-v5.json",
+      "--lifecycle-stream",
+      "/home/zhuhe/litchi-performance-0978/analysis/reducer-replay-child02-v1/lifecycle-stream-v2.json",
+      "--stream-generation-receipt",
+      "/home/zhuhe/litchi-performance-0978/analysis/child-02-build-ledger-integration-v3.json"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "no_perf_subprocess": true,
+    "offline_only": true
+  },
+  "inputs": {
+    "binary": {
+      "bytes": 47909224,
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+    },
+    "corrected_script": {
+      "bytes": 11598818,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.corrected.perf-script-no-inline.txt",
+      "sha256": "371eee38919ec71a916c0a386c2b289d4dd82ff1f2c4932f3c47e050965b8338"
+    },
+    "lifecycle_stream": {
+      "bytes": 14347606,
+      "path": "/home/zhuhe/litchi-performance-0978/analysis/reducer-replay-child02-v1/lifecycle-stream-v2.json",
+      "sha256": "2ec935924bc854e53f7ee9288ac7c2e24317821bd2e3dea507a757b1bbfc7eb5"
+    },
+    "perf_data": {
+      "bytes": 237904472,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf.data",
+      "sha256": "3b929236dc8378e2804d1d7421e0a2f9bfc22fbad7c6f29cc0f8cf1774df22dc"
+    },
+    "perf_evlist": {
+      "bytes": 499,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-evlist-v.txt",
+      "sha256": "29f2a64536a635ac827b283009f72855d998151954c3000f867cbeaf8b8058af"
+    },
+    "raw_mmap_dump": {
+      "bytes": 1140014935,
+      "path": "/home/zhuhe/litchi-performance-0978/cpu-profile-child02-v1/capture/child-02/child-02.perf-mmap-dump.txt",
+      "sha256": "06d9529bf1c741e33105e4dd79a86466c64ba84ff8f58cdde8ab2abb8b0b41ce"
+    },
+    "raw_summary": {
+      "bytes": 5850204,
+      "path": "/home/zhuhe/litchi-performance-0978/analysis/reducer-replay-child02-v1/raw-summary.json",
+      "sha256": "2bb22763da4750a2c03feee1d8a74e25988cb4b3154815842c3a9247689b5a47"
+    },
+    "saved_ledger": {
+      "bytes": 4407422,
+      "path": "/home/zhuhe/litchi-performance-0978/analysis/reducer-replay-child02-v1/ledger-replay.json",
+      "sha256": "66fdaaa1951407d4488ad4b605958a223ceb641b69ce1d678f3c3382131f07ba"
+    }
+  },
+  "ledger_summary": {
+    "D": 7201000000,
+    "M": 945000000,
+    "R": 6256000000,
+    "T": 6788000000,
+    "Tknown": 6738000000,
+    "U_marker": 6000000,
+    "U_target": 50000000,
+    "conservation": {
+      "D_equals_phase_sum": true,
+      "M_equals_known_plus_U_marker": true,
+      "R_equals_D_minus_M": true,
+      "T_equals_known_plus_U_target": true
+    },
+    "marker_sample_count": 945
+  },
+  "limitations": [
+    "one child only; no all-12 reduction or cohort admission",
+    "the retained capture originated from 0977; this replay does not claim a 0978 native command/plan custody result",
+    "D/M/R/T are sampled instruction periods; R means marker ancestry not observed and may include missing/truncated marker ancestry",
+    "no speedup, exact timed-region, optimization, or causal owner claim",
+    "the original ledger-replay.json is preserved and compared; the derived ledger output is a fresh version"
+  ],
+  "outputs": {
+    "derived_ledger": {
+      "bytes": 5665461,
+      "path": "/home/zhuhe/litchi-performance-0978/analysis/reducer-replay-child02-v1/ledger-replay-v5.json",
+      "sha256": "ceb28465eee186cb2e029d65b56b25d086c821d3c676680a902afcb012f27936"
+    },
+    "receipt": {
+      "path": "/home/zhuhe/litchi-performance-0978/analysis/reducer-replay-child02-v1/replay-receipt-v6.json",
+      "script_hash_bound_before_write": "ba240445dd7353687654a9ca2adeeaecd60c78a795fe38a06671844e004169c3"
+    }
+  },
+  "schema": "litchi.performance.0978.child02_offline_reducer_replay.v3",
+  "scope": {
+    "0978_native_plan_claim": false,
+    "capture_origin": "retained 0977 capture copied into 0978 custody directory",
+    "child": "child-02",
+    "cohort_admitted": false,
+    "kind": "offline_analysis_replay",
+    "native_actions": {
+      "build": false,
+      "recording": false,
+      "workload": false
+    }
+  },
+  "source_bindings": {
+    "focused_decoder": {
+      "bytes": 53527,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/focuseddecode_0978.py",
+      "sha256": "ecabcd01ba6f9bae6b397f80573bc3d170b538d9d0f1d08477486875420afc34"
+    },
+    "lifecycle_helper_used_for_replay": {
+      "bytes": 56966,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/lifecycle_ledger_0978.py",
+      "sha256": "6296e2dd20f911b2d989f1a8c7b9e337c9a34efc5c0f04831a50111192b9e7d0"
+    },
+    "raw_scanner_source": {
+      "bytes": 32486,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/raw_stack_0978.py",
+      "sha256": "5f844b82a40426662ffaed5ba21dd0687fefa3f98ecc233dc572eeb3041017b7"
+    },
+    "reducer": {
+      "bytes": 103753,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/reduce_0978.py",
+      "sha256": "e904caa12e395cc7b6917cc03cf82509168338c94291575b3ecef282639ae626"
+    },
+    "replay_script": {
+      "bytes": 15621,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/replay_attribution_0978_v1.py",
+      "sha256": "ba240445dd7353687654a9ca2adeeaecd60c78a795fe38a06671844e004169c3"
+    },
+    "stream_generation_lifecycle_helper_sha256": "6296e2dd20f911b2d989f1a8c7b9e337c9a34efc5c0f04831a50111192b9e7d0",
+    "stream_generation_receipt": {
+      "bytes": 6574487,
+      "path": "/home/zhuhe/litchi-performance-0978/analysis/child-02-build-ledger-integration-v3.json",
+      "sha256": "337f48b4c0ce4669e7216e8ce08994821dc00ce21057ad4dfcad53bc6c119016"
+    }
+  },
+  "status": "pass"
+}

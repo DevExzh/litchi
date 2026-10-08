@@ -1,0 +1,189 @@
+{
+  "checks": {
+    "control_boundary_equivalence_v5": {
+      "all_checks_passed": true,
+      "receipt": {
+        "bytes": 3388,
+        "path": "/home/zhuhe/litchi-performance-0978/receipts/control-boundary-equivalence-0978-v5.json",
+        "sha256": "c4b0c814ce93cb3a3f2bc3d30c92a91c0f8ca814fbc9003d38200a162a91432d"
+      },
+      "reusable_boundary": {
+        "period": 1000000,
+        "process_group_cleanup": "SIGTERM then bounded SIGKILL and verify_group_gone",
+        "recorder_cpu": 30,
+        "retry": false,
+        "root_go_still_required": true,
+        "same_pid_bridge_exec": true,
+        "serial_children": true,
+        "stack_cap": 32768,
+        "stop_on_first_failure": true,
+        "target_cpu": 31,
+        "timeout_seconds": 900
+      },
+      "status": "pass"
+    },
+    "focused_decoder_v3_validate_plan": {
+      "returncode": 0,
+      "status": "pass"
+    },
+    "native_command_tokens_present": true,
+    "native_function_source_equal_to_retained_0977": {
+      "affinity_observation_gate": true,
+      "native_env": true,
+      "terminate_group": true,
+      "verify_group_gone": true
+    },
+    "plan_binding_validate_plan": {
+      "result": {
+        "helper_count": 11,
+        "plan": "/home/zhuhe/litchi-performance-0978/plans/plan-0978-v3.json",
+        "schema": "litchi.performance.0978.plan.v1",
+        "status": "pass"
+      },
+      "returncode": 0,
+      "status": "pass"
+    },
+    "plan_delta_from_historical_v1": {
+      "changed_paths": [
+        "/created_utc",
+        "/dependencies/reducer/bytes",
+        "/dependencies/reducer/path",
+        "/dependencies/reducer/sha256",
+        "/helper_seal/path",
+        "/helper_seal/sha256",
+        "/helper_seal_sha256",
+        "/helpers/plan_binding/sha256",
+        "/helpers/reducer/bytes",
+        "/helpers/reducer/path",
+        "/helpers/reducer/sha256",
+        "/plan_path"
+      ],
+      "native_batch_execution_output_contracts_unchanged": true,
+      "only_metadata_or_binding_changes": true,
+      "plan_binding_final_hash_bound": true,
+      "reducer_v2_to_v4_owner_fix_bound": true
+    },
+    "reducer_v4_validate_plan": {
+      "returncode": 0,
+      "status": "pass"
+    },
+    "runner_check_plan": {
+      "returncode": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "809fa8cb56ad02cf5ccac53d3d8edde9df15ee8eb0d356dad8f93fe9f2a8ff44"
+    },
+    "runner_self_test": {
+      "returncode": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "777f2734e91b5747a28ff50b9ee29a97cd59f0039bf008eaec2187db2d184ae7"
+    }
+  },
+  "decision": "pass_for_final_v3_plan_binding_and_native_boundary_static_admission_only",
+  "final_plan": {
+    "bytes": 31010,
+    "helper_seal": {
+      "bytes": 6649,
+      "path": "/home/zhuhe/litchi-performance-0978/receipts/helper-seal-0978-v3.json",
+      "sha256": "a9735d56b4a73fab0ef8e6f14a2e05b19813e686c99e850283c06f4c2c8281fe"
+    },
+    "no_build_or_workload": true,
+    "path": "/home/zhuhe/litchi-performance-0978/plans/plan-0978-v3.json",
+    "root_go_absent": true,
+    "schema": "litchi.performance.0978.plan.v1",
+    "sha256": "9849dfd914463db998f02df7505db85ff02eb84215143d4ac1e67af267fa6424",
+    "status": "pre_capture"
+  },
+  "findings": [],
+  "limitations": [
+    "Static/native-boundary and final pre-capture plan admission only; no native, Office, perf, control, or decoder workload was launched.",
+    "Root GO and any authorized capture plan remain separate gates.",
+    "This receipt does not make performance, correctness, or production-adoption claims."
+  ],
+  "reviewed_utc": "2026-10-08T09:35:57.094095+00:00",
+  "schema": "litchi.performance.0978.independent_native_boundary_review.v4",
+  "scope": {
+    "build_started": false,
+    "final_plan_binding": true,
+    "native_boundary": true,
+    "native_workload_started": false,
+    "performance_or_adoption_claim": false,
+    "reader_artifact_gate_binding": true,
+    "retained_0977_control_reuse": true,
+    "root_go_authorization": false
+  },
+  "source_bindings": {
+    "control_equivalence_v5": {
+      "bytes": 3388,
+      "path": "/home/zhuhe/litchi-performance-0978/receipts/control-boundary-equivalence-0978-v5.json",
+      "sha256": "c4b0c814ce93cb3a3f2bc3d30c92a91c0f8ca814fbc9003d38200a162a91432d"
+    },
+    "focuseddecode_0978_v3": {
+      "bytes": 62748,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/focuseddecode_0978_v3.py",
+      "sha256": "9596e246c7c627fb3810e7c6c6d3dda12af58b62477f1f1233654c4256e2dac9"
+    },
+    "plan_binding_0978_v1_final": {
+      "bytes": 40141,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/plan_binding_0978_v1.py",
+      "sha256": "eb703fdbfecb672358eedcba64fd23bdf09a7b3b0af03adbe7be89cb32078497"
+    },
+    "prepare_plan_0978_v1": {
+      "bytes": 20673,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/prepare_plan_0978_v1.py",
+      "sha256": "d17352c73346e559fb554b6da1204c1baaf53aa32cd203ac47b4e18181dc6b58"
+    },
+    "reducer_0978_v4": {
+      "bytes": 104834,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/reduce_0978_v4.py",
+      "sha256": "1c40193d0debcea9feb696d82f029cc058b10e39e20ceb2183e2444223fc756c"
+    },
+    "retained_bridge_0977": {
+      "bytes": 13348,
+      "path": "/home/zhuhe/litchi-performance-0977/tools/affinity_bridge_0977.py",
+      "sha256": "2c9f5839c23da769625d3b9fdf339ec00d9c8a3209e6f6c1a5c166d475800a43"
+    },
+    "retained_runner_0977": {
+      "bytes": 38108,
+      "path": "/home/zhuhe/litchi-performance-0977/tools/run_0977_v2.py",
+      "sha256": "d7904b4773cc17d96c7194c5d4df7e83520795580af17a8217da93cfffa565a4"
+    },
+    "runner_0978": {
+      "bytes": 48826,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/run_0978_v1.py",
+      "sha256": "c24da0749dd6d5dd1464e23dffbb9a3650634f0a803ac3a372a6d365cfc9837a"
+    }
+  },
+  "source_stability": {
+    "hashes_after": {
+      "/home/zhuhe/litchi-performance-0977/tools/affinity_bridge_0977.py": "2c9f5839c23da769625d3b9fdf339ec00d9c8a3209e6f6c1a5c166d475800a43",
+      "/home/zhuhe/litchi-performance-0977/tools/run_0977_v2.py": "d7904b4773cc17d96c7194c5d4df7e83520795580af17a8217da93cfffa565a4",
+      "/home/zhuhe/litchi-performance-0978/plans/plan-0978-v3.json": "9849dfd914463db998f02df7505db85ff02eb84215143d4ac1e67af267fa6424",
+      "/home/zhuhe/litchi-performance-0978/receipts/control-boundary-equivalence-0978-v5.json": "c4b0c814ce93cb3a3f2bc3d30c92a91c0f8ca814fbc9003d38200a162a91432d",
+      "/home/zhuhe/litchi-performance-0978/receipts/helper-seal-0978-v3.json": "a9735d56b4a73fab0ef8e6f14a2e05b19813e686c99e850283c06f4c2c8281fe",
+      "/home/zhuhe/litchi-performance-0978/tools/focuseddecode_0978_v3.py": "9596e246c7c627fb3810e7c6c6d3dda12af58b62477f1f1233654c4256e2dac9",
+      "/home/zhuhe/litchi-performance-0978/tools/plan_binding_0978_v1.py": "eb703fdbfecb672358eedcba64fd23bdf09a7b3b0af03adbe7be89cb32078497",
+      "/home/zhuhe/litchi-performance-0978/tools/prepare_plan_0978_v1.py": "d17352c73346e559fb554b6da1204c1baaf53aa32cd203ac47b4e18181dc6b58",
+      "/home/zhuhe/litchi-performance-0978/tools/reduce_0978_v4.py": "1c40193d0debcea9feb696d82f029cc058b10e39e20ceb2183e2444223fc756c",
+      "/home/zhuhe/litchi-performance-0978/tools/run_0978_v1.py": "c24da0749dd6d5dd1464e23dffbb9a3650634f0a803ac3a372a6d365cfc9837a"
+    },
+    "hashes_before": {
+      "/home/zhuhe/litchi-performance-0977/tools/affinity_bridge_0977.py": "2c9f5839c23da769625d3b9fdf339ec00d9c8a3209e6f6c1a5c166d475800a43",
+      "/home/zhuhe/litchi-performance-0977/tools/run_0977_v2.py": "d7904b4773cc17d96c7194c5d4df7e83520795580af17a8217da93cfffa565a4",
+      "/home/zhuhe/litchi-performance-0978/plans/plan-0978-v3.json": "9849dfd914463db998f02df7505db85ff02eb84215143d4ac1e67af267fa6424",
+      "/home/zhuhe/litchi-performance-0978/receipts/control-boundary-equivalence-0978-v5.json": "c4b0c814ce93cb3a3f2bc3d30c92a91c0f8ca814fbc9003d38200a162a91432d",
+      "/home/zhuhe/litchi-performance-0978/receipts/helper-seal-0978-v3.json": "a9735d56b4a73fab0ef8e6f14a2e05b19813e686c99e850283c06f4c2c8281fe",
+      "/home/zhuhe/litchi-performance-0978/tools/focuseddecode_0978_v3.py": "9596e246c7c627fb3810e7c6c6d3dda12af58b62477f1f1233654c4256e2dac9",
+      "/home/zhuhe/litchi-performance-0978/tools/plan_binding_0978_v1.py": "eb703fdbfecb672358eedcba64fd23bdf09a7b3b0af03adbe7be89cb32078497",
+      "/home/zhuhe/litchi-performance-0978/tools/prepare_plan_0978_v1.py": "d17352c73346e559fb554b6da1204c1baaf53aa32cd203ac47b4e18181dc6b58",
+      "/home/zhuhe/litchi-performance-0978/tools/reduce_0978_v4.py": "1c40193d0debcea9feb696d82f029cc058b10e39e20ceb2183e2444223fc756c",
+      "/home/zhuhe/litchi-performance-0978/tools/run_0978_v1.py": "c24da0749dd6d5dd1464e23dffbb9a3650634f0a803ac3a372a6d365cfc9837a"
+    }
+  },
+  "status": "pass",
+  "supersedes": {
+    "path": "/home/zhuhe/litchi-performance-0978/review/independent-native-boundary-review-v3.json",
+    "reason": "final v3 plan/seal and coherent original validator/reducer imports supersede v3 historical bindings",
+    "sha256": "b793c8c393cb29b8ba79dfc0cef1ecaaac420a4cf5f4c8efdd1f59a784c1aaea"
+  },
+  "version": 4
+}

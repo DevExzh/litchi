@@ -1,5 +1,21 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0978 — variable-layout accounting enabler, native cohort stops on loss
+
+[0978](0978-variable-layout-profile-accounting.md) passes its bounded offline
+variable-layout scanner, lifecycle ledger, packet validation, and reducer
+metadata checks, then fails native cohort qualification at the first loss gate.
+The run is bound to plan v3 and the root GO: child 01 has 7,200 samples and
+955 markers with raw/terminal loss zero, and child 02 has 7,201 samples and
+950 markers with raw/terminal loss zero. Child 03's native command returns 0,
+but its audit finds two `PERF_RECORD_LOST` records totaling 4 (values 1 and 3)
+and a matching terminal `LOST_SAMPLES=4`; the views are not summed. The runner
+returns 2, emits no child-03 packet, stops without retry, and never launches
+children 04--12. The v4 reducer returns 2 with no cohort output. This is not a
+timing baseline and yields no 12-child reduction, source-owner, speedup,
+adoption, or host-cause claim. See the [record](0978-variable-layout-profile-accounting.md)
+and [failed-cohort audit](results/change-0978/review/postcapture-failed-cohort-audit-v1.json).
+
 ## 0977 — combined profile stops at variable-layout scanner admission
 
 [0977](0977-combined-profile-qualification.md) is a failed, stop-on-first-

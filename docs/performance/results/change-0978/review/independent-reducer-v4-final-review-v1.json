@@ -1,0 +1,72 @@
+{
+  "controls": {
+    "ip_hex_regression": {
+      "591928": 5839144,
+      "e59f0": 940528
+    },
+    "mutation_evidence": {
+      "bytes": 2602,
+      "path": "/home/zhuhe/litchi-performance-0978/review/independent-reducer-scoped-approval-v3.json",
+      "sha256": "ef96bd4601f339ad6ac282cd94cdca8591051d1f05fb2eded7617281c032458f"
+    },
+    "reducer_self_test": "pass"
+  },
+  "created_utc": "2026-10-08T09:27:33.479564+00:00",
+  "decision": {
+    "approve_v4_for_final_plan_binding": true,
+    "future_plan_must_bind": {
+      "bytes": 104834,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/reduce_0978_v4.py",
+      "sha256": "1c40193d0debcea9feb696d82f029cc058b10e39e20ceb2183e2444223fc756c"
+    },
+    "no_native_admission_or_performance_claim": true
+  },
+  "inherited_validation": {
+    "checks_passed": 23,
+    "native_actions": {
+      "build": false,
+      "recording": false,
+      "workload": false
+    },
+    "packet_status": "pass",
+    "packet_validation": {
+      "bytes": 26513,
+      "path": "/home/zhuhe/litchi-performance-0978/fresh-offline-child02-v1/packet-validation-v4.json",
+      "sha256": "a970f7309ab455c74a73b80c9ff7d99fcd2859b8ba05801aaf8c6f3a59643aab"
+    },
+    "required_failures": 0,
+    "source_inputs_stable_before_after": true,
+    "validated_reducer_sha256": "e925755639ccdca3b75ed5b6e64265f711f506b6e6478bcee9a94990ce08521f"
+  },
+  "schema": "litchi.performance.0978.independent_reducer_v4_review.v1",
+  "scope": {
+    "build_started": false,
+    "claim_boundary": "v4 metadata correction only; inherited v2 packet validation and mutation evidence remain explicitly inherited",
+    "native_capture": false,
+    "native_workload_started": false,
+    "raw_reparse_by_reviewer": false
+  },
+  "semantic_checks": {
+    "Tknown_scope": "known physical-leaf period in target execution across all mapped DSOs",
+    "U_target_scope": "target execution period without a defensible physical owner",
+    "logic_unchanged_from_v2": true,
+    "owner_bounds_map": "target_source_owner_period",
+    "owner_bounds_scope": "target-source eligible physical-leaf period; unknown target period is shared bound mass"
+  },
+  "source": {
+    "diff_bytes": 598,
+    "diff_sha256": "a86f5f319758edb1aa1640c8fcb1e7befcd02cc7f8a0f7f262eed84c7bc2bbef",
+    "only_change": "owner_bounds scope string",
+    "v2": {
+      "bytes": 104870,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/reduce_0978_v2.py",
+      "sha256": "e925755639ccdca3b75ed5b6e64265f711f506b6e6478bcee9a94990ce08521f"
+    },
+    "v4": {
+      "bytes": 104834,
+      "path": "/home/zhuhe/litchi-performance-0978/tools/reduce_0978_v4.py",
+      "sha256": "1c40193d0debcea9feb696d82f029cc058b10e39e20ceb2183e2444223fc756c"
+    }
+  },
+  "status": "pass_scoped_metadata_correction"
+}

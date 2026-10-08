@@ -1,0 +1,30 @@
+{
+  "children_completed": 2,
+  "children_requested": 12,
+  "created_utc": "2026-10-08T09:47:18Z",
+  "failure": {
+    "child": 3,
+    "error": "child-03: decoder failed: loss_gate: raw or terminal loss is nonzero",
+    "no_retry": true,
+    "type": "RunnerError"
+  },
+  "mode": "office",
+  "no_retry": true,
+  "packets": [
+    "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.packet.json",
+    "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-02/child-02.packet.json"
+  ],
+  "plan": {
+    "bytes": 31010,
+    "path": "/home/zhuhe/litchi-performance-0978/plans/plan-0978-v3.json",
+    "sha256": "9849dfd914463db998f02df7505db85ff02eb84215143d4ac1e67af267fa6424"
+  },
+  "root_go": {
+    "bytes": 2466,
+    "path": "/home/zhuhe/litchi-performance-0978/receipts/root-go-0978-office-v1.json",
+    "sha256": "94cb8410778ba388cb3a7c80f5086b8fc080c21a62b7dcda5ffbc72c4fd4a789"
+  },
+  "schema": "litchi.performance.0978.capture_manifest.v1",
+  "serial": true,
+  "status": "failed"
+}

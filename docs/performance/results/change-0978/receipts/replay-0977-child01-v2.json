@@ -1,0 +1,176 @@
+{
+  "binary": {
+    "bytes": 47909224,
+    "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+    "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+  },
+  "children": [
+    {
+      "child": 1,
+      "expected_pid": 3848944,
+      "inputs": {
+        "dump": {
+          "bytes": 1139326734,
+          "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-01/child-01.perf-mmap-dump.txt",
+          "sha256": "d2fcdd02073d07ae0e08130eae07f4c065713648bbadc3c073bae05776929f85"
+        },
+        "evlist": {
+          "bytes": 499,
+          "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-01/child-01.perf-evlist-v.txt",
+          "sha256": "29f2a64536a635ac827b283009f72855d998151954c3000f867cbeaf8b8058af"
+        },
+        "launch": {
+          "bytes": 1106,
+          "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-01/child-01.launch.json",
+          "sha256": "6c5c25ff0dffd6ef3ea8055d3a89793818071761978f99e5405307dbd73c3b46"
+        },
+        "perf_data": {
+          "bytes": 237785552,
+          "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-01/child-01.perf.data",
+          "sha256": "ba3d8834e670f6189c7d8e4e7dd8c985f32d62ebcc9724b08e46876db3152e3c"
+        },
+        "report": {
+          "bytes": 292296,
+          "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-01/child-01.report.json",
+          "sha256": "5feff2a4ab527e22e994e569d9c20778f1486ca2d81047e6b4e5c586283e5add"
+        },
+        "terminal": {
+          "bytes": 2618,
+          "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-01/child-01.terminal.json",
+          "sha256": "0611c23bb7010fb468d0f2d58449456318548de76a14c2e90e122fc8d526e963"
+        }
+      },
+      "summary": {
+        "binary": {
+          "bytes": 47909224,
+          "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+          "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+        },
+        "bounds_valid": true,
+        "dump": {
+          "bytes": 1139326734,
+          "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-01/child-01.perf-mmap-dump.txt",
+          "sha256": "d2fcdd02073d07ae0e08130eae07f4c065713648bbadc3c073bae05776929f85"
+        },
+        "event_contract": {
+          "authority": "perf evlist -v",
+          "line": "instructions:u: type: 4 (cpu), size: 144, config: 0xc0 (instructions), { sample_period, sample_freq }: 1000000, sample_type: IP|TID|TIME|CALLCHAIN|CPU|PERIOD|REGS_USER|STACK_USER, read_format: ID|LOST, disabled: 1, exclude_kernel: 1, exclude_hv: 1, mmap: 1, comm: 1, enable_on_exec: 1, task: 1, mmap_data: 1, sample_id_all: 1, exclude_callchain_kernel: 1, exclude_callchain_user: 1, mmap2: 1, comm_exec: 1, ksymbol: 1, bpf_event: 1, build_id: 1, sample_regs_user: 0xff0fff, sample_stack_user: 32768",
+          "linux_uapi": "/usr/include/linux/perf_event.h",
+          "linux_uapi_sha256": "4c2e217b87afecaa002ec35dd748319b02fbf98ddc301c60238146fa2ab057b7",
+          "period": 1000000,
+          "regs_user_mask": 16715775,
+          "sample_type": "IP|TID|TIME|CALLCHAIN|CPU|PERIOD|REGS_USER|STACK_USER",
+          "sample_type_mask": 12711,
+          "sample_type_names": [
+            "IP",
+            "TID",
+            "TIME",
+            "CALLCHAIN",
+            "CPU",
+            "PERIOD",
+            "REGS_USER",
+            "STACK_USER"
+          ],
+          "schema": "litchi.performance.0978.evlist_contract.v1",
+          "source": "perf evlist -v",
+          "stack_cap": 32768,
+          "status": "pass",
+          "supported_sample_mask": 12711,
+          "upstream_evsel_source": "https://raw.githubusercontent.com/torvalds/linux/v6.12/tools/perf/util/evsel.c"
+        },
+        "expected_cpu": 31,
+        "expected_period": 1000000,
+        "expected_pid": 3848944,
+        "mode_counts": {
+          "kernel": 32,
+          "user": 7168
+        },
+        "mode_missing_unwindability_counts": {
+          "kernel": 32,
+          "user": 7168
+        },
+        "perf_data": {
+          "bytes": 237785552,
+          "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-01/child-01.perf.data",
+          "sha256": "ba3d8834e670f6189c7d8e4e7dd8c985f32d62ebcc9724b08e46876db3152e3c"
+        },
+        "period_valid": true,
+        "physical_identity_valid": true,
+        "physical_location_count": 8050,
+        "pid_tid_cpu_valid": true,
+        "raw_event_count": 8050,
+        "raw_record_size_counts": {
+          "104": 583,
+          "112": 3,
+          "120": 19,
+          "136": 40,
+          "144": 65,
+          "16": 1,
+          "168": 30,
+          "176": 10,
+          "208": 5,
+          "32": 1,
+          "33008": 7200,
+          "40": 1,
+          "48": 1,
+          "56": 5,
+          "8": 86
+        },
+        "raw_record_type_counts": {
+          "10": 755,
+          "3": 4,
+          "4": 1,
+          "68": 85,
+          "69": 1,
+          "73": 1,
+          "74": 1,
+          "78": 1,
+          "82": 1,
+          "9": 7200
+        },
+        "raw_sample_record_count": 7200,
+        "raw_unconsumed_count": 850,
+        "regs_abi_counts": {
+          "64": 7200
+        },
+        "sample_conservation": true,
+        "sample_count": 7200,
+        "sample_ledger_retained": false,
+        "sample_line_count": 7200,
+        "schema": "litchi.performance.0978.raw_stack.v1",
+        "scope": {
+          "all_perf_record_sample_lines": true,
+          "all_raw_records_counted": true,
+          "no_unwind_or_owner_claim": true,
+          "variable_layout": true
+        },
+        "stack_cap": 32768,
+        "stack_shape_counts": {
+          "nonzero": 7200
+        },
+        "status": "complete",
+        "time_valid": true,
+        "violations": []
+      }
+    }
+  ],
+  "created_utc": "2026-10-08T07:56:54.987400+00:00",
+  "schema": "litchi.performance.0978.raw_stack_replay.v1",
+  "scope": {
+    "offline_only": true,
+    "payload_presence_is_not_unwind_proof": true,
+    "sample_ledger_retained": false,
+    "sealed_inputs_0977_modified": false,
+    "workload_or_build": false
+  },
+  "tool": {
+    "bytes": 3739,
+    "path": "/home/zhuhe/litchi-performance-0978/tools/replay_raw_stack_0978.py",
+    "sha256": "db33ff4c1179a2f221cab0e5fbe6d8c961adb4e37fdfbd52939d446f60033980"
+  },
+  "uapi": {
+    "path": "/usr/include/linux/perf_event.h",
+    "sha256": "4c2e217b87afecaa002ec35dd748319b02fbf98ddc301c60238146fa2ab057b7",
+    "upstream_evsel_source": "https://raw.githubusercontent.com/torvalds/linux/v6.12/tools/perf/util/evsel.c"
+  }
+}

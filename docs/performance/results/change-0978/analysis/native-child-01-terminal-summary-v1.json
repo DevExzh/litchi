@@ -1,0 +1,24 @@
+{
+  "command": [
+    "/usr/bin/perf",
+    "report",
+    "--stdio",
+    "--percent-limit",
+    "100",
+    "-i",
+    "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.perf.data"
+  ],
+  "command_receipt": {
+    "bytes": 1087,
+    "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.terminal-report.command.json",
+    "sha256": "e4225f7e0a562f9c26278ea7c1f929dfb12d6b53c0e6f4869f5ad25781361420"
+  },
+  "lost_samples": 0,
+  "report": {
+    "bytes": 1097,
+    "path": "/home/zhuhe/litchi-performance-0978/capture/instruction-profile-v1/child-01/child-01.terminal-report.txt",
+    "sha256": "591fb7d5c516276bffab3c22b73a5a20985ea9ac4129a5e0abfc3a8b8624b716"
+  },
+  "returncode": 0,
+  "schema": "litchi.performance.0978.terminal_summary.v1"
+}
