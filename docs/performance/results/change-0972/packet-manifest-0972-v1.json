@@ -1,0 +1,119 @@
+{
+  "authoritative_receipts": {
+    "author_seal_sha256": "a8be68fb63e7460d839ca23ab2457b2415762da76d8a92d26e8640281a7bde1c",
+    "binding_resolution_sha256": "c49b9a130e58f3a474b3eae44852400b6a6555a51e3c4d687980be7f2a2a914c",
+    "cleanup_sha256": "952105c102be9e9cf8313f61acc6b0cb5c30ec37d839ebe72ca7b52b5876b236",
+    "independent_review_sha256": "617900bc7f758eaf1e3c38643538a74dd04e75f6a679c3beea39942b65952c3d",
+    "replay_receipt_sha256": "452ffec504e387b5beea157d755b817a1ce1e282c0a8acc379ddf6bafa429522"
+  },
+  "constraints": {
+    "all_repository_files_below_1_mib": true,
+    "compiled_binaries_copied": false,
+    "max_repository_file_bytes": 443936,
+    "raw_perf_captures_copied": false
+  },
+  "external_root": "/home/zhuhe/litchi-performance-0972",
+  "file_count": 20,
+  "files": [
+    {
+      "bytes": 2659,
+      "path": "docs/performance/results/change-0972/README.md",
+      "sha256": "3f4782535c978e45e0de83ce514f073462f8f1d99025151f2b3b8e02bbb5e552"
+    },
+    {
+      "bytes": 443936,
+      "path": "docs/performance/results/change-0972/analysis/corrected-raw-stack-scan-0972-v2.json",
+      "sha256": "6ef76bc01cc7e298c924eda95cfd29dc0cc070ac3e3de4cbe9d87a7cf1b93a9b"
+    },
+    {
+      "bytes": 8086,
+      "path": "docs/performance/results/change-0972/analysis/diagnosis-v3.md",
+      "sha256": "80c54eeb6116b585b9088399c14eef2583b73202faa4a364f0983968753eff9c"
+    },
+    {
+      "bytes": 353440,
+      "path": "docs/performance/results/change-0972/analysis/dwfl-corrected-decode-v6.json",
+      "sha256": "3b75fdabf79ca7104f24e5deb2e389ecbd94c7a439579cc16a5a8d3c7b42e7db"
+    },
+    {
+      "bytes": 1612,
+      "path": "docs/performance/results/change-0972/provenance/commands-corrected-raw-scan-v2.txt",
+      "sha256": "4d031e7d111c3a7e6b8ad9ddc64a7792ef08be1acf82181123fea03e7146e198"
+    },
+    {
+      "bytes": 3180,
+      "path": "docs/performance/results/change-0972/provenance/commands-dwfl-replay-v6.txt",
+      "sha256": "47c07fef0a6a7d072fd817d10354b5d6d852d457fcad749db2716738ca9de893"
+    },
+    {
+      "bytes": 1024,
+      "path": "docs/performance/results/change-0972/provenance/evidence-bindings-v1.json",
+      "sha256": "b3fdc025e394633f4c5b59749830801d1e9a622bbb64d12dd57fff757a8835f0"
+    },
+    {
+      "bytes": 19713,
+      "path": "docs/performance/results/change-0972/provenance/external-artifact-descriptor-final-v1.json",
+      "sha256": "3f7ba467794b1c3de2fccf358632d686cd8c6685a3fe6e8dea6864a6ecb42a3d"
+    },
+    {
+      "bytes": 1821,
+      "path": "docs/performance/results/change-0972/provenance/historical-dwfl-v1-invalid-correction-v1.json",
+      "sha256": "012331d05a540491869503afbfd99e6a79b28d429b24f2ca4b474b97c34ed7d4"
+    },
+    {
+      "bytes": 8574,
+      "path": "docs/performance/results/change-0972/receipts/adr-goal-revalidation-0972-v1.json",
+      "sha256": "083a73712fee1cecba962d9ac75913e81bfd0a9e48db35e8ed8e1ef099e6550e"
+    },
+    {
+      "bytes": 9202,
+      "path": "docs/performance/results/change-0972/receipts/diagnosis-v3-receipt.json",
+      "sha256": "69f75c7f97f5a2bb94ef88b260b4dd161813354285bc76cfc1756defbe8b3805"
+    },
+    {
+      "bytes": 4200,
+      "path": "docs/performance/results/change-0972/receipts/dwfl-replay-author-seal-v6.json",
+      "sha256": "a8be68fb63e7460d839ca23ab2457b2415762da76d8a92d26e8640281a7bde1c"
+    },
+    {
+      "bytes": 11599,
+      "path": "docs/performance/results/change-0972/receipts/dwfl-replay-receipt-v6.json",
+      "sha256": "452ffec504e387b5beea157d755b817a1ce1e282c0a8acc379ddf6bafa429522"
+    },
+    {
+      "bytes": 9877,
+      "path": "docs/performance/results/change-0972/receipts/independent-offline-review-0972-final-v1.json",
+      "sha256": "617900bc7f758eaf1e3c38643538a74dd04e75f6a679c3beea39942b65952c3d"
+    },
+    {
+      "bytes": 1395,
+      "path": "docs/performance/results/change-0972/receipts/root-binding-resolution-0972-v1.json",
+      "sha256": "c49b9a130e58f3a474b3eae44852400b6a6555a51e3c4d687980be7f2a2a914c"
+    },
+    {
+      "bytes": 17292,
+      "path": "docs/performance/results/change-0972/receipts/temporary-cleanup-0972-v1.json",
+      "sha256": "952105c102be9e9cf8313f61acc6b0cb5c30ec37d839ebe72ca7b52b5876b236"
+    },
+    {
+      "bytes": 22507,
+      "path": "docs/performance/results/change-0972/tools/corrected_raw_stack_scan_0972_v2.py",
+      "sha256": "b60e2638fc6af5432a3dfa1402721678f6b58f8b3f454ee99611e67fb80f3987"
+    },
+    {
+      "bytes": 8685,
+      "path": "docs/performance/results/change-0972/tools/dwfl_base_shim_v6.c",
+      "sha256": "391ecf6192425ebb7e05e5ce3de4f4fe9be3195e22b9f05b111dad7de6b05311"
+    },
+    {
+      "bytes": 107,
+      "path": "docs/performance/results/change-0972/tools/dwfl_base_shim_v6.map",
+      "sha256": "d0a7914c5cb02770073db94dc4d2b207a95ae513b436c661d8a9c9a206aefef6"
+    }
+  ],
+  "generated_utc": "2026-10-08T03:56:20.722197+00:00",
+  "manifest_excludes_self": true,
+  "schema": "litchi.performance.0972.packet_manifest.final.v1",
+  "scope": "Final bounded offline decoder diagnosis; no native workload, production source change, raw capture, derived perf data, or compiled executable copied.",
+  "status": "sealed"
+}

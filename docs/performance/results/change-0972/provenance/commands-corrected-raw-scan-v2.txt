@@ -1,0 +1,15 @@
+generated_utc=2026-10-08T03:37:39.079048+00:00
+
+# Offline-only commands used by this diagnosis
+/usr/bin/perf --version
+/usr/bin/perf script -D -i /home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf.data
+/usr/bin/perf script -vvv --show-lost-events --no-inline -i /home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf.data > /tmp/0972-perf-script-vvv.out 2> /tmp/0972-perf-script-vvv.err
+/usr/bin/readelf -lW /home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile
+/usr/bin/readelf -S /home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile
+/usr/bin/readelf --debug-dump=frames-interp /home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile
+/usr/bin/nm -n -C /home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile
+/usr/bin/objdump -d -C --start-address=0xec4f0 --stop-address=0xec570 /home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile
+/usr/bin/objdump -d -C --start-address=0xe6ca0 --stop-address=0xe7040 /home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile
+/usr/bin/objdump -d -C --start-address=0xf15f0 --stop-address=0xf2700 /home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile
+
+# No command above executes the retained binary or changes sealed capture files.

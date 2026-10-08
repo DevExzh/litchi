@@ -1,0 +1,53 @@
+# 0972 ABI-correct offline libdw decoder replay v6; generated 2026-10-08.
+# This file contains the exact external build/replay commands. The replay reads
+# only the retained perf.data; it never launches the retained Office binary.
+# v1 is invalid because it used a five-argument declaration for the six-argument
+# dwfl_report_elf API. v6 is the robustness-corrected comparator candidate.
+
+sha256sum /home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf.data
+sha256sum /home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile
+sha256sum /usr/bin/perf /usr/lib/x86_64-linux-gnu/libdw.so.1 /usr/lib/x86_64-linux-gnu/libelf.so.1
+/usr/bin/perf --version
+cc --version
+sha256sum /home/zhuhe/litchi-performance-0972/header-v2/root/usr/include/elfutils/libdwfl.h
+
+cc -shared -fPIC -O2 -std=c11 -Wall -Wextra -Werror \
+  -I/home/zhuhe/litchi-performance-0972/header-v2/root/usr/include \
+  -Wl,--version-script=/home/zhuhe/litchi-performance-0972/tools/dwfl_base_shim_v6.map \
+  -o /home/zhuhe/litchi-performance-0972/replay-dwfl-v6/dwfl_base_shim_v6.so \
+  /home/zhuhe/litchi-performance-0972/tools/dwfl_base_shim_v6.c -ldl
+
+# Stock control.
+/usr/bin/perf script --no-inline \
+  -i /home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf.data \
+  > /home/zhuhe/litchi-performance-0972/replay-dwfl-v6/stock.script-no-inline.txt \
+  2> /home/zhuhe/litchi-performance-0972/replay-dwfl-v6/stock.stderr.txt
+
+# No-op interposer control: same API forwarding and diagnostic logs, no correction.
+LITCHI_0972_SHIM_MODE=noop \
+LITCHI_0972_SHIM_LOG=/home/zhuhe/litchi-performance-0972/replay-dwfl-v6/noop.dwfl.jsonl \
+LD_PRELOAD=/home/zhuhe/litchi-performance-0972/replay-dwfl-v6/dwfl_base_shim_v6.so \
+  /usr/bin/perf script --no-inline \
+  -i /home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf.data \
+  > /home/zhuhe/litchi-performance-0972/replay-dwfl-v6/noop.script-no-inline.txt \
+  2> /home/zhuhe/litchi-performance-0972/replay-dwfl-v6/noop.stderr.txt
+
+# Corrected replay: only the exact retained DSO base is changed at report time,
+# and only direct /usr/bin/perf target-module info calls expose the comparator
+# start expected by the perf module map. The v6 wrapper captures return PC in
+# dwfl_module_info itself and restores errno after logging.
+LITCHI_0972_SHIM_MODE=corrected \
+LITCHI_0972_SHIM_LOG=/home/zhuhe/litchi-performance-0972/replay-dwfl-v6/corrected.dwfl.jsonl \
+LD_PRELOAD=/home/zhuhe/litchi-performance-0972/replay-dwfl-v6/dwfl_base_shim_v6.so \
+  /usr/bin/perf script --no-inline \
+  -i /home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf.data \
+  > /home/zhuhe/litchi-performance-0972/replay-dwfl-v6/corrected.script-no-inline.txt \
+  2> /home/zhuhe/litchi-performance-0972/replay-dwfl-v6/corrected.stderr.txt
+
+# Offline decode summary command (read-only retained text and logs).
+python3 - <<'PY2'
+import json
+from pathlib import Path
+p=Path('/home/zhuhe/litchi-performance-0972/analysis/dwfl-corrected-decode-v6.json')
+print(json.loads(p.read_text())['canonical_results'])
+PY2

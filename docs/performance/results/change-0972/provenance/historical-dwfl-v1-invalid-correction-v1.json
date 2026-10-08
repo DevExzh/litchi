@@ -1,0 +1,37 @@
+{
+  "schema": "litchi.performance.0972.dwfl_v1_invalid_correction.v1",
+  "created_utc": "2026-10-08T03:48:03.376840+00:00",
+  "status": "invalid_do_not_use",
+  "scope": "custody correction only; no capture or source mutation",
+  "invalid_artifacts": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0972/tools/dwfl_base_shim_v1.c",
+      "bytes": 3405,
+      "sha256": "a067dc54587ba9eeb273535050b5d7c2658f32a4b9199f6deadfc3734eed33f9"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v1/dwfl_base_shim_v1.so",
+      "bytes": 16208,
+      "sha256": "e8eee06b33ef6368724162b2809a7da091489a3e7eef47c943bfd425baafc610"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0972/receipts/dwfl-replay-receipt-v1.json",
+      "bytes": 8604,
+      "sha256": "aaffc6a181507196709e0c42a6e524971d2cc0d11de204a4fa75f27b99bbd59a"
+    }
+  ],
+  "reason": {
+    "actual_header": "elfutils/libdwfl.h dwfl_report_elf(Dwfl*, const char*, const char*, int fd, GElf_Addr base, bool add_p_vaddr)",
+    "v1_declaration": "Dwfl*, const char*, const char*, GElf_Addr base, GElf_Addr main_addr",
+    "effect": "The v1 wrapper interpreted the fourth ABI argument fd (-1) as base and shifted the real base into a nonexistent fifth semantic field; its forwarding call also omitted add_p_vaddr.",
+    "consequence": "v1 logs/results and v1 report conclusion are invalid and must not be used."
+  },
+  "header_binding": {
+    "path": "/home/zhuhe/litchi-performance-0972/header-v2/root/usr/include/elfutils/libdwfl.h",
+    "bytes": 39682,
+    "sha256": "6f9dc2c2f9ca8d691f42f78e7634c2e40750a3af134e8226bd7c5aff395a3657"
+  },
+  "corrected_work": "The ABI-correct v5 helper forwards fd and add_p_vaddr unchanged and records the true fifth-argument base.",
+  "raw_input_untouched": true,
+  "workload_started": false
+}

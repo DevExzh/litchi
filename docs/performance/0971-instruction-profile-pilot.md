@@ -31,16 +31,22 @@ operation-local region and excludes wrappers and sidecar I/O. The independent
 audit confirms the native child returned rc0 with a valid 80-sample report,
 matching PID/CPU and 1,387 `instructions:u` samples at 5,000,000 instructions
 each (6,935,000,000 total period), with zero lost events. It also confirms the
-exact 125-byte marker ELF symbol and FDE, but neither decode contains the
-marker: 906 samples have no physical frames, 618 frame records are unresolved,
+exact 125-byte marker ELF symbol and FDE, but the original stock decodes contain
+no marker: 906 samples have no physical frames, 618 frame records are unresolved,
 and only 11 samples contain 23 frames from the native binary, all other
 symbols. Attribution is therefore unusable even though native execution and
 raw custody pass. The audit does not establish the underlying unwind failure
 or assert that the 16 KiB stack setting is its cause.
 
-The sealed offline failure analysis independently re-decodes the profile and
-matches the retained decode; native leaf-IP symbolization works, but no marker
-return-word or caller ancestry is observed. It isolates no underlying cause.
+The later [0972 offline recovery](0972-instruction-profile-recovery.md) found
+that the raw scanner used a load bias one page high and a truncated executable
+interval; its raw-zero inference is withdrawn. The sealed v6 replay corrects
+the external decoder binding on this immutable capture and recovers 78 marker
+chains, with 41 outer `measure_one` frames and 37 missing that outer context.
+All recovered marker frames resolve, but the original gate required 100 marker
+samples, so the 0971 pilot remains failed and no 12-child cohort or performance
+attribution follows. The recovery supports a decoder map-metadata interaction,
+not a proven stack-depth, unwind, host, or source cause.
 
 ## Completed retained-work analysis
 
@@ -74,11 +80,11 @@ alternatives.
 The corrected pre-capture review passed the helper, parser, custody, timeout,
 source-binding, and synthetic mutation controls, and root GO bound the exact
 historical binary, fixture, CPU, and output roots. The failed pilot is not
-reduced or aggregated and no replacement child was run. The next step is
-offline callchain forensics to isolate the coverage failure; any future native
-attribution must first demonstrate non-empty marker ancestry while reporting
-all empty, unresolved, and truncated samples. No rerun, native rebuild, or
-production change occurred.
+reduced or aggregated and no replacement child was run. The offline callchain
+recovery is recorded in 0972; it corrects decoder binding without reviving the
+native cohort. Any future native attribution must first demonstrate non-empty
+marker ancestry while reporting all empty, unresolved, and truncated samples.
+No rerun, native rebuild, or production change occurred.
 
 ## Evidence
 
@@ -88,9 +94,10 @@ production change occurred.
 | [failed pilot manifest](results/change-0971/capture/capture-manifest-v2.json) | `bb51f571c33cb6426d3adf75ac91f7ef3f1720a2cec17738832e90205c08673f` |
 | [root GO](results/change-0971/receipts/root-go-0971-v2.json) | `ac84a543596842798d09a4727e7e32096bda580270b3e56e37dd55871768f13e` |
 | [corrected pre-capture review](results/change-0971/review/independent-final-review-0971-v2.json) | `ab2d1c292e008ea2f398b3dbb9b3e923ab4581207eaa99c2efd659a3703ca92d` |
-| [failed-pilot independent audit](results/change-0971/review/failed-pilot-independent-audit-0971-v1.json) | `99eefd86a035d8f6ac87dfa3bd768f1d1d85fee7e152526d2e26e0c40112a2a` |
-| [offline failure-analysis receipt](results/change-0971/analysis/instruction-profile-v2-failure-v1/receipt-v1.json) | `5eb4a186159247e2369b595c53a8ce8d11dab9cd5ed56ff899950b65c7bfdae7` |
-| [offline failure analysis](results/change-0971/analysis/instruction-profile-v2-failure-v1/failure-analysis-v1.md) | `6aecc34e84edd357401549f8591bd921cf01249b67a22163d0888c2f95658c52` |
+| [failed-pilot independent audit](results/change-0971/review/failed-pilot-independent-audit-0971-v1.json) | `99eefd86a035d8f6ac87dfa3bd768f1d1d85fee7e152526d2e26e0c40112a2a7` |
+| [historical offline failure-analysis receipt; raw-word conclusion superseded](results/change-0971/analysis/instruction-profile-v2-failure-v1/receipt-v1.json) | `5eb4a186159247e2369b595c53a8ce8d11dab9cd5ed56ff899950b65c7bfdae7` |
+| [historical offline failure analysis; raw-word conclusion superseded](results/change-0971/analysis/instruction-profile-v2-failure-v1/failure-analysis-v1.md) | `6aecc34e84edd357401549f8591bd921cf01249b67a22163d0888c2f95658c52` |
+| [0972 final offline diagnosis](results/change-0972/analysis/diagnosis-v3.md) | `80c54eeb6116b585b9088399c14eef2583b73202faa4a364f0983968753eff9c` |
 | [retained Float/e1 analysis](results/change-0971/analysis/float-e1-work-v1.json) | `1e27a1e84b12d696133bf97fab17e59180e8ba99db64d70fb0ea85f9f61c19fc` |
 | [analysis receipt](results/change-0971/receipts/float-e1-work-receipt-v1.json) | `cc9da6e1ef8357691df9b91ed361a9a81f672a92138bedddf85e5e23501ed4da` |
 | [temporary cleanup](results/change-0971/receipts/temporary-cleanup-0971-v1.json) | `e25b7eb218960e440b187b4aa73f74acecd507acbe66f1f2b2ccfdad81801832` |

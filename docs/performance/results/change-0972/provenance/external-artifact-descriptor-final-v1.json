@@ -1,0 +1,461 @@
+{
+  "entries": [
+    {
+      "bytes": 23129880,
+      "copied_to_repository": false,
+      "kind": "sealed_input_perf_data",
+      "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf.data",
+      "sealed_reference": true,
+      "sha256": "499e3008e6496b01fe09c9cf7f6f2aedbf46c1b24f7697e98289c09460143746",
+      "status": "sealed_reference"
+    },
+    {
+      "bytes": 47909224,
+      "copied_to_repository": false,
+      "kind": "retained_compiled_executable",
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "sealed_reference": true,
+      "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb",
+      "status": "external_reference_only"
+    },
+    {
+      "bytes": 236196,
+      "copied_to_repository": false,
+      "kind": "initial_verbose_decoder_output",
+      "path": "/home/zhuhe/litchi-performance-0972/diagnostics/0972-perf-script-vvv.out",
+      "sealed_reference": false,
+      "sha256": "563fb2d0c8188a9f2a9174ef0caa3a66fd9ed770301f897011b7d72747858d35",
+      "status": "external_only"
+    },
+    {
+      "bytes": 1034123,
+      "copied_to_repository": false,
+      "kind": "initial_verbose_decoder_output",
+      "path": "/home/zhuhe/litchi-performance-0972/diagnostics/0972-perf-script-vvv.err",
+      "sealed_reference": false,
+      "sha256": "760f8fa4c71bcf1accfcdc9215889f67d0c80a0936b07a39acd622b345eff9da",
+      "status": "external_only"
+    },
+    {
+      "bytes": 23129880,
+      "copied_to_repository": false,
+      "kind": "derived_perf_data",
+      "path": "/home/zhuhe/litchi-performance-0972/counterfactual-mmap-v1/child-01.mmap-pgoff-corrected.perf.data",
+      "sealed_reference": false,
+      "sha256": "d72f74c048435bdfd45526739c0929e27c97d19fe2c5ccf44d3d03633ae798c2",
+      "status": "derived_diagnostic_snapshot"
+    },
+    {
+      "bytes": 23129880,
+      "copied_to_repository": false,
+      "kind": "derived_perf_data",
+      "path": "/home/zhuhe/litchi-performance-0972/counterfactual-mmap-v1/child-01.rw-only.perf.data",
+      "sealed_reference": false,
+      "sha256": "3af0505cd35f886bcc1fb0749be05c879d71ea737da5be9c92ceb05971dcd8e5",
+      "status": "derived_diagnostic_snapshot"
+    },
+    {
+      "bytes": 23129880,
+      "copied_to_repository": false,
+      "kind": "derived_perf_data",
+      "path": "/home/zhuhe/litchi-performance-0972/counterfactual-mmap-v1/child-01.rx-only.perf.data",
+      "sealed_reference": false,
+      "sha256": "e886749c73c3dad8306469ff697464290ca98c5143352cc45ae11aaa468dcf89",
+      "status": "derived_diagnostic_snapshot"
+    },
+    {
+      "bytes": 2775,
+      "copied_to_repository": false,
+      "kind": "derived_counterfactual_output",
+      "path": "/home/zhuhe/litchi-performance-0972/counterfactual-mmap-v1/counterfactual-analysis-v1.json",
+      "sealed_reference": false,
+      "sha256": "f6e67aa8e11f679fd5e0707ab16c7fb6c3b8edb8ede058ec5df28e04c84b4346",
+      "status": "derived_receipt"
+    },
+    {
+      "bytes": 943,
+      "copied_to_repository": false,
+      "kind": "derived_counterfactual_output",
+      "path": "/home/zhuhe/litchi-performance-0972/counterfactual-mmap-v1/decode-receipt-v1.json",
+      "sealed_reference": false,
+      "sha256": "78d53879a9698178544972d8cec6901f18afd4fcef878279d0a2121d28e206f0",
+      "status": "derived_receipt"
+    },
+    {
+      "bytes": 0,
+      "copied_to_repository": false,
+      "kind": "derived_counterfactual_output",
+      "path": "/home/zhuhe/litchi-performance-0972/counterfactual-mmap-v1/original.script-no-inline.stderr.txt",
+      "sealed_reference": false,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "derived_diagnostic_snapshot"
+    },
+    {
+      "bytes": 236196,
+      "copied_to_repository": false,
+      "kind": "derived_counterfactual_output",
+      "path": "/home/zhuhe/litchi-performance-0972/counterfactual-mmap-v1/original.script-no-inline.txt",
+      "sealed_reference": false,
+      "sha256": "563fb2d0c8188a9f2a9174ef0caa3a66fd9ed770301f897011b7d72747858d35",
+      "status": "derived_diagnostic_snapshot"
+    },
+    {
+      "bytes": 1388,
+      "copied_to_repository": false,
+      "kind": "derived_counterfactual_output",
+      "path": "/home/zhuhe/litchi-performance-0972/counterfactual-mmap-v1/patch-receipt-v1.json",
+      "sealed_reference": false,
+      "sha256": "3830bc3b21ec604882ebcc234af218adb28ab0b1a0809b55569f06e671254039",
+      "status": "derived_receipt"
+    },
+    {
+      "bytes": 0,
+      "copied_to_repository": false,
+      "kind": "derived_counterfactual_output",
+      "path": "/home/zhuhe/litchi-performance-0972/counterfactual-mmap-v1/patched.script-no-inline.stderr.txt",
+      "sealed_reference": false,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "derived_diagnostic_snapshot"
+    },
+    {
+      "bytes": 2072081,
+      "copied_to_repository": false,
+      "kind": "derived_counterfactual_output",
+      "path": "/home/zhuhe/litchi-performance-0972/counterfactual-mmap-v1/patched.script-no-inline.txt",
+      "sealed_reference": false,
+      "sha256": "f03759c90cb930202be8fa450ca70a796e4bc1c47c614fca7d965ae078e3552d",
+      "status": "derived_diagnostic_snapshot"
+    },
+    {
+      "bytes": 5886007,
+      "copied_to_repository": false,
+      "kind": "derived_counterfactual_output",
+      "path": "/home/zhuhe/litchi-performance-0972/counterfactual-mmap-v1/patched.script-vvv.err",
+      "sealed_reference": false,
+      "sha256": "cb1e588b5d8e0171cb404ce8c91ab99aa6741d9f1057c0b8a742d2b646bae4ed",
+      "status": "derived_diagnostic_snapshot"
+    },
+    {
+      "bytes": 2072081,
+      "copied_to_repository": false,
+      "kind": "derived_counterfactual_output",
+      "path": "/home/zhuhe/litchi-performance-0972/counterfactual-mmap-v1/patched.script-vvv.out",
+      "sealed_reference": false,
+      "sha256": "f03759c90cb930202be8fa450ca70a796e4bc1c47c614fca7d965ae078e3552d",
+      "status": "derived_receipt"
+    },
+    {
+      "bytes": 889,
+      "copied_to_repository": false,
+      "kind": "derived_counterfactual_output",
+      "path": "/home/zhuhe/litchi-performance-0972/counterfactual-mmap-v1/rw-only-receipt-v1.json",
+      "sealed_reference": false,
+      "sha256": "fbf4f0b51eaec7dd720de5f85356bbb46815603f3a3cf47188cb005696f19b31",
+      "status": "derived_receipt"
+    },
+    {
+      "bytes": 0,
+      "copied_to_repository": false,
+      "kind": "derived_counterfactual_output",
+      "path": "/home/zhuhe/litchi-performance-0972/counterfactual-mmap-v1/rw-only.script-no-inline.stderr.txt",
+      "sealed_reference": false,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "derived_diagnostic_snapshot"
+    },
+    {
+      "bytes": 503360,
+      "copied_to_repository": false,
+      "kind": "derived_counterfactual_output",
+      "path": "/home/zhuhe/litchi-performance-0972/counterfactual-mmap-v1/rw-only.script-no-inline.txt",
+      "sealed_reference": false,
+      "sha256": "7af85a3d0463bb2b376aae9f75db2ddc74a656df16e46055bca09c912486d854",
+      "status": "derived_diagnostic_snapshot"
+    },
+    {
+      "bytes": 768,
+      "copied_to_repository": false,
+      "kind": "derived_counterfactual_output",
+      "path": "/home/zhuhe/litchi-performance-0972/counterfactual-mmap-v1/rx-only-receipt-v1.json",
+      "sealed_reference": false,
+      "sha256": "3a8d3ad958e638639142b4ce71153f73f6a859303a49f7b7f51af8c991f38a90",
+      "status": "derived_receipt"
+    },
+    {
+      "bytes": 0,
+      "copied_to_repository": false,
+      "kind": "derived_counterfactual_output",
+      "path": "/home/zhuhe/litchi-performance-0972/counterfactual-mmap-v1/rx-only.script-no-inline.stderr.txt",
+      "sealed_reference": false,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "derived_diagnostic_snapshot"
+    },
+    {
+      "bytes": 2072081,
+      "copied_to_repository": false,
+      "kind": "derived_counterfactual_output",
+      "path": "/home/zhuhe/litchi-performance-0972/counterfactual-mmap-v1/rx-only.script-no-inline.txt",
+      "sealed_reference": false,
+      "sha256": "f03759c90cb930202be8fa450ca70a796e4bc1c47c614fca7d965ae078e3552d",
+      "status": "derived_diagnostic_snapshot"
+    },
+    {
+      "bytes": 18165996,
+      "copied_to_repository": false,
+      "kind": "shim_call_log_external_only",
+      "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v6/corrected.dwfl.jsonl",
+      "sealed_reference": false,
+      "sha256": "433ba37c3a220f35c8c02e46f141c13a34ce11ced50f2b8782b2ca512c0ca6d2",
+      "status": "sealed_external_final"
+    },
+    {
+      "bytes": 2013005,
+      "copied_to_repository": false,
+      "kind": "final_replay_output_external_only",
+      "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v6/corrected.script-no-inline.txt",
+      "sealed_reference": false,
+      "sha256": "fa27bd237b3716cfbdc1ff052882114e77d2228b0caa87f81f54948285c8401d",
+      "status": "sealed_external_final"
+    },
+    {
+      "bytes": 0,
+      "copied_to_repository": false,
+      "kind": "final_replay_output_external_only",
+      "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v6/corrected.stderr.txt",
+      "sealed_reference": false,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "sealed_external_final"
+    },
+    {
+      "bytes": 16592,
+      "copied_to_repository": false,
+      "kind": "compiled_shim_external_only",
+      "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v6/dwfl_base_shim_v6.so",
+      "sealed_reference": false,
+      "sha256": "de1348268dd283086680973102dccb2e5584db7eb98efc5a87b88fc8a0eec39f",
+      "status": "sealed_external_final"
+    },
+    {
+      "bytes": 5317468,
+      "copied_to_repository": false,
+      "kind": "shim_call_log_external_only",
+      "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v6/noop.dwfl.jsonl",
+      "sealed_reference": false,
+      "sha256": "19b0f72df36bb2f7a7f932df00f1fbc5a93a4a6760490f50ea7d83c78b6f695f",
+      "status": "sealed_external_final"
+    },
+    {
+      "bytes": 236196,
+      "copied_to_repository": false,
+      "kind": "final_replay_output_external_only",
+      "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v6/noop.script-no-inline.txt",
+      "sealed_reference": false,
+      "sha256": "563fb2d0c8188a9f2a9174ef0caa3a66fd9ed770301f897011b7d72747858d35",
+      "status": "sealed_external_final"
+    },
+    {
+      "bytes": 0,
+      "copied_to_repository": false,
+      "kind": "final_replay_output_external_only",
+      "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v6/noop.stderr.txt",
+      "sealed_reference": false,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "sealed_external_final"
+    },
+    {
+      "bytes": 236196,
+      "copied_to_repository": false,
+      "kind": "final_replay_output_external_only",
+      "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v6/stock.script-no-inline.txt",
+      "sealed_reference": false,
+      "sha256": "563fb2d0c8188a9f2a9174ef0caa3a66fd9ed770301f897011b7d72747858d35",
+      "status": "sealed_external_final"
+    },
+    {
+      "bytes": 0,
+      "copied_to_repository": false,
+      "kind": "final_replay_output_external_only",
+      "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v6/stock.stderr.txt",
+      "sealed_reference": false,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "sealed_external_final"
+    },
+    {
+      "bytes": 3405,
+      "copied_to_repository": false,
+      "kind": "shim_source_lineage",
+      "path": "/home/zhuhe/litchi-performance-0972/tools/dwfl_base_shim_v1.c",
+      "sealed_reference": false,
+      "sha256": "a067dc54587ba9eeb273535050b5d7c2658f32a4b9199f6deadfc3734eed33f9",
+      "status": "invalid_historical_do_not_use"
+    },
+    {
+      "bytes": 59,
+      "copied_to_repository": false,
+      "kind": "shim_source_lineage",
+      "path": "/home/zhuhe/litchi-performance-0972/tools/dwfl_base_shim_v1.map",
+      "sealed_reference": false,
+      "sha256": "8bc398daff059acc3c0d028a427376b7194d5fb495b29a61765d1dd770f32b4a",
+      "status": "invalid_historical_do_not_use"
+    },
+    {
+      "bytes": 16208,
+      "copied_to_repository": false,
+      "kind": "compiled_shim_lineage",
+      "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v1/dwfl_base_shim_v1.so",
+      "sealed_reference": false,
+      "sha256": "e8eee06b33ef6368724162b2809a7da091489a3e7eef47c943bfd425baafc610",
+      "status": "invalid_historical_do_not_use"
+    },
+    {
+      "bytes": 3327,
+      "copied_to_repository": false,
+      "kind": "shim_source_lineage",
+      "path": "/home/zhuhe/litchi-performance-0972/tools/dwfl_base_shim_v2.c",
+      "sealed_reference": false,
+      "sha256": "c9a06292b7d274afd3536363c7a55b3517968aba8428ea1a4c230a5d47c92022",
+      "status": "superseded_intermediate_non_authoritative"
+    },
+    {
+      "bytes": 59,
+      "copied_to_repository": false,
+      "kind": "shim_source_lineage",
+      "path": "/home/zhuhe/litchi-performance-0972/tools/dwfl_base_shim_v2.map",
+      "sealed_reference": false,
+      "sha256": "8bc398daff059acc3c0d028a427376b7194d5fb495b29a61765d1dd770f32b4a",
+      "status": "superseded_intermediate_non_authoritative"
+    },
+    {
+      "bytes": 16208,
+      "copied_to_repository": false,
+      "kind": "compiled_shim_lineage",
+      "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v2/dwfl_base_shim_v2.so",
+      "sealed_reference": false,
+      "sha256": "fcd0cabfee18b1273b6549e3a9f1727306c955a33f6fa9181f49ba4fd5f89a76",
+      "status": "superseded_intermediate_non_authoritative"
+    },
+    {
+      "bytes": 3541,
+      "copied_to_repository": false,
+      "kind": "shim_source_lineage",
+      "path": "/home/zhuhe/litchi-performance-0972/tools/dwfl_base_shim_v3.c",
+      "sealed_reference": false,
+      "sha256": "b037212495729c8b03eac0ee26e1573b391d847581dd2636164e55cc79cf7a43",
+      "status": "superseded_intermediate_non_authoritative"
+    },
+    {
+      "bytes": 59,
+      "copied_to_repository": false,
+      "kind": "shim_source_lineage",
+      "path": "/home/zhuhe/litchi-performance-0972/tools/dwfl_base_shim_v3.map",
+      "sealed_reference": false,
+      "sha256": "8bc398daff059acc3c0d028a427376b7194d5fb495b29a61765d1dd770f32b4a",
+      "status": "superseded_intermediate_non_authoritative"
+    },
+    {
+      "bytes": 16248,
+      "copied_to_repository": false,
+      "kind": "compiled_shim_lineage",
+      "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v3/dwfl_base_shim_v3.so",
+      "sealed_reference": false,
+      "sha256": "11c953c5d5574784f27878e77c154696767faaf548dde6e936286a74c8141d03",
+      "status": "superseded_intermediate_non_authoritative"
+    },
+    {
+      "bytes": 4903,
+      "copied_to_repository": false,
+      "kind": "shim_source_lineage",
+      "path": "/home/zhuhe/litchi-performance-0972/tools/dwfl_base_shim_v4.c",
+      "sealed_reference": false,
+      "sha256": "aeca1957d2529d16b4bb0420cf79ab41a88cff63c361b93828c8c1cdd899ebf1",
+      "status": "superseded_intermediate_non_authoritative"
+    },
+    {
+      "bytes": 59,
+      "copied_to_repository": false,
+      "kind": "shim_source_lineage",
+      "path": "/home/zhuhe/litchi-performance-0972/tools/dwfl_base_shim_v4.map",
+      "sealed_reference": false,
+      "sha256": "8bc398daff059acc3c0d028a427376b7194d5fb495b29a61765d1dd770f32b4a",
+      "status": "superseded_intermediate_non_authoritative"
+    },
+    {
+      "bytes": 16376,
+      "copied_to_repository": false,
+      "kind": "compiled_shim_lineage",
+      "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v4/dwfl_base_shim_v4.so",
+      "sealed_reference": false,
+      "sha256": "6e218789cafa566313c07fca5e673634ad4c7f21b06ed4c1e57dd6a37e9d5c91",
+      "status": "superseded_intermediate_non_authoritative"
+    },
+    {
+      "bytes": 8619,
+      "copied_to_repository": false,
+      "kind": "shim_source_lineage",
+      "path": "/home/zhuhe/litchi-performance-0972/tools/dwfl_base_shim_v5.c",
+      "sealed_reference": false,
+      "sha256": "27c05a27e510c05f84b0890cd0de2e3dbdeaf36792e07a6e161dee1a2bba9db9",
+      "status": "superseded_intermediate_non_authoritative"
+    },
+    {
+      "bytes": 107,
+      "copied_to_repository": false,
+      "kind": "shim_source_lineage",
+      "path": "/home/zhuhe/litchi-performance-0972/tools/dwfl_base_shim_v5.map",
+      "sealed_reference": false,
+      "sha256": "d0a7914c5cb02770073db94dc4d2b207a95ae513b436c661d8a9c9a206aefef6",
+      "status": "superseded_intermediate_non_authoritative"
+    },
+    {
+      "bytes": 16592,
+      "copied_to_repository": false,
+      "kind": "compiled_shim_lineage",
+      "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v5/dwfl_base_shim_v5.so",
+      "sealed_reference": false,
+      "sha256": "dff378bfd1ba3d1a3c470007e9035ab9a48e816e806aae393230e56eabaa21e3",
+      "status": "superseded_intermediate_non_authoritative"
+    },
+    {
+      "bytes": 8604,
+      "copied_to_repository": false,
+      "kind": "historical_replay_receipt_or_command",
+      "path": "/home/zhuhe/litchi-performance-0972/receipts/dwfl-replay-receipt-v1.json",
+      "sealed_reference": false,
+      "sha256": "aaffc6a181507196709e0c42a6e524971d2cc0d11de204a4fa75f27b99bbd59a",
+      "status": "invalid_or_superseded_historical"
+    },
+    {
+      "bytes": 4164,
+      "copied_to_repository": false,
+      "kind": "historical_replay_receipt_or_command",
+      "path": "/home/zhuhe/litchi-performance-0972/commands-dwfl-replay-v5.txt",
+      "sealed_reference": false,
+      "sha256": "8d613806d1b0140d275667b75d45f05fc119beb62005ddab7123c23b303c0019",
+      "status": "invalid_or_superseded_historical"
+    },
+    {
+      "bytes": 39682,
+      "copied_to_repository": false,
+      "kind": "external_abi_header",
+      "path": "/home/zhuhe/litchi-performance-0972/header-v2/root/usr/include/elfutils/libdwfl.h",
+      "sealed_reference": false,
+      "sha256": "6f9dc2c2f9ca8d691f42f78e7634c2e40750a3af134e8226bd7c5aff395a3657",
+      "status": "sealed_external_support"
+    }
+  ],
+  "final_authority": {
+    "binding_resolution": "receipts/root-binding-resolution-0972-v1.json",
+    "final_diagnosis": "analysis/diagnosis-v3.md",
+    "independent_review": "receipts/independent-offline-review-0972-final-v1.json",
+    "replay_version": "v6"
+  },
+  "generated_utc": "2026-10-08T03:56:20.721003+00:00",
+  "historical_exclusion": "The v1 shim used a five-argument declaration for the six-argument dwfl_report_elf ABI and is invalid. v2-v5 are superseded intermediate candidates. Their external lineage is retained only for custody and cannot support the final result.",
+  "regeneration": {
+    "corrected_raw_scan": "Use provenance/commands-corrected-raw-scan-v2.txt and tools/corrected_raw_stack_scan_0972_v2.py against the sealed external perf data and retained executable.",
+    "final_replay": "Use provenance/commands-dwfl-replay-v6.txt with the external v6 source/header and retained perf data. The compiled .so and replay outputs remain external."
+  },
+  "repository_packet": "docs/performance/results/change-0972",
+  "schema": "litchi.performance.0972.external_artifact_descriptor.final.v1",
+  "scope": "External custody descriptors for the sealed input, retained executable, pgoff diagnostic copies, final v6 replay outputs and compiled shim, and superseded shim lineage. No listed external artifact is copied into this repository.",
+  "status": "sealed_descriptor_for_final_packet"
+}

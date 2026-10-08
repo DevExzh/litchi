@@ -1,0 +1,31 @@
+{
+  "created_utc": "2026-10-08T03:54:21.869475+00:00",
+  "final_diagnosis": {
+    "bytes": 8086,
+    "path": "/home/zhuhe/litchi-performance-0972/diagnosis-v3.md",
+    "sha256": "80c54eeb6116b585b9088399c14eef2583b73202faa4a364f0983968753eff9c"
+  },
+  "final_diagnosis_receipt": {
+    "bytes": 9202,
+    "path": "/home/zhuhe/litchi-performance-0972/receipts/diagnosis-v3-receipt.json",
+    "sha256": "69f75c7f97f5a2bb94ef88b260b4dd161813354285bc76cfc1756defbe8b3805"
+  },
+  "resolved_finding": "Final diagnosis now binds PF_X-derived raw scan v2, 908 target-leaf samples and 4,540,000,000 period; old v1 explicitly superseded.",
+  "review": {
+    "bytes": 9877,
+    "path": "/home/zhuhe/litchi-performance-0972/receipts/independent-offline-review-0972-final-v1.json",
+    "sha256": "617900bc7f758eaf1e3c38643538a74dd04e75f6a679c3beea39942b65952c3d"
+  },
+  "schema": "litchi.performance.0972.root_binding_resolution.v1",
+  "status": "pass",
+  "validated_scan": {
+    "bytes": 443936,
+    "path": "/home/zhuhe/litchi-performance-0972/analysis/corrected-raw-stack-scan-0972-v2.json",
+    "sha256": "6ef76bc01cc7e298c924eda95cfd29dc0cc070ac3e3de4cbe9d87a7cf1b93a9b"
+  },
+  "validated_scanner": {
+    "bytes": 22507,
+    "path": "/home/zhuhe/litchi-performance-0972/analysis/corrected-raw-stack-scan-0972-v2.py",
+    "sha256": "b60e2638fc6af5432a3dfa1402721678f6b58f8b3f454ee99611e67fb80f3987"
+  }
+}

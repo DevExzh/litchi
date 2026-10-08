@@ -1,0 +1,24 @@
+{
+  "generated_utc": "2026-10-08T03:37:39.079048+00:00",
+  "perf_version": "perf version 7.0.14",
+  "sealed_perf_data": {
+    "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf.data",
+    "bytes": 23129880,
+    "sha256": "499e3008e6496b01fe09c9cf7f6f2aedbf46c1b24f7697e98289c09460143746"
+  },
+  "retained_binary": {
+    "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+    "bytes": 47909224,
+    "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+  },
+  "vvv_stdout": {
+    "path": "/home/zhuhe/litchi-performance-0972/diagnostics/0972-perf-script-vvv.out",
+    "bytes": 236196,
+    "sha256": "563fb2d0c8188a9f2a9174ef0caa3a66fd9ed770301f897011b7d72747858d35"
+  },
+  "vvv_stderr": {
+    "path": "/home/zhuhe/litchi-performance-0972/diagnostics/0972-perf-script-vvv.err",
+    "bytes": 1034123,
+    "sha256": "760f8fa4c71bcf1accfcdc9215889f67d0c80a0936b07a39acd622b345eff9da"
+  }
+}

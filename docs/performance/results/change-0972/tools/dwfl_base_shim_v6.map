@@ -1,0 +1,7 @@
+ELFUTILS_0.156 {
+  global: dwfl_report_elf;
+};
+ELFUTILS_0.122 {
+  global: dwfl_module_info;
+  local: *;
+};

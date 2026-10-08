@@ -1,0 +1,223 @@
+{
+  "bindings": {
+    "diagnosis_v3": {
+      "bytes": 7388,
+      "path": "/home/zhuhe/litchi-performance-0972/diagnosis-v3.md",
+      "sha256": "cc189cfbcaad63e95ebf20bbd5a2c36b7a60e2aa72305e50cfcafe3b77a7ad16"
+    },
+    "diagnosis_v3_receipt": {
+      "bytes": 8356,
+      "path": "/home/zhuhe/litchi-performance-0972/receipts/diagnosis-v3-receipt.json",
+      "sha256": "06ab85ae0f09637843aba598ed43f390f62161a93a2ab52381746bbe10dfa7e5"
+    },
+    "ptx_scan_output": {
+      "bytes": 443936,
+      "path": "/home/zhuhe/litchi-performance-0972/analysis/corrected-raw-stack-scan-0972-v2.json",
+      "sha256": "6ef76bc01cc7e298c924eda95cfd29dc0cc070ac3e3de4cbe9d87a7cf1b93a9b"
+    },
+    "ptx_scan_script": {
+      "bytes": 22507,
+      "path": "/home/zhuhe/litchi-performance-0972/analysis/corrected-raw-stack-scan-0972-v2.py",
+      "sha256": "b60e2638fc6af5432a3dfa1402721678f6b58f8b3f454ee99611e67fb80f3987"
+    },
+    "raw_perf_data": {
+      "bytes": 23129880,
+      "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf.data",
+      "sha256": "499e3008e6496b01fe09c9cf7f6f2aedbf46c1b24f7697e98289c09460143746"
+    },
+    "retained_binary": {
+      "bytes": 47909224,
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+    },
+    "v6_author_seal": {
+      "bytes": 4200,
+      "path": "/home/zhuhe/litchi-performance-0972/receipts/dwfl-replay-author-seal-v6.json",
+      "sha256": "a8be68fb63e7460d839ca23ab2457b2415762da76d8a92d26e8640281a7bde1c"
+    },
+    "v6_corrected_dwfl_log": {
+      "bytes": 18165996,
+      "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v6/corrected.dwfl.jsonl",
+      "sha256": "433ba37c3a220f35c8c02e46f141c13a34ce11ced50f2b8782b2ca512c0ca6d2"
+    },
+    "v6_corrected_script": {
+      "bytes": 2013005,
+      "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v6/corrected.script-no-inline.txt",
+      "sha256": "fa27bd237b3716cfbdc1ff052882114e77d2228b0caa87f81f54948285c8401d"
+    },
+    "v6_decode_summary": {
+      "bytes": 353440,
+      "path": "/home/zhuhe/litchi-performance-0972/analysis/dwfl-corrected-decode-v6.json",
+      "sha256": "3b75fdabf79ca7104f24e5deb2e389ecbd94c7a439579cc16a5a8d3c7b42e7db"
+    },
+    "v6_noop_script": {
+      "bytes": 236196,
+      "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v6/noop.script-no-inline.txt",
+      "sha256": "563fb2d0c8188a9f2a9174ef0caa3a66fd9ed770301f897011b7d72747858d35"
+    },
+    "v6_replay_receipt": {
+      "bytes": 11599,
+      "path": "/home/zhuhe/litchi-performance-0972/receipts/dwfl-replay-receipt-v6.json",
+      "sha256": "452ffec504e387b5beea157d755b817a1ce1e282c0a8acc379ddf6bafa429522"
+    },
+    "v6_shim_shared_object": {
+      "bytes": 16592,
+      "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v6/dwfl_base_shim_v6.so",
+      "sha256": "de1348268dd283086680973102dccb2e5584db7eb98efc5a87b88fc8a0eec39f"
+    },
+    "v6_shim_source": {
+      "bytes": 8685,
+      "path": "/home/zhuhe/litchi-performance-0972/tools/dwfl_base_shim_v6.c",
+      "sha256": "391ecf6192425ebb7e05e5ce3de4f4fe9be3195e22b9f05b111dad7de6b05311"
+    },
+    "v6_stock_script": {
+      "bytes": 236196,
+      "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v6/stock.script-no-inline.txt",
+      "sha256": "563fb2d0c8188a9f2a9174ef0caa3a66fd9ed770301f897011b7d72747858d35"
+    },
+    "v6_version_script": {
+      "bytes": 107,
+      "path": "/home/zhuhe/litchi-performance-0972/tools/dwfl_base_shim_v6.map",
+      "sha256": "d0a7914c5cb02770073db94dc4d2b207a95ae513b436c661d8a9c9a206aefef6"
+    }
+  },
+  "created_utc": "2026-10-08T03:53:30.972301+00:00",
+  "decision": {
+    "native_recapture_or_timing_claim": false,
+    "offline_decoder_recovery": true,
+    "offline_decoder_recovery_status": "pass",
+    "original_0971_pilot_status": "failed_gate_and_remains_failed",
+    "phase_or_owner_fraction_claim": false,
+    "production_adoption": false,
+    "recovered_marker_chains": 78,
+    "required_marker_gate": 100,
+    "stack_depth_or_stack_payload_cause_proven": false,
+    "upstream_perf_or_libdw_root_cause_proven": false
+  },
+  "diagnosis_v3_claim_check": {
+    "claim_boundaries_honest": true,
+    "coupled_decoder_replay_only": true,
+    "no_native_timing_or_speedup_claim": true,
+    "no_phase_or_owner_fraction_claim": true,
+    "original_pilot_below_gate": true,
+    "required_addendum": "diagnosis-v3 currently binds the superseded v1 raw-scan artifact; final note must bind PT_LOAD-derived v2 (or explicitly mark v1 historical) before packet seal. Marker potential counts are unchanged, but v1 target-leaf denominator is incomplete."
+  },
+  "historical_exclusions": {
+    "new_native_capture": "not performed",
+    "v1_shim": "invalid five-argument ABI; excluded",
+    "v2_v3_shims": "base-only/alias experiments insufficient or negative; excluded from final counts",
+    "v5_shim": "successful prototype retained for lineage only; v6 is authoritative"
+  },
+  "pt_load_raw_scan_v2_checks": {
+    "executable_interval": [
+      "0x64d1e4f409f0",
+      "0x64d1e51c7960"
+    ],
+    "layout_failures": 0,
+    "load_bias": "0x64d1e4e5b000",
+    "method": "target offset-zero PERF_RECORD_MMAP2 map start binds load bias; ELF PF_X PT_LOAD p_vaddr..p_vaddr+p_memsz derives executable interval; all raw sample records scanned without misc filter",
+    "output_sha256": "6ef76bc01cc7e298c924eda95cfd29dc0cc070ac3e3de4cbe9d87a7cf1b93a9b",
+    "parser_mismatches": 0,
+    "potential_marker_range_period": 265000000,
+    "potential_marker_range_samples": 53,
+    "potential_marker_return_period": 195000000,
+    "potential_marker_return_samples": 39,
+    "potential_measure_one_return_period": 85000000,
+    "potential_measure_one_return_samples": 17,
+    "potential_run_case_range_period": 270000000,
+    "potential_run_case_range_samples": 54,
+    "raw_callchain_nr_each": 0,
+    "raw_word_interpretation": "potential address-word matches only; not live ancestry, phase ownership, stack-depth evidence, or performance evidence",
+    "record_size_bytes": 16624,
+    "sample_misc_counts": {
+      "0x1": 10,
+      "0x2": 1377
+    },
+    "sample_records": 1387,
+    "script_sha256": "b60e2638fc6af5432a3dfa1402721678f6b58f8b3f454ee99611e67fb80f3987",
+    "stack_user_bytes_each": 16384,
+    "target_leaf_period": 4540000000,
+    "target_leaf_samples": 908,
+    "v1_truncated_denominator_superseded": true
+  },
+  "reviewer": "/root/cpu_review",
+  "schema": "litchi.performance.0972.independent_offline_review.v1",
+  "scope": "Independent read-only review of sealed v6 decoder replay and PT_LOAD-derived raw scan; no benchmark/workload/build/capture/source mutation and no host debug-cache mutation.",
+  "status": "pass_offline_decoder_recovery_with_native_gate_failed",
+  "v6_checks": {
+    "abi": {
+      "buildid_alias_rewrite": false,
+      "corrected_report_base": "0x64d1e4e5b000",
+      "corrected_report_target_only": true,
+      "direct_caller_guard": "all 19,389 adjusted rows report caller_file=/usr/bin/perf; no non-target or non-perf adjustment",
+      "errno_restored_after_real_calls": true,
+      "header_signature": "Dwfl_Module *dwfl_report_elf(Dwfl*, const char*, const char*, int fd, GElf_Addr base, bool add_p_vaddr)",
+      "module_info_adjustment_target_and_direct_perf_only": true,
+      "original_perf_map_base": "0x64d1e4e5c000",
+      "report_forwards_fd_and_add_p_vaddr_unchanged": true
+    },
+    "custody_and_controls": {
+      "all_modes_lost_events": 0,
+      "all_modes_sample_headers": 1387,
+      "all_modes_total_period": 6935000000,
+      "binary_sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb",
+      "raw_sha256": "499e3008e6496b01fe09c9cf7f6f2aedbf46c1b24f7697e98289c09460143746",
+      "raw_sha256_unchanged": true,
+      "stock_and_corrected_header_identity": true,
+      "stock_noop_stderr_byte_identical": true,
+      "stock_noop_stdout_byte_identical": true
+    },
+    "independent_decoded_text_check": {
+      "all_corrected_header_periods": 5000000,
+      "corrected_frame_lines": 11154,
+      "corrected_headers": 1387,
+      "corrected_marker_frame_lines": 78,
+      "corrected_target_dso_frame_lines": 9238,
+      "corrected_unresolved_lines": 611,
+      "noop_frame_lines": 1945,
+      "noop_headers": 1387,
+      "noop_marker_frame_lines": 0,
+      "noop_unresolved_lines": 618,
+      "stock_frame_lines": 1945,
+      "stock_headers": 1387,
+      "stock_marker_frame_lines": 0,
+      "stock_unresolved_lines": 618
+    },
+    "log_check": {
+      "adjusted_target_perf_rows": 19389,
+      "corrected_info_rows": 47375,
+      "corrected_log_rows": 47382,
+      "corrected_report_rows": 7,
+      "non_target_adjusted_rows": 0,
+      "target_info_rows": 38779,
+      "target_nonperf_adjusted_rows": 0,
+      "target_report_add_p_vaddr": false,
+      "target_report_fd": -1,
+      "target_report_nonnull": 1,
+      "target_report_replacement_rows": 1,
+      "target_report_rows": 1
+    },
+    "marker_chain_check": {
+      "all_chain_cpus": [
+        31
+      ],
+      "all_chain_periods": [
+        5000000
+      ],
+      "all_chain_pids": [
+        3683783
+      ],
+      "all_marker_chain_frames_resolved": true,
+      "all_marker_offsets_exact": true,
+      "chains": 78,
+      "each_chain_exactly_one_marker_frame": true,
+      "inclusive_tags_overlap": true,
+      "marker_symbol_and_offset": "doc_retention_probe_0942_cfb_profile::profiled_measured_case+0x1a",
+      "outer_measure_one_missing": 37,
+      "outer_measure_one_present": 41,
+      "outer_measure_symbol_and_offset": "doc_retention_probe_0942_cfb_profile::measure_one+0xf2",
+      "run_case_outer_offsets_are_not_single_constant": true,
+      "run_case_present_in_all_marker_chains": true
+    }
+  }
+}

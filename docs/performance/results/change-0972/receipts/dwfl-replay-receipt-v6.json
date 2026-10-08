@@ -1,0 +1,268 @@
+{
+  "abi": {
+    "forwarding": "The v6 report interposer forwards fd and add_p_vaddr unchanged and changes only the exact target fifth-argument base in corrected mode.",
+    "header": {
+      "bytes": 39682,
+      "path": "/home/zhuhe/litchi-performance-0972/header-v2/root/usr/include/elfutils/libdwfl.h",
+      "sha256": "6f9dc2c2f9ca8d691f42f78e7634c2e40750a3af134e8226bd7c5aff395a3657"
+    },
+    "signature": "Dwfl_Module *dwfl_report_elf(Dwfl*, const char*, const char*, int fd, GElf_Addr base, bool add_p_vaddr)",
+    "v1_invalid_reason": "v1 declared five arguments, interpreted fd=-1 as base, shifted the actual base, and omitted add_p_vaddr; v1 logs and conclusions are excluded.",
+    "v1_invalid_receipt": {
+      "bytes": 1821,
+      "path": "/home/zhuhe/litchi-performance-0972/receipts/dwfl-v1-invalid-correction-v1.json",
+      "sha256": "012331d05a540491869503afbfd99e6a79b28d429b24f2ca4b474b97c34ed7d4"
+    }
+  },
+  "canonical_results": {
+    "corrected": {
+      "lost_events": 0,
+      "marker_period": 390000000,
+      "marker_period_share": 0.05623648161499639,
+      "marker_sample_count": 78,
+      "sample_count": 1387,
+      "stack_truncated": 0,
+      "total_period": 6935000000,
+      "unresolved_frames": 611
+    },
+    "noop": {
+      "lost_events": 0,
+      "marker_period": 0,
+      "marker_period_share": 0.0,
+      "marker_sample_count": 0,
+      "sample_count": 1387,
+      "stack_truncated": 906,
+      "total_period": 6935000000,
+      "unresolved_frames": 618
+    },
+    "stock": {
+      "lost_events": 0,
+      "marker_period": 0,
+      "marker_period_share": 0.0,
+      "marker_sample_count": 0,
+      "sample_count": 1387,
+      "stack_truncated": 906,
+      "total_period": 6935000000,
+      "unresolved_frames": 618
+    }
+  },
+  "controls": {
+    "all_modes_sample_count": 1387,
+    "all_modes_total_period": 6935000000,
+    "lost_events_all_modes": 0,
+    "raw_sha256_after_replay": "499e3008e6496b01fe09c9cf7f6f2aedbf46c1b24f7697e98289c09460143746",
+    "raw_sha256_expected": "499e3008e6496b01fe09c9cf7f6f2aedbf46c1b24f7697e98289c09460143746",
+    "stock_corrected_header_identity": true,
+    "stock_noop_header_identity": true,
+    "stock_noop_stderr_byte_identical": true,
+    "stock_noop_stdout_byte_identical": true
+  },
+  "created_utc": "2026-10-08T03:50:30.173030+00:00",
+  "decision": "offline_marker_ancestry_recovered_by_abi_corrected_dwfl_and_perf_comparator_replay",
+  "input": {
+    "bytes": 23129880,
+    "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf.data",
+    "sha256": "499e3008e6496b01fe09c9cf7f6f2aedbf46c1b24f7697e98289c09460143746"
+  },
+  "interpretation": "The corrected interposer recovers 78 marker-containing chains from the unchanged raw perf.data, while stock and no-op retain zero. This is descriptive decoder evidence only; it is not a phase fraction, timing result, performance claim, adoption result, or proof of the upstream capture cause.",
+  "lineage": {
+    "v5_shared_object": {
+      "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v5/dwfl_base_shim_v5.so",
+      "sha256": "dff378bfd1ba3d1a3c470007e9035ab9a48e816e806aae393230e56eabaa21e3"
+    },
+    "v5_source": {
+      "path": "/home/zhuhe/litchi-performance-0972/tools/dwfl_base_shim_v5.c",
+      "sha256": "27c05a27e510c05f84b0890cd0de2e3dbdeaf36792e07a6e161dee1a2bba9db9"
+    },
+    "v6_change": "fresh version only: direct caller-PC capture in dwfl_module_info and errno restoration; v5 files and outputs remain immutable"
+  },
+  "marker_detail": {
+    "all_78_chains_included_in": "analysis/dwfl-corrected-decode-v6.json:parsed.corrected.marker_chains",
+    "decode_summary_contains_all_chains": true,
+    "decode_summary_path": "/home/zhuhe/litchi-performance-0972/analysis/dwfl-corrected-decode-v6.json",
+    "marker_chains": 78,
+    "marker_dso": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+    "marker_period_share": 0.05623648161499639,
+    "marker_period_share_label": "raw descriptive marker-period share; never a phase fraction or attribution percentage",
+    "marker_symbol": "doc_retention_probe_0942_cfb_profile::profiled_measured_case",
+    "outer_measure_missing": 37,
+    "outer_measure_present": 41,
+    "outer_measure_symbol": "doc_retention_probe_0942_cfb_profile::measure_one"
+  },
+  "replay": {
+    "all_commands_exit_zero": true,
+    "argv": [
+      "/usr/bin/perf",
+      "script",
+      "--no-inline",
+      "-i",
+      "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf.data"
+    ],
+    "mode_outputs": {
+      "corrected": {
+        "dwfl_log": {
+          "bytes": 18165996,
+          "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v6/corrected.dwfl.jsonl",
+          "sha256": "433ba37c3a220f35c8c02e46f141c13a34ce11ced50f2b8782b2ca512c0ca6d2"
+        },
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v6/corrected.stderr.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 2013005,
+          "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v6/corrected.script-no-inline.txt",
+          "sha256": "fa27bd237b3716cfbdc1ff052882114e77d2228b0caa87f81f54948285c8401d"
+        }
+      },
+      "noop": {
+        "dwfl_log": {
+          "bytes": 5317468,
+          "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v6/noop.dwfl.jsonl",
+          "sha256": "19b0f72df36bb2f7a7f932df00f1fbc5a93a4a6760490f50ea7d83c78b6f695f"
+        },
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v6/noop.stderr.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 236196,
+          "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v6/noop.script-no-inline.txt",
+          "sha256": "563fb2d0c8188a9f2a9174ef0caa3a66fd9ed770301f897011b7d72747858d35"
+        }
+      },
+      "stock": {
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v6/stock.stderr.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 236196,
+          "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v6/stock.script-no-inline.txt",
+          "sha256": "563fb2d0c8188a9f2a9174ef0caa3a66fd9ed770301f897011b7d72747858d35"
+        }
+      }
+    },
+    "serialized_modes": [
+      "stock",
+      "noop",
+      "corrected"
+    ]
+  },
+  "retained_binary": {
+    "build_id": "e5c457384eeebd057932c444efda77618f137399",
+    "bytes": 47909224,
+    "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+    "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+  },
+  "review_requirements": {
+    "independent_review_pending": true,
+    "no_new_workload_or_capture_required": true,
+    "required_checks": [
+      "ABI/header binding",
+      "stock/no-op byte identity",
+      "unchanged raw hash",
+      "exact target/caller correction conditions",
+      "all 78 chain custody in decode summary"
+    ]
+  },
+  "schema": "litchi.performance.0972.dwfl_replay.v6",
+  "scope": "offline perf-script decode only; retained perf.data was read without mutation; no Office workload, target executable launch, source mutation, or target rebuild",
+  "shim": {
+    "caller_pc_method": "__builtin_return_address(0) is captured directly in the interposed dwfl_module_info before classification; the classifier receives the captured PC as data.",
+    "corrected_target_base": "0x64d1e4e5b000",
+    "errno_method": "errno saved immediately after each real call and restored after diagnostic logging.",
+    "exports": [
+      "dwfl_report_elf@@ELFUTILS_0.156",
+      "dwfl_module_info@@ELFUTILS_0.122"
+    ],
+    "info_condition": "module name exactly equals retained target name, mode=corrected, direct caller PC resolves to /usr/bin/perf, and returned start=0x64d1e4e5b000",
+    "non_target_policy": "No base or module start adjustment for non-target paths/modules; no BuildID alias rewrite in v6.",
+    "original_target_base": "0x64d1e4e5c000",
+    "perf_expected_start": "0x64d1e4e5c000",
+    "report_condition": "file_name exactly equals retained target path and mode=corrected",
+    "shared_object": {
+      "bytes": 16592,
+      "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v6/dwfl_base_shim_v6.so",
+      "sha256": "de1348268dd283086680973102dccb2e5584db7eb98efc5a87b88fc8a0eec39f"
+    },
+    "source": {
+      "bytes": 8685,
+      "path": "/home/zhuhe/litchi-performance-0972/tools/dwfl_base_shim_v6.c",
+      "sha256": "391ecf6192425ebb7e05e5ce3de4f4fe9be3195e22b9f05b111dad7de6b05311"
+    },
+    "target_name": "doc_retention_probe_0942_cfb_profile",
+    "target_path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+    "version_script": {
+      "bytes": 107,
+      "path": "/home/zhuhe/litchi-performance-0972/tools/dwfl_base_shim_v6.map",
+      "sha256": "d0a7914c5cb02770073db94dc4d2b207a95ae513b436c661d8a9c9a206aefef6"
+    }
+  },
+  "status": "diagnostic_recovery_ready_for_independent_review",
+  "tools": {
+    "commands": {
+      "bytes": 3180,
+      "path": "/home/zhuhe/litchi-performance-0972/commands-dwfl-replay-v6.txt",
+      "sha256": "47c07fef0a6a7d072fd817d10354b5d6d852d457fcad749db2716738ca9de893"
+    },
+    "compiler": {
+      "argv": [
+        "cc",
+        "-shared",
+        "-fPIC",
+        "-O2",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-I/home/zhuhe/litchi-performance-0972/header-v2/root/usr/include",
+        "-Wl,--version-script=/home/zhuhe/litchi-performance-0972/tools/dwfl_base_shim_v6.map",
+        "-o",
+        "/home/zhuhe/litchi-performance-0972/replay-dwfl-v6/dwfl_base_shim_v6.so",
+        "/home/zhuhe/litchi-performance-0972/tools/dwfl_base_shim_v6.c",
+        "-ldl"
+      ],
+      "command": "cc",
+      "version": "cc (Ubuntu 15.2.0-16ubuntu1) 15.2.0"
+    },
+    "decode_summary": {
+      "bytes": 353440,
+      "path": "/home/zhuhe/litchi-performance-0972/analysis/dwfl-corrected-decode-v6.json",
+      "sha256": "3b75fdabf79ca7104f24e5deb2e389ecbd94c7a439579cc16a5a8d3c7b42e7db"
+    },
+    "libdw": {
+      "bytes": 823824,
+      "path": "/usr/lib/x86_64-linux-gnu/libdw.so.1",
+      "sha256": "86a59c8071ab57c25daacb275cedae072de83151bd358d4ffdc7844afbd31109"
+    },
+    "libelf": {
+      "bytes": 154408,
+      "path": "/usr/lib/x86_64-linux-gnu/libelf.so.1",
+      "sha256": "d1e1539cc36403b603deb0d4558711e50bc8144eec1d833ece69df81ce01b527"
+    },
+    "parser": {
+      "bytes": 29320,
+      "path": "/home/zhuhe/litchi-performance-0971/tools/protocol_common_0971_v2.py",
+      "sha256": "4ff9af4c64b50896f39a6a30286d445ebe0c9364435888593ade45a11c5cab43"
+    },
+    "perf": {
+      "bytes": 25221960,
+      "path": "/usr/bin/perf",
+      "sha256": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b",
+      "version": "perf version 7.0.14"
+    }
+  },
+  "workload_and_mutation": {
+    "Office_capture_started": false,
+    "diagnostic_shim_compiled_externally": true,
+    "retained_binary_executed": false,
+    "retained_binary_rebuilt": false,
+    "retained_perf_data_mutated": false,
+    "retained_perf_data_read": true,
+    "target_source_mutated": false
+  }
+}

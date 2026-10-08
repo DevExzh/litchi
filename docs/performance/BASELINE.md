@@ -1,5 +1,22 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0972 — offline callchain recovery corrects the 0971 raw diagnosis
+
+[0972](0972-instruction-profile-recovery.md) replays the immutable 0971
+`perf.data` with a sealed external decoder shim after correcting the target ELF
+load bias and executable interval. Stock and no-op controls retain 906 empty
+chains; the corrected decode has 1,387 sample records, zero empty chains,
+11,154 frames, and 78 exact marker chains. All marker frames resolve; 41 have
+the outer `measure_one` frame and 37 do not. The original 100-marker gate
+therefore still fails, and the planned 12-child native cohort is not revived.
+The replay supports a map-metadata/decoder interaction in this artifact, not a
+stack-depth, unwind, source, host, timing, or speedup claim. The raw scanner's
+earlier zero-word inference is withdrawn; raw word matches remain potential
+values only. The [independent review](results/change-0972/receipts/independent-offline-review-0972-final-v1.json)
+passes the offline recovery, and the [author seal](results/change-0972/receipts/dwfl-replay-author-seal-v6.json)
+binds the exact external replay. Production and the sealed 0971 capture remain
+unchanged.
+
 ## 0971 — instruction-profile pilot fails marker admission
 
 [0971](0971-instruction-profile-pilot.md) attempted a bounded diagnostic on
@@ -9,7 +26,7 @@ required child-01 pilot recovered zero exact marker samples, zero marker-period
 share, and zero lost events, so the runner exited with `pilot_gate_failed`
 after one child and enforced no retry. The independent audit confirms rc0,
 valid report/PID/CPU, 1,387 samples, zero lost events, and exact marker ELF
-identity, but no marker in either decode: 906 samples have empty callchains,
+identity, but no marker in the original stock decode: 906 samples have empty callchains,
 618 frames are unresolved, and only 11 samples contain 23 frames from the
 native binary. Attribution is unusable; the underlying unwind failure remains
 unestablished and the 16 KiB setting is not assigned as its cause. The

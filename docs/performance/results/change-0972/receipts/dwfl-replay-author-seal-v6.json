@@ -1,0 +1,97 @@
+{
+  "abi_control": {
+    "caller_pc_captured_at_interposer": true,
+    "errno_restored_after_logging": true,
+    "exact_target_only": true,
+    "header_signature": "Dwfl_Module *dwfl_report_elf(Dwfl*, const char*, const char*, int fd, GElf_Addr base, bool add_p_vaddr)",
+    "no_buildid_alias_rewrite": true
+  },
+  "created_utc": "2026-10-08T03:51:20.631540+00:00",
+  "historical_invalid_v1": {
+    "bytes": 1821,
+    "path": "/home/zhuhe/litchi-performance-0972/receipts/dwfl-v1-invalid-correction-v1.json",
+    "sha256": "012331d05a540491869503afbfd99e6a79b28d429b24f2ca4b474b97c34ed7d4"
+  },
+  "input_invariants": {
+    "all_three_sample_count": 1387,
+    "all_three_total_period": 6935000000,
+    "corrected_marker_period": 390000000,
+    "corrected_marker_samples": 78,
+    "corrected_stack_truncated": 0,
+    "outer_measure_missing": 37,
+    "outer_measure_present": 41,
+    "raw_input_sha_unchanged": "499e3008e6496b01fe09c9cf7f6f2aedbf46c1b24f7697e98289c09460143746",
+    "stock_noop_stderr_byte_identical": true,
+    "stock_noop_stdout_byte_identical": true
+  },
+  "interpretation_guard": {
+    "independent_review_pending": true,
+    "no_source_adoption_claim": true,
+    "no_timing_or_performance_claim": true,
+    "offline_marker_ancestry_recovery": true,
+    "raw_marker_period_share_not_phase_fraction": true
+  },
+  "purpose": "Seal the ABI-correct comparator-aware v6 replay and its immutable raw decode before independent review.",
+  "references": {
+    "commands": {
+      "bytes": 3180,
+      "path": "/home/zhuhe/litchi-performance-0972/commands-dwfl-replay-v6.txt",
+      "sha256": "47c07fef0a6a7d072fd817d10354b5d6d852d457fcad749db2716738ca9de893"
+    },
+    "decode": {
+      "bytes": 353440,
+      "path": "/home/zhuhe/litchi-performance-0972/analysis/dwfl-corrected-decode-v6.json",
+      "sha256": "3b75fdabf79ca7104f24e5deb2e389ecbd94c7a439579cc16a5a8d3c7b42e7db"
+    },
+    "header": {
+      "bytes": 39682,
+      "path": "/home/zhuhe/litchi-performance-0972/header-v2/root/usr/include/elfutils/libdwfl.h",
+      "sha256": "6f9dc2c2f9ca8d691f42f78e7634c2e40750a3af134e8226bd7c5aff395a3657"
+    },
+    "perf": {
+      "bytes": 25221960,
+      "path": "/usr/bin/perf",
+      "sha256": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b"
+    },
+    "raw_input": {
+      "bytes": 23129880,
+      "path": "/home/zhuhe/litchi-performance-0971/capture/instruction-profile-v2/child-01/child-01.perf.data",
+      "sha256": "499e3008e6496b01fe09c9cf7f6f2aedbf46c1b24f7697e98289c09460143746"
+    },
+    "receipt": {
+      "bytes": 11599,
+      "path": "/home/zhuhe/litchi-performance-0972/receipts/dwfl-replay-receipt-v6.json",
+      "sha256": "452ffec504e387b5beea157d755b817a1ce1e282c0a8acc379ddf6bafa429522"
+    },
+    "report": {
+      "bytes": 3441,
+      "path": "/home/zhuhe/litchi-performance-0972/report-dwfl-replay-v6.md",
+      "sha256": "a776535abe695f0c1b046fa27d6ac4f7d0787638a68b1f1c63c09a136e8bf0de"
+    },
+    "retained_binary": {
+      "bytes": 47909224,
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+    },
+    "shared_object": {
+      "bytes": 16592,
+      "path": "/home/zhuhe/litchi-performance-0972/replay-dwfl-v6/dwfl_base_shim_v6.so",
+      "sha256": "de1348268dd283086680973102dccb2e5584db7eb98efc5a87b88fc8a0eec39f"
+    },
+    "source": {
+      "bytes": 8685,
+      "path": "/home/zhuhe/litchi-performance-0972/tools/dwfl_base_shim_v6.c",
+      "sha256": "391ecf6192425ebb7e05e5ce3de4f4fe9be3195e22b9f05b111dad7de6b05311"
+    },
+    "version_script": {
+      "bytes": 107,
+      "path": "/home/zhuhe/litchi-performance-0972/tools/dwfl_base_shim_v6.map",
+      "sha256": "d0a7914c5cb02770073db94dc4d2b207a95ae513b436c661d8a9c9a206aefef6"
+    }
+  },
+  "schema": "litchi.performance.0972.dwfl_replay_author_seal.v1",
+  "scope": "external offline decoder diagnostic; no target workload, rebuild, capture, or source mutation",
+  "status": "sealed",
+  "supersedes": "v5 replay candidate only; v1 remains explicitly invalid and all prior artifacts remain immutable",
+  "version": "v6"
+}
