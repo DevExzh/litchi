@@ -34481,7 +34481,8 @@ fn run_semantic_docx(
                     }
                 }
                 let mut sink = CountingSeekSink::default();
-                let commit = package.publish_document_edit(edit)?;
+                let commit = edit.commit()?;
+                package = commit.package().clone();
                 package.to_stream(&mut sink)?;
                 let duration = started.elapsed();
                 if commit.patch().changed() == selected.is_empty()
@@ -49169,7 +49170,7 @@ fn verify_docx_section_layout_output(
 fn publish_docx_source_edit<W: Write>(
     source: Arc<dyn ReadAt>,
     writer: W,
-) -> Result<(usize, litchi_docx::document::Commit), Box<dyn Error>> {
+) -> Result<(usize, litchi_docx::document::snapshot::Commit), Box<dyn Error>> {
     let package = litchi_docx::source_backed::Package::from_read_at(source)?;
     let target = SemanticShape::Medium.docx_paragraphs() / 2;
     let mut edit = package.edit()?;

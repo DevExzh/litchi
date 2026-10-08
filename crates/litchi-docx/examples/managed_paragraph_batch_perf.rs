@@ -580,7 +580,7 @@ fn build_managed_preflight(
 }
 
 fn stage_edit(
-    edit: &mut litchi_docx::document::Edit,
+    edit: &mut litchi_docx::document::snapshot::Edit,
     fixture: &Fixture,
     mode: EditMode,
 ) -> AnyResult<()> {

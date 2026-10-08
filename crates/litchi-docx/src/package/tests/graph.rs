@@ -376,8 +376,9 @@ fn document_patch_publishes_atomically_and_reopens() {
     let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(litchi_core::Position::new(0), "after and longer")
         .unwrap();
-    let commit = package.publish_document_edit(edit).unwrap();
-    let published = commit.snapshot();
+    let commit = edit.commit().unwrap();
+    package = commit.package().clone();
+    let published = commit.patch().target();
     assert_eq!(
         published
             .paragraph(litchi_core::Position::new(0))
@@ -754,7 +755,7 @@ fn package_root_three_way_transfer_history_and_durable_reopen_are_coupled() {
         .xml_bytes()
         .to_vec();
     assert!(matches!(
-        stale_receiver.publish_document_commit(stale_commit),
+        stale_receiver.apply(stale_commit.patch()),
         Err(crate::document::Error::StaleSource)
     ));
     assert_eq!(
@@ -1246,7 +1247,8 @@ fn exact_source_patch_reuse_keeps_noop_arcs_stale_conflicts_and_scan_errors() {
     let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(litchi_core::Position::new(0), "after and longer")
         .unwrap();
-    let commit = package.publish_document_edit(edit).unwrap();
+    let commit = edit.commit().unwrap();
+    package = commit.package().clone();
     let republished = package.opc.main_document_part().unwrap().blob().to_vec();
     assert!(matches!(
         package.apply(commit.patch()),
@@ -1304,7 +1306,7 @@ fn the_document_snapshot_shares_the_main_part_payload_instead_of_copying_it() {
     let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(litchi_core::Position::new(0), "after and longer")
         .unwrap();
-    package.publish_document_edit(edit).unwrap();
+    package = edit.commit().unwrap().into_package();
     assert_eq!(snapshot.xml_bytes(), source_xml);
     assert!(!std::ptr::eq(
         package.opc.main_document_part().unwrap().blob().as_ptr(),
@@ -1332,7 +1334,7 @@ fn the_compaction_policy_reaches_publication_through_the_package_route() {
     let mut edit = preserving.edit().unwrap();
     edit.replace_paragraph_text(litchi_core::Position::new(1), "two edited")
         .unwrap();
-    preserving.publish_document_edit(edit).unwrap();
+    preserving = edit.commit().unwrap().into_package();
     let preserved = preserving.opc.main_document_part().unwrap().blob().to_vec();
 
     let mut compacting = build();
@@ -1342,7 +1344,7 @@ fn the_compaction_policy_reaches_publication_through_the_package_route() {
         .with_compaction_policy(crate::document::CompactionPolicy::WholeDocument);
     edit.replace_paragraph_text(litchi_core::Position::new(1), "two edited")
         .unwrap();
-    compacting.publish_document_edit(edit).unwrap();
+    compacting = edit.commit().unwrap().into_package();
     let compacted = compacting.opc.main_document_part().unwrap().blob().to_vec();
 
     assert!(

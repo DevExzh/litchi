@@ -30,9 +30,10 @@ use quick_xml::reader::Reader;
 use sha2::{Digest as _, Sha256};
 use thiserror::Error as ThisError;
 
+use crate::document::snapshot::Edit as DocumentEdit;
 use crate::document::{
-    Edit as DocumentEdit, Error as TransactionError, MAX_DOCUMENT_XML_BYTES,
-    Snapshot as DocumentSnapshot, validate_paragraph_text,
+    Error as TransactionError, MAX_DOCUMENT_XML_BYTES, Snapshot as DocumentSnapshot,
+    validate_paragraph_text,
 };
 
 use super::Package;

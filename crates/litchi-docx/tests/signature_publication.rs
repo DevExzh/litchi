@@ -281,3 +281,31 @@ fn opaque_signature_members_allow_noop_but_refuse_raw_and_semantic_changes() {
         snapshot.xml_bytes()
     );
 }
+
+#[test]
+fn owned_commit_enforces_signature_policy_before_returning_a_package() {
+    let original = signed_source();
+    let mut package = Package::from_reader(original.as_slice()).unwrap();
+    let mut noop = package.edit().unwrap().commit().unwrap().into_package();
+    assert!(noop.is_signed());
+    assert_eq!(bytes(&mut noop), original);
+    let mut edit = package.edit().unwrap();
+    edit.accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(0))
+        .unwrap();
+    assert!(edit.commit().is_err());
+    assert_eq!(bytes(&mut package), original);
+    package.unsign();
+    let mut edit = package.edit().unwrap();
+    edit.accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(0))
+        .unwrap();
+    let committed = edit.commit().unwrap().into_package();
+    assert!(!committed.is_signed());
+    assert!(
+        committed
+            .document()
+            .unwrap()
+            .text()
+            .unwrap()
+            .contains("added")
+    );
+}

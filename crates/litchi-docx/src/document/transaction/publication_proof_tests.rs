@@ -217,8 +217,9 @@ fn publishing_with_the_proof_emits_what_publishing_without_it_emits() {
     edit.replace_paragraph_text(Position::new(7), "edited")
         .unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.snapshot().publication_proof().is_some());
-    let published = proven_package.publish_document_commit(commit).unwrap();
+    assert!(commit.patch().target().publication_proof().is_some());
+    let published = commit;
+    proven_package = published.package().clone();
     // The main part now shares the committed snapshot's allocation.
     assert!(std::ptr::eq(
         proven_package
@@ -226,18 +227,18 @@ fn publishing_with_the_proof_emits_what_publishing_without_it_emits() {
             .main_document_part()
             .unwrap()
             .blob(),
-        published.snapshot().xml_bytes()
+        published.patch().target().xml_bytes()
     ));
 
     let mut unproven_package = generated_package(64);
-    let mut edit = unproven_package.edit().unwrap();
+    let mut edit = unproven_package.document_snapshot().unwrap().edit();
     edit.replace_paragraph_text(Position::new(7), "edited")
         .unwrap();
     let mut commit = edit.commit().unwrap();
     commit.snapshot.publication = None;
     commit.patch.after.publication = None;
-    assert!(commit.snapshot().publication_proof().is_none());
-    let _published = unproven_package.publish_document_commit(commit).unwrap();
+    assert!(commit.patch().target().publication_proof().is_none());
+    unproven_package = unproven_package.apply(commit.patch()).unwrap();
 
     assert_eq!(saved(&mut proven_package), saved(&mut unproven_package));
 
@@ -248,7 +249,7 @@ fn publishing_with_the_proof_emits_what_publishing_without_it_emits() {
         assert!(edit.projected().publication_proof().is_none());
         edit.replace_paragraph_text(Position::new(9), "second")
             .unwrap();
-        package.publish_document_edit(edit).unwrap();
+        *package = edit.commit().unwrap().into_package();
     }
     assert_eq!(saved(&mut proven_package), saved(&mut unproven_package));
 }
@@ -295,7 +296,7 @@ fn a_derived_snapshot_never_inherits_a_proof() {
     edit.replace_paragraph_text(Position::new(1), "edited")
         .unwrap();
     let commit = edit.commit().unwrap();
-    let proven = commit.snapshot();
+    let proven = commit.patch().target();
     assert!(proven.publication_proof().is_some());
     // A clone is the same allocation and keeps it.
     assert!(proven.clone().publication_proof().is_some());

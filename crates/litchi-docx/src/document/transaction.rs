@@ -2101,7 +2101,7 @@ impl Operation {
 ///     .edit()?
 ///     .with_compaction_policy(CompactionPolicy::WholeDocument);
 /// edit.replace_paragraph_text(Position::new(0), "hello")?;
-/// package.publish_document_edit(edit)?;
+/// package = edit.commit()?.into_package();
 /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]

@@ -8,6 +8,8 @@
 //! ordinary document snapshot/edit path must retain its source owner and every
 //! candidate owner through the commit and publication boundary.
 
+use litchi_docx::document::snapshot::Commit;
+
 use std::io::{self, Write};
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -18,7 +20,7 @@ use litchi_core::{
     OwnedSource, Position, ReadAt, Resource, SourceVersion,
 };
 use litchi_docx::document::{
-    Commit, Error as TransactionError, RevisionAction, RevisionKind, RevisionSelector,
+    Error as TransactionError, RevisionAction, RevisionKind, RevisionSelector,
 };
 use litchi_docx::paragraph::{Collapsed, Inline, Symbols};
 use litchi_docx::{Error, ReadLimits, source_backed};

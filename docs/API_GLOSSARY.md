@@ -42,13 +42,13 @@ transaction is the bare `Package::edit()`.
 
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
-| Edit entry, primary transaction | `Package::edit()` | `edit_document()` (docx), `opened_presentation_transaction()` (pptx), `Workbook::edit()` (xlsx — moves to `Package`) | ✅ docx eager/source entry name (0018; package-owning commit still pending) · ✅ iWork/xlsx-name · 🔴 pptx/xlsx (W2), odt already `edit` but moves onto `Package` (W3) |
+| Edit entry, primary transaction | `Package::edit()` | `edit_document()` (docx), `opened_presentation_transaction()` (pptx), `Workbook::edit()` (xlsx — moves to `Package`) | ✅ docx eager/source entry name (0018; eager package-bound commit 0022, source pending) · ✅ iWork/xlsx-name · 🔴 pptx/xlsx (W2), odt already `edit` but moves onto `Package` (W3) |
 | Edit entry, scoped family | `Package::edit_x()` | — | ✅ numbers/keynote/pages families |
 | Transaction type | `Edit` | `Transaction` (pptx), `WorkbookEdit` (xlsb) | 🔴 W2 |
 | Commit | `Edit::commit() -> Result<Commit>` | — | ✅ everywhere; shape fixed by the rows below |
-| New snapshot accessor | `Commit::package()` / `Commit::into_package()` | `Commit::snapshot()` (docx/pptx), `Commit::{workbook, into_workbook}` (xlsx) | ✅ iWork · 🔴 W2 |
+| New snapshot accessor | `Commit::package()` / `Commit::into_package()` | `Commit::snapshot()` (docx/pptx), `Commit::{workbook, into_workbook}` (xlsx) | ✅ iWork/docx eager (0022) · 🔴 source-backed DOCX and other W2 |
 | Diagnostics on every commit | `Commit::diagnostics()` | commits without diagnostics (xlsx, pptx) | ✅ docx/iWork · 🔴 xlsx/pptx (W2) |
-| Split commit | `Commit::into_parts() -> (Package, Patch)` | — | ✅ xlsx/docx/pptx exist; name fixed |
+| Split commit | `Commit::into_parts() -> (Package, Patch)` | — | ✅ docx eager (0022); 🔴 source-backed DOCX and remaining owner shapes |
 | Patch application | `Package::apply(&patch)`; scoped `Package::apply_x(&patch)` | `publish_document_commit()`, `apply_document_patch()` (docx), `apply_opened_presentation_commit/patch()` (pptx), `Workbook::apply` (xlsx — moves) | ✅ iWork · ✅ docx eager immutable `apply` (0020); 🔴 source-backed package publication and other W2 owners |
 | No-op introspection | `commit.diagnostics().changed()`; `patch.is_noop()` | `Transaction::is_changed()`, `Commit::is_changed()` (pptx), `Patch::is_empty()` (xlsx) | ✅ iWork/docx · 🔴 W2 |
 | Inverse patch | `Patch::inverse()` | — | ✅ everywhere |
@@ -256,11 +256,11 @@ also handles the package ingress error.
 eager `apply_document_patch` removal (0020). The full
 profile enables `automatic-fonts`, `encryption`, `sign` and `vba-inspection`,
 which include every optional DOCX feature. Neither profile registers the
-complete document family yet: `Commit` still carries a document `Snapshot`,
-not the immutable package required by ADR 0034. The eager read-only
+complete document family yet: eager `Commit` carries the immutable package
+(0022), while source-backed and legacy history retain transitional XML commits. The eager read-only
 projection is now owned (0019), and eager `apply(&patch) -> Result<Package>`
-is immutable (0020). Full immutable package ownership, package-bound commit
-and source-backed publication replacement, `LimitKind`,
+is immutable (0020), and eager package-bound commit is implemented (0022).
+Full immutable package ownership, source-backed publication replacement, `LimitKind`,
 and mutable-writer removal remain pending. Scoped transactions and other
 formats are not marked migrated by this step.
 
@@ -283,3 +283,21 @@ original source. Execution reservations follow the lifetime of retained shares.
 These stream entries remain transitional: the package-bound `Edit`/`Commit` triad
 and immutable source-overlay publication are still pending. No additional full
 transaction family is marked conformant by this step.
+
+## 15. W2 DOCX eager package-bound commit (record 0022)
+
+Root `document::{Edit, Commit}` retain a complete eager package. `commit()`
+validates and publishes through the existing immutable application engine;
+`Commit` exposes `package`, `patch`, `diagnostics`, `into_package` and
+`into_parts -> (Package, Patch)`. Eager `publish_document_edit` and
+`publish_document_commit` are removed. Minimal/full profiles ban their return
+and ban `snapshot` on the canonical commit type.
+
+Standalone XML and source-backed publication explicitly use the transitional
+`document::snapshot::{Edit, Commit}` types. They are distinct nominal types,
+not aliases for the canonical package family. Snapshot composition/history and
+source stream publishers still require owner migration; no complete family is
+registered until that work and `LimitKind` are finished. The root patch still
+uses main-XML equality for ordinary eager sources; full package lineage remains
+required for owner-wide conformance. Broad content-safe Debug cleanup remains
+pending beyond the new canonical Edit/Commit implementations.

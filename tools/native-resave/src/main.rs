@@ -175,7 +175,7 @@ fn generate_docx(output: &Path) -> Result<()> {
     println!("docx source paragraph[0]={before}");
     let mut edit = package.edit()?;
     edit.replace_paragraph_text(position, SENTINEL)?;
-    package.publish_document_edit(edit)?;
+    package = edit.commit()?.into_package();
     package.save(output)?;
     readback_docx(output)
 }

@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0022 | Eager DOCX package-bound Edit/Commit and removal of mutating publication doors | eager primary commit migrated; source overlays, history and full W2 pending |
 | 0021 | Shared source-backed DOCX owners and borrowing stream publication | sharing prerequisite complete; package-bound Edit/Commit pending |
 | 0020 | Cheap eager DOCX package shares and immutable primary patch application | eager apply migrated; package-owning commit W2 work pending |
 | 0019 | Owned eager DOCX read projection and shared physical graph | projection migrated; immutable package and commit W2 work pending |
@@ -223,3 +224,17 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
   managed tests explicitly release the retained source before zero-budget checks.
 - This enables retained source publication; package-bound `Edit`/`Commit`, source
   overlays and canonical immutable publication remain required. See record 0021.
+
+## 0022 — eager DOCX package-bound commit
+
+- Canonical `document::Edit` retains its complete eager source. Its commit
+  validates and publishes a new `Package` with the patch and diagnostics triad.
+- Removed eager `publish_document_edit`/`publish_document_commit`; migrated
+  consumers and enforced removal in minimal/full glossary profiles.
+- Explicit nominal `document::snapshot` types retain the raw XML engine for
+  standalone/source/history callers until their owner migration. Root commits
+  cannot carry only a snapshot or an optional owner.
+- Tests cover retained related parts, source drop, forked edits, chaining,
+  inverse, no-op sharing, later source writer changes and security refusals.
+- Source-overlay owners, snapshot composition/history, full package lineage,
+  limits and writer removal remain required. Evidence and limits are in 0022.

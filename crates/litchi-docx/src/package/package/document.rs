@@ -1,4 +1,4 @@
-//! Mutable document acquisition for the package facade.
+//! Immutable document transactions and legacy history orchestration.
 
 use super::super::model::{Error, MutableDocument, PackURI, Package, Result};
 use super::transfer::{
@@ -27,14 +27,16 @@ enum DocumentPatchSource {
 
 impl Package {
     /// Start the ordinary immutable main-document edit directly from this
-    /// opened package.
+    /// opened package. The edit retains this source; `commit()` returns a new
+    /// package without mutating the caller.
     ///
     /// # Errors
     ///
     /// Returns a typed snapshot error when package state is stale, malformed,
     /// or outside the document transaction bounds.
     pub fn edit(&self) -> std::result::Result<crate::document::Edit, crate::document::Error> {
-        self.document_snapshot().map(|snapshot| snapshot.edit())
+        self.document_snapshot()
+            .map(|snapshot| crate::document::Edit::new(self.clone(), snapshot.edit()))
     }
 
     /// Capture an immutable, source-preserving main-document snapshot.
@@ -221,37 +223,6 @@ impl Package {
         Ok(candidate)
     }
 
-    /// Commit and atomically publish an edit created by [`Self::edit`].
-    ///
-    /// # Errors
-    ///
-    /// Returns a commit, stale-source, compaction, or package-validation error
-    /// without publishing a partial edit.
-    pub fn publish_document_edit(
-        &mut self,
-        edit: crate::document::Edit,
-    ) -> std::result::Result<crate::document::Commit, crate::document::Error> {
-        let commit = edit.commit()?;
-        self.publish_document_commit(commit)
-    }
-
-    /// Atomically publish a previously committed document edit.
-    ///
-    /// This is the common package boundary for ordinary edits, deterministic
-    /// composition, and resolved three-way plans.
-    ///
-    /// # Errors
-    ///
-    /// Returns a stale-source or package-validation error without publishing
-    /// any partial mutation.
-    pub fn publish_document_commit(
-        &mut self,
-        commit: crate::document::Commit,
-    ) -> std::result::Result<crate::document::Commit, crate::document::Error> {
-        self.publish_patch(commit.patch())?;
-        Ok(commit)
-    }
-
     /// Publish a commit and record it in bounded history as one coupled action.
     ///
     /// History capacity is preflighted before package publication, and the
@@ -262,7 +233,7 @@ impl Package {
     /// Returns a stale-source, history-bound, or package-validation error.
     pub fn publish_document_commit_with_history(
         &mut self,
-        commit: crate::document::Commit,
+        commit: crate::document::snapshot::Commit,
         history: &mut crate::document::History,
     ) -> std::result::Result<Vec<crate::document::Snapshot>, crate::document::Error> {
         if history.current().xml_bytes() != commit.patch().source().xml_bytes() {

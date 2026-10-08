@@ -34,6 +34,21 @@
           "name": "apply_document_patch",
           "scope": "litchi_docx",
           "replacement": "use immutable Package::apply(&patch)"
+        },
+        {
+          "name": "publish_document_edit",
+          "scope": "litchi_docx",
+          "replacement": "use Package::edit()?.commit()?.into_package()"
+        },
+        {
+          "name": "publish_document_commit",
+          "scope": "litchi_docx",
+          "replacement": "use Package::edit()?.commit()?.into_package()"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_docx::document::Commit",
+          "replacement": "use Commit::package()"
         }
       ],
       "families": []
@@ -68,6 +83,21 @@
           "name": "apply_document_patch",
           "scope": "litchi_docx",
           "replacement": "use immutable Package::apply(&patch)"
+        },
+        {
+          "name": "publish_document_edit",
+          "scope": "litchi_docx",
+          "replacement": "use Package::edit()?.commit()?.into_package()"
+        },
+        {
+          "name": "publish_document_commit",
+          "scope": "litchi_docx",
+          "replacement": "use Package::edit()?.commit()?.into_package()"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_docx::document::Commit",
+          "replacement": "use Commit::package()"
         }
       ],
       "families": []

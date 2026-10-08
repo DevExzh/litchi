@@ -67,11 +67,12 @@ fn open_path(path: &std::path::Path, options: &OpenOptions) -> Docx {
     }
 }
 
-/// The main-document edit an unsigned handle's editor builder returns.
+/// The source projection retained by either unsigned editor.
 #[track_caller]
-fn retained_edit(docx: &Docx) -> litchi_docx::document::Edit {
+fn retained_source(docx: &Docx) -> litchi_docx::document::Snapshot {
     match docx.edit() {
-        Ok(DocxEditor::Edit(edit)) => *edit,
+        Ok(DocxEditor::Edit(edit)) => edit.source().clone(),
+        Ok(DocxEditor::Source(edit)) => edit.source().clone(),
         other => panic!("expected a main-document edit, got {other:?}"),
     }
 }
@@ -397,17 +398,11 @@ fn editor_is_built_from_either_owner_without_reindexing() {
     let source = open_bytes(bytes.clone(), &OpenOptions::new()).unwrap();
     let eager = open_eager(bytes, &OpenOptions::new()).unwrap();
 
-    let source_edit = retained_edit(&source);
-    let eager_edit = retained_edit(&eager);
-    assert_eq!(source_edit.source().paragraph_count(), 2);
-    assert_eq!(
-        source_edit.source().paragraph_count(),
-        eager_edit.source().paragraph_count()
-    );
-    assert_eq!(
-        source_edit.source().xml_bytes(),
-        eager_edit.source().xml_bytes()
-    );
+    let source_edit = retained_source(&source);
+    let eager_edit = retained_source(&eager);
+    assert_eq!(source_edit.paragraph_count(), 2);
+    assert_eq!(source_edit.paragraph_count(), eager_edit.paragraph_count());
+    assert_eq!(source_edit.xml_bytes(), eager_edit.xml_bytes());
     // Building the editor read only the main part on the source owner.
     assert_eq!(cold_loads(&source), 1);
 }
@@ -421,22 +416,19 @@ fn editor_admits_word_markup_compatibility_on_both_owners() {
         let bytes = std::fs::read(fixture(name)).unwrap();
         let eager = open_eager(bytes.clone(), &OpenOptions::new()).unwrap();
         let source = open_bytes(bytes, &OpenOptions::new()).unwrap();
-        let eager_edit = retained_edit(&eager);
+        let eager_edit = retained_source(&eager);
         let source_edit = match source.edit() {
-            Ok(DocxEditor::Edit(edit)) => *edit,
+            Ok(DocxEditor::Edit(edit)) => edit.source().clone(),
+            Ok(DocxEditor::Source(edit)) => edit.source().clone(),
             other => panic!("{name}: {other:?}"),
         };
-        assert!(source_edit.source().paragraph_count() > 0, "{name}");
+        assert!(source_edit.paragraph_count() > 0, "{name}");
         assert_eq!(
-            source_edit.source().paragraph_count(),
-            eager_edit.source().paragraph_count(),
+            source_edit.paragraph_count(),
+            eager_edit.paragraph_count(),
             "{name}"
         );
-        assert_eq!(
-            source_edit.source().xml_bytes(),
-            eager_edit.source().xml_bytes(),
-            "{name}"
-        );
+        assert_eq!(source_edit.xml_bytes(), eager_edit.xml_bytes(), "{name}");
     }
 }
 

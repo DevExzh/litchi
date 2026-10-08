@@ -92,6 +92,8 @@ pub(crate) enum DocxEditor {
     /// An isolated main-document edit over the handle's own owner, whose
     /// commit publishes through that owner.
     Edit(Box<litchi_docx::document::Edit>),
+    /// Transitional source-backed XML edit awaiting retained overlays.
+    Source(Box<litchi_docx::document::snapshot::Edit>),
     /// After [`Signed::unsign`](crate::Signed::unsign): an owning copy of the
     /// document whose signature the leaf removed explicitly
     /// ([`litchi_docx::Package::unsign`]). Edits start from it
@@ -104,6 +106,7 @@ impl fmt::Debug for DocxEditor {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::Edit(_) => "DocxEditor::Edit",
+            Self::Source(_) => "DocxEditor::Source",
             Self::Unsigned(_) => "DocxEditor::Unsigned",
         })
     }
@@ -456,7 +459,7 @@ impl Docx {
                 self.0
                     .owner
                     .finish(result)
-                    .map(|edit| DocxEditor::Edit(Box::new(edit)))
+                    .map(|edit| DocxEditor::Source(Box::new(edit)))
             },
         }
     }

@@ -77,7 +77,7 @@ fn authored_revision_actions_round_trip_through_borrowed_package_and_durable_inv
         .unwrap();
     let commit = edit.commit().unwrap();
     assert_eq!(commit.patch().operations().len(), 4);
-    let target_xml = commit.snapshot().xml_bytes().to_vec();
+    let target_xml = commit.patch().target().xml_bytes().to_vec();
     let target_text = std::str::from_utf8(&target_xml).unwrap();
     assert!(!target_text.contains("<w:ins"));
     assert!(!target_text.contains("<w:del"));
@@ -87,7 +87,7 @@ fn authored_revision_actions_round_trip_through_borrowed_package_and_durable_inv
     assert!(target_text.contains("restored deletion"));
 
     let durable = commit.patch().to_durable(durable_limits()).unwrap();
-    package.publish_document_commit(commit).unwrap();
+    package = commit.into_package();
 
     let changed_file = NamedTempFile::with_suffix(".docx").unwrap();
     package.save(changed_file.path()).unwrap();

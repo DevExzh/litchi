@@ -83,7 +83,8 @@ pub use tail_append_stream::patch::{
 };
 
 use crate::alt::Data;
-use crate::document::{Commit, Edit, Result as TransactionResult, Snapshot};
+use crate::document::snapshot::{Commit, Edit};
+use crate::document::{Result as TransactionResult, Snapshot};
 use crate::error::{Error, Result};
 use crate::namespace::scan_word_element_ranges;
 use crate::package::validate_document_main_content_type;

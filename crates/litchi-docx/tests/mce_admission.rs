@@ -9,6 +9,8 @@
 //! the same rule to the owning package and the managed route (stage 3), and
 //! keeps every real hazard refused.
 
+use litchi_docx::document::snapshot::Edit;
+
 use std::io::Cursor;
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::Arc;
@@ -17,7 +19,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, Position,
     Resource,
 };
-use litchi_docx::document::{Edit, Error as TransactionError, Snapshot};
+use litchi_docx::document::{Error as TransactionError, Snapshot};
 use litchi_docx::{Error, Package, ReadLimits, source_backed};
 use litchi_ooxml_common::mce::admission::{Admission, admit};
 use litchi_ooxml_common::mce::{self, Capabilities};
@@ -161,6 +163,19 @@ fn first_edit(edit: &mut Edit) {
     edit.insert_paragraph(Position::new(count), "UO-0011 appended")
         .unwrap();
 }
+fn first_eager_edit(edit: &mut litchi_docx::document::Edit) {
+    let count = edit.source().paragraph_count();
+    for position in 0..count {
+        if edit
+            .replace_paragraph_text(Position::new(position), "UO-0011 replaced")
+            .is_ok()
+        {
+            return;
+        }
+    }
+    edit.insert_paragraph(Position::new(count), "UO-0011 appended")
+        .unwrap();
+}
 
 fn is_protection_refusal(error: &TransactionError) -> bool {
     matches!(
@@ -225,13 +240,12 @@ fn source_backed_edits_publish_what_the_eager_owner_publishes() {
         let mut published = Vec::new();
         let source_result = package.publish_document_commit_to_stream(&mut published, &commit);
 
-        let mut owner = eager(&original);
+        let owner = eager(&original);
         let mut edit = owner
             .edit()
             .unwrap_or_else(|error| panic!("{name}: {error}"));
-        first_edit(&mut edit);
-        let commit = edit.commit().unwrap();
-        let eager_result = owner.publish_document_commit(commit);
+        first_eager_edit(&mut edit);
+        let eager_result = edit.commit();
 
         if protected {
             // One protection policy, whichever owner holds the document.
@@ -253,7 +267,9 @@ fn source_backed_edits_publish_what_the_eager_owner_publishes() {
             continue;
         }
         source_result.unwrap_or_else(|error| panic!("{name}: {error}"));
-        eager_result.unwrap_or_else(|error| panic!("{name}: {error}"));
+        let mut owner = eager_result
+            .unwrap_or_else(|error| panic!("{name}: {error}"))
+            .into_package();
         let mut saved = Vec::new();
         owner.to_stream(&mut saved).unwrap();
 
@@ -298,10 +314,10 @@ fn exact_no_ops_republish_every_fixture_byte_for_byte() {
             .unwrap_or_else(|error| panic!("{name}: {error}"));
         assert_eq!(published, original, "{name}");
 
-        let mut owner = eager(&original);
+        let owner = eager(&original);
         let before = owner.document_snapshot().unwrap();
         let commit = owner.edit().unwrap().commit().unwrap();
-        let after = owner.publish_document_commit(commit).unwrap();
+        let after = commit;
         assert_eq!(
             after.patch().source().xml_bytes(),
             before.xml_bytes(),
@@ -583,9 +599,7 @@ fn witness_matrix_on_both_owners_and_the_managed_route() {
                 source_owner
                     .publish_document_commit_to_stream(&mut published, &commit)
                     .unwrap();
-                owner
-                    .publish_document_commit(eager_edit.commit().unwrap())
-                    .unwrap();
+                owner = eager_edit.commit().unwrap().into_package();
                 let mut saved = Vec::new();
                 owner.to_stream(&mut saved).unwrap();
                 assert_eq!(main_part(&published), main_part(&saved), "{label}");
